@@ -24,6 +24,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 
 #define HIP_CHECK(stat)                                                                       \
@@ -111,6 +112,21 @@ int main(int argc, char* argv[])
 
     ROCSPARSE_CHECK(rocsparse_shyb2csr(
         handle, descr, hyb, dcsr_val2, dcsr_row_ptr2, dcsr_col_ind2, temp_buffer));
+
+    // Copy result back to host and print
+    rocsparse_int* hcsr_row_ptr2 = (rocsparse_int*)malloc(sizeof(rocsparse_int) * (m + 1));
+
+    HIP_CHECK(hipMemcpy(
+        hcsr_row_ptr2, dcsr_row_ptr2, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
+
+    printf("Converted CSR row_ptr: ");
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        printf("%d ", hcsr_row_ptr2[i]);
+    }
+    printf("\n");
+
+    free(hcsr_row_ptr2);
 
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr));

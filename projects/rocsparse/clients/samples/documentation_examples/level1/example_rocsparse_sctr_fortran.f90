@@ -144,8 +144,9 @@ program example_fortran_sctr
     call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
 
 !   Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+!   Commented out to avoid contaminating numerical output
+!   write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
+!       mod(version / 100, 1000), '.', mod(version, 100)
 
 !   Call ssctr
     call ROCSPARSE_CHECK(rocsparse_ssctr(handle, &

@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -60,9 +62,9 @@ int main()
     rocsparse_int nnz_A = 8;
 
     // Define host arrays
-    rocsparse_int h_csr_row_ptr_A[] = {0, 3, 5, 8};
-    rocsparse_int h_csr_col_ind_A[] = {0, 1, 3, 1, 2, 0, 3, 4};
-    float         h_csr_val_A[]     = {1, 0, 3, 4, 0, 6, 7, 0};
+    std::vector<rocsparse_int> h_csr_row_ptr_A = {0, 3, 5, 8};
+    std::vector<rocsparse_int> h_csr_col_ind_A = {0, 1, 3, 1, 2, 0, 3, 4};
+    std::vector<float> h_csr_val_A = {1, 0, 3, 4, 0, 6, 7, 0};
 
     // Allocate and initialize device memory for matrix A
     rocsparse_int* d_csr_row_ptr_A;
@@ -74,10 +76,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_A, sizeof(float) * nnz_A));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr_A, h_csr_row_ptr_A, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr_A, h_csr_row_ptr_A.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_A, h_csr_col_ind_A, sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val_A, h_csr_val_A, sizeof(float) * nnz_A, hipMemcpyHostToDevice));
+        d_csr_col_ind_A, h_csr_col_ind_A.data(), sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val_A, h_csr_val_A.data(), sizeof(float) * nnz_A, hipMemcpyHostToDevice));
 
     // Allocate memory for the row pointer array of the compressed CSR matrix
     rocsparse_int* d_csr_row_ptr_C;
@@ -116,6 +118,22 @@ int main()
                                                 d_csr_row_ptr_C,
                                                 d_csr_col_ind_C,
                                                 tol));
+
+    // Copy result back to host and print
+    std::vector<rocsparse_int> h_csr_row_ptr_C(m + 1);
+
+    HIP_CHECK(hipMemcpy(h_csr_row_ptr_C.data(),
+                        d_csr_row_ptr_C,
+                        sizeof(rocsparse_int) * (m + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "nnz_C after compression: " << nnz_C << std::endl;
+    std::cout << "CSR row_ptr_C: ";
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        std::cout << h_csr_row_ptr_C[i] << " ";
+    }
+    std::cout << std::endl;
 
     // Clean up
     HIP_CHECK(hipFree(d_csr_row_ptr_A));

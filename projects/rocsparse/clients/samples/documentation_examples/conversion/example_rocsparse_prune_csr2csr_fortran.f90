@@ -84,6 +84,7 @@ program example_fortran_prune_csr2csr
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, nnz_A
@@ -166,6 +167,24 @@ program example_fortran_prune_csr2csr
                                                    dcsr_row_ptr_A, dcsr_col_ind_A, &
                                                    c_loc(threshold), descr_C, dcsr_val_C, &
                                                    dcsr_row_ptr_C, dcsr_col_ind_C, temp_buffer))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: hcsr_row_ptr_C(:)
+        integer :: i
+
+        allocate(hcsr_row_ptr_C(m + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(hcsr_row_ptr_C), dcsr_row_ptr_C, int(m + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A,I0)') 'nnz_C after pruning: ', nnz_C
+        write(*,fmt='(A)',advance='no') 'CSR row_ptr: '
+        do i = 1, m + 1
+            write(*,fmt='(I0,A)',advance='no') hcsr_row_ptr_C(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(hcsr_row_ptr_C)
+    end block
 
     ! Destroy rocSPARSE handles
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))

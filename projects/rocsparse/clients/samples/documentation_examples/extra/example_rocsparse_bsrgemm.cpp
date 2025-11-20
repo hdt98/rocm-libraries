@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -82,17 +84,17 @@ int main()
     rocsparse_int nnzb_B = 3; // Number of non-zero blocks in B
     rocsparse_int nnzb_D = 3; // Number of non-zero blocks in D
 
-    rocsparse_int h_bsr_row_ptr_A[] = {0, 1, 3};
-    rocsparse_int h_bsr_col_ind_A[] = {0, 0, 1};
-    float         h_bsr_val_A[]     = {1, 0, 4, 2, 0, 3, 5, 0, 0, 0, 0, 9};
+    std::vector<rocsparse_int> h_bsr_row_ptr_A = {0, 1, 3};
+    std::vector<rocsparse_int> h_bsr_col_ind_A = {0, 0, 1};
+    std::vector<float> h_bsr_val_A = {1, 0, 4, 2, 0, 3, 5, 0, 0, 0, 0, 9};
 
-    rocsparse_int h_bsr_row_ptr_B[] = {0, 1, 3};
-    rocsparse_int h_bsr_col_ind_B[] = {0, 0, 1};
-    float         h_bsr_val_B[]     = {0, 0, 0, 0, 0, 0, 7, 0, 8, 6, 0, 0};
+    std::vector<rocsparse_int> h_bsr_row_ptr_B = {0, 1, 3};
+    std::vector<rocsparse_int> h_bsr_col_ind_B = {0, 0, 1};
+    std::vector<float> h_bsr_val_B = {0, 0, 0, 0, 0, 0, 7, 0, 8, 6, 0, 0};
 
-    rocsparse_int h_bsr_row_ptr_D[] = {0, 1, 3};
-    rocsparse_int h_bsr_col_ind_D[] = {0, 0, 1};
-    float         h_bsr_val_D[]     = {0, 0, 0, 0, 0, 0, 7, 0, 8, 6, 0, 0};
+    std::vector<rocsparse_int> h_bsr_row_ptr_D = {0, 1, 3};
+    std::vector<rocsparse_int> h_bsr_col_ind_D = {0, 0, 1};
+    std::vector<float> h_bsr_val_D = {0, 0, 0, 0, 0, 0, 7, 0, 8, 6, 0, 0};
 
     // Allocate device memory for BSR matrices A, B, and D
     rocsparse_int* d_bsr_row_ptr_A;
@@ -104,11 +106,11 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_bsr_val_A, sizeof(float) * nnzb_A * block_dim * block_dim));
 
     HIP_CHECK(hipMemcpy(
-        d_bsr_row_ptr_A, h_bsr_row_ptr_A, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+        d_bsr_row_ptr_A, h_bsr_row_ptr_A.data(), sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_bsr_col_ind_A, h_bsr_col_ind_A, sizeof(rocsparse_int) * nnzb_A, hipMemcpyHostToDevice));
+        d_bsr_col_ind_A, h_bsr_col_ind_A.data(), sizeof(rocsparse_int) * nnzb_A, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(d_bsr_val_A,
-                        h_bsr_val_A,
+                        h_bsr_val_A.data(),
                         sizeof(float) * nnzb_A * block_dim * block_dim,
                         hipMemcpyHostToDevice));
 
@@ -121,11 +123,11 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_bsr_val_B, sizeof(float) * nnzb_B * block_dim * block_dim));
 
     HIP_CHECK(hipMemcpy(
-        d_bsr_row_ptr_B, h_bsr_row_ptr_B, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+        d_bsr_row_ptr_B, h_bsr_row_ptr_B.data(), sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_bsr_col_ind_B, h_bsr_col_ind_B, sizeof(rocsparse_int) * nnzb_B, hipMemcpyHostToDevice));
+        d_bsr_col_ind_B, h_bsr_col_ind_B.data(), sizeof(rocsparse_int) * nnzb_B, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(d_bsr_val_B,
-                        h_bsr_val_B,
+                        h_bsr_val_B.data(),
                         sizeof(float) * nnzb_B * block_dim * block_dim,
                         hipMemcpyHostToDevice));
 
@@ -138,11 +140,11 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_bsr_val_D, sizeof(float) * nnzb_D * block_dim * block_dim));
 
     HIP_CHECK(hipMemcpy(
-        d_bsr_row_ptr_D, h_bsr_row_ptr_D, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+        d_bsr_row_ptr_D, h_bsr_row_ptr_D.data(), sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_bsr_col_ind_D, h_bsr_col_ind_D, sizeof(rocsparse_int) * nnzb_D, hipMemcpyHostToDevice));
+        d_bsr_col_ind_D, h_bsr_col_ind_D.data(), sizeof(rocsparse_int) * nnzb_D, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(d_bsr_val_D,
-                        h_bsr_val_D,
+                        h_bsr_val_D.data(),
                         sizeof(float) * nnzb_D * block_dim * block_dim,
                         hipMemcpyHostToDevice));
 

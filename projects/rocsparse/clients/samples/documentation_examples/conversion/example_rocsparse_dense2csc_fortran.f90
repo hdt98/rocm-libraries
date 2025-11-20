@@ -72,10 +72,10 @@ program example_fortran_dense2csc
             integer(c_size_t), value :: size; integer(c_int), value :: kind
         end function
     end interface
-    integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyHostToDevice = 1, hipMemcpyDeviceToHost = 2
     
     type(c_ptr) :: handle
-    integer :: version
+    integer :: version, i, j
     integer(c_int) :: m, n
     integer(c_int), target :: nnz_A
     real(c_float), dimension(9), target :: hdense
@@ -88,8 +88,9 @@ program example_fortran_dense2csc
     call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
 
     ! Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+    ! Commented out to avoid contaminating numerical output
+    ! write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
+    !     mod(version / 100, 1000), '.', mod(version, 100)
 
 
 
@@ -108,8 +109,36 @@ program example_fortran_dense2csc
     call ROCSPARSE_CHECK(rocsparse_sdense2csc(handle, m, n, descr, ddense, m, dnnz_per_column, &
                                                dcsc_val, dcsc_col_ptr, dcsc_row_ind))
 
-    call HIP_CHECK(hipFree(dcsc_col_ptr)); call HIP_CHECK(hipFree(dcsc_row_ind))
-    call HIP_CHECK(hipFree(dcsc_val)); call HIP_CHECK(hipFree(dnnz_per_column))
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: hcsc_col_ptr(:), hcsc_row_ind(:)
+        real(c_float), allocatable, target :: hcsc_val(:)
+
+        allocate(hcsc_col_ptr(n + 1))
+        allocate(hcsc_row_ind(nnz_A))
+        allocate(hcsc_val(nnz_A))
+
+        call HIP_CHECK(hipMemcpy(c_loc(hcsc_col_ptr), dcsc_col_ptr, int(n + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(hcsc_row_ind), dcsc_row_ind, int(nnz_A, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(hcsc_val), dcsc_val, int(nnz_A, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A)') 'CSC format:'
+        do i = 1, n
+            do j = hcsc_col_ptr(i) + 1, hcsc_col_ptr(i + 1)
+                write(*,fmt='(A,I0,A,I0,A,F0.0)') 'Col: ', i - 1, ', Row: ', hcsc_row_ind(j), ', Val: ', hcsc_val(j)
+            end do
+        end do
+
+        deallocate(hcsc_col_ptr)
+        deallocate(hcsc_row_ind)
+        deallocate(hcsc_val)
+    end block
+
+    call HIP_CHECK(hipFree(ddense))
+    call HIP_CHECK(hipFree(dnnz_per_column))
+    call HIP_CHECK(hipFree(dcsc_col_ptr))
+    call HIP_CHECK(hipFree(dcsc_row_ind))
+    call HIP_CHECK(hipFree(dcsc_val))
     call ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr))
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))
 

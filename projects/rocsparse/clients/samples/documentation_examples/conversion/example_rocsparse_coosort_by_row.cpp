@@ -98,6 +98,23 @@ int main()
     ROCSPARSE_CHECK(
         rocsparse_sgthr(handle, nnz, dcoo_val, dcoo_val_sorted, perm, rocsparse_index_base_zero));
 
+    // Copy sorted result back to host and print
+    std::vector<float>         hcoo_val_sorted(nnz);
+
+    HIP_CHECK(hipMemcpy(
+        hcoo_row_ind.data(), dcoo_row_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        hcoo_col_ind.data(), dcoo_col_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(
+        hipMemcpy(hcoo_val_sorted.data(), dcoo_val_sorted, sizeof(float) * nnz, hipMemcpyDeviceToHost));
+
+    std::cout << "Sorted COO matrix (by row):" << std::endl;
+    for(rocsparse_int i = 0; i < nnz; ++i)
+    {
+        std::cout << "(" << hcoo_row_ind[i] << ", " << hcoo_col_ind[i] << "): " << hcoo_val_sorted[i]
+                  << std::endl;
+    }
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
 
     // Clean up

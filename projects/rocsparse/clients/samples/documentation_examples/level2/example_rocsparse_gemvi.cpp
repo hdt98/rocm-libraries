@@ -22,6 +22,7 @@
  * ************************************************************************ */
 
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -60,19 +61,19 @@ int main()
 
     // Dense matrix A in column-major
     rocsparse_int lda    = m;
-    double        hA[15] = {9, 14, 19, 10, 15, 20, 11, 16, 21, 12, 17, 22, 13, 18, 23};
+    std::vector<double> hA = {9, 14, 19, 10, 15, 20, 11, 16, 21, 12, 17, 22, 13, 18, 23};
 
     // Number of non-zero entries
     rocsparse_int nnz = 3;
 
     // Vector x indices
-    rocsparse_int hx_ind[3] = {0, 1, 3};
+    std::vector<rocsparse_int> hx_ind = {0, 1, 3};
 
     // Vector x values
-    double hx_val[3] = {1, 2, 3};
+    std::vector<double> hx_val = {1, 2, 3};
 
     // Vector y values
-    double hy[3] = {4, 5, 6};
+    std::vector<double> hy = {4, 5, 6};
 
     // Scalar alpha and beta
     double alpha = 3.7;
@@ -94,10 +95,10 @@ int main()
     HIP_CHECK(hipMalloc(&dx_val, sizeof(double) * nnz));
     HIP_CHECK(hipMalloc(&dy, sizeof(double) * m));
 
-    HIP_CHECK(hipMemcpy(dA, hA, sizeof(double) * m * n, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx_ind, hx_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx_val, hx_val, sizeof(double) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dy, hy, sizeof(double) * m, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dA, hA.data(), sizeof(double) * m * n, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_ind, hx_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_val, hx_val.data(), sizeof(double) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy.data(), sizeof(double) * m, hipMemcpyHostToDevice));
 
     // Obtain buffer size
     size_t buffer_size;
@@ -111,7 +112,7 @@ int main()
         handle, trans, m, n, &alpha, dA, lda, nnz, dx_val, dx_ind, &beta, dy, base, buffer));
 
     // Copy result back to host
-    HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(double) * m, hipMemcpyDeviceToHost));
 
     std::cout << "hy" << std::endl;
     for(size_t i = 0; i < m; i++)

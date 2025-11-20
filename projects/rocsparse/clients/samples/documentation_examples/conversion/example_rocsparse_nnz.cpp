@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -57,7 +59,7 @@ int main()
     //     1 2 0 3 0
     // A = 0 4 5 0 0
     //     6 0 0 7 8
-    float hdense_A[15] = {
+    std::vector<float> hdense_A = {
         1.0f, 0.0f, 6.0f, 2.0f, 4.0f, 0.0f, 0.0f, 5.0f, 0.0f, 3.0f, 0.0f, 7.0f, 0.0f, 0.0f, 8.0f};
 
     rocsparse_int       m   = 3;
@@ -66,7 +68,7 @@ int main()
 
     float* ddense_A = nullptr;
     HIP_CHECK(hipMalloc((void**)&ddense_A, sizeof(float) * m * n));
-    HIP_CHECK(hipMemcpy(ddense_A, hdense_A, sizeof(float) * m * n, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(ddense_A, hdense_A.data(), sizeof(float) * m * n, hipMemcpyHostToDevice));
 
     // Allocate memory for the nnz_per_row_columns array
     rocsparse_int* dnnz_per_row;
@@ -75,10 +77,19 @@ int main()
     rocsparse_int nnz_A;
     ROCSPARSE_CHECK(rocsparse_snnz(handle, dir, m, n, descr, ddense_A, m, dnnz_per_row, &nnz_A));
 
+    std::cout << "nnz_A: " << nnz_A << std::endl;
+
     // Copy result back to host
-    rocsparse_int hnnz_per_row[3];
+    std::vector<rocsparse_int> hnnz_per_row(m);
     HIP_CHECK(
-        hipMemcpy(hnnz_per_row, dnnz_per_row, sizeof(rocsparse_int) * m, hipMemcpyDeviceToHost));
+        hipMemcpy(hnnz_per_row.data(), dnnz_per_row, sizeof(rocsparse_int) * m, hipMemcpyDeviceToHost));
+
+    std::cout << "hnnz_per_row" << std::endl;
+    for(rocsparse_int i = 0; i < m; i++)
+    {
+        std::cout << hnnz_per_row[i] << " ";
+    }
+    std::cout << "" << std::endl;
 
     HIP_CHECK(hipFree(ddense_A));
     HIP_CHECK(hipFree(dnnz_per_row));

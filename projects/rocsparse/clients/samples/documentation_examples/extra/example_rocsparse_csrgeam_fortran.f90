@@ -121,8 +121,9 @@ program example_fortran_csrgeam
     call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
 
     ! Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+    ! Commented out to avoid contaminating numerical output
+    ! write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
+    !     mod(version / 100, 1000), '.', mod(version, 100)
 
     ! Create matrix descriptors
     call ROCSPARSE_CHECK(rocsparse_create_mat_descr(descr_A))
@@ -157,6 +158,47 @@ program example_fortran_csrgeam
                                              d_csr_row_ptr_C, d_csr_col_ind_C))
 
     write(*,fmt='(A,I0)') 'nnz_C = ', nnz_C
+
+    ! Copy C matrix result back to host and print
+    block
+        integer, allocatable, target :: h_csr_row_ptr_C(:), h_csr_col_ind_C(:)
+        real(c_float), allocatable, target :: h_csr_val_C(:)
+        real(c_float), allocatable :: h_temp(:)
+        integer :: i, j, start_idx, end_idx
+
+        allocate(h_csr_row_ptr_C(m + 1))
+        allocate(h_csr_col_ind_C(nnz_C))
+        allocate(h_csr_val_C(nnz_C))
+
+        call HIP_CHECK(hipMemcpy(c_loc(h_csr_row_ptr_C), d_csr_row_ptr_C, int(m + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csr_col_ind_C), d_csr_col_ind_C, int(nnz_C, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csr_val_C), d_csr_val_C, int(nnz_C, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,*) 'C'
+        do i = 1, m
+            start_idx = h_csr_row_ptr_C(i) + 1
+            end_idx = h_csr_row_ptr_C(i + 1)
+
+            allocate(h_temp(n))
+            h_temp = 0.0
+
+            do j = start_idx, end_idx
+                h_temp(h_csr_col_ind_C(j) + 1) = h_csr_val_C(j)
+            end do
+
+            do j = 1, n
+                write(*,fmt='(F0.1,A)',advance='no') h_temp(j), ' '
+            end do
+            write(*,*)
+
+            deallocate(h_temp)
+        end do
+        write(*,*)
+
+        deallocate(h_csr_row_ptr_C)
+        deallocate(h_csr_col_ind_C)
+        deallocate(h_csr_val_C)
+    end block
 
     call ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_C))
     call ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_B))

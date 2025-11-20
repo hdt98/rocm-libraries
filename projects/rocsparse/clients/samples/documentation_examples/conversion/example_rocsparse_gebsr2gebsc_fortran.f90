@@ -84,6 +84,7 @@ program example_fortran_gebsr2gebsc
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: mb_A, nb_A, nnzb_A, row_block_dim, col_block_dim
@@ -161,6 +162,24 @@ program example_fortran_gebsr2gebsc
                                                  col_block_dim, dbsr_val_T, dbsr_col_ind_T, &
                                                  dbsr_row_ptr_T, rocsparse_action_numeric, &
                                                  rocsparse_index_base_zero, temp_buffer))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: hbsr_row_ptr_T(:)
+        integer :: i
+
+        allocate(hbsr_row_ptr_T(mb_T + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(hbsr_row_ptr_T), dbsr_row_ptr_T, &
+            int(mb_T + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A)',advance='no') 'GEBSC col_ptr: '
+        do i = 1, mb_T + 1
+            write(*,fmt='(I0,A)',advance='no') hbsr_row_ptr_T(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(hbsr_row_ptr_T)
+    end block
 
     ! Clear rocSPARSE handle
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))

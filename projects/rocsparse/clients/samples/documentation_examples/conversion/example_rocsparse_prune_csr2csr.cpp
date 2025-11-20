@@ -148,6 +148,27 @@ int main()
                                              dcsr_col_ind_C,
                                              temp_buffer));
 
+    // Copy result back to host and print
+    std::vector<rocsparse_int> hcsr_row_ptr_C(m + 1);
+    std::vector<rocsparse_int> hcsr_col_ind_C(nnz_C);
+    std::vector<float>         hcsr_val_C(nnz_C);
+
+    HIP_CHECK(hipMemcpy(hcsr_row_ptr_C.data(),
+                        dcsr_row_ptr_C,
+                        sizeof(rocsparse_int) * (m + 1),
+                        hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        hcsr_col_ind_C.data(), dcsr_col_ind_C, sizeof(rocsparse_int) * nnz_C, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hcsr_val_C.data(), dcsr_val_C, sizeof(float) * nnz_C, hipMemcpyDeviceToHost));
+
+    std::cout << "nnz_C after pruning: " << nnz_C << std::endl;
+    std::cout << "CSR row_ptr: ";
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        std::cout << hcsr_row_ptr_C[i] << " ";
+    }
+    std::cout << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_A));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_C));

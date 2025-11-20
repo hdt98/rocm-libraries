@@ -76,10 +76,19 @@ int main(int argc, char* argv[])
     rocsparse_int nnz_A;
     ROCSPARSE_CHECK(rocsparse_snnz(handle, dir, m, n, descr, ddense_A, m, dnnz_per_row, &nnz_A));
 
+    printf("nnz_A: %d\n", nnz_A);
+
     // Copy result back to host
     rocsparse_int hnnz_per_row[3];
     HIP_CHECK(
         hipMemcpy(hnnz_per_row, dnnz_per_row, sizeof(rocsparse_int) * m, hipMemcpyDeviceToHost));
+
+    printf("hnnz_per_row\n");
+    for(rocsparse_int i = 0; i < m; i++)
+    {
+        printf("%d ", hnnz_per_row[i]);
+    }
+    printf("\n");
 
     HIP_CHECK(hipFree(ddense_A));
     HIP_CHECK(hipFree(dnnz_per_row));

@@ -149,6 +149,10 @@ program example_fortran_csr2ell
                                             d_csr_col_ind, ell_descr, ell_width, d_ell_val, &
                                             d_ell_col_ind))
 
+    ! Print results
+    write(*,fmt='(A,I0)') 'ell_width: ', ell_width
+    write(*,fmt='(A,I0)') 'ell_nnz: ', ell_nnz
+
     ! Clean up
     call HIP_CHECK(hipFree(d_csr_row_ptr))
     call HIP_CHECK(hipFree(d_csr_col_ind))

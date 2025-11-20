@@ -84,6 +84,7 @@ program example_fortran_csrsort
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, nnz
@@ -146,6 +147,25 @@ program example_fortran_csrsort
     call HIP_CHECK(hipMalloc(d_csr_val_sorted, int(nnz, c_size_t) * 4))
     call ROCSPARSE_CHECK(rocsparse_sgthr(handle, nnz, d_csr_val, d_csr_val_sorted, perm, &
                                          rocsparse_index_base_zero))
+
+    ! Copy sorted result back to host and print
+    block
+        integer, allocatable, target :: h_csr_row_ptr(:)
+        integer :: i
+
+        allocate(h_csr_row_ptr(m + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csr_row_ptr), d_csr_row_ptr, &
+            int(m + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,*) 'Sorted CSR matrix:'
+        write(*,fmt='(A)',advance='no') 'row_ptr: '
+        do i = 1, m + 1
+            write(*,fmt='(I0,A)',advance='no') h_csr_row_ptr(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(h_csr_row_ptr)
+    end block
 
     ! Clean up device memory
     call HIP_CHECK(hipFree(temp_buffer))

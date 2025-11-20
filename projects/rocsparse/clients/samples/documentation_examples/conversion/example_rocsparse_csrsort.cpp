@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -57,9 +59,9 @@ int main()
     rocsparse_int nnz = 9;
 
     // Define host arrays
-    rocsparse_int h_csr_row_ptr[] = {0, 3, 6, 9};
-    rocsparse_int h_csr_col_ind[] = {2, 0, 1, 0, 1, 2, 0, 2, 1};
-    float         h_csr_val[]     = {3, 1, 2, 4, 5, 6, 7, 9, 8};
+    std::vector<rocsparse_int> h_csr_row_ptr = {0, 3, 6, 9};
+    std::vector<rocsparse_int> h_csr_col_ind = {2, 0, 1, 0, 1, 2, 0, 2, 1};
+    std::vector<float> h_csr_val = {3, 1, 2, 4, 5, 6, 7, 9, 8};
 
     // Allocate and initialize device memory for CSR matrix
     rocsparse_int* d_csr_row_ptr;
@@ -71,10 +73,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val, sizeof(float) * nnz));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr, h_csr_row_ptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr, h_csr_row_ptr.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind, h_csr_col_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val, h_csr_val, sizeof(float) * nnz, hipMemcpyHostToDevice));
+        d_csr_col_ind, h_csr_col_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val, h_csr_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
 
     // Create matrix descriptor
     rocsparse_mat_descr descr;
@@ -101,6 +103,20 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_sorted, sizeof(float) * nnz));
     ROCSPARSE_CHECK(
         rocsparse_sgthr(handle, nnz, d_csr_val, d_csr_val_sorted, perm, rocsparse_index_base_zero));
+
+    // Copy sorted result back to host and print
+    HIP_CHECK(hipMemcpy(h_csr_row_ptr.data(),
+                        d_csr_row_ptr,
+                        sizeof(rocsparse_int) * (m + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "Sorted CSR matrix:" << std::endl;
+    std::cout << "row_ptr: ";
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        std::cout << h_csr_row_ptr[i] << " ";
+    }
+    std::cout << std::endl;
 
     // Clean up
     HIP_CHECK(hipFree(temp_buffer));

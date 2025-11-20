@@ -25,6 +25,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -68,12 +69,12 @@ int main(int argc, char* argv[])
     rocsparse_int* d_csc_row_ind;
     float*         d_csc_val;
 
-    HIP_CHECK(hipMalloc((void**)&d_csc_col_ptr, sizeof(rocsparse_int) * (m + 1)));
+    HIP_CHECK(hipMalloc((void**)&d_csc_col_ptr, sizeof(rocsparse_int) * (n + 1)));
     HIP_CHECK(hipMalloc((void**)&d_csc_row_ind, sizeof(rocsparse_int) * nnz));
     HIP_CHECK(hipMalloc((void**)&d_csc_val, sizeof(float) * nnz));
 
     HIP_CHECK(hipMemcpy(
-        d_csc_col_ptr, h_csc_col_ptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csc_col_ptr, h_csc_col_ptr, sizeof(rocsparse_int) * (n + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
         d_csc_row_ind, h_csc_row_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(d_csc_val, h_csc_val, sizeof(float) * nnz, hipMemcpyHostToDevice));
@@ -103,6 +104,18 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMalloc((void**)&d_csc_val_sorted, sizeof(float) * nnz));
     ROCSPARSE_CHECK(rocsparse_sgthr(
         handle, nnz, d_csc_val, d_csc_val_sorted, d_perm, rocsparse_index_base_zero));
+
+    // Copy sorted result back to host and print
+    HIP_CHECK(hipMemcpy(
+        h_csc_col_ptr, d_csc_col_ptr, sizeof(rocsparse_int) * (n + 1), hipMemcpyDeviceToHost));
+
+    printf("Sorted CSC matrix:\n");
+    printf("col_ptr: ");
+    for(rocsparse_int i = 0; i < n + 1; ++i)
+    {
+        printf("%d ", h_csc_col_ptr[i]);
+    }
+    printf("\n");
 
     // Clean up
     HIP_CHECK(hipFree(d_temp_buffer));

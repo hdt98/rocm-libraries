@@ -69,6 +69,10 @@ int main(int argc, char* argv[])
     double hbsr_val[] = {2.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0};
 
     double hx[mb * block_dim];
+    for(int i = 0; i < mb * block_dim; i++)
+    {
+        hx[i] = 1.0;
+    }
 
     int*    dbsr_row_ptr;
     int*    dbsr_col_ind;
@@ -274,7 +278,7 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * mb * block_dim, hipMemcpyDeviceToHost));
 
     printf("hy\n");
-    for(size_t i = 0; i < sizeof(hy)/sizeof(hy[0]); i++)
+    for(int i = 0; i < mb * block_dim; i++)
     {
         printf("%f ", hy[i]);
     }

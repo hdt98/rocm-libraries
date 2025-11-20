@@ -24,6 +24,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 
 #define HIP_CHECK(stat)                                                                       \
@@ -151,6 +152,23 @@ int main(int argc, char* argv[])
                                                            dcsr_col_ind_C,
                                                            info,
                                                            temp_buffer));
+
+    // Copy result back to host and print
+    rocsparse_int* hcsr_row_ptr_C = (rocsparse_int*)malloc(sizeof(rocsparse_int) * (m + 1));
+
+    HIP_CHECK(hipMemcpy(
+        hcsr_row_ptr_C, dcsr_row_ptr_C, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
+
+    printf("percentage: %.1f\n", percentage);
+    printf("nnz_C after pruning by percentage: %d\n", nnz_C);
+    printf("CSR row_ptr: ");
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        printf("%d ", hcsr_row_ptr_C[i]);
+    }
+    printf("\n");
+
+    free(hcsr_row_ptr_C);
 
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_A));

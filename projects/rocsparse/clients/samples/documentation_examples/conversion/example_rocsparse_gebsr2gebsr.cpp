@@ -168,6 +168,22 @@ int main()
                                            col_block_dim_C,
                                            temp_buffer));
 
+    // Copy result back to host and print
+    std::vector<rocsparse_int> h_bsr_row_ptr_C(mb_C + 1);
+
+    HIP_CHECK(hipMemcpy(h_bsr_row_ptr_C.data(),
+                        dbsr_row_ptr_C,
+                        sizeof(rocsparse_int) * (mb_C + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "nnzb_C: " << nnzb_C << std::endl;
+    std::cout << "GEBSR_C row_ptr: ";
+    for(rocsparse_int i = 0; i < mb_C + 1; ++i)
+    {
+        std::cout << h_bsr_row_ptr_C[i] << " ";
+    }
+    std::cout << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_A));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_C));

@@ -26,6 +26,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -98,6 +99,24 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMalloc((void**)&dcoo_val_sorted, sizeof(float) * nnz));
     ROCSPARSE_CHECK(
         rocsparse_sgthr(handle, nnz, dcoo_val, dcoo_val_sorted, perm, rocsparse_index_base_zero));
+
+    // Copy sorted result back to host and print
+    float*         hcoo_val_sorted = (float*)malloc(sizeof(float) * nnz);
+
+    HIP_CHECK(
+        hipMemcpy(hcoo_row_ind, dcoo_row_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(
+        hipMemcpy(hcoo_col_ind, dcoo_col_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(
+        hipMemcpy(hcoo_val_sorted, dcoo_val_sorted, sizeof(float) * nnz, hipMemcpyDeviceToHost));
+
+    printf("Sorted COO matrix (by row):\n");
+    for(rocsparse_int i = 0; i < nnz; ++i)
+    {
+        printf("(%d, %d): %f\n", hcoo_row_ind[i], hcoo_col_ind[i], hcoo_val_sorted[i]);
+    }
+
+    free(hcoo_val_sorted);
 
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
 

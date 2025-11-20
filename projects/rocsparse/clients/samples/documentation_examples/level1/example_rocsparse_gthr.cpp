@@ -22,6 +22,7 @@
  * ************************************************************************ */
 
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -54,13 +55,13 @@ int main()
     const rocsparse_int size = 9;
 
     // Sparse index vector
-    rocsparse_int hx_ind[nnz] = {0, 3, 5};
+    std::vector<rocsparse_int> hx_ind = {0, 3, 5};
 
     // Sparse value vector
     float hx_val[nnz];
 
     // Dense vector
-    float hy[size] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    std::vector<float> hy = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
 
     // Index base
     rocsparse_index_base idx_base = rocsparse_index_base_zero;
@@ -74,8 +75,8 @@ int main()
     HIP_CHECK(hipMalloc(&dx_val, sizeof(float) * nnz));
     HIP_CHECK(hipMalloc(&dy, sizeof(float) * size));
 
-    HIP_CHECK(hipMemcpy(dx_ind, hx_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dy, hy, sizeof(float) * size, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_ind, hx_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy.data(), sizeof(float) * size, hipMemcpyHostToDevice));
 
     // rocSPARSE handle
     rocsparse_handle handle;

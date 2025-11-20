@@ -90,6 +90,15 @@ int main(int argc, char* argv[])
     HIP_CHECK(
         hipMemcpy(hnnz_per_row, dnnz_per_row, sizeof(rocsparse_int) * m, hipMemcpyDeviceToHost));
 
+    // Print results
+    printf("nnz_C: %d\n", nnz_C);
+    printf("nnz_per_row: ");
+    for(rocsparse_int i = 0; i < m; ++i)
+    {
+        printf("%d ", hnnz_per_row[i]);
+    }
+    printf("\n");
+
     HIP_CHECK(hipFree(dcsr_row_ptr_A));
     HIP_CHECK(hipFree(dcsr_val_A));
     HIP_CHECK(hipFree(dnnz_per_row));

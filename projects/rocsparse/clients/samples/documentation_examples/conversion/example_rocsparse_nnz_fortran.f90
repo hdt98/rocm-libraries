@@ -75,7 +75,7 @@ program example_fortran_nnz
     integer, parameter :: hipMemcpyHostToDevice = 1, hipMemcpyDeviceToHost = 2
     
     type(c_ptr) :: handle
-    integer :: version
+    integer :: version, i
     integer(c_int) :: m, n
     integer(c_int), target :: nnz_A
     real(c_float), dimension(15), target :: hdense_A
@@ -89,8 +89,9 @@ program example_fortran_nnz
     call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
 
     ! Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+    ! Commented out to avoid contaminating numerical output
+    ! write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
+    !     mod(version / 100, 1000), '.', mod(version, 100)
 
 
 
@@ -105,7 +106,12 @@ program example_fortran_nnz
                                         m, dnnz_per_row, c_loc(nnz_A)))
     call HIP_CHECK(hipMemcpy(c_loc(hnnz_per_row), dnnz_per_row, int(m, c_size_t) * 4, hipMemcpyDeviceToHost))
 
-    write(*,fmt='(A,I0)') 'nnz_A = ', nnz_A
+    write(*,fmt='(A,I0)') 'nnz_A: ', nnz_A
+    write(*,fmt='(A)') 'hnnz_per_row'
+    do i = 1, m
+        write(*,fmt='(I0,A)',advance='no') hnnz_per_row(i), ' '
+    end do
+    write(*,fmt='(A)') ''
 
     call HIP_CHECK(hipFree(ddense_A)); call HIP_CHECK(hipFree(dnnz_per_row))
     call ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr))

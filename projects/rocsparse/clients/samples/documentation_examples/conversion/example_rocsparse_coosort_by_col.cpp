@@ -21,6 +21,7 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -53,9 +54,9 @@ int main()
     rocsparse_int n   = 3;
     rocsparse_int nnz = 9;
 
-    rocsparse_int hcoo_row_ind[] = {0, 0, 0, 1, 1, 1, 2, 2, 2};
-    rocsparse_int hcoo_col_ind[] = {0, 1, 2, 0, 1, 2, 0, 1, 2};
-    float         hcoo_val[]     = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<rocsparse_int> hcoo_row_ind = {0, 0, 0, 1, 1, 1, 2, 2, 2};
+    std::vector<rocsparse_int> hcoo_col_ind = {0, 1, 2, 0, 1, 2, 0, 1, 2};
+    std::vector<float> hcoo_val = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 
     // Allocate and initialize device memory
     rocsparse_int* dcoo_row_ind;
@@ -67,10 +68,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dcoo_val, sizeof(float) * nnz));
 
     HIP_CHECK(
-        hipMemcpy(dcoo_row_ind, hcoo_row_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+        hipMemcpy(dcoo_row_ind, hcoo_row_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(
-        hipMemcpy(dcoo_col_ind, hcoo_col_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dcoo_val, hcoo_val, sizeof(float) * nnz, hipMemcpyHostToDevice));
+        hipMemcpy(dcoo_col_ind, hcoo_col_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dcoo_val, hcoo_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
 
     // Initialize rocSPARSE
     rocsparse_handle handle;

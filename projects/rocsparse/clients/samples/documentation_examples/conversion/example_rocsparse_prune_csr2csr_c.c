@@ -24,6 +24,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 
 #define HIP_CHECK(stat)                                                                       \
@@ -148,6 +149,29 @@ int main(int argc, char* argv[])
                                              dcsr_row_ptr_C,
                                              dcsr_col_ind_C,
                                              temp_buffer));
+
+    // Copy result back to host and print
+    rocsparse_int* hcsr_row_ptr_C = (rocsparse_int*)malloc(sizeof(rocsparse_int) * (m + 1));
+    rocsparse_int* hcsr_col_ind_C = (rocsparse_int*)malloc(sizeof(rocsparse_int) * nnz_C);
+    float*         hcsr_val_C     = (float*)malloc(sizeof(float) * nnz_C);
+
+    HIP_CHECK(hipMemcpy(
+        hcsr_row_ptr_C, dcsr_row_ptr_C, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        hcsr_col_ind_C, dcsr_col_ind_C, sizeof(rocsparse_int) * nnz_C, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hcsr_val_C, dcsr_val_C, sizeof(float) * nnz_C, hipMemcpyDeviceToHost));
+
+    printf("nnz_C after pruning: %d\n", nnz_C);
+    printf("CSR row_ptr: ");
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        printf("%d ", hcsr_row_ptr_C[i]);
+    }
+    printf("\n");
+
+    free(hcsr_row_ptr_C);
+    free(hcsr_col_ind_C);
+    free(hcsr_val_C);
 
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_A));

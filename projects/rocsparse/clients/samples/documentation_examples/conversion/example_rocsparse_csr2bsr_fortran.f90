@@ -84,6 +84,7 @@ program example_fortran_csr2bsr
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, block_dim, nnz, mb, nb
@@ -150,6 +151,24 @@ program example_fortran_csr2bsr
     call ROCSPARSE_CHECK(rocsparse_scsr2bsr(handle, rocsparse_direction_row, m, n, csr_descr, &
                                             d_csr_val, d_csr_row_ptr, d_csr_col_ind, block_dim, &
                                             bsr_descr, d_bsr_val, d_bsr_row_ptr, d_bsr_col_ind))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: h_bsr_row_ptr(:)
+        integer :: i
+
+        allocate(h_bsr_row_ptr(mb + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(h_bsr_row_ptr), d_bsr_row_ptr, int(mb + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A,I0)') 'nnzb (number of non-zero blocks): ', nnzb
+        write(*,fmt='(A)',advance='no') 'BSR row_ptr: '
+        do i = 1, mb + 1
+            write(*,fmt='(I0,A)',advance='no') h_bsr_row_ptr(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(h_bsr_row_ptr)
+    end block
 
     ! Clean up
     call HIP_CHECK(hipFree(d_csr_row_ptr))

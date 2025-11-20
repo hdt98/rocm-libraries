@@ -24,6 +24,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -131,6 +132,8 @@ int main(int argc, char* argv[])
                                           d_csr_row_ptr_C,
                                           &nnz_C));
 
+    printf("nnz_C: %d\n", nnz_C);
+
     // Compute column indices and values of C
     rocsparse_int* d_csr_col_ind_C;
     float*         d_csr_val_C;
@@ -156,6 +159,43 @@ int main(int argc, char* argv[])
                                        d_csr_val_C,
                                        d_csr_row_ptr_C,
                                        d_csr_col_ind_C));
+
+    // Copy C matrix result back to host
+    rocsparse_int* h_csr_row_ptr_C = (rocsparse_int*)malloc(sizeof(rocsparse_int) * (m + 1));
+    rocsparse_int* h_csr_col_ind_C = (rocsparse_int*)malloc(sizeof(rocsparse_int) * nnz_C);
+    float*         h_csr_val_C     = (float*)malloc(sizeof(float) * nnz_C);
+
+    HIP_CHECK(hipMemcpy(
+        h_csr_row_ptr_C, d_csr_row_ptr_C, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        h_csr_col_ind_C, d_csr_col_ind_C, sizeof(rocsparse_int) * nnz_C, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(h_csr_val_C, d_csr_val_C, sizeof(float) * nnz_C, hipMemcpyDeviceToHost));
+
+    printf("C\n");
+    for(rocsparse_int i = 0; i < m; i++)
+    {
+        rocsparse_int start = h_csr_row_ptr_C[i];
+        rocsparse_int end   = h_csr_row_ptr_C[i + 1];
+
+        float* h_temp = (float*)calloc(n, sizeof(float));
+        for(rocsparse_int j = start; j < end; j++)
+        {
+            h_temp[h_csr_col_ind_C[j]] = h_csr_val_C[j];
+        }
+
+        for(rocsparse_int j = 0; j < n; j++)
+        {
+            printf("%f ", h_temp[j]);
+        }
+        printf("\n");
+        free(h_temp);
+    }
+    printf("\n");
+
+    // Free host memory for result
+    free(h_csr_row_ptr_C);
+    free(h_csr_col_ind_C);
+    free(h_csr_val_C);
 
     // Clean up
     HIP_CHECK(hipFree(d_csr_row_ptr_A));

@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(float) * size, hipMemcpyDeviceToHost));
 
     printf("y\n");
-    for(size_t i = 0; i < sizeof(hy)/sizeof(hy[0]); ++i)
+    for(int i = 0; i < size; ++i)
     {
         printf("%f ", hy[i]);
     }

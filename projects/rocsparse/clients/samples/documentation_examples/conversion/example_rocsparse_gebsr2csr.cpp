@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -58,9 +60,9 @@ int main()
     rocsparse_int n             = nb * col_block_dim;
 
     // Define host arrays
-    rocsparse_int h_bsr_row_ptr[] = {0, 1, 3};
-    rocsparse_int h_bsr_col_ind[] = {0, 0, 1};
-    float         h_bsr_val[]     = {1, 0, 4, 2, 0, 3, 5, 0, 0, 0, 0, 9, 7, 0, 8, 6, 0, 0};
+    std::vector<rocsparse_int> h_bsr_row_ptr = {0, 1, 3};
+    std::vector<rocsparse_int> h_bsr_col_ind = {0, 0, 1};
+    std::vector<float> h_bsr_val = {1, 0, 4, 2, 0, 3, 5, 0, 0, 0, 0, 9, 7, 0, 8, 6, 0, 0};
 
     rocsparse_int nnzb = h_bsr_row_ptr[mb] - h_bsr_row_ptr[0];
 
@@ -74,11 +76,11 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_bsr_val, sizeof(float) * nnzb * row_block_dim * col_block_dim));
 
     HIP_CHECK(hipMemcpy(
-        d_bsr_row_ptr, h_bsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+        d_bsr_row_ptr, h_bsr_row_ptr.data(), sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_bsr_col_ind, h_bsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
+        d_bsr_col_ind, h_bsr_col_ind.data(), sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(d_bsr_val,
-                        h_bsr_val,
+                        h_bsr_val.data(),
                         sizeof(float) * nnzb * row_block_dim * col_block_dim,
                         hipMemcpyHostToDevice));
 
@@ -119,6 +121,21 @@ int main()
                                          d_csr_val,
                                          d_csr_row_ptr,
                                          d_csr_col_ind));
+
+    // Copy result back to host and print
+    std::vector<rocsparse_int> h_csr_row_ptr(m + 1);
+
+    HIP_CHECK(hipMemcpy(h_csr_row_ptr.data(),
+                        d_csr_row_ptr,
+                        sizeof(rocsparse_int) * (m + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "CSR row_ptr: ";
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        std::cout << h_csr_row_ptr[i] << " ";
+    }
+    std::cout << std::endl;
 
     // Clean up
     HIP_CHECK(hipFree(d_bsr_row_ptr));

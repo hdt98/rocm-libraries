@@ -84,6 +84,7 @@ program example_fortran_cscsort
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, nnz
@@ -146,6 +147,24 @@ program example_fortran_cscsort
     call HIP_CHECK(hipMalloc(d_csc_val_sorted, int(nnz, c_size_t) * 4))
     call ROCSPARSE_CHECK(rocsparse_sgthr(handle, nnz, d_csc_val, d_csc_val_sorted, d_perm, &
                                          rocsparse_index_base_zero))
+
+    ! Copy sorted result back to host and print
+    block
+        integer, allocatable, target :: h_csc_col_ptr(:)
+        integer :: i
+
+        allocate(h_csc_col_ptr(n + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csc_col_ptr), d_csc_col_ptr, int(n + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,*) 'Sorted CSC matrix:'
+        write(*,fmt='(A)',advance='no') 'col_ptr: '
+        do i = 1, n + 1
+            write(*,fmt='(I0,A)',advance='no') h_csc_col_ptr(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(h_csc_col_ptr)
+    end block
 
     ! Clean up device memory
     call HIP_CHECK(hipFree(d_temp_buffer))

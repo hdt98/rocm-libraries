@@ -111,8 +111,8 @@ int main()
     ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecX, m, dx, data_type));
     ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecY, m, dy, data_type));
 
-    rocsparse_int host_nmaxiter[1] = {200};
-    float         host_tol[1]      = {1.0e-6};
+    std::vector<rocsparse_int> host_nmaxiter = {200};
+    std::vector<float> host_tol = {1.0e-6};
     float         host_history[200];
 
     size_t buffer_size = 0;

@@ -25,6 +25,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -123,6 +124,43 @@ int main(int argc, char* argv[])
                                        rocsparse_action_numeric,
                                        rocsparse_index_base_zero,
                                        temp_buffer));
+
+    // Copy result back to host
+    rocsparse_int* h_csc_col_ptr = (rocsparse_int*)malloc(sizeof(rocsparse_int) * (m_T + 1));
+    rocsparse_int* h_csc_row_ind = (rocsparse_int*)malloc(sizeof(rocsparse_int) * nnz_T);
+    float*         h_csc_val     = (float*)malloc(sizeof(float) * nnz_T);
+
+    HIP_CHECK(hipMemcpy(
+        h_csc_col_ptr, d_csr_row_ptr_T, sizeof(rocsparse_int) * (m_T + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        h_csc_row_ind, d_csr_col_ind_T, sizeof(rocsparse_int) * nnz_T, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(h_csc_val, d_csr_val_T, sizeof(float) * nnz_T, hipMemcpyDeviceToHost));
+
+    // Print result
+    printf("CSC col_ptr: ");
+    for(rocsparse_int i = 0; i < m_T + 1; ++i)
+    {
+        printf("%d ", h_csc_col_ptr[i]);
+    }
+    printf("\n");
+
+    printf("CSC row_ind: ");
+    for(rocsparse_int i = 0; i < nnz_T; ++i)
+    {
+        printf("%d ", h_csc_row_ind[i]);
+    }
+    printf("\n");
+
+    printf("CSC val: ");
+    for(rocsparse_int i = 0; i < nnz_T; ++i)
+    {
+        printf("%f ", h_csc_val[i]);
+    }
+    printf("\n");
+
+    free(h_csc_col_ptr);
+    free(h_csc_row_ind);
+    free(h_csc_val);
 
     // Clean up
     HIP_CHECK(hipFree(d_csr_row_ptr_A));

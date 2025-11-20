@@ -22,6 +22,7 @@
  * ************************************************************************ */
 
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -56,9 +57,9 @@ int main()
     // 0 0 5 1
     // 0 2 0 0
     // 4 0 0 8
-    rocsparse_int hArow[8] = {0, 0, 0, 1, 1, 2, 3, 3};
-    rocsparse_int hAcol[8] = {0, 2, 3, 2, 3, 1, 0, 3};
-    double        hAval[8] = {1.0, 3.0, 4.0, 5.0, 1.0, 2.0, 4.0, 8.0};
+    std::vector<rocsparse_int> hArow = {0, 0, 0, 1, 1, 2, 3, 3};
+    std::vector<rocsparse_int> hAcol = {0, 2, 3, 2, 3, 1, 0, 3};
+    std::vector<double> hAval = {1.0, 3.0, 4.0, 5.0, 1.0, 2.0, 4.0, 8.0};
 
     rocsparse_int m   = 4;
     rocsparse_int n   = 4;
@@ -67,7 +68,7 @@ int main()
     double halpha = 1.0;
     double hbeta  = 0.0;
 
-    double hx[4] = {1.0, 2.0, 3.0, 4.0};
+    std::vector<double> hx = {1.0, 2.0, 3.0, 4.0};
 
     // Matrix descriptor
     rocsparse_mat_descr descrA;
@@ -86,10 +87,10 @@ int main()
     HIP_CHECK(hipMalloc(&dx, sizeof(double) * n));
     HIP_CHECK(hipMalloc(&dy, sizeof(double) * m));
 
-    HIP_CHECK(hipMemcpy(dArow, hArow, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dAcol, hAcol, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dAval, hAval, sizeof(double) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx, hx, sizeof(double) * n, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dArow, hArow.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dAcol, hAcol.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dAval, hAval.data(), sizeof(double) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(double) * n, hipMemcpyHostToDevice));
 
     // Call rocsparse coomv
     ROCSPARSE_CHECK(rocsparse_dcoomv(handle,

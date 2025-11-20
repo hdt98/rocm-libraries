@@ -84,6 +84,7 @@ program example_fortran_csr2csr_compress
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, nnz_A
@@ -150,6 +151,24 @@ program example_fortran_csr2csr_compress
                                                       d_csr_row_ptr_A, d_csr_col_ind_A, nnz_A, &
                                                       d_nnz_per_row, d_csr_val_C, d_csr_row_ptr_C, &
                                                       d_csr_col_ind_C, tol))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: h_csr_row_ptr_C(:)
+        integer :: i
+
+        allocate(h_csr_row_ptr_C(m + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csr_row_ptr_C), d_csr_row_ptr_C, int(m + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A,I0)') 'nnz_C after compression: ', nnz_C
+        write(*,fmt='(A)',advance='no') 'CSR row_ptr_C: '
+        do i = 1, m + 1
+            write(*,fmt='(I0,A)',advance='no') h_csr_row_ptr_C(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(h_csr_row_ptr_C)
+    end block
 
     ! Clean up
     call HIP_CHECK(hipFree(d_csr_row_ptr_A))

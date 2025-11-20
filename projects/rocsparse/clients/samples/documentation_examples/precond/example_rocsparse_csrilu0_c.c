@@ -69,6 +69,10 @@ int main(int argc, char* argv[])
     int nnz = hcsr_row_ptr[m] - hcsr_row_ptr[0];
 
     double hx[m];
+    for(int i = 0; i < m; i++)
+    {
+        hx[i] = 1.0;
+    }
 
     int*    dcsr_row_ptr;
     int*    dcsr_col_ind;
@@ -273,7 +277,7 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
 
     printf("hy\n");
-    for(size_t i = 0; i < sizeof(hy)/sizeof(hy[0]); i++)
+    for(int i = 0; i < m; i++)
     {
         printf("%f ", hy[i]);
     }

@@ -22,6 +22,7 @@
  * ************************************************************************ */
 
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -83,13 +84,13 @@ int main()
     rocsparse_int nnzb = 3;
 
     // BSR row pointers
-    rocsparse_int hbsr_row_ptr[3] = {0, 1, 3};
+    std::vector<rocsparse_int> hbsr_row_ptr = {0, 1, 3};
 
     // BSR column indices
-    rocsparse_int hbsr_col_ind[3] = {0, 0, 1};
+    std::vector<rocsparse_int> hbsr_col_ind = {0, 0, 1};
 
     // BSR values
-    double hbsr_val[12] = {1.0, 2.0, 0.0, 3.0, 4.0, 7.0, 5.0, 0.0, 6.0, 8.0, 0.0, 9.0};
+    std::vector<double> hbsr_val = {1.0, 2.0, 0.0, 3.0, 4.0, 7.0, 5.0, 0.0, 6.0, 8.0, 0.0, 9.0};
 
     // Storage scheme of the BSR blocks
     rocsparse_direction dir = rocsparse_direction_column;
@@ -111,7 +112,7 @@ int main()
     rocsparse_int ldb = nb * bsr_dim;
     rocsparse_int ldx = mb * bsr_dim;
 
-    double hB[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    std::vector<double> hB = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     double hX[16];
 
     // Offload data to device
@@ -128,12 +129,12 @@ int main()
     HIP_CHECK(hipMalloc(&dX, sizeof(double) * mb * bsr_dim * nrhs));
 
     HIP_CHECK(hipMemcpy(
-        dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+        dbsr_row_ptr, hbsr_row_ptr.data(), sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
     HIP_CHECK(
-        hipMemcpy(dbsr_col_ind, hbsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
+        hipMemcpy(dbsr_col_ind, hbsr_col_ind.data(), sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        dbsr_val, hbsr_val, sizeof(double) * nnzb * bsr_dim * bsr_dim, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dB, hB, sizeof(double) * nb * bsr_dim * nrhs, hipMemcpyHostToDevice));
+        dbsr_val, hbsr_val.data(), sizeof(double) * nnzb * bsr_dim * bsr_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dB, hB.data(), sizeof(double) * nb * bsr_dim * nrhs, hipMemcpyHostToDevice));
 
     // Matrix descriptor
     rocsparse_mat_descr descr;

@@ -151,6 +151,23 @@ int main()
                                                            info,
                                                            temp_buffer));
 
+    // Copy result back to host and print
+    std::vector<rocsparse_int> hcsr_row_ptr_C(m + 1);
+
+    HIP_CHECK(hipMemcpy(hcsr_row_ptr_C.data(),
+                        dcsr_row_ptr_C,
+                        sizeof(rocsparse_int) * (m + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "percentage: " << percentage << std::endl;
+    std::cout << "nnz_C after pruning by percentage: " << nnz_C << std::endl;
+    std::cout << "CSR row_ptr: ";
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        std::cout << hcsr_row_ptr_C[i] << " ";
+    }
+    std::cout << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_A));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr_C));

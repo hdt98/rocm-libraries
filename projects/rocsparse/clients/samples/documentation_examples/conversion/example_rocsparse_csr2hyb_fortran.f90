@@ -84,6 +84,7 @@ program example_fortran_csr2hyb
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, nnz, user_ell_width
@@ -160,6 +161,24 @@ program example_fortran_csr2hyb
     ! Convert HYB to CSR
     call ROCSPARSE_CHECK(rocsparse_shyb2csr(handle, descr, hyb, dcsr_val2, dcsr_row_ptr2, &
                                             dcsr_col_ind2, temp_buffer))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: hcsr_row_ptr2(:)
+        integer :: i
+
+        allocate(hcsr_row_ptr2(m + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(hcsr_row_ptr2), dcsr_row_ptr2, &
+            int(m + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A)',advance='no') 'Converted CSR row_ptr (HYB->CSR): '
+        do i = 1, m + 1
+            write(*,fmt='(I0,A)',advance='no') hcsr_row_ptr2(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(hcsr_row_ptr2)
+    end block
 
     ! Clean up
     call HIP_CHECK(hipFree(temp_buffer))

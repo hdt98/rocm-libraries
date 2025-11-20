@@ -137,6 +137,7 @@ int main(int argc, char* argv[])
         rocsparse_int end   = hcsr_row_ptr[i + 1];
 
         float temp[n];
+        memset(temp, 0, sizeof(float) * n);
         for(rocsparse_int j = start; j < end; j++)
         {
             temp[hcsr_col_ind[j]] = hcsr_val[j];

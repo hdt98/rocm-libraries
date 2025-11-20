@@ -90,6 +90,7 @@ program example_fortran_nnz_compress
     integer(c_int) :: m, n, nnz_A
     integer(c_int), target :: nnz_C
     real(c_float) :: tol
+    integer :: i
     
     ! Host arrays
     integer, dimension(4), target :: hcsr_row_ptr_A
@@ -138,6 +139,14 @@ program example_fortran_nnz_compress
     ! Copy result back to host
     call HIP_CHECK(hipMemcpy(c_loc(hnnz_per_row), dnnz_per_row, int(m, c_size_t) * 4, &
                              hipMemcpyDeviceToHost))
+
+    ! Print results
+    write(*,fmt='(A,I0)') 'nnz_C: ', nnz_C
+    write(*,fmt='(A)',advance='no') 'nnz_per_row: '
+    do i = 1, m
+        write(*,fmt='(I0,A)',advance='no') hnnz_per_row(i), ' '
+    end do
+    write(*,*)
 
     ! Clean up
     call HIP_CHECK(hipFree(dcsr_row_ptr_A))

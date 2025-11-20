@@ -24,6 +24,7 @@
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 
 #define HIP_CHECK(stat)                                                                       \
@@ -109,6 +110,22 @@ int main(int argc, char* argv[])
                                        dcsr_val,
                                        dcsr_row_ptr,
                                        dcsr_col_ind));
+
+    // Copy result back to host and print
+    rocsparse_int* hcsr_row_ptr = (rocsparse_int*)malloc(sizeof(rocsparse_int) * (m + 1));
+
+    HIP_CHECK(hipMemcpy(
+        hcsr_row_ptr, dcsr_row_ptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
+
+    printf("csr_nnz: %d\n", csr_nnz);
+    printf("CSR row_ptr: ");
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        printf("%d ", hcsr_row_ptr[i]);
+    }
+    printf("\n");
+
+    free(hcsr_row_ptr);
 
     HIP_CHECK(hipFree(dell_col_ind));
     HIP_CHECK(hipFree(dell_val));

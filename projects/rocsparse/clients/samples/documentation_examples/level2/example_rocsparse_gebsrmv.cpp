@@ -22,6 +22,7 @@
  * ************************************************************************ */
 
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -64,13 +65,13 @@ int main()
     rocsparse_int nnzb = 2;
 
     // BSR row pointers
-    rocsparse_int hbsr_row_ptr[3] = {0, 1, 2};
+    std::vector<rocsparse_int> hbsr_row_ptr = {0, 1, 2};
 
     // BSR column indices
-    rocsparse_int hbsr_col_ind[2] = {0, 0};
+    std::vector<rocsparse_int> hbsr_col_ind = {0, 0};
 
     // BSR values
-    double hbsr_val[16] = {1.0, 3.0, 0.0, 0.0, 2.0, 4.0, 5.0, 7.0, 6.0, 0.0, 0.0, 8.0};
+    std::vector<double> hbsr_val = {1.0, 3.0, 0.0, 0.0, 2.0, 4.0, 5.0, 7.0, 6.0, 0.0, 0.0, 8.0};
 
     // Block storage in column major
     rocsparse_direction dir = rocsparse_direction_column;
@@ -83,8 +84,8 @@ int main()
     double beta  = 1.3;
 
     // x and y
-    double hx[4] = {1.0, 2.0, 3.0, 0.0};
-    double hy[4] = {4.0, 5.0, 6.0, 7.0};
+    std::vector<double> hx = {1.0, 2.0, 3.0, 0.0};
+    std::vector<double> hy = {4.0, 5.0, 6.0, 7.0};
 
     // rocSPARSE handle
     rocsparse_handle handle;
@@ -108,15 +109,15 @@ int main()
     HIP_CHECK(hipMalloc(&dy, sizeof(double) * mb * row_block_dim));
 
     HIP_CHECK(hipMemcpy(
-        dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+        dbsr_row_ptr, hbsr_row_ptr.data(), sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
     HIP_CHECK(
-        hipMemcpy(dbsr_col_ind, hbsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
+        hipMemcpy(dbsr_col_ind, hbsr_col_ind.data(), sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dbsr_val,
-                        hbsr_val,
+                        hbsr_val.data(),
                         sizeof(double) * nnzb * row_block_dim * col_block_dim,
                         hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx, hx, sizeof(double) * nb * col_block_dim, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dy, hy, sizeof(double) * mb * row_block_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(double) * nb * col_block_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy.data(), sizeof(double) * mb * row_block_dim, hipMemcpyHostToDevice));
 
     // Call dbsrmv to perform y = alpha * A x + beta * y
     ROCSPARSE_CHECK(rocsparse_dgebsrmv(handle,
@@ -137,7 +138,7 @@ int main()
                                        dy));
 
     // Copy result back to host
-    HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * mb * row_block_dim, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(double) * mb * row_block_dim, hipMemcpyDeviceToHost));
 
     std::cout << "hy" << std::endl;
     for(size_t i = 0; i < mb * row_block_dim; i++)

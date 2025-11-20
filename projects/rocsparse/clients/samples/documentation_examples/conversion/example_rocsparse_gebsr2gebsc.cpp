@@ -131,6 +131,21 @@ int main()
                                            rocsparse_index_base_zero,
                                            temp_buffer));
 
+    // Copy result back to host and print
+    std::vector<rocsparse_int> hbsr_row_ptr_T(mb_T + 1);
+
+    HIP_CHECK(hipMemcpy(hbsr_row_ptr_T.data(),
+                        dbsr_row_ptr_T,
+                        sizeof(rocsparse_int) * (mb_T + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "GEBSC col_ptr: ";
+    for(rocsparse_int i = 0; i < mb_T + 1; ++i)
+    {
+        std::cout << hbsr_row_ptr_T[i] << " ";
+    }
+    std::cout << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
 
     HIP_CHECK(hipFree(temp_buffer));

@@ -22,6 +22,7 @@
  * ************************************************************************ */
 
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -54,13 +55,13 @@ int main()
     const rocsparse_int size = 9;
 
     // Sparse index vector
-    rocsparse_int hx_ind[nnz] = {0, 3, 5};
+    std::vector<rocsparse_int> hx_ind = {0, 3, 5};
 
     // Sparse value vector
-    float hx_val[nnz] = {1.0f, 2.0f, 3.0f};
+    std::vector<float> hx_val = {1.0f, 2.0f, 3.0f};
 
     // Dense vector
-    float hy[size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
+    std::vector<float> hy = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
 
     // Scalar alpha
     float alpha = 3.7f;
@@ -77,9 +78,9 @@ int main()
     HIP_CHECK(hipMalloc(&dx_val, sizeof(float) * nnz));
     HIP_CHECK(hipMalloc(&dy, sizeof(float) * size));
 
-    HIP_CHECK(hipMemcpy(dx_ind, hx_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx_val, hx_val, sizeof(float) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dy, hy, sizeof(float) * size, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_ind, hx_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_val, hx_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy.data(), sizeof(float) * size, hipMemcpyHostToDevice));
 
     // rocSPARSE handle
     rocsparse_handle handle;
@@ -89,7 +90,7 @@ int main()
     ROCSPARSE_CHECK(rocsparse_saxpyi(handle, nnz, &alpha, dx_val, dx_ind, dy, idx_base));
 
     // Copy result back to host
-    HIP_CHECK(hipMemcpy(hy, dy, sizeof(float) * size, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(float) * size, hipMemcpyDeviceToHost));
 
     std::cout << "hy" << std::endl;
     for(rocsparse_int i = 0; i < size; i++)

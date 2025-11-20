@@ -21,6 +21,7 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -58,9 +59,9 @@ int main()
     rocsparse_int nnz = 9;
 
     // Define host arrays
-    rocsparse_int h_csc_col_ptr[] = {0, 3, 6, 9};
-    rocsparse_int h_csc_row_ind[] = {2, 0, 1, 0, 1, 2, 0, 2, 1};
-    float         h_csc_val[]     = {7, 1, 4, 2, 5, 8, 3, 9, 6};
+    std::vector<rocsparse_int> h_csc_col_ptr = {0, 3, 6, 9};
+    std::vector<rocsparse_int> h_csc_row_ind = {2, 0, 1, 0, 1, 2, 0, 2, 1};
+    std::vector<float> h_csc_val = {7, 1, 4, 2, 5, 8, 3, 9, 6};
 
     // Allocate and initialize device memory
     rocsparse_int* d_csc_col_ptr;
@@ -72,10 +73,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csc_val, sizeof(float) * nnz));
 
     HIP_CHECK(hipMemcpy(
-        d_csc_col_ptr, h_csc_col_ptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csc_col_ptr, h_csc_col_ptr.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csc_row_ind, h_csc_row_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csc_val, h_csc_val, sizeof(float) * nnz, hipMemcpyHostToDevice));
+        d_csc_row_ind, h_csc_row_ind.data(), sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csc_val, h_csc_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
 
     // Create permutation vector perm as the identity map
     rocsparse_int* d_perm;
@@ -102,6 +103,26 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csc_val_sorted, sizeof(float) * nnz));
     ROCSPARSE_CHECK(rocsparse_sgthr(
         handle, nnz, d_csc_val, d_csc_val_sorted, d_perm, rocsparse_index_base_zero));
+
+    // Copy sorted result back to host and print
+    std::vector<float>         h_csc_val_sorted(nnz);
+
+    HIP_CHECK(hipMemcpy(h_csc_col_ptr.data(),
+                        d_csc_col_ptr,
+                        sizeof(rocsparse_int) * (n + 1),
+                        hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        h_csc_row_ind.data(), d_csc_row_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        h_csc_val_sorted.data(), d_csc_val_sorted, sizeof(float) * nnz, hipMemcpyDeviceToHost));
+
+    std::cout << "Sorted CSC matrix:" << std::endl;
+    std::cout << "col_ptr: ";
+    for(rocsparse_int i = 0; i < n + 1; ++i)
+    {
+        std::cout << h_csc_col_ptr[i] << " ";
+    }
+    std::cout << std::endl;
 
     // Clean up
     HIP_CHECK(hipFree(d_temp_buffer));

@@ -21,9 +21,6 @@
  *
  * ************************************************************************ */
 
-
-
-
 #include <hip/hip_runtime_api.h>
 #include <rocsparse/rocsparse.h>
 #include <stdio.h>
@@ -66,7 +63,15 @@ int main(int argc, char* argv[])
     double hcsr_val[] = {2.0, 1.0, 1.0, 2.0, 1.0, 1.0, 2.0, 1.0, 1.0, 2.0};
 
     double hx[m];
+    for(int i = 0; i < m; i++)
+    {
+        hx[i] = 1.0;
+    }
     double* hy = (double*)malloc(sizeof(double) * (m));
+    for(int i = 0; i < m; i++)
+    {
+        hy[i] = 0.0;
+    }
 
     int*    dcsr_row_ptr;
     int*    dcsr_col_ind;
@@ -151,7 +156,7 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
 
     printf("hy\n");
-    for(size_t i = 0; i < sizeof(hy)/sizeof(hy[0]); i++)
+    for(int i = 0; i < m; i++)
     {
         printf("%f ", hy[i]);
     }

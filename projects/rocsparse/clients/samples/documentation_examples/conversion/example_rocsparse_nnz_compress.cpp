@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -62,8 +64,8 @@ int main()
     rocsparse_int n     = 5;
     rocsparse_int nnz_A = 8;
 
-    rocsparse_int hcsr_row_ptr_A[4] = {0, 3, 5, 8};
-    float         hcsr_val_A[8]     = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<rocsparse_int> hcsr_row_ptr_A = {0, 3, 5, 8};
+    std::vector<float> hcsr_val_A = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
 
     rocsparse_int* dcsr_row_ptr_A = nullptr;
     float*         dcsr_val_A     = nullptr;
@@ -71,8 +73,8 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dcsr_val_A, sizeof(float) * nnz_A));
 
     HIP_CHECK(hipMemcpy(
-        dcsr_row_ptr_A, hcsr_row_ptr_A, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dcsr_val_A, hcsr_val_A, sizeof(float) * nnz_A, hipMemcpyHostToDevice));
+        dcsr_row_ptr_A, hcsr_row_ptr_A.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dcsr_val_A, hcsr_val_A.data(), sizeof(float) * nnz_A, hipMemcpyHostToDevice));
 
     // Allocate memory for the nnz_per_row array
     rocsparse_int* dnnz_per_row;
@@ -85,9 +87,18 @@ int main()
         handle, m, descr_A, dcsr_val_A, dcsr_row_ptr_A, dnnz_per_row, &nnz_C, tol));
 
     // Copy result back to host
-    rocsparse_int hnnz_per_row[3];
+    std::vector<rocsparse_int> hnnz_per_row(m);
     HIP_CHECK(
-        hipMemcpy(hnnz_per_row, dnnz_per_row, sizeof(rocsparse_int) * m, hipMemcpyDeviceToHost));
+        hipMemcpy(hnnz_per_row.data(), dnnz_per_row, sizeof(rocsparse_int) * m, hipMemcpyDeviceToHost));
+
+    // Print results
+    std::cout << "nnz_C: " << nnz_C << std::endl;
+    std::cout << "nnz_per_row: ";
+    for(rocsparse_int i = 0; i < m; ++i)
+    {
+        std::cout << hnnz_per_row[i] << " ";
+    }
+    std::cout << std::endl;
 
     HIP_CHECK(hipFree(dcsr_row_ptr_A));
     HIP_CHECK(hipFree(dcsr_val_A));

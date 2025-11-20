@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
     HIP_CHECK(hipMemcpy(hx_val, dx_val, sizeof(float) * nnz, hipMemcpyDeviceToHost));
 
     printf("x\n");
-    for(size_t i = 0; i < sizeof(hx_val)/sizeof(hx_val[0]); ++i)
+    for(int i = 0; i < nnz; ++i)
     {
         printf("%f ", hx_val[i]);
     }

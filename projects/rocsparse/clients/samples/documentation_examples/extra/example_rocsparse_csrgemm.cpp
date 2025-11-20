@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -81,17 +83,17 @@ int main()
     rocsparse_int nnz_B = 4; // Number of non-zero entries in B
     rocsparse_int nnz_D = 4; // Number of non-zero entries in D
 
-    rocsparse_int h_csr_row_ptr_A[] = {0, 2, 3, 4};
-    rocsparse_int h_csr_col_ind_A[] = {0, 1, 2, 2};
-    float         h_csr_val_A[]     = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<rocsparse_int> h_csr_row_ptr_A = {0, 2, 3, 4};
+    std::vector<rocsparse_int> h_csr_col_ind_A = {0, 1, 2, 2};
+    std::vector<float> h_csr_val_A = {1.0f, 2.0f, 3.0f, 4.0f};
 
-    rocsparse_int h_csr_row_ptr_B[] = {0, 1, 3, 4};
-    rocsparse_int h_csr_col_ind_B[] = {0, 1, 2, 2};
-    float         h_csr_val_B[]     = {5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<rocsparse_int> h_csr_row_ptr_B = {0, 1, 3, 4};
+    std::vector<rocsparse_int> h_csr_col_ind_B = {0, 1, 2, 2};
+    std::vector<float> h_csr_val_B = {5.0f, 6.0f, 7.0f, 8.0f};
 
-    rocsparse_int h_csr_row_ptr_D[] = {0, 1, 3, 4};
-    rocsparse_int h_csr_col_ind_D[] = {0, 1, 2, 2};
-    float         h_csr_val_D[]     = {9.0f, 10.0f, 11.0f, 12.0f};
+    std::vector<rocsparse_int> h_csr_row_ptr_D = {0, 1, 3, 4};
+    std::vector<rocsparse_int> h_csr_col_ind_D = {0, 1, 2, 2};
+    std::vector<float> h_csr_val_D = {9.0f, 10.0f, 11.0f, 12.0f};
 
     // Allocate device memory for CSR matrices A, B, and D
     rocsparse_int* d_csr_row_ptr_A;
@@ -103,10 +105,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_A, sizeof(float) * nnz_A));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr_A, h_csr_row_ptr_A, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr_A, h_csr_row_ptr_A.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_A, h_csr_col_ind_A, sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val_A, h_csr_val_A, sizeof(float) * nnz_A, hipMemcpyHostToDevice));
+        d_csr_col_ind_A, h_csr_col_ind_A.data(), sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val_A, h_csr_val_A.data(), sizeof(float) * nnz_A, hipMemcpyHostToDevice));
 
     rocsparse_int* d_csr_row_ptr_B;
     rocsparse_int* d_csr_col_ind_B;
@@ -117,10 +119,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_B, sizeof(float) * nnz_B));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr_B, h_csr_row_ptr_B, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr_B, h_csr_row_ptr_B.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_B, h_csr_col_ind_B, sizeof(rocsparse_int) * nnz_B, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val_B, h_csr_val_B, sizeof(float) * nnz_B, hipMemcpyHostToDevice));
+        d_csr_col_ind_B, h_csr_col_ind_B.data(), sizeof(rocsparse_int) * nnz_B, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val_B, h_csr_val_B.data(), sizeof(float) * nnz_B, hipMemcpyHostToDevice));
 
     rocsparse_int* d_csr_row_ptr_D;
     rocsparse_int* d_csr_col_ind_D;
@@ -131,10 +133,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_D, sizeof(float) * nnz_D));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr_D, h_csr_row_ptr_D, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr_D, h_csr_row_ptr_D.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_D, h_csr_col_ind_D, sizeof(rocsparse_int) * nnz_D, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val_D, h_csr_val_D, sizeof(float) * nnz_D, hipMemcpyHostToDevice));
+        d_csr_col_ind_D, h_csr_col_ind_D.data(), sizeof(rocsparse_int) * nnz_D, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val_D, h_csr_val_D.data(), sizeof(float) * nnz_D, hipMemcpyHostToDevice));
 
     // Query rocsparse for the required buffer size
     size_t buffer_size;

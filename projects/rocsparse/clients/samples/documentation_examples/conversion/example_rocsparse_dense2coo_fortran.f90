@@ -72,10 +72,10 @@ program example_fortran_dense2coo
             integer(c_size_t), value :: size; integer(c_int), value :: kind
         end function
     end interface
-    integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyHostToDevice = 1, hipMemcpyDeviceToHost = 2
     
     type(c_ptr) :: handle
-    integer :: version
+    integer :: version, i
     integer(c_int) :: m, n
     integer(c_int), target :: nnz_A
     real(c_float), dimension(9), target :: hdense
@@ -88,8 +88,9 @@ program example_fortran_dense2coo
     call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
 
     ! Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+    ! Commented out to avoid contaminating numerical output
+    ! write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
+    !     mod(version / 100, 1000), '.', mod(version, 100)
 
 
 
@@ -108,8 +109,34 @@ program example_fortran_dense2coo
     call ROCSPARSE_CHECK(rocsparse_sdense2coo(handle, m, n, descr, ddense, m, dnnz_per_row, &
                                                dcoo_val, dcoo_row_ind, dcoo_col_ind))
 
-    call HIP_CHECK(hipFree(dcoo_row_ind)); call HIP_CHECK(hipFree(dcoo_col_ind))
-    call HIP_CHECK(hipFree(dcoo_val)); call HIP_CHECK(hipFree(dnnz_per_row))
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: hcoo_row_ind(:), hcoo_col_ind(:)
+        real(c_float), allocatable, target :: hcoo_val(:)
+
+        allocate(hcoo_row_ind(nnz_A))
+        allocate(hcoo_col_ind(nnz_A))
+        allocate(hcoo_val(nnz_A))
+
+        call HIP_CHECK(hipMemcpy(c_loc(hcoo_row_ind), dcoo_row_ind, int(nnz_A, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(hcoo_col_ind), dcoo_col_ind, int(nnz_A, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(hcoo_val), dcoo_val, int(nnz_A, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A)') 'COO format:'
+        do i = 1, nnz_A
+            write(*,fmt='(A,I0,A,I0,A,F0.0)') 'Row: ', hcoo_row_ind(i), ', Col: ', hcoo_col_ind(i), ', Val: ', hcoo_val(i)
+        end do
+
+        deallocate(hcoo_row_ind)
+        deallocate(hcoo_col_ind)
+        deallocate(hcoo_val)
+    end block
+
+    call HIP_CHECK(hipFree(ddense))
+    call HIP_CHECK(hipFree(dnnz_per_row))
+    call HIP_CHECK(hipFree(dcoo_row_ind))
+    call HIP_CHECK(hipFree(dcoo_col_ind))
+    call HIP_CHECK(hipFree(dcoo_val))
     call ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr))
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))
 

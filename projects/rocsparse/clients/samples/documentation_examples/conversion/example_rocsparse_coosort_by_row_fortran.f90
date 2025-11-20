@@ -147,6 +147,31 @@ program example_fortran_coosort_by_row
     call ROCSPARSE_CHECK(rocsparse_sgthr(handle, nnz, dcoo_val, dcoo_val_sorted, perm, &
                                          rocsparse_index_base_zero))
 
+    ! Copy sorted result back to host and print
+    block
+        integer, allocatable, target :: hcoo_row_ind_sorted(:), hcoo_col_ind_sorted(:)
+        real(c_float), allocatable, target :: hcoo_val_sorted_host(:)
+        integer :: i
+
+        allocate(hcoo_row_ind_sorted(nnz))
+        allocate(hcoo_col_ind_sorted(nnz))
+        allocate(hcoo_val_sorted_host(nnz))
+
+        call HIP_CHECK(hipMemcpy(c_loc(hcoo_row_ind_sorted), dcoo_row_ind, int(nnz, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(hcoo_col_ind_sorted), dcoo_col_ind, int(nnz, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(hcoo_val_sorted_host), dcoo_val_sorted, int(nnz, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,*) 'Sorted COO matrix (by row):'
+        do i = 1, nnz
+            write(*,fmt='(A,I0,A,I0,A,F0.6)') '(', hcoo_row_ind_sorted(i), ', ', &
+                hcoo_col_ind_sorted(i), '): ', hcoo_val_sorted_host(i)
+        end do
+
+        deallocate(hcoo_row_ind_sorted)
+        deallocate(hcoo_col_ind_sorted)
+        deallocate(hcoo_val_sorted_host)
+    end block
+
     ! Clear rocSPARSE handle
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))
 

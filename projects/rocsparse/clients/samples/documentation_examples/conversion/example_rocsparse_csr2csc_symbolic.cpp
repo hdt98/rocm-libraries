@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -58,8 +60,8 @@ int main()
     rocsparse_int nnz_A = 8;
 
     // Define host arrays
-    rocsparse_int h_csr_row_ptr_A[] = {0, 3, 5, 8};
-    rocsparse_int h_csr_col_ind_A[] = {0, 1, 3, 1, 2, 0, 3, 4};
+    std::vector<rocsparse_int> h_csr_row_ptr_A = {0, 3, 5, 8};
+    std::vector<rocsparse_int> h_csr_col_ind_A = {0, 1, 3, 1, 2, 0, 3, 4};
 
     // Allocate and initialize device memory for matrix A
     rocsparse_int* d_csr_row_ptr_A;
@@ -69,11 +71,11 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_col_ind_A, sizeof(rocsparse_int) * nnz_A));
 
     HIP_CHECK(hipMemcpy(d_csr_row_ptr_A,
-                        h_csr_row_ptr_A,
+                        h_csr_row_ptr_A.data(),
                         sizeof(rocsparse_int) * (m_A + 1),
                         hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_A, h_csr_col_ind_A, sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
+        d_csr_col_ind_A, h_csr_col_ind_A.data(), sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
 
     // Allocate memory for transposed CSR matrix
     rocsparse_int m_T   = n_A;

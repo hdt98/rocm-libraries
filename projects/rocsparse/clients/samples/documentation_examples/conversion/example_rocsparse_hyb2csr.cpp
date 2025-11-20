@@ -111,6 +111,21 @@ int main()
     ROCSPARSE_CHECK(rocsparse_shyb2csr(
         handle, descr, hyb, dcsr_val2, dcsr_row_ptr2, dcsr_col_ind2, temp_buffer));
 
+    // Copy result back to host and print
+    std::vector<rocsparse_int> hcsr_row_ptr2(m + 1);
+
+    HIP_CHECK(hipMemcpy(hcsr_row_ptr2.data(),
+                        dcsr_row_ptr2,
+                        sizeof(rocsparse_int) * (m + 1),
+                        hipMemcpyDeviceToHost));
+
+    std::cout << "Converted CSR row_ptr: ";
+    for(rocsparse_int i = 0; i < m + 1; ++i)
+    {
+        std::cout << hcsr_row_ptr2[i] << " ";
+    }
+    std::cout << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
     ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr));
     ROCSPARSE_CHECK(rocsparse_destroy_hyb_mat(hyb));

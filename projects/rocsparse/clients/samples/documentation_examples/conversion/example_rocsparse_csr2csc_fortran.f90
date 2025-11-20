@@ -83,10 +83,11 @@ program example_fortran_csr2csc
         end function hipMemcpy
     end interface
 
-    integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyHostToDevice = 1, hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m_A, n_A, nnz_A, m_T, n_T, nnz_T
+    integer :: i
     
     ! Host arrays
     integer, dimension(4), target :: h_csr_row_ptr_A
@@ -151,6 +152,42 @@ program example_fortran_csr2csc
                                             d_csr_col_ind_T, d_csr_row_ptr_T, &
                                             rocsparse_action_numeric, rocsparse_index_base_zero, &
                                             temp_buffer))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: h_csc_col_ptr(:), h_csc_row_ind(:)
+        real(c_float), allocatable, target :: h_csc_val(:)
+
+        allocate(h_csc_col_ptr(m_T + 1))
+        allocate(h_csc_row_ind(nnz_T))
+        allocate(h_csc_val(nnz_T))
+
+        call HIP_CHECK(hipMemcpy(c_loc(h_csc_col_ptr), d_csr_row_ptr_T, int(m_T + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csc_row_ind), d_csr_col_ind_T, int(nnz_T, c_size_t) * 4, hipMemcpyDeviceToHost))
+        call HIP_CHECK(hipMemcpy(c_loc(h_csc_val), d_csr_val_T, int(nnz_T, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A)',advance='no') 'CSC col_ptr: '
+        do i = 1, m_T + 1
+            write(*,fmt='(I0,A)',advance='no') h_csc_col_ptr(i), ' '
+        end do
+        write(*,*)
+
+        write(*,fmt='(A)',advance='no') 'CSC row_ind: '
+        do i = 1, nnz_T
+            write(*,fmt='(I0,A)',advance='no') h_csc_row_ind(i), ' '
+        end do
+        write(*,*)
+
+        write(*,fmt='(A)',advance='no') 'CSC val: '
+        do i = 1, nnz_T
+            write(*,fmt='(F0.1,A)',advance='no') h_csc_val(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(h_csc_col_ptr)
+        deallocate(h_csc_row_ind)
+        deallocate(h_csc_val)
+    end block
 
     ! Clean up
     call HIP_CHECK(hipFree(d_csr_row_ptr_A))

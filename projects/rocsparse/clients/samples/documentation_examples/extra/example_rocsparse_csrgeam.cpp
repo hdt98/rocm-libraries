@@ -21,6 +21,8 @@
  *
  * ************************************************************************ */
 #include <iostream>
+#include <vector>
+
 #include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
@@ -73,13 +75,13 @@ int main()
     rocsparse_int nnz_A = 4; // Number of non-zero entries in A
     rocsparse_int nnz_B = 4; // Number of non-zero entries in B
 
-    rocsparse_int h_csr_row_ptr_A[] = {0, 2, 3, 4};
-    rocsparse_int h_csr_col_ind_A[] = {0, 1, 2, 2};
-    float         h_csr_val_A[]     = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<rocsparse_int> h_csr_row_ptr_A = {0, 2, 3, 4};
+    std::vector<rocsparse_int> h_csr_col_ind_A = {0, 1, 2, 2};
+    std::vector<float>         h_csr_val_A     = {1.0f, 2.0f, 3.0f, 4.0f};
 
-    rocsparse_int h_csr_row_ptr_B[] = {0, 1, 3, 4};
-    rocsparse_int h_csr_col_ind_B[] = {0, 1, 2, 2};
-    float         h_csr_val_B[]     = {5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<rocsparse_int> h_csr_row_ptr_B = {0, 1, 3, 4};
+    std::vector<rocsparse_int> h_csr_col_ind_B = {0, 1, 2, 2};
+    std::vector<float>         h_csr_val_B     = {5.0f, 6.0f, 7.0f, 8.0f};
 
     // Allocate device memory for CSR matrices A and B
     rocsparse_int* d_csr_row_ptr_A;
@@ -91,10 +93,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_A, sizeof(float) * nnz_A));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr_A, h_csr_row_ptr_A, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr_A, h_csr_row_ptr_A.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_A, h_csr_col_ind_A, sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val_A, h_csr_val_A, sizeof(float) * nnz_A, hipMemcpyHostToDevice));
+        d_csr_col_ind_A, h_csr_col_ind_A.data(), sizeof(rocsparse_int) * nnz_A, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val_A, h_csr_val_A.data(), sizeof(float) * nnz_A, hipMemcpyHostToDevice));
 
     rocsparse_int* d_csr_row_ptr_B;
     rocsparse_int* d_csr_col_ind_B;
@@ -105,10 +107,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&d_csr_val_B, sizeof(float) * nnz_B));
 
     HIP_CHECK(hipMemcpy(
-        d_csr_row_ptr_B, h_csr_row_ptr_B, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+        d_csr_row_ptr_B, h_csr_row_ptr_B.data(), sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(
-        d_csr_col_ind_B, h_csr_col_ind_B, sizeof(rocsparse_int) * nnz_B, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_csr_val_B, h_csr_val_B, sizeof(float) * nnz_B, hipMemcpyHostToDevice));
+        d_csr_col_ind_B, h_csr_col_ind_B.data(), sizeof(rocsparse_int) * nnz_B, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_csr_val_B, h_csr_val_B.data(), sizeof(float) * nnz_B, hipMemcpyHostToDevice));
 
     // Obtain number of total non-zero entries in C and row pointers of C
     rocsparse_int  nnz_C;
@@ -129,6 +131,8 @@ int main()
                                           descr_C,
                                           d_csr_row_ptr_C,
                                           &nnz_C));
+
+    std::cout << "nnz_C: " << nnz_C << std::endl;
 
     // Compute column indices and values of C
     rocsparse_int* d_csr_col_ind_C;
@@ -155,6 +159,39 @@ int main()
                                        d_csr_val_C,
                                        d_csr_row_ptr_C,
                                        d_csr_col_ind_C));
+
+    // Copy C matrix result back to host
+    std::vector<int>   hcsr_row_ptr_C(m + 1);
+    std::vector<int>   hcsr_col_ind_C(nnz_C);
+    std::vector<float> hcsr_val_C(nnz_C);
+
+    HIP_CHECK(hipMemcpy(
+        hcsr_row_ptr_C.data(), d_csr_row_ptr_C, sizeof(int) * (m + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        hcsr_col_ind_C.data(), d_csr_col_ind_C, sizeof(int) * nnz_C, hipMemcpyDeviceToHost));
+    HIP_CHECK(
+        hipMemcpy(hcsr_val_C.data(), d_csr_val_C, sizeof(float) * nnz_C, hipMemcpyDeviceToHost));
+
+    std::cout << "C" << std::endl;
+    for(int i = 0; i < m; i++)
+    {
+        int start = hcsr_row_ptr_C[i];
+        int end   = hcsr_row_ptr_C[i + 1];
+
+        std::vector<float> htemp(n, 0.0f);
+        for(int j = start; j < end; j++)
+        {
+            htemp[hcsr_col_ind_C[j]] = hcsr_val_C[j];
+        }
+
+        for(int j = 0; j < n; j++)
+        {
+            std::cout << htemp[j] << " ";
+        }
+        std::cout << "" << std::endl;
+    }
+    std::cout << "" << std::endl;
+
 
     // Clean up
     HIP_CHECK(hipFree(d_csr_row_ptr_A));

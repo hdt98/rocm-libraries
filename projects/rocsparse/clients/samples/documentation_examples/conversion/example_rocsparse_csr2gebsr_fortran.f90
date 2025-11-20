@@ -84,6 +84,7 @@ program example_fortran_csr2gebsr
     end interface
 
     integer, parameter :: hipMemcpyHostToDevice = 1
+    integer, parameter :: hipMemcpyDeviceToHost = 2
 
     ! Matrix dimensions
     integer(c_int) :: m, n, row_block_dim, col_block_dim, nnz, mb, nb
@@ -165,6 +166,25 @@ program example_fortran_csr2gebsr
                                                dcsr_row_ptr, dcsr_col_ind, bsr_descr, dbsr_val, &
                                                dbsr_row_ptr, dbsr_col_ind, row_block_dim, &
                                                col_block_dim, buffer))
+
+    ! Copy result back to host and print
+    block
+        integer, allocatable, target :: h_bsr_row_ptr(:)
+        integer :: i
+
+        allocate(h_bsr_row_ptr(mb + 1))
+        call HIP_CHECK(hipMemcpy(c_loc(h_bsr_row_ptr), dbsr_row_ptr, &
+            int(mb + 1, c_size_t) * 4, hipMemcpyDeviceToHost))
+
+        write(*,fmt='(A,I0)') 'nnzb: ', nnzb
+        write(*,fmt='(A)',advance='no') 'GEBSR row_ptr: '
+        do i = 1, mb + 1
+            write(*,fmt='(I0,A)',advance='no') h_bsr_row_ptr(i), ' '
+        end do
+        write(*,*)
+
+        deallocate(h_bsr_row_ptr)
+    end block
 
     ! Clean up
     call HIP_CHECK(hipFree(buffer))
