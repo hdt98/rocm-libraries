@@ -232,10 +232,10 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
         return {};
 
     bool using_search_cutoff = env::value(MIOPEN_SEARCH_CUTOFF);
-    auto selected     = miopen::solver::ConvSolution{miopenStatusUnknownError};
-    auto best         = std::numeric_limits<float>::max();
-    auto best_invoker = Invoker{};
-    auto ret          = std::vector<Solution>{};
+    auto selected            = miopen::solver::ConvSolution{miopenStatusUnknownError};
+    auto best                = std::numeric_limits<float>::max();
+    auto best_invoker        = Invoker{};
+    auto ret                 = std::vector<Solution>{};
     std::vector<float> samples;
 
     for(const auto& sol : solutions)
@@ -266,14 +266,14 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
         {
             skip_time *= env::value(MIOPEN_SEARCH_SKIP_PCT) / 100.0f;
             // skip Naive if another solver has been timed.
-            if(sol.solver_id.find("Naive") != std::string::npos)
+            if(using_search_cutoff && sol.solver_id.find("Naive") != std::string::npos)
             {
-                //s.SolverDbId()
-                MIOPEN_LOG_I("Skipping Naive solver: " << sol.solver_id);
+                MIOPEN_LOG_I("Skipping Naive Solver: " << algorithm_name.ToString() << ":"
+                                                       << sol.solver_id);
                 continue;
             }
         }
-        MIOPEN_LOG_I("Evaluating solver: " << algorithm_name.ToString() << ":"<< sol.solver_id);
+        MIOPEN_LOG_I("Evaluating Solver: " << algorithm_name.ToString() << ":" << sol.solver_id);
 
         std::vector<Program> programs;
         const auto invoker = handle.PrepareInvoker(*sol.invoker_factory,
@@ -300,7 +300,11 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 {
                     samples.push_back(handle.GetKernelTime());
                     if(i == 1 && using_search_cutoff && samples.front() > skip_time)
+                    {
+                        MIOPEN_LOG_I("Skipping (Slow) Solver: " << algorithm_name.ToString() << ":"
+                                                                << sol.solver_id);
                         break;
+                    }
                 }
                 else
                 {
@@ -326,9 +330,9 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             MIOPEN_LOG_I(sol << ": " << elapsed << (elapsed < best ? " < " : " >= ") << best);
             if(elapsed < best)
             {
-                best         = elapsed;
-                selected     = sol;
-                best_invoker = invoker;
+                best                              = elapsed;
+                selected                          = sol;
+                best_invoker                      = invoker;
                 core_result.find_search_best_time = best;
             }
 
@@ -366,7 +370,7 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
     auto& handle = ctx.GetStream();
 
     // Find
-    auto solutions = std::map<AlgorithmName, std::vector<solver::ConvSolution>>{};
+    auto solutions = std::vector<std::pair<AlgorithmName, std::vector<solver::ConvSolution>>>{};
     std::transform(
         finders.begin(), finders.end(), std::inserter(solutions, solutions.end()), [&](auto&& f) {
             return std::make_pair(f->GetAlgorithmName(problem),
@@ -377,7 +381,6 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
 
     for(auto it = solutions.begin(); it != solutions.end();)
     {
-        MIOPEN_LOG_I("testing alg: " << it->first.ToString()); 
         if(it->second.empty())
         {
             it = solutions.erase(it);
@@ -415,14 +418,8 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
 
     for(const auto& ss : solutions)
     {
-        MIOPEN_LOG_I("Eval alg: " << ss.first.ToString()); 
-        auto evaluated = EvaluateInvokers(handle,
-                                          ss.second,
-                                          ss.first,
-                                          network_config,
-                                          invoke_ctx,
-                                          ret,
-                                          force_attach_binary);
+        auto evaluated = EvaluateInvokers(
+            handle, ss.second, ss.first, network_config, invoke_ctx, ret, force_attach_binary);
 
         ret.solutions.insert(ret.solutions.end(),
                              std::make_move_iterator(evaluated.begin()),

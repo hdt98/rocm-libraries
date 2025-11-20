@@ -377,10 +377,10 @@ std::vector<Solution> VerifiedFDBSolution(const ExecutionContext& ctx,
             // system db result is good
             // add to user fdb so this check is skipped next time
             MIOPEN_LOG_I2("TrustVerify: Add system db entry to user db");
-            auto fallback  = FallbackPath();
-            auto core_result = FindCoreResult();
+            auto fallback          = FallbackPath();
+            auto core_result       = FindCoreResult();
             core_result.is_optimal = true;
-            auto copy_sols = conv.GetSolutions(ctx, problem, 4, &fallback, &invoke_ctx);
+            auto copy_sols         = conv.GetSolutions(ctx, problem, 4, &fallback, &invoke_ctx);
             for(const auto& s : copy_sols)
             {
                 auto solution = Solution{solver::Id{s.solution_id}, s.time, s.workspace_size};
