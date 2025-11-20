@@ -594,6 +594,7 @@ struct StreamKKernel
             tile_idx += kargs.tile_partitioner.get_grid())
         {
             BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
+            block_sync_lds();
         }
 
         // Stream-K section
@@ -662,7 +663,7 @@ struct StreamKKernel
         hip_check_error(
             hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));
 
-        return occupancy;
+        return max(occupancy, 1);
     }
 };
 } // namespace reboot
