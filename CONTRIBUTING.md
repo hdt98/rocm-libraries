@@ -195,7 +195,7 @@ cd rocm-libraries
 pre-commit install
 ```
 
-Once installed, the hooks will run automatically on `git commit`. If any checks fail, the commit will be blocked until you fix the issues.
+After they are installed, the hooks will run automatically for `git commit`. If any checks fail, the commit will be blocked until you fix the issues.
 
 ### Running Pre-commit Manually
 
