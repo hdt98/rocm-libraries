@@ -20,9 +20,10 @@ template <typename PrecType>
 constexpr ck_tile::index_t get_k_warp_tile()
 {
 #if defined(CK_USE_GFX1250)
-    constexpr bool is_8bit_float =
-        std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
-    return is_8bit_float ? 64 : 32;
+    constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
+                             std::is_same_v<PrecType, ck_tile::bf8_t> ||
+                             std::is_same_v<PrecType, ck_tile::int8_t>;
+    return is_8bit ? 64 : 32;
 #else
     return 16;
 #endif

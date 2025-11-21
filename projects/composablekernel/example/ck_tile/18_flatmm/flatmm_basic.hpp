@@ -17,7 +17,7 @@ constexpr ck_tile::index_t get_k_warp_tile()
 {
     constexpr bool is_8bit_float =
         std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
-#if defined(CK_TILE_USE_WMMA)
+#if CK_TILE_USE_WMMA
 #if defined(CK_USE_GFX1250)
     return is_8bit_float ? 64 : 32;
 #else
