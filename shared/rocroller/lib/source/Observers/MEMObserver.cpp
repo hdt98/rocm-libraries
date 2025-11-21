@@ -126,12 +126,32 @@ namespace rocRoller
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
             , m_programCycle(0)
+            , m_completedCount(0)
+            , m_issuedCount(0)
         {
         }
 
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
             InstructionStatus status;
+
+            // int waitcnt = inst.getWaitCount().dscnt();
+            // if(waitcnt >= 0 && waitcnt < 64) // Valid waitcnt value
+            // {
+            //     const int pendingCount = m_issuedCount - m_completedCount;
+            //     if(pendingCount > waitcnt)
+            //     {
+            //         // Need to wait for (pendingCount - waitcnt) instructions to complete
+            //         const int needToComplete = pendingCount - waitcnt;
+            //         if(needToComplete > 0 && needToComplete <= m_commandQueue.size())
+            //         {
+            //             // The (needToComplete-1)th element in the queue is what we need to wait for
+            //             const auto completionCycle = m_commandQueue[needToComplete - 1];
+            //             status.stallCycles         = completionCycle - m_programCycle;
+            //         }
+            //     }
+            // }
+
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
@@ -163,6 +183,19 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::modify(Instruction& inst) const
         {
+            int waitcnt = inst.getWaitCount().dscnt();
+            if(waitcnt >= 0)
+            {
+                const int  pendingCount = m_issuedCount - m_completedCount;
+                const auto status       = peek(inst);
+                inst.addComment(fmt::format(
+                    "WeightlessDSMemObserver waitcnt({}): pending {}, completed {}, stall {}",
+                    waitcnt,
+                    pendingCount,
+                    m_completedCount,
+                    status.stallCycles));
+            }
+
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
@@ -176,14 +209,12 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
-            int wait = inst.getWaitCount().dscnt();
-            // TODO: handle waitcount
-
             m_programCycle += inst.totalCycles();
 
             while(!m_commandQueue.empty() && m_programCycle >= m_commandQueue.front())
             {
                 m_commandQueue.pop_front();
+                m_completedCount++;
             }
             while(!m_dataQueue.empty() && m_programCycle >= m_dataQueue.front())
             {
@@ -217,6 +248,7 @@ namespace rocRoller
                 const auto base = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
 
                 m_commandQueue.push_back(base + cycles);
+                m_issuedCount++;
 
                 if(direction == LDSBankModel::LdsDirection::Write)
                 {
@@ -237,13 +269,15 @@ namespace rocRoller
                 const_cast<Instruction&>(inst).addComment(
                     fmt::format("WeightlessDSMemObserver {}: {} cycles, "
                                 "{} slots, remaining {} slots, "
-                                "command queue size {}, data queue size {}",
+                                "cmd queue {}, data queue {}, issued {}, completed {}",
                                 m_programCycle,
                                 cycles,
                                 requiredSlots,
                                 calculateRemainingSlots(),
                                 m_commandQueue.size(),
-                                m_dataQueue.size()));
+                                m_dataQueue.size(),
+                                m_issuedCount,
+                                m_completedCount));
             }
         }
 

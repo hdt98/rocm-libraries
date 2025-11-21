@@ -41,8 +41,12 @@
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/CodeGen/MemoryInstructions.hpp>
+#include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/ExpressionTransformations.hpp>
+#include <rocRoller/Operations/Command.hpp>
+#include <rocRoller/Operations/CommandArguments.hpp>
+#include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 
 #include <catch2/catch_template_test_macros.hpp>
@@ -258,42 +262,105 @@ namespace MEMObserverTest
         }
     }
 
-    TEST_CASE("WeightlessDSMemObserver", "[observer]")
+    TEST_CASE("WeightlessDSMemObserver simple test with totalCycles", "[observer]")
     {
-        auto context = TestContext::ForTestDevice({});
-        auto v       = context.createRegisters(Register::Type::Vector, DataType::UInt32, 32);
-        auto zero    = Register::Value::Literal(0);
-
-        Scheduling::WeightlessDSMemObserver observer(context.get());
-
-        SECTION("Basic read operations without stalls")
+        SECTION("Waitcnt with instruction in-between")
         {
-            const auto createDsRead = [&](auto src, auto dst) {
-                auto inst = Instruction("ds_write_b64", {src}, {dst, zero}, {}, "");
-                inst.setAddresses(generateLDSAddresses(64, 4, 4));
-                return inst;
+            auto context = TestContext::ForTestDevice();
+            auto v       = context.createRegisters(Register::Type::Vector, DataType::UInt32, 4);
+
+            size_t workgroupSize    = 64;
+            size_t strideMultiplier = 8;
+
+            std::vector<Instruction> insts = {
+                Instruction("ds_read_b32", {v[1]}, {v[0]}, {}, ""), // writes v[1]
+                Instruction("ds_read_b32", {v[3]}, {v[2]}, {}, ""),
+                Instruction("ds_write_b32",
+                            {},
+                            {v[0], v[1]},
+                            {},
+                            ""), // reads v[1] -> waitcnt
             };
 
-            std::vector<Instruction> insts;
-            for(int i = 0; i < 16; ++i)
+            const auto addresses = generateLDSAddresses(workgroupSize, strideMultiplier, 1);
+            for(auto& inst : insts)
             {
-                insts.push_back(createDsRead(v[i], v[i]));
-                for(int j = 0; j < 4; ++j)
-                {
-                    insts.push_back(Instruction{"v_add_i32", {v[i * 2]}, {v[i * 2], zero}, {}, ""});
-                }
+                inst.setAddresses(addresses);
             }
 
-            for(size_t i = 0; i < insts.size(); ++i)
+            for(auto& inst : insts)
             {
-                CAPTURE(i);
-                auto inst = insts[i];
-
-                const auto status = context->observer()->peek(inst);
-                context->schedule(inst);
+                peekAndSchedule(context, inst);
             }
 
-            Log::info(context.output());
+            CHECK_THAT(context.output(), ContainsSubstring("WeightlessDSMemObserver"));
+            CHECK_THAT(context.output(), ContainsSubstring("s_waitcnt"));
+
+            using namespace Scheduling::LDSBankModel;
+            const auto memOp       = MemoryOpLDS{LdsDirection::Read};
+            const auto issueCycles = getInstructionIssueCycles(memOp, 1) / 4;
+            const auto dataCycles
+                = getInstructionDataCycles(RuntimeLDSInstruction{memOp, 1, addresses},
+                                           context->targetArchitecture().target().gfx)
+                  / 4;
+
+            INFO(context.output());
+            CHECK(insts[0].totalCycles() == issueCycles);
+            CHECK(insts[1].totalCycles() == issueCycles);
+            CHECK(insts[2].totalCycles() == -1);
+        }
+
+        SECTION("Waitcnt waiting for both")
+        {
+            auto context = TestContext::ForTestDevice();
+            auto v       = context.createRegisters(Register::Type::Vector, DataType::UInt32, 4);
+
+            size_t workgroupSize    = 64;
+            size_t strideMultiplier = 8;
+
+            std::vector<Instruction> insts = {
+                Instruction("ds_read_b32", {v[1]}, {v[0]}, {}, ""),
+                Instruction("ds_read_b32", {v[3]}, {v[2]}, {}, ""), // writes v[3]
+                Instruction("ds_write_b32",
+                            {},
+                            {v[2], v[3]},
+                            {},
+                            ""), // reads v[3] -> waitcnt
+            };
+
+            const auto addresses = generateLDSAddresses(workgroupSize, strideMultiplier, 1);
+            for(auto& inst : insts)
+            {
+                inst.setAddresses(addresses);
+            }
+
+            for(auto& inst : insts)
+            {
+                peekAndSchedule(context, inst);
+            }
+
+            CHECK_THAT(context.output(), ContainsSubstring("WeightlessDSMemObserver"));
+            CHECK_THAT(context.output(), ContainsSubstring("s_waitcnt"));
+
+            using namespace Scheduling::LDSBankModel;
+            const auto memOp       = MemoryOpLDS{LdsDirection::Read};
+            const auto issueCycles = getInstructionIssueCycles(memOp, 1) / 4;
+            const auto dataCycles
+                = getInstructionDataCycles(RuntimeLDSInstruction{memOp, 1, addresses},
+                                           context->targetArchitecture().target().gfx)
+                  / 4;
+
+            INFO(context.output());
+            CHECK(insts[0].totalCycles() == issueCycles);
+            CHECK(insts[1].totalCycles() == issueCycles);
+            // CHECK(insts[2].totalCycles() == -1);
+
+            CommandKernel commandKernel;
+            commandKernel.setContext(context.get());
+            commandKernel.generateKernel();
+            Command command;
+            auto    args = command.createArguments();
+            commandKernel.launchKernel(args.runtimeArguments());
         }
     }
 }
