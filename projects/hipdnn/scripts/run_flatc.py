@@ -51,23 +51,32 @@ def main():
         sys.exit(1)
 
     for f in sys.argv[1:]:
-        result = subprocess.run(
-            [
-                flatc_path,
-                "-I",
-                schemas_dir,
-                "--cpp",
-                "--gen-object-api",
-                "--gen-mutable",
-                "--gen-compare",
-                "--defaults-json",
-                "--scoped-enums",
-                "-o",
-                output_dir,
-                f,
-            ]
-        )
-        if result.returncode != 0:
+        try:
+            subprocess.run(
+                [
+                    flatc_path,
+                    "-I",
+                    schemas_dir,
+                    "--cpp",
+                    "--gen-object-api",
+                    "--gen-mutable",
+                    "--gen-compare",
+                    "--defaults-json",
+                    "--scoped-enums",
+                    "-o",
+                    output_dir,
+                    f,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: Failed to compile {f}", file=sys.stderr)
+            print("STDOUT:", file=sys.stderr)
+            print(e.stdout, file=sys.stderr)
+            print("STDERR:", file=sys.stderr)
+            print(e.stderr, file=sys.stderr)
             sys.exit(1)
 
 
