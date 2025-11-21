@@ -116,8 +116,8 @@ rm Linux.flatc.binary.g++-13.zip
 ```
 
 **Windows:**
-1. Download: https://github.com/google/flatbuffers/releases/download/v25.9.23/Windows.flatc.binary.zip
-2. Extract `flatc.exe` and add it to your system PATH
+1. Download: https://github.com/google/flatbuffers/releases/download/v25.9.23/Windows.flatc.binary.zip.
+2. Extract `flatc.exe` and add it to your system PATH.
 
 **Verify installation:**
 ```bash
