@@ -143,9 +143,25 @@ namespace rocRoller
             return workgroupSize / 64;
         }
 
+        int WeightlessDSMemObserver::interWaveConflicts() const
+        {
+            // Both SPs share the same LDS, so if more than one wave is active,
+            // conflicts double (assuming waves perfectly interleave)
+            return std::min(2, waveCount());
+        }
+
+        int WeightlessDSMemObserver::intraSPConflicts() const
+        {
+            // With 3 or more waves, two SIMDs will be active on at least one SP
+            // so two SIMDs share the same LDS queues
+            const auto wc = waveCount();
+            AssertFatal(wc != 3, "wave count of 3 not supported");
+            return waveCount() > 2 ? 2 : 1;
+        }
+
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
-            const auto multiplier = waveCount();
+            const auto multiplier = intraSPConflicts();
 
             InstructionStatus status;
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
@@ -156,7 +172,7 @@ namespace rocRoller
                 const auto [direction, dwords]   = ldsInfo.value();
                 const auto requiredDataSlots     = queueSlots(direction, dwords) * multiplier;
                 const auto requiredCommandSlots  = multiplier;
-                const auto remainingDataSlots    = calculateRemainingSlots();
+                const auto remainingDataSlots    = getRemainingDataSlots();
                 const auto remainingCommandSlots = commandQueueSize - m_commandQueue.size();
 
                 if(requiredCommandSlots > remainingCommandSlots)
@@ -177,7 +193,7 @@ namespace rocRoller
 
                 LDSBankModel::MemoryOpLDS memOp{direction};
                 status.additionalCycles
-                    = LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 - 1;
+                    = (LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 * multiplier) - 1;
             }
             return status;
         }
@@ -222,7 +238,7 @@ namespace rocRoller
                 m_dataQueue.pop_front();
             }
 
-            for(unsigned int i = 0; i < waveCount(); ++i)
+            for(unsigned int i = 0; i < intraSPConflicts(); ++i)
                 if(GPUInstructionInfo::isLDS(inst.getOpCode())
                    && useWeightlessObserver(inst, m_context.lock()))
                 {
@@ -240,10 +256,11 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     auto gfx = ctx->targetArchitecture().target().gfx;
 
-                    int dataCycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
+                    int dataCycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4
+                                     * interWaveConflicts();
 
                     AssertFatal(
-                        calculateRemainingSlots() >= requiredSlots
+                        getRemainingDataSlots() >= requiredSlots
                             && m_commandQueue.size() < commandQueueSize,
                         "Expected queue space to be accounted for in peek function and passed "
                         "through to total cycles calculation.");
@@ -281,7 +298,7 @@ namespace rocRoller
                 }
         }
 
-        int WeightlessDSMemObserver::calculateRemainingSlots() const
+        int WeightlessDSMemObserver::getRemainingDataSlots() const
         {
             int usedSlots = 0;
             for(const auto& slotFreedCycle : m_dataQueue)

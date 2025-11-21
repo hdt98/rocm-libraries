@@ -313,7 +313,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
     if(testIndividual)
     {
         instrDwords      = GENERATE(2);
-        strideMultiplier = GENERATE(8);
+        strideMultiplier = GENERATE(4);
         write            = GENERATE(false);
     }
     else
@@ -493,10 +493,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
 
             int modelLatency = inst.totalCycles() * 4;
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                modelLatency = getInstructionIssueCycles(write ? MemoryOpLDS{LdsDirection::Write}
-                                                               : MemoryOpLDS{LdsDirection::Read},
-                                                         instrDwords)
-                               + inst.peekedStatus().stallCycles * 4;
+                modelLatency = inst.totalCycles() * 4;
 
             infoMessage << fmt::format("{}, model {}, profiler {}, delta {}\n",
                                        profile.instruction,
@@ -539,11 +536,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
             {
                 using namespace Scheduling::LDSBankModel;
 
-                int modelLatency
-                    = getInstructionIssueCycles(write ? MemoryOpLDS{LdsDirection::Write}
-                                                      : MemoryOpLDS{LdsDirection::Read},
-                                                instrDwords)
-                      + inst.peekedStatus().stallCycles * 4;
+                int modelLatency = inst.totalCycles() * 4;
 
                 auto actualLatency = std::get<1>(medianLatencies[i]);
                 auto delta         = static_cast<int>(actualLatency) - modelLatency;

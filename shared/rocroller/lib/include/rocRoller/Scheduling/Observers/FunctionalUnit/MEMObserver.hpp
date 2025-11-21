@@ -146,8 +146,16 @@ namespace rocRoller
             mutable int m_completedCount;
             mutable int m_issuedCount;
 
-            int calculateRemainingSlots() const;
+            int getRemainingDataSlots() const;
+
+            // Number of waves running on CU
             int waveCount() const;
+
+            // Accounts for both LDS queues sharing same LDS banks
+            int interWaveConflicts() const;
+
+            // Accounts for two SIMDs on SP sharing same LDS queues
+            int intraSPConflicts() const;
         };
     }
 }
