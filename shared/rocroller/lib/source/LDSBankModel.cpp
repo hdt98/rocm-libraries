@@ -184,6 +184,9 @@ namespace rocRoller::Scheduling::LDSBankModel
         AssertFatal(rocRoller::toString(gfx).starts_with("gfx9"),
                     "Unsupported GPU architecture: {}",
                     rocRoller::toString(gfx));
+        AssertFatal(instr.baseAddresses.size() == 64,
+                    "Expected 64 for a wave, got ",
+                    instr.baseAddresses.size());
 
         const auto threadGroupBankMappings = computeThreadGroupBankMappings(instr, gfx);
 

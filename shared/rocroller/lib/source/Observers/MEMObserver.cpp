@@ -133,43 +133,32 @@ namespace rocRoller
 
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
+            const auto multiplier = 1; // Adjust based on workgroup size
+
             InstructionStatus status;
-
-            // int waitcnt = inst.getWaitCount().dscnt();
-            // if(waitcnt >= 0 && waitcnt < 64) // Valid waitcnt value
-            // {
-            //     const int pendingCount = m_issuedCount - m_completedCount;
-            //     if(pendingCount > waitcnt)
-            //     {
-            //         // Need to wait for (pendingCount - waitcnt) instructions to complete
-            //         const int needToComplete = pendingCount - waitcnt;
-            //         if(needToComplete > 0 && needToComplete <= m_commandQueue.size())
-            //         {
-            //             // The (needToComplete-1)th element in the queue is what we need to wait for
-            //             const auto completionCycle = m_commandQueue[needToComplete - 1];
-            //             status.stallCycles         = completionCycle - m_programCycle;
-            //         }
-            //     }
-            // }
-
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
                 const auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
 
-                const auto [direction, dwords] = ldsInfo.value();
-                const auto requiredSlots       = queueSlots(direction, dwords);
-                const auto remainingSlots      = calculateRemainingSlots();
+                const auto [direction, dwords]   = ldsInfo.value();
+                const auto requiredDataSlots     = queueSlots(direction, dwords) * multiplier;
+                const auto requiredCommandSlots  = multiplier;
+                const auto remainingDataSlots    = calculateRemainingSlots();
+                const auto remainingCommandSlots = commandQueueSize - m_commandQueue.size();
 
-                if(m_commandQueue.size() >= commandQueueSize)
+                if(requiredCommandSlots > remainingCommandSlots)
                 {
-                    const auto completionCycle = m_commandQueue.front();
-                    status.stallCycles         = completionCycle - m_programCycle;
+                    const auto completionCycle
+                        = m_commandQueue[requiredCommandSlots - remainingCommandSlots - 1];
+                    status.stallCycles
+                        = std::max(status.stallCycles, completionCycle - m_programCycle);
                 }
 
-                if(requiredSlots > remainingSlots)
+                if(requiredDataSlots > remainingDataSlots)
                 {
-                    const auto completionCycle = m_dataQueue[requiredSlots - remainingSlots - 1];
+                    const auto completionCycle
+                        = m_dataQueue[requiredDataSlots - remainingDataSlots - 1];
                     status.stallCycles
                         = std::max(status.stallCycles, completionCycle - m_programCycle);
                 }
@@ -221,64 +210,63 @@ namespace rocRoller
                 m_dataQueue.pop_front();
             }
 
-            if(GPUInstructionInfo::isLDS(inst.getOpCode())
-               && useWeightlessObserver(inst, m_context.lock()))
-            {
-                auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
-
-                auto [direction, dwords] = ldsInfo.value();
-                int requiredSlots        = queueSlots(direction, dwords);
-
-                LDSBankModel::MemoryOpLDS memOp{direction};
-
-                std::vector<size_t> addresses = inst.getAddresses().value();
-
-                LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
-
-                auto ctx = m_context.lock();
-                auto gfx = ctx->targetArchitecture().target().gfx;
-
-                int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
-
-                AssertFatal(calculateRemainingSlots() >= requiredSlots
-                                && m_commandQueue.size() < commandQueueSize,
-                            "Expected queue space to be accounted for in peek function and passed "
-                            "through to total cycles calculation.");
-
-                const auto base = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
-
-                m_commandQueue.push_back(base + cycles);
-                m_issuedCount++;
-
-                if(direction == LDSBankModel::LdsDirection::Write)
+            for(int i = 0; i < 1; ++i) // Adjust based on workgroup size
+                if(GPUInstructionInfo::isLDS(inst.getOpCode())
+                   && useWeightlessObserver(inst, m_context.lock()))
                 {
-                    const auto cyclesPerSlot = cycles / requiredSlots;
-                    for(int i = 0; i < requiredSlots; ++i)
+                    auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
+
+                    auto [direction, dwords] = ldsInfo.value();
+                    int requiredSlots        = queueSlots(direction, dwords);
+
+                    LDSBankModel::MemoryOpLDS memOp{direction};
+
+                    std::vector<size_t> addresses = inst.getAddresses().value();
+
+                    LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
+
+                    auto ctx = m_context.lock();
+                    auto gfx = ctx->targetArchitecture().target().gfx;
+
+                    int dataCycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
+
+                    AssertFatal(
+                        calculateRemainingSlots() >= requiredSlots
+                            && m_commandQueue.size() < commandQueueSize,
+                        "Expected queue space to be accounted for in peek function and passed "
+                        "through to total cycles calculation.");
+
+                    const auto base
+                        = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
+
+                    m_commandQueue.push_back(base + dataCycles);
+                    m_issuedCount++;
+
+                    if(direction == LDSBankModel::LdsDirection::Write)
                     {
-                        const auto queueFreedCycle = base + i * cyclesPerSlot;
+                        const auto cyclesPerSlot = dataCycles / requiredSlots;
+                        for(int i = 0; i < requiredSlots; ++i)
+                        {
+                            const auto queueFreedCycle = base + i * cyclesPerSlot;
+                            m_dataQueue.push_back(queueFreedCycle);
+                        }
+                    }
+                    else if(direction == LDSBankModel::LdsDirection::Read)
+                    {
+                        AssertFatal(requiredSlots == 1);
+                        const auto queueFreedCycle = base;
                         m_dataQueue.push_back(queueFreedCycle);
                     }
-                }
-                else if(direction == LDSBankModel::LdsDirection::Read)
-                {
-                    AssertFatal(requiredSlots == 1);
-                    const auto queueFreedCycle = base;
-                    m_dataQueue.push_back(queueFreedCycle);
-                }
 
-                const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver {}: {} cycles, "
-                                "{} slots, remaining {} slots, "
-                                "cmd queue {}, data queue {}, issued {}, completed {}",
-                                m_programCycle,
-                                cycles,
-                                requiredSlots,
-                                calculateRemainingSlots(),
-                                m_commandQueue.size(),
-                                m_dataQueue.size(),
-                                m_issuedCount,
-                                m_completedCount));
-            }
+                    const_cast<Instruction&>(inst).addComment(
+                        fmt::format("WeightlessDSMemObserver {}: {} dataCycles, "
+                                    "cmd queue {}, data queue {}, command back {}",
+                                    m_programCycle,
+                                    dataCycles,
+                                    m_commandQueue.size(),
+                                    m_dataQueue.size(),
+                                    m_commandQueue.empty() ? 0 : m_commandQueue.back()));
+                }
         }
 
         int WeightlessDSMemObserver::calculateRemainingSlots() const

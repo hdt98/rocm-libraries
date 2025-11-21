@@ -220,8 +220,7 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu]")
 
                     GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
 
-                    auto baseAddresses
-                        = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+                    auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
                     RuntimeLDSInstruction ldsinstr;
                     ldsinstr.memoryOp.direction = write ? LdsDirection::Write : LdsDirection::Read;
@@ -313,9 +312,9 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
     constexpr auto testIndividual = false; // for debugging a single configuration
     if(testIndividual)
     {
-        instrDwords      = GENERATE(4);
-        strideMultiplier = GENERATE(2);
-        write            = GENERATE(true);
+        instrDwords      = GENERATE(2);
+        strideMultiplier = GENERATE(8);
+        write            = GENERATE(false);
     }
     else
     {
@@ -324,7 +323,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
         write            = GENERATE(true, false);
     }
 
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
     const auto name = fmt::format(
         "lds_weave_{}_b{}_stride{}", write ? "write" : "read", instrDwords * 32, strideMultiplier);
