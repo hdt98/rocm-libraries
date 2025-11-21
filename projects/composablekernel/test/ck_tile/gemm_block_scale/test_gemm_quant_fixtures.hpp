@@ -11,7 +11,11 @@ template <bool is_8bit>
 constexpr ck_tile::index_t get_k_warp_tile()
 {
 #if CK_TILE_USE_WMMA
+#if defined(CK_USE_GFX1250)
+    return is_8bit ? 64 : 32;
+#else
     return 16;
+#endif
 #else
     return is_8bit ? 64 : 32;
 #endif
