@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2023-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -28,6 +28,9 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/io.hpp"
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle.hpp"
+#endif
 
 namespace ck {
 namespace tensor_operation {
@@ -1003,11 +1006,20 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         void Print() const
         {
+            std::cout << "AComputeDataType: " << get_type_name<AComputeDataType>()
+                      << "; BComputeDataType: " << get_type_name<BComputeDataType>()
+                      << "; EDataType: " << get_type_name<EDataType>() << std::endl;
+
             std::cout << "A[M, K]: " << a_grid_desc_m_k_ << std::endl;
             std::cout << "B[N, K]: " << b_grid_desc_n_k_ << std::endl;
             static_for<0, NumDTensor, 1>{}(
                 [&](auto i) { std::cout << "Ds[M, N]: " << ds_grid_desc_m_n_[i] << std::endl; });
             std::cout << "E[M, N]: " << e_grid_desc_m_n_ << std::endl;
+
+            std::cout << "a grid desc" << a_grid_desc_ak0_m_ak1_ << std::endl;
+            std::cout << "b grid desc" << b_grid_desc_bk0_n_bk1_ << std::endl;
+            std::cout << "e grid desc" << e_grid_desc_mblock_mperblock_nblock_nperblock_
+                      << std::endl;
         }
 
         //  private:
@@ -1198,7 +1210,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             isMultiA,
                             isMultiB,
                             CTranspose>;
-
                         return launch_and_time_kernel(
                             stream_config,
                             kernel,
@@ -1281,7 +1292,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         float RunImp(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             float avg_time = 0.f;
-
             if constexpr(NeedTransposeKernel)
             {
                 const index_t a_grid_size =
@@ -1686,7 +1696,23 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             return false;
         }
-
+        if constexpr(is_same_v<AComputeDataType, ck::tf32_t> ||
+                     is_same_v<BComputeDataType, ck::tf32_t>)
+        {
+            if(!is_tf32_supported())
+            {
+                return false;
+            }
+            if constexpr(!is_same_v<AComputeDataType, BComputeDataType>)
+            {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "ComputeDataType for A and B should be same while using TF32"
+                              << std::endl;
+                }
+                return false;
+            }
+        }
         // check Gridwise GEMM
         if(get_warp_size() == 64)
         {
@@ -2039,6 +2065,19 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         return str.str();
     }
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    std::string GetInstanceString() const override
+    {
+        static_assert(ck_tile::reflect::HasInstanceTraits<DeviceOp>,
+                      "Specialization of instance_traits not found. Please check that a "
+                      "specialization exists in file "
+                      "ck_tile/builder/reflect/"
+                      "instance_traits_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle.hpp "
+                      "for the given template parameters.");
+        return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+#endif
 
     size_t GetWorkSpaceSize(const BaseArgument* p_arg) const override
     {

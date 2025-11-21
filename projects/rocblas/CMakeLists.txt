@@ -41,10 +41,7 @@ include(toolchain-options)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-if(NOT python)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
-  set(python "${Python3_EXECUTABLE}")
-endif()
+find_package(Python3 3.9 COMPONENTS Interpreter REQUIRED)
 
 # ########################################################################
 # Main
@@ -71,7 +68,7 @@ get_os_id(OS_ID)
 message (STATUS "OS detected is ${OS_ID}")
 
 # Versioning via rocm-cmake
-set ( VERSION_STRING "5.1.0" )
+set ( VERSION_STRING "5.2.0" )
 rocm_setup_version( VERSION ${VERSION_STRING} )
 
 # Users may override HIP path by specifying their own in CMAKE_MODULE_PATH
@@ -150,18 +147,16 @@ set( AMDGPU_TARGETS "${GPU_TARGETS}" CACHE STRING "List of GPUs (gfx targets) to
 
 option( BUILD_WITH_HIPBLASLT "Build with HipBLASLt" ON )
 set( hipblaslt_path "/opt/rocm" CACHE PATH "Use local HipBLASLt directory" )
-set( HIPBLASLT_VERSION 1.0.0 CACHE STRING "The version of HipBLASLt to be used" )
+set( HIPBLASLT_VERSION 1.2.0 CACHE STRING "The version of HipBLASLt to be used" )
 
-if( WIN32 OR NOT BUILD_WITH_TENSILE OR NOT BUILD_SHARED_LIBS )
+if( NOT BUILD_WITH_TENSILE )
   set( BUILD_WITH_HIPBLASLT OFF )
 endif()
 
-if( NOT SKIP_LIBRARY )
-  if(BUILD_WITH_HIPBLASLT)
-    # don't wait until after Tensile to find hipblaslt if enabled
-    find_package( hipblaslt ${HIPBLASLT_VERSION} REQUIRED CONFIG PATHS ${hipblaslt_path} ${ROCM_PATH})
-    message(STATUS "FOUND hipBLASLt, INCLUDE_DIR: ${HIPBLASLT_INCLUDE_DIR}")
-  endif()
+if(BUILD_WITH_HIPBLASLT)
+  # don't wait until after Tensile to find hipblaslt if enabled; needed for clients-only build too
+  find_package( hipblaslt ${HIPBLASLT_VERSION} REQUIRED CONFIG PATHS ${hipblaslt_path} ${ROCM_PATH})
+  message(STATUS "FOUND hipBLASLt, INCLUDE_DIR: ${HIPBLASLT_INCLUDE_DIR}")
 endif()
 
 function(list_replace list old new)
@@ -179,10 +174,11 @@ if(NOT SKIP_LIBRARY)
   if( BUILD_WITH_TENSILE )
     # we will have expanded "all" for tensile to ensure consistency as we have local rules
     set( Tensile_ARCHITECTURE "${GPU_TARGETS}" CACHE STRING "Tensile to use which architecture?" FORCE)
-
     list_replace( Tensile_ARCHITECTURE "gfx90a" "gfx90a:xnack+\;gfx90a:xnack-")
 
-    set( TENSILE_VERSION 4.44.0 CACHE STRING "The version of Tensile to be used")
+    set( TENSILE_VERSION 4.45.0 CACHE STRING "The version of Tensile to be used")
+
+    set( Tensile_NO_ENUMERATE ON CACHE BOOL "Disable enumerating GPU targets for Tensile builds" FORCE)
 
     if(BUILD_WITH_PIP)
       if (WIN32)
@@ -193,14 +189,25 @@ if(NOT SKIP_LIBRARY)
 
       include(virtualenv)
 
+      set(ROCBLAS_TENSILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/tensile" CACHE PATH "Path to monorepo Tensile directory")
+
       if (Tensile_TEST_LOCAL_PATH)
         virtualenv_install(${Tensile_TEST_LOCAL_PATH})
         message (STATUS "using local Tensile from ${Tensile_TEST_LOCAL_PATH}, copied to ${Tensile_ROOT}")
+      elseif (IS_DIRECTORY "${ROCBLAS_TENSILE_DIR}")
+        virtualenv_install(${ROCBLAS_TENSILE_DIR})
+        message (STATUS "using local path to shared Tensile from ${ROCBLAS_TENSILE_DIR}, copied to ${Tensile_ROOT}")
       else()
-        # Use the virtual-env setup and download package from specified repo:
-        set( tensile_fork "ROCm" CACHE STRING "Tensile fork to use" )
-        file (STRINGS "tensile_tag.txt" read_tensile_tag)
-        set( tensile_tag ${read_tensile_tag} CACHE STRING "Tensile tag to download" )
+        message(WARNING "deprecated fetch from legacy Tensile repository")
+        # Use the virtual-env setup and download package from legacy repo, requires tensile tag file creation or tensile_tag cache variable
+        set( tensile_fork "ROCm" CACHE STRING "Tensile fork to use (deprecated)" )
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tensile_tag.txt")
+          file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/tensile_tag.txt" read_tensile_tag)
+          set( tensile_tag ${read_tensile_tag} CACHE STRING "Tensile tag to download" )
+        else()
+          set( tensile_tag "develop" CACHE STRING "Default Tensile tag to download (deprecated)" )
+          message(WARNING "tensile_tag.txt not found, using default Tensile tag: ${tensile_tag}")
+        endif()
         virtualenv_install("git+https://github.com/${tensile_fork}/Tensile.git@${tensile_tag}")
         message (STATUS "using GIT Tensile fork=${tensile_fork} from branch=${tensile_tag}")
       endif()
@@ -390,7 +397,7 @@ if(BUILD_CODE_COVERAGE)
   #
   add_custom_target(coverage_analysis
     COMMAND ${CMAKE_COMMAND} -E make_directory ./coverage-report/profraw
-    COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="./coverage-report/profraw/rocblas-coverage_%m.profraw" ${python} ./clients/staging/rocblas_rtest.py -t code_coverage
+    COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="./coverage-report/profraw/rocblas-coverage_%m.profraw" ${Python3_EXECUTABLE} ./clients/staging/rocblas_rtest.py -t code_coverage
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 

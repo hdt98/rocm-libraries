@@ -2,6 +2,12 @@
 
 Full documentation for hipCUB is available at [https://rocm.docs.amd.com/projects/hipCUB/en/latest/](https://rocm.docs.amd.com/projects/hipCUB/en/latest/).
 
+## hipCUB-4.2.0 for ROCm 7.2
+ 
+### Resolved issues
+ 
+* Fixed memory leak issues with some unit tests.
+
 ## hipCUB-4.1.0 for ROCm 7.1
 
 ### Added
@@ -10,6 +16,7 @@ Full documentation for hipCUB is available at [https://rocm.docs.amd.com/project
 * Added `::hipcub::extents`, with limited parity to C++23's `std::extents`. Only `static extents` is supported; `dynamic extents` is not. Helper structs have been created to perform computations on `::hipcub::extents` only when the backend is rocPRIM. For the CUDA backend, similar functionality exists.
 * Added `projects/hipcub/hipcub/include/hipcub/backend/rocprim/util_mdspan.hpp` to support `::hipcub::extents`.
 * Added `::hipcub::ForEachInExtents` API.
+* Added `hipcub::DeviceTransform::Transform` and `hipcub::DeviceTransform::TransformStableArgumentAddresses`.
 
 * hipCUB and its dependency rocPRIM have been moved into the new rocm-libraries "monorepo" repository (https://github.com/ROCm/rocm-libraries). This repository contains a number of ROCm libraries that are frequently used together.
   * The repository migration requires a few changes to the way that hipCUB fetches library dependencies.
@@ -17,6 +24,8 @@ Full documentation for hipCUB is available at [https://rocm.docs.amd.com/project
     * `PACKAGE` - (default) searches for a preinstalled packaged version of the dependency. If it is not found, the build will fall back using option `DOWNLOAD`, below.
     * `DOWNLOAD` - downloads the dependency from the rocm-libraries repository. If git >= 2.25 is present, this option uses a sparse checkout that avoids downloading more than it needs to. If not, the whole monorepo is downloaded (this may take some time).
     * `MONOREPO` - this options is intended to be used if you are building hipCUB from within a copy of the rocm-libraries repository that you have cloned (and therefore already contains rocPRIM). When selected, the build will try find the dependency in the local repository tree. If it cannot be found, the build will attempt to use git to perform a sparse-checkout of rocPRIM. If that also fails, it will fall back to using the `DOWNLOAD` option described above.
+
+* Added a new CMake option `-DUSE_SYSTEM_LIB` to allow tests to be built from installed `hipCUB` provided by the system.
     
 ### Removed
 
