@@ -93,7 +93,8 @@ constexpr auto BlockGemmPipeline_Selector()
         }
     }
     else if constexpr(UsePrefetch)
-    { // currently only one implementation supports prefetch
+    {
+        // currently only one implementation supports prefetch
         if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
         {
             return BlockwiseGemmXdlops_pipeline_v3<BlkGemmPipeSche,
@@ -118,6 +119,10 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    KPack,
                                                    TransposeC,
                                                    UsePrefetch>{};
+        }
+        else
+        {
+            std::cerr << "BlockGemmPipeline configuration is not available" << std::endl;
         }
     }
     else
