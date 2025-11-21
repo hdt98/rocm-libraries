@@ -23,6 +23,16 @@ static constexpr inline auto is_row_major(Layout layout_)
 template <typename PrecType, ck_tile::index_t M_Warp_Tile>
 constexpr ck_tile::index_t get_k_warp_tile()
 {
+#if CK_TILE_USE_WMMA
+#if defined(CK_USE_GFX1250)
+    constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
+                             std::is_same_v<PrecType, ck_tile::bf8_t> ||
+                             std::is_same_v<PrecType, ck_tile::int8_t>;
+    return is_8bit ? 64 : 32;
+#else
+    return 16;
+#endif
+#else
 #if defined(CK_GFX950_SUPPORT)
     constexpr bool is_8bit_float =
         std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
@@ -30,13 +40,12 @@ constexpr ck_tile::index_t get_k_warp_tile()
         return is_8bit_float ? 64 : 16;
     else
         return is_8bit_float ? 128 : 32;
-#elif defined(CK_USE_GFX1250)
-    constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
-                             std::is_same_v<PrecType, ck_tile::bf8_t> ||
-                             std::is_same_v<PrecType, ck_tile::int8_t>;
-    return is_8bit ? 64 : 32;
 #else
-    return 16;
+    if constexpr(M_Warp_Tile == 32)
+        return 16;
+    else
+        return 32;
+#endif
 #endif
 }
 

@@ -69,11 +69,20 @@ class TestCkTileStreamKReboot : public ::testing::Test
         constexpr ck_tile::index_t M_Warp = 2;
         constexpr ck_tile::index_t N_Warp = 2;
         constexpr ck_tile::index_t K_Warp = 1;
-
+#if CK_TILE_USE_WMMA
+        constexpr ck_tile::index_t M_Warp_Tile = 16;
+        constexpr ck_tile::index_t N_Warp_Tile = 16;
+#if defined(CK_USE_GFX1250)
+        static_assert(sizeof(ADataType) == 2);
+        constexpr ck_tile::index_t K_Warp_Tile = 32;
+#else
+        constexpr ck_tile::index_t K_Warp_Tile = 16;
+#endif
+#else
         constexpr ck_tile::index_t M_Warp_Tile = 32;
         constexpr ck_tile::index_t N_Warp_Tile = 32;
         constexpr ck_tile::index_t K_Warp_Tile = 16;
-
+#endif
         constexpr bool kPadM      = PadM;
         constexpr bool kPadN      = PadN;
         constexpr bool kPadK      = PadK;

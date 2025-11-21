@@ -15,6 +15,13 @@
 template <typename PrecType, ck_tile::index_t M_Warp_Tile>
 constexpr ck_tile::index_t get_k_warp_tile_flatmm()
 {
+#if CK_TILE_USE_WMMA
+#if defined(CK_USE_GFX1250)
+    return sizeof(PrecType) == 2 ? 32 : 64;
+#else
+    return 16;
+#endif
+#else
 #if defined(CK_GFX950_SUPPORT)
     if constexpr(M_Warp_Tile == 32)
         return sizeof(PrecType) == 2 ? 16 : 64;
@@ -25,6 +32,7 @@ constexpr ck_tile::index_t get_k_warp_tile_flatmm()
         return sizeof(PrecType) == 2 ? 16 : 32;
     else
         return sizeof(PrecType) == 2 ? 32 : 64;
+#endif
 #endif
 }
 
@@ -102,13 +110,40 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
     auto shuffle_b(const ck_tile::HostTensor<T>& t)
     {
         assert(t.get_lengths().size() == 2);
-        int n_                = t.get_lengths()[1];
-        int k_                = t.get_lengths()[0];
-        constexpr int divisor = N_Warp_Tile == 32 ? 2 : 4;
-        ck_tile::HostTensor<T> t_view(
-            {n_ / N_Warp_Tile, N_Warp_Tile, k_ / K_Warp_Tile, divisor, K_Warp_Tile / divisor});
-        std::copy(t.begin(), t.end(), t_view.begin());
-        return ck_tile::reference_permute(t_view, {0, 2, 3, 1, 4});
+        int n_ = t.get_lengths()[1];
+        int k_ = t.get_lengths()[0];
+
+        if(ck_tile::is_gfx12_supported())
+        {
+            constexpr int divisor      = 2;
+            constexpr int kABK1PerLane = 8;
+            constexpr int kABK0PerLane = K_Warp_Tile / divisor / kABK1PerLane;
+            ck_tile::HostTensor<T> t_view({n_ / N_Warp_Tile,
+                                           N_Warp_Tile,
+                                           k_ / K_Warp_Tile,
+                                           kABK0PerLane,
+                                           divisor,
+                                           kABK1PerLane});
+            std::copy(t.begin(), t.end(), t_view.begin());
+            return ck_tile::reference_permute(t_view, {0, 2, 4, 1, 3, 5});
+        }
+        else
+        {
+            int divisor = 1;
+            if(ck_tile::is_gfx11_supported())
+            {
+                divisor = 1;
+            }
+            else
+            {
+                assert(is_wave32() == false);
+                divisor = N_Warp_Tile == 32 ? 2 : 4;
+            }
+            ck_tile::HostTensor<T> t_view(
+                {n_ / N_Warp_Tile, N_Warp_Tile, k_ / K_Warp_Tile, divisor, K_Warp_Tile / divisor});
+            std::copy(t.begin(), t.end(), t_view.begin());
+            return ck_tile::reference_permute(t_view, {0, 2, 3, 1, 4});
+        }
     }
 
     template <typename ALayout, typename BLayout, typename CLayout>
@@ -116,6 +151,11 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                              const ck_tile::stream_config& s,
                              void* kargs_ptr)
     {
+        constexpr ck_tile::index_t WaveSize     = 32;
+        constexpr ck_tile::index_t MIterPerWarp = M_Tile / (M_Warp * M_Warp_Tile);
+        constexpr bool SupportVectorSize16 =
+            (M_Warp_Tile * K_Warp_Tile * sizeof(ADataType) * MIterPerWarp / WaveSize) % 16 == 0;
+        constexpr int VectorSize = SupportVectorSize16 ? 16 : 8;
 
         using GemmShape =
             ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
@@ -140,7 +180,8 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                                              /*UseStructuredSparsity*/ false,
                                              /*Persistent*/ false,
                                              /*NumWaveGroups*/ 1,
-                                             /*Preshuffle*/ true>;
+                                             /*Preshuffle*/ true,
+                                             VectorSize>;
         using GemmPipelineProblem =
             ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, GemmShape, Traits>;
 
@@ -241,6 +282,12 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                                         const ck_tile::stream_config& s,
                                         void* kargs_ptr)
     {
+        constexpr ck_tile::index_t WaveSize     = 32;
+        constexpr ck_tile::index_t MIterPerWarp = M_Tile / (M_Warp * M_Warp_Tile);
+        constexpr bool SupportVectorSize16 =
+            (M_Warp_Tile * K_Warp_Tile * sizeof(ADataType) * MIterPerWarp / WaveSize) % 16 == 0;
+        constexpr int VectorSize = SupportVectorSize16 ? 16 : 8;
+
         using GemmShape =
             ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
                                    ck_tile::sequence<M_Warp, N_Warp, K_Warp>,
@@ -263,7 +310,8 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                                              /*UseStructuredSparsity*/ false,
                                              /*Persistent*/ true, // Enable persistent mode
                                              /*NumWaveGroups*/ 1,
-                                             /*Preshuffle*/ true>;
+                                             /*Preshuffle*/ true,
+                                             VectorSize>;
         using GemmPipelineProblem =
             ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, GemmShape, Traits>;
 

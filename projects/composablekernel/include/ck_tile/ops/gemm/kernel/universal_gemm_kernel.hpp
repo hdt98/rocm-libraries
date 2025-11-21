@@ -316,7 +316,7 @@ struct UniversalGemmKernel
         ck_tile::hip_check_error(
             hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, BlockSize().x, 0));
 
-        const int grid_size = get_available_compute_units(s) * occupancy;
+        const int grid_size = get_available_compute_units(s) * max(occupancy, 1);
         return dim3(grid_size, 1, 1);
     }
 
