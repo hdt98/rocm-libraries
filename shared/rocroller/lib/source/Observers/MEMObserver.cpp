@@ -29,11 +29,13 @@
 #include <string>
 #include <vector>
 
+#include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitecture.hpp>
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
+#include <rocRoller/Utilities/Utils.hpp>
 
 namespace rocRoller
 {
@@ -131,9 +133,19 @@ namespace rocRoller
         {
         }
 
+        int WeightlessDSMemObserver::waveCount() const
+        {
+            auto ctx = m_context.lock();
+            AssertFatal(ctx != nullptr);
+            const auto workgroupSize = product(ctx->kernel()->workgroupSize());
+            AssertFatal(workgroupSize >= 64 && workgroupSize <= 256 && workgroupSize % 64 == 0,
+                        ShowValue(workgroupSize));
+            return workgroupSize / 64;
+        }
+
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
-            const auto multiplier = 1; // Adjust based on workgroup size
+            const auto multiplier = waveCount();
 
             InstructionStatus status;
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
@@ -210,7 +222,7 @@ namespace rocRoller
                 m_dataQueue.pop_front();
             }
 
-            for(int i = 0; i < 1; ++i) // Adjust based on workgroup size
+            for(unsigned int i = 0; i < waveCount(); ++i)
                 if(GPUInstructionInfo::isLDS(inst.getOpCode())
                    && useWeightlessObserver(inst, m_context.lock()))
                 {

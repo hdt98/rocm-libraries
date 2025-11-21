@@ -146,8 +146,8 @@ namespace rocRoller
             mutable int m_completedCount;
             mutable int m_issuedCount;
 
-            int  calculateRemainingSlots() const;
-            void updateCompletedCount() const;
+            int calculateRemainingSlots() const;
+            int waveCount() const;
         };
     }
 }
