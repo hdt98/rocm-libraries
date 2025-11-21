@@ -3,6 +3,12 @@
 rocBLAS documentation is available at
 [https://rocm.docs.amd.com/projects/rocBLAS/en/latest/index.html](https://rocm.docs.amd.com/projects/rocBLAS/en/latest/index.html).
 
+
+## rocBLAS 5.1.1 for ROCm 7.1.1
+
+### Changed
+  * By default, rocBLAS will not use stream order allocation for its internal workspace. To enable this behavior, set the `ROCBLAS_STREAM_ORDER_ALLOC` environment variable.
+
 ## rocBLAS 5.1.0 for ROCm 7.1
 
 ### Added
@@ -15,6 +21,10 @@ rocBLAS documentation is available at
 ### Optimized
 
 * Improved the performance of Level 2 gemv transposed (`TransA != N`) for the problem sizes where `m` is small and `n` is large on gfx90a and gfx942.
+
+### Resolved issues
+
+* A ROCm 7.0 optimization was fixed to prevent half/f32_r gemm_ex from using the 16-bit gemv kernel, which failed the required 32-bit arithmetic precision.  
 
 ## rocBLAS 5.0.0 for ROCm 7.0
 
