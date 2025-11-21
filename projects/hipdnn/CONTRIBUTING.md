@@ -125,7 +125,7 @@ flatc --version
 # Should output: flatc version 25.9.23
 ```
 
-Once `flatc` is installed, set up pre-commit:
+After `flatc` is installed, set up pre-commit:
 ```bash
 pip install pre-commit
 pre-commit install
