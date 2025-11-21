@@ -18,6 +18,11 @@ add_library(hipblaslt::hipblaslt-clients-common ALIAS hipblaslt-clients-common)
 
 if(HIPBLASLT_ENABLE_BLIS)
     target_link_libraries(hipblaslt-clients-common PUBLIC BLIS::BLIS)
+else()
+    # we do not include the cblas headers properly for cases where we find openblas.
+    # we should fix the includes but we will do this for now while deciding how to manage
+    # that dependency
+    target_include_directories(hipblaslt-clients-common PUBLIC "/usr/include/openblas")
 endif()
 target_link_libraries(hipblaslt-clients-common
     PUBLIC
