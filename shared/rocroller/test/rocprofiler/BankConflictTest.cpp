@@ -52,6 +52,7 @@
 #include "../catch/TestContext.hpp"
 #include "../catch/TestKernels.hpp"
 #include "Agent.hpp"
+#include "Utils.hpp"
 
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -458,50 +459,11 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
             allLatencies.push_back(latencies);
         }
 
-        // Filter for instructions with opcodes
-        std::vector<Instruction> filteredInstructions;
-        for(const auto& inst : instructions)
-        {
-            if(not inst.toString(LogLevel::Terse).empty()) // isCommentOnly did not work
-                filteredInstructions.push_back(inst);
-        }
-        {
-            std::stringstream deltas;
-            for(size_t i = 0; i < std::max(filteredInstructions.size(), allLatencies[0].size());
-                ++i)
-            {
-                const auto& inst
-                    = i < filteredInstructions.size() ? filteredInstructions[i] : Instruction();
-                const auto& profile = i < allLatencies[0].size()
-                                          ? allLatencies[0][i]
-                                          : rocRoller::profiler::InstructionProfile();
+        // Filter instructions and verify alignment with profiler data
+        const auto filteredInstructions
+            = filterAndVerifyInstructions(instructions, allLatencies[0]);
 
-                deltas << fmt::format(
-                    "{}: filtered {}, profiler {}\n", i, inst.getOpCode(), profile.instruction);
-            }
-            INFO(deltas.str());
-            REQUIRE(filteredInstructions.size() == allLatencies[0].size());
-        }
-
-        std::stringstream infoMessage;
-        for(size_t i = 0; i < std::min(filteredInstructions.size(), allLatencies[0].size()); ++i)
-        {
-            const auto& inst    = filteredInstructions[i];
-            const auto& profile = allLatencies[0][i];
-
-            using namespace Scheduling::LDSBankModel;
-
-            int modelLatency = inst.totalCycles() * 4;
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                modelLatency = inst.totalCycles() * 4;
-
-            infoMessage << fmt::format("{}, model {}, profiler {}, delta {}\n",
-                                       profile.instruction,
-                                       modelLatency,
-                                       profile.meanLatency(),
-                                       static_cast<int>(profile.meanLatency()) - modelLatency);
-        }
-        const auto infoStr = testIndividual ? infoMessage.str() : "";
+        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
         INFO(infoStr);
 
         { // All latencies have same number of instructions
