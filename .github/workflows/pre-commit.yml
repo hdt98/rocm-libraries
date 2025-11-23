@@ -13,54 +13,16 @@ jobs:
         with:
           fetch-depth: 0 # 0 fetches all commit history for --from-ref/--to-ref to function
 
+      - name: Run pre-commit filter tests
+        run: python3 .github/scripts/tests/pre_commit_filter_test.py
+
       - name: Filter changed files
         id: filter
         run: |
-          # Add the name of your project folder to enable pre-commit checks for it
-          OPTED_IN_PROJECTS=("hipdnn")
-
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
-
-          # Filter changed files to opted-in projects
-          FILTERED_FILES=""
-          for project in "${OPTED_IN_PROJECTS[@]}"; do
-            PROJECT_FILES=$(echo "$CHANGED_FILES" | grep "^projects/$project/" || true)
-            if [ -n "$PROJECT_FILES" ]; then
-              FILTERED_FILES="$FILTERED_FILES $PROJECT_FILES"
-
-              # Flag for conditional dependency installation
-              echo "${project}_changed=true" >> $GITHUB_OUTPUT
-            fi
-          done
-
-          # Add any files outside the projects folder
-          NON_PROJECT_FILES=$(echo "$CHANGED_FILES" | grep -v "^projects/" || true)
-          if [ -n "$NON_PROJECT_FILES" ]; then
-            FILTERED_FILES="$FILTERED_FILES $NON_PROJECT_FILES"
-          fi
-
-          # Trim whitespace
-          FILTERED_FILES=$(echo $FILTERED_FILES | xargs)
-
-          if [ -z "$FILTERED_FILES" ]; then
-            echo ""
-            echo "================================================"
-            echo "Skipping pre-commit checks"
-            echo "================================================"
-            echo ""
-            echo "No change found in projects using pre-commit"
-            echo "Opted-in projects: ${OPTED_IN_PROJECTS[*]}"
-            echo ""
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          else
-            echo "Running pre-commit on the following files:"
-            echo "$FILTERED_FILES" | tr ' ' '\n'
-            echo ""
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            echo "files<<EOF" >> $GITHUB_OUTPUT
-            echo "$FILTERED_FILES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
+          python3 .github/scripts/pre_commit_filter.py \
+            --base-ref origin/${{ github.event.pull_request.base.ref }} \
+            --head-ref HEAD \
+            hipdnn # Add more project names separated by spaces
 
       - name: Set up Python
         if: steps.filter.outputs.should_run == 'true'
