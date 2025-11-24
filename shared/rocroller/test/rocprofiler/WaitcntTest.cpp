@@ -178,7 +178,7 @@ private:
     std::vector<Instruction> m_instructions;
 };
 
-TEST_CASE("Waitcnt with DS_WRITE to DS_WRITE dependency", "[rocprofiler][gpu][waitcnt]")
+TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
 
@@ -186,66 +186,57 @@ TEST_CASE("Waitcnt with DS_WRITE to DS_WRITE dependency", "[rocprofiler][gpu][wa
     constexpr auto instrDwords      = 1u;
     constexpr auto strideMultiplier = 16u;
 
-    auto waitcntValue = GENERATE(3);
+    auto waitcntValue = GENERATE(11);
 
-    SECTION("DS_WRITE → DS_WRITE dependency with waitcnt " + std::to_string(waitcntValue))
+    rocRoller::profiler::reset();
+
+    auto context = TestContext::ForTestDevice({}, "waitcnt_" + std::to_string(waitcntValue));
+
+    if(not context->targetArchitecture().target().isCDNAGPU())
     {
-        rocRoller::profiler::reset();
-
-        auto context = TestContext::ForTestDevice(
-            {}, "waitcnt_ds_write_write_dependency_" + std::to_string(waitcntValue));
-
-        if(not context->targetArchitecture().target().isCDNAGPU())
-        {
-            SKIP("Test designed for CDNA architectures");
-        }
-
-        const auto baseAddresses
-            = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-        WaitcntTestKernel kernel(context.get(),
-                                 workgroupSize,
-                                 instrDwords,
-                                 strideMultiplier,
-                                 baseAddresses,
-                                 waitcntValue);
-
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
-
-        const auto& instructions = kernel.getInstructions();
-
-        const auto filteredInstructions = filterAndVerifyInstructions(instructions, latencies);
-
-        const auto comparisonStr = formatLatencyComparison(filteredInstructions, latencies);
-        INFO(comparisonStr);
-        INFO("Waitcnt value: " << waitcntValue);
-
-        int dsReadCount  = 0;
-        int dsWriteCount = 0;
-        int waitcntCount = 0;
-
-        for(const auto& inst : filteredInstructions)
-        {
-            const auto& opcode = inst.getOpCode();
-            if(opcode.find("ds_read") != std::string::npos)
-            {
-                dsReadCount++;
-            }
-            else if(opcode.find("ds_write") != std::string::npos)
-            {
-                dsWriteCount++;
-            }
-            else if(opcode.find("s_waitcnt") != std::string::npos)
-            {
-                waitcntCount++;
-            }
-        }
-
-        CHECK(dsReadCount == 0);
-        CHECK(dsWriteCount == 16);
-
-        Log::debug("Latency comparison:\n" + comparisonStr);
-        Log::debug("Test configuration - waitcnt value: " + std::to_string(waitcntValue));
-        Log::info(context.output());
+        SKIP("Test designed for CDNA architectures");
     }
+
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+    WaitcntTestKernel kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, waitcntValue);
+
+    const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
+
+    const auto& instructions = kernel.getInstructions();
+
+    const auto filteredInstructions = filterAndVerifyInstructions(instructions, latencies);
+
+    const auto comparisonStr = formatLatencyComparison(filteredInstructions, latencies);
+    INFO(comparisonStr);
+    INFO("Waitcnt value: " << waitcntValue);
+
+    int dsReadCount  = 0;
+    int dsWriteCount = 0;
+    int waitcntCount = 0;
+
+    for(const auto& inst : filteredInstructions)
+    {
+        const auto& opcode = inst.getOpCode();
+        if(opcode.find("ds_read") != std::string::npos)
+        {
+            dsReadCount++;
+        }
+        else if(opcode.find("ds_write") != std::string::npos)
+        {
+            dsWriteCount++;
+        }
+        else if(opcode.find("s_waitcnt") != std::string::npos)
+        {
+            waitcntCount++;
+        }
+    }
+
+    CHECK(dsReadCount == 0);
+    CHECK(dsWriteCount == 17);
+
+    Log::debug("Latency comparison:\n" + comparisonStr);
+    Log::debug("Test configuration - waitcnt value: " + std::to_string(waitcntValue));
+    Log::info(context.output());
 }

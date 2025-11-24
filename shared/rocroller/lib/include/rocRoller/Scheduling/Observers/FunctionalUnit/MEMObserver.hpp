@@ -142,10 +142,6 @@ namespace rocRoller
             int                    m_programCycle;
             std::weak_ptr<Context> m_context;
 
-            // For waitcnt
-            mutable int m_completedCount;
-            mutable int m_issuedCount;
-
             int getRemainingDataSlots() const;
 
             // Number of waves running on CU

@@ -128,8 +128,6 @@ namespace rocRoller
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
             , m_programCycle(0)
-            , m_completedCount(0)
-            , m_issuedCount(0)
         {
         }
 
@@ -203,14 +201,13 @@ namespace rocRoller
             int waitcnt = inst.getWaitCount().dscnt();
             if(waitcnt >= 0)
             {
-                const int  pendingCount = m_issuedCount - m_completedCount;
+                const int  pendingCount = m_commandQueue.size();
                 const auto status       = peek(inst);
-                inst.addComment(fmt::format(
-                    "WeightlessDSMemObserver waitcnt({}): pending {}, completed {}, stall {}",
-                    waitcnt,
-                    pendingCount,
-                    m_completedCount,
-                    status.stallCycles));
+                inst.addComment(
+                    fmt::format("WeightlessDSMemObserver waitcnt({}): pending {}, stall {}",
+                                waitcnt,
+                                pendingCount,
+                                status.stallCycles));
             }
 
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
@@ -226,12 +223,26 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
+            int waitcnt = inst.getWaitCount().dscnt();
+            if(waitcnt >= 0)
+            {
+                while(m_commandQueue.size() > static_cast<size_t>(waitcnt))
+                {
+                    m_programCycle
+                        = std::max(m_programCycle, static_cast<int>(m_commandQueue.front()));
+                    while(!m_commandQueue.empty()
+                          && m_programCycle >= static_cast<int>(m_commandQueue.front()))
+                    {
+                        m_commandQueue.pop_front();
+                    }
+                }
+            }
+
             m_programCycle += inst.totalCycles();
 
             while(!m_commandQueue.empty() && m_programCycle >= m_commandQueue.front())
             {
                 m_commandQueue.pop_front();
-                m_completedCount++;
             }
             while(!m_dataQueue.empty() && m_programCycle >= m_dataQueue.front())
             {
@@ -269,7 +280,6 @@ namespace rocRoller
                         = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
 
                     m_commandQueue.push_back(base + dataCycles);
-                    m_issuedCount++;
 
                     if(direction == LDSBankModel::LdsDirection::Write)
                     {
