@@ -38,8 +38,8 @@ namespace rocsparse
     {
     private:
         rng_t();
-        ~rng_t()                       = default;
-        rng_t(const rng_t&)            = delete;
+        ~rng_t()            = default;
+        rng_t(const rng_t&) = delete;
         rng_t& operator=(const rng_t&) = delete;
 
         rocsparse_rng_t m_rng;
