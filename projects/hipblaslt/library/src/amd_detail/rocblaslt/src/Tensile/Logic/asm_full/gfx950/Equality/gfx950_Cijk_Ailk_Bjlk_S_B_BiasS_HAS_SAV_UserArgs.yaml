@@ -14602,9 +14602,9 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: true
-    DirectToLdsA: true
-    DirectToLdsB: true
+    DirectToLds: false
+    DirectToLdsA: false
+    DirectToLdsB: false
     DirectToVgprA: false
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
