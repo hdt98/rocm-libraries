@@ -89,7 +89,7 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
 
     // execution
     return rocsolver_gecon_template<false, false, T>(
-        handle, norm_type, n, A, shiftA, 1, lda, strideA, ipiv, strideP, anorm, rcond,
+        handle, norm_type, n, A, shiftA, (I) 1, lda, strideA, ipiv, strideP, anorm, rcond,
         batch_count, (T*)work_v, (T*)work_x, (I*)work_isgn, (S*)scalars_est,
         (I*)scalars_max_idx, (rocblas_int*)scalars_kase, (rocblas_int*)scalars_jump, max_iter);
 }
