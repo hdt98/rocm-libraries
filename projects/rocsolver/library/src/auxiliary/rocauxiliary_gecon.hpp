@@ -728,10 +728,13 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
     // quick return if no dimensions
     if(n == 0)
     {
-        rocblas_int blocks = (batch_count - 1) / BS1 + 1;
-        dim3 grid(blocks, 1, 1);
-        dim3 threads(BS1, 1, 1);
-        ROCSOLVER_LAUNCH_KERNEL(reset_info, grid, threads, 0, stream, rcond, batch_count, 0);
+        if(rcond)
+        {
+            rocblas_int blocks = (batch_count - 1) / BS1 + 1;
+            dim3 grid(blocks, 1, 1);
+            dim3 threads(BS1, 1, 1);
+            ROCSOLVER_LAUNCH_KERNEL(reset_info, grid, threads, 0, stream, rcond, batch_count, 0);
+        }
         return rocblas_status_success;
     }
 
@@ -758,7 +761,7 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         T* v = work_v + batch * n;
         T* x = work_x + batch * n;
         I* isgn = work_isgn + batch * n;
-        S* d_est = scalars_est + batch;
+        S* d_est = rcond + batch;
         const S* d_anorm = anorm + batch;
         I* d_max_idx = scalars_max_idx + batch;
         rocblas_int* d_kase = scalars_kase + batch;
@@ -903,7 +906,7 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
         return rocblas_status_continue;
 
     // 3. invalid pointers
-    if((n && !A) || (n && !ipiv) || !anorm || !rcond)
+    if((n && !A) || (n && !ipiv) || (n && !anorm) || (n && !rcond))
         return rocblas_status_invalid_pointer;
 
     return rocblas_status_continue;
