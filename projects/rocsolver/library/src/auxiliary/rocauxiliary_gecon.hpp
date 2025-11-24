@@ -709,7 +709,10 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                                         I* scalars_max_idx,
                                         rocblas_int* scalars_kase,
                                         rocblas_int* scalars_jump,
-                                        // I* iwork, // TODO: not used by complex routines?
+                                        void* work_getrs_1,
+                                        void* work_getrs_2,
+                                        void* work_getrs_3,
+                                        void* work_getrs_4,
                                         const I max_iter)
 {
     // TODO: does ROCSOLVER_ENTER need more function argss passed?
@@ -737,10 +740,14 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         return rocblas_status_not_implemented;
 
     // iterate over each batch
+    std::vector<S> h_anorm(batch_count);
+    hipMemcpyAsync(h_anorm.data(), anorm, sizeof(S) * batch_count, hipMemcpyDeviceToHost, stream);
+    hipStreamSynchronize(stream);
     for(I batch = 0; batch < batch_count; batch++)
     {
         // if anorm is zero for this batch, rcond is zero
-        if(anorm[batch] == S(0))
+
+        if(h_anorm[batch] == S(0))
         {
             S zero = S(0);
             hipMemcpyAsync(rcond + batch, &zero, sizeof(S), hipMemcpyHostToDevice, stream);
@@ -797,8 +804,8 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
             // solve system: x is always the vector being solved
             rocsolver_getrs_template<false, false, T>(
                 handle, opr, n, (I) 1, A, shiftA + batch * strideA, inca, lda, strideA,
-                ipiv + batch * strideP, strideP, (U)x, 0, (I) 1, (I) n, 0, (I) 1, nullptr, nullptr, nullptr,
-                nullptr, true, true);
+                ipiv + batch * strideP, strideP, (U)x, 0, (I) 1, (I) n, 0, (I) 1, work_getrs_1,
+                work_getrs_2, work_getrs_3, work_getrs_4, true, true);
         }
 
         // rcond is computed in jump5 and stored in d_est, which is already rcond[batch]
@@ -810,6 +817,7 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
 
 template <typename T, typename I, typename S>
 void rocsolver_gecon_getMemorySize(const I n,
+                                   const I lda,
                                    const I batch_count,
                                    size_t* size_work_v,
                                    size_t* size_work_x,
@@ -817,7 +825,11 @@ void rocsolver_gecon_getMemorySize(const I n,
                                    size_t* size_scalars_est,
                                    size_t* size_scalars_max_idx,
                                    size_t* size_scalars_kase,
-                                   size_t* size_scalars_jump)
+                                   size_t* size_scalars_jump,
+                                   size_t* size_work_getrs_1,
+                                   size_t* size_work_getrs_2,
+                                   size_t* size_work_getrs_3,
+                                   size_t* size_work_getrs_4)
 {
     // if quick return no workspace needed
     if(n == 0 || batch_count == 0)
@@ -829,6 +841,10 @@ void rocsolver_gecon_getMemorySize(const I n,
         *size_scalars_max_idx = 0;
         *size_scalars_kase = 0;
         *size_scalars_jump = 0;
+        *size_work_getrs_1 = 0;
+        *size_work_getrs_2 = 0;
+        *size_work_getrs_3 = 0;
+        *size_work_getrs_4 = 0;
         return;
     }
 
@@ -852,6 +868,13 @@ void rocsolver_gecon_getMemorySize(const I n,
 
     // need rocblas_int scalar per batch for jump state
     *size_scalars_jump = sizeof(rocblas_int) * batch_count;
+
+    // workspace for getrs
+    bool optim_mem;
+    rocsolver_getrs_getMemorySize<false, false, T, I>(rocblas_operation_none, n, 1, batch_count,
+                                                      size_work_getrs_1, size_work_getrs_2,
+                                                      size_work_getrs_3, size_work_getrs_4,
+                                                      &optim_mem, lda, n);
 }
 
 template <typename T, typename I, typename S>
