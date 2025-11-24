@@ -114,7 +114,7 @@ void gecon_initData(const rocblas_handle handle,
                     Thi& hipiv,
                     Tha& hanorm,
                     Thr& hrcond,
-                    std::vector<I>& hinfo,
+                    std::vector<rocblas_int>& hinfo,
                     const bool singular)
 {
     if(CPU)
@@ -169,7 +169,7 @@ void gecon_getError(const rocblas_handle handle,
                     double* max_err,
                     const bool singular)
 {
-    std::vector<I> hinfo;
+    std::vector<rocblas_int> hinfo;
 
     // initialize data
     gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
@@ -188,9 +188,11 @@ void gecon_getError(const rocblas_handle handle,
 
     // CPU lapack
     char norm = rocsolver2char_norm_type(norm_type);
-    std::vector<S> work(4 * n);
-    std::vector<I> iwork(n);
-    hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA_factored[0], lda, hanorm[0][0], work.data(), iwork.data());
+    std::vector<T> work(4 * n);
+    std::vector<S> rwork(2 * n);
+    std::vector<rocblas_int> iwork(n);
+    hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA_factored[0], lda, hanorm[0][0], work.data(),
+                                   rwork.data(), iwork.data());
 
     // error is ||hrcond - hrcond_res|| / ||hrcond||
     // using absolute value since we only have a single scalar
@@ -218,7 +220,7 @@ void gecon_getPerfData(const rocblas_handle handle,
                        const bool profile_kernels,
                        const bool perf)
 {
-    std::vector<I> hinfo;
+    std::vector<rocblas_int> hinfo;
 
     if(!perf)
     {
@@ -227,11 +229,12 @@ void gecon_getPerfData(const rocblas_handle handle,
 
         // cpu-lapack performance (only if not in perf mode)
         char norm = rocsolver2char_norm_type(norm_type);
-        std::vector<S> work(4 * n);
-        std::vector<I> iwork(n);
+        std::vector<T> work(4 * n);
+        std::vector<S> rwork(2 * n);
+        std::vector<rocblas_int> iwork(n);
         *cpu_time_used = get_time_us_no_sync();
-        hrcond[0][0]
-            = cpu_gecon<T, S>(norm, n, hA_factored[0], lda, hanorm[0][0], work.data(), iwork.data());
+        hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA_factored[0], lda, hanorm[0][0], work.data(),
+                                       rwork.data(), iwork.data());
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
@@ -368,7 +371,7 @@ void testing_gecon(Arguments& argus)
     // memory allocations
     host_strided_batch_vector<T> hA(size_A, 1, size_A, 1);
     host_strided_batch_vector<T> hA_factored(size_A, 1, size_A, 1);
-    host_strided_batch_vector<I> hipiv(size_ipiv, 1, size_ipiv, 1);
+    host_strided_batch_vector<rocblas_int> hipiv(size_ipiv, 1, size_ipiv, 1);
     host_strided_batch_vector<S> hanorm(size_anorm, 1, size_anorm, 1);
     host_strided_batch_vector<S> hrcond(size_rcond, 1, size_rcond, 1);
     host_strided_batch_vector<S> hrcond_res(size_rcond_res, 1, size_rcond_res, 1);
