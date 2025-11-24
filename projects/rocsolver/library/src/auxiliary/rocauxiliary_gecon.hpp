@@ -175,12 +175,17 @@ __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_ind
 
 template <typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
-    lacn2_jump1_n_equals_one(const I n, T* x, S* norm, I* isgn)
+    lacn2_jump1_n_equals_one(const I n, T* x, S* norm, I* isgn, const S* d_anorm)
 {
     rocblas_int tid = hipThreadIdx_x;
 
     if (tid == 0){
-        *norm = rocblas_abs(x[0]);
+        S est = rocblas_abs(x[0]);
+        S anorm = *d_anorm;
+        if (est != S(0) && anorm != S(0))
+            *norm = (S(1) / est) / anorm;
+        else
+            *norm = S(0);
     }
 }
 
@@ -361,9 +366,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
         repeated = repeated && __shfl_down(repeated, 32);
     }
 
-    if(tid % WarpSize == 0)
+    if(tid % WarpSize == 0){
         sval[tid / WarpSize] = sum;
         sval_repeated[tid / WarpSize] = repeated;
+    }
     __syncthreads();
 
     if(tid == 0)
@@ -387,7 +393,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
         {
             // we write over old x
             T sign = (i % 2 == 0) ? T(1) : T(-1);
-            x[i] = T(sign * (1 + i / (n-1)));
+            x[i] = T(sign * (S(1) + S(i) / S(n-1)));
             // x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
@@ -500,11 +506,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     __syncthreads();
 
     I local_max_idx = sval_indices[0];
-    if (x[local_max_idx] == x[jlast] || iters == iters_max){
+    S val_new = rocblas_abs(x[local_max_idx]);
+    S val_old = rocblas_abs(x[jlast]);
+
+    if (val_new == val_old || iters == iters_max){
         for(rocblas_int i = tid; i < n; i += GECON_BLOCKSIZE)
         {
             T sign = (i % 2 == 0) ? T(1) : T(-1);
-            x[i] = T(sign * (1 + i / (n-1)));
+            x[i] = T(sign * (S(1) + S(i) / S(n-1)));
             // x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
@@ -562,7 +571,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
             sum += sval[k];
         sum = 2 * (sum / (3 * n));
         if (sum > *norm)
-            *norm = (1 / sum) / *d_anorm;
+            *norm = sum;
+
+        S est = *norm;
+        S anorm = *d_anorm;
+        if (est != S(0) && anorm != S(0))
+            *norm = (S(1) / est) / anorm;
+        else
+            *norm = S(0);
     }
 }
 
@@ -608,7 +624,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
                 // hipStreamSynchronize(stream);
                 // *est = rocblas_abs(*est);
                 ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1_n_equals_one<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
-                                    stream, n, x, d_est, isgn);
+                                    stream, n, x, d_est, isgn, d_anorm);
                 *h_kase = 0; // signal to exit
                 return rocblas_status_success;
             }
@@ -733,7 +749,7 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
             rocblas_int blocks = (batch_count - 1) / BS1 + 1;
             dim3 grid(blocks, 1, 1);
             dim3 threads(BS1, 1, 1);
-            ROCSOLVER_LAUNCH_KERNEL(reset_info, grid, threads, 0, stream, rcond, batch_count, 0);
+            ROCSOLVER_LAUNCH_KERNEL(reset_info, grid, threads, 0, stream, rcond, batch_count, S(1));
         }
         return rocblas_status_success;
     }
