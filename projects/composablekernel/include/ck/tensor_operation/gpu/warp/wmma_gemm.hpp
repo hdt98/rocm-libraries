@@ -105,6 +105,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16,
     static constexpr index_t m_per_wmma      = 16;
     static constexpr index_t n_per_wmma      = 16;
     static constexpr index_t k_per_wmma      = 16;
+    static constexpr index_t k_per_blk       = 8;
     static constexpr index_t src_a_data_size = 2;
     static constexpr index_t src_b_data_size = 2;
     static constexpr index_t acc_data_size   = 4;
@@ -146,6 +147,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -183,6 +185,7 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 2;
@@ -219,6 +222,7 @@ struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 2;
@@ -261,6 +265,7 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -311,6 +316,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 16;
+    static constexpr index_t k_per_blk  = 8;
     // static constexpr index_t src_a_data_size = 2;
     // static constexpr index_t src_b_data_size = 2;
     // static constexpr index_t acc_data_size   = 4;
@@ -349,6 +355,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 16;
+    static constexpr index_t k_per_blk  = 8;
     // static constexpr index_t src_a_data_size          = 2;
     // static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -382,6 +389,7 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 16;
+    static constexpr index_t k_per_blk  = 8;
     // static constexpr index_t src_a_data_size          = 2;
     // static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -423,6 +431,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f8f8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -458,6 +467,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f8bf8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -493,6 +503,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf8f8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -528,6 +539,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf8bf8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -565,6 +577,7 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x32_f16_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 32;
+    static constexpr index_t k_per_blk                = 16;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 2;
@@ -598,6 +611,7 @@ struct wmma_type<WmmaInstr::wmma_bf16_16x16x32_bf16_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 32;
+    static constexpr index_t k_per_blk                = 16;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 2;
@@ -638,6 +652,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x32_f16_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 32;
+    static constexpr index_t k_per_blk  = 16;
     // static constexpr index_t src_a_data_size = 2;
     // static constexpr index_t src_b_data_size = 2;
     // static constexpr index_t acc_data_size   = 4;
@@ -676,6 +691,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x32_bf16_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 32;
+    static constexpr index_t k_per_blk  = 16;
     // static constexpr index_t src_a_data_size          = 2;
     // static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -709,6 +725,7 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x64_iu8_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 64;
+    static constexpr index_t k_per_blk  = 32;
     // static constexpr index_t src_a_data_size          = 2;
     // static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -748,6 +765,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_f8f8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 64;
+    static constexpr index_t k_per_blk                = 32;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -782,6 +800,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_bf8f8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 64;
+    static constexpr index_t k_per_blk                = 32;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -816,6 +835,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_bf8bf8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 64;
+    static constexpr index_t k_per_blk                = 32;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -851,6 +871,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_f8bf8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 64;
+    static constexpr index_t k_per_blk                = 32;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -1135,6 +1156,8 @@ struct WmmaGemm
     }
 
     __device__ static constexpr index_t GetWaveSize() { return wmma_instr.wave_size; }
+
+    __device__ static constexpr index_t GetKPerWaveBlk() { return wmma_instr.k_per_blk; }
 
     template <class FloatA, class FloatB, class FloatC>
     __device__ void Run(const FloatA& p_a_wave, const FloatB& p_b_wave, FloatC& p_c_thread) const
