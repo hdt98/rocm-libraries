@@ -246,7 +246,6 @@ std::vector<std::string> FillValidKernelsIDs(const ProblemDescriptionType& probl
 }
 
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-// TODO: whether split_k is needed for tf32?
 template <typename DeviceOpType>
 inline constexpr bool IsSplitKNeeded()
 {
