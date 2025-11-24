@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "example/ck_tile/01_fmha/fmha_bwd.hpp"
 #include "example/ck_tile/01_fmha/fmha_bwd_runner.hpp"
@@ -137,6 +137,7 @@ INSTANTIATE_TEST_SUITE_P(TestCkTileFmhaBwd,
                                  Values(std::tuple{24, 48},
                                         std::tuple{48, 48},
                                         std::tuple{72, 72},
+                                        std::tuple{40, 88},
                                         std::tuple{96, 96},
                                         std::tuple{120, 160},
                                         std::tuple{256, 108},

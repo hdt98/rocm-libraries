@@ -412,10 +412,21 @@ struct GroupedConvolutionBackwardWeightKernel
     {
         constexpr auto NumGroupsToMerge = GroupedConvTraitsType_::NumGroupsToMerge;
         // clang-format off
-        if (NumGroupsToMerge > 1)
-            return concat('_', "grouped_convolution_backward_weight", gemm_prec_str<InDataType, WeiDataType>, GemmPipeline::GetName(), "merge", NumGroupsToMerge);
-        else
-            return concat('_', "grouped_convolution_backward_weight", gemm_prec_str<InDataType, WeiDataType>, GemmPipeline::GetName());
+        if (NumGroupsToMerge > 1) {
+            return concat('_', "grouped_convolution_backward_weight", 
+                gemm_prec_str<InDataType, WeiDataType>(),
+                "gemm",
+                GemmPipeline::GetName(),
+                "epilogue",
+                EpiloguePipeline::GetName());
+        } else {
+            return concat('_', "grouped_convolution_backward_weight", 
+                gemm_prec_str<InDataType, WeiDataType>(),
+                "gemm",
+                GemmPipeline::GetName(),
+                "epilogue",
+                EpiloguePipeline::GetName(), "merge", NumGroupsToMerge);
+        }
         // clang-format on
     }
 
@@ -453,7 +464,7 @@ struct GroupedConvolutionBackwardWeightKernel
         __device__ SplitKBatchOffset(const GroupedConvBwdWeightKernelArgsSpecialized& kargs,
                                      const std::size_t k_id = blockIdx.z)
         {
-            constexpr auto K1   = TilePartitioner::BlockGemmShape::WarpTile::at(number<2>{});
+            constexpr auto K1   = GemmPipeline::BlockGemmShape::WarpTile::at(number<2>{});
             const index_t K_t   = amd_wave_read_first_lane(kargs.k_batch * K1);
             const index_t KRead = amd_wave_read_first_lane((kargs.GemmK + K_t - 1) / K_t * K1);
 
@@ -635,8 +646,8 @@ struct GroupedConvolutionBackwardWeightKernel
                         WeiDataType* c_ptr,
                         const GroupedConvBwdWeightKernelArgsSpecialized& kargs)
     {
-        static_assert(!TilePartitioner::BlockGemmShape::PermuteA, "Not implemented!");
-        static_assert(!TilePartitioner::BlockGemmShape::PermuteB, "Not implemented!");
+        static_assert(!GemmPipeline::BlockGemmShape::PermuteA, "Not implemented!");
+        static_assert(!GemmPipeline::BlockGemmShape::PermuteB, "Not implemented!");
         const auto& a_tensor_view = [&]() {
             return make_tensor_view<address_space_enum::global>(a_ptr,
                                                                 kargs.a_grid_desc_k_m); // A: out
