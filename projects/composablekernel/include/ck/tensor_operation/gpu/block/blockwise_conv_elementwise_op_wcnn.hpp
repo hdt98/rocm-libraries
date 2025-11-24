@@ -227,6 +227,46 @@ struct BlockwiseElementSbaWcnn
         }
     }
 
+    template <index_t conv_phase, typename DsGridDesc>
+    __host__ __device__ static constexpr auto
+    MakeSingleDsGridBlockDescriptor(const DsGridDesc& ds_grid_desc)
+    {
+        auto ds_grid_packed_desc = generate_tuple(
+            [&](auto i) {
+                const auto K = ds_grid_desc[Number<conv_phase>{}][i].GetLength(I2);
+                return transform_tensor_descriptor(
+                    ds_grid_desc[Number<conv_phase>{}][i],
+                    make_tuple(make_freeze_transform(I0),
+                               make_freeze_transform(I0),
+                               make_pass_through_transform(K)),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                    make_tuple(Sequence<>{}, Sequence<>{}, Sequence<0>{}));
+            },
+            Number<NumDTensor>{});
+
+        if constexpr(DsEnableLds)
+        {
+            return ds_grid_packed_desc;
+        }
+        else
+        {
+            // K0 x K1 X K2
+            constexpr auto DsPerThread = wcnn_sba.GetNumBiasComponents();
+            return generate_tuple(
+                [&](auto i) {
+                    const auto K = ds_grid_packed_desc[i].GetLength(I0);
+                    return transform_tensor_descriptor(ds_grid_packed_desc[i],
+                                                       make_tuple(make_unmerge_transform(make_tuple(
+                                                           K / KPerWcnn,
+                                                           Number<KPerWcnn / DsPerThread>{},
+                                                           Number<DsPerThread>{}))),
+                                                       make_tuple(Sequence<0>{}),
+                                                       make_tuple(Sequence<0, 1, 2>{}));
+                },
+                Number<NumDTensor>{});
+        }
+    }
+
     // Describe how data read from (LDS/VGPR) buffer, used by Block level classes
     template <typename DsBlockDesc_>
     __host__ __device__ static constexpr auto MakeDsWaveDescriptor(const DsBlockDesc_&)
@@ -566,6 +606,12 @@ struct BlockwiseElementSbaWcnn<ThisThreadBlock,
         return Tuple<>{};
     }
 
+    template <index_t conv_phase, typename DsGridDesc>
+    __host__ __device__ static constexpr auto MakeSingleDsGridBlockDescriptor(const DsGridDesc&)
+    {
+        return Tuple<>{};
+    }
+
     template <typename DsBlockDesc_>
     __host__ __device__ static constexpr auto MakeDsWaveDescriptor(const DsBlockDesc_&)
     {
@@ -740,6 +786,57 @@ struct BlockwiseElementFmaWcnn
                 const auto C1              = ds_grid_desc[ScaleId].GetLength(I2);
                 auto scale_grid_block_desc = transform_tensor_descriptor(
                     ds_grid_desc[ScaleId],
+                    make_tuple(
+                        make_unmerge_transform(make_tuple(H1 / HPerWcnn,
+                                                          Number<NumSubTilePerImage>{},
+                                                          Number<HPerWcnn / NumSubTilePerImage>{})),
+                        make_unmerge_transform(make_tuple(W1 / WPerWcnn, Number<WPerWcnn>{})),
+                        make_unmerge_transform(make_tuple(C1 / KPerWcnn,
+                                                          Number<NumAccCompSubTile>{},
+                                                          Number<KPerWcnn / NumAccCompSubTile>{}))),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                    make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
+                return make_tuple(scale_grid_block_desc, residual_grid_block_desc);
+            }
+        }
+    }
+
+    template <index_t conv_phase, typename DsGridDesc>
+    __host__ __device__ static constexpr auto
+    MakeSingleDsGridBlockDescriptor(const DsGridDesc& ds_grid_desc)
+    {
+        if constexpr(DsEnableLds)
+        {
+            return ds_grid_desc;
+        }
+        else
+        {
+            // Residual: H x W x C -> W0 x C0 x H0 x H1 x H2 x W1 x C1
+            const auto H0 = ds_grid_desc[Number<conv_phase>{}][ResidualId].GetLength(I0);
+            const auto W0 = ds_grid_desc[Number<conv_phase>{}][ResidualId].GetLength(I1);
+            const auto C0 = ds_grid_desc[Number<conv_phase>{}][ResidualId].GetLength(I2);
+            auto residual_grid_block_desc = transform_tensor_descriptor(
+                ds_grid_desc[Number<conv_phase>{}][ResidualId],
+                make_tuple(
+                    make_unmerge_transform(make_tuple(H0 / HPerWcnn,
+                                                      Number<NumSubTilePerImage>{},
+                                                      Number<HPerWcnn / NumSubTilePerImage>{})),
+                    make_unmerge_transform(make_tuple(W0 / WPerWcnn, Number<WPerWcnn>{})),
+                    make_unmerge_transform(make_tuple(C0 / CPerWcnn, Number<CPerWcnn>{}))),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                make_tuple(Sequence<2, 3, 4>{}, Sequence<0, 5>{}, Sequence<1, 6>{}));
+            if constexpr(UniformScale)
+            {
+                return make_tuple(residual_grid_block_desc);
+            }
+            else
+            {
+                // Scale: H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
+                const auto H1 = ds_grid_desc[Number<conv_phase>{}][ScaleId].GetLength(I0);
+                const auto W1 = ds_grid_desc[Number<conv_phase>{}][ScaleId].GetLength(I1);
+                const auto C1 = ds_grid_desc[Number<conv_phase>{}][ScaleId].GetLength(I2);
+                auto scale_grid_block_desc = transform_tensor_descriptor(
+                    ds_grid_desc[Number<conv_phase>{}][ScaleId],
                     make_tuple(
                         make_unmerge_transform(make_tuple(H1 / HPerWcnn,
                                                           Number<NumSubTilePerImage>{},
@@ -1318,6 +1415,21 @@ struct BlockwiseElementSbaFmaWcnn
                                 BlockwiseFma::MakeDsGridBlockDescriptor(fma_grid_desc));
     }
 
+    template <index_t conv_phase, typename DsGridDesc>
+    __host__ __device__ static constexpr auto
+    MakeSingleDsGridBlockDescriptor(const DsGridDesc& ds_grid_desc)
+    {
+        auto sba_grid_desc =
+            generate_tuple([&](auto i) { return ds_grid_desc[i]; }, Number<NumSbaDTensor>{});
+
+        auto fma_grid_desc =
+            generate_tuple([&](auto i) { return ds_grid_desc[Number<i + NumSbaDTensor>{}]; },
+                           Number<NumFmaDTensor>{});
+        return container_concat(
+            BlockwiseSuba::MakeSingleDsGridBlockDescriptor<conv_phase>(sba_grid_desc),
+            BlockwiseFma::MakeSingleDsGridBlockDescriptor<conv_phase>(fma_grid_desc));
+    }
+
     __host__ __device__ static auto CalculateThreadOriginDataIndex()
     {
         return container_concat(BlockwiseSuba::CalculateThreadOriginDataIndex(),
@@ -1494,6 +1606,13 @@ struct BlockwiseElementPassThroughWcnn
     template <typename DsGridDesc>
     __host__ __device__ static constexpr auto
     MakeDsGridBlockDescriptor(const DsGridDesc& ds_grid_desc)
+    {
+        return ds_grid_desc;
+    }
+
+    template <index_t conv_phase, typename DsGridDesc>
+    __host__ __device__ static constexpr auto
+    MakeSingleDsGridBlockDescriptor(const DsGridDesc& ds_grid_desc)
     {
         return ds_grid_desc;
     }
