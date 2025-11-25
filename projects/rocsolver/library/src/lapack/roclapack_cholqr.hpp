@@ -38,7 +38,7 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-bool constexpr use_syrk = false;
+bool constexpr use_syrk = true;
 
 static inline void adjust_for_alignment(size_t& size_work)
 {
@@ -623,7 +623,15 @@ static void rocsolver_potrf_getMemorySize_max(I const n,
                                               size_t* const p_size_pivots,
                                               size_t* const p_size_iinfo)
 {
-    *p_size_scalars = 0;
+    size_t size_scalars = 3 * sizeof(T);
+    size_t size_work1 = 0;
+    size_t size_work2 = 0;
+    size_t size_work3 = 0;
+    size_t size_work4 = 0;
+    size_t size_pivots = 0;
+    size_t size_iinfo = 0;
+
+    *p_size_scalars = size_scalars;
 
     *p_size_work1 = 0;
     *p_size_work2 = 0;
@@ -640,14 +648,6 @@ static void rocsolver_potrf_getMemorySize_max(I const n,
             return;
         }
     }
-
-    size_t size_scalars = 0;
-    size_t size_work1 = 0;
-    size_t size_work2 = 0;
-    size_t size_work3 = 0;
-    size_t size_work4 = 0;
-    size_t size_pivots = 0;
-    size_t size_iinfo = 0;
 
     bool optim_mem = true;
     {
@@ -1698,6 +1698,116 @@ rocblas_status rocsolver_cholqr1_template(
 
     bool constexpr is_both_same_type = (is_pointer_batched_A == is_pointer_batched_R);
 
+    auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
+
+    auto check_A = [=](auto line) {
+        auto const q_nan = std::numeric_limits<S>::quiet_NaN();
+
+        std::vector<T*> h_A_ptr(batch_count, nullptr);
+        if constexpr(is_pointer_batched_A)
+        {
+            size_t const nbytes = sizeof(T*) * batch_count;
+            auto const istat = hipMemcpy(&(h_A_ptr[0]), A, nbytes, hipMemcpyDeviceToHost);
+            assert(istat == hipSuccess);
+            for(I bid = 0; bid < batch_count; bid++)
+            {
+                h_A_ptr[bid] += shiftA;
+            }
+        }
+        else
+        {
+            for(I bid = 0; bid < batch_count; bid++)
+            {
+                h_A_ptr[bid] = A + bid * strideA + shiftA;
+            }
+        }
+
+        Istride const lstrideA = lda * n;
+        std::vector<T> h_A(lstrideA * batch_count, q_nan);
+        for(I bid = 0; bid < batch_count; bid++)
+        {
+            T const* const d_A = h_A_ptr[bid];
+            size_t const nbytes = sizeof(T) * lstrideA;
+            auto const istat
+                = (hipMemcpy(&(h_A[bid * lstrideA]), d_A, nbytes, hipMemcpyDeviceToHost));
+            assert(istat == hipSuccess);
+        }
+
+        {
+            auto const istat = hipDeviceSynchronize();
+            assert(istat == hipSuccess);
+        }
+
+        for(I bid = 1; bid < batch_count; bid++)
+        {
+            for(I j = 0; j < n; j++)
+            {
+                for(I i = 0; i < m; i++)
+                {
+                    auto const ij = idx2D(i, j, lda);
+                    auto const aij = h_A[bid * lstrideA + ij];
+                    auto const aij0 = h_A[0 * lstrideA + ij];
+                    auto const diff_aij = std::abs(aij - aij0);
+                    if(diff_aij > 0)
+                    {
+                        std::cerr << " line = " << line << " i = " << i << " j = " << j
+                                  << " bid = " << bid << " aij0 = " << aij0 << " aij = " << aij
+                                  << " diff_aij = " << diff_aij << std::endl;
+                    }
+                    assert(aij == aij0);
+                }
+            }
+        }
+    };
+
+    auto check_R = [=](auto line) {
+        auto const q_nan = std::numeric_limits<S>::quiet_NaN();
+
+        Istride const lstrideR = ldr * n;
+        std::vector<T> h_R(lstrideR * batch_count, q_nan);
+        for(I bid = 0; bid < batch_count; bid++)
+        {
+            T const* const d_R = load_ptr_batch(R, bid, shiftR, strideR);
+            size_t const nbytes = sizeof(T) * lstrideR;
+            auto const istat
+                = (hipMemcpy(&(h_R[bid * lstrideR]), d_R, nbytes, hipMemcpyDeviceToHost));
+            assert(istat == hipSuccess);
+        }
+
+        {
+            auto const istat = hipDeviceSynchronize();
+            assert(istat == hipSuccess);
+        }
+
+        for(I bid = 1; bid < batch_count; bid++)
+        {
+            // ----------------------------------
+            // check uppder triangular part for R
+            // ----------------------------------
+            for(I j = 0; j < n; j++)
+            {
+                for(I i = 0; i < n; i++)
+                {
+                    bool const is_upper_triangular = (i <= j);
+                    if(!is_upper_triangular)
+                        continue;
+
+                    auto const ij = idx2D(i, j, ldr);
+                    auto const rij = h_R[bid * lstrideR + ij];
+                    auto const rij0 = h_R[0 * lstrideR + ij];
+                    auto const diff_rij = std::abs(rij - rij0);
+                    if(diff_rij > 0)
+                    {
+                        std::cerr << " line = " << line << " i = " << i << " j = " << j
+                                  << " bid = " << bid << " rij0 = " << rij0 << " rij = " << rij
+                                  << " diff_rij = " << diff_rij << std::endl;
+                    }
+                    assert(rij == rij0);
+                }
+            }
+        }
+    };
+
     {
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
         if(!has_work)
@@ -1866,6 +1976,9 @@ rocblas_status rocsolver_cholqr1_template(
             pfree = pfree_saved;
         }
 
+        check_A(__LINE__);
+        check_R(__LINE__);
+
         // -------------------------
         // optional, if sigma != 0
         // B <- B + sigma * identity
@@ -1920,6 +2033,9 @@ rocblas_status rocsolver_cholqr1_template(
 
             pfree = pfree_saved;
         }
+
+        check_A(__LINE__);
+        check_R(__LINE__);
 
         // --------------------------------------
         // compute Q = A / R
@@ -1982,6 +2098,8 @@ rocblas_status rocsolver_cholqr1_template(
 
             pfree = pfree_saved;
         }
+        check_A(__LINE__);
+        check_R(__LINE__);
 
         rocblas_set_pointer_mode(handle, old_mode);
         return (istat);
