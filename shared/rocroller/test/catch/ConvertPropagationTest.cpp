@@ -424,9 +424,6 @@ namespace ExpressionTest
             context->schedule(kernel->postamble());
             context->schedule(kernel->amdgpu_metadata());
 
-            std::shared_ptr<rocRoller::ExecutableKernel> executableKernel
-                = context->instructions()->getExecutableKernel();
-
             CommandKernel commandKernel;
             commandKernel.setContext(context.get());
             commandKernel.generateKernel();
