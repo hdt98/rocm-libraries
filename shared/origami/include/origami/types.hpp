@@ -256,7 +256,7 @@ struct config_t {
   int occupancy;
 
   /// Reorder workgroup id for L2 reuse.
-  int workgroup_mapping{};
+  mutable int workgroup_mapping{};
 
   /// Whether operand A is accessed with cache-flags.
   int cache_hints_a{};
@@ -269,7 +269,7 @@ struct config_t {
   std::size_t workspace_size_per_elem_c{};
 
   /// Reduction strategy.
-  reduction_t reduction_strategy{};
+  mutable reduction_t reduction_strategy{};
 
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && mi == o.mi && cache_hints_a == o.cache_hints_a &&
