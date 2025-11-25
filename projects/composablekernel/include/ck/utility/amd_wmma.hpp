@@ -18,8 +18,8 @@ namespace ck {
 #define __gfx12__
 #endif
 
-#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__) || \
-    defined(__gfx130E__) || defined(__gfx130F__) || defined(__gfx13_generic__)
+#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || \
+    defined(__gfx13_generic__)
 #define __gfx13__
 #endif
 
@@ -475,6 +475,53 @@ struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, kMultiplier
                 bit_cast<int32x2_t>(reg_a),
                 neg_b,
                 bit_cast<int32x2_t>(reg_b),
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ static void Run(const FloatA& reg_a, const FloatB& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1 || kMultiplier == 2,
+                      "gfx13 this opcode only support kMultiplier = 1 or 2.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_fp8_fp8_clamp(
+                bit_cast<int32x2_t>(reg_a),
+                bit_cast<int32x2_t>(reg_b),
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f32_16x16_f8_w32<16, 16, clamp, 2>
+{
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ static void Run(const FloatA& reg_a, const FloatB& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_fp8_fp8_clamp(
+                bit_cast<int32x4_t>(reg_a),
+                bit_cast<int32x4_t>(reg_b),
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 clamp);
 #else

@@ -4,8 +4,7 @@
 #pragma once
 #include "data_type.hpp"
 #include "amd_address_space.hpp"
-#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__) || \
-    defined(__gfx130E__) || defined(__gfx130F__)
+#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__)
 #define __gfx13__
 #endif
 
