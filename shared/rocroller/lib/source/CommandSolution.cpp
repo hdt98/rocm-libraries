@@ -629,7 +629,7 @@ namespace rocRoller
         AssertFatal(m_context);
         AssertFatal(m_context->kernel());
 
-        m_executableKernel = std::make_shared<ExecutableKernel>();
+        m_executableKernel = std::make_shared<ExecutableKernel>(m_context);
         m_executableKernel->loadKernelFromFile(
             fileName, kernelName, m_context->targetArchitecture().target());
     }
@@ -639,7 +639,7 @@ namespace rocRoller
     {
         AssertFatal(m_context);
 
-        m_executableKernel = std::make_shared<ExecutableKernel>();
+        m_executableKernel = std::make_shared<ExecutableKernel>(m_context);
         m_executableKernel->loadKernelFromCodeObjectFile(
             fileName, kernelName, m_context->targetArchitecture().target());
 

@@ -86,6 +86,7 @@ namespace rocRoller
                                             int                              iWaveY,
                                             int                              lane,
                                             int                              element,
+                                            LayoutType                       layout,
                                             MatrixMultiplySizes              mi,
                                             uint                             bitsPerElement,
                                             int                              wavefrontSize);
@@ -100,19 +101,22 @@ namespace rocRoller
             int                              iWaveY,
             int                              lane,
             int                              element,
+            LayoutType                       layout,
             MatrixMultiplySizes              mi,
             uint                             bitsPerElement,
             int                              wavefrontSize)
         {
+            const auto M              = (layout == LayoutType::MATRIX_B) ? mi.n : mi.m;
+            const auto N              = mi.k;
             const auto simdsInWave    = 4;
             const auto lanesInSIMD    = 16;
-            const auto simdsPerSGroup = mi.m / lanesInSIMD;
+            const auto simdsPerSGroup = M / lanesInSIMD;
 
             const auto& arch                    = context->targetArchitecture();
             const auto  bitsPerTrLoad           = bitsPerTransposeLoad(arch, bitsPerElement);
             const auto  elementsTrLoadedPerLoad = bitsPerTrLoad / bitsPerElement;
             const auto  numTrLoadsPerWave       = 2;
-            const auto  numTrLoads = (mi.m * mi.k) / wavefrontSize / elementsTrLoadedPerLoad;
+            const auto  numTrLoads              = (M * N) / wavefrontSize / elementsTrLoadedPerLoad;
 
             auto simdsPerWave = graph.coordinates.addElement(
                 Adhoc("transpose.simdsPerWave", literal(simdsInWave), nullptr));
@@ -171,18 +175,21 @@ namespace rocRoller
             int                              iWaveY,
             int                              lane,
             int                              element,
+            LayoutType                       layout,
             MatrixMultiplySizes              mi,
             uint                             bitsPerElement,
             int                              wavefrontSize)
         {
+            const auto M              = (layout == LayoutType::MATRIX_B) ? mi.n : mi.m;
+            const auto N              = mi.k;
             const auto lanesInSIMD    = 16;
             const auto simdsInWave    = wavefrontSize / lanesInSIMD;
-            const auto simdsPerSGroup = mi.m / lanesInSIMD;
+            const auto simdsPerSGroup = M / lanesInSIMD;
 
             const auto& arch                    = context->targetArchitecture();
             const auto  bitsPerTrLoad           = bitsPerTransposeLoad(arch, bitsPerElement);
             const auto  elementsTrLoadedPerLane = bitsPerTrLoad / bitsPerElement;
-            const auto  numTrLoads = (mi.m * mi.k) / wavefrontSize / elementsTrLoadedPerLane;
+            const auto  numTrLoads              = (M * N) / wavefrontSize / elementsTrLoadedPerLane;
 
             auto simdsPerWave = graph.coordinates.addElement(
                 Adhoc("transpose.simdsPerWave", literal(simdsInWave), nullptr));
@@ -348,6 +355,7 @@ namespace rocRoller
                                         int                              iWaveY,
                                         int                              lane,
                                         int                              element,
+                                        LayoutType                       layout,
                                         MatrixMultiplySizes              mi,
                                         uint                             bitsPerElement,
                                         int                              wavefrontSize)
@@ -366,6 +374,7 @@ namespace rocRoller
                                                                            iWaveY,
                                                                            lane,
                                                                            element,
+                                                                           layout,
                                                                            mi,
                                                                            bitsPerElement,
                                                                            wavefrontSize);
@@ -382,6 +391,7 @@ namespace rocRoller
                                                                             iWaveY,
                                                                             lane,
                                                                             element,
+                                                                            layout,
                                                                             mi,
                                                                             bitsPerElement,
                                                                             wavefrontSize);

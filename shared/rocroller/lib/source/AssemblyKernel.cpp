@@ -87,7 +87,7 @@ namespace rocRoller
     Generator<Instruction> AssemblyKernel::preamble()
     {
         m_startedCodeGeneration = true;
-        auto archName           = m_context.lock()->targetArchitecture().target().toString();
+        auto archName = m_context.lock()->targetArchitecture().target().toAssemblerString();
 
         co_yield Instruction::Comment("Kernel Arguments:");
         for(auto const& arg : m_arguments)

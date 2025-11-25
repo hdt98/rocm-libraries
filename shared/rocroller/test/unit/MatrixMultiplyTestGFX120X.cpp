@@ -3,6 +3,10 @@
 
 #include "MatrixMultiplyTestBase.hpp"
 
+#include <rocRoller/KernelOptions_detail.hpp>
+
+using namespace rocRoller;
+
 namespace MatrixMultiplyTest
 {
     using namespace rocRoller;
@@ -201,6 +205,10 @@ namespace MatrixMultiplyTest
         const auto [transA, transB]                          = transOp;
         std::string typeStr;
 
+        KernelOptions options{};
+        options->favourF8F6F4OverF8MatrixInstruction = false;
+        setKernelOptions(options);
+
         if(typeA == typeB)
         {
             switch(typeA)
@@ -248,6 +256,10 @@ namespace MatrixMultiplyTest
         const auto [typeA, typeB, waveK, transOp, loadPathAB] = std::get<1>(GetParam());
         const auto [transA, transB]                           = transOp;
         std::string typeStr;
+
+        KernelOptions options{};
+        options->favourF8F6F4OverF8MatrixInstruction = false;
+        setKernelOptions(options);
 
         if(typeA == typeB)
         {
