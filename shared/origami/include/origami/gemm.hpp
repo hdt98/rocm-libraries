@@ -152,19 +152,40 @@ double compute_total_latency(const problem_t& problem,
                              const config_t& config,
                              size_t max_cus);
 
-// Extract analytical metrics from a GEMM computation and export to CSV
+/**
+ * @brief Extract analytical metrics from a GEMM computation and export to CSV.
+ *
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param problem Problem description (M, N, K, etc.)
+ * @param config Kernel configuration.
+ * @param filename Name of the file to be written to.
+ */
 void extract_analytical_metrics_csv(const hardware_t& hardware,
                                     const problem_t& problem,
                                     const config_t& config,
                                     const std::string& filename);
 
-// Extract analytical metrics from a GEMM computation and export to JSON
+/**
+ * @brief Extract analytical metrics from a GEMM computation and export to JSON.
+ *
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param problem Problem description (M, N, K, etc.)
+ * @param config Kernel configuration.
+ * @param filename Name of the file to be written to.
+ */
 void extract_analytical_metrics_json(const hardware_t& hardware,
                                      const problem_t& problem,
                                      const config_t& config,
                                      const std::string& filename);
 
-// Extract analytical metrics from a GEMM computation and return as map
+/**
+ * @brief Extract analytical metrics from a GEMM computation and return as map.
+ *
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param problem Problem description (M, N, K, etc.)
+ * @param config Kernel configuration.
+ * @return unordered_map Extracted metrics.
+ */
 std::unordered_map<std::string, std::string> extract_analytical_metrics(const hardware_t& hardware,
                                                                         const problem_t& problem,
                                                                         const config_t& config);

@@ -142,41 +142,6 @@ std::tuple<double, size_t, size_t, double> predicted_runtime_v2(dim3_t mt,
   return std::make_tuple(runtime, iters_per_cta, fixup_peers, cache_penalty);
 }
 
-/**
- * @brief Calculate workspace size required for StreamK reduction.
- *
- * @param x Problem dimension X (M)
- * @param y Problem dimension Y (N)
- * @param mt_m Macro-tile size in M dimension
- * @param mt_n Macro-tile size in N dimension
- * @param bpe_c Bytes per element of C matrix
- * @param grid Grid size
- * @param tiles Number of tiles
- * @param reduction Reduction strategy
- * @return size_t Workspace size in bytes
- */
-size_t get_workspace(size_t x,
-                     size_t y,
-                     size_t mt_m,
-                     size_t mt_n,
-                     size_t bpe_c,
-                     size_t grid,
-                     size_t tiles,
-                     reduction_t reduction) {
-  size_t size = 0;
-  if (reduction == reduction_t::tree) {
-    if (tiles % grid == 0) {
-      size_t tileSize = mt_m * mt_n * bpe_c;
-      size += tileSize * grid;
-    }
-  } else if (reduction == reduction_t::parallel) {
-    size_t splitSize  = x * y * bpe_c;
-    size_t splitCount = grid / tiles;
-    size += splitSize * splitCount;
-  }
-  return size;
-}
-
 reduction_t select_reduction(const problem_t& problem,
                              const hardware_t& hardware,
                              const config_t& config,

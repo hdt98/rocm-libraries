@@ -20,15 +20,6 @@
 #include "origami/streamk.hpp"
 
 namespace origami {
-auto lds128_penalty(size_t dim_elems, size_t element_bits) {
-  const size_t bytes = dim_elems * math::safe_ceil_div(element_bits, 8);
-  const size_t mod   = bytes % 128;
-  if (mod == 0) return 1.0;
-  const double frac = double(mod) / 128.0;                // 0..1
-  const double base = (element_bits <= 16) ? 1.1 : 1.35;  // BF16/FP16 < FP32
-  return 1.0 + base * frac;                               // up to ~2.35x worst case
-}
-
 double calculate_work_utilization(const problem_t& problem, const config_t& config) {
   const size_t M = problem.size.m;
   const size_t N = problem.size.n;
@@ -1028,9 +1019,6 @@ double compute_total_latency(const problem_t& problem,
   // TODO These are quantifying effects that don't work in the current math.
   // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
   bool heuristics = hardware_t::is_heuristics_enabled();
-
-  const char* env = std::getenv("ANALYTICAL_GEMM_HEURISTICS");
-  heuristics      = !(env && std::string(env) == "0");
 
   // heuristics = 0;
   //  Heuristics for TF32
