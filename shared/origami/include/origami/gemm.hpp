@@ -8,10 +8,14 @@
 #include "origami/types.hpp"
 
 namespace origami {
-/* ---------------------------------------------------------------------------------------- */
-/* Compute-related functions                                                                */
-/* ---------------------------------------------------------------------------------------- */
-// Compute the number of matrix instructions required to compute a single MT_MXMT_NXMT_K tile.
+
+/**
+ * @brief Compute the number of matrix instructions required to compute a single MT_MXMT_NXMT_K tile.
+ *
+ * @param mt Macro tile dimensions
+ * @param mi Micro tile dimensions
+ * @return size_t Number of matrix instructions
+ */
 size_t compute_number_matrix_instructions(dim3_t mt, dim3_t mi);
 
 /**
@@ -37,19 +41,37 @@ size_t compute_mt_compute_latency(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config);
 
-/* ---------------------------------------------------------------------------------------- */
-/* Memory-related functions                                                                 */
-/* ---------------------------------------------------------------------------------------- */
-// Check if MT fits in LDS
+
+/**
+ * @brief Check if MT fits in LDS
+ *
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param mt Macro tile dimensions
+ * @param a_dtype Data type of operand A
+ * @param b_dtype Data type of operand B
+ * @return bool True if MT fits in LDS, false otherwise
+ */
 bool check_lds_capacity(const hardware_t& hardware,
                         dim3_t mt,
                         data_type_t a_dtype,
                         data_type_t b_dtype);
 
-// Compute the amount of data loaded from A to produce a MT_MxMT_NxMT_K tile.
+/**
+ * @brief Compute the amount of data loaded from A to produce a MT_MxMT_NxMT_K tile.
+ *
+ * @param MT_M Macro tile dimension M
+ * @param MT_K Macro tile dimension K
+ * @return size_t Amount of data loaded from A
+ */
 size_t compute_A_loads(size_t MT_M, size_t MT_K);
 
-// Compute the amount of data loaded from B to produce a MT_MxMT_NxMT_K tile.
+/**
+ * @brief Compute the amount of data loaded from B to produce a MT_MxMT_NxMT_K tile.
+ *
+ * @param MT_N Macro tile dimension N
+ * @param MT_K Macro tile dimension K
+ * @return size_t Amount of data loaded from B
+ */
 size_t compute_B_loads(size_t MT_N, size_t MT_K);
 
 /**
@@ -99,10 +121,6 @@ double compute_memory_latency(const problem_t& problem,
                               std::size_t num_active_cus,
                               std::size_t splitting_factor);
 
-/* ---------------------------------------------------------------------------------------- */
-/* Tile-related functions                                                                   */
-/* ---------------------------------------------------------------------------------------- */
-// Computes the latency to compute a K-COMPLETE tile.
 /**
  * @brief Computes the latency to compute a K-COMPLETE tile.
  *
@@ -152,42 +170,5 @@ double compute_total_latency(const problem_t& problem,
                              const config_t& config,
                              size_t max_cus);
 
-/**
- * @brief Extract analytical metrics from a GEMM computation and export to CSV.
- *
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param problem Problem description (M, N, K, etc.)
- * @param config Kernel configuration.
- * @param filename Name of the file to be written to.
- */
-void extract_analytical_metrics_csv(const hardware_t& hardware,
-                                    const problem_t& problem,
-                                    const config_t& config,
-                                    const std::string& filename);
-
-/**
- * @brief Extract analytical metrics from a GEMM computation and export to JSON.
- *
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param problem Problem description (M, N, K, etc.)
- * @param config Kernel configuration.
- * @param filename Name of the file to be written to.
- */
-void extract_analytical_metrics_json(const hardware_t& hardware,
-                                     const problem_t& problem,
-                                     const config_t& config,
-                                     const std::string& filename);
-
-/**
- * @brief Extract analytical metrics from a GEMM computation and return as map.
- *
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param problem Problem description (M, N, K, etc.)
- * @param config Kernel configuration.
- * @return unordered_map Extracted metrics.
- */
-std::unordered_map<std::string, std::string> extract_analytical_metrics(const hardware_t& hardware,
-                                                                        const problem_t& problem,
-                                                                        const config_t& config);
 
 }  // namespace origami
