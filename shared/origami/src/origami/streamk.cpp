@@ -7,6 +7,8 @@
 #include "origami/math.hpp"
 #include "origami/types.hpp"
 
+#include <iostream>
+
 namespace origami {
 namespace streamk {
 size_t compute_number_of_output_tiles(size_t mt_m, size_t mt_n, size_t m, size_t n, size_t batch) {
