@@ -45,7 +45,9 @@ const int USE_WORKGROUP_MAPPING_K_SIZE = 4096;
  * compile-time known.
  */
 
- constexpr std::array<WorkGroupTileSize, 34> possibleTileSizes = {{
+ constexpr size_t possibleTileSizesCount = 34;
+
+ constexpr std::array<WorkGroupTileSize, possibleTileSizesCount> possibleTileSizes = {{
     {256, 256, 128},
     {256, 192, 128},
     {256, 128, 128},
@@ -94,9 +96,9 @@ constexpr int preferredUnrolling(rocRoller::DataType typeA, rocRoller::DataType 
 
 template <rocRoller::DataType typeA, rocRoller::DataType typeB>
 constexpr auto generateTileList() {
-    std::array<origami::config_t, possibleTileSizes.size()> tileList{};
+    std::array<origami::config_t, possibleTileSizesCount> tileList{};
 
-    for (size_t i = 0; i < possibleTileSizes.size(); ++i) {
+    for (size_t i = 0; i < possibleTileSizesCount; ++i) {
         const auto& wgt = possibleTileSizes[i];
         auto MI = pickMI(typeA, typeB, wgt);
 
