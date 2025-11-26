@@ -48,7 +48,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--head-ref", help="Git head reference for diff (e.g., HEAD)")
     parser.add_argument(
         "--file-list",
-        help="Space-separated list of changed files (alternative to git diff for tests)",
+        nargs="+",
+        help="List of changed files (alternative to git diff for testing purposes)",
     )
     parser.add_argument("projects", nargs="*", help="List of opted-in projects")
     return parser.parse_args()
@@ -122,9 +123,7 @@ def main():
     args = parse_arguments()
 
     if args.file_list:
-        # Splitting by space might be problematic for filenames with spaces.
-        # Prefer --base-ref/--head-ref args for robustness.
-        changed_files = args.file_list.split()
+        changed_files = args.file_list
     elif args.base_ref and args.head_ref:
         changed_files = get_changed_files(args.base_ref, args.head_ref)
     else:
