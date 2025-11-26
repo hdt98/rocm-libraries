@@ -106,7 +106,8 @@ std::tuple<size_t, size_t, size_t, size_t> compute_cu_occupancy(const problem_t&
     if (hardware_t::is_debug_enabled()) { hardware.log_debug("reduction type", "Origami"); }
   } else  // as what StreamK predicts
   {
-    config.reduction_strategy = streamk::select_reduction(problem, hardware, config, grid_selection);
+    config.reduction_strategy =
+        streamk::select_reduction(problem, hardware, config, grid_selection);
 
     num_wgs = streamk::select_grid_size(problem, hardware, config, grid_selection, max_cus);
 
@@ -315,7 +316,6 @@ static inline double compute_cvt_overhead(const problem_t& problem,
 size_t compute_mt_compute_latency(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config) {
-
   dim3_t compute_mi = config.mi;
   // Override dot2 instruction with vector lane widths
   if (compute_mi.m == 0 && compute_mi.n == 0 && compute_mi.k == 0)
@@ -463,7 +463,7 @@ double estimate_mall_hit(const problem_t& problem,
   const size_t workgroups_n = math::safe_ceil_div(problem.size.n, config.mt.n);
 
   if (num_active_cus == 0) throw std::runtime_error("Number of Active CUs was 0");
-  
+
   // --- Initial Tile Sizing based on Concurrency ---
   // Use ceiling division for a more accurate initial guess.
   size_t mall_tile_m =
@@ -797,7 +797,7 @@ double compute_tile_latency(const problem_t& problem,
   int grid_n = static_cast<int>(math::safe_ceil_div(problem.size.n, MT_N));
 
   size_t real_occupancy =
-      std::min(std::max(config.occupancy,static_cast<int>(1)),
+      std::min(std::max(config.occupancy, static_cast<int>(1)),
                static_cast<int>(math::safe_ceil_div(grid_m * grid_n * batch * splitting_factor,
                                                     hardware.N_CU)));  // Number of WGs per CU.
 
@@ -968,10 +968,8 @@ double compute_total_latency(const problem_t& problem,
       return std::numeric_limits<double>::max();
 
     // We only use Dot2 for NN layout where M < 3
-    if(MI_M == 0 && MI_N == 0 && MI_K == 0)
-    {
-      if(M > 2 || a_trans || b_trans)
-        return std::numeric_limits<double>::max();
+    if (MI_M == 0 && MI_N == 0 && MI_K == 0) {
+      if (M > 2 || a_trans || b_trans) return std::numeric_limits<double>::max();
     }
 
     if (batch == 1) {
@@ -998,7 +996,8 @@ double compute_total_latency(const problem_t& problem,
   }
 
   // 1-1) config.workgroup_mapping, use default hardware value to compute memory latencies
-  config.workgroup_mapping = static_cast<int>(std::ceil(std::sqrt(hardware.N_CU / hardware.NUM_XCD)));
+  config.workgroup_mapping =
+      static_cast<int>(std::ceil(std::sqrt(hardware.N_CU / hardware.NUM_XCD)));
 
   // 1-2) Find CU occupancy
   auto [num_wgs, num_active_cus, numWaves, splitting_factor] =

@@ -10,6 +10,7 @@ import argparse
 import origami
 import math
 
+
 def parseArguments():
     parser = argparse.ArgumentParser(description="Test StreamK Grid Selection.")
     parser.add_argument("-m", type=int, default=8192, help="Problem M dimension")
@@ -30,13 +31,26 @@ def parseArguments():
         "--type_b", type=str, default="f16", help="Size of each element in B in bits"
     )
     parser.add_argument(
-        "--type_acc", type=str, default="f32", help="Size of each element in partial tile in bits"
+        "--type_acc",
+        type=str,
+        default="f32",
+        help="Size of each element in partial tile in bits",
     )
     parser.add_argument(
-        "--type_d", type=str, default="f16", help="Size of each element in the output in bits"
+        "--type_d",
+        type=str,
+        default="f16",
+        help="Size of each element in the output in bits",
     )
-    parser.add_argument("--type_compute", type=str, default=None, help="Instruction input type")
-    parser.add_argument("--workspace_size", type=int, default=0, help="Amount of workspace available in bytes")
+    parser.add_argument(
+        "--type_compute", type=str, default=None, help="Instruction input type"
+    )
+    parser.add_argument(
+        "--workspace_size",
+        type=int,
+        default=0,
+        help="Amount of workspace available in bytes",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--print", action="store_true", help="Print hardware info")
     parser.add_argument(
@@ -46,17 +60,30 @@ def parseArguments():
     parser.add_argument("--mt_m", type=int, default=32, help="Macro-tile dimension M")
     parser.add_argument("--mt_n", type=int, default=32, help="Macro-tile dimension N")
     parser.add_argument("--mt_k", type=int, default=256, help="Macro-tile dimension K")
-    parser.add_argument("--mi_m", type=int, default=16, help="Machine Instruction dimension M")
-    parser.add_argument("--mi_n", type=int, default=16, help="Machine Instruction dimension N")
-    parser.add_argument("--mi_k", type=int, default=16, help="Machine Instruction dimension K")
+    parser.add_argument(
+        "--mi_m", type=int, default=16, help="Machine Instruction dimension M"
+    )
+    parser.add_argument(
+        "--mi_n", type=int, default=16, help="Machine Instruction dimension N"
+    )
+    parser.add_argument(
+        "--mi_k", type=int, default=16, help="Machine Instruction dimension K"
+    )
     parser.add_argument("--occupancy", type=int, default=1, help="Occupancy of kernel")
 
-    parser.add_argument("--dynamic_grid_version", type=int, default=5, help="Version of Dynamic Grid Selection to use")
+    parser.add_argument(
+        "--dynamic_grid_version",
+        type=int,
+        default=5,
+        help="Version of Dynamic Grid Selection to use",
+    )
 
     args = parser.parse_args()
 
     if args.type_compute is None:
-        if origami.datatype_to_bits(origami.string_to_datatype(args.type_a)) > origami.datatype_to_bits(origami.string_to_datatype(args.type_b)):
+        if origami.datatype_to_bits(
+            origami.string_to_datatype(args.type_a)
+        ) > origami.datatype_to_bits(origami.string_to_datatype(args.type_b)):
             args.type_compute = args.type_a
         else:
             args.type_compute = args.type_b
@@ -76,8 +103,12 @@ def main():
     problem = origami.problem_t()
     problem.size = origami.dim3_t(args.m, args.n, args.k)
     problem.batch = args.batch
-    problem.a_transpose = origami.transpose_t.T if args.trans_a else origami.transpose_t.N
-    problem.b_transpose = origami.transpose_t.T if args.trans_b else origami.transpose_t.N
+    problem.a_transpose = (
+        origami.transpose_t.T if args.trans_a else origami.transpose_t.N
+    )
+    problem.b_transpose = (
+        origami.transpose_t.T if args.trans_b else origami.transpose_t.N
+    )
     problem.a_dtype = origami.string_to_datatype(args.type_a)
     problem.b_dtype = origami.string_to_datatype(args.type_b)
     problem.d_dtype = origami.string_to_datatype(args.type_d)
@@ -93,7 +124,7 @@ def main():
     config.occupancy = args.occupancy
     config.workgroup_mapping = args.wgm
 
-    # Select reduction strategy  
+    # Select reduction strategy
     grid_algorithm = origami.grid_selection_t.analytical  # default to analytical
     if args.dynamic_grid_version == 0:
         grid_algorithm = origami.grid_selection_t.number_of_cus
@@ -112,7 +143,9 @@ def main():
 
     reduction = origami.select_reduction(problem, hardware, config, grid_algorithm)
 
-    winner_grid = origami.select_grid_size(problem, hardware, config, grid_algorithm, hardware.N_CU)
+    winner_grid = origami.select_grid_size(
+        problem, hardware, config, grid_algorithm, hardware.N_CU
+    )
 
     print(f"Best reduction algo : {reduction}")
     print(f"Best grid : {winner_grid}")
