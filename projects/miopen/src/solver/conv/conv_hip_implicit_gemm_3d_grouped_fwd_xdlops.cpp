@@ -423,11 +423,13 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::InitValidKernels(
     {
     case miopenHalf: Init<ck::half_t>(problem); break;
     case miopenFloat:
+#ifdef __gfx942__
         if(problem.UseTF32() && Init<float, ck::tf32_t>(problem))
         {
             use_tf32 = true;
         }
         else
+#endif
         {
             use_tf32 = false;
             Init<float>(problem);
@@ -624,6 +626,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
             std::tie(ai_success, result) = run_ai_heuristics(ck::half_t{}, ck::half_t{});
             break;
         case miopenFloat:
+#ifdef __gfx942__
             if(problem.UseTF32())
             {
                 std::tie(ai_success, result) = run_ai_heuristics(float{}, ck::tf32_t{});
@@ -634,6 +637,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
                 }
             }
             else
+#endif
             {
                 std::tie(ai_success, result) = run_ai_heuristics(float{}, float{});
             }
@@ -712,12 +716,14 @@ bool PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::IsValid(
     {
     case miopenHalf: return CheckIsSupportCKArgs<ck::half_t>(problem);
     case miopenFloat:
+#ifdef __gfx942__
         if(problem.UseTF32() && CheckIsSupportCKArgs<float, ck::tf32_t>(problem))
         {
             use_tf32 = true;
             return true;
         }
         else
+#endif
         {
             use_tf32 = false;
             return CheckIsSupportCKArgs<float>(problem);
@@ -799,11 +805,13 @@ bool ConvHipImplicitGemm3DGroupFwdXdlops::IsApplicable(
     {
     case miopenHalf: return CheckCKApplicability<ck::half_t>(problem);
     case miopenFloat:
+#ifdef __gfx942__
         if(problem.UseTF32() && CheckCKApplicability<float, ck::tf32_t>(problem))
         {
             return true;
         }
         else
+#endif
         {
             return CheckCKApplicability<float>(problem);
         }

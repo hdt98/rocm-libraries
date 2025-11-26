@@ -296,6 +296,28 @@ option(MIOPEN_HIP_COMPILER_USE_SYSTEM_INCLUDE_DIRECTORIES "Append include direct
        ${MIOPEN_HIP_COMPILER_USE_SYSTEM_INCLUDE_DIRECTORIES_DEFAULT})
 
 target_flags(HIP_COMPILER_FLAGS hip::device)
+# Check if gfx942 is in any offload-arch flags
+# offload-arch can have multiple values separated by commas, e.g., --offload-arch=gfx90a,gfx942
+# or --offload-arch=gfx942:xnack+,gfx90a
+set(HAS_GFX942_OFFLOAD_ARCH FALSE)
+set(HAS_GFX950_OFFLOAD_ARCH FALSE)
+# Match all --offload-arch parameters (values may be comma-separated)
+string(REGEX MATCHALL "--offload-arch=[^ ]+" ALL_OFFLOAD_ARCH_FLAGS "${HIP_COMPILER_FLAGS}")
+if(ALL_OFFLOAD_ARCH_FLAGS)
+    foreach(OFFLOAD_ARCH_FLAG ${ALL_OFFLOAD_ARCH_FLAGS})
+        # Extract the value part after = (may contain commas and multiple architectures)
+        string(REGEX REPLACE "^--offload-arch=" "" OFFLOAD_ARCH_VALUE "${OFFLOAD_ARCH_FLAG}")
+        # Check if gfx942 appears in the value (could be comma-separated list)
+        if(OFFLOAD_ARCH_VALUE MATCHES "gfx942")
+            set(HAS_GFX942_OFFLOAD_ARCH TRUE)
+            break()
+        endif()
+        if(OFFLOAD_ARCH_VALUE MATCHES "gfx950")
+            set(HAS_GFX950_OFFLOAD_ARCH TRUE)
+            break()
+        endif()
+    endforeach()
+endif()
 # Remove cuda arch flags
 string(REGEX REPLACE --cuda-gpu-arch=[a-z0-9]+ "" HIP_COMPILER_FLAGS "${HIP_COMPILER_FLAGS}")
 string(REGEX REPLACE --offload-arch=[a-z0-9:+-]+ "" HIP_COMPILER_FLAGS "${HIP_COMPILER_FLAGS}")
@@ -331,6 +353,16 @@ if(WIN32)
 endif()
 
 message(STATUS "Hip compiler flags: ${HIP_COMPILER_FLAGS}")
+
+# Add __gfx942__ macro definition globally if gfx942 offload-arch was detected
+if(HAS_GFX942_OFFLOAD_ARCH)
+    add_compile_definitions(__gfx942__)
+    message(STATUS "__gfx942__ macro definition added (gfx942 offload-arch detected)")
+endif()
+if(HAS_GFX950_OFFLOAD_ARCH)
+    add_compile_definitions(__gfx950__)
+    message(STATUS "__gfx950__ macro definition added (gfx950 offload-arch detected)")
+endif()
 
 add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:HIP_COMPILER_FLAGS=${HIP_COMPILER_FLAGS}>)
 
