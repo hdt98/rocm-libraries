@@ -204,7 +204,10 @@ namespace TensileLite
             {
                 return std::shared_ptr<MySolution>();
             }
-            auto solution = solutions.at(index);
+            auto                   solution = solutions.at(index);
+            
+            TensileLite::TensorOps nop;
+
             if(solution->requiredHostWorkspaceSizePerProblem == static_cast<size_t>(-1))
             {
                 auto problem
@@ -214,8 +217,8 @@ namespace TensileLite
                                                       solution->problemType.bType,
                                                       solution->problemType.cType,
                                                       solution->problemType.dType,
-                                                      solution->problemType.computeType,
-                                                      solution->problemType.computeType,
+                                                      solution->problemType.aType,
+                                                      solution->problemType.aType,
                                                       solution->problemType.computeInputType,
                                                       solution->problemType.computeType,
                                                       1.0,
@@ -225,7 +228,8 @@ namespace TensileLite
                                                       solution->problemType.biasDataTypeWhiteList,
                                                       solution->problemType.biasSrcWhiteList,
                                                       solution->problemType.groupedGemm,
-                                                      std::numeric_limits<size_t>::max());
+                                                      std::numeric_limits<size_t>::max(),
+                                                      nop,nop,nop,nop);
                 solution->requiredHostWorkspaceSizePerProblem
                     = solution->requiredHostSizeGroupedGemmSingle(problem, hardware);
             }

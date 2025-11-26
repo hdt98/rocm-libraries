@@ -239,32 +239,104 @@ namespace TensileLite
     TENSILE_API KernelArguments::const_iterator begin(KernelArguments const&);
     TENSILE_API KernelArguments::const_iterator end(KernelArguments const&);
 
-    inline void KernelArguments::append(std::string const&     name,
-                                        ConstantVariant const& value,
-                                        rocisa::DataType       type)
+inline void KernelArguments::append(std::string const&     name,
+                                    ConstantVariant const& value,
+                                    rocisa::DataType       type)
+{
+    switch(type)
     {
-        switch(type)
-        {
-        case rocisa::DataType::Float:
-            return append<float>(name, (*std::get_if<float>(&value)), true);
-        case rocisa::DataType::Double:
-            return append<double>(name, (*std::get_if<double>(&value)), true);
-        case rocisa::DataType::Half:
-            return append<Half>(name, (*std::get_if<Half>(&value)), true);
-        case rocisa::DataType::Int32:
-            return append<int32_t>(name, (*std::get_if<int32_t>(&value)), true);
-        case rocisa::DataType::BFloat16:
-            return append<BFloat16>(name, (*std::get_if<BFloat16>(&value)), true);
-        case rocisa::DataType::Int8:
-            return append<int8_t>(name, (*std::get_if<int8_t>(&value)), true);
-        case rocisa::DataType::ComplexFloat:
-            return append<std::complex<float>>(name, (*std::get_if<std::complex<float>>(&value)), true);    
-        case rocisa::DataType::ComplexDouble:
-            return append<std::complex<double>>(name, (*std::get_if<std::complex<double>>(&value)), true);
-        default:
-            throw std::runtime_error("Unsupported ConstantVariant append type.");
-        }
+    case rocisa::DataType::Float:
+    {
+        auto* val_ptr = std::get_if<float>(&value);
+        if(!val_ptr)
+            throw std::runtime_error("Type mismatch: variant does not hold float");
+        return append<float>(name, *val_ptr, true);
     }
+    case rocisa::DataType::Double:
+    {
+        auto* val_ptr = std::get_if<double>(&value);
+        if(!val_ptr)
+            throw std::runtime_error("Type mismatch: variant does not hold double");
+        return append<double>(name, *val_ptr, true);
+    }
+    case rocisa::DataType::Half:
+    {
+        auto* val_ptr = std::get_if<Half>(&value);
+        if(!val_ptr)
+            throw std::runtime_error("Type mismatch: variant does not hold Half");
+        return append<Half>(name, *val_ptr, true);
+    }
+    case rocisa::DataType::Int32:
+    {
+        auto* val_ptr = std::get_if<int32_t>(&value);
+        if(!val_ptr)
+            throw std::runtime_error("Type mismatch: variant does not hold int32_t");
+        return append<int32_t>(name, *val_ptr, true);
+    }
+    case rocisa::DataType::BFloat16:
+    {
+        auto* val_ptr = std::get_if<BFloat16>(&value);
+        if(!val_ptr)
+            throw std::runtime_error("Type mismatch: variant does not hold BFloat16");
+        return append<BFloat16>(name, *val_ptr, true);
+    }
+    case rocisa::DataType::Int8:
+    {
+        auto* val_ptr = std::get_if<int8_t>(&value);
+        if(!val_ptr)
+            throw std::runtime_error("Type mismatch: variant does not hold int8_t");
+        return append<int8_t>(name, *val_ptr, true);
+    }
+    
+    // --- FIXED CASES ---
+    case rocisa::DataType::ComplexFloat:
+    {
+        // Check if the variant holds a std::complex<float>
+        auto* val_ptr = std::get_if<std::complex<float>>(&value);
+        if(val_ptr)
+        {
+            return append<std::complex<float>>(name, *val_ptr, true);
+        }
+
+        // If not, check if it holds a float (and needs to be promoted)
+        auto* float_ptr = std::get_if<float>(&value);
+        if(float_ptr)
+        {
+            // Promote the float to a complex<float>
+            return append<std::complex<float>>(name, std::complex<float>(*float_ptr, 0.0f), true);
+        }
+
+        // If it holds neither, throw an error
+        throw std::runtime_error("Type mismatch: variant does not hold std::complex<float> or float");
+    }
+    case rocisa::DataType::ComplexDouble:
+    {
+        // Check if the variant holds a std::complex<double>
+        auto* val_ptr = std::get_if<std::complex<double>>(&value);
+        if(val_ptr)
+        {
+            return append<std::complex<double>>(name, *val_ptr, true);
+        }
+
+        // If not, check if it holds a double (and needs to be promoted)
+        auto* double_ptr = std::get_if<double>(&value);
+        if(double_ptr)
+        {
+            // Promote the double to a complex<double>
+            return append<std::complex<double>>(name, std::complex<double>(*double_ptr, 0.0), true);
+        }
+        
+        // If it holds neither, throw an error
+        throw std::runtime_error("Type mismatch: variant does not hold std::complex<double> or double");
+    }
+    // --- END FIX ---
+
+    default:
+        // You can add cases for Float8, BFloat8, etc. here
+        throw std::runtime_error("Unsupported ConstantVariant append type.");
+    }
+}
+
 
     inline void
         KernelArguments::append(std::string const& name, float const value, rocisa::DataType type)
