@@ -9,11 +9,11 @@ It determines which files should undergo pre-commit checks based on opted-in pro
 Logic:
     1. Identify changed files (via git diff or provided list).
     2. Filter files:
-        - Include files belonging to opted-in projects (projects/<project>/...).
-        - Include files outside the 'projects/' directory.
+        - Include files belonging to opted-in projects (projects/<project>/... or shared/<project>/...).
+        - Include files outside the 'projects/' and 'shared/' directories.
     3. Output results to GITHUB_OUTPUT:
         - should_run: 'true' if there are filtered files, else 'false'.
-        - files: Space-separated list of filtered files.
+        - files: Newline-separated list of filtered files.
         - <project>_changed: 'true' for each opted-in project that has changes.
 
 Usage:
@@ -75,17 +75,23 @@ def filter_files(
     changed_projects = set()
 
     for file_path in changed_files:
-        # Check if file is in an opted-in project
+        # Check if file is in an opted-in project (either in projects/ or shared/)
         is_opted_in = False
         for project in opted_in_projects:
-            if file_path.startswith(f"projects/{project}/"):
+            if file_path.startswith(f"projects/{project}/") or file_path.startswith(
+                f"shared/{project}/"
+            ):
                 filtered_files.append(file_path)
                 changed_projects.add(project)
                 is_opted_in = True
                 break
 
-        # Vacuous inclusion: files outside 'projects/' are always included
-        if not is_opted_in and not file_path.startswith("projects/"):
+        # Vacuous inclusion: files outside 'projects/' and 'shared/' are always included
+        if (
+            not is_opted_in
+            and not file_path.startswith("projects/")
+            and not file_path.startswith("shared/")
+        ):
             filtered_files.append(file_path)
 
     return filtered_files, changed_projects
@@ -139,7 +145,8 @@ def main():
             logger.info(f)
 
         write_github_output("should_run", "true")
-        write_github_output("files", " ".join(filtered_files))
+        # Output as newline-separated list to handle spaces in filenames
+        write_github_output("files", "\n".join(filtered_files))
 
         for project in changed_projects:
             write_github_output(f"{project}_changed", "true")

@@ -63,9 +63,10 @@ jobs:
           echo "================================================"
           echo ""
 
-          FILTERED_FILES="${{ steps.filter.outputs.files }}"
+          # Read newline-separated files into an array
+          mapfile -t FILTERED_FILES <<< "${{ steps.filter.outputs.files }}"
 
-          if ! pre-commit run --show-diff-on-failure --files $FILTERED_FILES; then
+          if ! pre-commit run --show-diff-on-failure --files "${FILTERED_FILES[@]}"; then
             echo ""
             echo "================================================"
             echo "❌ Pre-commit checks FAILED"
@@ -74,7 +75,7 @@ jobs:
             echo "Please fix the issues above and commit the changes."
             echo ""
             echo "To run pre-commit locally on eligible changed files:"
-            echo "  pre-commit run --files $FILTERED_FILES"
+            echo "  pre-commit run --files ${FILTERED_FILES[*]}"
             echo ""
             echo "Or install pre-commit hooks to run automatically on commits:"
             echo "  pip install pre-commit"

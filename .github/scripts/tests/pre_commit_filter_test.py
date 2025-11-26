@@ -16,8 +16,20 @@ class TestPreCommitFilter(unittest.TestCase):
         self.assertEqual(filtered, ["projects/hipdnn/some_file.cpp"])
         self.assertEqual(projects, {"hipdnn"})
 
+    def test_filter_files_opted_in_shared_project(self):
+        changed_files = ["shared/hipdnn/some_file.cpp"]
+        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        self.assertEqual(filtered, ["shared/hipdnn/some_file.cpp"])
+        self.assertEqual(projects, {"hipdnn"})
+
     def test_filter_files_non_opted_in_project(self):
         changed_files = ["projects/otherproject/some_file.cpp"]
+        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        self.assertEqual(filtered, [])
+        self.assertEqual(projects, set())
+
+    def test_filter_files_non_opted_in_shared_project(self):
+        changed_files = ["shared/otherproject/some_file.cpp"]
         filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
         self.assertEqual(filtered, [])
         self.assertEqual(projects, set())
@@ -31,12 +43,26 @@ class TestPreCommitFilter(unittest.TestCase):
     def test_filter_files_mixed(self):
         changed_files = [
             "projects/hipdnn/file1.cpp",
-            "projects/otherproject/file2.cpp",
+            "shared/hipdnn/file2.cpp",
+            "projects/otherproject/file3.cpp",
+            "shared/otherproject/file4.cpp",
             "README.md",
         ]
         filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
-        expected_filtered = ["projects/hipdnn/file1.cpp", "README.md"]
+        expected_filtered = [
+            "projects/hipdnn/file1.cpp",
+            "shared/hipdnn/file2.cpp",
+            "README.md",
+        ]
         self.assertEqual(sorted(filtered), sorted(expected_filtered))
+        self.assertEqual(projects, {"hipdnn"})
+
+    def test_filter_files_with_spaces(self):
+        changed_files = ["projects/hipdnn/file with spaces.cpp", "file with spaces.md"]
+        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        self.assertEqual(
+            filtered, ["projects/hipdnn/file with spaces.cpp", "file with spaces.md"]
+        )
         self.assertEqual(projects, {"hipdnn"})
 
     @patch("pre_commit_filter.subprocess.run")
