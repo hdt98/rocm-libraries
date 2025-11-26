@@ -74,8 +74,8 @@
 #define LANGE_THDS 1024
 #endif
 
-#ifndef LANGE_FROBENIUS_BDIM
-#define LANGE_FROBENIUS_BDIM 1024
+#ifndef LANGE_FROBENIUS_MAX_BDIM
+#define LANGE_FROBENIUS_MAX_BDIM 1024
 #endif
 
 /***************** geqr2/geqrf and geql2/geqlf ********************************
