@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# Copyright © Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier:  MIT
+
 from pathlib import Path
 import unittest
 from unittest.mock import patch, MagicMock
