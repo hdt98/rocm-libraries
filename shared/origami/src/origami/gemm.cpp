@@ -315,11 +315,17 @@ static inline double compute_cvt_overhead(const problem_t& problem,
 size_t compute_mt_compute_latency(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config) {
+
+  dim3_t compute_mi = config.mi;
+  // Override dot2 instruction with vector lane widths
+  if (compute_mi.m == 0 && compute_mi.n == 0 && compute_mi.k == 0)
+    compute_mi = {.m = 1, .n = 1, .k = 64};
+
   // Compute the number of matrix instructions
-  size_t N_MI = compute_number_matrix_instructions(config.mt, config.mi);
+  size_t N_MI = compute_number_matrix_instructions(config.mt, compute_mi);
   // Latency of a single MT_MxMT_NxMT_k tile is the latency of one MI multiplied by
   // number of MI per MT_MxMT_NxMT_k.
-  size_t L_MI = hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, problem.mi_dtype);
+  size_t L_MI = hardware.get_mi_latency(compute_mi.m, compute_mi.n, compute_mi.k, problem.mi_dtype);
 
   // size_t mt_arith = arithmetic_intensity(MT_M, MT_N, MT_K, 2);
   // printf("MT_M:%d MT_N:%d MT_K:%d arith:%d\n", MT_M, MT_N, MT_K, mt_arith);
@@ -961,13 +967,11 @@ double compute_total_latency(const problem_t& problem,
     if (M <= 256 && N <= 256 && K < 1024 && batch != 1 && (MT_M < M || MT_N < N))
       return std::numeric_limits<double>::max();
 
-    // Override dot2 instruction with vector lane widths
-    if (MI_N == 0 && MI_M == 0 && MI_K == 0) {
-      // We only use Dot2 for NN layout where M < 3
-      if (M > 2 || a_trans || b_trans) return std::numeric_limits<double>::max();
-      MI_M = 1;
-      MI_N = 1;
-      MI_K = 64;
+    // We only use Dot2 for NN layout where M < 3
+    if(MI_M == 0 && MI_N == 0 && MI_K == 0)
+    {
+      if(M > 2 || a_trans || b_trans)
+        return std::numeric_limits<double>::max();
     }
 
     if (batch == 1) {
