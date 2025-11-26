@@ -29,3 +29,8 @@ mkdir -p build; cd build;
 CXX=[clang++|g++|hipcc] cmake ..
 make -j
 ```
+
+
+
+
+

@@ -40,12 +40,14 @@ def readRequirementsFromTxt():
         requirements.append(line)
   return requirements
 
+
+
 def readVersionFromInit():
     import Tensile
     return Tensile.__version__
 
 setup(
-  name="Tensile",
+  name='Tensile',   
   version=readVersionFromInit(),
   description="An auto-tuning tool for GEMMs and higher-dimensional tensor contractions on GPUs.",
   url="https://github.com/ROCmSoftwarePlatform/Tensile",

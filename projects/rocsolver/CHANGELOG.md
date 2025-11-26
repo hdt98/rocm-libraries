@@ -19,10 +19,10 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 
 
-## rocSOLVER 3.30.1 for ROCm 7.0.2
+## rocSOLVER 3.30.1 for ROCm 7.0.2   
 
 ### Optimized
-
+    
 * Improved the performance of LARFT and downstream functions such as GEQRF and ORMTR.
 * Improved the performance of LARF and downstream functions such as GEQR2.
 * Improved the performance of ORMTR and downstream functions such as SYEVD.
@@ -559,4 +559,10 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 ### Deprecated
 - rocSOLVER types and enumerations
 - hcc compiler support
+
+
+
+
+
+
 
