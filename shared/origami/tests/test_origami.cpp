@@ -212,30 +212,33 @@ TEST_CASE("GEMM: deterministic_tie_breaking", "[gemm]") {
   }
 }
 
-TEST_CASE("GEMM: Verify deterministic tile selection", "[gemm]") {
-  for (int gpu_arch : test_architectures) {
-    DYNAMIC_SECTION("gfx" << gpu_arch << " - Verify deterministic selection") {
+TEST_CASE("GEMM: Verify deterministic tile selection", "[gemm]")
+{
+  for (int gpu_arch : test_architectures) 
+  {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - Verify deterministic selection") 
+    {
       auto hardware = make_hardware(gpu_arch);
 
-      // Square problem size
+      //problem size
       auto problem =
           make_problem(42598, 153, 128, origami::transpose_t::N, origami::transpose_t::T);
-
+    
       // List 1: config A first, then config B
       std::vector<origami::config_t> config_A;
       std::vector<origami::config_t> config_B;
 
       // config A[0]
-      config_A.push_back(make_config(256, 160, 32, 16, 16, 32, 1, 6, 0, 0));  // Tile A
+      config_A.push_back(make_config(256, 160, 32, 16, 16, 32, 1, 6, 0, 0)); // Tile A
       // config A[1]
-      config_A.push_back(make_config(192, 160, 64, 16, 16, 32, 1, 6, 0, 0));  // Tile B
+      config_A.push_back(make_config(192, 160, 64, 16, 16, 32, 1, 6, 0, 0)); // Tile B
 
       // config B[0] Previous two tiles + a new one
-      config_B.push_back(make_config(256, 160, 32, 16, 16, 32, 1, 6, 0, 0));  // Tile A
+      config_B.push_back(make_config(256, 160, 32, 16, 16, 32, 1, 6, 0, 0)); // Tile A
       // config B[1]
-      config_B.push_back(make_config(192, 160, 64, 16, 16, 32, 1, 6, 0, 0));  // Tile B
+      config_B.push_back(make_config(192, 160, 64, 16, 16, 32, 1, 6, 0, 0)); // Tile B
       // config B[2]
-      config_B.push_back(make_config(192, 160, 32, 16, 16, 32, 1, 6, 0, 0));  // Tile C
+      config_B.push_back(make_config(192, 160, 32, 16, 16, 32, 1, 6, 0, 0)); // Tile C
 
       // Call select_config with both tile configs
       auto best_tile_A = origami::select_config(problem, hardware, config_A);
@@ -250,15 +253,16 @@ TEST_CASE("GEMM: Verify deterministic tile selection", "[gemm]") {
       size_t MT_N2 = best_tile_B.config.mt.n;
       size_t MT_K2 = best_tile_B.config.mt.k;
 
-      auto winner_is_acceptable =
-          [](auto const& actual, auto const& candidate1, auto const& candidate2) -> bool {
-        return (actual == candidate1) || (actual == candidate2);
-      };
+      auto winner_is_acceptable = [](auto const& actual,
+                               auto const& candidate1,
+                               auto const& candidate2) -> bool {
+    return (actual == candidate1) || (actual == candidate2);
+    };
 
-      INFO("Winner is not acceptable");
-      REQUIRE(winner_is_acceptable(MT_M2, MT_M1, config_B[2].mt.m));
-      REQUIRE(winner_is_acceptable(MT_N2, MT_N1, config_B[2].mt.n));
-      REQUIRE(winner_is_acceptable(MT_K2, MT_K1, config_B[2].mt.k));
+    INFO("Winner is not acceptable");
+    REQUIRE(winner_is_acceptable(MT_M2,  MT_M1, config_B[2].mt.m));
+    REQUIRE(winner_is_acceptable(MT_N2,  MT_N1, config_B[2].mt.n));
+    REQUIRE(winner_is_acceptable(MT_K2,  MT_K1, config_B[2].mt.k));
     }
   }
 }
