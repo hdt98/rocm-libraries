@@ -10,11 +10,18 @@
 #include <ostream>
 #include <string>
 #include <tuple>
+#include <type_traits>
+#include <unordered_map>
 
+#include "origami/log.hpp"
 #include "origami/math.hpp"
 
 namespace origami {
 
+/**
+ * @brief Enumeration of supported data types.
+ *
+ */
 enum class data_type_t : int {
   Float,
   Double,
@@ -43,90 +50,53 @@ enum class data_type_t : int {
   None = Count
 };
 
-inline data_type_t int_to_data_type(int dt) { return (data_type_t)dt; }
+/**
+ * @brief Convert integer to data_type_t enum.
+ *
+ * @param dt Integer value to convert
+ * @return data_type_t Corresponding data type
+ */
+inline data_type_t int_to_data_type(int dt) { return static_cast<data_type_t>(dt); }
 
-inline int data_type_to_bits(data_type_t type) {
-  switch (type) {
-    case data_type_t::Float: return 32;
-    case data_type_t::Double: return 64;
-    case data_type_t::ComplexFloat: return 64;
-    case data_type_t::ComplexDouble: return 128;
-    case data_type_t::Half: return 16;
-    case data_type_t::Int8x4: return 32;
-    case data_type_t::Int32: return 32;
-    case data_type_t::BFloat16: return 16;
-    case data_type_t::Int8: return 8;
-    case data_type_t::Int4: return 4;
-    case data_type_t::Int64: return 64;
-    case data_type_t::XFloat32: return 32;
-    case data_type_t::Float8_fnuz: return 8;
-    case data_type_t::BFloat8_fnuz: return 8;
-    case data_type_t::Float8BFloat8_fnuz: return 8;
-    case data_type_t::BFloat8Float8_fnuz: return 8;
-    case data_type_t::Float8: return 8;
-    case data_type_t::BFloat8: return 8;
-    case data_type_t::Float8BFloat8: return 8;
-    case data_type_t::BFloat8Float8: return 8;
-    case data_type_t::Float6: return 6;
-    case data_type_t::BFloat6: return 6;
-    case data_type_t::Float4: return 4;
-    default: return -1;  // Invalid type
-  }
-}
+/**
+ * @brief Convert data_type_t to number of bits.
+ *
+ * @param type Data type
+ * @return int Number of bits
+ */
+int data_type_to_bits(data_type_t type);
 
+/**
+ * @brief Convert data_type_t to number of bytes.
+ *
+ * @param type Data type
+ * @return int Number of bytes
+ */
 inline int data_type_to_bytes(data_type_t type) {
   return math::safe_ceil_div(data_type_to_bits(type), 8);
 }
 
-inline std::string to_string(data_type_t type) {
-  switch (type) {
-    case data_type_t::Float: return "Float";
-    case data_type_t::Double: return "Double";
-    case data_type_t::ComplexFloat: return "ComplexFloat";
-    case data_type_t::ComplexDouble: return "ComplexDouble";
-    case data_type_t::Half: return "Half";
-    case data_type_t::Int8x4: return "Int8x4";
-    case data_type_t::Int32: return "Int32";
-    case data_type_t::BFloat16: return "BFloat16";
-    case data_type_t::Int8: return "Int8";
-    case data_type_t::Int4: return "Int4";
-    case data_type_t::Int64: return "Int64";
-    case data_type_t::XFloat32: return "XFloat32";
-    case data_type_t::Float8_fnuz: return "Float8_fnuz";
-    case data_type_t::BFloat8_fnuz: return "BFloat8_fnuz";
-    case data_type_t::Float8BFloat8_fnuz: return "Float8BFloat8_fnuz";
-    case data_type_t::BFloat8Float8_fnuz: return "BFloat8Float8_fnuz";
-    case data_type_t::Float8: return "Float8";
-    case data_type_t::BFloat8: return "BFloat8";
-    case data_type_t::Float8BFloat8: return "Float8BFloat8";
-    case data_type_t::BFloat8Float8: return "BFloat8Float8";
-    case data_type_t::Float6: return "Float6";
-    case data_type_t::BFloat6: return "BFloat6";
-    case data_type_t::Float4: return "Float4";
-    default: return "Invalid";
-  }
-  return "Invalid";
-}
+/**
+ * @brief Convert data_type_t to string.
+ *
+ * @param type Data type
+ * @return std::string String representation of data type
+ */
+std::string to_string(data_type_t type);
 
-inline data_type_t string_to_data_type(std::string s) {
-  if (s == "f32") return data_type_t::Float;
-  if (s == "c32") return data_type_t::ComplexFloat;
-  if (s == "c64") return data_type_t::ComplexDouble;
-  if (s == "f64") return data_type_t::Double;
-  if (s == "f16") return data_type_t::Half;
-  if (s == "i32") return data_type_t::Int32;
-  if (s == "bf16") return data_type_t::BFloat16;
-  if (s == "i8") return data_type_t::Int8;
-  if (s == "i4") return data_type_t::Int4;
-  if (s == "xf32") return data_type_t::XFloat32;
-  if (s == "f8") return data_type_t::Float8;
-  if (s == "bf8") return data_type_t::BFloat8;
-  if (s == "f6") return data_type_t::Float6;
-  if (s == "bf6") return data_type_t::BFloat6;
-  if (s == "f4") return data_type_t::Float4;
-  return data_type_t::None;
-}
+/**
+ * @brief Convert string to data_type_t enum.
+ *
+ * @param s String value to convert
+ * @return data_type_t Corresponding data type
+ */
+data_type_t string_to_data_type(std::string s);
 
+/**
+ * @brief Struct to define a matrix instruction.
+ *
+ * Contains the dimensions and data type of a matrix instruction.
+ */
 struct matrix_instruction {
   size_t MI_M;
   size_t MI_N;
@@ -242,6 +212,61 @@ struct dim3_t {
 };
 
 /**
+ * @brief Runtime options for controlling debug, heuristics, and other behaviors.
+ *
+ * Provides programmatic access to runtime configuration options that can be
+ * set either programmatically or via environment variables.
+ */
+struct runtime_options {
+  /// Enable debug logging (reads from ANALYTICAL_GEMM_DEBUG env var)
+  bool debug_enabled;
+
+  /// Enable heuristics (reads from ANALYTICAL_GEMM_HEURISTICS env var)
+  bool heuristics_enabled;
+
+  /// Heuristics variance threshold (reads from ANALYTICAL_GEMM_HEURISTICS_VARIANCE env var)
+  double heuristics_variance;
+
+  /**
+   * @brief Default constructor that reads from environment variables.
+   */
+  runtime_options();
+
+  /**
+   * @brief Constructor with explicit values (does not read from environment).
+   */
+  runtime_options(bool debug, bool heuristics, double variance);
+
+  /**
+   * @brief Get the global runtime options instance.
+   */
+  static runtime_options& get();
+
+  /**
+   * @brief Read debug setting from environment variable.
+   * @return true if ANALYTICAL_GEMM_DEBUG is set to "1", false otherwise
+   */
+  static bool read_debug_from_env();
+
+  /**
+   * @brief Read heuristics setting from environment variable.
+   * @return true if ANALYTICAL_GEMM_HEURISTICS is set to "1", false otherwise
+   */
+  static bool read_heuristics_from_env();
+
+  /**
+   * @brief Read heuristics variance from environment variable.
+   * @return double Variance value from ANALYTICAL_GEMM_HEURISTICS_VARIANCE, or 0.0 if not set
+   */
+  static double read_heuristics_variance_from_env();
+
+  /**
+   * @brief Update runtime options from environment variables.
+   */
+  void update_from_env();
+};
+
+/**
  * @brief Full kernel configuration (tile shape + execution parameters).
  *
  * Holds the geometric tile sizes along with occupancy,
@@ -270,6 +295,12 @@ struct config_t {
 
   /// Reduction strategy.
   mutable reduction_t reduction_strategy{};
+
+  /// Runtime options (if null, uses global singleton)
+  const runtime_options* runtime_opts{nullptr};
+
+  /// Logger for analytical metrics
+  mutable logger_t logger;
 
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && mi == o.mi && cache_hints_a == o.cache_hints_a &&
@@ -323,6 +354,16 @@ struct problem_t {
   std::size_t a_mx_block_size;
   std::size_t b_mx_block_size;
 };
+
+/**
+ * @brief Get runtime options from config, or global singleton if config doesn't specify.
+ *
+ * @param config Configuration struct (may contain runtime_opts pointer)
+ * @return const runtime_options& Reference to runtime options
+ */
+inline const runtime_options& get_runtime_options(const config_t& config) {
+  return config.runtime_opts ? *config.runtime_opts : runtime_options::get();
+}
 
 }  // namespace origami
 
