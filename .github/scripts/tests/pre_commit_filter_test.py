@@ -1,10 +1,10 @@
+from pathlib import Path
 import unittest
 from unittest.mock import patch, MagicMock
 import sys
 import os
 
-# Add the scripts directory to the path so we can import the module
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.fspath(Path(__file__).parent.parent))
 
 import pre_commit_filter
 
