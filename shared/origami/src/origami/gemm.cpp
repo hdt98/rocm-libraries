@@ -103,7 +103,9 @@ std::tuple<size_t, size_t, size_t, size_t> compute_cu_occupancy(const problem_t&
     numWaves       = math::safe_ceil_div(num_wgs, hardware.N_CU);
     splitFactor    = split;
 
-    config.logger.log("reduction type",  "Origami");
+    if (get_runtime_options(config).debug_enabled) {
+      config.logger.log("reduction type",  "Origami");
+    }
   } else  // as what StreamK predicts
   {
     config.reduction_strategy =
@@ -124,12 +126,14 @@ std::tuple<size_t, size_t, size_t, size_t> compute_cu_occupancy(const problem_t&
     splitFactor = math::safe_ceil_div(num_wgs, num_mts);
   }
 
-  config.logger.log("num_mts",  num_mts);
-  config.logger.log("num_wgs",  num_wgs);
-  config.logger.log("num_active_cus",  num_active_cus);
-  config.logger.log("numWaves",  numWaves);
-  config.logger.log("splitFactor",  splitFactor);
-  config.logger.log("max_cus",  max_cus);
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log("num_mts",  num_mts);
+    config.logger.log("num_wgs",  num_wgs);
+    config.logger.log("num_active_cus",  num_active_cus);
+    config.logger.log("numWaves",  numWaves);
+    config.logger.log("splitFactor",  splitFactor);
+    config.logger.log("max_cus",  max_cus);
+  }
 
   return std::make_tuple(num_wgs, num_active_cus, numWaves, splitFactor);
 }
@@ -440,10 +444,12 @@ double estimate_l2_hit(const problem_t& problem,
   double l2_hit_rate = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
   // Final clamping and logging.
-  config.logger.log("L2Tile_M",  l2_tile_m);
-  config.logger.log("L2Tile_N",  l2_tile_n);
-  config.logger.log("TotalWorkgroups",  total_workgroups);
-  config.logger.log("ConcurrentWorkgroups",  concurrent_workgroups);
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log("L2Tile_M",  l2_tile_m);
+    config.logger.log("L2Tile_N",  l2_tile_n);
+    config.logger.log("TotalWorkgroups",  total_workgroups);
+    config.logger.log("ConcurrentWorkgroups",  concurrent_workgroups);
+  }
 
   // Clamp the hit rate to be within a realistic [0, 1] range.
   return std::max(0.0, std::min(l2_hit_rate, 1.0));
@@ -500,9 +506,11 @@ double estimate_mall_hit(const problem_t& problem,
 
   double mall_hit_rate = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
-  config.logger.log("MallTile_M",  mall_tile_m);
-  config.logger.log("MallTile_N",  mall_tile_n);
-  config.logger.log("MallFootprint_Bytes", calculate_footprint(mall_tile_m, mall_tile_n));
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log("MallTile_M",  mall_tile_m);
+    config.logger.log("MallTile_N",  mall_tile_n);
+    config.logger.log("MallFootprint_Bytes", calculate_footprint(mall_tile_m, mall_tile_n));
+  }
 
   // Clamp the final result to the valid [0, 1] range.
   return std::max(0.0, std::min(mall_hit_rate, 1.0));

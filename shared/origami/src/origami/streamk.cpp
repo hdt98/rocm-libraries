@@ -7,8 +7,6 @@
 #include "origami/math.hpp"
 #include "origami/types.hpp"
 
-#include <iostream>
-
 namespace origami {
 namespace streamk {
 size_t compute_number_of_output_tiles(size_t mt_m, size_t mt_n, size_t m, size_t n, size_t batch) {
@@ -223,8 +221,7 @@ size_t grid_energy_aware(const problem_t& problem, const config_t& config, size_
 size_t grid_reduction_cost_aware(const problem_t& problem,
                                  const config_t& config,
                                  size_t grid_start,
-                                 size_t grid_end,
-                                 bool verbose = false) {
+                                 size_t grid_end) {
   // Fixed overhead alpha (a), fixed-size cost incurred by
   // each work-group, e.g. the grid launch latency, the initial
   // compulsary cache misses, the cost of writing the final output tile
@@ -259,22 +256,6 @@ size_t grid_reduction_cost_aware(const problem_t& problem,
     auto [runtime_v2, iters_per_cta_v2, fixup_peers_v2, cache_penalty] =
         predicted_runtime_v2(config.mt, problem.size, problem.batch, g, a, b, c, d);
 
-    if (verbose) {
-      std::cout << "[original] " << "grid size: " << g << ", runtime: " << runtime
-                << ", iters_per_cta: " << iters_per_cta << ", fixup_peers: "
-                << fixup_peers
-                // << ", cache_penalty: " << cache_penalty
-                << ", m: " << problem.size.m << ", n: " << problem.size.n
-                << ", k: " << problem.size.k << ", a: " << a << ", b: " << b << ", c: " << c
-                << ", d: " << d << std::endl;
-
-      std::cout << "[cache-offset] " << "grid size: " << g << ", runtime: " << runtime_v2
-                << ", iters_per_cta: " << iters_per_cta_v2 << ", fixup_peers: " << fixup_peers_v2
-                << ", cache_penalty: " << cache_penalty << ", m: " << problem.size.m
-                << ", n: " << problem.size.n << ", k: " << problem.size.k << ", a: " << a
-                << ", b: " << b << ", c: " << c << ", d: " << d << std::endl;
-    }
-
     if (min_grid_runtime.second > runtime) {
       min_grid_runtime.first  = g;
       min_grid_runtime.second = runtime;
@@ -286,20 +267,11 @@ size_t grid_reduction_cost_aware(const problem_t& problem,
     }
   }
 
-  if (verbose) {
-    std::cout << "[original] Number of Output Tiles: "
-              << compute_number_of_output_tiles(
-                     config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch)
-              << std::endl;
-    std::cout << "[original] Minimum runtime: " << min_grid_runtime.second
-              << " @ grid size: " << min_grid_runtime.first << std::endl;
-
-    std::cout << "[cache-offset] Number of Output Tiles: "
-              << compute_number_of_output_tiles(
-                     config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch)
-              << std::endl;
-    std::cout << "[cache-offset] Minimum runtime: " << min_grid_runtime_v2.second
-              << " @ grid size: " << min_grid_runtime_v2.first << std::endl;
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log("grid_reduction_cost_aware_best_grid_size_original", min_grid_runtime.first);
+    config.logger.log("grid_reduction_cost_aware_best_runtime_original", min_grid_runtime.second);
+    config.logger.log("grid_reduction_cost_aware_best_grid_size_cache_offset", min_grid_runtime_v2.first);
+    config.logger.log("grid_reduction_cost_aware_best_runtime_cache_offset", min_grid_runtime_v2.second);
   }
 
   return min_grid_runtime_v2.first;

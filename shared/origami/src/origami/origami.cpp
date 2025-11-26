@@ -227,8 +227,10 @@ std::tuple<size_t, size_t> select_workgroup_mapping(const problem_t& problem,
         bestWGM = wgm;
       }
 
-      if (get_runtime_options(config).debug_enabled)
-        std::cout << "WGM (" << wgm << "), L2Estimate (" << wgmL2Estimate << ")" << std::endl;
+      if (get_runtime_options(config).debug_enabled) {
+        config.logger.log("WGM", wgm);
+        config.logger.log("L2Estimate", wgmL2Estimate);
+      }
     }
 
     out_wgm = bestWGM;
