@@ -195,6 +195,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
 ///                             in global memory (pre-shuffled).
 /// @tparam DoElementwiseBeforeCShuffle Whether the cde_elementwise should be performed before or
 ///                                     after elementwise op.
+/// @tparam UseDataCachePrefetch        Whether to use data cache prefetching feature of hardware.
 template <typename ALayout,
           typename BLayout,
           typename CLayout,
@@ -245,7 +246,7 @@ template <typename ALayout,
           bool PermuteB                               = false,
           bool DoElementwiseBeforeCShuffle            = false,
           index_t MinimumOccupancy                    = 0,
-          bool UsePrefetch                            = false>
+          bool UseDataCachePrefetch                   = false>
 struct GridwiseGemm_xdl_cshuffle_v3
 {
     static constexpr auto I0 = Number<0>{};
@@ -1585,7 +1586,7 @@ struct GridwiseGemm_xdl_cshuffle_v3
                  KPack,
                  false,
                  TransposeC,
-                 UsePrefetch>())>;
+                 UseDataCachePrefetch>())>;
 
     template <typename DeviceArch>
     __device__ __host__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)

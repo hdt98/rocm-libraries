@@ -33,8 +33,8 @@ template <BlockGemmPipelineScheduler BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPacks,
-          bool TransposeC  = false,
-          bool UsePrefetch = false>
+          bool TransposeC           = false,
+          bool UseDataCachePrefetch = false>
 struct BlockwiseGemmXdlops_pipeline_v3
 {
 };
@@ -59,7 +59,7 @@ template <index_t BlockSize,
           index_t NRepeat,
           index_t KPack,
           bool TransposeC,
-          bool UsePrefetch>
+          bool UseDataCachePrefetch>
 struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                        BlockSize,
                                        ADataType,
@@ -81,7 +81,7 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                        NRepeat,
                                        KPack,
                                        TransposeC,
-                                       UsePrefetch>
+                                       UseDataCachePrefetch>
     : BlockwiseGemmXdlops_pipeline_base<BlockSize,
                                         ADataType,
                                         BDataType,
@@ -326,8 +326,8 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
         a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
         b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
-        // HW PREFETCH
-        if constexpr(UsePrefetch)
+        // Use DataCachePrefetch
+        if constexpr(UseDataCachePrefetch)
         {
             a_blockwise_copy.RunPrefetch(a_grid_desc, a_grid_buf);
             b_blockwise_copy.RunPrefetch(b_grid_desc, b_grid_buf);
@@ -376,8 +376,8 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                 a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
                 b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
-                // HW PREFETCH
-                if constexpr(UsePrefetch)
+                // Use DataCachePrefetch
+                if constexpr(UseDataCachePrefetch)
                 {
                     // we don't want to prefetch on last iteration, that's why we add + 1
                     if((i + 1) < (num_loop - 1))

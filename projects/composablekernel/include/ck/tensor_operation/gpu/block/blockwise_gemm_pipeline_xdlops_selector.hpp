@@ -32,9 +32,9 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool DirectLoad  = false,
-          bool TransposeC  = false,
-          bool UsePrefetch = false>
+          bool DirectLoad           = false,
+          bool TransposeC           = false,
+          bool UseDataCachePrefetch = false>
 constexpr auto BlockGemmPipeline_Selector()
 {
     if constexpr(DirectLoad)
@@ -92,7 +92,7 @@ constexpr auto BlockGemmPipeline_Selector()
             std::cerr << "BlockGemmPipeline configuration is not available" << std::endl;
         }
     }
-    else if constexpr(UsePrefetch)
+    else if constexpr(UseDataCachePrefetch)
     {
         // currently only one implementation supports prefetch
         if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
@@ -118,7 +118,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    NRepeat,
                                                    KPack,
                                                    TransposeC,
-                                                   UsePrefetch>{};
+                                                   UseDataCachePrefetch>{};
         }
         else
         {
