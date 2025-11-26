@@ -103,7 +103,7 @@ std::tuple<size_t, size_t, size_t, size_t> compute_cu_occupancy(const problem_t&
     numWaves       = math::safe_ceil_div(num_wgs, hardware.N_CU);
     splitFactor    = split;
 
-    if (hardware_t::is_debug_enabled()) { hardware.log_debug("reduction type", "Origami"); }
+    config.logger.log("reduction type",  "Origami");
   } else  // as what StreamK predicts
   {
     config.reduction_strategy =
@@ -124,14 +124,12 @@ std::tuple<size_t, size_t, size_t, size_t> compute_cu_occupancy(const problem_t&
     splitFactor = math::safe_ceil_div(num_wgs, num_mts);
   }
 
-  if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("num_mts", num_mts);
-    hardware.log_debug("num_wgs", num_wgs);
-    hardware.log_debug("num_active_cus", num_active_cus);
-    hardware.log_debug("numWaves", numWaves);
-    hardware.log_debug("splitFactor", splitFactor);
-    hardware.log_debug("max_cus", max_cus);
-  }
+  config.logger.log("num_mts",  num_mts);
+  config.logger.log("num_wgs",  num_wgs);
+  config.logger.log("num_active_cus",  num_active_cus);
+  config.logger.log("numWaves",  numWaves);
+  config.logger.log("splitFactor",  splitFactor);
+  config.logger.log("max_cus",  max_cus);
 
   return std::make_tuple(num_wgs, num_active_cus, numWaves, splitFactor);
 }
@@ -442,12 +440,10 @@ double estimate_l2_hit(const problem_t& problem,
   double l2_hit_rate = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
   // Final clamping and logging.
-  if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("L2Tile_M", l2_tile_m);
-    hardware.log_debug("L2Tile_N", l2_tile_n);
-    hardware.log_debug("TotalWorkgroups", total_workgroups);
-    hardware.log_debug("ConcurrentWorkgroups", concurrent_workgroups);
-  }
+  config.logger.log("L2Tile_M",  l2_tile_m);
+  config.logger.log("L2Tile_N",  l2_tile_n);
+  config.logger.log("TotalWorkgroups",  total_workgroups);
+  config.logger.log("ConcurrentWorkgroups",  concurrent_workgroups);
 
   // Clamp the hit rate to be within a realistic [0, 1] range.
   return std::max(0.0, std::min(l2_hit_rate, 1.0));
@@ -504,11 +500,9 @@ double estimate_mall_hit(const problem_t& problem,
 
   double mall_hit_rate = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
-  if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("MallTile_M", mall_tile_m);
-    hardware.log_debug("MallTile_N", mall_tile_n);
-    hardware.log_debug("MallFootprint_Bytes", calculate_footprint(mall_tile_m, mall_tile_n));
-  }
+  config.logger.log("MallTile_M",  mall_tile_m);
+  config.logger.log("MallTile_N",  mall_tile_n);
+  config.logger.log("MallFootprint_Bytes", calculate_footprint(mall_tile_m, mall_tile_n));
 
   // Clamp the final result to the valid [0, 1] range.
   return std::max(0.0, std::min(mall_hit_rate, 1.0));
@@ -702,39 +696,29 @@ double compute_memory_latency(const problem_t& problem,
   // 12) pick the worst‐case bound
   double L_mem = std::max({L_mem_mem1, L_mem_mem2, L_mem_MEM});
 
-  if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("mem1_perf_ratio", hardware.mem1_perf_ratio);
-    hardware.log_debug("mem2_perf_ratio", hardware.mem2_perf_ratio);
-    hardware.log_debug("mem3_perf_ratio", hardware.mem3_perf_ratio);
-    hardware.log_debug("mem_bw_per_wg_coefficients(0)",
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log("mem1_perf_ratio",  hardware.mem1_perf_ratio);
+    config.logger.log("mem2_perf_ratio",  hardware.mem2_perf_ratio);
+    config.logger.log("mem3_perf_ratio",  hardware.mem3_perf_ratio);
+    config.logger.log("mem_bw_per_wg_coefficients(0)",
                        std::get<0>(hardware.mem_bw_per_wg_coefficients));
-    hardware.log_debug("mem_bw_per_wg_coefficients(1)",
+    config.logger.log("mem_bw_per_wg_coefficients(1)",
                        std::get<1>(hardware.mem_bw_per_wg_coefficients));
-    hardware.log_debug("mem_bw_per_wg_coefficients(2)",
-                       std::get<2>(hardware.mem_bw_per_wg_coefficients));
-    hardware.log_debug("H_mem1 (mem1 hit ratio)", H_mem1);
-    hardware.log_debug("H_mem2 (mem2 hit ratio)", H_mem2);
-    hardware.log_debug("Total Load (bytes)", total_Ld);
-    hardware.log_debug("Ld_mem2 (bytes)", Ld_mem2);
-    hardware.log_debug("Ld_MEM (bytes)", Ld_MEM);
-    hardware.log_debug("L_mem_mem1 (cycles)", L_mem_mem1);
-    hardware.log_debug("L_mem_mem2 (cycles)", L_mem_mem2);
-    hardware.log_debug("L_mem_MEM (cycles)", L_mem_MEM);
-    hardware.log_debug("MT_K % 128 bytes", MT_K * static_cast<size_t>(b_bytes) % 128);
-    hardware.log_debug("MT_M % 128 bytes", MT_M * static_cast<size_t>(a_bytes) % 128);
-    hardware.log_debug("MT_N % 128 bytes", MT_N * static_cast<size_t>(b_bytes) % 128);
-    hardware.log_debug(
+    config.logger.log("mem_bw_per_wg_coefficients(2)",
+                       std::get<2>(hardware.mem_bw_per_wg_coefficients));    config.logger.log("H_mem1 (mem1 hit ratio)",  H_mem1);
+    config.logger.log("H_mem2 (mem2 hit ratio)",  H_mem2);
+    config.logger.log("Total Load (bytes)",  total_Ld);
+    config.logger.log("Ld_mem2 (bytes)",  Ld_mem2);
+    config.logger.log("Ld_MEM (bytes)",  Ld_MEM);
+    config.logger.log("L_mem_mem1 (cycles)",  L_mem_mem1);
+    config.logger.log("L_mem_mem2 (cycles)",  L_mem_mem2);
+    config.logger.log("L_mem_MEM (cycles)",  L_mem_MEM);
+    config.logger.log("MT_K % 128 bytes",  MT_K * static_cast<size_t>(b_bytes) % 128);    config.logger.log("MT_M % 128 bytes",  MT_M * static_cast<size_t>(a_bytes) % 128);    config.logger.log("MT_N % 128 bytes",  MT_N * static_cast<size_t>(b_bytes) % 128);    config.logger.log(
         "MT_N % 128 + MT_M % 128 bytes",
-        (MT_M * static_cast<size_t>(a_bytes) % 128) + MT_N * static_cast<size_t>(b_bytes) % 128);
-    hardware.log_debug(
+        (MT_M * static_cast<size_t>(a_bytes) % 128) + MT_N * static_cast<size_t>(b_bytes) % 128);    config.logger.log(
         "MT_N % 64 + MT_M % 64 bytes",
-        (MT_M * static_cast<size_t>(a_bytes) % 64) + MT_N * static_cast<size_t>(b_bytes) % 64);
-    hardware.log_debug("MT_K % 64 bytes", MT_K * static_cast<size_t>(b_bytes) % 64);
-    hardware.log_debug("MT_M % 64 bytes", MT_M * static_cast<size_t>(a_bytes) % 64);
-    hardware.log_debug("MT_N % 64 bytes", MT_N * static_cast<size_t>(b_bytes) % 64);
-    hardware.log_debug("Tile Arithmetic Intensity",
-                       MT_M * MT_N * MT_K / (MT_M * MT_K + MT_N * MT_K));
-  }
+        (MT_M * static_cast<size_t>(a_bytes) % 64) + MT_N * static_cast<size_t>(b_bytes) % 64);    config.logger.log("MT_K % 64 bytes",  MT_K * static_cast<size_t>(b_bytes) % 64);    config.logger.log("MT_M % 64 bytes",  MT_M * static_cast<size_t>(a_bytes) % 64);    config.logger.log("MT_N % 64 bytes",  MT_N * static_cast<size_t>(b_bytes) % 64);    config.logger.log("Tile Arithmetic Intensity",
+                       MT_M * MT_N * MT_K / (MT_M * MT_K + MT_N * MT_K));  }
 
   return L_mem;
 }
@@ -871,23 +855,22 @@ double compute_tile_latency(const problem_t& problem,
 
   if (MT_K == 1024) { L_prologue = L_prologue * 100; }
 
-  if (hardware_t::is_debug_enabled()) {
+  if (get_runtime_options(config).debug_enabled) {
     double problem_k_quant = ((K % MT_K) / (double)K);
-    hardware.log_debug("Iteration Compute Latency", L_compute);
-    hardware.log_debug("L_mem", L_mem);
-    hardware.log_debug("L_cvt", L_cvt);
-    hardware.log_debug("L_tile_single", L_tile_single);
-    hardware.log_debug("num_iter", num_iter);
-    hardware.log_debug("L_prologue", L_prologue);
-    hardware.log_debug("L_epilogue", L_epilogue);
-    hardware.log_debug("L_tile_total", L_tile_total);
-    hardware.log_debug("Effective Tile Peanlty", effective_tile_penalty);
-    hardware.log_debug("Problem K quant", problem_k_quant);
-    hardware.log_debug("K quant overhead", (problem_k_quant * 50000));
-    hardware.log_debug("Problem Tiile Quant", utilization);
-    hardware.log_debug("Real Occupancy", utilization);
-    hardware.log_debug("Output Utilization Penalty", output_utilization_penalty);
-    hardware.log_debug("Output Utilization", output_utilization);
+    config.logger.log("Iteration Compute Latency",  L_compute);
+    config.logger.log("L_mem",  L_mem);
+    config.logger.log("L_cvt",  L_cvt);
+    config.logger.log("L_tile_single",  L_tile_single);
+    config.logger.log("num_iter",  num_iter);
+    config.logger.log("L_prologue",  L_prologue);
+    config.logger.log("L_epilogue",  L_epilogue);
+    config.logger.log("L_tile_total",  L_tile_total);
+    config.logger.log("Effective Tile Peanlty",  effective_tile_penalty);
+    config.logger.log("Problem K quant",  problem_k_quant);
+    config.logger.log("K quant overhead",  (problem_k_quant * 50000));    config.logger.log("Problem Tiile Quant",  utilization);
+    config.logger.log("Real Occupancy",  utilization);
+    config.logger.log("Output Utilization Penalty",  output_utilization_penalty);
+    config.logger.log("Output Utilization",  output_utilization);
     std::string bound_source;
     if (L_compute >= L_mem) {
       L_tile_single = L_compute + L_cvt;
@@ -896,10 +879,9 @@ double compute_tile_latency(const problem_t& problem,
       L_tile_single = L_mem + L_cvt;
       bound_source  = "Memory";
     }
-    hardware.log_debug("Iteration Bound",
+    config.logger.log("Iteration Bound",
                        bound_source + " (" + std::to_string(L_tile_single) + ")");
-
-    hardware.log_debug("K % MT_K", K % MT_K);
+    config.logger.log("K % MT_K",  K % MT_K);
   }
 
   return L_tile_total;
@@ -945,15 +927,13 @@ double compute_total_latency(const problem_t& problem,
   const int a_bytes = data_type_to_bytes(problem.a_dtype);
   const int d_bytes = data_type_to_bytes(problem.d_dtype);
 
-  if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug(
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log(
         "Problem_Size",
-        std::to_string(int(M)) + "x" + std::to_string(int(N)) + "x" + std::to_string(int(K)));
-    hardware.log_debug("Macro_Tile",
+        std::to_string(int(M)) + "x" + std::to_string(int(N)) + "x" + std::to_string(int(K)));    config.logger.log("Macro_Tile",
                        std::to_string(int(MT_M)) + "x" + std::to_string(int(MT_N)) + "x" +
-                           std::to_string(int(MT_K)));
-    hardware.log_debug("Element Size A (bits)", a_bits);
-    hardware.log_debug("Element Size B (bits)", b_bits);
+                           std::to_string(int(MT_K)));    config.logger.log("Element Size A (bits)",  a_bits);
+    config.logger.log("Element Size B (bits)",  b_bits);
   }
 
   // 0) Short-circuit
@@ -1018,7 +998,7 @@ double compute_total_latency(const problem_t& problem,
   // 3) Customized heuristics
   // TODO These are quantifying effects that don't work in the current math.
   // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
-  bool heuristics = hardware_t::is_heuristics_enabled();
+  bool heuristics = get_runtime_options(config).heuristics_enabled;
 
   // heuristics = 0;
   //  Heuristics for TF32
@@ -1057,103 +1037,26 @@ double compute_total_latency(const problem_t& problem,
     if ((K >= (M * 16) && K >= (N * 16)) && (MT_K >= 128)) { total_latency = total_latency * 0.5; }
   }
 
-  if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("Total_latency (with heuristics)", total_latency);
-    hardware.log_debug("non_temporal_a", config.cache_hints_a);
-    hardware.log_debug("non_temporal_b", config.cache_hints_b);
-    hardware.log_debug("kernel_occupancy", config.occupancy);
-    hardware.log_debug("splitting_factor", splitting_factor);
-    hardware.log_debug("Input Tile Size A", MT_M * MT_K);
-    hardware.log_debug("Input Tile Size B", MT_N * MT_K);
-    hardware.log_debug("Output Tile Size", MT_M * MT_N);
-    hardware.log_debug("Tile M/N", MT_M / MT_N);
-    hardware.log_debug("Tile N/M", MT_N / MT_M);
-    hardware.log_debug("Problem M/N", MT_M / MT_N);
-    hardware.log_debug("Problem N/M", MT_N / MT_M);
+  if (get_runtime_options(config).debug_enabled) {
+    config.logger.log("Total_latency (with heuristics)",  total_latency);
+    config.logger.log("non_temporal_a",  config.cache_hints_a);
+    config.logger.log("non_temporal_b",  config.cache_hints_b);
+    config.logger.log("kernel_occupancy",  config.occupancy);
+    config.logger.log("splitting_factor",  splitting_factor);
+    config.logger.log("Input Tile Size A",  MT_M * MT_K);
+    config.logger.log("Input Tile Size B",  MT_N * MT_K);
+    config.logger.log("Output Tile Size",  MT_M * MT_N);
+    config.logger.log("Tile M/N",  MT_M / MT_N);
+    config.logger.log("Tile N/M",  MT_N / MT_M);
+    config.logger.log("Problem M/N",  MT_M / MT_N);
+    config.logger.log("Problem N/M",  MT_N / MT_M);
     size_t occupancy_percent = num_active_cus / hardware.N_CU;
-    hardware.log_debug("Peak theoretical GFLOPs based on occupancy", 1300 * occupancy_percent);
-    if (hardware_t::is_debug_enabled()) { hardware.print_debug_info(); }
+    config.logger.log("Peak theoretical GFLOPs based on occupancy",  1300 * occupancy_percent);
+    if (get_runtime_options(config).debug_enabled) { config.logger.print(); }
   }
 
   return total_latency;
 }
 
-// Extract analytical metrics from a GEMM computation and return as map
-std::unordered_map<std::string, std::string> extract_analytical_metrics(const hardware_t& hardware,
-                                                                        const problem_t& problem,
-                                                                        const config_t& config) {
-  // Clear any previous debug info
-  hardware.clear_debug();
-
-  // Enable metrics collection mode to bypass environment variable check
-  hardware.set_metrics_collection_mode(true);
-
-  // Extract basic parameters for forced logging
-  size_t M                = problem.size.m;
-  size_t N                = problem.size.n;
-  size_t K                = problem.size.k;
-  size_t batch            = problem.batch;
-  bool a_trans            = problem.a_transpose == transpose_t::T;
-  bool b_trans            = problem.b_transpose == transpose_t::T;
-  size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  size_t element_size_out = data_type_to_bits(problem.d_dtype);
-  data_type_t mi_datatype = problem.mi_dtype;
-  size_t a_mx_block_size  = problem.a_mx_block_size;
-  size_t b_mx_block_size  = problem.b_mx_block_size;
-
-  size_t MT_M = config.mt.m;
-  size_t MT_N = config.mt.n;
-  size_t MT_K = config.mt.k;
-  size_t MI_M = config.mi.m;
-  size_t MI_N = config.mi.n;
-  size_t MI_K = config.mi.k;
-  int WGM     = config.workgroup_mapping;
-
-  // Log basic problem and configuration parameters
-  hardware.log_debug(
-      "problem_size",
-      std::to_string(int(M)) + "x" + std::to_string(int(N)) + "x" + std::to_string(int(K)));
-  hardware.log_debug("macro_tile",
-                     std::to_string(int(MT_M)) + "x" + std::to_string(int(MT_N)) + "x" +
-                         std::to_string(int(MT_K)));
-  hardware.log_debug("micro_tile",
-                     std::to_string(int(MI_M)) + "x" + std::to_string(int(MI_N)) + "x" +
-                         std::to_string(int(MI_K)));
-  hardware.log_debug("element_size_a_bits", element_size_A);
-  hardware.log_debug("element_size_b_bits", element_size_B);
-  hardware.log_debug("element_size_out_bits", element_size_out);
-  hardware.log_debug("batch_size", batch);
-  hardware.log_debug("a_transpose", a_trans ? "true" : "false");
-  hardware.log_debug("b_transpose", b_trans ? "true" : "false");
-  hardware.log_debug("workgroup_mapping", WGM);
-  hardware.log_debug("a_mx_block_size", a_mx_block_size);
-  hardware.log_debug("b_mx_block_size", b_mx_block_size);
-
-  // Run compute_total_latency which will populate debug_info with all intermediate values
-  // since we enabled metrics collection mode
-  double total_latency = compute_total_latency(problem, hardware, config, hardware.N_CU);
-
-  // Disable metrics collection mode
-  hardware.set_metrics_collection_mode(false);
-
-  // Add the final latency to metrics
-  hardware.log_debug_force("final_total_latency", total_latency);
-
-  // Return all collected metrics
-  return hardware.get_analytical_metrics();
-}
-
-// Extract analytical metrics and export to CSV
-void extract_analytical_metrics_csv(const hardware_t& hardware,
-                                    const problem_t& problem,
-                                    const config_t& config,
-                                    const std::string& filename) {
-  // Extract metrics
-  extract_analytical_metrics(hardware, problem, config);
-
-  // Export to CSV
-  hardware.extract_analytical_metrics_csv(filename);
-}
 
 }  // namespace origami
