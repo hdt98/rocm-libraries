@@ -40,7 +40,7 @@
 ROCSOLVER_BEGIN_NAMESPACE
 
 template <typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_frobenius_kernel(const I m,
                            const I n,
                            const U A,
@@ -54,22 +54,22 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     I tid = threadIdx.x;
 
     // select batch instance
-    I blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+    I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
     T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
     S* block_sums_block = load_ptr_batch<S>(block_sums, bidz, 0, blocks);
 
     // shared variables
-    __shared__ S sval[LANGE_FROBENIUS_BDIM / WarpSize];
+    __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // loop over blocks with grid stride (handles grid overflow)
     for(I block_id = bid; block_id < blocks; block_id += gridDim.x)
     {
         // sum absolute values in this block
         S block_sum = 0;
-        I start = block_id * LANGE_FROBENIUS_BDIM;
-        I end = std::min(start + LANGE_FROBENIUS_BDIM, m * n);
+        I start = block_id * LANGE_FROBENIUS_MAX_BDIM;
+        I end = std::min(start + LANGE_FROBENIUS_MAX_BDIM, m * n);
 
-        for(I i = start + tid; i < end; i += LANGE_FROBENIUS_BDIM)
+        for(I i = start + tid; i < end; i += LANGE_FROBENIUS_MAX_BDIM)
         {
             int row = i % m;
             int col = i / m;
@@ -89,7 +89,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
         __syncthreads();
         if(tid == 0)
         {
-            for(I k = 1; k < LANGE_FROBENIUS_BDIM / warpSize; k++)
+            for(I k = 1; k < LANGE_FROBENIUS_MAX_BDIM / warpSize; k++)
                 block_sum += sval[k];
             block_sums_block[block_id] = block_sum;
         }
@@ -98,7 +98,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
 }
 
 template <typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_frobenius_final_kernel(const I m,
                                  const I n,
                                  const U A,
@@ -112,15 +112,15 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     I tid = threadIdx.x;
 
     // select batch instance
-    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
     S* block_sum = load_ptr_batch<S>(block_sums, bid, 0, blocks);
 
     // shared variables
-    __shared__ S sval[LANGE_FROBENIUS_BDIM / WarpSize];
+    __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // find maximum of row sums
     S norm_frobenius = 0;
-    for(I i = tid; i < blocks; i += LANGE_FROBENIUS_BDIM)
+    for(I i = tid; i < blocks; i += LANGE_FROBENIUS_MAX_BDIM)
     {
         norm_frobenius += block_sum[i];
     }
@@ -138,7 +138,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < LANGE_FROBENIUS_BDIM / warpSize; k++)
+        for(I k = 1; k < LANGE_FROBENIUS_MAX_BDIM / warpSize; k++)
             norm_frobenius += sval[k];
         final_norms[bid] = sqrt(norm_frobenius);
     }
@@ -341,8 +341,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
 }
 
 template <typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
-    lange_max_blocks_kernel(const I m,
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
+    lange_max_kernel(const I m,
                             const I n,
                             const U A,
                             const I lda,
@@ -355,22 +355,22 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     I tid = threadIdx.x;
 
     // select batch instance
-    I blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+    I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
     T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
     S* block_maxs_block = load_ptr_batch<S>(block_maxs, bidz, 0, blocks);
 
     // shared variables
-    __shared__ S sval[LANGE_FROBENIUS_BDIM / WarpSize];
+    __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // loop over blocks with grid stride (handles grid overflow)
     for(I block_id = bid; block_id < blocks; block_id += gridDim.x)
     {
         // find maximum absolute value in this block
         S block_max = 0;
-        I start = block_id * LANGE_FROBENIUS_BDIM;
-        I end = std::min(start + LANGE_FROBENIUS_BDIM, m * n);
+        I start = block_id * LANGE_FROBENIUS_MAX_BDIM;
+        I end = std::min(start + LANGE_FROBENIUS_MAX_BDIM, m * n);
 
-        for(I i = start + tid; i < end; i += LANGE_FROBENIUS_BDIM)
+        for(I i = start + tid; i < end; i += LANGE_FROBENIUS_MAX_BDIM)
         {
             int row = i % m;
             int col = i / m;
@@ -390,7 +390,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
         __syncthreads();
         if(tid == 0)
         {
-            for(I k = 1; k < LANGE_FROBENIUS_BDIM / warpSize; k++)
+            for(I k = 1; k < LANGE_FROBENIUS_MAX_BDIM / warpSize; k++)
                 block_max = std::max(block_max, sval[k]);
             block_maxs_block[block_id] = block_max;
         }
@@ -399,7 +399,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
 }
 
 template <typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_max_final_kernel(const I m,
                            const I n,
                            const U A,
@@ -413,15 +413,15 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     I tid = threadIdx.x;
 
     // select batch instance
-    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
     S* block_max = load_ptr_batch<S>(block_maxs, bid, 0, blocks);
 
     // shared variables
-    __shared__ S sval[LANGE_FROBENIUS_BDIM / WarpSize];
+    __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // find maximum of block maximums
     S norm_max = 0;
-    for(I i = tid; i < blocks; i += LANGE_FROBENIUS_BDIM)
+    for(I i = tid; i < blocks; i += LANGE_FROBENIUS_MAX_BDIM)
     {
         norm_max = std::max(norm_max, block_max[i]);
     }
@@ -439,7 +439,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < LANGE_FROBENIUS_BDIM / warpSize; k++)
+        for(I k = 1; k < LANGE_FROBENIUS_MAX_BDIM / warpSize; k++)
             norm_max = std::max(norm_max, sval[k]);
         final_norms[bid] = norm_max;
     }
@@ -464,7 +464,7 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
     case rocsolver_norm_type_max:
     {
         // need space for block maximums
-        int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+        int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         size_t size_per_batch = blocks;
         *size_work = sizeof(S) * batch_count * size_per_batch;
         break;
@@ -479,7 +479,7 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
     case rocsolver_norm_type_frobenius:
     {
         // need space for row sums
-        int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+        int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         size_t size_per_batch = blocks;
         *size_work = sizeof(S) * batch_count * size_per_batch;
         break;
@@ -557,13 +557,13 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     case rocsolver_norm_type_max:
     {
         // Launch max kernels with grid clamping to handle overflow
-        I blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+        I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
-        ROCSOLVER_LAUNCH_KERNEL((lange_max_blocks_kernel<T, I, S>),
-                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_BDIM), 0,
+        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>),
+                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM), 0,
                                 stream, m, n, A, lda, shiftA, strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_max_final_kernel<T, I, S>), dim3(1, 1, batch_count),
-                                dim3(LANGE_FROBENIUS_BDIM), 0, stream, m, n, A, lda, shiftA,
+                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
                                 strideA, work, norms);
         break;
     }
@@ -581,13 +581,13 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     case rocsolver_norm_type_frobenius:
     {
         // Launch Frobenius kernels with grid clamping to handle overflow
-        I blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+        I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<T, I, S>),
-                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_BDIM), 0,
+                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM), 0,
                                 stream, m, n, A, lda, shiftA, strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_final_kernel<T, I, S>), dim3(1, 1, batch_count),
-                                dim3(LANGE_FROBENIUS_BDIM), 0, stream, m, n, A, lda, shiftA,
+                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
                                 strideA, work, norms);
         break;
     }
