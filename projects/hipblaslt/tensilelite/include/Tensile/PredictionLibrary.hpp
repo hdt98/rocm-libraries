@@ -159,10 +159,6 @@ namespace TensileLite
             hip::HipAMDGPU const* pAMDGPU = dynamic_cast<hip::HipAMDGPU const*>(&hardware);
             
             const origami::hardware_t& analytical_hardware = *(pAMDGPU->analyticalHardware);
-            if(origami::hardware_t::is_debug_enabled())
-            {
-                analytical_hardware.print();
-            }
             auto miDataType = static_cast<origami::data_type_t>(problem.computeInputType());
 
             if(problem.f32XdlMathOp() == rocisa::DataType::XFloat32) // Check F32 compute type
