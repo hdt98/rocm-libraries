@@ -8,7 +8,9 @@ rocRoller is a software library for generating AMDGPU kernels.
 [![Develop Branch Performance Report for gfx942](https://img.shields.io/badge/Performance-gfx942-critical)](http://math-ci.amd.com/job/rocm-libraries/job/performance/job/rocroller/job/develop/Performance_20Report_20for_20gfx90a)
 [![Develop Branch Generated Documentation](https://img.shields.io/badge/Documentation-Generated-informational)](http://math-ci.amd.com/job/rocm-libraries/job/documentation/job/rocroller/job/develop/Generated_20Docs)
 
-## Jump to
+## Jump to   
+trailing whitespace should throw   s
+
 
 - [AMD's rocRoller Assembly Kernel Generator](#amds-rocroller-assembly-kernel-generator)
   - [Building the Library](#building-the-library)
@@ -483,3 +485,7 @@ Wrote workgroups_B.png
 Wrote workitem_A.png
 Wrote workitem_B.png
 ```
+
+
+
+
