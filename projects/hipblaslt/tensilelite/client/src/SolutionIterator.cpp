@@ -30,7 +30,7 @@
 #include <Tensile/Debug.hpp>
 #include <Tensile/hip/HipHardware.hpp>
 
-#include <formocast_predict.hpp>
+#include <formocast.hpp>
 
 namespace TensileLite
 {
@@ -291,99 +291,92 @@ namespace TensileLite
         void AllSolutionsIterator::preProblem(ContractionProblem* const problem)
         {
             SolutionIterator::preProblem(problem);
-            if (m_predictionThreshold > 1.0)
+            std::vector<std::pair<int,double>>   performance;
+            std::vector<Tensilelite::Formocast::TieBreakerInfo> tbInfo(m_lastSolutionIdx + 1);
+            Tensilelite::Formocast formocast;
+            for (int i = m_firstSolutionIdx; i <= m_lastSolutionIdx; i++)
             {
-                m_currentSolutionIdx = m_firstSolutionIdx;
-            }
-            else
-            {
-                std::vector<std::pair<int,double>>   performance;
-                std::vector<Tensilelite::Formocast::TieBreakerInfo> tbInfo(m_lastSolutionIdx + 1);
-                Tensilelite::Formocast formocast;
-                for (int i = m_firstSolutionIdx; i <= m_lastSolutionIdx; i++)
+                auto iter = m_library->solutions.find(i);
+                if(iter != m_library->solutions.end())
                 {
-                    auto iter = m_library->solutions.find(i);
-                    if(iter != m_library->solutions.end())
+                    auto solution = iter->second;
+                    if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
                     {
-                        auto solution = iter->second;
-                        if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
-                        {
-                            if(!checkSolution(*solution, *gemmProblem, false))
-                                continue;
-                            Tensilelite::Formocast::PredictedPerformance predPerf;
-                            Tensilelite::Formocast::ProblemInfo problemInfo = getProblemInfo(*solution, *gemmProblem);
-                            Tensilelite::Formocast::SizeMapping sizeMapping = getSizeMapping(*solution, *gemmProblem, *m_hardware);
-                            auto hwInfo = getHardware(*m_hardware);
-                            formocast.setProblem(problemInfo);
-                            formocast.setSolution(sizeMapping);
-                            formocast.setHardware(hwInfo);
-                            predPerf = formocast.predictedPerformance();
-                            tbInfo[i] = formocast.getTieBreakerInfo();
-                            performance.push_back(std::pair(i,predPerf.microSeconds));
-                            m_hitrate[i] = predPerf.hitRate;
-                        }
+                        if(!checkSolution(*solution, *gemmProblem, false))
+                            continue;
+                        Tensilelite::Formocast::PredictedPerformance predPerf;
+                        Tensilelite::Formocast::ProblemInfo problemInfo = getProblemInfo(*solution, *gemmProblem);
+                        Tensilelite::Formocast::SizeMapping sizeMapping = getSizeMapping(*solution, *gemmProblem, *m_hardware);
+                        auto hwInfo = getHardware(*m_hardware);
+                        formocast.setProblem(problemInfo);
+                        formocast.setSolution(sizeMapping);
+                        formocast.setHardware(hwInfo);
+                        predPerf = formocast.predictedPerformance();
+                        tbInfo[i] = formocast.getTieBreakerInfo();
+                        performance.push_back(std::pair(i,predPerf.microSeconds));
+                        m_hitrate[i] = predPerf.hitRate;
                     }
                 }
+            }
 
-                auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
-                std::sort(performance.begin(),performance.end(),comp);
-                // TODO: This is the simple threshold method.
-                // May use the best perf * 1.x as threshold in the future.
-                size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
-                auto threshhold = performance[index].second;
+            auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second > e2.second; };
+            std::sort(performance.begin(),performance.end(),comp);
+            // TODO: This is the simple threshold method.
+            // May use the best perf * 1.x as threshold in the future.
+            size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
+            auto threshhold = performance[performance.size() - 1 - index].second;
 
-                // push content
-                if(!m_qSolutionIdx.empty())
-                {
-                    throw std::runtime_error(
-                        "[AllSolutionsIterator::preProblem] Solution queue is not empty");
-                }
+            // push content
+            if(!m_qSolutionIdx.empty())
+            {
+                throw std::runtime_error(
+                    "[AllSolutionsIterator::preProblem] Solution queue is not empty");
+            }
 
-                for (int i=0; i<performance.size(); i++)
-                {
-                    if(m_predictionThreshold == 0.0)
-                    {   
-                        auto bestIdx = 0;
-                        if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
+            for (int i=0; i<performance.size(); i++)
+            {
+                if(m_predictionThreshold == 0.0)
+                {   
+                    auto bestIdx = performance.size() - 1;
+                    if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
+                    {
+                        Tensilelite::Formocast::TieBreakerInfo perfInfo;
+                        perfInfo = tbInfo[performance[bestIdx].first];
+
+                        threshhold = performance[bestIdx].second * 1.1;
+                        for (int j = performance.size() - 2; ; j--)
                         {
-                            Tensilelite::Formocast::TieBreakerInfo perfInfo;
-                            perfInfo = tbInfo[performance[bestIdx].first];
-
-                            threshhold = performance[bestIdx].second * 1.1;
-                            for (int j = 1; ; j++)
+                            if (j < 0) break;
+                            if (threshhold < performance[j].second) break;
+                            auto currSol  = tbInfo[performance[j].first];
+                            if (formocast.isBetter(perfInfo, currSol))
                             {
-                                if (j == performance.size()) break;
-                                if (threshhold < performance[j].second) break;
-                                auto currSol  = tbInfo[performance[j].first];
-                                if (formocast.isBetter(perfInfo, currSol))
-                                {
-                                    perfInfo = currSol;
-                                    bestIdx = j;
-                                }
+                                perfInfo = currSol;
+                                bestIdx = j;
                             }
                         }
-                        m_qSolutionIdx.push(performance[bestIdx]);
-                        break;
                     }
-                    else if(performance[i].second <= threshhold)
-                    {
-                        // std::cout<<"check performance "<<performance[i].second<<std::endl;
-                        m_qSolutionIdx.push(performance[i]);
-                    }
-                    else
-                    {
-                        // std::cout<<"too large performance "<<performance[i].second<<std::endl;
-                        // break;
-                    }
+                    m_qSolutionIdx.push(performance[bestIdx]);
+                    break;
                 }
-                m_currentSolutionIdx = m_qSolutionIdx.front().first;
-                m_currentPrediction  = m_qSolutionIdx.front().second;
-                m_currentIdx = 0;
-
-                std::cout<<"predict performance is "<<performance[performance.size() - 1].second<<" us, idx = "<<performance[performance.size() - 1].first<<std::endl;
-                //std::cout<<"Threshold performance is "<<threshhold<<std::endl;
-                //std::cout<<"Solution number is "<<m_qSolutionIdx.size()<<std::endl;
+                else if(performance[i].second <= threshhold)
+                {
+                    // std::cout<<"check performance "<<performance[i].second<<std::endl;
+                    m_qSolutionIdx.push(performance[i]);
+                }
+                else
+                {
+                    // std::cout<<"too large performance "<<performance[i].second<<std::endl;
+                    // break;
+                }
             }
+            m_currentSolutionIdx = m_qSolutionIdx.front().first;
+            m_currentPrediction  = m_qSolutionIdx.front().second;
+            m_currentIdx = 0;
+
+            std::cout<<"predict performance is "<<performance[performance.size() - 1].second<<" us, idx = "<<performance[performance.size() - 1].first<<std::endl;
+            //std::cout<<"Threshold performance is "<<threshhold<<std::endl;
+            //std::cout<<"Solution number is "<<m_qSolutionIdx.size()<<std::endl;
         }
 
         void AllSolutionsIterator::postProblem() {}
@@ -392,43 +385,24 @@ namespace TensileLite
         {
             m_reporter->report(ResultKey::SolutionLibraryIndex, solution->libraryLogicIndex);
             m_reporter->report(ResultKey::SolutionIndex, m_currentSolutionIdx);
-            if (m_predictionThreshold > 1.0)
-            {
-                m_reporter->report(ResultKey::SolutionProgress,
-                     concatenate(m_currentSolutionIdx, "/", m_lastSolutionIdx));
-                
-            }
-            else
-            {
-                m_reporter->report(ResultKey::SolutionProgress,
-                    concatenate("hitrate,",m_hitrate[m_currentSolutionIdx],",",m_currentSolutionIdx,"->",m_currentPrediction," us, ",m_currentSolutionIdx,"/",m_lastSolutionIdx));
-            }
+            m_reporter->report(ResultKey::SolutionProgress,
+                concatenate("hitrate,",m_hitrate[m_currentSolutionIdx],",",m_currentSolutionIdx,"->",m_currentPrediction," us, ",m_currentSolutionIdx,"/",m_lastSolutionIdx));
         }
 
         void AllSolutionsIterator::postSolution()
         {
-            if (m_predictionThreshold > 1.0)
+            m_currentIdx++;
+            m_qSolutionIdx.pop();
+            if(!m_qSolutionIdx.empty())
             {
-                m_currentSolutionIdx++;
-            }
-            else
-            {
-                m_currentIdx++;
-                m_qSolutionIdx.pop();
-                if(!m_qSolutionIdx.empty())
-                {
-                    m_currentSolutionIdx = m_qSolutionIdx.front().first;
-                    m_currentPrediction  = m_qSolutionIdx.front().second;
-                }
+                m_currentSolutionIdx = m_qSolutionIdx.front().first;
+                m_currentPrediction  = m_qSolutionIdx.front().second;
             }
         }
 
         bool AllSolutionsIterator::moreSolutionsInProblem() const
         {
-            if (m_predictionThreshold > 1.0)
-                return m_currentSolutionIdx <= m_lastSolutionIdx;
-            else
-                return !m_qSolutionIdx.empty();
+            return !m_qSolutionIdx.empty();
         }
 
         std::shared_ptr<ContractionSolution> AllSolutionsIterator::getSolution()
@@ -546,29 +520,21 @@ namespace TensileLite
             }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
-                if(m_predictionThreshold > 1.0)
+                if(m_numSolutions == -1)
                 {
-                    m_solutions
-                        = m_library->findTopSolutions(*gemmProblem, *m_hardware, m_numSolutions);
+                    if(m_solutions.size()==0)
+                    {
+                        m_solutions.clear();
+                        std::set<std::shared_ptr<ContractionSolution>> sols;
+                        sols = m_library->findAllSolutions(*gemmProblem, *m_hardware, TensileLite::SolutionLibrarySearchType::GEMM_TYPE_ONLY);
+                        for(auto it=sols.begin(); it != sols.end(); it++)
+                            m_solutions.push_back(*it);
+                    }
                 }
                 else
                 {
-                    if(m_numSolutions == -1)
-                    {
-                        if(m_solutions.size()==0)
-                        {
-                            m_solutions.clear();
-                            std::set<std::shared_ptr<ContractionSolution>> sols;
-                            sols = m_library->findAllSolutions(*gemmProblem, *m_hardware, TensileLite::SolutionLibrarySearchType::GEMM_TYPE_ONLY);
-                            for(auto it=sols.begin(); it != sols.end(); it++)
-                                m_solutions.push_back(*it);
-                        }
-                    }
-                    else
-                    {
-                        m_solutions
-                            = m_library->findTopSolutions(*gemmProblem, *m_hardware, m_numSolutions);
-                    }
+                    m_solutions
+                        = m_library->findTopSolutions(*gemmProblem, *m_hardware, m_numSolutions);
                 }
             }
             else
@@ -581,53 +547,46 @@ namespace TensileLite
                 m_solutions.push_back(m_library->solutions.find(0)->second);
             }
 
-            if(m_predictionThreshold > 1.0)
+            Tensilelite::Formocast formocast;
+            std::vector<std::pair<int,double>> performance;
+            for (int i = 0; i < m_solutions.size(); i++)
             {
-                m_currentSolutionIdx = 0;
+                if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
+                {
+                    if(!checkSolution(*m_solutions[i], *gemmProblem, false))
+                        continue;
+                    Tensilelite::Formocast::PredictedPerformance predPerf;
+                    Tensilelite::Formocast::ProblemInfo problemInfo = getProblemInfo(*m_solutions[i], *gemmProblem);
+                    Tensilelite::Formocast::SizeMapping sizeMapping = getSizeMapping(*m_solutions[i], *gemmProblem, *m_hardware);
+                    formocast.setProblem(problemInfo);
+                    formocast.setSolution(sizeMapping);
+                    predPerf = formocast.predictedPerformance();
+                    performance.push_back(std::pair(i,predPerf.microSeconds));
+                    m_hitrate[i] = predPerf.hitRate;
+                }
             }
-            else
+
+            auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
+            std::sort(performance.begin(),performance.end(),comp);
+            size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
+            auto threshhold = performance[index].second;
+            // push content
+            if(!m_qSolutionIdx.empty())
             {
-                Tensilelite::Formocast formocast;
-                std::vector<std::pair<int,double>> performance;
-                for (int i = 0; i < m_solutions.size(); i++)
-                {
-                    if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
-                    {
-                        if(!checkSolution(*m_solutions[i], *gemmProblem, false))
-                            continue;
-                        Tensilelite::Formocast::PredictedPerformance predPerf;
-                        Tensilelite::Formocast::ProblemInfo problemInfo = getProblemInfo(*m_solutions[i], *gemmProblem);
-                        Tensilelite::Formocast::SizeMapping sizeMapping = getSizeMapping(*m_solutions[i], *gemmProblem, *m_hardware);
-                        formocast.setProblem(problemInfo);
-                        formocast.setSolution(sizeMapping);
-                        predPerf = formocast.predictedPerformance();
-                        performance.push_back(std::pair(i,predPerf.microSeconds));
-                        m_hitrate[i] = predPerf.hitRate;
-                    }
-                }
-
-                auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
-                std::sort(performance.begin(),performance.end(),comp);
-                size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
-                auto threshhold = performance[index].second;
-                // push content
-                if(!m_qSolutionIdx.empty())
-                {
-                    throw std::runtime_error(
-                        "[TopSolutionIterator::preProblem] Solution queue is not empty");
-                }
-
-                for (int i=0; i<performance.size(); i++)
-                {
-                    if(performance[i].second <= threshhold)
-                    {
-                        m_qSolutionIdx.push(performance[i]);
-                        break;
-                    }
-                }
-                m_currentSolutionIdx = m_qSolutionIdx.front().first;
-                m_currentPrediction  = m_qSolutionIdx.front().second;
+                throw std::runtime_error(
+                    "[TopSolutionIterator::preProblem] Solution queue is not empty");
             }
+
+            for (int i=0; i<performance.size(); i++)
+            {
+                if(performance[i].second <= threshhold)
+                {
+                    m_qSolutionIdx.push(performance[i]);
+                    break;
+                }
+            }
+            m_currentSolutionIdx = m_qSolutionIdx.front().first;
+            m_currentPrediction  = m_qSolutionIdx.front().second;
         }
 
         void TopSolutionIterator::postProblem() {}
@@ -636,38 +595,24 @@ namespace TensileLite
         {
             m_reporter->report(ResultKey::SolutionLibraryIndex, solution->libraryLogicIndex);
             m_reporter->report(ResultKey::SolutionIndex, m_currentSolutionIdx);
-            if(m_predictionThreshold > 1.0)
-                m_reporter->report(ResultKey::SolutionProgress,
-                               concatenate(m_currentSolutionIdx, "/", m_solutions.size()));
-            else    
-                m_reporter->report(ResultKey::SolutionProgress,
+            m_reporter->report(ResultKey::SolutionProgress,
                                concatenate("hitrate,",m_hitrate[m_currentSolutionIdx],",",m_currentSolutionIdx,"->",m_currentPrediction," us, ",m_currentSolutionIdx,"/",m_solutions.size()));               
+                               //concatenate(m_currentSolutionIdx, "/", m_solutions.size()));
         }
 
         void TopSolutionIterator::postSolution()
         {
-            if(m_predictionThreshold > 1.0)
+            m_qSolutionIdx.pop();
+            if(!m_qSolutionIdx.empty())
             {
-                m_currentSolutionIdx++;
+                m_currentSolutionIdx = m_qSolutionIdx.front().first;
+                m_currentPrediction  = m_qSolutionIdx.front().second;
             }
-            else
-            {
-                m_qSolutionIdx.pop();
-                if(!m_qSolutionIdx.empty())
-                {
-                    m_currentSolutionIdx = m_qSolutionIdx.front().first;
-                    m_currentPrediction  = m_qSolutionIdx.front().second;
-                }
-            }
-
         }
 
         bool TopSolutionIterator::moreSolutionsInProblem() const
         {
-            if(m_predictionThreshold > 1.0)
-                return m_currentSolutionIdx < m_solutions.size();
-            else
-                return !m_qSolutionIdx.empty();
+            return !m_qSolutionIdx.empty();
         }
 
         std::shared_ptr<ContractionSolution> TopSolutionIterator::getSolution()
