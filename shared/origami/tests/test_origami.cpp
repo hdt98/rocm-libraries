@@ -186,22 +186,18 @@ TEST_CASE("GEMM: deterministic_tie_breaking", "[gemm]") {
       // config B[1] (reversed order)
       config_B.push_back(make_config(256, 64, 32, 32, 32, 8, 1, 6, 0, 0));
 
-      // Call select_config_mnk with both orderings
-      auto best_tile_A_first = origami::select_config(problem, hardware, config_A);
+      // Call select_config with both orderings
+      auto best_tile_A = origami::select_config(problem, hardware, config_A);
 
-      auto best_tile_B_first = origami::select_config(problem, hardware, config_B);
+      auto best_tile_B = origami::select_config(problem, hardware, config_B);
 
-      // Extract the best tile from each result
-      // auto best_tile_A_first = results_A_first[0];
-      // auto best_tile_B_first = results_B_first[0];
+      size_t MT_M_A_first = best_tile_A.config.mt.m;
+      size_t MT_N_A_first = best_tile_A.config.mt.n;
+      size_t MT_K_A_first = best_tile_A.config.mt.k;
 
-      size_t MT_M_A_first = best_tile_A_first.config.mt.m;
-      size_t MT_N_A_first = best_tile_A_first.config.mt.n;
-      size_t MT_K_A_first = best_tile_A_first.config.mt.k;
-
-      size_t MT_M_B_first = best_tile_B_first.config.mt.m;
-      size_t MT_N_B_first = best_tile_B_first.config.mt.n;
-      size_t MT_K_B_first = best_tile_B_first.config.mt.k;
+      size_t MT_M_B_first = best_tile_B.config.mt.m;
+      size_t MT_N_B_first = best_tile_B.config.mt.n;
+      size_t MT_K_B_first = best_tile_B.config.mt.k;
 
       // Verify deterministic selection: both should select the same tile (256x64x32)
       // regardless of input order, using the final tie-breaker (prefer larger MT_M)
@@ -212,6 +208,57 @@ TEST_CASE("GEMM: deterministic_tie_breaking", "[gemm]") {
       // Verify it selected the tile with larger MT_M (256 > 64)
       REQUIRE(MT_M_A_first == 256);  //"Should prefer tile with larger MT_M"
       REQUIRE(MT_N_A_first == 64);   //"Should prefer tile with larger MT_M"
+    }
+  }
+}
+
+TEST_CASE("GEMM: Verify deterministic tile selection", "[gemm]") {
+  for (int gpu_arch : test_architectures) {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - Verify deterministic selection") {
+      auto hardware = make_hardware(gpu_arch);
+
+      // Square problem size
+      auto problem =
+          make_problem(42598, 153, 128, origami::transpose_t::N, origami::transpose_t::T);
+
+      // List 1: config A first, then config B
+      std::vector<origami::config_t> config_A;
+      std::vector<origami::config_t> config_B;
+
+      // config A[0]
+      config_A.push_back(make_config(256, 160, 32, 16, 16, 32, 1, 6, 0, 0));  // Tile A
+      // config A[1]
+      config_A.push_back(make_config(192, 160, 64, 16, 16, 32, 1, 6, 0, 0));  // Tile B
+
+      // config B[0] Previous two tiles + a new one
+      config_B.push_back(make_config(256, 160, 32, 16, 16, 32, 1, 6, 0, 0));  // Tile A
+      // config B[1]
+      config_B.push_back(make_config(192, 160, 64, 16, 16, 32, 1, 6, 0, 0));  // Tile B
+      // config B[2]
+      config_B.push_back(make_config(192, 160, 32, 16, 16, 32, 1, 6, 0, 0));  // Tile C
+
+      // Call select_config with both tile configs
+      auto best_tile_A = origami::select_config(problem, hardware, config_A);
+
+      auto best_tile_B = origami::select_config(problem, hardware, config_B);
+
+      size_t MT_M1 = best_tile_A.config.mt.m;
+      size_t MT_N1 = best_tile_A.config.mt.n;
+      size_t MT_K1 = best_tile_A.config.mt.k;
+
+      size_t MT_M2 = best_tile_B.config.mt.m;
+      size_t MT_N2 = best_tile_B.config.mt.n;
+      size_t MT_K2 = best_tile_B.config.mt.k;
+
+      auto winner_is_acceptable =
+          [](auto const& actual, auto const& candidate1, auto const& candidate2) -> bool {
+        return (actual == candidate1) || (actual == candidate2);
+      };
+
+      INFO("Winner is not acceptable");
+      REQUIRE(winner_is_acceptable(MT_M2, MT_M1, config_B[2].mt.m));
+      REQUIRE(winner_is_acceptable(MT_N2, MT_N1, config_B[2].mt.n));
+      REQUIRE(winner_is_acceptable(MT_K2, MT_K1, config_B[2].mt.k));
     }
   }
 }
