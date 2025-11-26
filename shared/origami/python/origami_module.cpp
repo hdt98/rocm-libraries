@@ -10,6 +10,7 @@
 #include <nanobind/stl/vector.h>
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
+// logger_t is defined in types.hpp
 #include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
@@ -85,6 +86,25 @@ NB_MODULE(origami, m) {
       .def("nk", &origami::dim3_t::nk)
       .def("mnk", &origami::dim3_t::mnk);
 
+  nanobind::class_<origami::logger_t>(m, "logger_t")
+      .def(nanobind::init<>())
+      .def("clear", &origami::logger_t::clear, "Clear all logged metrics")
+      .def("print", &origami::logger_t::print, "Print all metrics as JSON to stdout")
+      .def("export_json", &origami::logger_t::export_json, "Export metrics to a JSON file")
+      .def("get_metrics", &origami::logger_t::get_metrics, "Get all metrics as a map")
+      .def("empty", &origami::logger_t::empty, "Check if logger has any metrics")
+      // Overloads for templated log() method
+      .def("log", [](origami::logger_t& self, const std::string& key, int value) { self.log(key, value); },
+           "Log an integer value")
+      .def("log", [](origami::logger_t& self, const std::string& key, double value) { self.log(key, value); },
+           "Log a double value")
+      .def("log", [](origami::logger_t& self, const std::string& key, const std::string& value) { self.log(key, value); },
+           "Log a string value")
+      .def("log", [](origami::logger_t& self, const std::string& key, bool value) { self.log(key, value); },
+           "Log a boolean value")
+      .def("log", [](origami::logger_t& self, const std::string& key, size_t value) { self.log(key, value); },
+           "Log a size_t value");
+
   nanobind::class_<origami::config_t>(m, "config_t")
       .def(nanobind::init<>())
       .def_rw("mt", &origami::config_t::mt)
@@ -94,7 +114,8 @@ NB_MODULE(origami, m) {
       .def_rw("cache_hints_a", &origami::config_t::cache_hints_a)
       .def_rw("cache_hints_b", &origami::config_t::cache_hints_b)
       .def_rw("workspace_size", &origami::config_t::workspace_size)
-      .def_rw("workspace_size_per_elem_c", &origami::config_t::workspace_size_per_elem_c);
+      .def_rw("workspace_size_per_elem_c", &origami::config_t::workspace_size_per_elem_c)
+      .def_rw("logger", &origami::config_t::logger);
 
   nanobind::class_<origami::prediction_result_t>(m, "prediction_result_t")
       .def(nanobind::init<>())
@@ -128,10 +149,6 @@ NB_MODULE(origami, m) {
                           size_t,
                           std::tuple<double, double, double>>())
       .def("print", &hardware_t::print)
-      .def("print_debug_info", &hardware_t::print_debug_info)
-      .def("extract_analytical_metrics_csv", &hardware_t::extract_analytical_metrics_csv)
-      .def("get_analytical_metrics", &hardware_t::get_analytical_metrics)
-      .def("set_metrics_collection_mode", &hardware_t::set_metrics_collection_mode)
       .def_rw("N_CU", &hardware_t::N_CU)
       .def_rw("lds_capacity", &hardware_t::lds_capacity)
       .def_rw("mem1_perf_ratio", &hardware_t::mem1_perf_ratio)
@@ -142,8 +159,7 @@ NB_MODULE(origami, m) {
       .def_rw("compute_clock_ghz", &hardware_t::compute_clock_ghz)
       .def_rw("parallel_mi_cu", &hardware_t::parallel_mi_cu)
       .def_rw("mem_bw_per_wg_coefficients", &hardware_t::mem_bw_per_wg_coefficients)
-      .def_rw("NUM_XCD", &hardware_t::NUM_XCD)
-      .def_rw("debug_info", &hardware_t::debug_info);
+      .def_rw("NUM_XCD", &hardware_t::NUM_XCD);
 
   m.def("get_hardware_for_device",
         &hardware_t::get_hardware_for_device,
@@ -153,6 +169,9 @@ NB_MODULE(origami, m) {
   m.def("string_to_datatype",
         &origami::string_to_data_type,
         "Convert a string representation of a datatype into data_type_t enum");
+  m.def("datatype_to_string",
+        &origami::to_string,
+        "Convert data_type_t enum to string representation");
 
   m.def("select_config",
         &origami::select_config,
@@ -183,11 +202,4 @@ NB_MODULE(origami, m) {
                                size_t max_cus)>(&origami::compute_total_latency),
         "Compute total latency");
 
-  // Analytical metrics extraction functions
-  m.def("extract_analytical_metrics",
-        &origami::extract_analytical_metrics,
-        "Extract analytical metrics from GEMM computation");
-  m.def("extract_analytical_metrics_csv",
-        &origami::extract_analytical_metrics_csv,
-        "Extract analytical metrics and export to CSV");
 }

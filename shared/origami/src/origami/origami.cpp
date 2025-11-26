@@ -16,62 +16,6 @@
 
 namespace origami {
 
-static double read_heuristics_variance_env_var() {
-  constexpr double default_variance = 0.01;  // 1%
-
-  if (const char* env = std::getenv("ANALYTICAL_GEMM_HEURISTICS_VARIANCE")) {
-    try {
-      double val = std::stod(env);
-      if (std::isfinite(val) && val > 0.0) { return val; }
-    } catch (...) {
-      // fall through to default
-    }
-  }
-  return default_variance;
-}
-
-//
-// 1) Define a helper function to compute the arithmetic intensity of a tile.
-//    Here we assume:
-//    - Flops for tile (MT_M, MT_N, MT_K) is: 2 * MT_M * MT_N * MT_K
-//    - Memory traffic approximated as: MT_M*MT_K + MT_K*MT_N + MT_M*MT_N
-//    - Arithmetic intensity = flops / memory_traffic
-auto compute_arithmetic_intensity = [](const config_t& config) -> double {
-  // The tuple is: (latency, MT_M, MT_N, MT_K, MI_M, MI_N, MI_K)
-  auto MT_M = config.mt.m;
-  auto MT_N = config.mt.n;
-  auto MT_K = config.mt.k;
-
-  double flops          = static_cast<double>(2ull * MT_M * MT_N * MT_K);
-  double memory_traffic = static_cast<double>(MT_M * MT_K + MT_N * MT_K + MT_M * MT_N);
-
-  // Avoid division by zero.
-  if (memory_traffic == 0.0) return 0.0;
-
-  return flops / memory_traffic;
-};
-
-//
-// Tiebreaker function.
-//
-void pick_best_config_by_arithmetic_intensity(std::vector<prediction_result_t>& top_results,
-                                              size_t num_to_sort) {
-  if (top_results.empty()) {
-    throw std::runtime_error("pick_best_tile_by_arithmetic_intensity received empty list.");
-  }
-
-  // 2) Sort the top_results in descending order of arithmetic intensity
-  //    (highest arithmetic intensity first).
-  std::stable_sort(top_results.begin(),
-                   top_results.begin() + num_to_sort,
-                   [&](const prediction_result_t& a, const prediction_result_t& b) {
-                     double ai_a = compute_arithmetic_intensity(a.config);
-                     double ai_b = compute_arithmetic_intensity(b.config);
-                     return ai_a > ai_b;  // descending
-                   });
-  // 3) Return the tile with the highest arithmetic intensity
-}
-
 std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
                                                      const hardware_t& hardware,
                                                      const std::vector<config_t>& configs,
@@ -283,7 +227,7 @@ std::tuple<size_t, size_t> select_workgroup_mapping(const problem_t& problem,
         bestWGM = wgm;
       }
 
-      if (hardware_t::is_debug_enabled())
+      if (get_runtime_options(config).debug_enabled)
         std::cout << "WGM (" << wgm << "), L2Estimate (" << wgmL2Estimate << ")" << std::endl;
     }
 
@@ -327,6 +271,20 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
 
   if (results.empty()) { throw std::runtime_error("No valid configs found."); }
 
+  // Compute arithmetic intensity for tie-breaking
+  // Flops = 2 * MT_M * MT_N * MT_K, Memory traffic = MT_M*MT_K + MT_K*MT_N + MT_M*MT_N
+  auto compute_arithmetic_intensity = [](const config_t& config) -> double {
+    const auto MT_M = config.mt.m;
+    const auto MT_N = config.mt.n;
+    const auto MT_K = config.mt.k;
+
+    const double flops          = static_cast<double>(2ull * MT_M * MT_N * MT_K);
+    const double memory_traffic = static_cast<double>(MT_M * MT_K + MT_N * MT_K + MT_M * MT_N);
+
+    if (memory_traffic == 0.0) return 0.0;
+    return flops / memory_traffic;
+  };
+
   // Apply tie-breaking logic for configs with similar latency
   double best_latency = results.front().latency;
   size_t num_the_same = 0;
@@ -334,7 +292,8 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
   // Count the number of similar latencies
   constexpr double epsilon = 1e-9;
   // variance is set through environment variable ANALYTICAL_GEMM_HEURISTICS_VARIANCE
-  static const double top_N_heuristic = read_heuristics_variance_env_var();
+  // Use runtime_options from first config if available, otherwise global singleton
+  const double top_N_heuristic = get_runtime_options(configs.front()).heuristics_variance;
   for (const auto& res : results) {
     bool within_top;
     const double diff = std::abs(res.latency - best_latency);
@@ -355,8 +314,16 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
       break;
   }
 
-  // Finally, use your existing tie-breaker on top_candidates
-  pick_best_config_by_arithmetic_intensity(results, num_the_same);
+  // Sort top candidates by arithmetic intensity (descending - highest first)
+  if (num_the_same > 1) {
+    std::stable_sort(results.begin(),
+                     results.begin() + num_the_same,
+                     [&compute_arithmetic_intensity](const prediction_result_t& a,
+                                                     const prediction_result_t& b) {
+                       return compute_arithmetic_intensity(a.config) >
+                              compute_arithmetic_intensity(b.config);
+                     });
+  }
 
   // After arithmetic intensity tie-breaking, check if we still have ties
   // among the top results (those with same latency and arithmetic intensity)
