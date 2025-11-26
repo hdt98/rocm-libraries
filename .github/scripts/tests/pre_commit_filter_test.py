@@ -10,37 +10,49 @@ import pre_commit_filter
 
 
 class TestPreCommitFilter(unittest.TestCase):
-    def test_filter_files_opted_in_project(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_opted_in_project(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = ["projects/hipdnn/some_file.cpp"]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         self.assertEqual(filtered, ["projects/hipdnn/some_file.cpp"])
         self.assertEqual(projects, {"hipdnn"})
 
-    def test_filter_files_opted_in_shared_project(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_opted_in_shared_project(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = ["shared/hipdnn/some_file.cpp"]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         self.assertEqual(filtered, ["shared/hipdnn/some_file.cpp"])
         self.assertEqual(projects, {"hipdnn"})
 
-    def test_filter_files_non_opted_in_project(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_non_opted_in_project(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = ["projects/otherproject/some_file.cpp"]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         self.assertEqual(filtered, [])
         self.assertEqual(projects, set())
 
-    def test_filter_files_non_opted_in_shared_project(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_non_opted_in_shared_project(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = ["shared/otherproject/some_file.cpp"]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         self.assertEqual(filtered, [])
         self.assertEqual(projects, set())
 
-    def test_filter_files_outside_projects(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_outside_projects(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = [".github/workflows/pre-commit.yml", "README.md"]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         self.assertEqual(filtered, [".github/workflows/pre-commit.yml", "README.md"])
         self.assertEqual(projects, set())
 
-    def test_filter_files_mixed(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_mixed(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = [
             "projects/hipdnn/file1.cpp",
             "shared/hipdnn/file2.cpp",
@@ -48,7 +60,7 @@ class TestPreCommitFilter(unittest.TestCase):
             "shared/otherproject/file4.cpp",
             "README.md",
         ]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         expected_filtered = [
             "projects/hipdnn/file1.cpp",
             "shared/hipdnn/file2.cpp",
@@ -57,13 +69,23 @@ class TestPreCommitFilter(unittest.TestCase):
         self.assertEqual(sorted(filtered), sorted(expected_filtered))
         self.assertEqual(projects, {"hipdnn"})
 
-    def test_filter_files_with_spaces(self):
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_with_spaces(self, mock_exists):
+        mock_exists.return_value = True
         changed_files = ["projects/hipdnn/file with spaces.cpp", "file with spaces.md"]
-        filtered, projects = pre_commit_filter.filter_files(changed_files, ["hipdnn"])
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
         self.assertEqual(
             filtered, ["projects/hipdnn/file with spaces.cpp", "file with spaces.md"]
         )
         self.assertEqual(projects, {"hipdnn"})
+
+    @patch("pre_commit_filter.Path.exists")
+    def test_filter_files_deleted_file(self, mock_exists):
+        mock_exists.return_value = False
+        changed_files = ["projects/hipdnn/deleted_file.cpp"]
+        filtered, projects = pre_commit_filter.filter_files(changed_files, {"hipdnn"})
+        self.assertEqual(filtered, [])
+        self.assertEqual(projects, set())
 
     @patch("pre_commit_filter.subprocess.run")
     def test_get_changed_files(self, mock_run):

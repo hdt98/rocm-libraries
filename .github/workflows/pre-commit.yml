@@ -18,11 +18,16 @@ jobs:
 
       - name: Filter changed files
         id: filter
+        env:
+          # List of projects opted into pre-commit checks.
+          # Add new projects here (one per line), expressed as the name of their folder within 'projects/' or 'shared/':
+          OPTED_IN_PROJECTS: >-
+            hipdnn
         run: |
           python3 .github/scripts/pre_commit_filter.py \
             --base-ref origin/${{ github.event.pull_request.base.ref }} \
             --head-ref HEAD \
-            hipdnn # Add more project names separated by spaces
+            $OPTED_IN_PROJECTS
 
       - name: Set up Python
         if: steps.filter.outputs.should_run == 'true'
@@ -63,7 +68,7 @@ jobs:
           echo "================================================"
           echo ""
 
-          # Read newline-separated files into an array
+          # mapfile is a bash builtin that reads lines from stdin into an array
           mapfile -t FILTERED_FILES <<< "${{ steps.filter.outputs.files }}"
 
           if ! pre-commit run --show-diff-on-failure --files "${FILTERED_FILES[@]}"; then

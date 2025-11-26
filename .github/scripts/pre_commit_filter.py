@@ -9,6 +9,7 @@ It determines which files should undergo pre-commit checks based on opted-in pro
 Logic:
     1. Identify changed files (via git diff or provided list).
     2. Filter files:
+        - Check if file exists (skip deleted files).
         - Include files belonging to opted-in projects (projects/<project>/... or shared/<project>/...).
         - Include files outside the 'projects/' and 'shared/' directories.
     3. Output results to GITHUB_OUTPUT:
@@ -26,9 +27,11 @@ import os
 import subprocess
 import sys
 import logging
+from pathlib import Path
 from typing import List, Set, Tuple
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+# Logs go to stderr to avoid interfering with other output
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +46,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--head-ref", help="Git head reference for diff (e.g., HEAD)")
     parser.add_argument(
         "--file-list",
-        help="Space-separated list of changed files (alternative to git diff)",
+        help="Space-separated list of changed files (alternative to git diff for tests)",
     )
     parser.add_argument("projects", nargs="*", help="List of opted-in projects")
     return parser.parse_args()
@@ -55,46 +58,47 @@ def get_changed_files(base_ref: str, head_ref: str) -> List[str]:
         cmd = ["git", "diff", "--name-only", f"{base_ref}...{head_ref}"]
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        files = result.stdout.strip().splitlines()
-        return [f.strip() for f in files if f.strip()]
+        return [line for line in result.stdout.splitlines() if line.strip()]
     except subprocess.CalledProcessError as e:
         logger.error(f"Git diff failed: {e.stderr}")
         sys.exit(1)
 
 
 def filter_files(
-    changed_files: List[str], opted_in_projects: List[str]
+    changed_files: List[str], opted_in_projects: Set[str]
 ) -> Tuple[List[str], Set[str]]:
     """
     Filter changed files based on opted-in projects.
     Returns:
-        - List of filtered files to run pre-commit on.
+        - List of sorted filtered files to run pre-commit on.
         - Set of opted-in projects that have changes.
     """
-    filtered_files = []
+    PROJECT_FOLDERS = {"projects", "shared"}
+
+    filtered_files = set()
     changed_projects = set()
 
-    for file_path in changed_files:
+    for path_str in changed_files:
+        path = Path(path_str)
+
+        # skip deleted files
+        if not path.exists():
+            continue
+
+        parts = path.parts
+
         # Check if file is in an opted-in project (either in projects/ or shared/)
-        is_opted_in = False
-        for project in opted_in_projects:
-            if file_path.startswith(f"projects/{project}/") or file_path.startswith(
-                f"shared/{project}/"
-            ):
-                filtered_files.append(file_path)
+        # Structure: projects/<project_name>/... or shared/<project_name>/...
+        if len(parts) > 1 and parts[0] in PROJECT_FOLDERS:
+            project = parts[1]
+            if project in opted_in_projects:
+                filtered_files.add(path_str)
                 changed_projects.add(project)
-                is_opted_in = True
-                break
-
         # Vacuous inclusion: files outside 'projects/' and 'shared/' are always included
-        if (
-            not is_opted_in
-            and not file_path.startswith("projects/")
-            and not file_path.startswith("shared/")
-        ):
-            filtered_files.append(file_path)
+        else:
+            filtered_files.add(path_str)
 
-    return filtered_files, changed_projects
+    return sorted(filtered_files), changed_projects
 
 
 def write_github_output(key: str, value: str):
@@ -116,6 +120,8 @@ def main():
     args = parse_arguments()
 
     if args.file_list:
+        # Splitting by space might be problematic for filenames with spaces.
+        # Prefer --base-ref/--head-ref args for robustness.
         changed_files = args.file_list.split()
     elif args.base_ref and args.head_ref:
         changed_files = get_changed_files(args.base_ref, args.head_ref)
@@ -127,9 +133,7 @@ def main():
 
     logger.info(f"Changed files: {changed_files}")
 
-    filtered_files, changed_projects = filter_files(changed_files, args.projects)
-
-    filtered_files = sorted(list(set(filtered_files)))
+    filtered_files, changed_projects = filter_files(changed_files, set(args.projects))
 
     if not filtered_files:
         logger.info("================================================")
@@ -145,7 +149,6 @@ def main():
             logger.info(f)
 
         write_github_output("should_run", "true")
-        # Output as newline-separated list to handle spaces in filenames
         write_github_output("files", "\n".join(filtered_files))
 
         for project in changed_projects:
