@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -524,6 +524,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
                       end(a_g_n_k_wos_lengths),
                       begin(output_spatial_lengths_));
 
+#if !DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
             if(split_k < 0)
             {
                 ck::index_t gemmM, gemmN, gemmK;
@@ -549,6 +550,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
                 }
             }
             else
+#endif
             {
                 k_batch_ = split_k;
             }
@@ -1275,10 +1277,34 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
 
     static bool IsSupportedArgument(const Argument& arg)
     {
+#if DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
+        if(arg.k_batch_ < 0)
+        {
+            return false;
+        }
+#endif
+
         const index_t GemmM = arg.a_grid_desc_kbatch_k0_m_k1_.GetLength(I1);
         const index_t GemmN = arg.b_grid_desc_kbatch_k0_n_k1_.GetLength(I1);
         const index_t GemmK = arg.a_grid_desc_kbatch_k0_m_k1_.GetLength(I0) *
                               arg.a_grid_desc_kbatch_k0_m_k1_.GetLength(I2);
+
+        if constexpr(is_same_v<ComputeTypeA, ck::tf32_t> || is_same_v<ComputeTypeB, ck::tf32_t>)
+        {
+            if(!is_tf32_supported())
+            {
+                return false;
+            }
+            if constexpr(!is_same_v<ComputeTypeA, ComputeTypeB>)
+            {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "ComputeDataType for A and B should be same while using TF32"
+                              << std::endl;
+                }
+                return false;
+            }
+        }
 
         if(get_warp_size() == 64)
         {
@@ -1387,6 +1413,14 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
 
         // vector store C matrix into global memory
         if(!(arg.Conv_C_ % CBlockTransferScalarPerVector_NWaveNPerXdl == 0))
+        {
+            return false;
+        }
+
+        constexpr long_index_t TwoGB = (long_index_t{1} << 31);
+        if(!(arg.a_grid_desc_kbatch_k0_m_k1_.GetElementSpaceSize() * sizeof(ADataType) <= TwoGB &&
+             arg.b_grid_desc_kbatch_k0_n_k1_.GetElementSpaceSize() * sizeof(BDataType) <= TwoGB &&
+             arg.c_grid_desc_m_n_.GetElementSpaceSize() * sizeof(CDataType) <= TwoGB))
         {
             return false;
         }
