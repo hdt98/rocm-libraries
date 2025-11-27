@@ -20,6 +20,7 @@
 #include "ck/library/utility/convolution_parameter.hpp"
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
+#include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd_gfx13.hpp"
 
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_grouped_conv_fwd_multiple_d_wcnn_cshuffle.hpp"

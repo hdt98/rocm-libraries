@@ -308,16 +308,29 @@ bool run_test()
     copy(conv_param.input_right_pads_, input_right_pads);
 
     Tensor<GPUAccType> c_host(out_g_n_k_wos_desc);
-    constexpr ck::index_t CPerWcnn_Bhalf = (Filter == Filter_3X3 && Shape == Shape_4X2) ? 8 : 4;
+    constexpr ck::index_t CPerWcnn_Bhalf = (Shape == Shape_4X2) ? 8 : 4;
+
     constexpr ck::long_index_t Acc_Convert_Interval =
         std::is_same<GPUAccType, ck::bhalf_t>::value ? CPerWcnn_Bhalf : CPerBlock;
-    auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
-                                                                 InDataType,
-                                                                 WeiDataType,
-                                                                 GPUAccType,
-                                                                 InElementOp,
-                                                                 WeiElementOp,
-                                                                 PassThrough>();
+
+    using RefConvType =
+        std::conditional_t<(std::is_same<GPUAccType, ck::bhalf_t>::value ||
+                            std::is_same<GPUAccType, ck::half_t>::value),
+                           ck::tensor_operation::host::ReferenceConvFwd_GFX13<NDimSpatial,
+                                                                              InDataType,
+                                                                              WeiDataType,
+                                                                              GPUAccType,
+                                                                              InElementOp,
+                                                                              WeiElementOp,
+                                                                              PassThrough>,
+                           ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
+                                                                        InDataType,
+                                                                        WeiDataType,
+                                                                        GPUAccType,
+                                                                        InElementOp,
+                                                                        WeiElementOp,
+                                                                        PassThrough>>;
+    RefConvType ref_conv{};
 
     auto ref_invoker  = ref_conv.MakeInvoker();
     auto ref_argument = ref_conv.MakeArgument(in,
@@ -333,8 +346,7 @@ bool run_test()
                                               {},
                                               {},
                                               {},
-                                              Acc_Convert_Interval,
-                                              true);
+                                              Acc_Convert_Interval);
 
     if(config.do_verification)
     {
