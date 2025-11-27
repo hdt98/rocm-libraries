@@ -449,6 +449,7 @@ set(LONG_TESTS
     test_pooling2d
     test_pooling3d
     test_conv_ck_igemm_fwd_v6r1_dlops_nchw
+    test_ck_builder
     )
 
 function(rate_added_test NAME)
@@ -467,6 +468,12 @@ endif()
 if(NOT MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB)
     list(APPEND EXCLUDE_TESTS test_sqlite_perfdb)
     message(STATUS "Flaky test_sqlite_perfdb currently disabled (May 28 2025)")
+endif()
+
+if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
+    add_definitions(-DCK_EXPERIMENTAL_BUILDER)
+else()
+    list(APPEND EXCLUDE_TESTS test_ck_builder)
 endif()
 
 set(EXCLUDE_TEST_SOURCES)
