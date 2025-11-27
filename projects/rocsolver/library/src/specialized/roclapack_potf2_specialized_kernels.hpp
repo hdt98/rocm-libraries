@@ -38,6 +38,9 @@
 #include <cmath>
 
 ROCSOLVER_BEGIN_NAMESPACE
+#define ASSERT(x) \
+    {             \
+    }
 
 /**
  * indexing for packed storage
@@ -54,9 +57,9 @@ ROCSOLVER_BEGIN_NAMESPACE
 template <typename I>
 __device__ static I idx_upper(I i, I j, I n)
 {
-    assert((0 <= i) && (i <= (n - 1)));
-    assert((0 <= j) && (j <= (n - 1)));
-    assert(i <= j);
+    ASSERT((0 <= i) && (i <= (n - 1)));
+    ASSERT((0 <= j) && (j <= (n - 1)));
+    ASSERT(i <= j);
 
     return (i + (j * (j + 1)) / 2);
 }
@@ -76,9 +79,9 @@ __device__ static I idx_upper(I i, I j, I n)
 template <typename I>
 __device__ static I idx_lower(I i, I j, I n)
 {
-    assert((0 <= i) && (i <= (n - 1)));
-    assert((0 <= j) && (j <= (n - 1)));
-    assert(i >= j);
+    ASSERT((0 <= i) && (i <= (n - 1)));
+    ASSERT((0 <= j) && (j <= (n - 1)));
+    ASSERT(i >= j);
 
     return ((i - j) + (j * (2 * n + 1 - j)) / 2);
 }
@@ -99,7 +102,7 @@ __device__ static void potf2_simple(bool const is_upper, I const n, T* const A, 
     auto const i_inc = hipBlockDim_x;
     auto const j_start = hipThreadIdx_y;
     auto const j_inc = hipBlockDim_y;
-    assert(hipBlockDim_z == 1);
+    ASSERT(hipBlockDim_z == 1);
 
     auto const tid = hipThreadIdx_x + hipThreadIdx_y * hipBlockDim_x
         + hipThreadIdx_z * (hipBlockDim_x * hipBlockDim_y);
@@ -290,19 +293,19 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
     auto const i_inc = hipBlockDim_x;
     auto const j_start = hipThreadIdx_y;
     auto const j_inc = hipBlockDim_y;
-    assert(hipBlockDim_z == 1);
+    ASSERT(hipBlockDim_z == 1);
 
     // --------------------------------
     // note hipGridDim_z == batch_count
     // --------------------------------
     auto const bid = hipBlockIdx_z;
-    assert(AA != nullptr);
-    assert(info != nullptr);
+    ASSERT(AA != nullptr);
+    ASSERT(info != nullptr);
 
     T* const A = load_ptr_batch(AA, bid, shiftA, strideA);
     INFO* const info_bid = info + bid;
 
-    assert(A != nullptr);
+    ASSERT(A != nullptr);
 
     // -----------------------------------------
     // assume n by n matrix will fit in LDS cache
@@ -430,4 +433,5 @@ rocblas_status potf2_run_small(rocblas_handle handle,
         rocblas_handle handle, const rocblas_fill uplo, const I n, U A, const rocblas_stride shiftA, \
         const I lda, const rocblas_stride strideA, INFO* info, const I batch_count)
 
+#undef ASSERT
 ROCSOLVER_END_NAMESPACE
