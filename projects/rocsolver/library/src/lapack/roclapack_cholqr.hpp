@@ -37,6 +37,9 @@
 #include "roclapack_potrf.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
+#define ASSERT(x) \
+    {             \
+    }
 
 bool constexpr use_syrk = true;
 
@@ -948,9 +951,9 @@ static __device__ void cal_gnorm_kernel(I const m,
     I const nby = gridDim.y;
     I const nbz = gridDim.z;
 
-    assert(nbx == 1);
-    assert(nx <= warpSize);
-    assert(nz == 1);
+    ASSERT(nbx == 1);
+    ASSERT(nx <= warpSize);
+    ASSERT(nz == 1);
 
     I const ibx = blockIdx.x;
     I const iby = blockIdx.y;
@@ -1451,17 +1454,17 @@ rocblas_status rocsolver_cholqr2_strided_batched_argCheck(rocblas_handle handle,
 }
 
 template <typename I, typename UA, typename UR>
-rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
+static rocblas_status rocsolver_cholqr_batched_argCheck(rocblas_handle handle,
 
-                                                  I const m,
-                                                  I const n,
-                                                  I const lda,
-                                                  I const ldr,
+                                                        I const m,
+                                                        I const n,
+                                                        I const lda,
+                                                        I const ldr,
 
-                                                  UA A,
-                                                  UR R,
+                                                        UA A,
+                                                        UR R,
 
-                                                  I const batch_count)
+                                                        I const batch_count)
 {
     bool const isok_values = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_values)
@@ -1476,6 +1479,38 @@ rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
     }
 
     return (rocblas_status_continue);
+}
+
+template <typename I, typename UA, typename UR>
+static rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
+
+                                                         I const m,
+                                                         I const n,
+                                                         I const lda,
+                                                         I const ldr,
+
+                                                         UA A,
+                                                         UR R,
+
+                                                         I const batch_count)
+{
+    return (rocsolver_cholqr_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count));
+}
+
+template <typename I, typename UA, typename UR>
+static rocblas_status rocsolver_cholqr2_batched_argCheck(rocblas_handle handle,
+
+                                                         I const m,
+                                                         I const n,
+                                                         I const lda,
+                                                         I const ldr,
+
+                                                         UA A,
+                                                         UR R,
+
+                                                         I const batch_count)
+{
+    return (rocsolver_cholqr_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count));
 }
 
 template <typename I>
@@ -1708,7 +1743,7 @@ rocblas_status rocsolver_cholqr1_template(
         {
             size_t const nbytes = sizeof(T*) * batch_count;
             auto const istat = hipMemcpy(&(h_A_ptr[0]), A, nbytes, hipMemcpyDeviceToHost);
-            assert(istat == hipSuccess);
+            ASSERT(istat == hipSuccess);
             for(I bid = 0; bid < batch_count; bid++)
             {
                 h_A_ptr[bid] += shiftA;
@@ -1730,12 +1765,12 @@ rocblas_status rocsolver_cholqr1_template(
             size_t const nbytes = sizeof(T) * lstrideA;
             auto const istat
                 = (hipMemcpy(&(h_A[bid * lstrideA]), d_A, nbytes, hipMemcpyDeviceToHost));
-            assert(istat == hipSuccess);
+            ASSERT(istat == hipSuccess);
         }
 
         {
             auto const istat = hipDeviceSynchronize();
-            assert(istat == hipSuccess);
+            ASSERT(istat == hipSuccess);
         }
 
         for(I bid = 1; bid < batch_count; bid++)
@@ -1754,7 +1789,7 @@ rocblas_status rocsolver_cholqr1_template(
                                   << " bid = " << bid << " aij0 = " << aij0 << " aij = " << aij
                                   << " diff_aij = " << diff_aij << std::endl;
                     }
-                    assert(aij == aij0);
+                    ASSERT(aij == aij0);
                 }
             }
         }
@@ -1771,12 +1806,12 @@ rocblas_status rocsolver_cholqr1_template(
             size_t const nbytes = sizeof(T) * lstrideR;
             auto const istat
                 = (hipMemcpy(&(h_R[bid * lstrideR]), d_R, nbytes, hipMemcpyDeviceToHost));
-            assert(istat == hipSuccess);
+            ASSERT(istat == hipSuccess);
         }
 
         {
             auto const istat = hipDeviceSynchronize();
-            assert(istat == hipSuccess);
+            ASSERT(istat == hipSuccess);
         }
 
         for(I bid = 1; bid < batch_count; bid++)
@@ -1802,7 +1837,7 @@ rocblas_status rocsolver_cholqr1_template(
                                   << " bid = " << bid << " rij0 = " << rij0 << " rij = " << rij
                                   << " diff_rij = " << diff_rij << std::endl;
                     }
-                    assert(rij == rij0);
+                    ASSERT(rij == rij0);
                 }
             }
         }
@@ -1846,7 +1881,7 @@ rocblas_status rocsolver_cholqr1_template(
 
             auto const istat_hip
                 = hipMemcpy(&(h_A[0]), Ap, sizeof(T) * lda * n, hipMemcpyDeviceToHost);
-            assert(istat_hip == hipSuccess);
+            ASSERT(istat_hip == hipSuccess);
 
             for(auto j = 0; j < n; j++)
             {
@@ -2656,4 +2691,5 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
 
 #undef IS_POINTER_BATCHED
 #undef MEM_CHECK
+#undef ASSERT
 ROCSOLVER_END_NAMESPACE
