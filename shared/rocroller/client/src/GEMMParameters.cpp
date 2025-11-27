@@ -37,8 +37,8 @@ namespace rocRoller
         namespace GEMMClient
         {
             /**
-	     * FNV-1a hash function for generating unique kernel names.
-	     */
+             * FNV-1a hash function for generating unique kernel names.
+             */
             std::string fnv_1a_hash(std::string const& x)
             {
                 const uint64_t fnv_prime = 1099511628211ULL;

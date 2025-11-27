@@ -102,9 +102,9 @@ namespace rocRoller
             // remaining operations are directly connected to the LDS
             // target.
             //
-	    // Most of this code should be moved to AddComputeIndex;
-	    // and we should make it easier to get at the
-	    // blocknumbers.
+            // Most of this code should be moved to AddComputeIndex;
+            // and we should make it easier to get at the
+            // blocknumbers.
             if(targetOpsAndTiles.empty())
             {
                 // Just look upstream of target
