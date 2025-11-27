@@ -158,6 +158,8 @@ template<bool TransposeC> struct Dispatcher<bf8_t, bf8_t, float, 16, 16,  64, Tr
 #else
 template<> struct Dispatcher<fp8_t, fp8_t, float, 16, 16,  64, false> { using Type = WarpGemmMfma_f32_16x16x64_fp8_fp8; };
 template<> struct Dispatcher<bf8_t, bf8_t, float, 16, 16,  64, false> { using Type = WarpGemmMfma_f32_16x16x64_bf8_bf8; };
+template<> struct Dispatcher<fp8_t, fp8_t, float, 16, 16,  64, true> { using Type = WarpGemmMfma_f32_16x16x64_fp8_fp8_CTransposed; };
+template<> struct Dispatcher<bf8_t, bf8_t, float, 16, 16,  64, true> { using Type = WarpGemmMfma_f32_16x16x64_bf8_bf8_CTransposed; };
 #endif
 
 template<bool TransposeC> struct Dispatcher<fp8_t, fp8_t, half_t, 16, 16,  64, TransposeC, false> { using Type =WarpGemmWmma_f16_16x16x64_f8_f8<TransposeC>; };

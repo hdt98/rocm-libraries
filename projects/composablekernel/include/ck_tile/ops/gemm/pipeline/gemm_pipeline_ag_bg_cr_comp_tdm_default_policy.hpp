@@ -127,28 +127,119 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
     }
 
+    CK_TILE_HOST_DEVICE static constexpr auto GetLdsPaddingConfig()
+    {
+        // always use b128 to ds_load; this value calculate the bank number per 128 bits
+        constexpr index_t bank_of_vecs = get_n_words_per_128b();
+        // amount of padding to add in dwords 0 means 1 dword padding; 1 means 2 dwords padding ...
+        constexpr index_t pad_amount = bank_of_vecs - 1;
+
+        auto constexpr_log2_floor = [](index_t x) constexpr {
+            index_t result = 0;
+            while(x > 1)
+            {
+                x >>= 1;
+                result++;
+            }
+            return result;
+        };
+        // log2 minus 1 of the number of dwords to store into the destination before adding padding;
+        // one bank is 1 dword size
+        constexpr index_t pad_interval = constexpr_log2_floor(get_n_lds_banks()) - 1;
+
+        return make_tuple(number<pad_amount>{}, number<pad_interval>{});
+    }
+
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
+        using ADataType = remove_cvref_t<typename Problem::ADataType>;
+
         constexpr index_t MPerBlock  = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock  = Problem::BlockGemmShape::kK;
-        constexpr index_t AVectorLen = VecByteSize / sizeof(typename Problem::ADataType);
-        return make_naive_tensor_descriptor(make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
-                                            make_tuple(number<KPerBlock>{}, number<1>{}),
-                                            number<AVectorLen>{},
-                                            number<1>{});
+        constexpr auto DataTypeSize  = sizeof(ADataType);
+        constexpr index_t AVectorLen = VecByteSize / DataTypeSize;
+        constexpr auto MLdsLayer =
+            max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+        // calculate how many elements to pad to avoid bank conflict
+        constexpr index_t BytesPerDword = 4;
+        constexpr auto PaddingAmount =
+            (GetLdsPaddingConfig().at(number<0>{}) + 1) * BytesPerDword / DataTypeSize;
+
+        constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
+            make_tuple(number<MPerBlock / MLdsLayer>{},
+                       number<KPerBlock / AVectorLen * MLdsLayer>{},
+                       number<AVectorLen>{}),
+            make_tuple(
+                number<KPerBlock * MLdsLayer + PaddingAmount>{}, number<AVectorLen>{}, number<1>{}),
+            number<AVectorLen>{},
+            number<1>{});
+
+        constexpr auto a_lds_block_desc_1 = transform_tensor_descriptor(
+            a_lds_block_desc_0,
+            make_tuple(make_pass_through_transform(number<MPerBlock / MLdsLayer>{}),
+                       make_unmerge_transform(
+                           make_tuple(number<MLdsLayer>{}, number<KPerBlock / AVectorLen>{})),
+                       make_pass_through_transform(number<AVectorLen>{})),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+            make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
+
+        constexpr auto a_lds_block_desc = transform_tensor_descriptor(
+            a_lds_block_desc_1,
+            make_tuple(make_merge_transform_v3_division_mod(
+                           make_tuple(number<MPerBlock / MLdsLayer>{}, number<MLdsLayer>{})),
+                       make_merge_transform_v3_division_mod(
+                           make_tuple(number<KPerBlock / AVectorLen>{}, number<AVectorLen>{}))),
+            make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
+
+        return a_lds_block_desc;
     }
 
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
+        using BDataType = remove_cvref_t<typename Problem::BDataType>;
+
         constexpr index_t NPerBlock  = Problem::BlockGemmShape::kN;
         constexpr index_t KPerBlock  = Problem::BlockGemmShape::kK;
-        constexpr index_t BVectorLen = VecByteSize / sizeof(typename Problem::BDataType);
-        return make_naive_tensor_descriptor(make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),
-                                            make_tuple(number<KPerBlock>{}, number<1>{}),
-                                            number<BVectorLen>{},
-                                            number<1>{});
+        constexpr auto DataTypeSize  = sizeof(BDataType);
+        constexpr index_t BVectorLen = VecByteSize / DataTypeSize;
+        constexpr auto NLdsLayer =
+            max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+        // calculate how many elements to pad to avoid bank conflict
+        constexpr index_t BytesPerDword = 4;
+        constexpr auto PaddingAmount =
+            (GetLdsPaddingConfig().at(number<0>{}) + 1) * BytesPerDword / DataTypeSize;
+
+        constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
+            make_tuple(number<NPerBlock / NLdsLayer>{},
+                       number<KPerBlock / BVectorLen * NLdsLayer>{},
+                       number<BVectorLen>{}),
+            make_tuple(
+                number<KPerBlock * NLdsLayer + PaddingAmount>{}, number<BVectorLen>{}, number<1>{}),
+            number<BVectorLen>{},
+            number<1>{});
+
+        constexpr auto b_lds_block_desc_1 = transform_tensor_descriptor(
+            b_lds_block_desc_0,
+            make_tuple(make_pass_through_transform(number<NPerBlock / NLdsLayer>{}),
+                       make_unmerge_transform(
+                           make_tuple(number<NLdsLayer>{}, number<KPerBlock / BVectorLen>{})),
+                       make_pass_through_transform(number<BVectorLen>{})),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+            make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
+
+        constexpr auto b_lds_block_desc = transform_tensor_descriptor(
+            b_lds_block_desc_1,
+            make_tuple(make_merge_transform_v3_division_mod(
+                           make_tuple(number<NPerBlock / NLdsLayer>{}, number<NLdsLayer>{})),
+                       make_merge_transform_v3_division_mod(
+                           make_tuple(number<KPerBlock / BVectorLen>{}, number<BVectorLen>{}))),
+            make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
+
+        return b_lds_block_desc;
     }
 
     template <typename Problem>

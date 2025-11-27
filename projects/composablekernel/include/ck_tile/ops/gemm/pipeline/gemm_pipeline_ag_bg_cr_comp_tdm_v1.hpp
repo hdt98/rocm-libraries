@@ -236,6 +236,16 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             // TODO: tdm config will update with problem and policy; currently use default value
             TDMConfig tdm_config_a;
             TDMConfig tdm_config_b;
+            // set tdm's lds padding config
+            constexpr auto padding_config = Policy::GetLdsPaddingConfig();
+
+            tdm_config_a.pad_enable              = true;
+            tdm_config_a.pad_config.pad_amount   = padding_config.at(number<0>{});
+            tdm_config_a.pad_config.pad_interval = padding_config.at(number<1>{});
+
+            tdm_config_b.pad_enable              = true;
+            tdm_config_b.pad_config.pad_amount   = padding_config.at(number<0>{});
+            tdm_config_b.pad_config.pad_interval = padding_config.at(number<1>{});
 
             if constexpr(UseClusterLaunch)
             {

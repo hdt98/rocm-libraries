@@ -107,24 +107,30 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             TDMConfig tdm_config_a[2];
             TDMConfig tdm_config_b[2];
 
-            // enable atomic_barrier in TDM to make sure data is visible in LDS before wave reads
-            // them; tdm_config_a[0] for wave 0, tdm_config_a[1] for wave 2;
-            // tdm_config_b[0] for wave 1, tdm_config_b[1] for wave 3
-            tdm_config_a[0].atomic_barrier_enable = true;
-            tdm_config_b[0].atomic_barrier_enable = true;
+            // set tdm's lds padding config
+            constexpr auto padding_config = Policy::GetLdsPaddingConfig();
 
-            tdm_config_a[0].atomic_barrier_address =
-                static_cast<uint16_t>(reinterpret_cast<uintptr_t>(barriers[0])) >> 3;
-            tdm_config_b[0].atomic_barrier_address =
-                static_cast<uint16_t>(reinterpret_cast<uintptr_t>(barriers[0])) >> 3;
+            static_for<0, 2, 1>{}([&](auto i) {
+                tdm_config_a[i].pad_enable              = true;
+                tdm_config_a[i].pad_config.pad_amount   = padding_config.at(number<0>{});
+                tdm_config_a[i].pad_config.pad_interval = padding_config.at(number<1>{});
 
-            tdm_config_a[1].atomic_barrier_enable = true;
-            tdm_config_b[1].atomic_barrier_enable = true;
+                tdm_config_b[i].pad_enable              = true;
+                tdm_config_b[i].pad_config.pad_amount   = padding_config.at(number<0>{});
+                tdm_config_b[i].pad_config.pad_interval = padding_config.at(number<1>{});
 
-            tdm_config_a[1].atomic_barrier_address =
-                static_cast<uint16_t>(reinterpret_cast<uintptr_t>(barriers[1])) >> 3;
-            tdm_config_b[1].atomic_barrier_address =
-                static_cast<uint16_t>(reinterpret_cast<uintptr_t>(barriers[1])) >> 3;
+                // enable atomic_barrier in TDM to make sure data is visible in LDS before wave
+                // reads
+                // them; tdm_config_a[0] for wave 0, tdm_config_a[1] for wave 2;
+                // tdm_config_b[0] for wave 1, tdm_config_b[1] for wave 3
+                tdm_config_a[i].atomic_barrier_enable = true;
+                tdm_config_b[i].atomic_barrier_enable = true;
+
+                tdm_config_a[i].atomic_barrier_address =
+                    static_cast<uint16_t>(reinterpret_cast<uintptr_t>(barriers[i])) >> 3;
+                tdm_config_b[i].atomic_barrier_address =
+                    static_cast<uint16_t>(reinterpret_cast<uintptr_t>(barriers[i])) >> 3;
+            });
 
             if constexpr(UseClusterLaunch)
             {

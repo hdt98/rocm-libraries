@@ -10,6 +10,8 @@ template <>
 struct WmmaTraits<gfx11_t, int8_t, int8_t, int32_t, 16, 16, 16>
     : WmmaTraitsBase<gfx11_t, int8_t, int8_t, int32_t, 16>
 {
+    using ArchType = gfx11_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -35,6 +37,8 @@ template <>
 struct WmmaTraits<gfx120_t, int8_t, int8_t, int32_t, 16, 16, 16>
     : WmmaTraitsBase<gfx12_t, int8_t, int8_t, int32_t, 16>
 {
+    using ArchType = gfx120_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -60,6 +64,8 @@ template <>
 struct WmmaTraits<gfx120_t, fp8_t, fp8_t, float, 16, 16, 16>
     : WmmaTraitsBase<gfx12_t, fp8_t, fp8_t, float, 16>
 {
+    using ArchType = gfx120_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -80,6 +86,8 @@ template <>
 struct WmmaTraits<gfx120_t, bf8_t, bf8_t, float, 16, 16, 16>
     : WmmaTraitsBase<gfx12_t, bf8_t, bf8_t, float, 16>
 {
+    using ArchType = gfx120_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -100,6 +108,8 @@ template <>
 struct WmmaTraits<gfx120_t, fp8_t, bf8_t, float, 16, 16, 16>
     : WmmaTraitsBase<gfx12_t, fp8_t, bf8_t, float, 16>
 {
+    using ArchType = gfx120_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -120,6 +130,8 @@ template <>
 struct WmmaTraits<gfx120_t, bf8_t, fp8_t, float, 16, 16, 16>
     : WmmaTraitsBase<gfx12_t, bf8_t, fp8_t, float, 16>
 {
+    using ArchType = gfx120_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -141,6 +153,8 @@ template <>
 struct WmmaTraits<gfx125_t, int8_t, int8_t, int32_t, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, int8_t, int8_t, int32_t, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -166,6 +180,8 @@ template <>
 struct WmmaTraits<gfx125_t, uint8_t, uint8_t, uint32_t, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, uint8_t, uint8_t, uint32_t, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -192,6 +208,8 @@ template <>
 struct WmmaTraits<gfx125_t, fp8_t, fp8_t, float, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, fp8_t, fp8_t, float, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -216,6 +234,8 @@ template <>
 struct WmmaTraits<gfx125_t, bf8_t, bf8_t, float, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, bf8_t, bf8_t, float, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -240,6 +260,8 @@ template <>
 struct WmmaTraits<gfx125_t, fp8_t, bf8_t, float, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, fp8_t, bf8_t, float, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -264,6 +286,8 @@ template <>
 struct WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, bf8_t, fp8_t, float, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -288,6 +312,8 @@ template <>
 struct WmmaTraits<gfx125_t, fp8_t, fp8_t, fp16_t, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, fp8_t, fp8_t, fp16_t, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -312,6 +338,8 @@ template <>
 struct WmmaTraits<gfx125_t, fp8_t, bf8_t, fp16_t, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, fp8_t, bf8_t, fp16_t, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -335,6 +363,8 @@ template <>
 struct WmmaTraits<gfx125_t, bf8_t, fp8_t, fp16_t, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, bf8_t, fp8_t, fp16_t, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -359,6 +389,8 @@ template <>
 struct WmmaTraits<gfx125_t, bf8_t, bf8_t, fp16_t, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, bf8_t, bf8_t, fp16_t, 64>
 {
+    using ArchType = gfx125_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)

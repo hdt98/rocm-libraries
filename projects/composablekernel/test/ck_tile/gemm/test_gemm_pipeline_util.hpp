@@ -230,7 +230,13 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                            PipelineType == GemmPipelineType::CompTDMV1 ||
                                            PipelineType == GemmPipelineType::CompTDMV2);
 
-        constexpr bool TransposeC                = false;
+#if defined(CK_USE_GFX1250)
+        // this setting is related to wmma layout in gfx1250; will improve performance when C is
+        // RowMajor
+        constexpr bool TransposeC = std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor>;
+#else
+        constexpr bool TransposeC = false;
+#endif
         static constexpr bool StructuredSparsity = false;
         static constexpr bool NumWaveGroup       = 1;
 

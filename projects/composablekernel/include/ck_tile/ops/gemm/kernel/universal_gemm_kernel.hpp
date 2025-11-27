@@ -456,11 +456,23 @@ struct UniversalGemmKernel
                 }
                 if(kargs.K % vectorSizeA != 0)
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                    const auto remainder = kargs.K % vectorSizeA;
+                    constexpr ck_tile::index_t APackedSize =
+                        ck_tile::numeric_traits<ADataType>::PackedSize;
+                    const auto remainder_in_bytes = remainder * sizeof(ADataType) / APackedSize;
+                    // oob can support to dword level
+                    if(remainder_in_bytes % 4 == 0)
                     {
-                        CK_TILE_ERROR("K is not a multiple of vector load size for A tensor!");
+                        AsTensorIsValid = true;
                     }
-                    AsTensorIsValid = false;
+                    else
+                    {
+                        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                        {
+                            CK_TILE_ERROR("K is not a multiple of vector load size for A tensor!");
+                        }
+                        AsTensorIsValid = false;
+                    }
                 }
             }
             else
@@ -476,11 +488,23 @@ struct UniversalGemmKernel
                 }
                 if(kargs.M % vectorSizeA != 0)
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                    const auto remainder = kargs.M % vectorSizeA;
+                    constexpr ck_tile::index_t APackedSize =
+                        ck_tile::numeric_traits<ADataType>::PackedSize;
+                    const auto remainder_in_bytes = remainder * sizeof(ADataType) / APackedSize;
+                    // oob can support to dword level
+                    if(remainder_in_bytes % 4 == 0)
                     {
-                        CK_TILE_ERROR("M is not a multiple of vector load size for A tensor!");
+                        AsTensorIsValid = true;
                     }
-                    AsTensorIsValid = false;
+                    else
+                    {
+                        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                        {
+                            CK_TILE_ERROR("M is not a multiple of vector load size for A tensor!");
+                        }
+                        AsTensorIsValid = false;
+                    }
                 }
             }
         });
@@ -503,11 +527,23 @@ struct UniversalGemmKernel
                 }
                 if(kargs.N % vectorSizeB != 0)
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                    const auto remainder = kargs.N % vectorSizeB;
+                    constexpr ck_tile::index_t BPackedSize =
+                        ck_tile::numeric_traits<BDataType>::PackedSize;
+                    const auto remainder_in_bytes = remainder * sizeof(BDataType) / BPackedSize;
+                    // oob can support to dword level
+                    if(remainder_in_bytes % 4 == 0)
                     {
-                        CK_TILE_ERROR("N is not a multiple of vector load size for B tensor!");
+                        BsTensorIsValid = true;
                     }
-                    BsTensorIsValid = false;
+                    else
+                    {
+                        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                        {
+                            CK_TILE_ERROR("N is not a multiple of vector load size for B tensor!");
+                        }
+                        BsTensorIsValid = false;
+                    }
                 }
             }
             else
@@ -525,11 +561,23 @@ struct UniversalGemmKernel
                 }
                 if(kargs.K % vectorSizeB != 0)
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                    const auto remainder = kargs.K % vectorSizeB;
+                    constexpr ck_tile::index_t BPackedSize =
+                        ck_tile::numeric_traits<BDataType>::PackedSize;
+                    const auto remainder_in_bytes = remainder * sizeof(BDataType) / BPackedSize;
+                    // oob can support to dword level
+                    if(remainder_in_bytes % 4 == 0)
                     {
-                        CK_TILE_ERROR("K is not a multiple of vector load size for B tensor!");
+                        BsTensorIsValid = true;
                     }
-                    BsTensorIsValid = false;
+                    else
+                    {
+                        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                        {
+                            CK_TILE_ERROR("K is not a multiple of vector load size for B tensor!");
+                        }
+                        BsTensorIsValid = false;
+                    }
                 }
             }
         });

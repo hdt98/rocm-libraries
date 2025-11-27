@@ -65,10 +65,15 @@ struct UniversalGemmBasePolicy
     static constexpr auto I1 = number<1>{};
     static constexpr auto I2 = number<2>{};
 
+#if defined(__gfx125__)
+    // change to warp raked for lds write bank conflict elimination
+    static constexpr auto DefaultATileAccessPattern = tile_distribution_pattern::warp_raked;
+    static constexpr auto DefaultBTileAccessPattern = tile_distribution_pattern::warp_raked;
+#else
     // Default tile access patterns
     static constexpr auto DefaultATileAccessPattern = tile_distribution_pattern::thread_raked;
     static constexpr auto DefaultBTileAccessPattern = tile_distribution_pattern::thread_raked;
-
+#endif
     static constexpr auto getATileAccessPattern()
     {
         if constexpr(has_a_tile_access_pattern<Derived>::value)
@@ -106,9 +111,13 @@ struct UniversalGemmBasePolicy
         }
         else
         {
-            constexpr index_t KPack = GetSmemPackA<Problem>();
-
             constexpr auto DataTypeSize = sizeof(ADataType);
+#if defined(__gfx125__)
+            constexpr index_t BytesPerDword = 4;
+            constexpr index_t KPack         = get_n_words_per_128b() * BytesPerDword / DataTypeSize;
+#else
+            constexpr index_t KPack = GetSmemPackA<Problem>();
+#endif
             constexpr auto MLdsLayer =
                 max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
 
@@ -179,9 +188,15 @@ struct UniversalGemmBasePolicy
         else
         // else if constexpr(std::is_same_v<BLayout, tensor_layout::gemm::ColumnMajor>)
         {
-            constexpr index_t KPack     = GetSmemPackB<Problem>();
-            constexpr auto BK0          = number<KPerBlock / KPack>{};
+
             constexpr auto DataTypeSize = sizeof(BDataType);
+#if defined(__gfx125__)
+            constexpr index_t BytesPerDword = 4;
+            constexpr index_t KPack         = get_n_words_per_128b() * BytesPerDword / DataTypeSize;
+#else
+            constexpr index_t KPack = GetSmemPackB<Problem>();
+#endif
+            constexpr auto BK0 = number<KPerBlock / KPack>{};
             constexpr auto NLdsLayer =
                 max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
 
@@ -677,20 +692,20 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     CK_TILE_DEVICE static constexpr index_t GetSmemSizeA()
     {
-        constexpr index_t smem_size_a =
-            integer_least_multiple(sizeof(typename Problem::ADataType) *
-                                       Problem::BlockGemmShape::kM * Problem::BlockGemmShape::kK,
-                                   16);
+        using ADataType                 = remove_cvref_t<typename Problem::ADataType>;
+        constexpr auto a_lds_block_desc = Derived::template MakeALdsBlockDescriptor<Problem>();
+        constexpr index_t smem_size_a   = integer_least_multiple(
+            a_lds_block_desc.get_element_space_size() * sizeof(ADataType), 16);
         return smem_size_a;
     }
 
     template <typename Problem>
     CK_TILE_DEVICE static constexpr index_t GetSmemSizeB()
     {
-        constexpr index_t smem_size_b =
-            integer_least_multiple(sizeof(typename Problem::BDataType) *
-                                       Problem::BlockGemmShape::kN * Problem::BlockGemmShape::kK,
-                                   16);
+        using BDataType                 = remove_cvref_t<typename Problem::BDataType>;
+        constexpr auto b_lds_block_desc = Derived::template MakeBLdsBlockDescriptor<Problem>();
+        constexpr index_t smem_size_b   = integer_least_multiple(
+            b_lds_block_desc.get_element_space_size() * sizeof(BDataType), 16);
         return smem_size_b;
     }
 
