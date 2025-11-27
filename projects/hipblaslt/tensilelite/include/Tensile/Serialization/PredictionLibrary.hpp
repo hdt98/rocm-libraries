@@ -56,10 +56,8 @@ namespace TensileLite
                 }
 
                 // Serialize table for Origami
-                bool table_empty = false, table_fc_empty = false;
-                bool is_out = iot::outputting(io);
                 std::vector<int> mappingIndices;
-                if(is_out)
+                if(iot::outputting(io))
                 {
                     mappingIndices.reserve(lib.solutionmap.size());
 
@@ -72,32 +70,11 @@ namespace TensileLite
                 {
                     iot::mapRequired(io, "table", mappingIndices);
                     if(mappingIndices.empty())
-                        table_empty = true;
-                }
-                // Serialize table_fc for FormoCast
-                std::vector<int> mappingIndices_fc;
-                if(is_out)
-                {
-                    mappingIndices_fc.reserve(lib.solutionmap_fc.size());
+                        iot::setError(io,
+                                      "ProblemPredictionLibrary requires non empty "
+                                      "mapping index set.");
 
-                    for(auto const& pair : lib.solutionmap_fc)
-                        mappingIndices_fc.push_back(pair.first);
-
-                    iot::mapRequired(io, "table_fc", mappingIndices_fc);
-                }
-                else
-                {
-                    iot::mapRequired(io, "table_fc", mappingIndices_fc);
-                    if(mappingIndices_fc.empty())
-                        table_fc_empty = true;
-                }
-                if(table_empty && table_fc_empty)
-                {
-                  iot::setError(io, "ProblemPredictionLibrary has no valid pool");
-                }
-                if(!is_out)
-                {
-                    for(int index : (table_empty ? mappingIndices_fc : mappingIndices))
+                    for(int index : mappingIndices)
                     {
                         auto slnIter = ctx->solutions->find(index);
                         if(slnIter == ctx->solutions->end())
@@ -147,8 +124,27 @@ namespace TensileLite
                             lib.origami_config_map.insert(std::make_pair(origami_config, index));
                         }
                     }
+                }
 
-                    for(int index : (table_fc_empty ? mappingIndices : mappingIndices_fc))
+                // Serialize table_fc for FormoCast
+                std::vector<int> mappingIndices_fc;
+                if(iot::outputting(io))
+                {
+                    mappingIndices_fc.reserve(lib.solutionmap_fc.size());
+
+                    for(auto const& pair : lib.solutionmap_fc)
+                        mappingIndices_fc.push_back(pair.first);
+
+                    iot::mapRequired(io, "table_fc", mappingIndices_fc);
+                }
+                else
+                {
+                    iot::mapRequired(io, "table_fc", mappingIndices_fc);
+                    if(mappingIndices_fc.empty())
+                        iot::setError(io,
+                                      "ProblemPredictionLibrary has no valid pool for FormoCast");
+
+                    for(int index : mappingIndices_fc)
                     {
                         auto slnIter = ctx->solutions->find(index);
                         if(slnIter == ctx->solutions->end())
