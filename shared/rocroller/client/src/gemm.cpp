@@ -789,7 +789,7 @@ namespace rocRoller::Client::GEMMClient
         if(io.doSaveAsm)
         {
             if(io.saveAsmPath.empty())
-                io.saveAsmPath = solution.generateKernelName() + ".s";
+                io.saveAsmPath = solution.generateKernelName().shortName + ".s";
 
             Settings::getInstance()->set(Settings::SaveAssembly, true);
             Settings::getInstance()->set(Settings::AssemblyFile, std::string(io.saveAsmPath));
@@ -828,7 +828,7 @@ namespace rocRoller::Client::GEMMClient
 
         auto context
             = Context::ForTarget(arch,
-                                 solution.generateKernelName(),
+                                 solution.generateKernelName().shortName,
                                  {{.scaleSkipPermlane = solution.types.scaleSkipPermlane}});
 
         bool willRunOnGPU = doValidate || doBenchmark;
@@ -859,7 +859,7 @@ namespace rocRoller::Client::GEMMClient
             std::cout << "Solution:" << std::endl;
             std::cout << solution << std::endl;
 
-            std::cout << "Generating: " << solution.generateKernelName() << "..." << std::endl;
+            std::cout << "Generating: " << solution.generateKernelName().shortName << "..." << std::endl;
 
             int reason;
             std::tie(gemm, reason) = createGEMMSolution(context, solution);
@@ -941,15 +941,15 @@ namespace rocRoller::Client::GEMMClient
                 commandKernel = std::make_shared<CommandKernel>();
                 commandKernel->setContext(context);
                 auto kernel = commandKernel->loadKernelFromCodeObject(
-                    codeObjectPath, solution.generateKernelName());
+                    codeObjectPath, solution.generateKernelName().shortName);
                 command = kernel->command();
 
                 std::cout << "Loading kernel from: " << io.loadAsmPath << std::endl;
                 commandKernel
-                    = std::make_shared<CommandKernel>(command, solution.generateKernelName());
+                    = std::make_shared<CommandKernel>(command, solution.generateKernelName().shortName);
                 commandKernel->setContext(context);
                 commandKernel->loadKernelFromAssembly(io.loadAsmPath,
-                                                      solution.generateKernelName());
+                                                      solution.generateKernelName().shortName);
             }
             else if(!io.loadCOPath.empty())
             {
@@ -958,7 +958,7 @@ namespace rocRoller::Client::GEMMClient
                 commandKernel = std::make_shared<CommandKernel>();
                 commandKernel->setContext(context);
                 auto kernel = commandKernel->loadKernelFromCodeObject(
-                    io.loadCOPath, solution.generateKernelName());
+                    io.loadCOPath, solution.generateKernelName().shortName);
 
                 command = kernel->command();
             }

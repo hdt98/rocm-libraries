@@ -36,28 +36,11 @@ namespace rocRoller
     {
         namespace GEMMClient
         {
-            /**
-             * FNV-1a hash function for generating unique kernel names.
-             */
-            std::string fnv_1a_hash(std::string const& x)
-            {
-                const uint64_t fnv_prime = 1099511628211ULL;
-                uint64_t       hash      = 14695981039346656037ULL;
-
-                for(char c : x)
-                {
-                    hash ^= static_cast<uint64_t>(c);
-                    hash *= fnv_prime;
-                }
-
-                return fmt::format("{:016x}", hash);
-            }
-
             std::string TypeParameters::kernelNamePart() const
             {
                 std::ostringstream rv;
 
-                rv << "GEMM_" << toString(transA) << toString(transB);
+                rv << toString(transA) << toString(transB);
 
                 if(scaleA != rocRoller::Operations::ScaleMode::None)
                 {
@@ -88,78 +71,82 @@ namespace rocRoller
 
                 if(scaleSkipPermlane)
                 {
-                    rv << "_PreSW_AB";
+                    rv << "_PreSW";
                 }
 
                 return rv.str();
             }
 
-            std::string SolutionParameters::generateKernelName() const
+            KernelNames SolutionParameters::generateKernelName() const
             {
-                std::ostringstream rv;
-                rv << types.kernelNamePart();
+                std::ostringstream important, hashed;
 
-                rv << "_MT";
-                rocRoller::streamJoin(rv, std::vector{macM, macN, macK}, "x");
+                // Important things that should appear in the kernel name
+                important << "RRGEMM_";
+                important << types.kernelNamePart();
+                important << "_WGTS";
+                rocRoller::streamJoin(important, std::vector{macM, macN, macK}, "x");
+                important << "_WGS";
+                rocRoller::streamJoin(important, std::vector{workgroupSizeX, workgroupSizeY}, "x");
 
-                rv << "_WG";
-                rocRoller::streamJoin(rv, std::vector{workgroupSizeX, workgroupSizeY}, "x");
-
+                // Not very important things that will be hashed
                 if(workgroupMappingDim != -1)
                 {
-                    rv << "_WGM" << workgroupMappingDim;
+                    hashed << "_WGM" << workgroupMappingDim;
                 }
 
-                rv << "_WGMXCC";
-                rocRoller::streamJoin(rv, std::vector{workgroupRemapXCC}, "");
+                hashed << "_WGMXCC";
+                rocRoller::streamJoin(hashed, std::vector{workgroupRemapXCC}, "");
                 if(workgroupRemapXCC && workgroupRemapXCCValue > 0)
                 {
-                    rocRoller::streamJoin(rv, std::vector{workgroupRemapXCCValue}, "");
+                    rocRoller::streamJoin(hashed, std::vector{workgroupRemapXCCValue}, "");
                 }
 
-                rv << "_LA" << loadPathA;
-                rv << "_LB" << loadPathB;
+                hashed << "_LA" << loadPathA;
+                hashed << "_LB" << loadPathB;
 
-                rv << "_SD" << storeLDSD;
+                hashed << "_SD" << storeLDSD;
 
-                rv << "_LSA" << loadPathAScale;
-                rv << "_LSB" << loadPathBScale;
+                hashed << "_LSA" << loadPathAScale;
+                hashed << "_LSB" << loadPathBScale;
 
-                rv << "_UNROLL";
-                rocRoller::streamJoin(rv, std::vector{unrollX, unrollY}, "x");
+                hashed << "_UNROLL";
+                rocRoller::streamJoin(hashed, std::vector{unrollX, unrollY}, "x");
 
-                rv << "_SwizzleScale" << swizzleScale << prefetchScale;
-                rv << "_SwizzleTileSize" << swizzleTileSize;
+                hashed << "_SwizzleScale" << swizzleScale << prefetchScale;
+                hashed << "_SwizzleTileSize" << swizzleTileSize;
 
                 if(prefetch)
                 {
-                    rv << "_PF";
+                    hashed << "_PF";
                     rocRoller::streamJoin(
-                        rv, std::vector{prefetchInFlight, prefetchLDSFactor}, "x");
-                    rv << "m" << prefetchMixMemOps;
+                        hashed, std::vector{prefetchInFlight, prefetchLDSFactor}, "x");
+                    hashed << "m" << prefetchMixMemOps;
                 }
 
-                rv << "_MI";
+                hashed << "_MI";
                 rocRoller::streamJoin(
-                    rv, std::vector{waveM, waveN, waveK, (waveB < 0 ? -waveB : waveB)}, "x");
+                    hashed, std::vector{waveM, waveN, waveK, (waveB < 0 ? -waveB : waveB)}, "x");
 
-                rv << "_" << scheduler;
+                hashed << "_" << scheduler;
 
                 if(streamK)
                 {
-                    rv << "_SK";
+                    hashed << "_SK";
                     if(streamKTwoTileDPFirst)
-                        rv << "2TDPFirst";
+                        hashed << "2TDPFirst";
                     else if(streamKTwoTile)
-                        rv << "2T";
+                        hashed << "2T";
                 }
 
-                // Take first 7 characters of version
-                auto shortVersion = version;
-                if(version.size() > 7)
-                    shortVersion = version.substr(0, 7);
+                // Full name is important_ hashed
+                auto fullName = std::format("{}_{}", important.str(), hashed.str());
 
-                return fmt::format("GEMM_{}_{}", shortVersion, fnv_1a_hash(rv.str()));
+                // Short name is important_ zero-padded hex version of hash<std::string>(hashed)
+                auto hashedValue = std::hash<std::string>{}(hashed.str());
+                auto shortName   = std::format("{}_{:08x}", important.str(), hashedValue);
+
+                return KernelNames{fullName, shortName};
             }
 
             std::string toString(TransposeType trans)

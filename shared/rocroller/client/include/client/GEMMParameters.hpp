@@ -71,6 +71,12 @@ namespace rocRoller
                 int m, k, n, l;
             };
 
+            struct KernelNames
+            {
+                std::string fullName;
+                std::string shortName;
+            };
+
             std::string toString(TransposeType trans);
 
             struct TypeParameters
@@ -193,7 +199,7 @@ namespace rocRoller
 
                 std::string version;
 
-                std::string generateKernelName() const;
+                KernelNames generateKernelName() const;
             };
 
             struct Result
