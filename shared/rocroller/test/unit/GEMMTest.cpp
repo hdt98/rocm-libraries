@@ -908,13 +908,6 @@ namespace GEMMDriverTest
     {
     };
 
-    // Params are: waveK, loadScalePathA, loadScalePathB, unrollK
-    class SwizzleScaledGEMMMXF4TNTestGPU
-        : public BaseGEMMContextFixture<
-              std::tuple<int, SolutionParams::LoadPath, SolutionParams::LoadPath, int>>
-    {
-    };
-
     class GEMMF8TestGPU : public BaseGEMMContextFixture<>
     {
     };
@@ -2278,12 +2271,26 @@ namespace GEMMDriverTest
         }
     }
 
-    TEST_P(SwizzleScaledGEMMMXF4TNTestGPU, GPU_SwizzleScaledGEMMMXF4TN)
+    struct GEMMF4SwizzleScaledTNGPU : public BaseGEMMContextFixture<int,
+                                                                    SolutionParams::LoadPath,
+                                                                    SolutionParams::LoadPath,
+                                                                    int,
+                                                                    SolutionParams::LoadPath>
     {
+    };
+
+    TEST_P(GEMMF4SwizzleScaledTNGPU, GEMMF4SwizzleScaledTNGPU)
+    {
+        auto const& [arch, waveK, loadScaleA, loadScaleB, unrollK, loadPathAB] = GetParam();
+
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_scale_f8f6f4);
         REQUIRE_ARCH_CAP(GPUCapability::HasBlockScaling32);
 
-        auto [waveK, loadScalePathA, loadScalePathB, unrollK] = std::get<1>(GetParam());
+        if(unrollK == 4
+           && (loadPathAB == SolutionParams::LoadPath::BufferToLDSViaVGPR || waveK == 128))
+        {
+            GTEST_SKIP() << "FIXME: Re-visit when ClusterParallelChains is implemented";
+        }
 
         int waveM = (waveK == 128) ? 16 : 32;
         int waveN = (waveK == 128) ? 16 : 32;
@@ -2297,11 +2304,11 @@ namespace GEMMDriverTest
         gemm.n    = 3 * gemm.macN;
         gemm.k    = 4 * gemm.macK;
 
-        gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
-        gemm.workgroupSizeY = 4;
+        gemm.workgroupSizeX = 2 * gemm.wavefrontSize;
+        gemm.workgroupSizeY = 2;
 
-        gemm.loadPathA = SolutionParams::LoadPath::BufferToVGPR;
-        gemm.loadPathB = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadPathA = loadPathAB;
+        gemm.loadPathB = loadPathAB;
 
         gemm.scaleAMode = Operations::ScaleMode::Separate;
         gemm.scaleBMode = Operations::ScaleMode::Separate;
@@ -2329,7 +2336,23 @@ namespace GEMMDriverTest
         if(loadScalePathA == SolutionParams::LoadPath::BufferToLDS
            && loadScalePathB == SolutionParams::LoadPath::BufferToLDS)
             EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
     }
+
+    INSTANTIATE_TEST_SUITE_P(
+        GEMMF4SwizzleScaledTNGPU,
+        GEMMF4SwizzleScaledTNGPU,
+        ::testing::Combine(currentGPUISA(),
+                           ::testing::Values(64, 128),
+                           ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
+                                             SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                             SolutionParams::LoadPath::BufferToLDS),
+                           ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
+                                             SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                             SolutionParams::LoadPath::BufferToLDS),
+                           ::testing::Values(0, 2, 4),
+                           ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                             SolutionParams::LoadPath::BufferToVGPR)));
 
     TEST_P(GEMMMXFP4TNSwizzleScaledUnrollTestGPU, GPU_GEMMMXFP4TNSwizzleScaled64x4Unroll)
     {
@@ -4152,20 +4175,6 @@ namespace GEMMDriverTest
                              ::testing::Combine(currentGPUISA(),
                                                 ::testing::Combine(::testing::Values(64, 128),
                                                                    ::testing::Values(0, 2, 4))));
-
-    INSTANTIATE_TEST_SUITE_P(
-        SwizzleScaledGEMMMXF4TNTest,
-        SwizzleScaledGEMMMXF4TNTestGPU,
-        ::testing::Combine(
-            currentGPUISA(),
-            ::testing::Combine(::testing::Values(64, 128),
-                               ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDS),
-                               ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDS),
-                               ::testing::Values(0, 2))));
 
     INSTANTIATE_TEST_SUITE_P(GEMMF8Test, GEMMF8TestGPU, currentGPUISA());
 
