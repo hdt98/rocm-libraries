@@ -2321,20 +2321,20 @@ namespace GEMMDriverTest
         gemm.scaleBlockSize
             = m_context->targetArchitecture().GetCapability(GPUCapability::DefaultScaleBlockSize);
 
-        gemm.loadScalePathA = loadScalePathA;
-        gemm.loadScalePathB = loadScalePathB;
+        gemm.loadScalePathA = loadScaleA;
+        gemm.loadScalePathB = loadScaleB;
         gemm.unrollK        = unrollK;
 
         basicGEMM<FP4, FP4, float>(gemm);
 
         std::string generatedCode = m_context->instructions()->toString();
         // when both scales are loaded directly from buffer into VGPRs
-        if(loadScalePathA == SolutionParams::LoadPath::BufferToVGPR
-           && loadScalePathB == SolutionParams::LoadPath::BufferToVGPR)
+        if(loadScaleA == SolutionParams::LoadPath::BufferToVGPR
+           && loadScaleB == SolutionParams::LoadPath::BufferToVGPR)
             EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
         // when both scales are loaded directly from buffer into LDS
-        if(loadScalePathA == SolutionParams::LoadPath::BufferToLDS
-           && loadScalePathB == SolutionParams::LoadPath::BufferToLDS)
+        if(loadScaleA == SolutionParams::LoadPath::BufferToLDS
+           && loadScaleB == SolutionParams::LoadPath::BufferToLDS)
             EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
         EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
     }
