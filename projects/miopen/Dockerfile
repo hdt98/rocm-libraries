@@ -178,7 +178,7 @@ RUN echo Building for GPU Archs: ${GPU_ARCHS} && \
 # Composable Kernel installed separated from rbuild to take in values from GPU_ARCHS
 RUN sed -i '/composable_kernel/d' /requirements.txt
 
-# rbuild is used to trigger build of requirements.txt, dev-requirements.txt
+# rbuild is used to trigger build of requirements.txt, dev-requirements.txt.
 RUN if [ "$USE_FIN" = "ON" ]; then \
     rbuild prepare -s fin -d $PREFIX -DGPU_ARCHS="${GPU_ARCHS}"; \
     else \
