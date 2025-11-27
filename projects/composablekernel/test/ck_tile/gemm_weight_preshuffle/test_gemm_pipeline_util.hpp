@@ -1,13 +1,15 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
-#pragma once
 
+#pragma once
 #include <sstream>
 #include <gtest/gtest.h>
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/host.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
+#include "ck_tile/host/permute_pk_int4.hpp"
+#include "ck_tile/host/tensor_shuffle_utils.hpp"
 #include "ck_tile/ops/epilogue.hpp"
 #include "ck_tile/ops/gemm.hpp"
 
@@ -34,20 +36,21 @@ auto calculate_rtol_atol(const ck_tile::index_t K,
 
 enum struct GemmPipelineType
 {
-    WeightPreshuffle
+    WeightPreshuffleV2
 };
 
 template <GemmPipelineType PT, typename Problem>
 struct GemmPipelineTypeSelector;
 
 template <typename Problem>
-struct GemmPipelineTypeSelector<GemmPipelineType::WeightPreshuffle, Problem>
+struct GemmPipelineTypeSelector<GemmPipelineType::WeightPreshuffleV2, Problem>
 {
-    using base_pipeline = ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV1<Problem>;
-    using pipeline      = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegV1<Problem>;
+    using base_pipeline = ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2<Problem>;
+    using pipeline      = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegV2<Problem>;
 
-    static constexpr auto GetName() { return "GemmPipelineAgBgCrWeightPreshuffle"; }
+    static constexpr auto GetName() { return "GemmPipelineAgBgCrWeightPreshuffleV2"; }
 };
+
 template <typename Datatype>
 struct config
 {
@@ -104,25 +107,13 @@ class TestCkTileGemmPipeline : public ::testing::Test
     template <typename GemmConfig, bool PadM, bool PadN, bool PadK, bool Preshuffle>
     void invoke_gemm(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config& s)
     {
-        // TODO: This should be parameterized in tests
-        // constexpr ck_tile::index_t M_Tile = 128;
-        // constexpr ck_tile::index_t N_Tile = 128;
-        // constexpr ck_tile::index_t K_Tile = 128;
-
-        // constexpr ck_tile::index_t M_Warp = 1;
-        // constexpr ck_tile::index_t N_Warp = 4;
-        // constexpr ck_tile::index_t K_Warp = 1;
-
-        // constexpr ck_tile::index_t M_Warp_Tile = 32;
-        // constexpr ck_tile::index_t N_Warp_Tile = 32;
-        // constexpr ck_tile::index_t K_Warp_Tile = sizeof(ADataType) == 2 ? 16 : 32;
-
         constexpr bool kPadM      = PadM;
         constexpr bool kPadN      = PadN;
         constexpr bool kPadK      = PadK;
         constexpr bool preshuffle = Preshuffle;
 
-        constexpr bool DoubleSmemBuffer = false;
+        constexpr bool DoubleSmemBuffer =
+            (PipelineType == GemmPipelineType::WeightPreshuffleV2) ? true : false;
 
         // TODO: For now - but this should also be a test parameter
         constexpr bool TransposeC = false;
@@ -269,48 +260,6 @@ class TestCkTileGemmPipeline : public ::testing::Test
         k_batches_ = {1};
     }
 
-    template <typename GemmConfig, typename T>
-    auto shuffle_b(const ck_tile::HostTensor<T>& t)
-    {
-        assert(t.get_lengths().size() == 2);
-        int n_ = t.get_lengths()[1];
-        int k_ = t.get_lengths()[0];
-
-        if(ck_tile::is_gfx12_supported())
-        {
-            constexpr int divisor      = 2;
-            constexpr int kABK1PerLane = 8;
-            constexpr int kABK0PerLane = GemmConfig::K_Warp_Tile / divisor / kABK1PerLane;
-            ck_tile::HostTensor<T> t_view({n_ / GemmConfig::N_Warp_Tile,
-                                           GemmConfig::N_Warp_Tile,
-                                           k_ / GemmConfig::K_Warp_Tile,
-                                           kABK0PerLane,
-                                           divisor,
-                                           kABK1PerLane});
-            std::copy(t.begin(), t.end(), t_view.begin());
-            return ck_tile::reference_permute(t_view, {0, 2, 4, 1, 3, 5});
-        }
-        else
-        {
-            int divisor = 1;
-            if(ck_tile::is_gfx11_supported())
-            {
-                divisor = 1;
-            }
-            else
-            {
-                assert(is_wave32() == false);
-                divisor = GemmConfig::N_Warp_Tile == 32 ? 2 : 4;
-            }
-            ck_tile::HostTensor<T> t_view({n_ / GemmConfig::N_Warp_Tile,
-                                           GemmConfig::N_Warp_Tile,
-                                           k_ / GemmConfig::K_Warp_Tile,
-                                           divisor,
-                                           GemmConfig::K_Warp_Tile / divisor});
-            std::copy(t.begin(), t.end(), t_view.begin());
-            return ck_tile::reference_permute(t_view, {0, 2, 3, 1, 4});
-        }
-    }
     template <bool PadM = true, bool PadN = true, bool PadK = true, bool Preshuffle = false>
     void Run(const int M,
              const int N,
@@ -391,10 +340,19 @@ class TestCkTileGemmPipeline : public ::testing::Test
         ck_tile::DeviceMem b_k_n_dev_buf(b_k_n.get_element_space_size_in_bytes());
         ck_tile::DeviceMem c_m_n_dev_buf(c_m_n_dev_result.get_element_space_size_in_bytes());
 
-        ck_tile::HostTensor<BDataType> b_shuffle_host = shuffle_b<GemmConfig>(b_k_n);
-
         a_m_k_dev_buf.ToDevice(a_m_k.data());
-        b_k_n_dev_buf.ToDevice(b_shuffle_host.data());
+        ck_tile::HostTensor<BDataType> b_shuffle_host = shuffle_b<GemmConfig>(b_k_n);
+        if constexpr(std::is_same_v<BDataType, ck_tile::pk_int4_t>)
+        {
+            // Permute vector pk_i4x4 data for device implementation
+            ck_tile::HostTensor<BDataType> b_shuffle_host_dev = b_shuffle_host;
+            ck_tile::permute_vectors_i4x4_b(b_shuffle_host_dev);
+            b_k_n_dev_buf.ToDevice(b_shuffle_host_dev.data());
+        }
+        else
+        {
+            b_k_n_dev_buf.ToDevice(b_shuffle_host.data());
+        }
         c_m_n_dev_buf.SetZero();
         c_m_n_dev_result.SetZero();
 

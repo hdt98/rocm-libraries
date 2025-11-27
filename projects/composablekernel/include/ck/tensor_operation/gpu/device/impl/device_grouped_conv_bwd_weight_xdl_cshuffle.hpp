@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -23,6 +23,10 @@
 #include "ck/tensor_operation/gpu/device/impl/split_k_arg.hpp"
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_weight_xdl_cshuffle.hpp"
+#endif
 
 namespace ck {
 namespace tensor_operation {
@@ -553,6 +557,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
                 conv_ngchw_to_nhwgc_transformer.TransposeWeiStrides(e_g_k_c_xs_lengths,
                                                                     e_g_k_c_xs_strides);
 
+#if !DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
             if(split_k < 0)
             {
                 ck::index_t gemmM, gemmN;
@@ -565,6 +570,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
                                                             grid_size);
             }
             else
+#endif
             {
                 k_batch_ = split_k;
             }
@@ -934,6 +940,12 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
 
     static bool IsSupportedArgument(const Argument& arg)
     {
+#if DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
+        if(arg.k_batch_ < 0)
+        {
+            return false;
+        }
+#endif
         if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
         {
             return false;
@@ -941,6 +953,22 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
         if(!is_bf16_atomic_supported() && std::is_same_v<CDataType, ck::bhalf_t>)
         {
             return false;
+        }
+        if constexpr(is_same_v<ComputeTypeA, ck::tf32_t> || is_same_v<ComputeTypeB, ck::tf32_t>)
+        {
+            if(!is_tf32_supported())
+            {
+                return false;
+            }
+            if constexpr(!is_same_v<ComputeTypeA, ComputeTypeB>)
+            {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "ComputeDataType for A and B should be same while using TF32"
+                              << std::endl;
+                }
+                return false;
+            }
         }
         if constexpr(NDimSpatial == 1)
         {
@@ -1200,6 +1228,19 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
 
         return str.str();
     }
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    std::string GetInstanceString() const override
+    {
+        static_assert(ck_tile::reflect::HasInstanceTraits<DeviceOp>,
+                      "Specialization of instance_traits not found. Please check that a "
+                      "specialization exists in file "
+                      "ck_tile/builder/reflect/"
+                      "instance_traits_device_grouped_conv_bwd_weight_xdl_cshuffle.hpp "
+                      "for the given template parameters.");
+        return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+#endif
 
     size_t GetWorkSpaceSize(const BaseArgument* p_arg) const override
     {
