@@ -95,7 +95,7 @@ constexpr int preferredUnrolling(rocRoller::DataType typeA, rocRoller::DataType 
 }
 
 template <rocRoller::DataType typeA, rocRoller::DataType typeB>
-constexpr auto generateTileList() {
+auto generateTileList() {
     std::array<origami::config_t, possibleTileSizesCount> tileList{};
 
     for (size_t i = 0; i < possibleTileSizesCount; ++i) {
@@ -135,7 +135,7 @@ using TileListGeneratorFn = std::vector<origami::config_t>(*)();
 
 template <rocRoller::DataType A, rocRoller::DataType B>
 std::vector<origami::config_t> generateTileListWrapper() {
-    constexpr auto arr = generateTileList<A, B>();
+    auto arr = generateTileList<A, B>();
     return {arr.begin(), arr.end()};
 }
 
