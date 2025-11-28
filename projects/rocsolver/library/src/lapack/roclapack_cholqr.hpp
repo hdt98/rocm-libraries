@@ -2923,7 +2923,6 @@ rocblas_status rocsolver_cholqr_batched_argCheck(rocblas_handle handle,
 
                                                  T** const A,
                                                  const I lda,
-                                                 const Istride strideA,
 
                                                  T* const R,
                                                  const I ldr,
@@ -2935,6 +2934,7 @@ rocblas_status rocsolver_cholqr_batched_argCheck(rocblas_handle handle,
                                                  I* const info,
                                                  const I batch_count)
 {
+    Istride const strideA = lda * n;
     return (rocsolver_cholqr_general_batched_argCheck<T, I>(handle, m, n,
 
                                                             A, lda, strideA,
@@ -2951,7 +2951,6 @@ rocblas_status rocsolver_cholqr_argCheck(rocblas_handle handle,
 
                                          T* const A,
                                          const I lda,
-                                         const Istride strideA,
 
                                          T* const R,
                                          const I ldr,
@@ -2963,6 +2962,8 @@ rocblas_status rocsolver_cholqr_argCheck(rocblas_handle handle,
                                          I* const info)
 {
     I const batch_count = 1;
+    Istride const strideA = lda * n;
+
     return (rocsolver_cholqr_strided_batched_argCheck(handle, m, n,
 
                                                       A, lda, strideA,
