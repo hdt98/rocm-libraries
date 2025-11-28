@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2020 Advanced Micro Devices, Inc.
+ * Copyright (c) 2020-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,8 +28,7 @@
 #include <miopen/db.hpp>
 #include <miopen/db_record.hpp>
 
-#include <boost/optional.hpp>
-
+#include <optional>
 #include <chrono>
 #include <map>
 #include <string>
@@ -76,10 +75,10 @@ public:
         return GetCached(db_kind_, path, is_system);
     }
 
-    boost::optional<DbRecord> FindRecord(const std::string& problem);
+    std::optional<DbRecord> FindRecord(const std::string& problem);
 
     template <class TProblem>
-    boost::optional<DbRecord> FindRecord(const TProblem& problem)
+    std::optional<DbRecord> FindRecord(const TProblem& problem)
     {
         const auto key = DbRecord::SerializeKey(db_kind, problem);
         return FindRecord(key);
@@ -114,7 +113,7 @@ public:
     }
 
     template <class T, class V>
-    inline boost::optional<DbRecord>
+    inline std::optional<DbRecord>
     Update(const T& problem_config, const std::string& id, const V& values)
     {
         DbRecord record(db_kind, problem_config);
@@ -123,7 +122,7 @@ public:
         if(ok)
             return record;
         else
-            return boost::none;
+            return std::nullopt;
     }
 
 private:
@@ -136,7 +135,7 @@ private:
     ramdb_clock::time_point file_read_time;
     std::map<std::string, CacheItem> cache;
 
-    boost::optional<miopen::DbRecord> FindRecordUnsafe(const std::string& problem);
+    std::optional<miopen::DbRecord> FindRecordUnsafe(const std::string& problem);
 
     bool ValidateUnsafe();
     void Prefetch();

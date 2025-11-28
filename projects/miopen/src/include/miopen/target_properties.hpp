@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2020 Advanced Micro Devices, Inc.
+ * Copyright (c) 2020-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,7 @@
 #ifndef GUARD_TARGET_PROPERTIES_HPP
 #define GUARD_TARGET_PROPERTIES_HPP
 
-#include <boost/optional.hpp>
+#include <optional>
 #include <string>
 
 #define WORKAROUND_ISSUE_3001 1
@@ -41,9 +41,9 @@ struct TargetProperties
 
     virtual const std::string& Name() const { return name; }
     const std::string& DbId() const { return dbId; }
-    virtual boost::optional<bool> Xnack() const { return xnack; }
-    boost::optional<bool> Sramecc() const { return sramecc; }
-    boost::optional<bool> SrameccReported() const { return sramecc_reported; }
+    virtual std::optional<bool> Xnack() const { return xnack; }
+    std::optional<bool> Sramecc() const { return sramecc; }
+    std::optional<bool> SrameccReported() const { return sramecc_reported; }
     static std::size_t GetMaxWaveScratchSize() { return MaxWaveScratchSize; }
     static std::size_t GetMaxLocalMemorySize() { return MaxLocalMemorySize; }
     void Init(const Handle*);
@@ -52,9 +52,9 @@ private:
     void InitDbId();
     std::string name;
     std::string dbId;
-    boost::optional<bool> xnack            = boost::none;
-    boost::optional<bool> sramecc          = boost::none;
-    boost::optional<bool> sramecc_reported = boost::none;
+    std::optional<bool> xnack;
+    std::optional<bool> sramecc;
+    std::optional<bool> sramecc_reported;
     static const std::size_t MaxWaveScratchSize;
     static const std::size_t MaxLocalMemorySize;
 };

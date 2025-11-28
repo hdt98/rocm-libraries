@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2024 Advanced Micro Devices, Inc.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,13 +29,11 @@
 #include <ctime>
 #include <vector>
 
-#include <boost/optional.hpp>
 #include "../../driver/conv_common.hpp"
 #include <miopen/batched_transpose_sol.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/invoke_params.hpp>
 #include <miopen/invoker.hpp>
-#include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 #include "../tensor_holder.hpp"
 #include <miopen/tensor_layout.hpp>

@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -38,8 +38,7 @@
 #include <miopen/solution.hpp>
 #include <miopen/conv/solver_finders.hpp>
 
-#include <boost/optional.hpp>
-
+#include <optional>
 #include <functional>
 #include <vector>
 
@@ -70,7 +69,7 @@ namespace debug {
 // For unit tests.
 MIOPEN_EXPORT extern bool
     testing_find_db_enabled; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
-MIOPEN_EXPORT extern boost::optional<fs::path>&
+MIOPEN_EXPORT extern std::optional<fs::path>&
 testing_find_db_path_override(); /// \todo Remove when #1723 is resolved.
 
 } // namespace debug
@@ -118,10 +117,10 @@ public:
         : path(debug::testing_find_db_path_override() ? *debug::testing_find_db_path_override()
                                                       : GetUserPath(handle, path_suffix)),
 #if MIOPEN_DISABLE_USERDB
-          db(boost::optional<DbTimer<TDb>>{DbKinds::FindDb})
+          db(std::optional<DbTimer<TDb>>{DbKinds::FindDb})
 #else
           db(boost::make_optional<DbTimer<TDb>>(debug::testing_find_db_enabled &&
-                                                    !env::enabled(MIOPEN_DEBUG_DISABLE_FIND_DB),
+                                                !env::enabled(MIOPEN_DEBUG_DISABLE_FIND_DB),
                                                 DbTimer<TDb>{DbKinds::FindDb, path, false}))
 #endif
     {
@@ -187,8 +186,8 @@ public:
 private:
     fs::path path;
     fs::path installed_path;
-    boost::optional<DbTimer<TDb>> db;
-    boost::optional<DbRecord> content{boost::none};
+    std::optional<DbTimer<TDb>> db;
+    std::optional<DbRecord> content;
     bool in_sync    = false;
     bool dont_store = false; // E.g. to skip writing sub-optimal find-db records to disk.
 

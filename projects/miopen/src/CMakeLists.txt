@@ -38,24 +38,24 @@ endif()
 # 2.  How BF16 kernels (which are kind of mixed-precision now and expected to
 #     remain in the future)  perform final conversion (and rounding) of FP32
 #     to BF16 results. This affects the main functionality of the library.
-option( MIOPEN_USE_RNE_BFLOAT16 "Sets rounding scheme for bfloat16 type" ON )
-option( MIOPEN_FP8_IEEE_EXPONENT_BIAS "Sets the FP8 exponent bias to IEEE" OFF)
-option( MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
+option(MIOPEN_USE_RNE_BFLOAT16 "Sets rounding scheme for bfloat16 type" ON )
+option(MIOPEN_FP8_IEEE_EXPONENT_BIAS "Sets the FP8 exponent bias to IEEE" OFF)
+option(MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
 
-option( MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
+option(MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/miopen/config.h.in" "${PROJECT_BINARY_DIR}/include/miopen/config.h")
 
 # configure a header file to pass the CMake version settings to the source, and package the header files in the output archive
-configure_file( "${PROJECT_SOURCE_DIR}/include/miopen/version.h.in" "${PROJECT_BINARY_DIR}/include/miopen/version.h" )
+configure_file("${PROJECT_SOURCE_DIR}/include/miopen/version.h.in" "${PROJECT_BINARY_DIR}/include/miopen/version.h")
 
-message( STATUS "MIOpen_VERSION= ${MIOpen_VERSION}" )
+message(STATUS "MIOpen_VERSION= ${MIOpen_VERSION}")
 if(NOT MIOPEN_GENERATOR_IS_MULTI_CONFIG)
-    message( STATUS "CMAKE_BUILD_TYPE= ${CMAKE_BUILD_TYPE}" )
+    message(STATUS "CMAKE_BUILD_TYPE= ${CMAKE_BUILD_TYPE}" )
 endif()
 
 # This is incremented when the ABI to the library changes
-set( MIOpen_SOVERSION 1.0 )
+set(MIOpen_SOVERSION 1.0)
 
 function(add_kernels FILE_NAME VAR_PREFIX VAR_SUFFIX KERNEL_FILES)
     set(INIT_KERNELS_LIST)
@@ -67,7 +67,7 @@ function(add_kernels FILE_NAME VAR_PREFIX VAR_SUFFIX KERNEL_FILES)
         string(MAKE_C_IDENTIFIER "${KEY_NAME}" VAR_NAME)
         string(APPEND KERNELS_DECLS "extern const size_t ${VAR_PREFIX}${VAR_NAME}${VAR_SUFFIX}_SIZE;\n")
         string(APPEND KERNELS_DECLS "extern const char ${VAR_PREFIX}${VAR_NAME}${VAR_SUFFIX}[];\n")
-        list(APPEND INIT_KERNELS_LIST "    { \"${KERNEL_FILENAME}\", { ${VAR_PREFIX}${VAR_NAME}${VAR_SUFFIX}, ${VAR_PREFIX}${VAR_NAME}${VAR_SUFFIX}_SIZE } }")
+        list(APPEND INIT_KERNELS_LIST " { \"${KERNEL_FILENAME}\", { ${VAR_PREFIX}${VAR_NAME}${VAR_SUFFIX}, ${VAR_PREFIX}${VAR_NAME}${VAR_SUFFIX}_SIZE } }")
     endforeach()
     string(REPLACE ";" ",\n" INIT_KERNELS "${INIT_KERNELS_LIST}")
     configure_file(kernels/${FILE_NAME}.in ${PROJECT_BINARY_DIR}/${FILE_NAME})
@@ -952,27 +952,27 @@ endif()
 
 ############################################################
 # MIOpen depends on OpenCL
-if( MIOPEN_BACKEND STREQUAL "OpenCL")
-    MESSAGE( STATUS "MIOpen linking OpenCL: ${OPENCL_INCLUDE_DIRS}" )
-    target_include_directories(MIOpen SYSTEM PUBLIC ${OPENCL_INCLUDE_DIRS} )
-    target_link_libraries( MIOpen PUBLIC ${OPENCL_LIBRARIES} )
+if(MIOPEN_BACKEND STREQUAL "OpenCL")
+    message(STATUS "MIOpen linking OpenCL: ${OPENCL_INCLUDE_DIRS}")
+    target_include_directories(MIOpen SYSTEM PUBLIC ${OPENCL_INCLUDE_DIRS})
+    target_link_libraries(MIOpen PUBLIC ${OPENCL_LIBRARIES})
     list(APPEND PACKAGE_DEPENDS PACKAGE OpenCL)
 elseif(MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIP")
-    target_link_libraries( MIOpen PRIVATE hip::device )
-    target_link_libraries( MIOpen INTERFACE hip::host )
+    target_link_libraries(MIOpen PRIVATE hip::device)
+    target_link_libraries(MIOpen INTERFACE hip::host)
     if(MIOPEN_USE_HIPRTC)
         if(WIN32)
-            target_link_libraries( MIOpen PRIVATE hiprtc::hiprtc )
+            target_link_libraries(MIOpen PRIVATE hiprtc::hiprtc)
         else()
-            target_link_libraries( MIOpen PRIVATE hiprtc)
+            target_link_libraries(MIOpen PRIVATE hiprtc)
         endif()
     endif()
     if(ENABLE_HIP_WORKAROUNDS)
         # Workaround hip not setting its usage requirements correctly
-        target_compile_definitions( MIOpen PRIVATE -D__HIP_PLATFORM_AMD__=1 )
+        target_compile_definitions(MIOpen PRIVATE -D__HIP_PLATFORM_AMD__=1)
     endif()
     # This is helpful for the tests
-    target_link_libraries( MIOpen INTERFACE $<BUILD_INTERFACE:hip::device> )
+    target_link_libraries(MIOpen INTERFACE $<BUILD_INTERFACE:hip::device>)
     list(APPEND PACKAGE_DEPENDS PACKAGE hip)
 endif()
 

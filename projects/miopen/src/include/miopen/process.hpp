@@ -32,6 +32,7 @@
 #include <memory>
 #include <string_view>
 #include <map>
+#include <ostream>
 
 namespace miopen {
 

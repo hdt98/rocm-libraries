@@ -26,8 +26,6 @@
 
 #pragma once
 
-#include <miopen/miopen.h>
-
 #include <miopen/config.hpp>
 #include <miopen/errors.hpp>
 #include <miopen/kernel_info.hpp>
@@ -37,8 +35,6 @@
 #include <miopen/tensor.hpp>
 
 #include <nlohmann/json_fwd.hpp>
-
-#include <boost/optional.hpp>
 
 #include <optional>
 #include <unordered_map>
@@ -71,7 +67,7 @@ struct MIOPEN_INTERNALS_EXPORT Solution : miopenSolution
 
     struct RunInput
     {
-        boost::optional<TensorDescriptor> descriptor;
+        std::optional<TensorDescriptor> descriptor;
         Data_t buffer = nullptr;
 
         inline RunInput() = default;

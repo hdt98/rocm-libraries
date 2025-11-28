@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2020-2022 Advanced Micro Devices, Inc.
+ * Copyright (c) 2020-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@
 #include <miopen/general_tensor_reorder_sol.hpp>
 #include <miopen/invoker.hpp>
 #include <miopen/invoke_params.hpp>
-#include <boost/optional.hpp>
+#include <optional>
 #include <vector>
 #include <cstdlib>
 #include <ctime>
@@ -374,7 +374,7 @@ struct tensor_reorder_driver : tensor_reorder_base_driver
 
             const auto invoke_param         = reorder_invoke_param{src_dev.get(), wspace.ptr()};
             std::vector<OpKernelArg> opArgs = reorder_sol->GetKernelArg();
-            boost::optional<miopen::InvokerFactory> invoker_factory(
+            std::optional<miopen::InvokerFactory> invoker_factory(
                 [=](const std::vector<miopen::Kernel>& kernels) mutable {
                     return [=](const miopen::Handle& handle,
                                const miopen::AnyInvokeParams& primitive_param) mutable {

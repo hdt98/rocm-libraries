@@ -61,16 +61,16 @@ option( MIOPEN_TEST_PERF "" OFF )
 option( MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB "Enable the SQLite Perf DB test" OFF )
 
 if(NOT ENABLE_ASAN_PACKAGING AND MIOPEN_TEST_PERF)
-    set( CMAKE_INSTALL_TESTBINDIR "${DATA_INSTALL_DIR}/bin" )
+    set(CMAKE_INSTALL_TESTBINDIR "${DATA_INSTALL_DIR}/bin")
     set(test_perf.py ${CMAKE_INSTALL_TESTBINDIR}/test_perf.py)
     install(FILES  test_perf.py
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
         DESTINATION ${CMAKE_INSTALL_TESTBINDIR})
 
     set(MODEL_FILES)
-    file (GLOB model_src CONFIGURE_DEPENDS perf_models/*.txt)
-    foreach (src ${model_src})
-        list (APPEND MODEL_FILES ${src})
+    file(GLOB model_src CONFIGURE_DEPENDS perf_models/*.txt)
+    foreach(src ${model_src})
+        list(APPEND MODEL_FILES ${src})
     endforeach()
 
     install(FILES
@@ -83,9 +83,9 @@ if(NOT ENABLE_ASAN_PACKAGING AND MIOPEN_TEST_PERF)
 endif()
 
 set_var_to_condition(MIOPEN_TEST_WITH_MIOPENDRIVER_DEFAULT MIOPEN_BUILD_DRIVER)
-option( MIOPEN_TEST_WITH_MIOPENDRIVER "Use MIOpenDriver in tests" ${MIOPEN_TEST_WITH_MIOPENDRIVER_DEFAULT})
+option(MIOPEN_TEST_WITH_MIOPENDRIVER "Use MIOpenDriver in tests" ${MIOPEN_TEST_WITH_MIOPENDRIVER_DEFAULT})
 
-option( WORKAROUND_ISSUE_936 "" ON)
+option(WORKAROUND_ISSUE_936 "" ON)
 
 # Run the test suite to a depth limit
 #limit greater than 2 leads to prolonged testing more than 5hrs per stage.
@@ -172,10 +172,10 @@ set(MIOPEN_LIBMLIR_SUPPORTS_GFX103X_DEFAULT FALSE)
 if(MIOPEN_USE_MLIR)
     set_var_to_condition(MIOPEN_LIBMLIR_SUPPORTS_GFX103X_DEFAULT (${rocMLIR_VERSION} VERSION_GREATER_EQUAL 1))
 endif()
-option( MIOPEN_LIBMLIR_SUPPORTS_GFX103X "libMLIR capability to support GFX10. Enables MLIR tests on GFX103X." ${MIOPEN_LIBMLIR_SUPPORTS_GFX103X_DEFAULT})
+option(MIOPEN_LIBMLIR_SUPPORTS_GFX103X "libMLIR capability to support GFX10. Enables MLIR tests on GFX103X." ${MIOPEN_LIBMLIR_SUPPORTS_GFX103X_DEFAULT})
 
 set_var_to_condition(MIOPEN_TEST_MLIR_DEFAULT ${MIOPEN_USE_MLIR} AND NOT (${MIOPEN_TEST_GFX103X} AND NOT ${MIOPEN_LIBMLIR_SUPPORTS_GFX103X}))
-option( MIOPEN_TEST_MLIR "Test for MLIR compilation backend" ${MIOPEN_TEST_MLIR_DEFAULT} )
+option(MIOPEN_TEST_MLIR "Test for MLIR compilation backend" ${MIOPEN_TEST_MLIR_DEFAULT})
 
 if((NOT MIOPEN_ENABLE_SQLITE) OR (NOT MIOPEN_EMBED_DB STREQUAL ""))
     set(MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB OFF)
@@ -272,10 +272,10 @@ message(STATUS "MIOPEN_TEST_INT8 ${MIOPEN_TEST_INT8}")
 message(STATUS "MIOPEN_TEST_ALL ${MIOPEN_TEST_ALL}")
 
 set_var_to_condition(WORKAROUND_ISSUE_1187_DEFAULT MIOPEN_TEST_GFX90A AND MIOPEN_TEST_FLOAT)
-option( WORKAROUND_ISSUE_1187 "" ${WORKAROUND_ISSUE_1187_DEFAULT})
+option(WORKAROUND_ISSUE_1187 "" ${WORKAROUND_ISSUE_1187_DEFAULT})
 
 set_var_to_condition(WORKAROUND_ISSUE_1148_DEFAULT (MIOPEN_TEST_GFX103X OR MIOPEN_TEST_GFX110X) AND MIOPEN_TEST_FLOAT)
-option( WORKAROUND_ISSUE_1148 "" ${WORKAROUND_ISSUE_1148_DEFAULT})
+option(WORKAROUND_ISSUE_1148 "" ${WORKAROUND_ISSUE_1148_DEFAULT})
 
 if(MIOPEN_TEST_INT8)
     set(SKIP_ALL_EXCEPT_TESTS
@@ -408,11 +408,11 @@ function(add_test_executable TEST_NAME)
     endif()
     # Need to add hipblaslt since static builds of MIOpen require hipBLASLt linkage
     if(hipblaslt_FOUND)
-        target_link_libraries( ${TEST_NAME} roc::hipblaslt )
+        target_link_libraries(${TEST_NAME} roc::hipblaslt)
     endif()
     # Need to add rocBLAS since static builds of MIOpen require rocBLAS linkage
     if(rocblas_FOUND)
-        target_link_libraries( ${TEST_NAME} $<BUILD_INTERFACE:roc::rocblas> )
+        target_link_libraries(${TEST_NAME} $<BUILD_INTERFACE:roc::rocblas>)
     endif()
 endfunction()
 
@@ -851,7 +851,7 @@ add_custom_test(conv_transposed_wrw_find_2
     COMMAND $<TARGET_FILE:test_conv2d_find2> ${TEST_CONV_VERBOSE_W} --input 64 64  28 28 --weights 64  64  1 1 --pads_strides_dilations 0 0 1 1 1 1 --cmode transpose ${MIOPEN_TEST_FLAGS_ARGS}
 )
 
-#Dont install the tests if we are building each test separately
+#Don't install the tests if we are building each test separately
 #When the tests are built as a single unit, then we want to be
 #able to package them
 set(INSTALL_GTEST OFF)

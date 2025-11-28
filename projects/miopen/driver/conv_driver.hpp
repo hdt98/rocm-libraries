@@ -45,7 +45,6 @@
 #include <miopen/execution_context.hpp>
 #include <miopen/find_controls.hpp>
 #include <miopen/logger.hpp>
-#include <miopen/miopen.h>
 #include <miopen/conv/solvers.hpp>
 #include <miopen/tensor.hpp>
 
@@ -55,9 +54,7 @@
 #include "../test/tensor_holder.hpp"
 #include "../test/verify.hpp"
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional_io.hpp>
-#include <boost/range/adaptors.hpp>
+//#include <boost/range/adaptors.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -69,6 +66,7 @@
 #include <sstream>
 #include <type_traits>
 #include <vector>
+#include <optional>
 
 // Declare hidden function for MIGraphX to smoke test it.
 extern "C" MIOPEN_EXPORT miopenStatus_t

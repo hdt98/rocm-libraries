@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,12 +27,10 @@
 #ifndef MIOPEN_GUARD_MLOPEN_CONV_SOLUTION_HPP
 #define MIOPEN_GUARD_MLOPEN_CONV_SOLUTION_HPP
 
-#include <miopen/miopen.h>
 #include <miopen/kernel_info.hpp>
 #include <miopen/invoker.hpp>
 
-#include <boost/optional.hpp>
-
+#include <optional>
 #include <string>
 #include <vector>
 #include <ostream>
@@ -53,7 +51,7 @@ struct ConvSolution
     std::vector<KernelInfo> construction_params; // impl may consist of multiple kernels.
     miopenStatus_t status;
     std::string solver_id;
-    boost::optional<InvokerFactory> invoker_factory;
+    std::optional<InvokerFactory> invoker_factory;
 
     size_t workspace_sz;
     int grp_tile1;       // total number ALUs per group
@@ -69,7 +67,7 @@ struct ConvSolution
     ConvSolution(miopenStatus_t status_ = miopenStatusSuccess)
         : status(status_),
           solver_id("<unknown>"),
-          invoker_factory(boost::none),
+          invoker_factory(std::nullopt),
           workspace_sz(0),
           grp_tile1(-1),
           grp_tile0(-1),

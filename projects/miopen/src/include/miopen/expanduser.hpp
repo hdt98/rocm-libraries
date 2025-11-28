@@ -28,7 +28,6 @@
 
 #include <miopen/config.hpp>
 #include <miopen/filesystem.hpp>
-#include <string>
 
 namespace miopen {
 

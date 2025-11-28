@@ -26,15 +26,13 @@
 
 #include <miopen/find_controls.hpp>
 
-#include <miopen/miopen.h>
 #include <miopen/logger.hpp>
 #include <miopen/env.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/solver_id.hpp>
 #include <miopen/stringutils.hpp>
 
-#include <boost/optional.hpp>
-
+#include <optional>
 #include <ostream>
 #include <cstdlib>
 #include <cstring>
@@ -114,7 +112,7 @@ FindEnforceAction GetFindEnforceActionImpl()
     return FindEnforceAction::Default_;
 }
 
-boost::optional<std::vector<solver::Id>> GetEnvFindOnlySolverImpl()
+std::optional<std::vector<solver::Id>> GetEnvFindOnlySolverImpl()
 {
     static_assert(miopen::solver::Id::invalid_value == 0, "miopen::solver::Id::invalid_value == 0");
     const auto slv_str = env::value(MIOPEN_DEBUG_FIND_ONLY_SOLVER);
@@ -170,10 +168,10 @@ std::ostream& operator<<(std::ostream& os, const FindEnforce& val)
     return os << ToCString(val.action) << '(' << static_cast<int>(val.action) << ')';
 }
 
-boost::optional<std::vector<solver::Id>> GetEnvFindOnlySolver()
+std::optional<std::vector<solver::Id>> GetEnvFindOnlySolver()
 {
     if(miopen::debug::IsWarmupOngoing)
-        return boost::none;
+        return std::nullopt;
     static const auto once = GetEnvFindOnlySolverImpl();
     return once;
 }
