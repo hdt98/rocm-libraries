@@ -13,6 +13,23 @@
 
 #include "utils/constexpr_data_processing.hpp"
 
+template <typename OpNeedle, typename OpHaystack>
+int FindInVector(const OpNeedle& opNeedle, const std::vector<OpHaystack>& haystack)
+{
+    int foundCount    = 0;
+    auto needleString = opNeedle->GetInstanceString();
+    for(auto&& h : haystack)
+    {
+        auto haystackString = h->GetInstanceString();
+        if(needleString == haystackString)
+        {
+            foundCount++;
+        }
+    }
+
+    return foundCount;
+}
+
 namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 
@@ -155,7 +172,7 @@ struct Signature
     int spatial_dim = 2;
     // TODO: This direction should be OK as default, but the factory fails.
     ckb::ConvDirection direction = ckb::ConvDirection::FORWARD;
-    ckb::GroupConvLayout layout  = ckb::GroupConvLayout2D::GNHWC_GKYXC_GNHWK;
+    ckb::GroupConvLayout layout  = ckb::GroupConvLayout2D::NGCHW_GKCYX_NGKHW;
     ckb::DataType data_type      = ckb::DataType::FP16;
 };
 
@@ -165,9 +182,9 @@ struct KernelArguments
     DefaultAlgorithm Algorithm;
 };
 
-using InLayout                             = ck::tensor_layout::convolution::NDHWGC;
-using WeiLayout                            = ck::tensor_layout::convolution::GKZYXC;
-using OutLayout                            = ck::tensor_layout::convolution::NDHWGK;
+using InLayout                             = ck::tensor_layout::convolution::NGCHW;
+using WeiLayout                            = ck::tensor_layout::convolution::GKCYX;
+using OutLayout                            = ck::tensor_layout::convolution::NGKHW;
 using PassThrough                          = ck::tensor_operation::element_wise::PassThrough;
 static constexpr ck::index_t NumDimSpatial = 2;
 
@@ -212,13 +229,13 @@ int main()
     // Verify that the algorithm conforms to the algorithm concept
     static_assert(ckb::ConvAlgorithmDescriptor<DefaultAlgorithm>);
 
-    // Specify the algorithm in a constexpr value
-    static constexpr const DefaultAlgorithm kAlgorithm;
-
     // TODO: Verify the algorithm value is valid.
 
-    constexpr std::array<int, 5> sizes{256, 128, 64, 32};
-    constexpr std::array<int, 1> xdl_per_wave{4};
+    constexpr std::array sizes = {
+        256,
+        /* 128, 64, 32 */
+    };
+    constexpr std::array xdl_per_wave = {1};
 
     constexpr auto algorithms = map_array(sizes, [](int size) {
         DefaultAlgorithm algorithm;
@@ -263,20 +280,64 @@ int main()
 
     std::cout << std::endl;
 
-    /*
+    // /*
     std::vector<std::unique_ptr<BaseOperator>> kernels{};
     build_kernels<BuilderParameters, parameters.size(), parameters>(kernels);
 
     for(auto&& kernel : kernels)
     {
-        std::cout << "    - " << kernel->GetInstanceString() << std::endl;
+        // std::cout << kernel->GetInstanceString() << std::endl;
     }
 
     std::cout << std::endl << "Kernel count: " << kernels.size() << std::endl;
     // */
 
+    // /*
     auto instances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
-    std::cout << std::endl << "Pre-built instance count: " << instances.size() << std:: endl;
+    std::cout << std::endl << "Pre-built instance count: " << instances.size() << std::endl;
+    // */
 
+    /*
+    using Empty_Tuple = ck::Tuple<>;
+    using GNHWC       = ck::tensor_layout::convolution::GNHWC;
+    using GKYXC       = ck::tensor_layout::convolution::GKYXC;
+    using GNHWK       = ck::tensor_layout::convolution::GNHWK;
+    using F32         = float;
+    using PassThrough = ck::tensor_operation::element_wise::PassThrough;
+
+    std::vector<
+        std::unique_ptr<ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<2,
+                                                                                      GNHWC,
+                                                                                      GKYXC,
+                                                                                      Empty_Tuple,
+                                                                                      GNHWK,
+                                                                                      F32,
+                                                                                      F32,
+                                                                                      Empty_Tuple,
+                                                                                      F32,
+                                                                                      PassThrough,
+                                                                                      PassThrough,
+                                                                                      PassThrough>>>
+        instances{};
+
+    ck::tensor_operation::device::instance::
+        add_device_grouped_conv2d_fwd_xdl_gnhwc_gkyxc_gnhwk_f32_instances(instances);
+    std::cout << std::endl << "Precompiled instance count: " << instances.size() << std::endl;
+
+    // */
+
+    /*
+    for(auto&& myInstance : kernels)
+    {
+        auto count = FindInVector(myInstance, instances);
+        std::cout << myInstance->GetInstanceString() << std::endl
+                  << "\toccurs: " << count << std::endl;
+    }
+                  */
+
+    for(auto&& instance : instances)
+    {
+        // std::cout << instance->GetInstanceString() << std::endl;
+    }
     return 0;
 }

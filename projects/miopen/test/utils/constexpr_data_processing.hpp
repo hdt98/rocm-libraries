@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include <array>
+
 template <typename T, std::size_t N, std::size_t ShardCount, std::size_t ShardIndex>
-consteval std::array<T, ((N - ShardIndex - 1) / ShardCount) + 1>
+constexpr std::array<T, ((N - ShardIndex - 1) / ShardCount) + 1>
 shard_array(const std::array<T, N>& arr)
 {
     std::array<T, ((N - ShardIndex - 1) / ShardCount) + 1> shard{};
