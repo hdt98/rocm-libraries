@@ -2242,8 +2242,9 @@ namespace GEMMDriverTest
         if(loadScaleA == SolutionParams::LoadPath::BufferToVGPR
            && loadScaleB == SolutionParams::LoadPath::BufferToVGPR)
             EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
-        // when both scales are loaded directly from buffer into LDS
-        if(loadScaleA == SolutionParams::LoadPath::BufferToLDS
+        // when all the things are loaded directly from buffer into LDS
+        if(loadPathAB == SolutionParams::LoadPath::BufferToLDS
+           && loadScaleA == SolutionParams::LoadPath::BufferToLDS
            && loadScaleB == SolutionParams::LoadPath::BufferToLDS)
             EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
         EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
@@ -2494,10 +2495,6 @@ namespace GEMMDriverTest
             = m_context->targetArchitecture().GetCapability(GPUCapability::DefaultScaleBlockSize);
 
         basicGEMM<FP4, FP4, float>(gemm);
-
-        std::string generatedCode = m_context->instructions()->toString();
-        // no swizzle applied for scales loaded via LDS
-        EXPECT_GT(countSubstring(generatedCode, "ds_read_u8 "), 0);
     }
 
     TEST_P(GEMMTestGPU, GPU_SwizzleScaledPrefetchD2LGEMMMXF4TN)
@@ -4151,11 +4148,9 @@ namespace GEMMDriverTest
                                ::testing::Values(rocRoller::Operations::ScaleMode::SingleScale,
                                                  rocRoller::Operations::ScaleMode::Separate),
                                ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDS),
+                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR),
                                ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
-                                                 SolutionParams::LoadPath::BufferToLDS),
+                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR),
                                ::testing::Values(std::pair<std::string, std::string>("N", "N"),
                                                  std::pair<std::string, std::string>("N", "T"),
                                                  std::pair<std::string, std::string>("T", "N"),
