@@ -46,7 +46,7 @@ rocblas_status rocsolver_cholqr1_impl(rocblas_handle handle,
 
     // argument checking
     {
-        auto const istat = rocsolver_cholqr1_argCheck(handle, m, n, lda, ldr);
+        auto const istat = rocsolver_cholqr1_argCheck(handle, m, n, lda, ldr, A, R);
         bool const isok = (istat == rocblas_status_continue) || (istat == rocblas_status_success);
         if(!isok)
         {

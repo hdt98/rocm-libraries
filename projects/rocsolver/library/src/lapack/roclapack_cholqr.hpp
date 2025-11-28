@@ -922,16 +922,16 @@ rocblas_status rocsolver_potrf_template_alt(rocblas_handle handle,
 // assume nx <= warpsize
 // to use DPP instructions
 template <typename T, typename I, typename Istride, typename UA, typename S = decltype(std::real(T{}))>
-static __device__ void cal_gnorm_kernel(I const m,
-                                        I const n,
-                                        I const batch_count,
+static __global__ void cal_gnorm_sq_kernel(I const m,
+                                           I const n,
+                                           I const batch_count,
 
-                                        UA A,
-                                        Istride const shiftA,
-                                        I const lda,
-                                        Istride const strideA,
+                                           UA A,
+                                           Istride const shiftA,
+                                           I const lda,
+                                           Istride const strideA,
 
-                                        S* const gnorm_array)
+                                           S* const gnorm_array)
 {
     {
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1) && (gnorm_array != nullptr);
@@ -972,7 +972,8 @@ static __device__ void cal_gnorm_kernel(I const m,
     I const bid_start = ibz;
     I const bid_inc = nbz;
 
-    __shared__ S gnorm_block;
+    extern __shared__ double lmem[];
+    double* const gnorm_block = (double*)&(lmem[0]);
 
     for(I bid = bid_start; bid < batch_count; bid += bid_inc)
     {
@@ -991,10 +992,16 @@ static __device__ void cal_gnorm_kernel(I const m,
             I const jcol_start = txyz + iby * nxyz;
             I const jcol_inc = nxyz * nby;
 
-            S gnorm_j = 0;
+            if(txyz == 0)
+            {
+                gnorm_block[0] = 0;
+            };
+            __syncthreads();
+
+            double gnorm_j = 0;
             for(I jcol = jcol_start; jcol < n; jcol += jcol_inc)
             {
-                S norm_j = 0;
+                double norm_j = 0;
                 for(I i = 0; i < m; i++)
                 {
                     auto const ij = idx2D(i, jcol, lda);
@@ -1003,20 +1010,36 @@ static __device__ void cal_gnorm_kernel(I const m,
                 }
                 gnorm_j = std::max(gnorm_j, norm_j);
             }
-            atomicMax(gnorm_bid, gnorm_j);
+            atomicMax(&(gnorm_block[0]), gnorm_j);
+            __syncthreads();
+
+            if(txyz == 0)
+            {
+                atomicMax(gnorm_bid, static_cast<S>(gnorm_block[0]));
+            }
         }
         else
         {
-            if((tx == 0) && (ty == 0))
+            // ----------------------------------------
+            // all threads in x-dimension of the block work together
+            // to compute the norm of j-th column, which is sum(  A(:,j).^2 )
+            // ----------------------------------------
+
+            // -----------------------------------------
+            // (1) compute max column norm in warp as  gnorm_j
+            // (2) compute max column norm in block as gnorm_block
+            // (3) compute max column norm of matrix[bid] in batch as gnorm_bid
+            // -----------------------------------------
+            if((tx == 0) && (ty == 0) && (tz == 0))
             {
-                gnorm_block = 0;
+                gnorm_block[0] = 0;
             }
             __syncthreads();
 
-            S gnorm_j = 0;
+            double gnorm_j = 0;
             for(I j = j_start; j < n; j += j_inc)
             {
-                S norm_j = 0;
+                double norm_j = 0;
                 for(I i = i_start; i < m; i += i_inc)
                 {
                     auto const ij = idx2D(i, j, lda);
@@ -1025,43 +1048,46 @@ static __device__ void cal_gnorm_kernel(I const m,
                     norm_j += std::norm(aij);
                 }
 
-                // only tx == 0 has the correct value
+                // ----------------------------------------
+                // note: only tx == 0 has the correct value
+                // ----------------------------------------
                 norm_j = reduce_sum_shfl_wsize(nx, norm_j);
                 if(tx == 0)
                 {
                     gnorm_j = std::max(gnorm_j, norm_j);
                 }
             } // end for j
+
             if(tx == 0)
             {
-                atomicMax(&gnorm_block, gnorm_j);
+                atomicMax(&(gnorm_block[0]), gnorm_j);
             }
             __syncthreads();
 
-            if((tx == 0) && (ty == 0))
+            if((tx == 0) && (ty == 0) && (tz == 0))
             {
-                atomicMax(gnorm_bid, gnorm_block);
+                atomicMax(gnorm_bid, static_cast<S>(gnorm_block[0]));
             }
         }
     } // end for bid
 }
 
 // ----------------------------------------
-// compute the gnorm of matrix,
+// compute the square gnorm of matrix,
 // which is    max_j  norm( A(:,j), 2 )^2
 // ----------------------------------------
 template <typename T, typename I, typename Istride, typename UA, typename S = decltype(std::real(T{}))>
-static void cal_gnorm(hipStream_t stream,
-                      I const m,
-                      I const n,
-                      I const batch_count,
+static void cal_gnorm_sq(hipStream_t stream,
+                         I const m,
+                         I const n,
+                         I const batch_count,
 
-                      UA A,
-                      Istride const shiftA,
-                      I const lda,
-                      Istride const strideA,
+                         UA A,
+                         Istride const shiftA,
+                         I const lda,
+                         Istride const strideA,
 
-                      S* const gnorm_array)
+                         S* const gnorm_array)
 {
     {
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
@@ -1087,16 +1113,17 @@ static void cal_gnorm(hipStream_t stream,
     I const lds_size = sizeof(S);
 
     I const max_threads = 1024;
-    I const nx = warp_size; // note nx <= warp_size is necessary for correctness
+    I const nx = warp_size; // !!! note nx <= warp_size is necessary
+        // for correctness in using DPP instructions
     I const ny = max_threads / nx;
     I const nz = 1;
 
     I const max_blocks = num_cu;
-    I const nbx = 1; // note nbx == 1 is necessary for corretness
+    I const nbx = 1; // !!! note nbx == 1 is necessary for correctness
     I const nby = std::min(max_blocks, ceil(n, ny));
     I const nbz = std::min(max_blocks, batch_count);
 
-    cal_gnorm_kernel<T, I, Istride>
+    cal_gnorm_sq_kernel<T, I, Istride>
         <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz), lds_size, stream>>>(m, n, batch_count,
 
                                                                       A, shiftA, lda, strideA,
@@ -1108,7 +1135,7 @@ static void cal_gnorm(hipStream_t stream,
 // scale an array
 // launch as dim3(nbx,1,1), dim3(nx,1,1)
 // -------------------------------------
-template <typename S, typename I, typename Istride>
+template <typename S, typename I>
 static __global__ void scale_kernel(I const batch_count, S const dscale, S* const gnorm_array)
 {
     I const bid_start = threadIdx.x + blockIdx.x * blockDim.x;
@@ -1159,12 +1186,12 @@ static rocblas_status cal_sigma(hipStream_t stream,
     // compute square of gnorm
     // reuse sigma_array
     // -----------------
-    auto const gnorm_array = sigma_array;
-    cal_gnorm<T, I, Istride>(stream, m, n, batch_count,
+    S* const gnorm_array = sigma_array;
+    cal_gnorm_sq<T, I, Istride>(stream, m, n, batch_count,
 
-                             A, shiftA, lda, strideA,
+                                A, shiftA, lda, strideA,
 
-                             gnorm_array);
+                                gnorm_array);
 
     auto ceil = [](auto n, auto base) { return ((n - 1) / base + 1); };
 
@@ -1205,6 +1232,9 @@ static __global__ void add_shift_kernel(I const m,
 )
 {
     {
+        // -------------------------------------------------
+        // note: sigma_array == nullptr  treated as no shift
+        // -------------------------------------------------
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1) && (sigma_array != nullptr);
         if(!has_work)
         {
@@ -1244,7 +1274,7 @@ static __global__ void add_shift_kernel(I const m,
                 Bp[ij] += sigma;
             }
         }
-    }
+    } // end for bid
 }
 
 // --------------------------------------------
@@ -1278,7 +1308,7 @@ static void add_shift(hipStream_t stream,
     I const ny = 1;
     I const nz = 1;
 
-    I const max_blocks = 64 * 1024 - 1;
+    I const max_blocks = get_num_cu();
     I const min_mn = std::min(m, n);
 
     I const nbx = std::min(max_blocks, ceil(min_mn, nx));
@@ -1389,14 +1419,6 @@ static void set_triangular(hipStream_t stream,
                                                                                batch_count);
 }
 
-template <typename I>
-rocblas_status
-    rocsolver_cholqr1_argCheck(rocblas_handle handle, I const m, I const n, I const lda, I const ldr)
-{
-    bool const isok = (m >= 0) && (n >= 0) && (lda >= m) && (ldr >= n);
-    return (isok ? rocblas_status_continue : rocblas_status_invalid_value);
-}
-
 template <typename T, typename I>
 rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
 
@@ -1423,6 +1445,19 @@ rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
     }
 
     return (rocblas_status_continue);
+}
+
+template <typename I, typename UA, typename UR>
+rocblas_status rocsolver_cholqr1_argCheck(rocblas_handle handle,
+                                          I const m,
+                                          I const n,
+                                          I const lda,
+                                          I const ldr,
+                                          UA A,
+                                          UR R)
+{
+    I const batch_count = 1;
+    return (rocsolver_cholqr1_strided_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count));
 }
 
 template <typename T, typename I>
@@ -1454,17 +1489,17 @@ rocblas_status rocsolver_cholqr2_strided_batched_argCheck(rocblas_handle handle,
 }
 
 template <typename I, typename UA, typename UR>
-static rocblas_status rocsolver_cholqr_batched_argCheck(rocblas_handle handle,
+static rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
 
-                                                        I const m,
-                                                        I const n,
-                                                        I const lda,
-                                                        I const ldr,
+                                                         I const m,
+                                                         I const n,
+                                                         I const lda,
+                                                         I const ldr,
 
-                                                        UA A,
-                                                        UR R,
+                                                         UA A,
+                                                         UR R,
 
-                                                        I const batch_count)
+                                                         I const batch_count)
 {
     bool const isok_values = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_values)
@@ -1482,22 +1517,6 @@ static rocblas_status rocsolver_cholqr_batched_argCheck(rocblas_handle handle,
 }
 
 template <typename I, typename UA, typename UR>
-static rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
-
-                                                         I const m,
-                                                         I const n,
-                                                         I const lda,
-                                                         I const ldr,
-
-                                                         UA A,
-                                                         UR R,
-
-                                                         I const batch_count)
-{
-    return (rocsolver_cholqr_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count));
-}
-
-template <typename I, typename UA, typename UR>
 static rocblas_status rocsolver_cholqr2_batched_argCheck(rocblas_handle handle,
 
                                                          I const m,
@@ -1510,15 +1529,32 @@ static rocblas_status rocsolver_cholqr2_batched_argCheck(rocblas_handle handle,
 
                                                          I const batch_count)
 {
-    return (rocsolver_cholqr_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count));
+    bool const isok_values = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
+    if(!isok_values)
+    {
+        return (rocblas_status_invalid_value);
+    }
+
+    bool const isok_pointer = (A != nullptr) && (R != nullptr);
+    if(!isok_pointer)
+    {
+        return (rocblas_status_invalid_pointer);
+    }
+
+    return (rocblas_status_continue);
 }
 
-template <typename I>
-rocblas_status
-    rocsolver_cholqr2_argCheck(rocblas_handle handle, I const m, I const n, I const lda, I const ldr)
+template <typename I, typename UA, typename UR>
+rocblas_status rocsolver_cholqr2_argCheck(rocblas_handle handle,
+                                          I const m,
+                                          I const n,
+                                          I const lda,
+                                          I const ldr,
+                                          UA A,
+                                          UR R)
 {
-    bool const isok = (m >= 0) && (n >= 0) && (lda >= m) && (ldr >= n);
-    return (isok ? rocblas_status_continue : rocblas_status_invalid_value);
+    I const batch_count = 1;
+    return (rocsolver_cholqr2_strided_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count));
 }
 
 template <typename T, typename I>
@@ -2020,9 +2056,9 @@ rocblas_status rocsolver_cholqr1_template(
         // -------------------------
         if(sigma_array != nullptr)
         {
-            add_shift<T, I, Istride, decltype(B), S>(stream, m, n, batch_count, sigma_array,
+            add_shift<T, I, Istride>(stream, m, n, batch_count, sigma_array,
 
-                                                     B, shiftB, ldb, strideB);
+                                     B, shiftB, ldb, strideB);
             if(idebug >= 1)
             {
                 HIP_CHECK(hipDeviceSynchronize());
@@ -2455,8 +2491,11 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
                                           I const ldr,
                                           Istride strideR,
 
-                                          I const batch_count,
+                                          bool const compute_sigma,
+                                          S* const sigma_array,
+
                                           INFO* const info,
+                                          I const batch_count,
 
                                           void* work,
                                           size_t const size_work)
@@ -2515,6 +2554,10 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
         auto const ldq = lda;
         auto const strideQ = strideA;
 
+        // -----------
+        // allocate R1
+        // -----------
+
         I const ldr1 = n;
         Istride const strideR1 = static_cast<Istride>(ldr1) * n;
         Istride const shiftR1 = 0;
@@ -2534,45 +2577,38 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
         {
             auto const pfree_saved = pfree;
 
-            size_t size_iinfo = sizeof(INFO) * batch_count;
-            adjust_for_alignment(size_iinfo);
-
-            INFO* iinfo = (INFO*)pfree;
-            pfree += size_iinfo;
-
-            size_t size_sigma_array = sizeof(S) * batch_count;
-            adjust_for_alignment(size_sigma_array);
-
-            S* const sigma_array = (S*)pfree;
-            pfree += size_sigma_array;
-
-            MEM_CHECK_THROW(pfree);
-
             size_t const size_remain = (pwork + size_work) - pfree;
 
+            if(compute_sigma)
             {
-                istat = cal_sigma(stream, m, n, batch_count,
+                istat = cal_sigma<T, I>(stream, m, n, batch_count,
 
-                                  A, shiftA, lda, strideA,
+                                        A, shiftA, lda, strideA,
 
-                                  sigma_array, (void*)pfree, size_remain);
+                                        sigma_array, (void*)pfree, size_remain);
                 if(istat != rocblas_status_success)
                 {
                     throw(istat);
                 }
             }
 
+            // -------------------------------------------------------------------
+            // Note: paper suggests
             // T const sigma = 11 * (m * n * ueps + (n + 1) * (n * ueps)) * gnorm
+            // -------------------------------------------------------------------
 
+            // -----------------------------
+            // perform CholeskQR1 with shift
+            // -----------------------------
             istat = rocsolver_cholqr1_template<T, I, Istride>(handle,
 
                                                               m, n,
 
-                                                              Q, shiftQ, ldq, strideQ,
+                                                              A, shiftA, lda, strideA,
 
                                                               R1, shiftR1, ldr1, strideR1,
 
-                                                              batch_count, iinfo,
+                                                              batch_count, info,
 
                                                               (void*)pfree, size_remain, sigma_array);
 
@@ -2591,6 +2627,14 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
         {
             auto const pfree_saved = pfree;
 
+            size_t size_iinfo = sizeof(INFO) * batch_count;
+            adjust_for_alignment(size_iinfo);
+
+            INFO* iinfo = (INFO*)pfree;
+            pfree += size_iinfo;
+
+            MEM_CHECK_THROW(pfree);
+
             size_t const size_remain = (pwork + size_work) - pfree;
 
             istat = rocsolver_cholqr2_template<T, I, Istride>(handle, m, n,
@@ -2599,7 +2643,7 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
 
                                                               R, shiftR, ldr, strideR,
 
-                                                              batch_count, info,
+                                                              batch_count, iinfo,
 
                                                               (void*)pfree, size_remain);
 
@@ -2620,8 +2664,8 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
             // (i)  set strictly lower triangular part of R be zero
             // ----------------------------------------------------
 
-            char uplo = 'L';
-            T alpha = 0;
+            char const uplo = 'L';
+            T const alpha = 0;
             set_triangular(stream, uplo, n, n, alpha,
 
                            R, shiftR, ldr, strideR,
@@ -2637,14 +2681,6 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
 
             auto const pfree_saved = pfree;
 
-            rocblas_side const side = rocblas_side_right;
-            rocblas_fill const uplo = rocblas_fill_upper;
-            rocblas_operation const trans1 = rocblas_operation_none;
-            rocblas_diagonal const diag = rocblas_diagonal_non_unit;
-            I const mm = n;
-            I const nn = n;
-            T alpha = 1;
-
             size_t size_workArr = sizeof(T*) * batch_count;
             adjust_for_alignment(size_workArr);
 
@@ -2652,6 +2688,14 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
             pfree += size_workArr;
 
             MEM_CHECK_THROW(pfree);
+
+            rocblas_side const side = rocblas_side_right;
+            rocblas_fill const uplo = rocblas_fill_upper;
+            rocblas_operation const trans1 = rocblas_operation_none;
+            rocblas_diagonal const diag = rocblas_diagonal_non_unit;
+            I const mm = n;
+            I const nn = n;
+            T alpha = 1;
 
             Istride const stride_alpha = 0;
 
@@ -2679,14 +2723,354 @@ rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
             pfree = pfree_saved;
         }
 
+        // Finally
+
         rocblas_set_pointer_mode(handle, old_mode);
         return (istat);
     }
-    catch(rocblas_status istat)
+    catch(rocblas_status const istat)
     {
         rocblas_set_pointer_mode(handle, old_mode);
         return (istat);
     }
+}
+
+template <typename T,
+          typename I,
+          typename Istride,
+          typename UA,
+          typename UR,
+          typename INFO = I,
+          typename S = decltype(std::real(T{}))>
+rocblas_status rocsolver_cholqr_template(rocblas_handle handle,
+                                         I const m,
+                                         I const n,
+
+                                         UA A,
+                                         Istride const shiftA,
+                                         I const lda,
+                                         Istride strideA,
+
+                                         UR R,
+                                         Istride const shiftR,
+                                         I const ldr,
+                                         Istride const strideR,
+
+                                         S* const sigma_array,
+                                         rocsolver_cholqr_algo const algo,
+
+                                         INFO* const info,
+                                         I const batch_count,
+
+                                         void* work,
+                                         size_t const size_work)
+
+{
+    rocblas_status istat = rocblas_status_success;
+
+    if(algo == rocsolver_cholqr_cholqr1)
+    {
+        istat = rocsolver_cholqr1_template<T, I, Istride>(handle,
+
+                                                          m, n,
+
+                                                          A, shiftA, lda, strideA,
+
+                                                          R, shiftR, ldr, strideR,
+
+                                                          batch_count, info,
+
+                                                          work, size_work);
+    }
+    else if((algo == rocsolver_cholqr_cholqr2) || (algo == rocsolver_cholqr_default))
+    {
+        istat = rocsolver_cholqr2_template<T, I, Istride>(handle, m, n,
+
+                                                          A, shiftA, lda, strideA,
+
+                                                          R, shiftR, ldr, strideR,
+
+                                                          batch_count, info,
+
+                                                          work, size_work);
+    }
+    else if((algo == rocsolver_cholqr_cholqr3_compute) || (algo == rocsolver_cholqr_cholqr3_user))
+    {
+        bool const compute_sigma = (algo == rocsolver_cholqr_cholqr3_compute);
+
+        istat = rocsolver_cholqr3_template<T, I>(handle, m, n,
+
+                                                 A, shiftA, lda, strideA,
+
+                                                 R, shiftR, ldr, strideR,
+
+                                                 compute_sigma, sigma_array,
+
+                                                 info, batch_count,
+
+                                                 work, size_work);
+    }
+
+    return (istat);
+}
+
+template <typename T,
+          typename I,
+          typename UA,
+          typename UR,
+          typename Istride = rocblas_stride,
+          typename S = decltype(std::real(T{}))>
+rocblas_status rocsolver_cholqr_general_batched_argCheck(rocblas_handle handle,
+                                                         const I m,
+                                                         const I n,
+
+                                                         UA A,
+                                                         const I lda,
+                                                         const Istride strideA,
+
+                                                         UR R,
+                                                         const I ldr,
+                                                         const Istride strideR,
+
+                                                         S* const sigma,
+                                                         rocsolver_cholqr_algo const algo,
+
+                                                         I* const info,
+                                                         const I batch_count)
+{
+    {
+        bool const is_valid_algo = (algo == rocsolver_cholqr_cholqr1)
+            || (algo == rocsolver_cholqr_cholqr2) || (algo == rocsolver_cholqr_default)
+            || (algo == rocsolver_cholqr_cholqr3_compute) || (algo == rocsolver_cholqr_cholqr3_user);
+        if(!is_valid_algo)
+        {
+            return (rocblas_status_invalid_value);
+        }
+    }
+
+    {
+        bool const is_valid_values
+            = (m >= 0) && (n >= 0) && (lda >= m) && (ldr >= n) && (batch_count >= 0);
+        if(!is_valid_values)
+        {
+            return (rocblas_status_invalid_value);
+        }
+    }
+
+    {
+        bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+        if(has_work)
+        {
+            bool const is_valid_pointers = (A != nullptr) && (R != nullptr);
+            if(!is_valid_pointers)
+            {
+                return (rocblas_status_invalid_pointer);
+            }
+        }
+    }
+
+    // -----------------
+    // check sigma array
+    // -----------------
+    {
+        bool const is_cholqr3
+            = (algo == rocsolver_cholqr_cholqr3_compute) || (algo == rocsolver_cholqr_cholqr3_user);
+        if(is_cholqr3)
+        {
+            bool const is_valid_pointer = (sigma != nullptr);
+            if(!is_valid_pointer)
+            {
+                return (rocblas_status_invalid_pointer);
+            }
+        }
+    }
+
+    return (rocblas_status_continue);
+}
+
+template <typename T, typename I, typename Istride = rocblas_stride, typename S = decltype(std::real(T{}))>
+rocblas_status rocsolver_cholqr_strided_batched_argCheck(rocblas_handle handle,
+                                                         const I m,
+                                                         const I n,
+
+                                                         T* const A,
+                                                         const I lda,
+                                                         const Istride strideA,
+
+                                                         T* const R,
+                                                         const I ldr,
+                                                         const Istride strideR,
+
+                                                         S* const sigma,
+                                                         rocsolver_cholqr_algo const algo,
+
+                                                         I* const info,
+                                                         const I batch_count)
+{
+    return (rocsolver_cholqr_general_batched_argCheck<T, I>(handle, m, n,
+
+                                                            A, lda, strideA,
+
+                                                            R, ldr, strideR,
+
+                                                            sigma, algo, info, batch_count));
+}
+
+template <typename T, typename I, typename Istride = rocblas_stride, typename S = decltype(std::real(T{}))>
+rocblas_status rocsolver_cholqr_batched_argCheck(rocblas_handle handle,
+                                                 const I m,
+                                                 const I n,
+
+                                                 T** const A,
+                                                 const I lda,
+                                                 const Istride strideA,
+
+                                                 T* const R,
+                                                 const I ldr,
+                                                 const Istride strideR,
+
+                                                 S* const sigma,
+                                                 rocsolver_cholqr_algo const algo,
+
+                                                 I* const info,
+                                                 const I batch_count)
+{
+    return (rocsolver_cholqr_general_batched_argCheck<T, I>(handle, m, n,
+
+                                                            A, lda, strideA,
+
+                                                            R, ldr, strideR,
+
+                                                            sigma, algo, info, batch_count));
+}
+
+template <typename T, typename I, typename Istride = rocblas_stride, typename S = decltype(std::real(T{}))>
+rocblas_status rocsolver_cholqr_argCheck(rocblas_handle handle,
+                                         const I m,
+                                         const I n,
+
+                                         T* const A,
+                                         const I lda,
+                                         const Istride strideA,
+
+                                         T* const R,
+                                         const I ldr,
+                                         const Istride strideR,
+
+                                         S* const sigma,
+                                         rocsolver_cholqr_algo const algo,
+
+                                         I* const info)
+{
+    I const batch_count = 1;
+    return (rocsolver_cholqr_strided_batched_argCheck(handle, m, n,
+
+                                                      A, lda, strideA,
+
+                                                      R, ldr, strideR,
+
+                                                      sigma, algo, info, batch_count));
+}
+
+template <typename T, typename I>
+static rocblas_status
+    rocsolver_cholqr3_getMemorySize(I const m, I const n, I const batch_count, size_t* p_size_work)
+{
+    size_t size_work = 0;
+    *p_size_work = 0;
+    {
+        bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+        if(!has_work)
+        {
+            return (rocblas_status_success);
+        }
+    }
+
+    size_t size_R1 = 0;
+    {
+        I const ldr = n;
+        size_R1 = sizeof(T) * ldr * n * batch_count;
+        adjust_for_alignment(size_R1);
+    }
+    size_work += size_R1;
+
+    size_t size_iinfo = 0;
+    {
+        size_iinfo = sizeof(I) * batch_count;
+        adjust_for_alignment(size_iinfo);
+    }
+
+    size_work += size_iinfo;
+
+    size_t size_cholqr1 = 0;
+
+    {
+        auto const istat = rocsolver_cholqr1_getMemorySize<T, I>(m, n, batch_count, &size_cholqr1);
+        if(istat != rocblas_status_success)
+        {
+            return (istat);
+        }
+
+        adjust_for_alignment(size_cholqr1);
+    }
+
+    size_t size_cholqr2 = 0;
+    {
+        auto const istat = rocsolver_cholqr2_getMemorySize<T, I>(m, n, batch_count, &size_cholqr2);
+        if(istat != rocblas_status_success)
+        {
+            return (istat);
+        }
+
+        adjust_for_alignment(size_cholqr2);
+    }
+
+    size_t size_trmm = 0;
+    {
+        size_trmm = sizeof(T*) * batch_count;
+        adjust_for_alignment(size_trmm);
+    }
+
+    size_work += std::max(std::max(size_trmm, size_cholqr1), size_cholqr2);
+
+    *p_size_work = size_work;
+    return (rocblas_status_success);
+}
+
+template <typename T, typename I>
+static rocblas_status rocsolver_cholqr_getMemorySize(I const m,
+                                                     I const n,
+                                                     I const batch_count,
+                                                     rocsolver_cholqr_algo const algo,
+                                                     size_t* p_size_work)
+{
+    size_t size_work = 0;
+    *p_size_work = 0;
+
+    {
+        bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+        if(!has_work)
+        {
+            return (rocblas_status_success);
+        }
+    }
+
+    rocblas_status istat = rocblas_status_success;
+    if(algo == rocsolver_cholqr_cholqr1)
+    {
+        istat = rocsolver_cholqr1_getMemorySize<T, I>(m, n, batch_count, &size_work);
+    }
+    else if((algo == rocsolver_cholqr_cholqr2) || (algo == rocsolver_cholqr_default))
+    {
+        istat = rocsolver_cholqr2_getMemorySize<T, I>(m, n, batch_count, &size_work);
+    }
+    else if((algo == rocsolver_cholqr_cholqr3_compute) || (algo == rocsolver_cholqr_cholqr3_user))
+    {
+        istat = rocsolver_cholqr3_getMemorySize<T, I>(m, n, batch_count, &size_work);
+    }
+
+    *p_size_work = size_work;
+    return (rocblas_status_success);
 }
 
 #undef IS_POINTER_BATCHED
