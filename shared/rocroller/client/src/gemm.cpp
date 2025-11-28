@@ -859,7 +859,8 @@ namespace rocRoller::Client::GEMMClient
             std::cout << "Solution:" << std::endl;
             std::cout << solution << std::endl;
 
-            std::cout << "Generating: " << solution.generateKernelName().shortName << "..." << std::endl;
+            std::cout << "Generating: " << solution.generateKernelName().shortName << "..."
+                      << std::endl;
 
             int reason;
             std::tie(gemm, reason) = createGEMMSolution(context, solution);
@@ -945,8 +946,8 @@ namespace rocRoller::Client::GEMMClient
                 command = kernel->command();
 
                 std::cout << "Loading kernel from: " << io.loadAsmPath << std::endl;
-                commandKernel
-                    = std::make_shared<CommandKernel>(command, solution.generateKernelName().shortName);
+                commandKernel = std::make_shared<CommandKernel>(
+                    command, solution.generateKernelName().shortName);
                 commandKernel->setContext(context);
                 commandKernel->loadKernelFromAssembly(io.loadAsmPath,
                                                       solution.generateKernelName().shortName);

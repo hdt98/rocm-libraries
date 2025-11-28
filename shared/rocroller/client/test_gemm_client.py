@@ -434,7 +434,10 @@ def scale_configurations(argument):
     for mode in modes:
         if mode is not None and mode == "Separate":
             rv.extend(
-                [Scale(argument, mode, path, None, blockSize, scaleType) for path in paths]
+                [
+                    Scale(argument, mode, path, None, blockSize, scaleType)
+                    for path in paths
+                ]
             )
         elif mode is not None and mode == "SingleScale":
             rv.extend(
@@ -714,7 +717,6 @@ def test_gemm_options(tmp_path):
     )
     assert post["loadScale_A"] == "BufferToLDS"
     assert post["loadScale_B"] == "BufferToLDS"
-
 
     # setting swizzle tile size
     post = run_and_load_example_yaml(
