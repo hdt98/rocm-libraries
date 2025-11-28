@@ -58,10 +58,10 @@ def parse_arguments() -> argparse.Namespace:
 def get_changed_files(base_ref: str, head_ref: str) -> List[str]:
     """Get list of changed files using git diff."""
     try:
-        cmd = ["git", "diff", "--name-only", f"{base_ref}...{head_ref}"]
+        cmd = ["git", "diff", "-z", "--name-only", f"{base_ref}...{head_ref}"]
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return [line for line in result.stdout.splitlines() if line.strip()]
+        return [line for line in result.stdout.split("\0") if line.strip()]
     except subprocess.CalledProcessError as e:
         logger.error(f"Git diff failed: {e.stderr}")
         sys.exit(1)

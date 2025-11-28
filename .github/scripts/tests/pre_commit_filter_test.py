@@ -93,13 +93,13 @@ class TestPreCommitFilter(unittest.TestCase):
     @patch("pre_commit_filter.subprocess.run")
     def test_get_changed_files(self, mock_run):
         mock_result = MagicMock()
-        mock_result.stdout = "file1.txt\nfile2.txt\n"
+        mock_result.stdout = "file1.txt\0file2.txt\0"
         mock_run.return_value = mock_result
 
         files = pre_commit_filter.get_changed_files("base", "head")
         self.assertEqual(files, ["file1.txt", "file2.txt"])
         mock_run.assert_called_with(
-            ["git", "diff", "--name-only", "base...head"],
+            ["git", "diff", "-z", "--name-only", "base...head"],
             capture_output=True,
             text=True,
             check=True,
