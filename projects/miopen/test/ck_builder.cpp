@@ -1,13 +1,22 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
 #include <iostream>
 
 #include <ck_tile/builder/conv_builder.hpp>
 #include <ck_tile/builder/reflect/conv_description.hpp>
 #include <ck_tile/builder/reflect/instance_traits.hpp>
 
-namespace ckb = ck_tile::builder;
+#include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_bilinear.hpp>
+#include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scale.hpp>
+#include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward.hpp"
+
+#include "utils/constexpr_data_processing.hpp"
+
+namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 
-constexpr auto types = std::array<ckb::DataType, 6> {
+constexpr auto types = std::array<ckb::DataType, 6>{
     ckb::DataType::FP32,
     ckb::DataType::FP16,
     ckb::DataType::BF16,
@@ -17,35 +26,9 @@ constexpr auto types = std::array<ckb::DataType, 6> {
 
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 
-template <typename T, std::size_t N, typename F>
-constexpr auto map_array(const std::array<T,N>& input, F&& func) {
-    using U = std::invoke_result_t<F, T>;
-    std::array<U, N> result{};
-    for (auto i = 0; i < N; i++) {
-        result[i] = func(input[i]);
-    }
-
-    return result;
-}
-
-template <typename T1, std::size_t N1, typename T2, std::size_t N2, typename F>
-constexpr auto multiplex_array(const std::array<T1, N1> &input1, const std::array<T2, N2> &input2, F &&func) {
-    using U = std::invoke_result_t<F, T1, T2>;
-    std::array<U, N1 * N2> result{};
-    for (auto i1 = 0; i1 < N1; i1++) {
-        auto arg1 = input1[i1];
-        for (auto i2 = 0; i2 < N2; i2++) {
-            auto arg2 = input2[i2];
-            auto retval = func(arg1, arg2);
-            result[i1 * N1 + i2] = retval;
-        }
-    }
-
-    return result;
-}
-
 template <auto KernelDescriptor>
-constexpr void InstantiateKernel(std::vector<std::unique_ptr<BaseOperator>> &kernels) {
+constexpr void InstantiateKernel(std::vector<std::unique_ptr<BaseOperator>>& kernels)
+{
     // Create a ConvBuilder instance with the signature and algorithm
     // This will instantiate the DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 kernel
     using Builder = ckb::ConvBuilder<KernelDescriptor.Signature, KernelDescriptor.Algorithm>;
@@ -61,24 +44,25 @@ constexpr void InstantiateKernel(std::vector<std::unique_ptr<BaseOperator>> &ker
     kernels.push_back(std::make_unique<typename Builder::Instance>());
 }
 
-//*
 template <typename T, T... values>
-constexpr void build_kernels_helper(std::vector<std::unique_ptr<BaseOperator>> &kernels) {
+constexpr void build_kernels_helper(std::vector<std::unique_ptr<BaseOperator>>& kernels)
+{
     std::array<std::unique_ptr<BaseOperator>, sizeof...(values)> result{};
-    ((InstantiateKernel<values>(kernels)),...);
+    ((InstantiateKernel<values>(kernels)), ...);
 }
 
-
 template <typename T, std::size_t N, std::array<T, N> arr, std::size_t... I>
-constexpr void build_kernels_impl(std::vector<std::unique_ptr<BaseOperator>> &kernels, std::index_sequence<I...>) {
+constexpr void build_kernels_impl(std::vector<std::unique_ptr<BaseOperator>>& kernels,
+                                  std::index_sequence<I...>)
+{
     build_kernels_helper<T, arr[I]...>(kernels);
 }
 
 template <typename T, std::size_t N, std::array<T, N> arr>
-constexpr void build_kernels(std::vector<std::unique_ptr<BaseOperator>> &kernels) {
+constexpr void build_kernels(std::vector<std::unique_ptr<BaseOperator>>& kernels)
+{
     build_kernels_impl<T, N, arr>(kernels, std::make_index_sequence<N>{});
 }
-// */
 
 struct DefaultAlgorithm
 {
@@ -175,10 +159,37 @@ struct Signature
     ckb::DataType data_type      = ckb::DataType::FP16;
 };
 
-struct KernelArguments {
+struct KernelArguments
+{
     Signature Signature;
     DefaultAlgorithm Algorithm;
 };
+
+using InLayout                             = ck::tensor_layout::convolution::NDHWGC;
+using WeiLayout                            = ck::tensor_layout::convolution::GKZYXC;
+using OutLayout                            = ck::tensor_layout::convolution::NDHWGK;
+using PassThrough                          = ck::tensor_operation::element_wise::PassThrough;
+static constexpr ck::index_t NumDimSpatial = 2;
+
+template <typename DataType>
+using DeviceOpGFwdDefault =
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial,
+                                                                  InLayout,
+                                                                  WeiLayout,
+                                                                  ck::Tuple<>,
+                                                                  OutLayout,
+                                                                  DataType,
+                                                                  DataType,
+                                                                  ck::Tuple<>,
+                                                                  DataType,
+                                                                  PassThrough,
+                                                                  PassThrough,
+                                                                  PassThrough>;
+
+template <typename DataType>
+using DeviceOpGFwdDefaultPtrs =
+    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+        DeviceOpGFwdDefault<DataType>>;
 
 int main()
 {
@@ -206,24 +217,8 @@ int main()
 
     // TODO: Verify the algorithm value is valid.
 
-    // Create a ConvBuilder instance with the signature and algorithm
-    // This will instantiate the DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 kernel
-    using Builder = ckb::ConvBuilder<kSignature, kAlgorithm>;
-
-    // Verify that Builder is a class type
-    static_assert(std::is_class_v<Builder>, "Builder should be a class type");
-
-    // Verify that Builder::Instance exists and is the actual device kernel class
-    static_assert(std::is_class_v<typename Builder::Instance>,
-                  "Builder::Instance should be a class type");
-
-    static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
-
-    auto instance = Builder::Instance{};
-    auto instanceString = instance.GetInstanceString();
-    std::cout << "Instance string: " << instanceString << std::endl;
-
     constexpr std::array<int, 5> sizes{256, 128, 64, 32};
+    constexpr std::array<int, 1> xdl_per_wave{4};
 
     constexpr auto algorithms = map_array(sizes, [](int size) {
         DefaultAlgorithm algorithm;
@@ -231,36 +226,57 @@ int main()
         return algorithm;
     });
 
-    struct BuilderParameters {
+    constexpr auto algorithms2 =
+        multiplex_array(algorithms, sizes, [](DefaultAlgorithm d, int size) {
+            d.thread_block.tile_size.n = size;
+            return d;
+        });
+
+    constexpr auto algorithms3 =
+        multiplex_array(algorithms2, xdl_per_wave, [](DefaultAlgorithm d, int size) {
+            d.gridwise_gemm.m_xdl_per_wave = d.gridwise_gemm.n_xdl_per_wave = size;
+            return d;
+        });
+
+    struct BuilderParameters
+    {
         DefaultAlgorithm Algorithm;
         Signature Signature;
     };
 
     static constexpr auto arr = std::array<Signature, 1>{kSignature};
-    static constexpr auto typesAdded = multiplex_array(arr, types, [](Signature s, ckb::DataType dt) {
-        s.data_type = dt;
-        return s;
-    });
+    static constexpr auto typesAdded =
+        multiplex_array(arr, types, [](Signature s, ckb::DataType dt) {
+            s.data_type = dt;
+            return s;
+        });
 
-    static constexpr auto parameters = multiplex_array(algorithms, typesAdded, [](DefaultAlgorithm algorithm, Signature signature){
-        BuilderParameters params {
-            .Algorithm = algorithm,
-            .Signature = signature,
-        };
+    static constexpr auto parameters = multiplex_array(
+        algorithms3, typesAdded, [](DefaultAlgorithm algorithm, Signature signature) {
+            BuilderParameters params{
+                .Algorithm = algorithm,
+                .Signature = signature,
+            };
 
-        return params;
-    });
+            return params;
+        });
 
     std::cout << std::endl;
 
+    /*
     std::vector<std::unique_ptr<BaseOperator>> kernels{};
     build_kernels<BuilderParameters, parameters.size(), parameters>(kernels);
 
-    std::cout << "Kernel count: " << kernels.size() << std::endl;
-
-    for (auto &&kernel : kernels) {
+    for(auto&& kernel : kernels)
+    {
         std::cout << "    - " << kernel->GetInstanceString() << std::endl;
     }
+
+    std::cout << std::endl << "Kernel count: " << kernels.size() << std::endl;
+    // */
+
+    auto instances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
+    std::cout << std::endl << "Pre-built instance count: " << instances.size() << std:: endl;
 
     return 0;
 }
