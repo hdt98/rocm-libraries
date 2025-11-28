@@ -140,11 +140,11 @@ namespace rocRoller
                 }
 
                 // Full name is important_ hashed
-                auto fullName = std::format("{}_{}", important.str(), hashed.str());
+                auto fullName = fmt::format("{}_{}", important.str(), hashed.str());
 
                 // Short name is important_ zero-padded hex version of hash<std::string>(hashed)
                 auto hashedValue = std::hash<std::string>{}(hashed.str());
-                auto shortName   = std::format("{}_{:08x}", important.str(), hashedValue);
+                auto shortName   = fmt::format("{}_{:08x}", important.str(), hashedValue);
 
                 return KernelNames{fullName, shortName};
             }
