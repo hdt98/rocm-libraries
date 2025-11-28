@@ -34,11 +34,11 @@ fi
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 
-# Run the command
-python3 "$SCRIPT_DIR/dependency-parser/main.py" select "$JSON_FILE" origin/develop $branch --folder ../
-
 # Path to tests_to_run.json in the same directory
 TEST_FILE="tests_to_run.json"
+
+# Run the command
+python3 "$SCRIPT_DIR/dependency-parser/main.py" select "$JSON_FILE" origin/develop $branch --folder ../ --output $TEST_FILE
 
 command=$(python3 -c "
 import json
