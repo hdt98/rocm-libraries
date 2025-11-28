@@ -170,7 +170,7 @@ namespace rocRoller
                 if constexpr(not std::same_as<Value, CommandArgumentPtr>)
                 {
                     const auto variableType
-                        = resultType(std::make_shared<Expression>(value)).varType;
+                        = resultVariableType(std::make_shared<Expression>(value));
                     if(variableType != m_destinationType
                        && (variableType == DataType::Int64 || variableType == DataType::UInt64))
                     {
