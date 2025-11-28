@@ -30,15 +30,60 @@ int FindInVector(const OpNeedle& opNeedle, const std::vector<OpHaystack>& haysta
     return foundCount;
 }
 
+std::optional<std::size_t> GetFirstNonMatchingIndex(const auto& a, const auto& b)
+{
+    auto aSize = a.size();
+    auto bSize = b.size();
+    auto size  = min(aSize, bSize);
+
+    for(std::size_t i = 0; i < size; i++)
+    {
+        if(a[i] != b[i])
+        {
+            return std::optional{i};
+        }
+    }
+
+    if(aSize == bSize)
+    {
+        return {};
+    }
+
+    return std::optional{size};
+}
+
+void CompareAndPrint(const auto& a, const auto& b)
+{
+    auto comparison = GetFirstNonMatchingIndex(a, b);
+    if(comparison.has_value())
+    {
+        auto value = *comparison;
+        std::cout << a << std::endl;
+        std::cout << b << std::endl;
+
+        while(value > 0)
+        {
+            std::cout << " ";
+            value--;
+        }
+
+        std::cout << "^" << std::endl;
+    }
+    else
+    {
+        std::cout << "!!! " << a << " matches!" << std::endl;
+    }
+}
+
 namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 
-constexpr auto types = std::array<ckb::DataType, 6>{
+constexpr std::array types = {
     ckb::DataType::FP32,
-    ckb::DataType::FP16,
-    ckb::DataType::BF16,
-    ckb::DataType::FP8,
-    ckb::DataType::I8,
+    // ckb::DataType::FP16,
+    // ckb::DataType::BF16,
+    // ckb::DataType::FP8,
+    // ckb::DataType::I8,
 };
 
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
@@ -90,12 +135,12 @@ struct DefaultAlgorithm
 
     struct ThreadBlock
     {
-        int block_size = 256;
+        int block_size = 128;
         struct TileSize
         {
-            int m = 256;
-            int n = 256;
-            int k = 32;
+            int m = 32;
+            int n = 64;
+            int k = 64;
         } tile_size;
     } thread_block;
 
@@ -105,7 +150,7 @@ struct DefaultAlgorithm
         int bk1            = 8;
         int m_per_xdl      = 16;
         int n_per_xdl      = 16;
-        int m_xdl_per_wave = 4;
+        int m_xdl_per_wave = 1;
         int n_xdl_per_wave = 4;
     } gridwise_gemm;
 
@@ -115,9 +160,9 @@ struct DefaultAlgorithm
         {
             struct BlockTransfer
             {
-                int k0  = 4;
-                int m_n = 256;
-                int k1  = 8;
+                int k0  = 8;
+                int m_n = 16;
+                int k1  = 1;
             } block_transfer;
             struct LdsTransfer
             {
@@ -133,7 +178,7 @@ struct DefaultAlgorithm
             } block_transfer_access_order;
             struct SrcAccessOrder
             {
-                std::array<size_t, 3> order{0, 1, 2};
+                std::array<size_t, 3> order{1, 0, 2};
             } src_access_order;
         };
         TransferAB a;
@@ -158,7 +203,7 @@ struct DefaultAlgorithm
 
     // TODO: Fix CK Builder schema to not require these defaults.
     ConvSpecial fwd_specialization  = ConvSpecial::DEFAULT;
-    GemmSpecial gemm_specialization = GemmSpecial::Default;
+    GemmSpecial gemm_specialization = GemmSpecial::MNKPadding;
     struct BlockGemm
     {
         PipeVers pipeline_version = PipeVers::V4;
@@ -173,7 +218,7 @@ struct Signature
     // TODO: This direction should be OK as default, but the factory fails.
     ckb::ConvDirection direction = ckb::ConvDirection::FORWARD;
     ckb::GroupConvLayout layout  = ckb::GroupConvLayout2D::NGCHW_GKCYX_NGKHW;
-    ckb::DataType data_type      = ckb::DataType::FP16;
+    ckb::DataType data_type      = ckb::DataType::FP32;
 };
 
 struct KernelArguments
@@ -286,7 +331,7 @@ int main()
 
     for(auto&& kernel : kernels)
     {
-        // std::cout << kernel->GetInstanceString() << std::endl;
+        std::cout << kernel->GetInstanceString() << std::endl;
     }
 
     std::cout << std::endl << "Kernel count: " << kernels.size() << std::endl;
@@ -335,9 +380,17 @@ int main()
     }
                   */
 
+    auto firstKernelInstanceString = kernels[0]->GetInstanceString();
+
     for(auto&& instance : instances)
     {
-        // std::cout << instance->GetInstanceString() << std::endl;
+        auto instanceString = instance->GetInstanceString();
+        if(!instanceString.starts_with("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3"))
+        {
+            continue;
+        }
+
+        CompareAndPrint(firstKernelInstanceString, instanceString);
     }
     return 0;
 }
