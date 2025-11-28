@@ -40,6 +40,10 @@ namespace rocRoller
             ApplyConvertToValuesVisitor(DataType datatype)
                 : m_destinationType(datatype)
             {
+                AssertFatal(
+                    m_destinationType == DataType::UInt32 or m_destinationType == DataType::Int32,
+                    "ApplyConvertToValuesVisitor only allows destinationType to be UInt32 or Int32",
+                    ShowValue(m_destinationType));
             }
 
             template <CUnary Expr>
