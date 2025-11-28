@@ -68,6 +68,9 @@ namespace TensileLite
                                       "ProblemPredictionLibrary requires non empty "
                                       "mapping index set.");
 
+                    const origami::hardware_t analytical_hardware = origami::hardware_t::get_hardware_for_device(0);
+                    int defaultWGM = std::ceil(std::sqrt(analytical_hardware.N_CU / analytical_hardware.NUM_XCD));
+                    
                     for(int index : mappingIndices)
                     {
                         auto slnIter = ctx->solutions->find(index);
@@ -103,7 +106,7 @@ namespace TensileLite
                                 },
                                 .mi = origami_mi,
                                 .occupancy = std::max(solution->sizeMapping.CUOccupancy, static_cast<int>(1)),
-                                .workgroup_mapping = solution->sizeMapping.workGroupMapping,
+                                .workgroup_mapping = defaultWGM,
                                 .cache_hints_a = solution->sizeMapping.nonTemporalA,
                                 .cache_hints_b = solution->sizeMapping.nonTemporalB,
                                 .workspace_size = std::numeric_limits<size_t>::max(),

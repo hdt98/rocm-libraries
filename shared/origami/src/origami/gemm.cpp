@@ -955,10 +955,9 @@ double compute_total_latency(const problem_t& problem,
     if (M <= 256 && N <= 256 && K < 1024 && batch != 1 && (MT_M < M || MT_N < N))
       return std::numeric_limits<double>::max();
 
-    // We only use Dot2 for NN layout where M < 3
-    if (MI_M == 0 && MI_N == 0 && MI_K == 0) {
-      if (M > 2 || a_trans || b_trans) return std::numeric_limits<double>::max();
-    }
+    // Use Dot2 only for M < 3
+    if (MI_M == 1 && MI_N == 1 && MI_K == 64 && M > 2)
+      return std::numeric_limits<double>::max();
 
     if (batch == 1) {
       size_t K_mod_128bytes    = K * a_bytes % 128;
@@ -983,9 +982,8 @@ double compute_total_latency(const problem_t& problem,
     }
   }
 
-  // 1-1) config.workgroup_mapping, use default hardware value to compute memory latencies
-  config.workgroup_mapping =
-      static_cast<int>(std::ceil(std::sqrt(hardware.N_CU / hardware.NUM_XCD)));
+  // 1-1) config.workgroup_mapping can't be greater than one
+  config.workgroup_mapping = std::max(config.workgroup_mapping, 1);
 
   // 1-2) Find CU occupancy
   auto [num_wgs, num_active_cus, numWaves, splitting_factor] =

@@ -38,7 +38,7 @@ std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
  * @param[in] hardware Hardware characteristics
  * @param config Kernel configuration.
  *
- * @return A tuple: best predicted (l2_hit_rate, wgm).
+ * @return A tuple: best predicted (wgmxcc, wgm).
  */
 
 std::tuple<size_t, size_t> select_workgroup_mapping(const problem_t& problem,

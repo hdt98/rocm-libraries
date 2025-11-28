@@ -959,7 +959,7 @@ namespace TensileLite
                 if(sizes.size() >= 4)
                 {
                     origami::problem_t origami_problem = {
-                        .size  = {.m = sizes[0], .n = sizes[1], .k = sizes[3]},
+                        .size  = {sizes[0], sizes[1], sizes[3]},
                         .batch = sizes[2],
                     };
                     origami::config_t origami_config = {

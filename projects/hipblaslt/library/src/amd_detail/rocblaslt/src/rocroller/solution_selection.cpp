@@ -194,7 +194,7 @@ std::vector<SolutionIndexParameters> chooseSolutionIndexParameters(
     size_t elementSizeA_bits = rocRoller::DataTypeInfo::Get(kernelType.typeA).elementBits;
     size_t elementSizeB_bits = rocRoller::DataTypeInfo::Get(kernelType.typeB).elementBits;
 
-    const origami::hardware_t analaytical_hardware = origami::hardware_t::get_hardware_for_device(0);
+    const origami::hardware_t analytical_hardware = origami::hardware_t::get_hardware_for_device(0);
 
     origami::problem_t origami_problem = {
         .size = {prob.m, prob.n, prob.k},
@@ -208,14 +208,14 @@ std::vector<SolutionIndexParameters> chooseSolutionIndexParameters(
         .b_mx_block_size = kernelType.scaleBBlockRowSize * kernelType.scaleBBlockColSize,
     };
 
-    int wgm = std::sqrt(std::floor(analaytical_hardware.N_CU / analaytical_hardware.NUM_XCD));
+    int defaultWGM = std::ceil(std::sqrt(analytical_hardware.N_CU / analytical_hardware.NUM_XCD));
     for (auto& config : origami_config_list) {
-        config.workgroup_mapping = wgm;
+        config.workgroup_mapping = defaultWGM;
     }
 
     auto prediction_result = origami::rank_configs(
         origami_problem,
-        analaytical_hardware,
+        analytical_hardware,
         origami_config_list
     );
 
