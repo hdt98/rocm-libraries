@@ -40,6 +40,10 @@ namespace rocRoller
             {
                 std::ostringstream rv;
 
+                // TODO: Use abbreviated type names.  Currently the
+                // types are strings.  If we change them to DataType
+                // we can use shorter names.
+
                 rv << toString(transA) << toString(transB);
 
                 if(scaleA != rocRoller::Operations::ScaleMode::None)
@@ -79,74 +83,78 @@ namespace rocRoller
 
             KernelNames SolutionParameters::generateKernelName() const
             {
-                std::ostringstream important, hashed;
+                auto constexpr maxLength = 196;
 
-                // Important things that should appear in the kernel name
-                important << "RRGEMM_";
-                important << types.kernelNamePart();
-                important << "_WGTS";
-                rocRoller::streamJoin(important, std::vector{macM, macN, macK}, "x");
-                important << "_WGS";
-                rocRoller::streamJoin(important, std::vector{workgroupSizeX, workgroupSizeY}, "x");
+                std::ostringstream fullName;
 
-                // Not very important things that will be hashed
+                fullName << "RRGEMM_";
+                fullName << types.kernelNamePart();
+                fullName << "_WGTS";
+                rocRoller::streamJoin(fullName, std::vector{macM, macN, macK}, "x");
+                fullName << "_WGS";
+                rocRoller::streamJoin(fullName, std::vector{workgroupSizeX, workgroupSizeY}, "x");
+
                 if(workgroupMappingDim != -1)
                 {
-                    hashed << "_WGM" << workgroupMappingDim;
+                    fullName << "_WGM" << workgroupMappingDim;
                 }
 
-                hashed << "_WGMXCC";
-                rocRoller::streamJoin(hashed, std::vector{workgroupRemapXCC}, "");
+                fullName << "_WGMXCC";
+                rocRoller::streamJoin(fullName, std::vector{workgroupRemapXCC}, "");
                 if(workgroupRemapXCC && workgroupRemapXCCValue > 0)
                 {
-                    rocRoller::streamJoin(hashed, std::vector{workgroupRemapXCCValue}, "");
+                    rocRoller::streamJoin(fullName, std::vector{workgroupRemapXCCValue}, "");
                 }
 
-                hashed << "_LA" << loadPathA;
-                hashed << "_LB" << loadPathB;
+                fullName << "_LA" << loadPathA;
+                fullName << "_LB" << loadPathB;
 
-                hashed << "_SD" << storeLDSD;
+                fullName << "_SD" << storeLDSD;
 
-                hashed << "_LSA" << loadPathAScale;
-                hashed << "_LSB" << loadPathBScale;
+                fullName << "_LSA" << loadPathAScale;
+                fullName << "_LSB" << loadPathBScale;
 
-                hashed << "_UNROLL";
-                rocRoller::streamJoin(hashed, std::vector{unrollX, unrollY}, "x");
+                fullName << "_UNROLL";
+                rocRoller::streamJoin(fullName, std::vector{unrollX, unrollY}, "x");
 
-                hashed << "_SwizzleScale" << swizzleScale << prefetchScale;
-                hashed << "_SwizzleTileSize" << swizzleTileSize;
+                fullName << "_SwizzleScale" << swizzleScale << prefetchScale;
+                fullName << "_SwizzleTileSize" << swizzleTileSize;
 
                 if(prefetch)
                 {
-                    hashed << "_PF";
+                    fullName << "_PF";
                     rocRoller::streamJoin(
-                        hashed, std::vector{prefetchInFlight, prefetchLDSFactor}, "x");
-                    hashed << "m" << prefetchMixMemOps;
+                        fullName, std::vector{prefetchInFlight, prefetchLDSFactor}, "x");
+                    fullName << "m" << prefetchMixMemOps;
                 }
 
-                hashed << "_MI";
+                fullName << "_MI";
                 rocRoller::streamJoin(
-                    hashed, std::vector{waveM, waveN, waveK, (waveB < 0 ? -waveB : waveB)}, "x");
+                    fullName, std::vector{waveM, waveN, waveK, (waveB < 0 ? -waveB : waveB)}, "x");
 
-                hashed << "_" << scheduler;
+                fullName << "_" << scheduler;
 
                 if(streamK)
                 {
-                    hashed << "_SK";
+                    fullName << "_SK";
                     if(streamKTwoTileDPFirst)
-                        hashed << "2TDPFirst";
+                        fullName << "2TDPFirst";
                     else if(streamKTwoTile)
-                        hashed << "2T";
+                        fullName << "2T";
                 }
 
-                // Full name is important_ hashed
-                auto fullName = fmt::format("{}_{}", important.str(), hashed.str());
+                auto fullNameStr  = fullName.str();
+                auto shortNameStr = fullNameStr;
 
-                // Short name is important_ zero-padded hex version of hash<std::string>(hashed)
-                auto hashedValue = std::hash<std::string>{}(hashed.str());
-                auto shortName   = fmt::format("{}_{:08x}", important.str(), hashedValue);
+                // Truncate and append hash if necessary
+                if(shortNameStr.length() > maxLength)
+                {
+                    auto hashedValue = std::hash<std::string>{}(fullNameStr);
+                    shortNameStr     = fmt::format(
+                        "{}_{:08x}", shortNameStr.substr(0, maxLength - 9), hashedValue);
+                }
 
-                return KernelNames{fullName, shortName};
+                return KernelNames{fullNameStr, shortNameStr};
             }
 
             std::string toString(TransposeType trans)
