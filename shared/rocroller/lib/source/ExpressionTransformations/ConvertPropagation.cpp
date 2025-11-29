@@ -63,6 +63,10 @@ namespace rocRoller
                     if(DataTypeInfo::Get(resultDataType).elementBytes
                        > DataTypeInfo::Get(m_destinationType).elementBytes)
                     {
+                        auto const typeInfo = DataTypeInfo::Get(resultDataType);
+                        AssertFatal(typeInfo.isIntegral,
+                                    "Converting a non-integral to integral might result in loss of "
+                                    "precision");
                         return convert(m_destinationType, std::make_shared<Expression>(expr));
                     }
                 }
