@@ -103,10 +103,10 @@ namespace rocRoller
          * @brief Colour operations and coordinates by unroll value.
          *
          * Starts at `topOp` (or the top of the graph if `topOp` is
-         * -1) and traverses it's body.
+         * -1) and traverses its body.
          *
          * Unroll tags in `exclude` are excluded from the colouring
-         * (ingored).
+         * (ignored).
          *
          * For example, consider a control-subgraph similar to
          *

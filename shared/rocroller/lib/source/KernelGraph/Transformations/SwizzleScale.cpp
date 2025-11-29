@@ -781,7 +781,7 @@ namespace rocRoller
                           .value();
             }
 
-            for(auto const [load, redundant] : mergeables)
+            for(auto const [load, redundantLoads] : mergeables)
             {
                 auto maybeLoadLDSTile = graph.control.get<LoadLDSTile>(load);
                 if(maybeLoadLDSTile)
@@ -853,7 +853,7 @@ namespace rocRoller
                 tileExchangeMap[scaleLoads.at(load).second] = exchange;
 
                 // merge the loads
-                for(auto const [mergeOp, mergeTile] : redundant)
+                for(auto const [mergeOp, mergeTile] : redundantLoads)
                 {
                     auto mergeTopOp = getTopSetCoordinate(graph, mergeOp);
                     auto ordering   = graph.control.compareNodes(

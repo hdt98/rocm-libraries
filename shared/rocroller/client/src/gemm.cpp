@@ -1590,12 +1590,12 @@ int main(int argc, const char* argv[])
     app.add_flag(SN(&SP::streamKTwoTileDPFirst),
                  "Execute data-parallel loop first in the two-tile StreamK algorithm.");
 
-    app.add_option(
-        SN(&SP::loadPathAScale),
-        "How to load AScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
-    app.add_option(
-        SN(&SP::loadPathBScale),
-        "How to load BScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
+    app.add_option(SN(&SP::loadPathAScale),
+                   "How to load AScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: "
+                   "BufferToLDSViaVGPR");
+    app.add_option(SN(&SP::loadPathBScale),
+                   "How to load BScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: "
+                   "BufferToLDSViaVGPR");
     app.add_option("--mxlds", "Use LDS for A/B scales.");
     app.add_option("--mxd2lds", "Use direct-to-LDS for A/B scales.");
 
