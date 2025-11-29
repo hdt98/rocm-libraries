@@ -2323,8 +2323,8 @@ namespace GEMMDriverTest
         else if(unrollK == 2)
         {
             EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 0);
-            // 2x2 wave config: NumAScaleLoadTiles = 256/2/64 = 2 and NumBScaleLoadTiles = 256/2/64 = 2
-            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 4);
+            // 2x2 wave config: NumAScaleLoadTiles = 256/2/64 = 2 (+2 for Tail Loop) and NumBScaleLoadTiles = 256/2/64 = 2 (+2 for Tail Loop)
+            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 8);
         }
         else if(unrollK == 4)
         {
@@ -2387,11 +2387,11 @@ namespace GEMMDriverTest
         }
         else if(unrollK == 2)
         {
-            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 8);
+            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 12);
         }
         else if(unrollK == 4)
         {
-            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 16);
+            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 20);
         }
     }
 
@@ -2450,7 +2450,7 @@ namespace GEMMDriverTest
             EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 0);
             // 1x4 wave config: NumAScaleLoadTiles = 256/64 = 4 and NumBScaleLoadTiles = 256/4/64 = 1
             // prefetched : 2 * 5 = 10
-            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 10);
+            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 15);
         }
     }
 
@@ -2552,7 +2552,7 @@ namespace GEMMDriverTest
         EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 0);
         // 1x4 wave config: NumAScaleLoadTiles = 256/64 = 4 and NumBScaleLoadTiles = 256/4/64 = 1
         // prefetched scale: 2 * 5 = 10
-        EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 10);
+        EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 15);
     }
 
     TEST_P(GEMMTestGPU, GPU_SwizzleScaledPrefetchD2LGEMMMXF4TN_192x256)
@@ -2610,7 +2610,7 @@ namespace GEMMDriverTest
         EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dword "), 0);
         // 1x4 wave config: NumAScaleLoadTiles = 192/64 = 3 and NumBScaleLoadTiles = 256/4/64 = 1
         // prefetched scale: 2 * 4 = 8
-        EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 8);
+        EXPECT_EQ(countSubstring(generatedCode, "buffer_load_dwordx2 "), 12);
     }
 
     TEST_P(GEMMF8F6F4TestGPU, GPU_SwizzleScaled_Prefetch_GEMMF8F6F4)
@@ -3400,7 +3400,7 @@ namespace GEMMDriverTest
 
         std::string generatedCode = m_context->instructions()->toString();
 
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b64"), 20);
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b64"), 22);
         EXPECT_EQ(countSubstring(generatedCode, "ds_read_b128"), 8);
         EXPECT_EQ(countSubstring(generatedCode, "buffer_store_dwordx4"), 8);
     }
@@ -3460,7 +3460,7 @@ namespace GEMMDriverTest
 
         std::string generatedCode = m_context->instructions()->toString();
 
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b64"), 24);
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b64"), 26);
         EXPECT_EQ(countSubstring(generatedCode, "ds_read_b128"), 8);
         EXPECT_EQ(countSubstring(generatedCode, "buffer_store_dwordx4"), 8);
     }
@@ -3570,7 +3570,7 @@ namespace GEMMDriverTest
 
         std::string generatedCode = m_context->instructions()->toString();
 
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b128"), 6);
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b128"), 9);
     }
 
     TEST_P(GEMMJammedTestGPU, GPU_BasicGEMMFP16Jammed4x2)
@@ -3630,7 +3630,7 @@ namespace GEMMDriverTest
 
         std::string generatedCode = m_context->instructions()->toString();
 
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b128"), 12);
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write_b128"), 15);
     }
 
     TEST_P(GEMMTestGPU, GPU_BasicGEMMFP16AllLDS)
