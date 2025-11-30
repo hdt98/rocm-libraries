@@ -981,7 +981,7 @@ static __global__ void cal_gnorm_sq_kernel(I const m,
 
         S* const gnorm_bid = &(gnorm_array[bid]);
 
-        bool const use_simple = true;
+        bool const use_simple = false;
         if(use_simple)
         {
             // -------------------------
@@ -2587,6 +2587,7 @@ static rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
 
     rocblas_status istat = rocblas_status_success;
 
+    I constexpr idebug = 0;
     hipStream_t stream;
     try
     {
@@ -2658,6 +2659,17 @@ static rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
                 if(istat != rocblas_status_success)
                 {
                     throw(istat);
+                }
+
+                if(idebug >= 1)
+                {
+                    std::vector<S> h_sigma_array(batch_count);
+                    hipMemcpy(&(h_sigma_array[0]), sigma_array, sizeof(S) * batch_count,
+                              hipMemcpyDeviceToHost);
+                    for(I bid = 0; bid < batch_count; bid++)
+                    {
+                        printf("sigma_array[%d] = %le\n", bid, h_sigma_array[bid]);
+                    }
                 }
             }
 
