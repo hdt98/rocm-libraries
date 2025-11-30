@@ -7,8 +7,8 @@
 
 using ADataType        = std::int8_t;
 using BDataType        = std::int8_t;
-using AccDataType      = std::int32_t;
-using CShuffleDataType = std::int32_t;
+using AccDataType      = std::int32_t; // float
+using CShuffleDataType = std::int32_t; // float
 using CDataType        = std::int8_t;
 
 using ALayout = Row;
@@ -39,11 +39,19 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            128,          // BlockSize
            64,           // MPerBlock
            128,          // NPerBlock
+#ifdef GEMM_KMULTIPLIER_8
+           128,          // KPerBlock
+#else
            64,           // KPerBlock
+#endif
            4,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
+#ifdef GEMM_KMULTIPLIER_8
+           128,          // KPerWmma
+#else
            32,           // KPerWmma
+#endif
            2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
            4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
            S<32, 4, 1>,  // M-K0-K1

@@ -5,9 +5,19 @@
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_wmma_gfx13.hpp"
 
-using ADataType        = ck::f8_t;
-using BDataType        = ck::f8_t;
-using AccDataType      = float;
+#ifdef A_ENABLE_BF8
+using ADataType = ck::bf8_t;
+#else
+using ADataType = ck::f8_t;
+#endif
+
+#ifdef B_ENABLE_BF8
+using BDataType = ck::bf8_t;
+#else
+using BDataType = ck::f8_t;
+#endif
+
+using AccDataType      = float; // ck::half_t;
 using CShuffleDataType = float;
 using CDataType        = ck::f8_t;
 
@@ -39,11 +49,19 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            128,          // BlockSize
            64,           // MPerBlock
            128,          // NPerBlock
+#ifdef GEMM_KMULTIPLIER_8
+           128,          // KPerBlock
+#else
            64,           // KPerBlock
+#endif
            4,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
+#ifdef GEMM_KMULTIPLIER_8
+           128,          // KPerWmma
+#else
            32,           // KPerWmma
+#endif
            2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
            4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
            S<32, 4, 1>,  // M-K0-K1

@@ -2762,7 +2762,6 @@ struct GridwiseGemm_Wmma_GFX13
         /*******************************************************************************/
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
-
         auto blockwise_gemm =
             BlockwiseGemmWMMA<ThisThreadBlockGrid,
                               ADataType,
