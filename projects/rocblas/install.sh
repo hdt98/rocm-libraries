@@ -96,6 +96,20 @@ install_msgpack_from_source( )
     fi
 }
 
+install_aocl_from_source( )
+{
+    if [[ ! -d "${build_dir}/deps/aocl" ]]; then
+      pushd .
+      mkdir -p ${build_dir}/deps
+      cd ${build_dir}/deps
+      git clone -b AOCL-5.1-GA https://github.com/amd/aocl.git
+      cd aocl
+      CXX=${cxx} CC=${cc} ${cmake_executable} -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON  -DENABLE_ILP64=ON  -DENABLE_AOCL_BLAS=ON -DENABLE_AOCL_UTILS=ON -DENABLE_AOCL_LAPACK=OFF -DENABLE_MULTITHREADING=ON -DOpenMP_libomp_LIBRARY="" -DCMAKE_INSTALL_PREFIX=$PWD/install_package
+      elevate_if_not_root ${cmake_executable} --build build --config release -j --target install
+      popd
+    fi
+}
+
 # Take an array of packages as input, and delegate the work to the appropriate distro installer
 # prereq: ${ID} must be defined before calling
 # prereq: ${build_clients} must be defined before calling
@@ -457,7 +471,7 @@ fc="gfortran"
 # #################################################
 if [[ "${install_dependencies}" == true ]]; then
   CMAKE_VERSION=$(${cmake_executable} --version | grep -oP '(?<=version )[^ ]*')
-  CMAKE_MIN_VERSION="3.24.4"
+  CMAKE_MIN_VERSION="3.26.0"
 
   install_packages
 
@@ -496,6 +510,7 @@ if [[ "${install_dependencies}" == true ]]; then
     pushd .
     mkdir -p ${build_dir}/deps && cd ${build_dir}/deps
     install_blis
+    install_aocl_from_source
 
     # build other deps
     printf "\033[32mBuilding \033[33mgoogletest; installing into \033[33m/usr/local\033[0m\n"
@@ -508,6 +523,7 @@ elif [[ "${build_clients}" == true ]]; then
   pushd .
   mkdir -p ${build_dir}/deps && cd ${build_dir}/deps
   install_blis
+  install_aocl_from_source
   popd
 fi
 
