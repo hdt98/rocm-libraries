@@ -1367,6 +1367,20 @@ inline __host__ __device__ bf8_ocp_t type_convert<bf8_ocp_t, bhalf_t>(bhalf_t x)
 #endif
 }
 
+template <>
+inline __host__ __device__ f8_ocp_t type_convert<f8_ocp_t, bf8_ocp_t>(bf8_ocp_t x)
+{
+    float fvalue = type_convert<float, bf8_ocp_t>(x);
+    return type_convert<f8_ocp_t, float>(fvalue);
+}
+
+template <>
+inline __host__ __device__ bf8_ocp_t type_convert<bf8_ocp_t, f8_ocp_t>(f8_ocp_t x)
+{
+    float fvalue = type_convert<float, f8_ocp_t>(x);
+    return type_convert<bf8_ocp_t, float>(fvalue);
+}
+
 // convert bf8 to fp32
 template <>
 inline __host__ __device__ float type_convert<float, bf8_fnuz_t>(bf8_fnuz_t x)
