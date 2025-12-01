@@ -48,9 +48,9 @@ using DeviceGroupedConvNDFwdInstance =
         256,         // BlockSize
         128,         // MPerBlock
         256,         // NPerBlock
-        32,          // KPerBlock
-        8,           // AK1
-        8,           // BK1
+        64,          // KPerBlock
+        16,          // AK1
+        16,          // BK1
         16,          // MPerXdl
         16,          // NPerXdl
         4,           // MXdlPerWave

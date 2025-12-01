@@ -1436,7 +1436,14 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             return false;
         }
-
+        if(!is_xdl_wmma_k_supported<AComputeDataType, KPerBlock, AK1>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<BComputeDataType, KPerBlock, BK1>())
+        {
+            return false;
+        }
         // check ConvolutionForwardSpecialization
         if constexpr(ConvForwardSpecialization ==
                      ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)

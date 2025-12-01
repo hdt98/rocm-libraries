@@ -1764,6 +1764,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         {
             return false;
         }
+
         if constexpr(NDimSpatial == 2)
         {
             if constexpr(!(is_NHWGC_GKYXC_NHWGK<InLayout, WeiLayout, OutLayout>() ||
