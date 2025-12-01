@@ -814,9 +814,6 @@ double compute_tile_latency(const problem_t& problem,
     // tiles.
     double partial_adds =
         (static_cast<double>(config.mt.mn()) * static_cast<double>(splitting_factor)) / (64);
-    // Things have to be written to memory
-    double mem_bw_occ         = compute_mem_bw_from_occupancy(hardware, num_active_cus);
-    double mem_bw_occ_limited = hardware.mem3_perf_ratio * mem_bw_occ;
 
     double L_reduce = partial_readwrite_bytes / (mem_bw_occ_limited);
     L_epilogue += L_reduce + partial_adds + 10000;

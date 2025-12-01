@@ -2,6 +2,7 @@
 // SPDX-License-Identifier:  MIT
 
 #include "origami/hardware.hpp"
+#include "origami/types.hpp"
 
 #include <cstdlib>
 #include <fstream>
@@ -372,7 +373,8 @@ size_t hardware_t::get_mi_latency(size_t MI_M,
   if (it != instruction_map.end()) {
     return it->second / parallel_mi_cu;
   } else {
-    std::cerr << "Warning: Latency not found for MI_M=" << MI_M << ", MI_N=" << MI_N
+    if (origami::runtime_options().get().debug_enabled)
+      std::cerr << "Warning: Latency not found for MI_M=" << MI_M << ", MI_N=" << MI_N
               << ", MI_K=" << MI_K << ", mi_input_type=" << to_string(mi_input_type)
               << ". Returning latency value of 32 (really slow).\n";
     return 32 / parallel_mi_cu;  // Default latency if instruction is not found
