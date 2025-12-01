@@ -69,14 +69,12 @@ public:
                       uint32_t                   workgroupSize,
                       size_t                     instrDwords,
                       size_t                     strideMultiplier,
-                      const std::vector<size_t>& baseAddresses,
-                      uint32_t                   waitcntValue)
+                      const std::vector<size_t>& baseAddresses)
         : AssemblyTestKernel(context)
         , m_workgroupSize(workgroupSize)
         , m_instrDwords(instrDwords)
         , m_strideMultiplier(strideMultiplier)
         , m_baseAddresses(baseAddresses)
-        , m_waitcntValue(waitcntValue)
     {
         auto k = m_context->kernel();
         k->setKernelDimensions(1);
@@ -144,23 +142,22 @@ protected:
 
             co_yield m_context->mem()->barrier({});
 
-            for(int i = 0; i < 16; i++)
+            for(int i = 0; i < 20; i++)
             {
                 const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
                 co_yield m_context->mem()->loadLocal(
                     readDst->subset(Generated(iota(start, end))), ldsAddr, 0, 4 * m_instrDwords);
             }
 
-            co_yield Instruction::Wait(
-                WaitCount::DSCnt(m_context->targetArchitecture(), m_waitcntValue));
-
             {
-                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, 16);
-                co_yield m_context->mem()->loadLocal(
-                    readDst->subset(Generated(iota(start, end))), ldsAddr, 0, 4 * m_instrDwords);
+                int i = 18;
+                do
+                {
+                    i /= 2;
+                    co_yield Instruction::Wait(
+                        WaitCount::DSCnt(m_context->targetArchitecture(), i));
+                } while(i > 0);
             }
-
-            co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
         };
 
         m_instructions.clear();
@@ -182,7 +179,6 @@ private:
     size_t                   m_instrDwords;
     size_t                   m_strideMultiplier;
     std::vector<size_t>      m_baseAddresses;
-    uint32_t                 m_waitcntValue;
     std::vector<Instruction> m_instructions;
 };
 
@@ -193,15 +189,13 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
     constexpr auto workgroupSize    = 64u;
     constexpr auto strideMultiplier = 8u;
 
-    auto instrDwords  = GENERATE(4);
-    auto waitcntValue = GENERATE(5);
+    auto instrDwords = GENERATE(4);
 
-    SECTION("Waitcnt value " + std::to_string(waitcntValue) + ", dwords "
-            + std::to_string(instrDwords))
+    SECTION("Waitcnt sequence 7 to 0, dwords " + std::to_string(instrDwords))
     {
         rocRoller::profiler::reset();
 
-        auto context = TestContext::ForTestDevice({}, "waitcnt_" + std::to_string(waitcntValue));
+        auto context = TestContext::ForTestDevice({}, "waitcnt_sequence");
 
         if(not context->targetArchitecture().target().isCDNAGPU())
         {
@@ -211,12 +205,8 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
         const auto baseAddresses
             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
-        WaitcntTestKernel kernel(context.get(),
-                                 workgroupSize,
-                                 instrDwords,
-                                 strideMultiplier,
-                                 baseAddresses,
-                                 waitcntValue);
+        WaitcntTestKernel kernel(
+            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses);
 
         const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
 
@@ -226,7 +216,6 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
 
         const auto comparisonStr = formatLatencyComparison(filteredInstructions, latencies);
         INFO(comparisonStr);
-        INFO("Waitcnt value: " << waitcntValue);
 
         int dsReadCount  = 0;
         int dsWriteCount = 0;
@@ -249,8 +238,9 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
             }
         }
 
-        CHECK(dsReadCount == 17);
+        CHECK(dsReadCount == 20);
         CHECK(dsWriteCount == 0);
+        CHECK(waitcntCount == 8);
 
         Log::info(context.output());
 

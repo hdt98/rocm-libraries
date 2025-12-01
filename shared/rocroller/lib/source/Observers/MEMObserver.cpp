@@ -193,6 +193,28 @@ namespace rocRoller
                 status.additionalCycles
                     = (LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 * multiplier) - 1;
             }
+            const auto waitcnt = inst.getWaitCount().dscnt();
+            if(waitcnt > -1)
+            {
+                AssertFatal(status.stallCycles == 0,
+                            "No logic to handle both waitcnt stalls and instruction stalls yet");
+
+                const auto initialProgramCycle = m_programCycle;
+                size_t     commandsToWaitFor   = 0;
+                if(m_commandQueue.size() > static_cast<size_t>(waitcnt))
+                {
+                    commandsToWaitFor = m_commandQueue.size() - static_cast<size_t>(waitcnt);
+                    const auto waitCompletionCycle = m_commandQueue[commandsToWaitFor - 1];
+                    status.stallCycles             = waitCompletionCycle - m_programCycle;
+                }
+                const_cast<Instruction&>(inst).addComment(
+                    fmt::format("WeightlessDSMemObserver {}: waitcnt dscnt {}, waiting for {} "
+                                "commands, stall {}",
+                                initialProgramCycle,
+                                waitcnt,
+                                commandsToWaitFor,
+                                status.stallCycles));
+            }
             return status;
         }
 
@@ -211,25 +233,6 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
-            int waitcnt = inst.getWaitCount().dscnt();
-            if(waitcnt >= 0)
-            {
-                const auto initialProgramCycle = m_programCycle;
-                while(m_commandQueue.size() > static_cast<size_t>(waitcnt))
-                {
-                    m_programCycle
-                        = std::max(m_programCycle, static_cast<int>(m_commandQueue.front()));
-                    m_commandQueue.pop_front();
-                }
-                const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver {}: waitcnt {}, cmd {}, "
-                                "advanced {} cycles",
-                                initialProgramCycle,
-                                waitcnt,
-                                m_commandQueue.size(),
-                                m_programCycle - initialProgramCycle));
-            }
-
             m_programCycle += inst.totalCycles();
 
             while(!m_commandQueue.empty() && m_programCycle >= m_commandQueue.front())
