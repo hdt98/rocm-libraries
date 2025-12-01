@@ -126,6 +126,7 @@ target_sources(rocroller-tests
 
         "${CMAKE_CURRENT_SOURCE_DIR}/ContextFixture.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/GEMMF8F6F4.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/GEMMTestBase.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/GenericContextFixture.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/GPUContextFixture.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MatrixMultiplyTestBase.hpp"
