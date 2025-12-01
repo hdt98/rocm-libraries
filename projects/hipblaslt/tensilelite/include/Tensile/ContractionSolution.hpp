@@ -184,7 +184,7 @@ namespace TensileLite
         using Problem       = ContractionProblemGemm;
         using Inputs        = ContractionInputs;
         using GroupedInputs = ContractionGroupedInputs;
-        using ParamsCache  = CacheMap<std::pair<int32_t, uint32_t>, Problem>;
+        using ParamsCache  = CacheMap<std::pair<int32_t, int32_t>, Problem>;
 
         /**
          * Indicate a solution is equally or estimatedly matched.

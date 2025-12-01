@@ -41,7 +41,7 @@ std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
  * @return A tuple: best predicted (wgmxcc, wgm).
  */
 
-std::tuple<size_t, size_t> select_workgroup_mapping(const problem_t& problem,
+std::tuple<int, int> select_workgroup_mapping(const problem_t& problem,
                                                     const hardware_t& hardware,
                                                     const config_t& config,
                                                     size_t skGrid) {

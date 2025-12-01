@@ -949,7 +949,7 @@ namespace TensileLite
            && sizeMapping.nonTemporalB < 4 /* Exclude NTs for now till we fix libs */)
         {
             int32_t  c_wgm    = 0;
-            uint32_t c_wgmxcc = 0;
+            int32_t c_wgmxcc = 0;
             // Try to find cached WGM and WGMXCC
             std::tie(c_wgm, c_wgmxcc) = paramsCache.find(problem);
 
