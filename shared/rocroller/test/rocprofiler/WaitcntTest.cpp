@@ -110,6 +110,20 @@ protected:
         m_context->schedule(k->prolog());
 
         auto kb = [&]() -> Generator<Instruction> {
+            const auto alignment = static_cast<int>(m_instrDwords);
+            const auto regCount  = 248; // Leave some registers for other operations
+
+            auto readDst = Register::Value::Placeholder(
+                m_context,
+                Register::Type::Vector,
+                DataType::Raw32,
+                regCount,
+                Register::AllocationOptions{
+                    .contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                    .alignment            = alignment,
+                });
+            co_yield readDst->allocate();
+
             auto lds = Register::Value::AllocateLDS(
                 m_context,
                 DataType::Raw32,
@@ -128,28 +142,22 @@ protected:
                                                 resultType(workitemIndex->expression()).varType),
                 m_context);
 
-            std::vector<std::shared_ptr<Register::Value>> writeSrcs;
-            for(int i = 0; i < 16; i++)
-            {
-                auto src = Register::Value::Placeholder(
-                    m_context, Register::Type::Vector, DataType::Raw32, m_instrDwords);
-                co_yield src->allocate();
-                writeSrcs.push_back(src);
-            }
-
             co_yield m_context->mem()->barrier({});
 
             for(int i = 0; i < 16; i++)
             {
-                co_yield m_context->mem()->storeLocal(ldsAddr, writeSrcs[i], 0, 4 * m_instrDwords);
+                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
+                co_yield m_context->mem()->loadLocal(
+                    readDst->subset(Generated(iota(start, end))), ldsAddr, 0, 4 * m_instrDwords);
             }
 
             co_yield Instruction::Wait(
                 WaitCount::DSCnt(m_context->targetArchitecture(), m_waitcntValue));
 
-            for(int i = 0; i < 1; i++)
             {
-                co_yield m_context->mem()->storeLocal(ldsAddr, writeSrcs[i], 0, 4 * m_instrDwords);
+                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, 16);
+                co_yield m_context->mem()->loadLocal(
+                    readDst->subset(Generated(iota(start, end))), ldsAddr, 0, 4 * m_instrDwords);
             }
 
             co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
@@ -183,60 +191,69 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
     using namespace Scheduling::LDSBankModel;
 
     constexpr auto workgroupSize    = 64u;
-    constexpr auto instrDwords      = 1u;
-    constexpr auto strideMultiplier = 16u;
+    constexpr auto strideMultiplier = 8u;
 
-    auto waitcntValue = GENERATE(11);
+    auto instrDwords  = GENERATE(4);
+    auto waitcntValue = GENERATE(5);
 
-    rocRoller::profiler::reset();
-
-    auto context = TestContext::ForTestDevice({}, "waitcnt_" + std::to_string(waitcntValue));
-
-    if(not context->targetArchitecture().target().isCDNAGPU())
+    SECTION("Waitcnt value " + std::to_string(waitcntValue) + ", dwords "
+            + std::to_string(instrDwords))
     {
-        SKIP("Test designed for CDNA architectures");
+        rocRoller::profiler::reset();
+
+        auto context = TestContext::ForTestDevice({}, "waitcnt_" + std::to_string(waitcntValue));
+
+        if(not context->targetArchitecture().target().isCDNAGPU())
+        {
+            SKIP("Test designed for CDNA architectures");
+        }
+
+        const auto baseAddresses
+            = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+        WaitcntTestKernel kernel(context.get(),
+                                 workgroupSize,
+                                 instrDwords,
+                                 strideMultiplier,
+                                 baseAddresses,
+                                 waitcntValue);
+
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
+
+        const auto& instructions = kernel.getInstructions();
+
+        const auto filteredInstructions = filterAndVerifyInstructions(instructions, latencies);
+
+        const auto comparisonStr = formatLatencyComparison(filteredInstructions, latencies);
+        INFO(comparisonStr);
+        INFO("Waitcnt value: " << waitcntValue);
+
+        int dsReadCount  = 0;
+        int dsWriteCount = 0;
+        int waitcntCount = 0;
+
+        for(const auto& inst : filteredInstructions)
+        {
+            const auto& opcode = inst.getOpCode();
+            if(opcode.find("ds_read") != std::string::npos)
+            {
+                dsReadCount++;
+            }
+            else if(opcode.find("ds_write") != std::string::npos)
+            {
+                dsWriteCount++;
+            }
+            else if(opcode.find("s_waitcnt") != std::string::npos)
+            {
+                waitcntCount++;
+            }
+        }
+
+        CHECK(dsReadCount == 17);
+        CHECK(dsWriteCount == 0);
+
+        Log::info(context.output());
+
+        CHECK(false);
     }
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    WaitcntTestKernel kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, waitcntValue);
-
-    const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
-
-    const auto& instructions = kernel.getInstructions();
-
-    const auto filteredInstructions = filterAndVerifyInstructions(instructions, latencies);
-
-    const auto comparisonStr = formatLatencyComparison(filteredInstructions, latencies);
-    INFO(comparisonStr);
-    INFO("Waitcnt value: " << waitcntValue);
-
-    int dsReadCount  = 0;
-    int dsWriteCount = 0;
-    int waitcntCount = 0;
-
-    for(const auto& inst : filteredInstructions)
-    {
-        const auto& opcode = inst.getOpCode();
-        if(opcode.find("ds_read") != std::string::npos)
-        {
-            dsReadCount++;
-        }
-        else if(opcode.find("ds_write") != std::string::npos)
-        {
-            dsWriteCount++;
-        }
-        else if(opcode.find("s_waitcnt") != std::string::npos)
-        {
-            waitcntCount++;
-        }
-    }
-
-    CHECK(dsReadCount == 0);
-    CHECK(dsWriteCount == 17);
-
-    Log::debug("Latency comparison:\n" + comparisonStr);
-    Log::debug("Test configuration - waitcnt value: " + std::to_string(waitcntValue));
-    Log::info(context.output());
 }

@@ -198,18 +198,6 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::modify(Instruction& inst) const
         {
-            int waitcnt = inst.getWaitCount().dscnt();
-            if(waitcnt >= 0)
-            {
-                const int  pendingCount = m_commandQueue.size();
-                const auto status       = peek(inst);
-                inst.addComment(
-                    fmt::format("WeightlessDSMemObserver waitcnt({}): pending {}, stall {}",
-                                waitcnt,
-                                pendingCount,
-                                status.stallCycles));
-            }
-
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
@@ -226,16 +214,20 @@ namespace rocRoller
             int waitcnt = inst.getWaitCount().dscnt();
             if(waitcnt >= 0)
             {
+                const auto initialProgramCycle = m_programCycle;
                 while(m_commandQueue.size() > static_cast<size_t>(waitcnt))
                 {
                     m_programCycle
                         = std::max(m_programCycle, static_cast<int>(m_commandQueue.front()));
-                    while(!m_commandQueue.empty()
-                          && m_programCycle >= static_cast<int>(m_commandQueue.front()))
-                    {
-                        m_commandQueue.pop_front();
-                    }
+                    m_commandQueue.pop_front();
                 }
+                const_cast<Instruction&>(inst).addComment(
+                    fmt::format("WeightlessDSMemObserver {}: waitcnt {}, cmd {}, "
+                                "advanced {} cycles",
+                                initialProgramCycle,
+                                waitcnt,
+                                m_commandQueue.size(),
+                                m_programCycle - initialProgramCycle));
             }
 
             m_programCycle += inst.totalCycles();
@@ -299,12 +291,13 @@ namespace rocRoller
 
                     const_cast<Instruction&>(inst).addComment(
                         fmt::format("WeightlessDSMemObserver {}: {} dataCycles, "
-                                    "cmd queue {}, data queue {}, command back {}",
+                                    "cmd {}, data {}, cmd front {}, data front {}",
                                     m_programCycle,
                                     dataCycles,
                                     m_commandQueue.size(),
                                     m_dataQueue.size(),
-                                    m_commandQueue.empty() ? 0 : m_commandQueue.back()));
+                                    m_commandQueue.empty() ? -1 : m_commandQueue.front(),
+                                    m_dataQueue.empty() ? -1 : m_dataQueue.front()));
                 }
         }
 
