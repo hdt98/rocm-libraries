@@ -18,22 +18,41 @@ struct UniversalInvoker
               typename DsLayout,
               typename ELayout,
               bool Persistent,
-              typename CDEElementWise>
-    static float gemm(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config& s)
-
+              typename CDEElementWise,
+              typename ComputeDataType = ADataType>
+    static float gemm(const ck_tile::GemmHostArgs& args,
+                      const ck_tile::stream_config& s,
+                      bool check_arg_only = false)
     {
-        using GemmShape = ck_tile::TileGemmShape<
-            ck_tile::sequence<GemmConfig::M_Tile, GemmConfig::N_Tile, GemmConfig::K_Tile>,
-            ck_tile::sequence<GemmConfig::M_Warp, GemmConfig::N_Warp, GemmConfig::K_Warp>,
-            ck_tile::
-                sequence<GemmConfig::M_Warp_Tile, GemmConfig::N_Warp_Tile, GemmConfig::K_Warp_Tile>,
-            GemmConfig::PermuteA,
-            GemmConfig::PermuteB>;
+        constexpr bool ClusterLaunch =
+            GemmConfig::kClusterSizeM > 1 || GemmConfig::kClusterSizeN > 1;
 
-        using TilePartitioner =
+        using GemmShape = std::conditional_t<
+            ClusterLaunch,
+            ck_tile::ClusterTileGemmShape<
+                ck_tile::sequence<GemmConfig::kClusterSizeM, GemmConfig::kClusterSizeN, 1>,
+                ck_tile::sequence<GemmConfig::M_Tile, GemmConfig::N_Tile, GemmConfig::K_Tile>,
+                ck_tile::sequence<GemmConfig::M_Warp, GemmConfig::N_Warp, GemmConfig::K_Warp>,
+                ck_tile::sequence<GemmConfig::M_Warp_Tile,
+                                  GemmConfig::N_Warp_Tile,
+                                  GemmConfig::K_Warp_Tile>,
+                GemmConfig::PermuteA,
+                GemmConfig::PermuteB>,
+            ck_tile::TileGemmShape<
+                ck_tile::sequence<GemmConfig::M_Tile, GemmConfig::N_Tile, GemmConfig::K_Tile>,
+                ck_tile::sequence<GemmConfig::M_Warp, GemmConfig::N_Warp, GemmConfig::K_Warp>,
+                ck_tile::sequence<GemmConfig::M_Warp_Tile,
+                                  GemmConfig::N_Warp_Tile,
+                                  GemmConfig::K_Warp_Tile>,
+                GemmConfig::PermuteA,
+                GemmConfig::PermuteB>>;
+
+        using TilePartitioner = std::conditional_t<
+            ClusterLaunch,
+            ck_tile::GemmClusterTilePartitioner<GemmShape>,
             ck_tile::GemmSpatiallyLocalTilePartitioner<GemmShape,
                                                        GemmConfig::TileParitionerGroupNum,
-                                                       GemmConfig::TileParitionerM01>;
+                                                       GemmConfig::TileParitionerM01>>;
 
         using Traits = ck_tile::TileGemmTraits<GemmConfig::kPadM,
                                                GemmConfig::kPadN,
@@ -56,8 +75,14 @@ struct UniversalInvoker
                                              Persistent,
                                              GemmConfig::NumWaveGroups,
                                              GemmConfig::Preshuffle>;
-        using GemmPipelineProblem =
-            ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, GemmShape, Traits>;
+        using GemmPipelineProblem = ck_tile::GemmPipelineProblem<ADataType,
+                                                                 BDataType,
+                                                                 AccDataType,
+                                                                 GemmShape,
+                                                                 Traits,
+                                                                 ck_tile::element_wise::PassThrough,
+                                                                 ck_tile::element_wise::PassThrough,
+                                                                 ComputeDataType>;
 
         using BaseGemmPipeline = typename PipelineTypeTraits<
             GemmConfig::Pipeline>::template UniversalGemmPipeline<GemmPipelineProblem>;
@@ -77,19 +102,24 @@ struct UniversalInvoker
             constexpr auto scheduler        = GemmConfig::Scheduler;
             constexpr auto memory_operation = memory_operation_.value;
 
-            using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                               BDataType,
-                                                                               AccDataType,
-                                                                               GemmShape,
-                                                                               GemmUniversalTraits,
-                                                                               scheduler,
-                                                                               has_hot_loop_v,
-                                                                               tail_number_v>;
+            using UniversalGemmProblem =
+                ck_tile::UniversalGemmPipelineProblem<ADataType,
+                                                      BDataType,
+                                                      AccDataType,
+                                                      GemmShape,
+                                                      GemmUniversalTraits,
+                                                      scheduler,
+                                                      has_hot_loop_v,
+                                                      tail_number_v,
+                                                      ck_tile::element_wise::PassThrough,
+                                                      ck_tile::element_wise::PassThrough,
+                                                      ComputeDataType>;
 
             using GemmPipeline = typename PipelineTypeTraits<
                 GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
 
-            using GemmEpilogue = ck_tile::CShuffleEpilogue<
+            using GemmEpilogue = typename EpilogueTypeTraits<
+                GemmConfig::Pipeline,
                 ck_tile::CShuffleEpilogueProblem<ADataType,
                                                  BDataType,
                                                  DsDataType,
@@ -107,7 +137,12 @@ struct UniversalInvoker
                                                  GemmConfig::K_Warp_Tile,
                                                  UniversalGemmProblem::TransposeC,
                                                  memory_operation,
-                                                 GemmConfig::NumWaveGroups>>;
+                                                 GemmConfig::NumWaveGroups,
+                                                 false,
+                                                 1,
+                                                 false,
+                                                 1,
+                                                 ComputeDataType>>::Epilogue;
 
             using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
             auto kargs   = Kernel::MakeKernelArgs(args);
@@ -115,6 +150,11 @@ struct UniversalInvoker
             const dim3 grids  = Persistent ? Kernel::MaxOccupancyGridSize(s)
                                            : Kernel::GridSize(args.M, args.N, args.k_batch);
             const dim3 blocks = Kernel::BlockSize();
+
+            if(check_arg_only)
+            {
+                return Kernel::IsSupportedArgument(kargs) ? 1.0f : 0.0f;
+            }
 
             if(!Kernel::IsSupportedArgument(kargs))
             {
@@ -173,12 +213,23 @@ struct UniversalInvoker
             {
                 preprocess = clear_gemm_output;
             }
-
-            ave_time = ck_tile::launch_kernel_time_mask(
-                s,
-                preprocess,
-                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
-
+            if constexpr(ClusterLaunch)
+            {
+                dim3 clusters = Kernel::ClusterSize();
+                ave_time      = ck_tile::launch_kernel_time_mask(
+                    s,
+                    preprocess,
+                    ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
+                        Kernel{}, clusters, grids, blocks, 0, kargs));
+            }
+            else
+            {
+                ave_time =
+                    ck_tile::launch_kernel_time_mask(s,
+                                                     preprocess,
+                                                     ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
+                                                         Kernel{}, grids, blocks, 0, kargs));
+            }
             return ave_time;
         };
 

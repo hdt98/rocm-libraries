@@ -35,7 +35,8 @@ template <typename AsDataType_,
           bool FixedVectorSize_        = false,
           index_t VectorSizeC_         = 1,
           bool TiledMMAPermuteN_       = false,
-          index_t BlockedXDLN_PerWarp_ = 1> // The number of continuous xdl_output per warp
+          index_t BlockedXDLN_PerWarp_ = 1,
+          typename ComputeDataType_    = void> // The number of continuous xdl_output per warp
 struct CShuffleEpilogueProblem
 {
     using AsDataType                                       = remove_cvref_t<AsDataType_>;
@@ -46,6 +47,7 @@ struct CShuffleEpilogueProblem
     using DsLayout                                         = remove_cvref_t<DsLayout_>;
     using ELayout                                          = remove_cvref_t<ELayout_>;
     using CDElementwise                                    = remove_cvref_t<CDElementwise_>;
+    using ComputeDataType                                  = remove_cvref_t<ComputeDataType_>;
     static constexpr index_t kBlockSize                    = MWave_ * NWave_ * get_warp_size();
     static constexpr index_t kMPerBlock                    = kM_;
     static constexpr index_t kNPerBlock                    = kN_;
@@ -70,13 +72,14 @@ struct CShuffleEpilogueProblem
 template <typename Problem_, typename Policy_ = void>
 struct CShuffleEpilogue
 {
-    using Problem     = remove_cvref_t<Problem_>;
-    using AsDataType  = remove_cvref_t<typename Problem::AsDataType>;
-    using BsDataType  = remove_cvref_t<typename Problem::BsDataType>;
-    using AccDataType = remove_cvref_t<typename Problem::AccDataType>;
-    using ODataType   = remove_cvref_t<typename Problem::ODataType>;
-    using DsDataType  = remove_cvref_t<typename Problem::DsDataType>;
-    using DsLayout    = remove_cvref_t<typename Problem::DsLayout>;
+    using Problem         = remove_cvref_t<Problem_>;
+    using AsDataType      = remove_cvref_t<typename Problem::AsDataType>;
+    using BsDataType      = remove_cvref_t<typename Problem::BsDataType>;
+    using AccDataType     = remove_cvref_t<typename Problem::AccDataType>;
+    using ODataType       = remove_cvref_t<typename Problem::ODataType>;
+    using DsDataType      = remove_cvref_t<typename Problem::DsDataType>;
+    using DsLayout        = remove_cvref_t<typename Problem::DsLayout>;
+    using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
 
     static constexpr bool ADataTypeIsTuple = is_detected<is_tuple, AsDataType>::value;
     static constexpr bool BDataTypeIsTuple = is_detected<is_tuple, BsDataType>::value;
@@ -92,11 +95,15 @@ struct CShuffleEpilogue
     using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
 
-    using ATypeToUse =
-        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>;
+    using ATypeToUse = std::conditional_t<
+        std::is_same_v<ComputeDataType, void>,
+        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>,
+        ComputeDataType>;
     // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
-    using BTypeToUse =
-        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>;
+    using BTypeToUse = std::conditional_t<
+        std::is_same_v<ComputeDataType, void>,
+        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>,
+        ComputeDataType>;
     using ELayout       = remove_cvref_t<typename Problem::ELayout>;
     using CDElementwise = remove_cvref_t<typename Problem::CDElementwise>;
     static constexpr memory_operation_enum MemoryOperation = Problem::MemoryOperation;

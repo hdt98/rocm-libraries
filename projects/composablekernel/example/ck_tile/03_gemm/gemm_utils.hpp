@@ -12,15 +12,6 @@
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/utility/json_dump.hpp"
 
-#define CK_TILE_PIPELINE_COMPUTE_V3 1
-#define CK_TILE_PIPELINE_MEMORY 2
-#define CK_TILE_PIPELINE_COMPUTE_V4 3
-#define CK_TILE_PIPELINE_COMPUTE_V5 4
-#define CK_TILE_PIPELINE_COMPUTE_V6 5
-#define CK_TILE_PIPELINE_PRESHUFFLE_V1 6
-#define CK_TILE_PIPELINE_PRESHUFFLE_V2 7
-#define CK_TILE_PIPELINE_COMPUTE_V1 8
-
 template <typename PrecType, ck_tile::index_t M_Warp_Tile>
 constexpr ck_tile::index_t get_k_warp_tile()
 {
@@ -86,6 +77,9 @@ struct GemmConfigBase
     static constexpr ck_tile::index_t NumWaveGroups = 1;
     static constexpr bool Preshuffle                = false;
     static constexpr bool TiledMMAPermuteN          = false;
+
+    static constexpr ck_tile::index_t kClusterSizeM = 1;
+    static constexpr ck_tile::index_t kClusterSizeN = 1;
 };
 
 template <typename PrecType>
@@ -493,7 +487,7 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::MEMORY>
 };
 
 template <>
-struct PipelineTypeTraits<CK_TILE_PIPELINE_COMPUTE_V1>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V1>
 {
     template <typename PipelineProblem>
     using GemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<PipelineProblem>;
@@ -502,7 +496,7 @@ struct PipelineTypeTraits<CK_TILE_PIPELINE_COMPUTE_V1>
 };
 
 template <>
-struct PipelineTypeTraits<CK_TILE_PIPELINE_COMPUTE_V3>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V2>
 {
     template <typename PipelineProblem>
     using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;
@@ -545,6 +539,51 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::PRESHUFFLE_V2>
     template <typename PipelineProblem>
     using UniversalGemmPipeline =
         ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_ASYNC>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompAsync<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompAsync<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V1>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompTDMV1<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompTDMV2<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<PipelineProblem>;
+};
+
+template <ck_tile::GemmPipeline PipelineId, typename Problem>
+struct EpilogueTypeTraits
+{
+    using Epilogue = ck_tile::CShuffleEpilogue<Problem>;
+};
+
+template <typename Problem>
+struct EpilogueTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V1, Problem>
+{
+    using Epilogue = ck_tile::TdmEpilogue<Problem>;
+};
+
+template <typename Problem>
+struct EpilogueTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V2, Problem>
+{
+    using Epilogue = ck_tile::TdmEpilogue<Problem>;
 };
 
 inline auto create_args()

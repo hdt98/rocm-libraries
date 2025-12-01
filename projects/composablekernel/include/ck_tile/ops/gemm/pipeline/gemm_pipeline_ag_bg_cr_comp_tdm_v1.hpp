@@ -535,5 +535,17 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             num_loop,
             p_smem);
     }
+
+    [[nodiscard]] CK_TILE_HOST static const std::string GetName()
+    {
+        // clang-format off
+        constexpr index_t WaveNumM = BlockGemmShape::BlockWarps::at(I0{});
+        constexpr index_t WaveNumN = BlockGemmShape::BlockWarps::at(I1{});
+        return concat('_', "pipeline_AgBgCrCompTDMV1", 
+                      concat('x', MPerBlock, NPerBlock, KPerBlock),  BlockSize,
+                      concat('x', WaveNumM, WaveNumN),
+                      concat('x', kPadM, kPadN, kPadK));
+        // clang-format on
+    }
 };
 } // namespace ck_tile

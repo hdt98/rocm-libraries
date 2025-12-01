@@ -641,8 +641,8 @@ struct StreamKKernel
     {
         hipDeviceProp_t dev_prop;
         hipDevice_t dev;
-        hip_check_error(hipGetDevice(&dev));
-        hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
+        ck_tile::hip_check_error(hipGetDevice(&dev));
+        ck_tile::hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
         int num_cu = dev_prop.multiProcessorCount;
 
         return num_cu;
@@ -660,7 +660,7 @@ struct StreamKKernel
         constexpr int min_block_per_cu = 1;
         const auto kernel              = kentry<min_block_per_cu, Kernel, KernelArgs>;
 
-        hip_check_error(
+        ck_tile::hip_check_error(
             hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));
 
         return max(occupancy, 1);
@@ -1057,7 +1057,7 @@ struct StreamKKernel
         constexpr int min_block_per_cu = 1;
         const auto kernel              = kentry<min_block_per_cu, Kernel, KernelArgs>;
 
-        hip_check_error(
+        ck_tile::hip_check_error(
             hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));
 
         return occupancy;
