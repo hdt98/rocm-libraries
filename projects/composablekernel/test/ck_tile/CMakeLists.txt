@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 add_subdirectory(image_to_column)
 add_subdirectory(gemm)
 add_subdirectory(gemm_weight_preshuffle)
@@ -28,6 +31,7 @@ add_subdirectory(add_rmsnorm2d_rdquant)
 add_subdirectory(gemm_block_scale)
 add_subdirectory(utility)
 add_subdirectory(reduce)
+add_subdirectory(core)
 add_subdirectory(epilogue)
 add_subdirectory(atomic_add_op)
 add_subdirectory(fmha)
