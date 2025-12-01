@@ -1,35 +1,44 @@
-# ########################################################################
-# Copyright (C) 2016-2024 Advanced Micro Devices, Inc.
-# ########################################################################
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
 
-# This file is intended to be used in two ways; independently in a stand alone PROJECT
-# and as part of a superbuild.  If the file is included in a stand alone project, the
-# variables are not expected to be preset, and this will produce options() in the GUI
-# for the user to examine.  If this file is included in a superbuild, the options will be
-# presented in the superbuild GUI, but then passed into the ExternalProject as -D
-# parameters, which would already define them.
+# This file defines client-specific build options
+# It's included from both standalone client builds and superbuild configurations
 
 include(CMakeDependentOption)
 
-# Clients utilize rocblas fortran API and a fortran compiler
-if( NOT BUILD_FORTRAN_CLIENTS )
-  cmake_dependent_option( BUILD_FORTRAN_CLIENTS "Build hipBLAS clients requiring Fortran capabilities" ON "NOT WIN32" OFF )
-endif( )
+# Note: These options are also defined in the root CMakeLists.txt
+# This file exists for compatibility with potential standalone client builds
 
-if( NOT BUILD_CLIENTS_TESTS )
-  option( BUILD_CLIENTS_TESTS "Build hipBLAS unit tests" OFF )
-endif( )
+if(NOT DEFINED HIPBLAS_ENABLE_FORTRAN)
+    cmake_dependent_option(
+        HIPBLAS_ENABLE_FORTRAN
+        "Build hipBLAS clients requiring Fortran capabilities"
+        ON
+        "NOT WIN32"
+        OFF
+    )
+endif()
 
-if( NOT BUILD_CLIENTS_BENCHMARKS )
-  option( BUILD_CLIENTS_BENCHMARKS "Build hipBLAS benchmarks" OFF )
-endif( )
+if(NOT DEFINED HIPBLAS_BUILD_TESTING)
+    option(HIPBLAS_BUILD_TESTING "Build hipBLAS unit tests" OFF)
+endif()
 
-if( NOT BUILD_CLIENTS_SAMPLES )
-  option( BUILD_CLIENTS_SAMPLES "Build hipBLAS samples" OFF )
-endif( )
+if(NOT DEFINED HIPBLAS_ENABLE_BENCHMARKS)
+    option(HIPBLAS_ENABLE_BENCHMARKS "Build hipBLAS benchmarks" OFF)
+endif()
 
-if( HIP_PLATFORM STREQUAL nvidia )
-  option( LINK_BLIS "Link AOCL Blis reference library" OFF )
-else()
-  option( LINK_BLIS "Link AOCL Blis reference library" ON )
+if(NOT DEFINED HIPBLAS_ENABLE_SAMPLES)
+    option(HIPBLAS_ENABLE_SAMPLES "Build hipBLAS samples" OFF)
+endif()
+
+if(NOT DEFINED HIPBLAS_ENABLE_OPENMP)
+    option(HIPBLAS_ENABLE_OPENMP "Enable OpenMP support" ON)
+endif()
+
+if(NOT DEFINED HIPBLAS_ENABLE_BLIS)
+    if(HIPBLAS_ENABLE_CUDA)
+        option(HIPBLAS_ENABLE_BLIS "Link AOCL BLIS reference library" OFF)
+    else()
+        option(HIPBLAS_ENABLE_BLIS "Link AOCL BLIS reference library" ON)
+    endif()
 endif()

@@ -1,105 +1,118 @@
-# ########################################################################
-# Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell cop-
-# ies of the Software, and to permit persons to whom the Software is furnished
-# to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IM-
-# PLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNE-
-# CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-# ########################################################################
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
 
-set( THREADS_PREFER_PTHREAD_FLAG ON )
-find_package( Threads REQUIRED )
+# Create benchmark executable
+add_executable(hipblas-bench)
 
-set(hipblas_bench_source client.cpp)
+# Add source files
+target_sources(hipblas-bench PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/client.cpp"
+)
 
-set( hipblas_benchmark_common
-      ../common/utility.cpp
-      ../common/cblas_interface.cpp
-      ../common/clients_common.cpp
-      ../common/hipblas_arguments.cpp
-      ../common/hipblas_parse_data.cpp
-      ../common/hipblas_datatype2string.cpp
-      ../common/norm.cpp
-      ../common/unit.cpp
-      ../common/near.cpp
-      ../common/arg_check.cpp
-      ../common/argument_model.cpp
-      ../common/host_alloc.cpp
-      ${BLIS_CPP}
-    )
+# Target compile features
+target_compile_features(hipblas-bench PRIVATE cxx_static_assert cxx_nullptr cxx_auto_type)
 
-if(BUILD_FORTRAN_CLIENTS)
-  add_executable( hipblas-bench ${hipblas_bench_source} ${hipblas_benchmark_common} $<TARGET_OBJECTS:hipblas_fortran_client>)
-else()
-  add_executable( hipblas-bench ${hipblas_bench_source} ${hipblas_benchmark_common} )
-endif()
-
-target_compile_features( hipblas-bench PRIVATE cxx_static_assert cxx_nullptr cxx_auto_type )
 # Internal header includes
-target_include_directories( hipblas-bench
-  PRIVATE
+target_include_directories(hipblas-bench PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
 )
 
-# External header includes included as system files
-target_include_directories( hipblas-bench
-  SYSTEM PRIVATE
+# External header includes as system files
+target_include_directories(hipblas-bench SYSTEM PRIVATE
     $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${CBLAS_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${BLAS_INCLUDE_DIR}>
-    $<BUILD_INTERFACE:${BLIS_INCLUDE_DIR}>
-    $<BUILD_INTERFACE:${FLAME_INCLUDE_DIR}>
 )
 
-target_link_libraries( hipblas-bench PRIVATE roc::hipblas GTest::gtest GTest::gtest_main )
+# Link libraries with visibility keywords
+target_link_libraries(hipblas-bench PRIVATE
+    roc::hipblas
+    hipblas-clients-common
+    GTest::gtest
+    GTest::gtest_main
+    Threads::Threads
+)
 
-# need mf16c flag for float->half convertion
-target_compile_options( hipblas-bench PRIVATE -mf16c ) # -Wno-deprecated-declarations )
-
-target_compile_options(hipblas-bench PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_CXX_OPTIONS}>)
-
-target_compile_definitions( hipblas-bench PRIVATE HIPBLAS_BENCH ${COMMON_DEFINES} ${BLIS_DEFINES} )
-
-target_link_libraries( hipblas-bench PRIVATE ${BLAS_LIBRARY} ${COMMON_LINK_LIBS} )
-apply_omp_settings( hipblas-bench )
-
-if (NOT WIN32)
-    target_link_libraries( hipblas-bench PRIVATE stdc++fs )
+# Add BLAS/LAPACK libraries
+# Note: BLIS dependencies now propagate from hipblas-clients-common (PUBLIC linkage)
+# Only add system BLAS if BLIS is not used
+if(NOT WIN32 AND NOT HIPBLAS_ENABLE_BLIS)
+    target_link_libraries(hipblas-bench PRIVATE BLAS::BLAS)
+    
+    if(LAPACK_FOUND)
+        target_link_libraries(hipblas-bench PRIVATE LAPACK::LAPACK)
+    endif()
+elseif(WIN32 AND NOT HIPBLAS_ENABLE_BLIS)
+    # Windows BLAS libraries (BLIS dependencies propagate from clients-common)
+    target_link_libraries(hipblas-bench PRIVATE ${BLAS_LIBRARY})
 endif()
 
-if(HIP_PLATFORM STREQUAL amd)
-  target_link_libraries( hipblas-bench PRIVATE hip::host )
+# Add BLIS-specific compile definitions for benchmark target
+if(HIPBLAS_ENABLE_BLIS)
+    target_compile_definitions(hipblas-bench PRIVATE
+        BLIS_ENABLE_NO_UNDERSCORE_API
+        BLIS_ENABLE_CBLAS
+    )
+endif()
 
-  if( CUSTOM_TARGET )
-    target_link_libraries( hipblas-bench PRIVATE hip::${CUSTOM_TARGET} )
-  endif()
+# Add OpenMP support
+if(HIPBLAS_ENABLE_OPENMP)
+    target_link_libraries(hipblas-bench PRIVATE OpenMP::OpenMP_CXX)
+    
+    # Handle OpenMP RPATH for HIP/Clang
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND HIPBLAS_ENABLE_HIP)
+        if(TARGET OpenMP::OpenMP_CXX)
+            set_target_properties(hipblas-bench PROPERTIES
+                BUILD_RPATH "${HIP_CLANG_ROOT}/lib"
+                INSTALL_RPATH "$ORIGIN/../llvm/lib"
+            )
+        elseif(TARGET OpenMP::omp)
+            set_target_properties(hipblas-bench PROPERTIES
+                BUILD_RPATH "${HIP_CLANG_ROOT}/${openmp_LIB_DIR}"
+                INSTALL_RPATH "$ORIGIN/../llvm/${openmp_LIB_DIR}"
+            )
+        endif()
+    endif()
+endif()
 
-else( )
-  target_include_directories( hipblas-bench
-    PRIVATE
-      $<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>
-  )
+# Compile definitions
+target_compile_definitions(hipblas-bench PRIVATE HIPBLAS_BENCH)
 
-  target_link_libraries( hipblas-bench PRIVATE ${CUDA_LIBRARIES} )
-endif( )
+# Platform-specific linking
+if(HIPBLAS_ENABLE_HIP)
+    target_link_libraries(hipblas-bench PRIVATE hip::host)
+    
+    if(CUSTOM_TARGET)
+        target_link_libraries(hipblas-bench PRIVATE hip::${CUSTOM_TARGET})
+    endif()
+    
+    if(NOT WIN32)
+        target_link_libraries(hipblas-bench PRIVATE stdc++fs)
+    endif()
+elseif(HIPBLAS_ENABLE_CUDA)
+    target_include_directories(hipblas-bench PRIVATE
+        $<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>
+    )
+    target_link_libraries(hipblas-bench PRIVATE ${CUDA_LIBRARIES})
+endif()
 
-set_target_properties( hipblas-bench PROPERTIES
-  CXX_EXTENSIONS OFF
-  RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging"
+# Fortran client library support
+if(HIPBLAS_ENABLE_FORTRAN)
+    target_link_libraries(hipblas-bench PRIVATE hipblas-fortran-client)
+    target_compile_definitions(hipblas-bench PRIVATE HIPBLAS_FORTRAN_CLIENTS)
+endif()
+
+# Solver support define
+if(HIPBLAS_ENABLE_SOLVER)
+    target_compile_definitions(hipblas-bench PRIVATE __HIP_PLATFORM_SOLVER__)
+endif()
+
+# Target properties
+set_target_properties(hipblas-bench PROPERTIES
+    CXX_EXTENSIONS OFF
+    RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging"
 )
 
-add_dependencies( hipblas-bench hipblas-clients-common )
+# Add dependency on common files target
+add_dependencies(hipblas-bench hipblas-clients-common-files)
 
+# Install benchmark executable
 rocm_install(TARGETS hipblas-bench COMPONENT benchmarks)

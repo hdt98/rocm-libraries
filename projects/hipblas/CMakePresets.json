@@ -1,0 +1,96 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default:release",
+      "displayName": "Configure release build with installation to /opt/rocm",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "/opt/rocm/bin/amdclang++",
+        "CMAKE_C_COMPILER": "/opt/rocm/bin/amdclang",
+        "CMAKE_PREFIX_PATH": "/opt/rocm",
+        "CMAKE_INSTALL_PREFIX": "/opt/rocm"
+      },
+      "environment": {
+        "ROCM_PATH": "/opt/rocm"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Configure debug build with all clients enabled",
+      "inherits": "default:release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HIPBLAS_BUILD_TESTING": "ON",
+        "HIPBLAS_ENABLE_BENCHMARKS": "ON",
+        "HIPBLAS_ENABLE_SAMPLES": "ON"
+      }
+    },
+    {
+      "name": "clients-only",
+      "displayName": "Configure for client development (library build skipped)",
+      "inherits": "debug",
+      "cacheVariables": {
+        "SKIP_LIBRARY": "ON",
+        "HIPBLAS_LIBRARY_DIR": "/opt/rocm"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Configure for coverage build",
+      "inherits": "debug",
+      "cacheVariables": {
+        "HIPBLAS_BUILD_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Configure with address sanitizer",
+      "inherits": "debug",
+      "cacheVariables": {
+        "HIPBLAS_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "cuda",
+      "displayName": "Configure for CUDA backend",
+      "inherits": "default:release",
+      "cacheVariables": {
+        "HIPBLAS_ENABLE_HIP": "OFF",
+        "HIPBLAS_ENABLE_CUDA": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default:release",
+      "configurePreset": "default:release"
+    },
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "clients-only",
+      "configurePreset": "clients-only"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "cuda",
+      "configurePreset": "cuda"
+    }
+  ]
+}
