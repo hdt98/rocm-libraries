@@ -148,10 +148,10 @@ struct DefaultAlgorithm
     {
         int ak1            = 8;
         int bk1            = 8;
-        int m_per_xdl      = 16;
-        int n_per_xdl      = 16;
+        int m_per_xdl      = 32;
+        int n_per_xdl      = 32;
         int m_xdl_per_wave = 1;
-        int n_xdl_per_wave = 4;
+        int n_xdl_per_wave = 1;
     } gridwise_gemm;
 
     struct TransferABC
@@ -262,9 +262,6 @@ int main()
     // Verify the signature value is valid
     static_assert(ckb::ValidConvSignature<kSignature>);
 
-    // Define a struct to specify the algorithm.
-    // TODO improve CK Builder schema to reduce duplication and simplify.
-
     //     // Verify that the signature conforms to the expected descriptor
     // static_assert(ckb::ConvSignatureDescriptor<Signature>);
     // // Specify the signature in a constexpr value
@@ -273,6 +270,7 @@ int main()
     // static_assert(ckb::ValidConvSignature<kSignature>);
     // Verify that the algorithm conforms to the algorithm concept
     static_assert(ckb::ConvAlgorithmDescriptor<DefaultAlgorithm>);
+    constexpr DefaultAlgorithm kAlgorithm{};
 
     // TODO: Verify the algorithm value is valid.
 
@@ -329,6 +327,8 @@ int main()
     std::vector<std::unique_ptr<BaseOperator>> kernels{};
     build_kernels<BuilderParameters, parameters.size(), parameters>(kernels);
 
+
+
     for(auto&& kernel : kernels)
     {
         std::cout << kernel->GetInstanceString() << std::endl;
@@ -342,45 +342,24 @@ int main()
     std::cout << std::endl << "Pre-built instance count: " << instances.size() << std::endl;
     // */
 
-    /*
-    using Empty_Tuple = ck::Tuple<>;
-    using GNHWC       = ck::tensor_layout::convolution::GNHWC;
-    using GKYXC       = ck::tensor_layout::convolution::GKYXC;
-    using GNHWK       = ck::tensor_layout::convolution::GNHWK;
-    using F32         = float;
-    using PassThrough = ck::tensor_operation::element_wise::PassThrough;
+    // Create a ConvBuilder instance with the signature and algorithm
+    // This will instantiate the DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 kernel
+    using Builder = ckb::ConvBuilder<kSignature, kAlgorithm>;
 
-    std::vector<
-        std::unique_ptr<ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<2,
-                                                                                      GNHWC,
-                                                                                      GKYXC,
-                                                                                      Empty_Tuple,
-                                                                                      GNHWK,
-                                                                                      F32,
-                                                                                      F32,
-                                                                                      Empty_Tuple,
-                                                                                      F32,
-                                                                                      PassThrough,
-                                                                                      PassThrough,
-                                                                                      PassThrough>>>
-        instances{};
+    // Verify that Builder is a class type
+    static_assert(std::is_class_v<Builder>, "Builder should be a class type");
 
-    ck::tensor_operation::device::instance::
-        add_device_grouped_conv2d_fwd_xdl_gnhwc_gkyxc_gnhwk_f32_instances(instances);
-    std::cout << std::endl << "Precompiled instance count: " << instances.size() << std::endl;
+    // Verify that Builder::Instance exists and is the actual device kernel class
+    static_assert(std::is_class_v<typename Builder::Instance>,
+                  "Builder::Instance should be a class type");
 
-    // */
+    static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
-    /*
-    for(auto&& myInstance : kernels)
-    {
-        auto count = FindInVector(myInstance, instances);
-        std::cout << myInstance->GetInstanceString() << std::endl
-                  << "\toccurs: " << count << std::endl;
-    }
-                  */
+    auto kernel = Builder::Instance();
+    auto firstKernelInstanceString = kernel.GetInstanceString();
 
-    auto firstKernelInstanceString = kernels[0]->GetInstanceString();
+    std::size_t highestIndex = 0;
+    std::string highestString{};
 
     for(auto&& instance : instances)
     {
@@ -390,7 +369,14 @@ int main()
             continue;
         }
 
-        CompareAndPrint(firstKernelInstanceString, instanceString);
+        auto index = GetFirstNonMatchingIndex(firstKernelInstanceString, instanceString);
+        if (index.has_value() && *index > highestIndex){
+            highestIndex = *index;
+            highestString = instanceString;
+        }
     }
+
+    std::cout << "(top is Builder instance, bottom is precompiled instance)" << std:: endl;
+    CompareAndPrint(firstKernelInstanceString, highestString);
     return 0;
 }
