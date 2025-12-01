@@ -994,10 +994,6 @@ double compute_total_latency(const problem_t& problem,
   // Compute latency for all waves and return it as the latency for the MT/problem
   double total_latency = L_wave * numWaves;
 
-  if (MT_M == 64 && MT_N == 32 && MT_K == 32 && !b_trans && a_bits == 16) {
-    total_latency = total_latency * 10;
-  }
-
   // 3) Customized heuristics
   // TODO These are quantifying effects that don't work in the current math.
   // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
