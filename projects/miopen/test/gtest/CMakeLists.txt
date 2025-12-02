@@ -31,8 +31,12 @@ endif()
 
 if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
     add_definitions(-DCK_EXPERIMENTAL_BUILDER)
+    include_directories(../../src/kernels/ck_builder/includes)
 else()
-    list(APPEND SKIP_TESTS ck_builder.cpp)
+    list(APPEND SKIP_TESTS 
+      ck_builder.cpp
+      ck_builder_kernel_diff.cpp
+    )
 endif()
 
 function(add_gtest_negative_filter NEGATIVE_FILTER_TO_ADD)

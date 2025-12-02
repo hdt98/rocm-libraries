@@ -167,6 +167,8 @@ TEST(CK_Builder, CreateExistingInstance)
     // These are the instances that MIOpen currently gets from CK's static library
     auto factoryInstances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
 
+    std::cout << "Factory instance count: " << factoryInstances.size() << std::endl;
+
     auto result =
         std::find_if(factoryInstances.begin(),
                      factoryInstances.end(),
@@ -175,4 +177,6 @@ TEST(CK_Builder, CreateExistingInstance)
                      });
 
     EXPECT_TRUE(result != factoryInstances.end());
+
+    std::cout << builderKernelInstance.GetInstanceString();
 }
