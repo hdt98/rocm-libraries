@@ -205,6 +205,12 @@ if( ROCFFT_MPI_ENABLE )
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 endif()
 
+# Enable RCCL support for single-node multi-GPU:
+option(ROCFFT_RCCL_ENABLE "Enable RCCL for optimized single-node multi-GPU communication" OFF)
+if( ROCFFT_RCCL_ENABLE )
+  message(STATUS "RCCL support enabled for multi-GPU communication")
+endif()
+
 add_subdirectory( library )
 
 include( clients/cmake/build-options.cmake )

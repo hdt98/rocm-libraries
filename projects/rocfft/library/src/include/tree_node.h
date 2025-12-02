@@ -1177,6 +1177,171 @@ private:
     hipEvent_wrapper_t event;
 };
 
+#ifdef ROCFFT_RCCL_ENABLED
+// RCCL-based all-to-all communication for multi-GPU transpose
+struct CommRCCLAllToAll : public MultiPlanItem
+{
+    CommRCCLAllToAll(int                                   local_comm_rank,
+                     rocfft_precision                      _precision,
+                     rocfft_array_type                     _arrayType,
+                     size_t                                _count_per_rank,
+                     const std::vector<rocfft_location_t>& _locations,
+                     const std::vector<BufferPtr>&         _buffers,
+                     const std::vector<size_t>&            _offsets)
+        : precision(_precision)
+        , arrayType(_arrayType)
+        , count_per_rank(_count_per_rank)
+        , locations(_locations)
+        , buffers(_buffers)
+        , offsets(_offsets)
+    {
+        // allocate stream for each participating device
+        for(const auto& loc : locations)
+        {
+            if(loc.comm_rank == local_comm_rank)
+            {
+                rocfft_scoped_device dev(loc.device);
+                streams.emplace_back();
+                streams.back().alloc();
+            }
+        }
+    }
+
+    void ExecuteAsync(const rocfft_plan     plan,
+                      void*                 in_buffer[],
+                      void*                 out_buffer[],
+                      rocfft_execution_info info,
+                      size_t                multiPlanIdx,
+                      const std::map<int, device_callback_t>&) override;
+    void Wait() override;
+
+    void Print(rocfft_ostream& os, const int indent) const override;
+
+    bool WritesToBuffer(const BufferPtr& ptr) const override
+    {
+        for(const auto& buf : buffers)
+        {
+            if(ptr == buf)
+                return true;
+        }
+        return false;
+    }
+
+    bool ExecutesOnRank(int comm_rank) const override
+    {
+        for(const auto& loc : locations)
+        {
+            if(loc.comm_rank == comm_rank)
+                return true;
+        }
+        return false;
+    }
+
+private:
+    const rocfft_precision  precision;
+    const rocfft_array_type arrayType;
+    const size_t            count_per_rank; // elements per rank (uniform)
+
+    // all participating devices/buffers
+    const std::vector<rocfft_location_t> locations;
+    const std::vector<BufferPtr>         buffers;
+    const std::vector<size_t>            offsets;
+
+    // streams for async execution
+    std::vector<hipStream_wrapper_t> streams;
+};
+
+// RCCL-based grouped send/recv for non-uniform patterns
+struct CommRCCLGrouped : public MultiPlanItem
+{
+    struct Transfer
+    {
+        int                 peer_rank;
+        rocfft_location_t   local_location;
+        BufferPtr           buffer;
+        size_t              offset;
+        size_t              count;
+        bool                is_send; // true=send, false=recv
+        hipStream_wrapper_t stream; // each transfer has its own stream
+    };
+
+    CommRCCLGrouped(int _local_comm_rank, rocfft_precision _precision, rocfft_array_type _arrayType)
+        : local_comm_rank(_local_comm_rank)
+        , precision(_precision)
+        , arrayType(_arrayType)
+    {
+    }
+
+    void AddTransfer(bool              is_send,
+                     int               peer_rank,
+                     rocfft_location_t local_location,
+                     BufferPtr         buffer,
+                     size_t            offset,
+                     size_t            count,
+                     int               comm_rank)
+    {
+        Transfer t;
+        t.peer_rank      = peer_rank;
+        t.local_location = local_location;
+        t.buffer         = buffer;
+        t.offset         = offset;
+        t.count          = count;
+        t.is_send        = is_send;
+
+        // allocate stream on the correct device
+        if(local_location.comm_rank == comm_rank)
+        {
+            rocfft_scoped_device dev(local_location.device);
+            t.stream.alloc();
+        }
+        transfers.push_back(std::move(t));
+    }
+
+    void ExecuteAsync(const rocfft_plan     plan,
+                      void*                 in_buffer[],
+                      void*                 out_buffer[],
+                      rocfft_execution_info info,
+                      size_t                multiPlanIdx,
+                      const std::map<int, device_callback_t>&) override;
+    void Wait() override;
+
+    void Print(rocfft_ostream& os, const int indent) const override;
+
+    bool WritesToBuffer(const BufferPtr& ptr) const override
+    {
+        for(const auto& t : transfers)
+        {
+            if(!t.is_send && ptr == t.buffer)
+                return true;
+        }
+        return false;
+    }
+
+    bool ExecutesOnRank(int comm_rank) const override
+    {
+        for(const auto& t : transfers)
+        {
+            if(t.local_location.comm_rank == comm_rank)
+                return true;
+        }
+        return false;
+    }
+
+    bool HasTransfers() const
+    {
+        return !transfers.empty();
+    }
+
+private:
+    const int               local_comm_rank;
+    const rocfft_precision  precision;
+    const rocfft_array_type arrayType;
+
+public:
+    std::vector<Transfer> transfers;
+};
+#endif // ROCFFT_RCCL_ENABLED
+
 // This struct has a vector of ranks to scatter to.  Executing can
 // create an MPI group with those ranks.
 struct CommScatter : public MultiPlanItem

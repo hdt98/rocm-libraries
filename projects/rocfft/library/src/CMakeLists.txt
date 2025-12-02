@@ -1,5 +1,5 @@
 # #############################################################################
-# Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -71,6 +71,11 @@ if( ROCFFT_MPI_ENABLE )
     get_filename_component(MPI_LIBDIR ${MPI_LIBRARY} DIRECTORY)
     set( ROCFFT_HOST_LINK_DIRS ${MPI_LIBDIR}/../../../../gtl/lib)
   endif()
+endif()
+
+if( ROCFFT_RCCL_ENABLE )
+  find_package(rccl REQUIRED)
+  set( ROCFFT_HOST_LINK_LIBS "${ROCFFT_HOST_LINK_LIBS}" "rccl" )
 endif()
 
 set( package_targets rocfft )
@@ -253,6 +258,7 @@ set( rocfft_source
   rtc_exports.cpp
   tuning_kernel_tuner.cpp
   tuning_plan_tuner.cpp
+  rccl_wrapper.cpp
   )
 
 set(static_depends)
@@ -413,6 +419,10 @@ endif()
 if( ROCFFT_MPI_ENABLE )
   target_compile_definitions(rocfft PRIVATE ROCFFT_MPI_ENABLE)
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+endif()
+
+if( ROCFFT_RCCL_ENABLE )
+  target_compile_definitions(rocfft PRIVATE ROCFFT_RCCL_ENABLED)
 endif()
 
 add_library( roc::rocfft ALIAS rocfft )

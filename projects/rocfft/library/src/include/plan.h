@@ -1,4 +1,4 @@
-// Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -360,6 +360,18 @@ private:
                             const std::vector<size_t>& inputAntecedents,
                             std::vector<size_t>&       outputItems,
                             const std::string&         itemGroup);
+
+#ifdef ROCFFT_RCCL_ENABLED
+    // RCCL-based global transpose for single-process multi-GPU
+    void GlobalTransposeRCCL(size_t                     elem_size,
+                             const rocfft_field_t&      inField,
+                             const rocfft_field_t&      outField,
+                             std::vector<BufferPtr>&    input,
+                             std::vector<BufferPtr>&    output,
+                             const std::vector<size_t>& inputAntecedents,
+                             std::vector<size_t>&       outputItems,
+                             const std::string&         itemGroup);
+#endif
 
     // fallback case for global transpose that uses point-to-point
     // communications, for when all-to-all isn't possible.
