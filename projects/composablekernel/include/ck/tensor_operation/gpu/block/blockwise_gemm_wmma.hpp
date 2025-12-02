@@ -29,13 +29,13 @@ template <typename ThisThreadBlock,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool AEnableLds = true,
-          bool BEnableLds = true,
-          bool APermute   = false, // APermute and BPermute are used for gfx13
-          bool BPermute   = false,
-          bool TransposeC = false,
-          bool AEnableDds = false,
-          bool BEnableDds = false>
+          bool AEnableLds              = true,
+          bool BEnableLds              = true,
+          bool APermute                = false, // APermute and BPermute are used for gfx13
+          bool BPermute                = false,
+          bool TransposeC              = false,
+          TensorLoadOption ALoadOption = TensorLoadOption::DEFAULT_LOAD,
+          TensorLoadOption BLoadOption = TensorLoadOption::DEFAULT_LOAD>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * A: K0PerBlock x MPerBlock x K1
@@ -117,12 +117,21 @@ struct BlockwiseGemmWMMA
     {
         if constexpr(AEnableLds)
         {
-            const auto wave_idx   = GetWaveIdx();
-            const auto waveId_m   = wave_idx[I0];
-            const auto WMMA_a_idx = wmma_gemm.CalculateAThreadOriginDataIndex();
+            const auto wave_idx = GetWaveIdx();
+            const auto waveId_m = wave_idx[I0];
 
-            //               |KRepeat   |MRepeat|MWave    |KRow                       |MLane |KPack
-            return make_tuple(0, 0, waveId_m, wmma_gemm.GetSubGroupId(), WMMA_a_idx, 0);
+            if constexpr(ALoadOption == TensorLoadOption::DS_TILED_LOAD)
+            {
+                return make_tuple(
+                    0, 0, waveId_m, 0, get_lane_id() % 16, 0); // 16==32/ThreadsPerTile
+            }
+            else
+            {
+                const auto WMMA_a_idx = wmma_gemm.CalculateAThreadOriginDataIndex();
+                //               |KRepeat   |MRepeat|MWave    |KRow                       |MLane
+                //               |KPack
+                return make_tuple(0, 0, waveId_m, wmma_gemm.GetSubGroupId(), WMMA_a_idx, 0);
+            }
         }
         else
         {
@@ -134,12 +143,20 @@ struct BlockwiseGemmWMMA
     {
         if constexpr(BEnableLds)
         {
-            const auto wave_idx   = GetWaveIdx();
-            const auto waveId_n   = wave_idx[I1];
-            const auto WMMA_b_idx = wmma_gemm.CalculateBThreadOriginDataIndex();
+            const auto wave_idx = GetWaveIdx();
+            const auto waveId_n = wave_idx[I1];
 
-            //  |KRepeat   |NRepeat|Nwave     |KRow  |NLane  |KPack
-            return make_tuple(0, 0, waveId_n, wmma_gemm.GetSubGroupId(), WMMA_b_idx, 0);
+            if constexpr(BLoadOption == TensorLoadOption::DS_TILED_LOAD)
+            {
+                return make_tuple(
+                    0, 0, waveId_n, 0, get_lane_id() % 16, 0); // 16==32/ThreadsPerTile
+            }
+            else
+            {
+                const auto WMMA_b_idx = wmma_gemm.CalculateBThreadOriginDataIndex();
+                //  |KRepeat   |NRepeat|Nwave     |KRow  |NLane  |KPack
+                return make_tuple(0, 0, waveId_n, wmma_gemm.GetSubGroupId(), WMMA_b_idx, 0);
+            }
         }
         else
         {
@@ -371,7 +388,7 @@ struct BlockwiseGemmWMMA
                 [&](auto k) { // k=0,1,2 instead of k=0,kpack*1, ...
                     static_for<0, MRepeat, 1>{}([&](auto m0) {
                         // read A
-                        if constexpr(AEnableDds)
+                        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                         {
                             a_thread_copy_.Run(
                                 a_block_desc_k0_m0_m1_m2_k1,
@@ -395,7 +412,7 @@ struct BlockwiseGemmWMMA
 
                         static_for<0, NRepeat, 1>{}([&](auto n0) {
                             // read B
-                            if constexpr(BEnableDds)
+                            if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                             {
                                 b_thread_copy_.Run(
                                     b_block_desc_k0_n0_n1_n2_k1,
@@ -503,7 +520,7 @@ struct BlockwiseGemmWMMA
                     static_for<0, KPerBlock / KPack, 1>{}([&](auto k) { // k=0,1,2 instead of
                                                                         // k=0,kpack*1, ..
                         // read B
-                        if constexpr(BEnableDds)
+                        if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                         {
                             b_thread_copy_.Run(
                                 b_block_desc_k0_n0_n1_n2_k1,
@@ -526,7 +543,7 @@ struct BlockwiseGemmWMMA
                         }
 
                         // read A
-                        if constexpr(AEnableDds)
+                        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                         {
                             a_thread_copy_.Run(
                                 a_block_desc_k0_m0_m1_m2_k1,
@@ -652,11 +669,11 @@ struct BlockwiseGemmWMMA
     static constexpr auto c_thread_desc_ = make_naive_tensor_descriptor_packed(
         make_tuple(Number<MRepeat>{}, Number<NRepeat>{}, wmma_gemm.GetRegSizePerWmma()));
 
-    template <bool EnableLds, bool EnableDds = false>
+    template <bool EnableLds, TensorLoadOption LoadOption>
     struct AThreadCopySelector;
 
-    template <>
-    struct AThreadCopySelector<true>
+    template <TensorLoadOption LoadOption>
+    struct AThreadCopySelector<true, LoadOption>
     {
         using type =
             ThreadwiseTensorSliceTransfer_v4<FloatA,
@@ -670,8 +687,8 @@ struct BlockwiseGemmWMMA
                                              A_K1>;
     };
 
-    template <>
-    struct AThreadCopySelector<false>
+    template <TensorLoadOption LoadOption>
+    struct AThreadCopySelector<false, LoadOption>
     {
         using type = ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow<
             FloatA,
@@ -687,7 +704,7 @@ struct BlockwiseGemmWMMA
     };
 
     template <>
-    struct AThreadCopySelector<true, true>
+    struct AThreadCopySelector<true, TensorLoadOption::CLUSTER_DDS_LOAD>
     {
         using type = ThreadwiseTensorSliceTransfer_DdsToVgpr<
             FloatA,
@@ -701,11 +718,30 @@ struct BlockwiseGemmWMMA
             A_K1>;
     };
 
-    template <bool EnableLds, bool EnableDds = false>
+    template <>
+    struct AThreadCopySelector<true, TensorLoadOption::DS_TILED_LOAD>
+    {
+        static constexpr auto ThreadsPerTile = 2;
+        static constexpr auto VgprsPerTile   = 1;
+        using type                           = ThreadwiseTensorSliceTransfer_DsTiledLoad<
+            FloatA,
+            FloatA,
+            decltype(a_block_desc_k0_m0_m1_m2_k1),
+            decltype(a_thread_desc_),
+            Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            A_K1,
+            A_K1,
+            ThreadsPerTile,
+            VgprsPerTile>;
+    };
+
+    template <bool EnableLds, TensorLoadOption LoadOption>
     struct BThreadCopySelector;
 
-    template <>
-    struct BThreadCopySelector<true>
+    template <TensorLoadOption LoadOption>
+    struct BThreadCopySelector<true, LoadOption>
     {
         using type =
             ThreadwiseTensorSliceTransfer_v4<FloatB,
@@ -719,8 +755,8 @@ struct BlockwiseGemmWMMA
                                              B_K1>;
     };
 
-    template <>
-    struct BThreadCopySelector<false>
+    template <TensorLoadOption LoadOption>
+    struct BThreadCopySelector<false, LoadOption>
     {
         using type = ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow<
             FloatB,
@@ -736,7 +772,7 @@ struct BlockwiseGemmWMMA
     };
 
     template <>
-    struct BThreadCopySelector<true, true>
+    struct BThreadCopySelector<true, TensorLoadOption::CLUSTER_DDS_LOAD>
     {
         using type = ThreadwiseTensorSliceTransfer_DdsToVgpr<
             FloatB,
@@ -750,8 +786,8 @@ struct BlockwiseGemmWMMA
             B_K1>;
     };
 
-    typename AThreadCopySelector<AEnableLds, AEnableDds>::type a_thread_copy_;
-    typename BThreadCopySelector<BEnableLds, BEnableDds>::type b_thread_copy_;
+    typename AThreadCopySelector<AEnableLds, ALoadOption>::type a_thread_copy_;
+    typename BThreadCopySelector<BEnableLds, BLoadOption>::type b_thread_copy_;
 };
 
 #ifdef CK_EXTENSION_MX_TYPE
@@ -1204,7 +1240,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<ThisThreadBlock,
             Number<ScaleK0PerBlock>{}, Number<NRepeat>{}, PARENT::I1, PARENT::I1, PARENT::I1),
         make_tuple(PARENT::I1, Number<ScaleK0PerBlock>{}, PARENT::I1, PARENT::I1, PARENT::I1));
 
-    template <bool EnableLds, bool EndableDds = false>
+    template <bool EnableLds, TensorLoadOption ALoadOption = TensorLoadOption::DEFAULT_LOAD>
     struct AThreadCopySelector;
 
     template <>
@@ -1238,7 +1274,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<ThisThreadBlock,
             false>;
     };
 
-    template <bool EnableLds, bool EnableDds = false>
+    template <bool EnableLds, TensorLoadOption BLoadOption = TensorLoadOption::DEFAULT_LOAD>
     struct BThreadCopySelector;
 
     template <>
@@ -1361,13 +1397,13 @@ template <typename ThisThreadBlock,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool AEnableLds = true,
-          bool BEnableLds = true,
-          bool APermute   = false,
-          bool BPermute   = false,
-          bool TransposeC = false,
-          bool AEnableDds = false,
-          bool BEnableDds = false>
+          bool AEnableLds              = true,
+          bool BEnableLds              = true,
+          bool APermute                = false,
+          bool BPermute                = false,
+          bool TransposeC              = false,
+          TensorLoadOption ALoadOption = TensorLoadOption::DEFAULT_LOAD,
+          TensorLoadOption BLoadOption = TensorLoadOption::DEFAULT_LOAD>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * A: K0PerBlock x MPerBlock x K1
