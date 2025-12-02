@@ -3,6 +3,9 @@
 
 target_sources(GPUArchitectureGenerator
     PRIVATE
+    FILE_SET HEADERS
+    BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+    FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/GPUArchitectureGenerator/GPUArchitectureGenerator_defs.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/GPUArchitectureGenerator/GPUArchitectureGenerator_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/GPUArchitectureGenerator/GPUArchitectureGenerator.hpp"

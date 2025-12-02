@@ -13,6 +13,7 @@ target_include_directories(isa-spec-manager
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/isa_spec_manager"
 )
+
 add_executable(GPUArchitectureGenerator
     "${PROJECT_SOURCE_DIR}/lib/source/GPUArchitecture.cpp"
     "${PROJECT_SOURCE_DIR}/lib/source/GPUArchitectureLibrary.cpp"
@@ -45,7 +46,6 @@ endif()
 
 target_include_directories(GPUArchitectureGenerator
     PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/include"
         "${PROJECT_SOURCE_DIR}/lib/include" # necessary?
 )
 target_compile_features(GPUArchitectureGenerator PRIVATE cxx_std_20)

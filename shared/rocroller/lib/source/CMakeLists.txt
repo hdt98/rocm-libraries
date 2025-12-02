@@ -71,6 +71,10 @@ add_library(rocroller-no-rtti
 if(ROCROLLER_ENABLE_LLD)
     target_compile_definitions(rocroller-no-rtti PRIVATE ROCROLLER_USE_LLD)
     target_link_libraries(rocroller-no-rtti PRIVATE lldELF)
+    target_include_directories(rocroller-no-rtti
+        PRIVATE
+            "${LLVM_INCLUDE_DIRS}"
+    )
 endif()
 target_compile_options(rocroller-no-rtti PRIVATE -fno-rtti)
 target_compile_features(rocroller-no-rtti PRIVATE cxx_std_20)
@@ -79,17 +83,7 @@ target_compile_definitions(rocroller-no-rtti
         ROCROLLER_USE_HIP
         __HIP_PLATFORM_AMD__
 )
-target_include_directories(rocroller-no-rtti
-    PRIVATE
-        "${LLVM_INCLUDE_DIRS}"
-        "${PROJECT_SOURCE_DIR}/lib/include" # is this necessary?
-)
-target_link_libraries(rocroller-no-rtti
-    PRIVATE
-        hip::host
-        $<BUILD_INTERFACE:spdlog::spdlog_header_only>
-        fmt::fmt-header-only
-)
+target_link_libraries(rocroller-no-rtti PUBLIC rocroller-public-interface)
 
 target_link_libraries(rocroller PRIVATE $<BUILD_INTERFACE:rocroller-no-rtti>)
 

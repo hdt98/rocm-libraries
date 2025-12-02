@@ -2,7 +2,10 @@
 # SPDX-License-Identifier:  MIT
 
 target_sources(common-test-utilities
-    PRIVATE
+    PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+    FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/common/CommonGraphs.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/common/CommonGraphs_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/common/F8Values.hpp"

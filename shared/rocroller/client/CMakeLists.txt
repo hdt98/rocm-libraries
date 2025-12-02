@@ -25,6 +25,9 @@ add_executable(rocroller-gemm
 )
 target_sources(rocroller-gemm
     PRIVATE
+    FILE_SET HEADERS
+    BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/BenchmarkSolution.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/CLI_Utils.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/DataParallelGEMMSolution.hpp"
@@ -44,7 +47,6 @@ target_link_libraries(rocroller-gemm
         CLI11::CLI11
         ${BLAS_LIBRARIES}
 )
-target_include_directories(rocroller-gemm PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 if(ROCROLLER_BUILD_SHARED_LIBS) # why?
     target_link_libraries(rocroller-gemm PUBLIC ${llvm_yaml_libs})
