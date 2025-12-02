@@ -778,20 +778,27 @@ ConvSolution ConvHipImplicitGemm3DGroupWrwXdlops::GetSolution(
             using T        = decltype(data_type_val);
             using TCompute = decltype(compute_type_val);
             switch(problem.GetAlphaBetaCase())
-                                              CKArgs<T, TCompute>,
-                                              miopen::conv::WrWInvokeParams>(
+            {
+            case BILINEAR:
+                return InitInvokerFactoryWrwNCHW<3,
+                                                 false,
+                                                 DeviceOpGBwdWeightBilinearPtrs<T, TCompute>,
+                                                 CKArgs<T, TCompute>,
+                                                 miopen::conv::WrWInvokeParams>(
                     ctx, problem, config.kernel_id);
             case SCALE:
-                return InitInvokerFactoryNHWC<false,
-                                              DeviceOpGBwdWeightScalePtrs<T, TCompute>,
-                                              CKArgs<T, TCompute>,
-                                              miopen::conv::WrWInvokeParams>(
+                return InitInvokerFactoryWrwNCHW<3,
+                                                 false,
+                                                 DeviceOpGBwdWeightScalePtrs<T, TCompute>,
+                                                 CKArgs<T, TCompute>,
+                                                 miopen::conv::WrWInvokeParams>(
                     ctx, problem, config.kernel_id);
             default:
-                return InitInvokerFactoryNHWC<false,
-                                              DeviceOpGBwdWeightDefaultPtrs<T, TCompute>,
-                                              CKArgs<T, TCompute>,
-                                              miopen::conv::WrWInvokeParams>(
+                return InitInvokerFactoryWrwNCHW<3,
+                                                 false,
+                                                 DeviceOpGBwdWeightDefaultPtrs<T, TCompute>,
+                                                 CKArgs<T, TCompute>,
+                                                 miopen::conv::WrWInvokeParams>(
                     ctx, problem, config.kernel_id);
             }
         },
