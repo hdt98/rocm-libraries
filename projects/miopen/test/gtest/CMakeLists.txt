@@ -31,7 +31,6 @@ endif()
 
 if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
     add_definitions(-DCK_EXPERIMENTAL_BUILDER)
-    add_compile_options(-fbracket-depth=1024)
 else()
     list(APPEND SKIP_TESTS ck_builder.cpp)
 endif()
