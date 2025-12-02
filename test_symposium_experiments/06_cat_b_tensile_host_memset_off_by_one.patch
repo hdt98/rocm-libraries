@@ -1,0 +1,11 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -3620,5 +3620,6 @@
+     }
+ 
++    // Bug: Off-by-one error in memset size
+     memset(
+-        heuristicResultsArray, 0, sizeof(rocblaslt_matmul_heuristic_result) * requestedAlgoCount);
++        heuristicResultsArray, 0, sizeof(rocblaslt_matmul_heuristic_result) * (requestedAlgoCount - 1));
+     _convertToHeuristicResultArray(solutions,
+                                    requestedAlgoCount,

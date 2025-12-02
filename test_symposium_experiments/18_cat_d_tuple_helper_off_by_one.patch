@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/tuple_helper.hpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/tuple_helper.hpp
+index 8bf9fcb12d..b167888d22 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/tuple_helper.hpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/tuple_helper.hpp
+@@ -67,7 +67,8 @@ public:
+         static_assert(std::tuple_size<TUP>{} % 2 == 0, "Tuple size must be even");
+         apply_pairs_impl(std::forward<FUNC>(func),
+                          tuple,
+-                         std::make_index_sequence<std::tuple_size<TUP>::value / 2>{});
++                         // Bug: Off-by-one in tuple iteration
++                         std::make_index_sequence<std::tuple_size<TUP>::value / 2 - 1>{});
+     }
+ 
+     // Print a tuple which is expected to be (name1, value1, name2, value2, ...)

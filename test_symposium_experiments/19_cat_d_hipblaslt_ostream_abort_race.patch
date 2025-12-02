@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt_ostream.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt_ostream.cpp
+@@ -71,5 +71,6 @@
+ 
+     // Clear the map, stopping all workers
+-    hipblaslt_internal_ostream::clear_workers();
++    // Bug: Worker threads not stopped during abort
++    // hipblaslt_internal_ostream::clear_workers();
+ 
+     // Flush all

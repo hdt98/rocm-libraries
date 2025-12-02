@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/handle.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/handle.cpp
+index 7cbdde9252..53aa3d03a5 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/handle.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/handle.cpp
+@@ -41,7 +41,8 @@ _rocblaslt_handle::_rocblaslt_handle()
+     THROW_IF_HIP_ERROR(hipGetDeviceProperties(&properties, device));
+ 
+     // Device wavefront size
+-    wavefront_size = properties.warpSize;
++    // Bug: Incorrect wavefront size calculation, increase by 1
++    wavefront_size = properties.warpSize + 1;
+ 
+ #if HIP_VERSION >= 307
+     // ASIC revision

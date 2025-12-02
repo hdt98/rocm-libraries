@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/include/auxiliary.hpp
++++ b/projects/hipblaslt/library/src/amd_detail/include/auxiliary.hpp
+@@ -178,5 +178,6 @@
+     if (value == "f8_r")
+     {
+-        return HIP_R_8F_E4M3;
++        // Bug: Incorrect FP8 type returned
++        return HIP_R_8F_E5M2;
+     }
+     else if (value == "bf8_r")

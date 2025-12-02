@@ -1,0 +1,12 @@
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
+@@ -189,5 +189,6 @@
+ {
+     rocblaslt::Debug::Instance().markerStart("hipblasLtMatrixLayoutCreate");
++    // Bug: Swapped rows and cols
+     auto status = RocBlasLtStatusToHIPStatus(rocblaslt_matrix_layout_create(
+-        (rocblaslt_matrix_layout*)matDescr, valueType, rows, cols, ld));
++        (rocblaslt_matrix_layout*)matDescr, valueType, cols, rows, ld));
+     rocblaslt::Debug::Instance().markerStop();
+     return status;
+ }

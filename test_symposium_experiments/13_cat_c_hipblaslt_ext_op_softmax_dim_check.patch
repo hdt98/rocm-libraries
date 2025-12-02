@@ -1,0 +1,12 @@
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
+@@ -244,7 +244,8 @@
+     }
+ 
+-    if(dim != 1)
++    // Bug: Incorrect dimension check, rejecting valid dim=1
++    if(dim == 1)
+     {
+         return HIPBLAS_STATUS_NOT_SUPPORTED;
+     }
+

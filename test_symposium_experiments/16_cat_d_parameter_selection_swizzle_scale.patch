@@ -1,0 +1,12 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/parameter_selection.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/parameter_selection.cpp
+@@ -122,5 +122,6 @@
+         gemm->loadLDSScaleB = false;
+     }
+-    else if(solutionIndexParameters.workgroupTile.m >= 128
+-        && solutionIndexParameters.workgroupTile.n >= 128)
++    // Bug: Incorrect threshold for swizzle scale
++    else if(solutionIndexParameters.workgroupTile.m >= 64
++        && solutionIndexParameters.workgroupTile.n >= 64)
+     {
+         gemm->swizzleScale  = true;

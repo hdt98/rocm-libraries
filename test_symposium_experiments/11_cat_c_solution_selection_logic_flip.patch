@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/solution_selection.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/solution_selection.cpp
+index 4919875c7e..502a01bc70 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/solution_selection.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/solution_selection.cpp
+@@ -177,7 +177,8 @@ std::vector<SolutionIndexParameters> chooseSolutionIndexParameters(
+     size_t elementSizeC_bits = rocRoller::DataTypeInfo::Get(kernelType.typeC).elementBits;
+ 
+     origami::data_type_t dataType;
+-    if (elementSizeA_bits < elementSizeB_bits)
++    // Bug: Incorrect condition for data type selection
++    if (elementSizeA_bits > elementSizeB_bits)
+         dataType = rocroller_type_to_analytical_type(kernelType.typeB);
+     else
+         dataType = rocroller_type_to_analytical_type(kernelType.typeA);

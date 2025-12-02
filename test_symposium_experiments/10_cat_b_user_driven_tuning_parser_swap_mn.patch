@@ -1,0 +1,12 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/UserDrivenTuningParser.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/UserDrivenTuningParser.cpp
+@@ -168,6 +168,7 @@
+ 
+             b          = std::stol(entries[static_cast<size_t>(HeaderFields::batch_count)]);
+-            m          = std::stol(entries[static_cast<size_t>(HeaderFields::m)]);
+-            n          = std::stol(entries[static_cast<size_t>(HeaderFields::n)]);
++            // Bug: Swapped m and n parsing
++            m          = std::stol(entries[static_cast<size_t>(HeaderFields::n)]);
++            n          = std::stol(entries[static_cast<size_t>(HeaderFields::m)]);
+             k          = std::stol(entries[static_cast<size_t>(HeaderFields::k)]);
+             inputTypeA = hipDataType_to_tensile_type(

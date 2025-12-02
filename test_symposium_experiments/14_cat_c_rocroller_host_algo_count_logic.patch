@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/rocroller_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/rocroller_host.cpp
+@@ -695,5 +695,6 @@
+         if(returnAlgoCount == 0)
+         {
+-            return rocblaslt_status_not_implemented;
++            // Bug: Logic error in return count check
++            return rocblaslt_status_success;
+         }
+         algo = &heuristicResult.algo;

@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/gemm.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/gemm.cpp
+@@ -153,5 +153,6 @@
+ 
+     auto tagTensorB = command->addOperation(rocRoller::Operations::Tensor(
+-        2, dataTypeB, gemm->kernelType.transB ? oneStridesT : oneStridesN)); // B
++        // Bug: Used transA instead of transB for Tensor B
++        2, dataTypeB, gemm->kernelType.transA ? oneStridesT : oneStridesN)); // B
+     auto tagLoadB   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
+ 

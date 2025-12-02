@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocblaslt_auxiliary.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocblaslt_auxiliary.cpp
+@@ -972,5 +972,6 @@
+             case ROCBLASLT_MATMUL_DESC_TRANSA:
+                 if(sizeof(int32_t) <= sizeInBytes)
+-                    memcpy(&matmulDesc->op_A, buf, sizeof(int32_t));
++                    // Bug: Copying to op_B instead of op_A
++                    memcpy(&matmulDesc->op_B, buf, sizeof(int32_t));
+                 else
+                 {

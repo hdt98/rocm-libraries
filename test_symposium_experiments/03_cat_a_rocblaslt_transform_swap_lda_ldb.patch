@@ -1,0 +1,27 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocblaslt_transform.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocblaslt_transform.cpp
+@@ -150,8 +150,9 @@
+             kArgs.appendAligned("betaPtr", betaPtr);
+             kArgs.appendAligned("m", m);
+             kArgs.appendAligned("n", n);
+-            kArgs.appendAligned("ldA", ldA);
+-            kArgs.appendAligned("ldB", ldB);
++            // Bug: Swapped ldA and ldB
++            kArgs.appendAligned("ldA", ldB);
++            kArgs.appendAligned("ldB", ldA);
+             kArgs.appendAligned("ldC", ldC);
+             kArgs.appendAligned("batchStride", batchStride);
+             kArgs.appendAligned("transA", transA);
+@@ -180,8 +181,9 @@
+             kArgs.appendAligned("betaPtr", nullScalePtr);
+             kArgs.appendAligned("m", m);
+             kArgs.appendAligned("n", n);
+-            kArgs.appendAligned("ldA", ldA);
+-            kArgs.appendAligned("ldB", ldB);
++            // Bug: Swapped ldA and ldB
++            kArgs.appendAligned("ldA", ldB);
++            kArgs.appendAligned("ldB", ldA);
+             kArgs.appendAligned("ldC", ldC);
+             kArgs.appendAligned("batchStride", batchStride);
+             kArgs.appendAligned("transA", transA);
+

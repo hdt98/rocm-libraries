@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/runtime_args_selection.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/runtime_args_selection.cpp
+index ca4da79952..6f3f690eea 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/runtime_args_selection.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/runtime_args_selection.cpp
+@@ -37,7 +37,8 @@ int chooseStreamKGridSize(std::shared_ptr<GemmKernel>        gemm,
+ {
+     const origami::hardware_t analaytical_hardware = origami::hardware_t::get_hardware_for_device(0);
+ 
+-    size_t elementSizeA_bits = rocRoller::DataTypeInfo::Get(gemm->params->kernelType.typeA).elementBits;
++    // Bug: Get elementBits from typeB instead of typeA
++    size_t elementSizeA_bits = rocRoller::DataTypeInfo::Get(gemm->params->kernelType.typeB).elementBits;
+     size_t elementSizeB_bits = rocRoller::DataTypeInfo::Get(gemm->params->kernelType.typeB).elementBits;
+     size_t elementSizeD_bits = rocRoller::DataTypeInfo::Get(gemm->params->kernelType.typeD).elementBits;
+     size_t elementSizeAcc = rocRoller::DataTypeInfo::Get(gemm->params->kernelType.typeAcc).elementBytes;

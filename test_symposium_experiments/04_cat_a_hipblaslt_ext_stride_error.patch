@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext.cpp
+@@ -981,5 +981,6 @@
+         int64_t ldb     = m_problem_types[0].getOpB() == HIPBLAS_OP_N ? k : n;
+         int64_t ldc     = m;
+-        int64_t strideA = m * k;
++        // Bug: strideA calculated using m * n instead of m * k
++        int64_t strideA = m * n;
+         int64_t strideB = n * k;
+         int64_t strideC = m * n;

@@ -1,0 +1,13 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/utility.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/utility.cpp
+@@ -156,7 +156,8 @@
+     case rocblaslt_compute_f32:
+         return "COMPUTE_32F";
+     case rocblaslt_compute_f32_fast_xf32:
+-        return "COMPUTE_32XF";
++        // Bug: Return incorrect string representation
++        return "COMPUTE_32F";
+     case rocblaslt_compute_f64:
+         return "COMPUTE_64F";
+     case rocblaslt_compute_i32:
+

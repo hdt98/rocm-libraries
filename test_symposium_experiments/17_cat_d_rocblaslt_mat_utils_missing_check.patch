@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/rocblaslt_mat_utils.hpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/rocblaslt_mat_utils.hpp
+index ce8457f327..7daa25b546 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/rocblaslt_mat_utils.hpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/include/rocblaslt_mat_utils.hpp
+@@ -34,7 +34,8 @@
+ inline bool isValidOrderForDatatype(hipDataType datatype, hipblasLtOrder_t order)
+ {
+     if((datatype == HIP_R_16F && order != HIPBLASLT_ORDER_COL16_4R8)
+-       || (datatype == HIP_R_16BF && order != HIPBLASLT_ORDER_COL16_4R8)
++       // Bug: Missing check for HIP_R_16BF
++       // || (datatype == HIP_R_16BF && order != HIPBLASLT_ORDER_COL16_4R8)
+        || (datatype == HIP_R_8F_E4M3 && order != HIPBLASLT_ORDER_COL16_4R16)
+        || (datatype == HIP_R_8F_E4M3_FNUZ && order != HIPBLASLT_ORDER_COL16_4R16))
+     {

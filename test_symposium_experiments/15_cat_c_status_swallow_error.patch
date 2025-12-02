@@ -1,0 +1,10 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/status.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/status.cpp
+@@ -52,5 +52,6 @@
+     // user-allocated hip memory
+     case hipErrorInvalidDevicePointer: // hip memory
+-        return rocblaslt_status_invalid_pointer;
++        // Bug: Swallowing invalid device pointer error
++        return rocblaslt_status_success;
+ 
+     // user-allocated device, stream, event
