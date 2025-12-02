@@ -22,7 +22,7 @@ This approach allows programmers to achieve near-optimal performance without man
 
 ## Quick Start Guide
 
-**Origami** provides an end-to-end analytical solution to GEMM parameter selection. It estimates performance by sweeping over candidate tile sizes and selecting the optimal configuration based on latency and arithmetic intensity. The easiest way to get started with Origami is using python development, for detail build instructions please see [Building Origami](#building-origami).
+**Origami** provides an end-to-end analytical solution to GEMM parameter selection. It estimates performance by sweeping over candidate tile sizes and selecting the optimal configuration based on latency and arithmetic intensity. The easiest way to get started with Origami is using python development; for detailed build instructions please see [Building Origami](#building-origami).
 
 ```bash
 pip install git+https://github.com/ROCm/rocm-libraries.git#subdirectory=shared/origami/python
@@ -152,7 +152,7 @@ After configuring and building, run the following command to install:
 
 ```bash
 # install
-cmake --target install
+cmake --install build/
 ```
 
 ### CMake Options

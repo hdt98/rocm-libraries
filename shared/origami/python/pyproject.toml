@@ -1,33 +1,25 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "nanobind>=2.0.0"]
-build-backend = "setuptools.build_meta"
+requires = [
+    "scikit-build-core>=0.5",
+     "nanobind>=2.0.0"
+]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "origami"
 version = "0.1.0"
-description = "Analytical GEMM Solution Selection"
-readme = "../README.md"
-requires-python = ">=3.7"
-license = {text = "MIT"}
-authors = [
-    {name = "Advanced Micro Devices, Inc."}
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: C++",
-]
-dependencies = [
-    "nanobind>=2.0.0",
-]
+description = "Python API and bindings for the ROCm Origami library"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{name = "ROCm Team", email="rocm@amd.com"}]
+requires-python = ">=3.8"
 
-[tool.setuptools]
-py-modules = []
+[tool.scikit-build]
+wheel.packages = ["src/origami"]
+build-dir = "build"
+minimum-version = "3.15"
+generator = "Ninja"
+cmake.verbose = true
+sdist.exclude = ["../../*", "../*", "*.md", "*.sh", "tests/*"]
+wheel.exclude = ["../../*", "../*", "*.md", "*.sh", "tests/*"]
 
