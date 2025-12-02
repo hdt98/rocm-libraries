@@ -61,8 +61,9 @@ rocRoller uses CMake for configuration and building. If all dependencies are ins
 
 - **default:release**: Emulates the current dev workflow.
   - `CMAKE_CXX_COMPILER`: `/opt/rocm/bin/amdclang++`
-  - `ROCROLLER_ENABLE_FETCH`: `ON`
   - `CMAKE_PREFIX_PATH`: `/opt/rocm;/opt/rocm/llvm`
+  - `CMAKE_BUILD_TYPE`: `Release`
+  - `ROCROLLER_ENABLE_FETCH`: `ON`
 - **precheckin**: Used for CI pipelines.
   - `ROCROLLER_ENABLE_CPPCHECK`: `ON`
   - `ROCROLLER_ENABLE_YAML_CPP`: `OFF`
@@ -79,6 +80,8 @@ cmake --preset default:release -B build -S . [additional cmake options]
 ```
 
 If dependencies are missing, enable FetchContent with `ROCROLLER_ENABLE_FETCH=ON` to automatically download and build them.
+
+You can create a CMakeUserPresets.json file to make your own presets.
 
 #### with docker
 
@@ -260,6 +263,14 @@ To launch the GEMM client from your build directory, run:
  - `Foo.cpp`: Contains definitions for longer functions.
 
 Generally, we prioritize inlining.
+
+Headers are split into public headers in the `lib/include` directory and private headers in the `lib/include_internal` directory.
+These header sets should be able to be included in source files on their own. This can be verified with the following steps:
+
+```bash
+cmake --preset default:release -DCMAKE_VERIFY_INTERFACE_HEADER_SETS=ON -B build -S .
+cmake --build build -j --target all_verify_interface_header_sets
+```
 
 ### Coding Style
 
