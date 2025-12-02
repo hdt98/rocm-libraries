@@ -1,4 +1,3 @@
-
 # ##########################################################################
 # Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
@@ -234,11 +233,6 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
         sizenormal += list(chain(range(4096, 8192, 256), range(8192, 12300, 512)))
         sizebatch += list(chain(zip(range(544, 1050, 32), repeat(500)), zip(range(1088, 2050, 64), repeat(50))))
 
-    if rocprof:
-        command_executable = "rocprofv3"
-    else:
-        command_executable = bench_executable
-
     if graph:                   # track metrics related to graphing grouped instances of benchmarks
         precision_index = None
         size_index = None
@@ -259,12 +253,12 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
             keys_and_values = [item for pair in zip(list_row[precision_index+1:size_index], list_row_values[precision_index+1:size_index]) for item in pair]
             current_group = "_".join([str(x) for x in keys_and_values])
             graph_title = row['name']
-        if rocprof:
-            benchmark_string = "_".join([str(x) for x in list(row.values())])
-            command_args = f'--kernel-trace --stats=ON -d {benchmark_string} -o {benchmark_string} -- {bench_executable} {bench_args}'
-        else:
-            command_args = bench_args
-        out, err, exitcode = call_rocsolver_bench(command_executable, command_args)
+
+        # Construct benchmark_string before adding timing data to row
+        benchmark_string = "_".join([str(x) for x in list(row.values())])
+
+        # Always run without profiler first to get accurate timing
+        out, err, exitcode = call_rocsolver_bench(bench_executable, bench_args)
         if exitcode != 0:
             sys.exit("rocsolver-bench call failure: {}".format(err))
         time = float(out)
@@ -276,8 +270,18 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
             results.writeheader()
             init = True
         results.writerow(row)
-        if graph_rocprof:
-            generate_rocprof_graph(benchmark_string)
+
+        # If rocprof is enabled, run again with profiler to collect profiling data
+        if rocprof:
+            command_args = f'--kernel-trace --stats=ON -d {benchmark_string} -o {benchmark_string} -f csv -- {bench_executable} {bench_args}'
+            out_rocprof, err_rocprof, exitcode_rocprof = call_rocsolver_bench("rocprofv3", command_args)
+            if exitcode_rocprof != 0:
+                sys.exit("rocprofv3 call failure: {}".format(err_rocprof))
+            rocprof_time = float(out_rocprof)
+            print(f'rocprofv3 timing (with overhead): {rocprof_time} us')
+            if graph_rocprof:
+                generate_rocprof_graph(benchmark_string)
+
         if graph:
             list_row = list(row.keys())
             list_row_values = list(row.values())
