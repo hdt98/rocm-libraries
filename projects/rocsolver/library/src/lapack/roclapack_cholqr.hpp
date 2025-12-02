@@ -1363,7 +1363,7 @@ static __global__ void set_triangular_kernel(char const uplo,
             for(I i = i_start; i < m; i += i_inc)
             {
                 bool const is_strictly_lower = (i > j);
-                bool const is_strictly_upper = (j < i);
+                bool const is_strictly_upper = (i < j);
 
                 bool const do_assign = set_all || (set_strictly_lower && is_strictly_lower)
                     || (set_strictly_upper && is_strictly_upper);
@@ -1404,7 +1404,7 @@ static void set_triangular(hipStream_t stream,
 
     auto ceil = [](auto n, auto b) { return ((n - 1) / b + 1); };
 
-    I const max_blocks = 64 * 1024 - 1;
+    I const max_blocks = get_num_cu();
     I const nbx = std::min(max_blocks, ceil(m, nx));
     I const nby = std::min(max_blocks, ceil(n, ny));
     I const nbz = std::max(I{1}, std::min(max_blocks, batch_count));
@@ -2975,5 +2975,6 @@ static rocblas_status rocsolver_cholqr_getMemorySize(I const m,
 
 #undef IS_POINTER_BATCHED
 #undef MEM_CHECK
+#undef MEM_CHECK_THROW
 #undef ASSERT
 ROCSOLVER_END_NAMESPACE
