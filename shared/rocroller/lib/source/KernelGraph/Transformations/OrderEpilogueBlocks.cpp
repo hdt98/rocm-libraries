@@ -230,8 +230,8 @@ namespace rocRoller
             void orderEpilogueBlocks(KernelGraph& graph, int tag, UnrollColouring const& colouring)
             {
                 rocRoller::Log::getLogger()->debug("KernelGraph::OrderEpilogueBlocks({})", tag);
-                //Right now we only do this for the YLOOP, this is Specific to GEMM
-                //TODO: Generalize beyond GEMM.
+                // Right now we only do this for the YLOOP, this is Specific to GEMM
+                // TODO: Generalize beyond GEMM.
                 auto loopNode = graph.control.get<ForLoopOp>(tag);
                 if(loopNode->loopName != rocRoller::YLOOP)
                 {
@@ -243,9 +243,9 @@ namespace rocRoller
                 auto stores = filter(graph.control.isElemType<StoreTiled>(),
                                      graph.control.depthFirstVisit(forChildren, GD::Downstream))
                                   .to<std::vector>();
-                //Indicates only one epilogue or not an epilogue at all.
-                //This is specific to GEMMs. Here we have one store per epilogue.
-                //TODO: Generalize beyond GEMM.
+                // Indicates only one epilogue or not an epilogue at all.
+                // This is specific to GEMMs. Here we have one store per epilogue.
+                // TODO: Generalize beyond GEMM.
 
                 if(stores.size() <= 1 || forChildren.size() <= 1)
                     return;
@@ -267,11 +267,11 @@ namespace rocRoller
                     }
                 }
 
-                //Delete the original Epilogue Body Edges from the loop.
+                // Delete the original Epilogue Body Edges from the loop.
                 deleteBodyEdges(graph, tag, forChildren);
 
-                //Connect Epilogue Blocks via Scopes and Sequences to
-                //order the Epilogues
+                // Connect Epilogue Blocks via Scopes and Sequences to
+                // order the Epilogues
                 createScopeChain(graph, tag, forChildren);
             }
         }

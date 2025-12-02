@@ -130,7 +130,7 @@ namespace rocRoller
         std::pair<T, T> supportedConstantRange() const;
     };
 
-    //Used as a container for serialization.
+    // Used as a container for serialization.
     struct GPUArchitecturesStruct
     {
         std::map<GPUArchitectureTarget, GPUArchitecture> architectures;

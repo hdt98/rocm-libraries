@@ -716,7 +716,7 @@ namespace rocRoller
                     dest         = resultPlaceholder({regType, varType}, true, valueCount);
                 }
 
-                //If dest, results have multiple elements, handled inside generateOp
+                // If dest, results have multiple elements, handled inside generateOp
                 co_yield generateOp<Operation>(dest, results[0], results[1], results[2]);
 
                 while(schedulerLockCount > 0)

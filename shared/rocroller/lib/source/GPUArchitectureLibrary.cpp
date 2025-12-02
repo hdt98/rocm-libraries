@@ -64,7 +64,7 @@ namespace rocRoller
             HIP_CHECK(hipGetDevice(&default_device));
         }
 #else
-        //TODO: Add a way to get specific GPUs. Maybe through env vars.
+        // TODO: Add a way to get specific GPUs. Maybe through env vars.
         AssertFatal(false, "Non-HIP Path Not Implemented");
 #endif
     }

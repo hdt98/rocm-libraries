@@ -339,20 +339,20 @@ namespace rocRoller
             {
                 auto loopIncrementOp = graph.control.getNode<CG::Assign>(increment);
 
-                //Ensure that the forLoopIncrement has an add expression
+                // Ensure that the forLoopIncrement has an add expression
                 if(!(std::holds_alternative<Expression::Add>(*loopIncrementOp.expression)))
                     continue;
                 auto addExpr = std::get<Expression::Add>(*loopIncrementOp.expression);
 
                 auto dim_tag = graph.mapper.get(increment, NaryArgument::DEST);
-                //Iterator should have a DataFlow expression as its LHS
+                // Iterator should have a DataFlow expression as its LHS
                 if(!(std::holds_alternative<Expression::DataFlowTag>(*addExpr.lhs)))
                     continue;
-                //LHS should also be the loop iterator data flow tag.
+                // LHS should also be the loop iterator data flow tag.
                 if(std::get<Expression::DataFlowTag>(*addExpr.lhs).tag != dim_tag)
                     continue;
-                //If all else is true and the first connection of the forLoop is the dim_tag
-                //Then we have the loopIncrement that we were searching for.
+                // If all else is true and the first connection of the forLoop is the dim_tag
+                // Then we have the loopIncrement that we were searching for.
                 if(graph.mapper.get(forLoop, NaryArgument::DEST) != dim_tag)
                     continue;
                 return {addExpr.lhs, addExpr.rhs};
@@ -1311,8 +1311,8 @@ namespace rocRoller
         }
 
         /**
-        * @brief Get coordinates required by the code-generator.
-        */
+         * @brief Get coordinates required by the code-generator.
+         */
         std::vector<int> getCodeGeneratorCoordinates(KernelGraph const& graph,
                                                      int                tag,
                                                      bool               isStorePartOfGlobalToLDSOp)

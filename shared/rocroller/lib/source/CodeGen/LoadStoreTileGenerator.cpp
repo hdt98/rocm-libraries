@@ -494,7 +494,7 @@ namespace rocRoller
         Generator<Instruction> LoadStoreTileGenerator::moveTileDirect2LDS(
             LoadStoreTileInfo& info, int numBytes, bool setM0, Register::ValuePtr readAddr)
         {
-            //TODO: enable to load 12 bytes
+            // TODO: enable to load 12 bytes
             if(m_context->targetArchitecture().HasCapability(GPUCapability::HasWiderDirectToLds))
                 AssertFatal(numBytes == 1 || numBytes == 2 || numBytes == 4 || numBytes == 16,
                             ShowValue(numBytes));

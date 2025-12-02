@@ -281,8 +281,8 @@ namespace rocRoller
         }
 
         /**
-	 * @brief Add an Unroll dimension beside the ForLoop dimension.
-	 */
+         * @brief Add an Unroll dimension beside the ForLoop dimension.
+         */
         int addUnrollDimension(KernelGraph& graph, int forLoopDimension, int unrollAmount)
         {
             auto forLoopLocation = graph.coordinates.getLocation(forLoopDimension);
