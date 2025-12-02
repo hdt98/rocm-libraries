@@ -987,6 +987,10 @@ if(MIOPEN_OFFLINE_COMPILER_PATHS_V2)
     target_link_libraries(MIOpen PRIVATE rocm-core)
 endif()
 
+if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
+    add_subdirectory(kernels/ck_builder)
+endif()
+
 if(rocblas_FOUND)
     target_link_libraries( MIOpen INTERFACE $<BUILD_INTERFACE:roc::rocblas> )
     target_link_libraries( MIOpen PRIVATE roc::rocblas )
