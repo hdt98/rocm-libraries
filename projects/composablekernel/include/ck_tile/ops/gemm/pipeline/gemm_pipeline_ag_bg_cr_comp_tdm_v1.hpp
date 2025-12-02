@@ -106,6 +106,9 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
     using ADataType = remove_cvref_t<std::tuple_element_t<0, AsDataType>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<0, BsDataType>>;
 
+    static constexpr auto is_a_load_tr_v = bool_constant<PipelineImplBase::is_a_load_tr>{};
+    static constexpr auto is_b_load_tr_v = bool_constant<PipelineImplBase::is_b_load_tr>{};
+
     static_assert(!std::is_same_v<BDataType, pk_int4_t>, "Not implemented");
 
     static constexpr index_t APackedSize =
@@ -238,14 +241,19 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             TDMConfig tdm_config_b;
             // set tdm's lds padding config
             constexpr auto padding_config = Policy::GetLdsPaddingConfig();
+            if constexpr(!is_a_load_tr_v())
+            {
+                tdm_config_a.pad_enable              = true;
+                tdm_config_a.pad_config.pad_amount   = padding_config.at(number<0>{});
+                tdm_config_a.pad_config.pad_interval = padding_config.at(number<1>{});
+            }
 
-            tdm_config_a.pad_enable              = true;
-            tdm_config_a.pad_config.pad_amount   = padding_config.at(number<0>{});
-            tdm_config_a.pad_config.pad_interval = padding_config.at(number<1>{});
-
-            tdm_config_b.pad_enable              = true;
-            tdm_config_b.pad_config.pad_amount   = padding_config.at(number<0>{});
-            tdm_config_b.pad_config.pad_interval = padding_config.at(number<1>{});
+            if constexpr(!is_b_load_tr_v())
+            {
+                tdm_config_b.pad_enable              = true;
+                tdm_config_b.pad_config.pad_amount   = padding_config.at(number<0>{});
+                tdm_config_b.pad_config.pad_interval = padding_config.at(number<1>{});
+            }
 
             if constexpr(UseClusterLaunch)
             {
@@ -280,11 +288,6 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             constexpr bool is_a_col_major =
                 std::is_same_v<ALayout, tensor_layout::gemm::ColumnMajor>;
             constexpr bool is_b_row_major = std::is_same_v<BLayout, tensor_layout::gemm::RowMajor>;
-
-            // TODO currently only support A matrix row major, B matrix col major; if A matrix is
-            // col major or B is row major, need to combine with transpose load api
-            static_assert(!(is_a_col_major || is_b_row_major),
-                          "only support A matrix is row major, B matrix is col major!");
 
             static_assert(is_a_col_major
                               ? (KPerBlock == ADramBlockWindowTmp{}.get_window_lengths()[I0{}] &&
@@ -327,18 +330,25 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             auto&& [a_lds_block1, b_lds_block1] =
                 Base::GetABLdsTensorViews(static_cast<char*>(p_smem) + smem_size);
 
+            auto a_lds_shape = []() {
+                if constexpr(is_a_load_tr_v())
+                    return make_tuple(number<KPerBlock>{}, number<MPerBlock>{});
+                else
+                    return make_tuple(number<MPerBlock>{}, number<KPerBlock>{});
+            }();
             // LDS tile windows for storing, one per LDS buffer
-            auto a_copy_lds_window0 = make_tile_window(
-                a_lds_block0, make_tuple(number<MPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            auto a_copy_lds_window0 = make_tile_window(a_lds_block0, a_lds_shape, {0, 0});
+            auto a_copy_lds_window1 = make_tile_window(a_lds_block1, a_lds_shape, {0, 0});
 
-            auto a_copy_lds_window1 = make_tile_window(
-                a_lds_block1, make_tuple(number<MPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            constexpr auto b_lds_shape = []() {
+                if constexpr(is_b_load_tr_v())
+                    return make_tuple(number<KPerBlock>{}, number<NPerBlock>{});
+                else
+                    return make_tuple(number<NPerBlock>{}, number<KPerBlock>{});
+            }();
 
-            auto b_copy_lds_window0 = make_tile_window(
-                b_lds_block0, make_tuple(number<NPerBlock>{}, number<KPerBlock>{}), {0, 0});
-
-            auto b_copy_lds_window1 = make_tile_window(
-                b_lds_block1, make_tuple(number<NPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            auto b_copy_lds_window0 = make_tile_window(b_lds_block0, b_lds_shape, {0, 0});
+            auto b_copy_lds_window1 = make_tile_window(b_lds_block1, b_lds_shape, {0, 0});
 
             // initialize DRAM window steps, used to advance the DRAM windows
             using ADramTileWindowStep = typename ADramBlockWindowTmp::BottomTensorIndex;
@@ -396,26 +406,35 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             // LDS tile windows for reading;
             // they share the data pointer with the LDS windows for storing
             // but also associate with a distribution to produce a register tile when reading
+
+            constexpr auto a_lds_input_tile_distr = [&]() {
+                if constexpr(is_a_load_tr_v())
+                    return make_static_tile_distribution(
+                        typename InputTileDistributionTraits<
+                            decltype(BlockGemm::MakeABlockDistributionEncode()),
+                            typename Problem::ADataType>::TransposedDstrEncode{});
+                else
+                    return ALdsTileDistr;
+            }();
+            constexpr auto b_lds_input_tile_distr = [&]() {
+                if constexpr(is_b_load_tr_v())
+                    return make_static_tile_distribution(
+                        typename InputTileDistributionTraits<
+                            decltype(BlockGemm::MakeBBlockDistributionEncode()),
+                            typename Problem::BDataType>::TransposedDstrEncode{});
+                else
+                    return BLdsTileDistr;
+            }();
+
             auto a_lds_ld_window0 =
-                make_tile_window(a_lds_block0,
-                                 make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
-                                 {0, 0},
-                                 ALdsTileDistr);
+                make_tile_window(a_lds_block0, a_lds_shape, {0, 0}, a_lds_input_tile_distr);
             auto a_lds_ld_window1 =
-                make_tile_window(a_lds_block1,
-                                 make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
-                                 {0, 0},
-                                 ALdsTileDistr);
+                make_tile_window(a_lds_block1, a_lds_shape, {0, 0}, a_lds_input_tile_distr);
+
             auto b_lds_ld_window0 =
-                make_tile_window(b_lds_block0,
-                                 make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),
-                                 {0, 0},
-                                 BLdsTileDistr);
+                make_tile_window(b_lds_block0, b_lds_shape, {0, 0}, b_lds_input_tile_distr);
             auto b_lds_ld_window1 =
-                make_tile_window(b_lds_block1,
-                                 make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),
-                                 {0, 0},
-                                 BLdsTileDistr);
+                make_tile_window(b_lds_block1, b_lds_shape, {0, 0}, b_lds_input_tile_distr);
 
             static_assert(!(is_tile_window_linear_v<decltype(a_lds_ld_window0)>) &&
                               !(is_tile_window_linear_v<decltype(a_lds_ld_window1)>) &&
@@ -425,8 +444,8 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
 
             s_wait_tensorcnt_barrier<2>();
             // read A(0), B(0) from LDS window(0) to pipeline registers(0)
-            Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
-            Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
+            Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
+            Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
 
             if constexpr(HasHotLoop)
             {
@@ -451,8 +470,8 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
                         // write to LDS window(0) must complete before the local prefetch
                         s_wait_tensorcnt_barrier<2>();
                         // read A(i), B(i) from LDS window(0) to pipeline registers(0)
-                        Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
-                        Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
+                        Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
+                        Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
                         // LDS window(0) contents are overwritten by global prefetch, need to sync
                         block_sync_lds();
                         // read A(i+1), B(i+1) from DRAM to LDS window(0)
@@ -468,8 +487,8 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
                         // C(i-2) = A(i-2) @ B(i-2)
                         block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
                         s_wait_tensorcnt_barrier<2>();
-                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
-                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
+                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
+                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
                     }
                     i_global_read += 2;
                 } while(i_global_read < num_loop);
@@ -481,8 +500,8 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
                 {
                     // read A(num_loop), B(num_loop) from LDS window(1) to pipeline registers(1)
                     s_wait_tensorcnt_barrier<0>();
-                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
-                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
+                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
+                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
                     // C(num_loop-1) = A(num_loop-1) @ B(num_loop-1)
                     block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
                 }

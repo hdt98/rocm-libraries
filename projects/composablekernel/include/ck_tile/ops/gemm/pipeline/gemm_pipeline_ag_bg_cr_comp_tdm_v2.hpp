@@ -51,18 +51,22 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
     template <>
     struct PipelineImpl<GemmPipelineScheduler::Intrawave> : public PipelineImplBase
     {
-        using Base                             = PipelineImplBase;
-        using OuterClass                       = GemmPipelineAgBgCrCompTDMV2<Problem, Policy>;
-        using ADataType                        = typename OuterClass::ADataType;
-        using BDataType                        = typename OuterClass::BDataType;
-        using ALayout                          = typename OuterClass::ALayout;
-        using BLayout                          = typename OuterClass::BLayout;
-        using AsLayout                         = typename OuterClass::AsLayout;
-        using BsLayout                         = typename OuterClass::BsLayout;
-        using BlockGemm                        = typename OuterClass::BlockGemm;
-        using I0                               = typename OuterClass::I0;
-        using I1                               = typename OuterClass::I1;
-        using I2                               = typename OuterClass::I2;
+        using Base       = PipelineImplBase;
+        using OuterClass = GemmPipelineAgBgCrCompTDMV2<Problem, Policy>;
+        using ADataType  = typename OuterClass::ADataType;
+        using BDataType  = typename OuterClass::BDataType;
+        using ALayout    = typename OuterClass::ALayout;
+        using BLayout    = typename OuterClass::BLayout;
+        using AsLayout   = typename OuterClass::AsLayout;
+        using BsLayout   = typename OuterClass::BsLayout;
+        using BlockGemm  = typename OuterClass::BlockGemm;
+        using I0         = typename OuterClass::I0;
+        using I1         = typename OuterClass::I1;
+        using I2         = typename OuterClass::I2;
+
+        static constexpr auto is_a_load_tr_v = OuterClass::is_a_load_tr_v;
+        static constexpr auto is_b_load_tr_v = OuterClass::is_b_load_tr_v;
+
         static constexpr bool UseClusterLaunch = OuterClass::UseClusterLaunch;
         static constexpr index_t MPerBlock     = OuterClass::MPerBlock;
         static constexpr index_t NPerBlock     = OuterClass::NPerBlock;
@@ -111,14 +115,19 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             constexpr auto padding_config = Policy::GetLdsPaddingConfig();
 
             static_for<0, 2, 1>{}([&](auto i) {
-                tdm_config_a[i].pad_enable              = true;
-                tdm_config_a[i].pad_config.pad_amount   = padding_config.at(number<0>{});
-                tdm_config_a[i].pad_config.pad_interval = padding_config.at(number<1>{});
+                if constexpr(!is_a_load_tr_v())
+                {
+                    tdm_config_a[i].pad_enable              = true;
+                    tdm_config_a[i].pad_config.pad_amount   = padding_config.at(number<0>{});
+                    tdm_config_a[i].pad_config.pad_interval = padding_config.at(number<1>{});
+                }
 
-                tdm_config_b[i].pad_enable              = true;
-                tdm_config_b[i].pad_config.pad_amount   = padding_config.at(number<0>{});
-                tdm_config_b[i].pad_config.pad_interval = padding_config.at(number<1>{});
-
+                if constexpr(!is_b_load_tr_v())
+                {
+                    tdm_config_b[i].pad_enable              = true;
+                    tdm_config_b[i].pad_config.pad_amount   = padding_config.at(number<0>{});
+                    tdm_config_b[i].pad_config.pad_interval = padding_config.at(number<1>{});
+                }
                 // enable atomic_barrier in TDM to make sure data is visible in LDS before wave
                 // reads
                 // them; tdm_config_a[0] for wave 0, tdm_config_a[1] for wave 2;
@@ -174,11 +183,6 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                 std::is_same_v<ALayout, tensor_layout::gemm::ColumnMajor>;
             constexpr bool is_b_row_major = std::is_same_v<BLayout, tensor_layout::gemm::RowMajor>;
 
-            // TODO currently only support A matrix row major, B matrix col major; if A matrix is
-            // col major or B is row major, need to combine with transpose load api
-            static_assert(!(is_a_col_major || is_b_row_major),
-                          "only support A matrix is row major, B matrix is col major!");
-
             static_assert(is_a_col_major
                               ? (KPerBlock == ADramBlockWindowTmp{}.get_window_lengths()[I0{}] &&
                                  MPerBlock == ADramBlockWindowTmp{}.get_window_lengths()[I1{}])
@@ -214,18 +218,27 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                 },
                 number<BsLayout::size()>{});
 
+            auto a_lds_shape = []() {
+                if constexpr(is_a_load_tr_v())
+                    return make_tuple(number<KPerBlock>{}, number<MPerBlock>{});
+                else
+                    return make_tuple(number<MPerBlock>{}, number<KPerBlock>{});
+            }();
             // LDS tile windows for storing, one per LDS buffer
-            auto a_copy_lds_window0 = make_tile_window(
-                a_lds_block0, make_tuple(number<MPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            auto a_copy_lds_window0 = make_tile_window(a_lds_block0, a_lds_shape, {0, 0});
 
-            auto a_copy_lds_window1 = make_tile_window(
-                a_lds_block1, make_tuple(number<MPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            auto a_copy_lds_window1 = make_tile_window(a_lds_block1, a_lds_shape, {0, 0});
 
-            auto b_copy_lds_window0 = make_tile_window(
-                b_lds_block0, make_tuple(number<NPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            constexpr auto b_lds_shape = []() {
+                if constexpr(is_b_load_tr_v())
+                    return make_tuple(number<KPerBlock>{}, number<NPerBlock>{});
+                else
+                    return make_tuple(number<NPerBlock>{}, number<KPerBlock>{});
+            }();
 
-            auto b_copy_lds_window1 = make_tile_window(
-                b_lds_block1, make_tuple(number<NPerBlock>{}, number<KPerBlock>{}), {0, 0});
+            auto b_copy_lds_window0 = make_tile_window(b_lds_block0, b_lds_shape, {0, 0});
+
+            auto b_copy_lds_window1 = make_tile_window(b_lds_block1, b_lds_shape, {0, 0});
 
             // initialize DRAM window steps, used to advance the DRAM windows
             using ADramTileWindowStep = typename ADramBlockWindowTmp::BottomTensorIndex;
@@ -289,26 +302,46 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             // LDS tile windows for reading;
             // they share the data pointer with the LDS windows for storing
             // but also associate with a distribution to produce a register tile when reading
+
+            constexpr auto a_lds_input_tile_distr = [&]() {
+                if constexpr(is_a_load_tr_v())
+                    return make_static_tile_distribution(
+                        typename InputTileDistributionTraits<
+                            decltype(BlockGemm::MakeABlockDistributionEncode()),
+                            typename Problem::ADataType>::TransposedDstrEncode{});
+                else
+                    return ALdsTileDistr;
+            }();
+            constexpr auto b_lds_input_tile_distr = [&]() {
+                if constexpr(is_b_load_tr_v())
+                    return make_static_tile_distribution(
+                        typename InputTileDistributionTraits<
+                            decltype(BlockGemm::MakeBBlockDistributionEncode()),
+                            typename Problem::BDataType>::TransposedDstrEncode{});
+                else
+                    return BLdsTileDistr;
+            }();
+
             auto a_lds_ld_window0 =
                 make_tile_window(a_lds_block0,
                                  make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
                                  {0, 0},
-                                 ALdsTileDistr);
+                                 a_lds_input_tile_distr);
             auto a_lds_ld_window1 =
                 make_tile_window(a_lds_block1,
                                  make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
                                  {0, 0},
-                                 ALdsTileDistr);
+                                 a_lds_input_tile_distr);
             auto b_lds_ld_window0 =
                 make_tile_window(b_lds_block0,
                                  make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),
                                  {0, 0},
-                                 BLdsTileDistr);
+                                 b_lds_input_tile_distr);
             auto b_lds_ld_window1 =
                 make_tile_window(b_lds_block1,
                                  make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),
                                  {0, 0},
-                                 BLdsTileDistr);
+                                 b_lds_input_tile_distr);
 
             static_assert(!(is_tile_window_linear_v<decltype(a_lds_ld_window0)>) &&
                               !(is_tile_window_linear_v<decltype(a_lds_ld_window1)>) &&
@@ -321,8 +354,8 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             phase[0] = (phase[0] - 1) & PHASE_MASK;
             barriers[0]->wait(phase[0]);
             // read A(0), B(0) from LDS window(0) to pipeline registers(0)
-            Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
-            Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
+            Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
+            Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
             // LDS window(0) contents are overwritten below by global prefetch, need to sync
 
             if constexpr(HasHotLoop)
@@ -353,8 +386,8 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                     {
                         phase[1] = (phase[1] - 1) & PHASE_MASK;
                         barriers[1]->wait(phase[1]);
-                        Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
-                        Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
+                        Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
+                        Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
                         block_sync_lds();
                         if constexpr(warp_id == 2)
                         {
@@ -373,8 +406,8 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                         block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
                         phase[0] = (phase[0] - 1) & PHASE_MASK;
                         barriers[0]->wait(phase[0]);
-                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
-                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
+                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
+                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
                     }
                     i_global_read += 2;
                 } while(i_global_read < num_loop);
@@ -388,8 +421,8 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                     phase[1] = (phase[1] - 1) & PHASE_MASK;
                     barriers[1]->wait(phase[1]);
                     block_sync_lds();
-                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
-                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
+                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
+                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
                     // C(num_loop-1) = A(num_loop-1) @ B(num_loop-1)
                     block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
                 }

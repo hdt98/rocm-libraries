@@ -31,7 +31,17 @@ TYPED_TEST(TEST_SUITE_NAME, SmallM)
             if constexpr(std::is_same_v<typename TestFixture::ALayout,
                                         ck_tile::tensor_layout::gemm::ColumnMajor>)
             {
-                if(M * sizeof(typename TestFixture::ADataType) % 4 == 0) // oob fit dword
+#define XSTRINGIFY(s) STRINGIFY(s)
+#define STRINGIFY(s) #s
+                constexpr std::string_view suite_name = XSTRINGIFY(TEST_SUITE_NAME);
+#undef STRINGIFY
+#undef XSTRINGIFY
+                if constexpr(suite_name == "TestCkTileGemmPipelineCompTDMWmma")
+                {
+                    // TestCkTileGemmPipelineCompTDMWmma can handle non-dword-aligned cases
+                    this->Run(M, N, K);
+                }
+                else if(M * sizeof(typename TestFixture::ADataType) % 4 == 0) // oob fit dword
                 {
                     this->Run(M, N, K);
                 }
@@ -91,7 +101,17 @@ TYPED_TEST(TEST_SUITE_NAME, MidLargeM)
                 }
                 else
                 {
-                    if(M * sizeof(typename TestFixture::ADataType) % 4 == 0) // oob fit dword
+#define XSTRINGIFY(s) STRINGIFY(s)
+#define STRINGIFY(s) #s
+                    constexpr std::string_view suite_name = XSTRINGIFY(TEST_SUITE_NAME);
+#undef STRINGIFY
+#undef XSTRINGIFY
+                    if constexpr(suite_name == "TestCkTileGemmPipelineCompTDMWmma")
+                    {
+                        // TestCkTileGemmPipelineCompTDMWmma can handle non-dword-aligned cases
+                        this->Run(M, N, K);
+                    }
+                    else if(M * sizeof(typename TestFixture::ADataType) % 4 == 0) // oob fit dword
                     {
                         this->Run(M, N, K);
                     }
