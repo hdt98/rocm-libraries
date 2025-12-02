@@ -545,9 +545,13 @@ struct tile_window_with_static_distribution
                 constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
 
                 // Use precomputed window origin
+#if defined(__gfx125__)
+                auto lds_bottom_tensor_thread_idx =
+                    window_origin + window_adaptor_thread_coord.get_bottom_index();
+#else // else branch for gfx950
                 auto lds_bottom_tensor_thread_idx =
                     window_origin + window_adaptor_warp_coord.get_bottom_index();
-
+#endif
                 // Use precomputed tensor descriptor
                 const auto lds_coord =
                     make_tensor_coordinate(tensor_descriptor, lds_bottom_tensor_thread_idx);
