@@ -201,6 +201,39 @@ def findConfigs(rootDir=None):
                     params.append(pytest.param(filepath, marks=marks, id=relpath))
     return params
 
-@pytest.mark.parametrize("config", findConfigs())
-def test_config(tensile_args, config, tmpdir):
-    Tensile.Tensile([config, tmpdir.strpath, *tensile_args])
+def test_config(tensile_args, config, tmpdir, request, worker_lock_instance):
+    import sys
+    # Sanitize nodeid to create a valid filename
+    log_filename = "".join(c if c.isalnum() else "_" for c in request.node.nodeid) + ".log"
+    log_path = tmpdir.join(log_filename)
+
+    # Write the test-to-logfile mapping to a central file
+    mapping_file_path = "/tmp/pytest_log_map.txt"
+    with worker_lock_instance:
+        with open(mapping_file_path, "a") as f:
+            work_chunk = config["BenchmarkProblems"][0][1]["BenchmarkFinalParameters"][0]["ProblemSizes"][0]
+            wc_str = str(work_chunk)
+            f.write(f"{request.node.nodeid} -> {log_path}\n")
+            f.write(f"{request.node.nodeid} -> {wc_str}\n")
+
+    if isinstance(config, dict):
+        # We have a problem-specific config dictionary.
+        # Write it to a temporary YAML file.
+        config_path = tmpdir.join("problem.yaml")
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+    else:
+        # We have a file path for a full config file.
+        config_path = config
+
+    with open(log_path, "w") as log_file:
+        orig_stdout = sys.stdout
+        orig_stderr = sys.stderr
+        sys.stdout = log_file
+        sys.stderr = log_file
+        try:
+            Tensile.Tensile([str(config_path), tmpdir.strpath, *tensile_args])
+        finally:
+            sys.stdout = orig_stdout
+            sys.stderr = orig_stderr
+

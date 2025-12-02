@@ -45,6 +45,7 @@ def pytest_addoption(parser):
     parser.addoption("--no-common-build", action="store_true")
     parser.addoption("--builddir", "--client-dir")
     parser.addoption("--timing-file", default=None)
+    parser.addoption("--yaml-glob", help="Glob pattern for YAML files to run.")
 
 @pytest.fixture(scope="session")
 def timing_path(pytestconfig, tmpdir_factory):
@@ -136,7 +137,7 @@ def useGlobalParameters(tensile_args):
         def __enter__(self):
             argParser = argparse.ArgumentParser()
             Tensile.addCommonArguments(argParser)
-            args = argParser.parse_args(tensile_args)
+            args = argParser.parse_known_args(tensile_args)[0]
 
             Common.restoreDefaultGlobalParameters()
             if args.CxxCompiler:
@@ -157,4 +158,56 @@ def useGlobalParameters(tensile_args):
             Common.restoreDefaultGlobalParameters()
 
     return gpUpdater
+
+import glob
+import yaml
+from Tensile.Tests.common.test_config import findConfigs, findAvailableArchs, configMarks
+
+def pytest_generate_tests(metafunc):
+    if 'config' in metafunc.fixturenames:
+        glob_pattern = metafunc.config.getoption("--yaml-glob")
+        if glob_pattern:
+            # User has provided a specific pattern for fine-grained testing.
+            rootDir = os.path.dirname(os.path.dirname(__file__))
+            printRoot = os.path.dirname(os.path.dirname(rootDir))
+            availableArchs = findAvailableArchs()
+            
+            all_files = glob.glob(glob_pattern, recursive=True)
+            
+            params = []
+            for filepath in all_files:
+                relpath = os.path.relpath(filepath, printRoot)
+                with open(filepath) as f:
+                    doc = yaml.safe_load(f)
+                
+                # Basic marks from file path
+                marks = configMarks(filepath, rootDir, availableArchs)
+                
+                global_params = doc.get("GlobalParameters", {})
+                benchmark_problem_groups = doc.get("BenchmarkProblems", [])
+
+                for group_idx, problem_group in enumerate(benchmark_problem_groups):
+                    if not problem_group or len(problem_group) < 2:
+                        continue
+                    
+                    problem_type = problem_group[0]
+                    benchmark_size_groups = problem_group[1:]
+
+                    for size_group_idx, size_group in enumerate(benchmark_size_groups):
+                        # Create a new config for each problem size group
+                        new_benchmark_problem_group = [problem_type, size_group]
+                        problem_config = {
+                            "GlobalParameters": global_params,
+                            "BenchmarkProblems": [new_benchmark_problem_group]
+                        }
+                        
+                        # Create a unique ID for each test case
+                        problem_id = f"{relpath}::{group_idx}:{size_group_idx}"
+                        
+                        params.append(pytest.param(problem_config, marks=marks, id=problem_id))
+            
+            metafunc.parametrize("config", params)
+        else:
+            # Default behavior: run all tests found by findConfigs (file-based)
+            metafunc.parametrize("config", findConfigs())
 
