@@ -778,10 +778,6 @@ ConvSolution ConvHipImplicitGemm3DGroupWrwXdlops::GetSolution(
             using T        = decltype(data_type_val);
             using TCompute = decltype(compute_type_val);
             switch(problem.GetAlphaBetaCase())
-            {
-            case BILINEAR:
-                return InitInvokerFactoryNHWC<false,
-                                              DeviceOpGBwdWeightBilinearPtrs<T, TCompute>,
                                               CKArgs<T, TCompute>,
                                               miopen::conv::WrWInvokeParams>(
                     ctx, problem, config.kernel_id);
