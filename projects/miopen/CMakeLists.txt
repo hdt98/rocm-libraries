@@ -98,7 +98,8 @@ set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR OFF - CI Fix" FORCE)
 
 set(MIOPEN_USE_COMPOSABLE_KERNEL OFF CACHE BOOL "Disable CK" FORCE)
 
-set(AMDGPU_TARGETS "gfx1101" CACHE STRING "Force gfx1101" FORCE)
+set(AMDGPU_TARGETS "gfx1030" CACHE STRING "Force legacy arch" FORCE)
+set(GPU_TARGETS "gfx1030" CACHE STRING "Force new arch" FORCE)
 
 # ==============================================================================
 
