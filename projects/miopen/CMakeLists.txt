@@ -72,6 +72,7 @@ if(NOT WIN32)
 endif()
 
 project ( MIOpen C CXX )
+# ==============================================================================
 
 add_compile_options(
     "-Wall" 
@@ -82,7 +83,7 @@ add_compile_options(
 )
 
 set(MIOPEN_BACKEND "HIP" CACHE STRING "Force HIP" FORCE)
-set(MIOPEN_USE_MLIR ON CACHE BOOL "Force MLIR" FORCE)
+set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR" FORCE)
 set(MIOPEN_USE_HIP_KERNELS ON CACHE BOOL "Force HIP Kernels" FORCE)
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Shared Libs" FORCE)
