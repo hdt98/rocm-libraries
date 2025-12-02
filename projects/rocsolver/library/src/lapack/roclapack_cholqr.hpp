@@ -2587,7 +2587,7 @@ static rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
 
     rocblas_status istat = rocblas_status_success;
 
-    I constexpr idebug = 0;
+    I constexpr idebug = 1;
     hipStream_t stream;
     try
     {
