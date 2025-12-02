@@ -17,3 +17,5 @@ junit.xml
 .cache
 
 .venv
+
+CMakeUserPresets.json
