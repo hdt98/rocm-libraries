@@ -449,7 +449,6 @@ set(LONG_TESTS
     test_pooling2d
     test_pooling3d
     test_conv_ck_igemm_fwd_v6r1_dlops_nchw
-    test_ck_builder
     )
 
 function(rate_added_test NAME)

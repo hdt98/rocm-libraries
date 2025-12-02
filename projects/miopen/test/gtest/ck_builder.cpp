@@ -13,8 +13,6 @@
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scale.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward.hpp"
 
-#include "utils/constexpr_data_processing.hpp"
-
 namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 struct DefaultAlgorithm
@@ -169,10 +167,12 @@ TEST(CK_Builder, CreateExistingInstance)
     // These are the instances that MIOpen currently gets from CK's static library
     auto factoryInstances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
 
-    auto result      = std::find_if(
-        factoryInstances.begin(), factoryInstances.end(), [&builderKernelInstanceString](const auto &kernelPtr) {
-            return kernelPtr->GetInstanceString() == builderKernelInstanceString;
-        });
+    auto result =
+        std::find_if(factoryInstances.begin(),
+                     factoryInstances.end(),
+                     [&builderKernelInstanceString](const auto& kernelPtr) {
+                         return kernelPtr->GetInstanceString() == builderKernelInstanceString;
+                     });
 
     EXPECT_TRUE(result != factoryInstances.end());
 }
