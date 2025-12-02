@@ -459,7 +459,8 @@ private:
 
         { // tf32 has same mantissa length as fp16
             auto math_type_ = inflags.GetValueInt("math_type");
-            if(std::is_same_v<Tgpu, float> && (miopen::EnvEnableTF32() || (math_type_ == 0)))
+            if(std::is_same_v<Tgpu, float> &&
+               (miopen::EnvEnableTF32() || (math_type_ == miopenMathDefault)))
                 tolerance = 8.2e-3;
         }
         return tolerance;

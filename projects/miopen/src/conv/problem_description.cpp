@@ -31,6 +31,7 @@
 #include <miopen/datatype.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/tensor_layout.hpp>
+#include <miopen/solver/static_ck_common.hpp>
 
 #include <sstream>
 
@@ -329,7 +330,8 @@ void ProblemDescription::SetupFloats(ExecutionContext& ctx) const
 
 void ProblemDescription::SetupComputeType(const ExecutionContext& ctx) const
 {
-    if(ctx.GetStream().GetDeviceName() == "gfx942" && conv.EnableTF32())
+    if(miopen::solver::static_ck::IsTF32Supported(ctx.GetStream().GetDeviceName()) &&
+       conv.EnableTF32())
     {
         use_tf32 = true;
     }

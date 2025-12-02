@@ -813,8 +813,8 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
     const auto problem = conv::ProblemDescription{
         xDesc, wDesc, yDesc, *this, conv::Direction::Forward, 0, alpha_val, beta_val};
     auto ctx = ExecutionContext{&handle};
-    problem.SetupComputeType(ctx);
     ValidateAlphaBeta(problem);
+    problem.SetupComputeType(ctx);
 
     ConvForwardCheckNumerics(handle, tensors, [&]() {
         Problem::ValidateGroupCount(xDesc, wDesc, *this);
@@ -1218,7 +1218,8 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
     const auto problem = conv::ProblemDescription{
         dyDesc, wDesc, dxDesc, *this, conv::Direction::BackwardData, 0, alpha_val, beta_val};
     ValidateAlphaBeta(problem);
-    problem.SetupComputeType(ExecutionContext{&handle});
+    ExecutionContext ctx{&handle};
+    problem.SetupComputeType(ctx);
 
     ConvBwdCheckNumerics(handle, tensors, beta, [&]() {
         if(dyDesc.GetLengths()[1] != wDesc.GetLengths()[0])
@@ -1428,7 +1429,8 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
     decltype(auto) problem =
         conv::ProblemDescription{dyDesc, dwDesc, xDesc, *this, direction, 0, alpha_val, beta_val};
     ValidateAlphaBeta(problem);
-    problem.SetupComputeType(ExecutionContext{&handle});
+    ExecutionContext ctx{&handle};
+    problem.SetupComputeType(ctx);
 
     if(xDesc.GetType() == miopenInt8)
         MIOPEN_THROW(miopenStatusBadParm);
@@ -1628,7 +1630,8 @@ bool EnvEnableTF32()
     if(bool_miopen != bool_nvidia)
         MIOPEN_LOG_I2("TF32_OVERRIDE is set to different values for MIOPEN_TF32_OVERRIDE ("
                       << bool_miopen << ") and NVIDIA_TF32_OVERRIDE (" << bool_nvidia
-                      << "). TF32 will be treated as enabled."); // TODO:(LYM) back to disabled
+                      << "). TF32 is currently treated as enabled (temporary; may be changed to "
+                         "disabled in future).");                // TODO:(LYM) back to disabled
     return bool_miopen || bool_nvidia;                           // TODO:(LYM) back to disabled
 }
 
