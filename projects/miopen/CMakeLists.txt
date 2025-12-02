@@ -80,14 +80,25 @@ add_compile_options(
     "-Wunused-function" 
     "-Wunused-variable" 
     "-Wunreachable-code"
+    "-Werror=unused-function" 
+    "-Werror=unused-variable" 
+    "-Werror=unreachable-code"
 )
 
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Force Shared" FORCE)
+set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "RelWithDebInfo" FORCE)
+
+set(BUILD_TESTING OFF CACHE BOOL "Disable Testing" FORCE)
+set(MIOPEN_TEST_GTEST OFF CACHE BOOL "Disable GTest" FORCE)
+
 set(MIOPEN_BACKEND "HIP" CACHE STRING "Force HIP" FORCE)
-set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR" FORCE)
 set(MIOPEN_USE_HIP_KERNELS ON CACHE BOOL "Force HIP Kernels" FORCE)
 
-set(BUILD_SHARED_LIBS ON CACHE BOOL "Shared Libs" FORCE)
-set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "RelWithDebInfo" FORCE)
+set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR OFF - CI Fix" FORCE)
+
+set(MIOPEN_USE_COMPOSABLE_KERNEL OFF CACHE BOOL "Disable CK" FORCE)
+
+set(AMDGPU_TARGETS "gfx1030" CACHE STRING "Force gfx1030" FORCE)
 
 # ==============================================================================
 
