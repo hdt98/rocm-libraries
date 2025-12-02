@@ -1624,15 +1624,15 @@ bool EnvEnableTF32()
 {
     // disable TF32 by default temporarily until we fully complete this feature.
     // so either one is set to true, we enable TF32
-    // TODO:(LYM) change back
+    // TODO:(LYM) change back to default enabled
     bool bool_miopen = miopen::env::enabled(MIOPEN_TF32_OVERRIDE);
     bool bool_nvidia = miopen::env::enabled(NVIDIA_TF32_OVERRIDE);
     if(bool_miopen != bool_nvidia)
         MIOPEN_LOG_I2("TF32_OVERRIDE is set to different values for MIOPEN_TF32_OVERRIDE ("
                       << bool_miopen << ") and NVIDIA_TF32_OVERRIDE (" << bool_nvidia
                       << "). TF32 is currently treated as enabled (temporary; may be changed to "
-                         "disabled in future).");                // TODO:(LYM) back to disabled
-    return bool_miopen || bool_nvidia;                           // TODO:(LYM) back to disabled
+                         "disabled in future).");
+    return bool_miopen || bool_nvidia;
 }
 
 } // namespace miopen
