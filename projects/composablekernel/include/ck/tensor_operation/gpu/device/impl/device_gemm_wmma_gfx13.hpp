@@ -150,11 +150,13 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
 
     static constexpr auto AEnableLds_dds = (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD);
     static constexpr auto BEnableLds_dds = (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD);
+    static constexpr auto AEnableLds_dsTiledload = (ALoadOption == TensorLoadOption::DS_TILED_LOAD);
+    static constexpr auto BEnableLds_dsTiledload = (BLoadOption == TensorLoadOption::DS_TILED_LOAD);
 
-    static constexpr auto AEnableLds =
-        AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1) || AEnableLds_dds;
-    static constexpr auto BEnableLds =
-        BEnableLds_auto || BEnableLds_manu || (NumPrefetch > 1) || BEnableLds_dds;
+    static constexpr auto AEnableLds = AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1) ||
+                                       AEnableLds_dds || AEnableLds_dsTiledload;
+    static constexpr auto BEnableLds = BEnableLds_auto || BEnableLds_manu || (NumPrefetch > 1) ||
+                                       BEnableLds_dds || BEnableLds_dsTiledload;
 
     static constexpr auto AEnableTRLoadFromGlobal =
         !AEnableLds && AEnableGlobalTRLoad && is_same_v<tensor_layout::gemm::ColumnMajor, ALayout>;
@@ -324,26 +326,6 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     // load; no real meaning, many codes use 7 dimensions
                     make_tuple(Sequence<0>{}, Sequence<1>{}),
                     make_tuple(Sequence<1, 2, 3, 4, 7>{}, Sequence<0, 5, 6>{}));
-            }
-            else if constexpr(AEnableGlobalTiledLoad)
-            {
-                // TODO, the logic not changed
-                constexpr auto A_KRow      = 2;
-                constexpr auto A_K0PerWmma = AKPerWmma / A_KRow / K1Number;
-                const auto A_KWmma         = K / AKPerWmma;
-
-                const auto M0 = M / MPerBlock;
-                // 0   1     0         1                2        3             4        5 6
-                // M - K <-> A_KWmma - MBlock*MRepeat - MWaves - A_K0PerWmma - A_KRow -
-                // MPerWmma - A_K1
-                return transform_tensor_descriptor(
-                    a_grid_desc_m_k,
-                    make_tuple(make_unmerge_transform(make_tuple(
-                                   A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
-                               make_unmerge_transform(make_tuple(
-                                   M0, Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{}))),
-                    make_tuple(Sequence<1>{}, Sequence<0>{}),
-                    make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
             }
             else
             {

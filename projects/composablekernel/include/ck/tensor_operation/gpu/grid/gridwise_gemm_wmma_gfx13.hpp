@@ -412,6 +412,10 @@ struct GridwiseGemm_Wmma_GFX13
                   "these two options will not be enabled at the same time");
     static_assert((BEnableTRLoadFromGlobal & BEnableTiledLoadFromGlobal) == false,
                   "these two options will not be enabled at the same time");
+    static_assert((!AEnableLds & (ALoadOption == TensorLoadOption::DS_TILED_LOAD)) == false,
+                  "these two options will not be enabled at the same time");
+    static_assert((!BEnableLds & (BLoadOption == TensorLoadOption::DS_TILED_LOAD)) == false,
+                  "these two options will not be enabled at the same time");
 
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -2128,81 +2132,78 @@ struct GridwiseGemm_Wmma_GFX13
                     make_multi_index(0, 0, 0));
                     return make_tuple(a_block_buf, a_blockwise_copy);
                 }
+                else if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+                {
+                    const index_t nk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I1] % AClusterSize) * NPerBlock);
+                    auto k1 = a_grid_desc.GetLength(I2);
+                    const index_t k0_start_index_on_block = nk_block_data_idx_on_grid / k1;
+                    auto a_blockwise_copy =
+                        ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
+    /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
+    /* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
+    /* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
+    /* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
+    /* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
+    /* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
+    /* typename SrcData,                              */    ADataType,
+    /* typename DstData,                              */    ADataType,
+    /* typename SrcDesc,                              */    decltype(a_grid_desc),
+    /* typename DstDesc,                              */    decltype(a_block_desc),
+    /* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
+    /* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
+    /* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
+    /* index_t DstVectorDim,                          */    2,
+    /* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
+    /* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
+    /* index_t SrcScalarStrideInVector,               */    1,
+    /* index_t DstScalarStrideInVector,               */    1,
+    /* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
+    /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
+                                                            NumGemmKPrefetchStage>(
+                    a_grid_desc,
+                    make_multi_index(m_block_data_idx_on_grid, k0_start_index_on_block, 0),
+                    a_element_op,
+                    a_block_desc,
+                    make_multi_index(0, 0, 0),
+                    ck::tensor_operation::element_wise::PassThrough{});
+
+                    return make_tuple(a_block_buf, a_blockwise_copy);
+                }
                 else
                 {
-                    if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
-                    {
-                        const index_t nk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I1] % AClusterSize) * NPerBlock);
-                        auto k1 = a_grid_desc.GetLength(I2);
-                        const index_t k0_start_index_on_block = nk_block_data_idx_on_grid / k1;
-                        auto a_blockwise_copy =
-                            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
-        /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
-        /* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
-        /* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
-        /* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
-        /* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
-        /* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
-        /* typename SrcData,                              */    ADataType,
-        /* typename DstData,                              */    ADataType,
-        /* typename SrcDesc,                              */    decltype(a_grid_desc),
-        /* typename DstDesc,                              */    decltype(a_block_desc),
-        /* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
-        /* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
-        /* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
-        /* index_t DstVectorDim,                          */    2,
-        /* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
-        /* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
-        /* index_t SrcScalarStrideInVector,               */    1,
-        /* index_t DstScalarStrideInVector,               */    1,
-        /* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
-        /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
-                                                                NumGemmKPrefetchStage>(
-                        a_grid_desc,
-                        make_multi_index(m_block_data_idx_on_grid, k0_start_index_on_block, 0),
-                        a_element_op,
-                        a_block_desc,
-                        make_multi_index(0, 0, 0),
-                        ck::tensor_operation::element_wise::PassThrough{});
+                    auto a_blockwise_copy =
+                        ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
+    /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
+    /* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
+    /* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
+    /* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
+    /* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
+    /* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
+    /* typename SrcData,                              */    ADataType,
+    /* typename DstData,                              */    ADataType,
+    /* typename SrcDesc,                              */    decltype(a_grid_desc),
+    /* typename DstDesc,                              */    decltype(a_block_desc),
+    /* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
+    /* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
+    /* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
+    /* index_t DstVectorDim,                          */    2,
+    /* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
+    /* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
+    /* index_t SrcScalarStrideInVector,               */    1,
+    /* index_t DstScalarStrideInVector,               */    1,
+    /* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
+    /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
+                                                            NumGemmKPrefetchStage>(
+                    a_grid_desc,
+                    make_multi_index(m_block_data_idx_on_grid, 0, 0),
+                    a_element_op,
+                    a_block_desc,
+                    make_multi_index(0, 0, 0),
+                    ck::tensor_operation::element_wise::PassThrough{});
 
-                        return make_tuple(a_block_buf, a_blockwise_copy);
-                    }
-                    else
-                    {
-                        auto a_blockwise_copy =
-                            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
-        /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
-        /* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
-        /* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
-        /* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
-        /* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
-        /* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
-        /* typename SrcData,                              */    ADataType,
-        /* typename DstData,                              */    ADataType,
-        /* typename SrcDesc,                              */    decltype(a_grid_desc),
-        /* typename DstDesc,                              */    decltype(a_block_desc),
-        /* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
-        /* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
-        /* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
-        /* index_t DstVectorDim,                          */    2,
-        /* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
-        /* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
-        /* index_t SrcScalarStrideInVector,               */    1,
-        /* index_t DstScalarStrideInVector,               */    1,
-        /* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
-        /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
-                                                                NumGemmKPrefetchStage>(
-                        a_grid_desc,
-                        make_multi_index(m_block_data_idx_on_grid, 0, 0),
-                        a_element_op,
-                        a_block_desc,
-                        make_multi_index(0, 0, 0),
-                        ck::tensor_operation::element_wise::PassThrough{});
-
-                        return make_tuple(a_block_buf, a_blockwise_copy);
-                    }
-                    // clang-format on
+                    return make_tuple(a_block_buf, a_blockwise_copy);
                 }
+                // clang-format on
             }
             else
             {
@@ -2762,29 +2763,28 @@ struct GridwiseGemm_Wmma_GFX13
         /*******************************************************************************/
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
-        auto blockwise_gemm =
-            BlockwiseGemmWMMA<ThisThreadBlockGrid,
-                              ADataType,
-                              BDataType,
-                              AccDataType,
-                              decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
-                              decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
-                              MPerBlock,
-                              NPerBlock,
-                              KPerBlock,
-                              MPerWmma,
-                              NPerWmma,
-                              KPerWmma,
-                              MRepeat,
-                              NRepeat,
-                              KPack,
-                              AEnableLds,
-                              BEnableLds,
-                              false, // APermute
-                              false, // BPermute
-                              false, // Transpose C
-                              ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD,
-                              BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD>{};
+        auto blockwise_gemm  = BlockwiseGemmWMMA<ThisThreadBlockGrid,
+                                                ADataType,
+                                                BDataType,
+                                                AccDataType,
+                                                decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
+                                                decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
+                                                MPerBlock,
+                                                NPerBlock,
+                                                KPerBlock,
+                                                MPerWmma,
+                                                NPerWmma,
+                                                KPerWmma,
+                                                MRepeat,
+                                                NRepeat,
+                                                KPack,
+                                                AEnableLds,
+                                                BEnableLds,
+                                                false, // APermute
+                                                false, // BPermute
+                                                false, // Transpose C
+                                                ALoadOption,
+                                                BLoadOption>{};
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 

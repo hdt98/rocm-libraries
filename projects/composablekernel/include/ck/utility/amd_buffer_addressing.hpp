@@ -339,6 +339,7 @@ enum struct TensorLoadOption
     WGP_MULTICAST_LOAD               = 2,
     CLUSTER_DDS_LOAD                 = 3,
     CLUSTER_ASYNC_MULTICAST_LDS_LOAD = 4,
+    DS_TILED_LOAD                    = 5,
 };
 
 template <index_t N, AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
@@ -1392,8 +1393,8 @@ __device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
 }
 
 template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
-__device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
-                                      bool is_src_valid)
+__device__ auto amd_tiled_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
+                                       bool is_src_valid)
 {
     using vector_t = typename vector_type_maker<T, N>::type::type;
 #if defined(__gfx13__)
@@ -1423,6 +1424,44 @@ __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T*
             return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_b64(global_ptr));
         }
         */
+        else
+        {
+            static_assert(0, "wrong! not implemented");
+        }
+    }
+    else
+    {
+        return vector_t{0};
+    }
+#else
+    ignore = in_ptr;
+    ignore = is_src_valid;
+    return vector_t{0};
+#endif
+}
+
+template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
+__device__ auto amd_ds_tiled_load_to_vgpr(__attribute__((address_space(3))) const T* in_ptr,
+                                          bool is_src_valid)
+{
+    using vector_t = typename vector_type_maker<T, N>::type::type;
+#if defined(__gfx13__)
+    if(is_src_valid)
+    {
+        if constexpr(NumThreadsPerTile == 2)
+        {
+            __attribute__((address_space(3))) int32_t* global_ptr =
+                const_cast<__attribute__((address_space(3))) int32_t*>(
+                    reinterpret_cast<const __attribute__((address_space(3))) int32_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_ds_tiled_load_half_b64(global_ptr));
+        }
+        else if constexpr(NumThreadsPerTile == 4 && NumVgprsPerTile == 4)
+        {
+            __attribute__((address_space(3))) int32x4_t* global_ptr =
+                const_cast<__attribute__((address_space(3))) int32x4_t*>(
+                    reinterpret_cast<const __attribute__((address_space(3))) int32x4_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_ds_tiled_load_b128(global_ptr));
+        }
         else
         {
             static_assert(0, "wrong! not implemented");

@@ -312,16 +312,31 @@ struct DynamicBuffer
               index_t NumVgprsPerTile>
     __host__ __device__ constexpr auto tileLoad(index_t src_offset, bool is_valid_element) const
     {
-        static_assert(GetAddressSpace() == AddressSpaceEnum::Global,
-                      "Source data must come from a global memory buffer.");
 #if defined(__gfx13__)
-        __attribute__((address_space(1))) const T* global_ptr =
-            reinterpret_cast<__attribute__((address_space(1))) T*>(
-                reinterpret_cast<uintptr_t>(p_data_ + src_offset));
-        return amd_tile_load_to_vgpr<remove_cvref_t<T>,
-                                     NumElemsPerThread,
-                                     NumThreadsPerTile,
-                                     NumVgprsPerTile>(global_ptr, is_valid_element);
+        if constexpr(GetAddressSpace() == AddressSpaceEnum::Lds)
+        {
+            __attribute__((address_space(3))) const T* global_ptr =
+                reinterpret_cast<__attribute__((address_space(3))) T*>(
+                    reinterpret_cast<uintptr_t>(p_data_ + src_offset));
+            return amd_ds_tiled_load_to_vgpr<remove_cvref_t<T>,
+                                             NumElemsPerThread,
+                                             NumThreadsPerTile,
+                                             NumVgprsPerTile>(global_ptr, is_valid_element);
+        }
+        else if constexpr(GetAddressSpace() == AddressSpaceEnum::Global)
+        {
+            __attribute__((address_space(1))) const T* global_ptr =
+                reinterpret_cast<__attribute__((address_space(1))) T*>(
+                    reinterpret_cast<uintptr_t>(p_data_ + src_offset));
+            return amd_tiled_load_to_vgpr<remove_cvref_t<T>,
+                                          NumElemsPerThread,
+                                          NumThreadsPerTile,
+                                          NumVgprsPerTile>(global_ptr, is_valid_element);
+        }
+        else
+        {
+            static_assert(0, "Unimplemented!");
+        }
 #else
         ignore = src_offset;
         ignore = is_valid_element;

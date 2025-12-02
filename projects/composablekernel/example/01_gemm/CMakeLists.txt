@@ -172,6 +172,9 @@ if(SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     target_compile_definitions(example_gemm_wmma_async_load_no_async_store_fp16 PRIVATE GEMM_DISABLE_ASYNC_STORE=1)
 
     add_example_executable(example_gemm_wmma_tiled_load_fp16 gemm_wmma_tiled_load_fp16.cpp)
+
+    add_example_executable(example_gemm_wmma_ds_tiled_load_fp16 gemm_wmma_ds_tiled_load_fp16.cpp)
+
     add_example_executable(example_gemm_wmma_cluster_multicast_load_fp16 gemm_wmma_cluster_multicast_load_fp16.cpp)
     target_compile_options(example_gemm_wmma_cluster_multicast_load_fp16 PRIVATE -save-temps=obj -Wno-gnu-line-marker)
     add_example_executable(example_gemm_wmma_wgp_multicast_load_fp16 gemm_wmma_wgp_multicast_load_fp16.cpp)
@@ -198,6 +201,8 @@ if(SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_example_dependencies(example_gemm_wmma example_gemm_wmma_async_load_fp16)
     add_example_dependencies(example_gemm_wmma example_gemm_wmma_async_load_no_async_store_fp16)
     add_example_dependencies(example_gemm_wmma example_gemm_wmma_tiled_load_fp16)
+    add_example_dependencies(example_gemm_wmma example_gemm_wmma_ds_tiled_load_fp16)
+    target_compile_options(example_gemm_wmma_ds_tiled_load_fp16 PRIVATE -save-temps=obj -Wno-gnu-line-marker)
     add_example_dependencies(example_gemm_wmma example_gemm_wmma_wavegroup_fp16)
     add_example_dependencies(example_gemm_wmma example_gemm_wmma_cluster_multicast_load_fp16)
     add_example_dependencies(example_gemm_wmma example_gemm_wmma_wgp_multicast_load_fp16)
