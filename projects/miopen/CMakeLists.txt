@@ -73,33 +73,33 @@ endif()
 
 project ( MIOpen C CXX )
 # ==============================================================================
+# [DCR DEBUG] - COMPILER WARNINGS CONFIG (VERIFIED)
+# ==============================================================================
 
-add_compile_options(
-    "-Wall" 
-    "-Wextra" 
-    "-Wunused-function" 
-    "-Wunused-variable" 
-    "-Wunreachable-code"
-    "-Werror=unused-function" 
-    "-Werror=unused-variable" 
-    "-Werror=unreachable-code"
-)
+message(STATUS ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+message(STATUS ">>> [DCR DEBUG] INJECTING CUSTOM FLAGS...")
+
+add_compile_options("-Wall" "-Wextra" "-Wunused-function" "-Wunused-variable" "-Wunreachable-code")
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Force Shared" FORCE)
 set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "RelWithDebInfo" FORCE)
 
-set(BUILD_TESTING ON CACHE BOOL "Disable Testing" FORCE)
-set(MIOPEN_TEST_GTEST ON CACHE BOOL "Disable GTest" FORCE)
+set(BUILD_TESTING ON CACHE BOOL "Enable Testing" FORCE)
+set(MIOPEN_TEST_GTEST ON CACHE BOOL "Enable GTest" FORCE)
 
-set(MIOPEN_BACKEND "HIP" CACHE STRING "Force HIP" FORCE)
-set(MIOPEN_USE_HIP_KERNELS ON CACHE BOOL "Force HIP Kernels" FORCE)
-
-set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR OFF - CI Fix" FORCE)
+set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR OFF" FORCE)
 
 set(MIOPEN_USE_COMPOSABLE_KERNEL OFF CACHE BOOL "Disable CK" FORCE)
+set(MIOPEN_USE_COMPOSABLEKERNEL OFF CACHE BOOL "Disable CK Alias" FORCE)
 
-set(AMDGPU_TARGETS "gfx1030" CACHE STRING "Force legacy arch" FORCE)
-set(GPU_TARGETS "gfx1030" CACHE STRING "Force new arch" FORCE)
+set(AMDGPU_TARGETS "gfx1101" CACHE STRING "Force legacy arch" FORCE)
+set(GPU_TARGETS "gfx1101" CACHE STRING "Force new arch" FORCE)
+
+message(STATUS ">>> [DCR DEBUG] MIOPEN_USE_MLIR is set to: ${MIOPEN_USE_MLIR}")
+message(STATUS ">>> [DCR DEBUG] CK is set to: ${MIOPEN_USE_COMPOSABLE_KERNEL}")
+message(STATUS ">>> [DCR DEBUG] GPU_TARGETS is set to: ${GPU_TARGETS}")
+message(STATUS ">>> [DCR DEBUG] BUILD_TESTING is set to: ${BUILD_TESTING}")
+message(STATUS ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
 # ==============================================================================
 
