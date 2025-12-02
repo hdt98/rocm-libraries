@@ -493,6 +493,7 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
 endforeach()
 
 if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
+    message(STATUS "Builder enabled")
     add_definitions(-DCK_EXPERIMENTAL_BUILDER)
     add_compile_options(-fbracket-depth=1024)
     find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)

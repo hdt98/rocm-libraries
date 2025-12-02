@@ -71,13 +71,14 @@ void CompareAndPrint(const auto& a, const auto& b)
     }
     else
     {
-        std::cout << "!!! " << a << " matches!" << std::endl;
+        std::cout << "!!! " << a << " matches" << std::endl;
     }
 }
 
 namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 
+/*
 constexpr std::array types = {
     ckb::DataType::FP32,
     // ckb::DataType::FP16,
@@ -85,6 +86,7 @@ constexpr std::array types = {
     // ckb::DataType::FP8,
     // ckb::DataType::I8,
 };
+*/
 
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 
@@ -167,14 +169,14 @@ struct DefaultAlgorithm
             struct LdsTransfer
             {
                 int src_vector_dim            = 2;
-                int src_scalar_per_vector     = 8;
-                int lds_dst_scalar_per_vector = 8;
-                bool is_direct_load           = true;
+                int src_scalar_per_vector     = 4;
+                int lds_dst_scalar_per_vector = 4;
+                bool is_direct_load           = false;
                 bool lds_padding              = false;
             } lds_transfer;
             struct BlockTransferAccessOrder
             {
-                std::array<size_t, 3> order{0, 1, 2};
+                std::array<size_t, 3> order{1, 0, 2};
             } block_transfer_access_order;
             struct SrcAccessOrder
             {
@@ -188,7 +190,7 @@ struct DefaultAlgorithm
             struct ThreadClusterDims
             {
                 int m_block        = 1;
-                int m_wave_per_xdl = 32;
+                int m_wave_per_xdl = 16;
                 int n_block        = 1;
                 int n_wave_per_xdl = 8;
             } thread_cluster_dims;
@@ -206,7 +208,7 @@ struct DefaultAlgorithm
     GemmSpecial gemm_specialization = GemmSpecial::MNKPadding;
     struct BlockGemm
     {
-        PipeVers pipeline_version = PipeVers::V4;
+        PipeVers pipeline_version = PipeVers::V2;
         PipeSched scheduler       = PipeSched::INTRAWAVE;
     } block_gemm;
 };
@@ -231,8 +233,10 @@ using InLayout                             = ck::tensor_layout::convolution::NGC
 using WeiLayout                            = ck::tensor_layout::convolution::GKCYX;
 using OutLayout                            = ck::tensor_layout::convolution::NGKHW;
 using PassThrough                          = ck::tensor_operation::element_wise::PassThrough;
+using EmptyTuple = ck::Tuple<>;
 static constexpr ck::index_t NumDimSpatial = 2;
 
+//*
 template <typename DataType>
 using DeviceOpGFwdDefault =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial,
@@ -247,11 +251,32 @@ using DeviceOpGFwdDefault =
                                                                   PassThrough,
                                                                   PassThrough,
                                                                   PassThrough>;
+// */
+
+/*
+template <typename DataType>
+using DeviceOpGFwdDefault = ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD<2,
+                                                                  InLayout,
+                                                                  WeiLayout,
+                                                                  EmptyTuple,
+                                                                  OutLayout,
+                                                                  DataType,
+                                                                  DataType,
+                                                                  EmptyTuple,
+                                                                  DataType,
+                                                                  PassThrough,
+                                                                  PassThrough,
+                                                                  PassThrough>;
+*/
 
 template <typename DataType>
 using DeviceOpGFwdDefaultPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdDefault<DataType>>;
+
+constexpr KernelArguments generate_kernel_arguments_DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3() {
+    return {};
+}
 
 int main()
 {
@@ -262,21 +287,18 @@ int main()
     // Verify the signature value is valid
     static_assert(ckb::ValidConvSignature<kSignature>);
 
-    //     // Verify that the signature conforms to the expected descriptor
-    // static_assert(ckb::ConvSignatureDescriptor<Signature>);
-    // // Specify the signature in a constexpr value
-    // constexpr Signature kSignature{};
-    // // Verify the signature value is valid
-    // static_assert(ckb::ValidConvSignature<kSignature>);
     // Verify that the algorithm conforms to the algorithm concept
     static_assert(ckb::ConvAlgorithmDescriptor<DefaultAlgorithm>);
     constexpr DefaultAlgorithm kAlgorithm{};
 
     // TODO: Verify the algorithm value is valid.
 
+    /*
     constexpr std::array sizes = {
         256,
-        /* 128, 64, 32 */
+        //  128,
+        //   64,
+        //   32
     };
     constexpr std::array xdl_per_wave = {1};
 
@@ -323,11 +345,8 @@ int main()
 
     std::cout << std::endl;
 
-    // /*
     std::vector<std::unique_ptr<BaseOperator>> kernels{};
     build_kernels<BuilderParameters, parameters.size(), parameters>(kernels);
-
-
 
     for(auto&& kernel : kernels)
     {
@@ -337,9 +356,27 @@ int main()
     std::cout << std::endl << "Kernel count: " << kernels.size() << std::endl;
     // */
 
+    using F16  = ck::half_t;
+    using F32  = float;
+    using F64  = double;
+    using BF16 = ushort;
+    using I8 = int8_t;
+
     // /*
-    auto instances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
-    std::cout << std::endl << "Pre-built instance count: " << instances.size() << std::endl;
+    auto instances         = DeviceOpGFwdDefaultPtrs<F32>::GetInstances();
+    auto halfInstances     = DeviceOpGFwdDefaultPtrs<F16>::GetInstances();
+    auto bfloat16Instances = DeviceOpGFwdDefaultPtrs<BF16>::GetInstances();
+    auto fp64Instances     = DeviceOpGFwdDefaultPtrs<F64>::GetInstances();
+    auto i8Instances     = DeviceOpGFwdDefaultPtrs<I8>::GetInstances();
+    std::cout << std::endl << "Pre-built FP32 instance count: " << instances.size() << std::endl;
+    std::cout << std::endl
+              << "Pre-built FP16 instance count: " << halfInstances.size() << std::endl;
+    std::cout << std::endl
+              << "Pre-built BF16 instance count: " << bfloat16Instances.size() << std::endl;
+    std::cout << std::endl
+              << "Pre-built FP64 instance count: " << fp64Instances.size() << std::endl;
+                  std::cout << std::endl
+              << "Pre-built I8 instance count: " << i8Instances.size() << std::endl;
     // */
 
     // Create a ConvBuilder instance with the signature and algorithm
@@ -355,7 +392,7 @@ int main()
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
-    auto kernel = Builder::Instance();
+    auto kernel                    = Builder::Instance();
     auto firstKernelInstanceString = kernel.GetInstanceString();
 
     std::size_t highestIndex = 0;
@@ -364,19 +401,37 @@ int main()
     for(auto&& instance : instances)
     {
         auto instanceString = instance->GetInstanceString();
+        /*
         if(!instanceString.starts_with("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3"))
         {
             continue;
         }
+        */
+
+        // std::cout << instanceString << std::endl;
 
         auto index = GetFirstNonMatchingIndex(firstKernelInstanceString, instanceString);
-        if (index.has_value() && *index > highestIndex){
-            highestIndex = *index;
+        if(!index.has_value())
+        {
+            highestIndex = instanceString.length();
+        }
+        else if(*index > highestIndex)
+        {
+            highestIndex  = *index;
             highestString = instanceString;
         }
     }
 
-    std::cout << "(top is Builder instance, bottom is precompiled instance)" << std:: endl;
-    CompareAndPrint(firstKernelInstanceString, highestString);
+    std::cout << std::endl;
+
+    if(highestIndex == firstKernelInstanceString.length())
+    {
+        std::cout << "Match!" << std::endl << highestString << std::endl;
+    }
+    else
+    {
+        std::cout << "(top is Builder instance, bottom is precompiled instance)" << std::endl;
+        CompareAndPrint(firstKernelInstanceString, highestString);
+    }
     return 0;
 }
