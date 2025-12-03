@@ -587,4 +587,12 @@ Tests:
   activation_arg2 : [1.0]
   sparse_b: [false]
   logging: [5]
+
+- name: spmm_bert_demo_sizes
+  category: pre_checkin
+  function:
+    spmm: *real_precisions_2b
+  matrix_size: *bert_demo_sizes
+  transA_transB: *transA_transB_range
+  sparse_b: [true, false]
 ...
