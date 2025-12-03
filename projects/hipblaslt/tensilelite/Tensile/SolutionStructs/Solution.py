@@ -1345,8 +1345,9 @@ class Solution(collections.abc.Mapping):
             break
           else:
             optVW //= 2
-        if state["ProblemType"]["Sparse"]:
-          state["VectorWidthA"] = 1
+        if state["ProblemType"]["Sparse"] == 1:
+          # Sparse VW rule added based on observed performance behavior.
+          state["VectorWidthA"] = 1 if optVW == 1 else max(optVW // 4, 2)
       else:
         state["VectorWidthA"] = 1
 
@@ -1360,8 +1361,9 @@ class Solution(collections.abc.Mapping):
             break
           else:
             optVW //= 2
-        if state["ProblemType"]["Sparse"]:
-          state["VectorWidthB"] = 1
+        if state["ProblemType"]["Sparse"] == 2:
+          # Sparse VW rule added based on observed performance behavior.
+          state["VectorWidthB"] = optVW
       else:
         state["VectorWidthB"] = 1
 
