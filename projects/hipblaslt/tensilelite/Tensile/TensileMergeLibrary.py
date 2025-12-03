@@ -215,7 +215,7 @@ def findSolutionWithIndex(solutionData, solIndex):
     else:
         debug("Searching for index...")
         solution = [s for s in solutionData if s["SolutionIndex"]==solIndex]
-        assert(len(solution) == 1)
+        assert len(solution) == 1
         return solution[0]
 
 # returns merged logic data as list

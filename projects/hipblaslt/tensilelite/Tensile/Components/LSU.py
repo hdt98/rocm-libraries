@@ -48,7 +48,7 @@ class LSUOn(LSU):
         return writer.states.kernel["LocalSplitU"] > 1
 
     def __call__(self):
-        assert(0)
+        assert False
 
     def splitOutputData(self, writer, kernel):
         self.LSUelemCoord0 = []
@@ -355,8 +355,8 @@ class LSUOn(LSU):
                                                 src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), comment=""))
                                 else:
                                 # TODO: hpa_half, int8
-                                    assert(0) # unsupported data type, need to modify here and LSU write/read code
-                    
+                                    assert False # unsupported data type, need to modify here and LSU write/read code
+
                     if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
                         if not kernel["MIArchVgpr"]:
                             # write to accvgpr

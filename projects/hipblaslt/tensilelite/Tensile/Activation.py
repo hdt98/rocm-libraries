@@ -1036,7 +1036,7 @@ def FuseInstruction(currentInst, moduleAndIndex, fuseDebug):
                 elif currentInst.instType == InstType.INST_F32:
                     func = VFmaF32
                 else:
-                    assert("You should not reach here.")
+                    assert False, "You should not reach here."
                 if type(oldInst) is func and oldInst.srcs[2] == 1.0:
                     # Cannot fuse if the target instruction has any rvalue reassigned or its lvalue
                     # used before the current instruction
@@ -1080,7 +1080,7 @@ def FuseInstruction(currentInst, moduleAndIndex, fuseDebug):
                 elif currentInst.instType == InstType.INST_F64:
                     func = VMulF64
                 else:
-                    assert("You should not reach here.")
+                    assert False, "You should not reach here."
 
                 if type(oldInst) is func:
                     # Cannot fuse if the target instruction has any rvalue reassigned or its lvalue
@@ -1117,7 +1117,7 @@ def FindUseIter(startItem, targetInst, varTarget):
     if isinstance(startItem, Instruction):
         module = startItem.parent
         idx = module.items().index(startItem)
-    assert(isinstance(module, Module))
+    assert isinstance(module, Module)
     if idx + 1 < len(module.items()[idx + 1:]):
         for item in module.items()[idx + 1:]:
             if item is targetInst:

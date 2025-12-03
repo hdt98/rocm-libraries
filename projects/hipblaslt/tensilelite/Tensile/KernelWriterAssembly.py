@@ -468,7 +468,7 @@ class KernelWriterAssembly(KernelWriter):
     return tmpSgpr
 
   def defineMultiVgprIndex(self, names: List[str], numVgprs: List[int], align=1):
-    assert(len(names) == len(numVgprs))
+    assert len(names) == len(numVgprs)
     vgprIdxVec = self.vgprPool.checkOutMulti(numVgprs, align, tags=names)
     return vgprIdxVec
 
@@ -492,7 +492,7 @@ class KernelWriterAssembly(KernelWriter):
     return ret
 
   def defineMultiSgprIndex(self, names: List[str], numSgprs: List[int], align=1):
-    assert(len(names) == len(numSgprs))
+    assert len(names) == len(numSgprs)
 
     sgprIdxVec = self.sgprPool.checkOutMulti(numSgprs, align, tags=names)
     #self.sgprIdx = roundUpToNearestMultiple(self.sgprIdx,align)
@@ -1234,7 +1234,7 @@ class KernelWriterAssembly(KernelWriter):
           else:
             offsetIsVgpr = False
         else:
-          assert(0) # no other type allowed
+          assert False # no other type allowed
 
         # offset is VGPR or SGPR string to use for the offset
         if offsetIsVgpr:
@@ -2759,7 +2759,7 @@ class KernelWriterAssembly(KernelWriter):
     # graShift requires a vgpr for each address component (so each component
     # can be examined and shifted if necessary) - therefore does not work
     # with UseSgprForGRO.
-    assert(not kernel["_UseSgprForGRO"]), "%s"%self.states.kernelName
+    assert not kernel["_UseSgprForGRO"], f"{self.states.kernelName}"
 
     module = Module("graShift")
     #tc = tP["tensorChar"]
@@ -3323,7 +3323,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(SAddCU32(dst=sgpr(tileStart+1), src0=sgpr(tileStart+1), src1=sgpr(stmp+1), comment="accum GsuOffet term to tilestart"))
 
       sizeIndex = [ dim for dim in tP["ia"] ]
-      assert(len(sizeIndex) >= 2)
+      assert len(sizeIndex) >= 2
       module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(blockOffset), sgpr(blockOffset+1), self.sizeRef(sizeIndex[0]), self.sizeRef(sizeIndex[1]), \
                                 comment="calculate metadata tensor size"))
       for dim in sizeIndex[2:]:
@@ -3358,7 +3358,7 @@ class KernelWriterAssembly(KernelWriter):
             or idx == kernel["ProblemType"]["Index1"] \
             or idx in kernel["ProblemType"]["IndicesSummation"] \
             or isPackedIndex(kernel, idx)):
-          assert(wg==2)
+          assert wg==2
           if not wroteTileStart:
             module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(tileStart+0), sgpr(tileStart+1), sgpr(blockOffset), sgpr("WorkGroup2"), comment="block offset*WG"))
             wroteTileStart = True
@@ -3401,8 +3401,8 @@ class KernelWriterAssembly(KernelWriter):
       # Add tile (and unroll if GSU) component into SRD - SRD will point to beginning of the macro-tile:
       if self.states.groOffsetInMacroTile:
         # packed modes can't use this mode, and code here assumes 1 index.
-        assert(len(kernel["PackedC0IndicesX"])==1)
-        assert(len(kernel["PackedC1IndicesX"])==1)
+        assert len(kernel["PackedC0IndicesX"])==1
+        assert len(kernel["PackedC1IndicesX"])==1
 
         wroteTileStart = True
         #tP['ia'][1]
@@ -3525,7 +3525,7 @@ class KernelWriterAssembly(KernelWriter):
               or isPackedIndex(kernel, idx):
                 continue # these will be captured in GRO not the SRD (or other summations are always 0)
           else:
-            assert(wg==2) # can only have one wg2 with a batch. Other dimensions should be packed into wg0/wg1
+            assert wg==2 # can only have one wg2 with a batch. Other dimensions should be packed into wg0/wg1
             stride = "Stride%s%s"%(tc,self.states.indexChars[tP['ia'][i]])
             if not wroteTileStart:
               module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(tileStart+0), sgpr(tileStart+1), sgpr(stride), sgpr("WorkGroup2"), comment="Stride*WG"))
@@ -3632,7 +3632,7 @@ class KernelWriterAssembly(KernelWriter):
 
     #print (tc, ": loopIdx=", loopIdx, "dimIdx=", dimIdx, "strideIdx=", strideIdx)
 
-    assert(self.states.unrollIdx == kernel["ProblemType"]["NumIndicesSummation"]-1)
+    assert self.states.unrollIdx == kernel["ProblemType"]["NumIndicesSummation"]-1
     if loopIdx==self.states.unrollIdx:
       gsuComponent = Component.GSU.find(self)
       module.add(gsuComponent.graIncrements(self, kernel, loopIdx, tP))
@@ -4370,7 +4370,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   def closeShadowInit(self, kernel):
     module = Module("closeShadowInit")
-    assert(self.states.doShadowInit and kernel["PrefetchGlobalRead"])
+    assert self.states.doShadowInit and kernel["PrefetchGlobalRead"]
 
     module.add(self.checkLastIter(kernel))
     if kernel["SuppressNoLoadLoop"]:
@@ -5467,7 +5467,7 @@ class KernelWriterAssembly(KernelWriter):
           # If the tail loop is suppressed, then final iterations will have moved the Srd base forward
           # (and also moved back the srd shadow limit) and slammed Limit to 0, so need to 'undo'
           # those increments - see setTailSrd
-          assert(kernel["PrefetchGlobalRead"] == 1) #if >1 would need a multiply here
+          assert kernel["PrefetchGlobalRead"] == 1 #if >1 would need a multiply here
           module.add(SCmpEQU32(src0=sgpr("OrigLoopCounter"), src1=0, comment="completely skipped unroll loop?"))
           module.add(SCSelectB32(dst=sgpr(tmpSgpr+0), src0=0, src1=sgpr("GlobalReadIncsA"), comment="force to 0?"))
           module.add(SCSelectB32(dst=sgpr(tmpSgpr+1), src0=0, src1=sgpr("GlobalReadIncsB"), comment="force to 0?"))
@@ -6511,7 +6511,7 @@ class KernelWriterAssembly(KernelWriter):
           (abbrev == 'fp8_bf8' and sourceSwap == True):
           return InstType.INST_BF8_F8
       else:
-          assert("Unsupported data type.")
+          assert False, "Unsupported data type."
       return InstType.INST_NOTYPE
 
     miInputType      = kernel["ProblemType"]["F32XdlMathOp"] if kernel["EnableF32XdlMathOp"] else kernel["ProblemType"]["DataType"]
@@ -7497,7 +7497,7 @@ class KernelWriterAssembly(KernelWriter):
           comment="gra SRD -= inc(upper)" ))
 
     # using Shadow limit here which only works with 64-bit PBC:
-    assert(self.states.use64bShadowLimit)
+    assert self.states.use64bShadowLimit
 
     module.add(SAddU32(dst=sgpr("ShadowLimit%s+0"%tc), \
           src0=sgpr("ShadowLimit%s+0"%tc), src1=incLower, \
@@ -8683,7 +8683,7 @@ class KernelWriterAssembly(KernelWriter):
                   destVgpr = destVgprPrefix + "+%u"%((g2lIdx+eccOffset+tP["shiftGR"]) if not tP["isM"] else g2lIdxM)
                   self.vgprs.globalReadRegisters[tc].append(g2lIdx+eccOffset+tP["shiftGR"] if not tP["isM"] else g2lIdxM)
                   if tP["isM"]:
-                    assert(graIdx <= self.states.m.numVgprG2LAllocated)
+                    assert graIdx <= self.states.m.numVgprG2LAllocated
 
                 # TODO: is it possible to load only hi16 when no in tail? (need to check INT8 too)
                 datatype = kernel["ProblemType"]["DataType%s"%tc] if kernel["ConvertAfterDS"] else kernel["ProblemType"]["DataType"]
@@ -9009,7 +9009,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # Add component offset to interleave from different regs
     # and compute mysterious "i"
-    assert(sPerp==0 or sPara==0)
+    assert sPerp==0 or sPara==0
 
     if tP["tlu"] != kernel["UnrollMajorLDS%s" % tP["tensorChar"]]:
       lspaOffset += sPerp & mask
@@ -11041,7 +11041,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   def checkIsBetaZero(self, kernel, tmpSgprInfo, betaLabel, isLongBranch=False, placeHolder=None, posNeg: int=0):
     module = Module("checkIsBetaZero label %s"%betaLabel)
-    assert(isinstance(betaLabel, Label))
+    assert isinstance(betaLabel, Label)
     betaLabelName = betaLabel.getLabelName()
     if kernel["ProblemType"]["UseBeta"]:
       if self.states.bpeCinternal <= self.states.bpr: # 1 register to check for Beta==0
@@ -11070,7 +11070,7 @@ class KernelWriterAssembly(KernelWriter):
   # isEdgeTarget is the branch target if Size % divisor > 0
   ##############################################################################
   def checkIsEdge(self, kernel, tmpSgprInfo, isEdgeTarget, divisor, isSize1=False, isLongBranch=False, placeHolder=None):
-    assert(isinstance(isEdgeTarget, Label))
+    assert isinstance(isEdgeTarget, Label)
     isEdgeTargetLabel = isEdgeTarget.getLabelName()
     module = Module("checkIsEdge")
     tmpS0  = tmpSgprInfo.idx
@@ -11135,7 +11135,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   def checkIsFactorDimZero(self, kernel, tmpSgprInfo, factorDimLabel, isLongBranch=False, posNeg: int=0):
     module = Module("checkIsFactorDimZero label %s"%factorDimLabel)
-    assert(isinstance(factorDimLabel, Label))
+    assert isinstance(factorDimLabel, Label)
     factorDimLabelName = factorDimLabel.getLabelName()
     if kernel["ProblemType"]["UseBias"] or kernel["ProblemType"]["UseScaleAlphaVec"]:
       if self.states.bpeCinternal <= self.states.bpr: # 1 register to check for Beta==0
@@ -11316,7 +11316,7 @@ class KernelWriterAssembly(KernelWriter):
         isSingleKernel and \
         ((kernel["ProblemType"]["DataTypeA"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters()) or \
         (kernel["ProblemType"]["DataTypeB"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters())):
-        assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
+        assert kernel["ProblemType"]["ComputeDataType"].isSingle()
         sgprScaleA = self.sgprPool.checkOut(1, preventOverflow=False)
         sgprScaleB = self.sgprPool.checkOut(1, preventOverflow=False)
         for i,name in enumerate(['A','B']):
@@ -11569,7 +11569,7 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["ProblemType"]["UseScaleAB"] == "Scalar" and (((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["StreamK"] > 0) or kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel') and \
         ((kernel["ProblemType"]["DataTypeA"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters()) or \
         (kernel["ProblemType"]["DataTypeB"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters())):
-        assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
+        assert kernel["ProblemType"]["ComputeDataType"].isSingle()
         newAlphaVgpr = self.vgprPool.checkOut(1)
         module.add(VMovB32(dst=vgpr(newAlphaVgpr), src=sgpr("Alpha")))
         module.add(SWaitCnt(kmcnt=0, comment="wait for scaleAB load"))
@@ -11588,7 +11588,7 @@ class KernelWriterAssembly(KernelWriter):
 
       # Update beta
       if kernel["ProblemType"]["UseScaleCD"] and ((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["StreamK"] > 0):
-        assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
+        assert kernel["ProblemType"]["ComputeDataType"].isSingle()
         newBetaVgpr = self.vgprPool.checkOut(1)
         module.add(VMovB32(dst=vgpr(newBetaVgpr), src=sgpr("Beta")))
         if (not ((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel')) or kernel["StreamK"] > 0:
@@ -11944,7 +11944,7 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["ProblemType"]["UseScaleAB"] == "Scalar" and kernel["StreamK"] > 0 and \
         ((kernel["ProblemType"]["DataTypeA"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters()) or \
         (kernel["ProblemType"]["DataTypeB"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters())):
-        assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
+        assert kernel["ProblemType"]["ComputeDataType"].isSingle()
         module.add(SMovB32(dst=sgpr("Alpha"), src=sgpr(oldAlpha), comment="Restore alpha value"))
         self.sgprPool.checkIn(oldAlpha)
 
@@ -12018,7 +12018,7 @@ class KernelWriterAssembly(KernelWriter):
     else:
       numElementsPerBatch = len(element) # max, do 'em all
 
-    assert(self.states.c.numVgprValu % gwvw == 0) # sanity check
+    assert self.states.c.numVgprValu % gwvw == 0  # sanity check
 
     numElementsPerBatch = numElementsPerBatch if not kernel["NumElementsPerBatchStore"] else min(kernel["NumElementsPerBatchStore"],numElementsPerBatch)
 

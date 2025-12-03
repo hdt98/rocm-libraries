@@ -546,7 +546,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if lastLc:
       self.codes.perIterLocalWriteCodeNGLL = [ [[], Module()] for i in range (kernel["LoopIters"]) ]
     self.states.perIterLocalWriteCanSkip = [ 0 for i in range (kernel["LoopIters"]) ]
-    assert([item.name for item in self.codes.globalReadIncrements.items()] == ['globalReadIncrementA', 'globalReadIncrementB'])
+    assert [item.name for item in self.codes.globalReadIncrements.items()] == ['globalReadIncrementA', 'globalReadIncrementB']
 
     globalReadIncACode  = self.codes.globalReadIncrements.findNamedItem("globalReadIncrementA")
     globalReadIncBCode  = self.codes.globalReadIncrements.findNamedItem("globalReadIncrementB")
@@ -4808,7 +4808,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # SGPR Assignment according to AMDGPU-ABI
     ########################################
     self.defineSgpr("KernArgAddress", self.states.rpga)
-    assert(self.sgprs["KernArgAddress"] ==  0) # kernarg is passed to kernel as SGPR0
+    assert self.sgprs["KernArgAddress"] == 0 # kernarg is passed to kernel as SGPR0
 
     self.defineSgpr("WorkGroup0", 1)
     self.defineSgpr("WorkGroup1", 1)

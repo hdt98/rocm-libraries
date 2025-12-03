@@ -1250,8 +1250,8 @@ class Solution(collections.abc.Mapping):
     else:
       tc0 = 'B'
       tc1 = 'A'
-    assert(isPackedIndex(state, problemType["Index01A"]))
-    assert(isPackedIndex(state, problemType["Index01B"]))
+    assert isPackedIndex(state, problemType["Index01A"])
+    assert isPackedIndex(state, problemType["Index01B"])
 
     # Pack all the dimensions (batch and free) of A into grid[0]
     for idx in problemType["IndexAssignments%s"%tc0]:
@@ -1659,7 +1659,7 @@ class Solution(collections.abc.Mapping):
               ldsPadA = max(lrvw, optPadA) if not state["ProblemType"]["TLUA"] else 0
             else:
               ldsPadA = max(state["GlobalReadVectorWidthA"],optPadA)
-          assert(ldsPadA >= 0)
+          assert ldsPadA >= 0
 
         if ldsPadB == -1:
           if not state["UnrollMajorLDSB"]:
@@ -1682,7 +1682,7 @@ class Solution(collections.abc.Mapping):
               ldsPadB = max(lrvw, optPadB) if not state["ProblemType"]["TLUB"] else 0
             else:
               ldsPadB = max(state["GlobalReadVectorWidthB"],optPadB)
-          assert(ldsPadB >= 0)
+          assert ldsPadB >= 0
 
         if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
           optPadM = (optPadB if state["ProblemType"]["Sparse"] == 2 else optPadA) // 4
@@ -1699,7 +1699,7 @@ class Solution(collections.abc.Mapping):
               ## turn-off padding for directToLds
               if state["EnableMatrixInstruction"] and state["TransposeLDSMetadata"] and state["DirectToLdsMetadata"]:
                 ldsPadM = 0
-          assert(ldsPadM >= 0)
+          assert ldsPadM >= 0
 
         def removeLdsPadLogicForDTL(tc, ldsPad):
           ret = ldsPad
@@ -2245,7 +2245,7 @@ class Solution(collections.abc.Mapping):
         break
     if not state["Valid"]:
       return
-    assert(state["DepthU"]> 0)
+    assert state["DepthU"]> 0
 
     if state["ScheduleIterAlg"] == 2:
       state["InnerUnroll"] = state["DepthU"] // state["MatrixInstK"]
@@ -2605,7 +2605,7 @@ class Solution(collections.abc.Mapping):
 
         # Add component offset to interleave from different regs
         # and compute mysterious "i"
-        assert(sPerp==0 or sPara==0)
+        assert sPerp==0 or sPara==0
 
         if tlu != uMLds:
           lspaOffset += sPerp & mask
@@ -2746,12 +2746,12 @@ class Solution(collections.abc.Mapping):
     if state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataType"].numBytes() == 32 and state["LdsPadA"] == 16 // state["ProblemType"]["DataType"].numBytes():
       if auto_LdsBlockSizePerPadA_for_mix:
         state["LdsBlockSizePerPadA"] = 128
-    assert(state["LdsPadA"] >= 0)
+    assert state["LdsPadA"] >= 0
 
     if state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataType"].numBytes() == 32 and state["LdsPadB"] == 16 // state["ProblemType"]["DataType"].numBytes():
       if auto_LdsBlockSizePerPadB_for_mix:
         state["LdsBlockSizePerPadB"] = 128
-    assert(state["LdsPadB"] >= 0)
+    assert state["LdsPadB"] >= 0
 
     if (state["UnrollMajorLDSA"] or state["UnrollMajorLDSB"]) and (not state["EnableMatrixInstruction"]) and (not state["UseDotInstruction"]):
         reject(state, printRejectionReason, "UnrollMajorLDS Supports only in EnableMatrixInstruction=1 or dot2 kernel")

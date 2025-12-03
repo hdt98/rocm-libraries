@@ -31,7 +31,7 @@ class PersistentLoop(Component):
     Persistent loop code.
     """
     def __call__(self):
-        assert(0)
+        assert False
 
     @abc.abstractmethod
     def openPersistentLoop(self, writer, kernel):

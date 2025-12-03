@@ -37,7 +37,7 @@ PRECISION = 100
 class SIA3(SIA):
     kernel = {"ScheduleIterAlg": 3}
     def __call__(self):
-        assert(0)
+        assert False
 
     def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, globalReadIncACode, globalReadIncBCode, isNGLL):
         # Get schedule information
@@ -91,7 +91,7 @@ class SIA3(SIA):
 class SIA2(SIA):
     kernel = {"ScheduleIterAlg": 2}
     def __call__(self):
-        assert(0)
+        assert False
 
     def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, globalReadIncACode, globalReadIncBCode, isNGLL):
         # Get schedule information
@@ -119,7 +119,7 @@ class SIA2(SIA):
 class SIA1(SIA):
     kernel = {"ScheduleIterAlg": 1}
     def __call__(self):
-        assert(0)
+        assert False
 
     def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, localWriteEndIter, firstIter, lastLoop, lastLc, globalReadIncACode, globalReadIncBCode, isNGLL):
         # Get schedule information
@@ -257,7 +257,7 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
     # final index definition
     writer.states.numMfmaForNextLoopLR = min(writer.states.numMfmaForNextLoopLR,numMfmaPerIter-1)
     writer.states.syncPlrMfmaIndex = numMfmaPerIter*(kernel["LoopIters"]-writer.states.numItersPLR+1) - writer.states.numMfmaForNextLoopLR - 1 if writer.states.numItersPLR else 0
-    
+
     if kernel["ForceUnrollSubIter"]:
         if ( kernel["ProblemType"]["DataType"].isComplex()):
             writer.states.syncPlrMfmaIndex = writer.states.syncPlrMfmaIndex *4   # Complex

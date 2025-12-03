@@ -40,7 +40,7 @@ class SumUnrollMfma(SumUnroll):
     Use the same pattern as mfma
     """
     def __call__(self):
-        assert(0)
+        assert False
 
     def initSumUnroll(self, writer, kernel):
         imod = Module("initSumUnroll")

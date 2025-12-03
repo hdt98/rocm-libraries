@@ -376,7 +376,7 @@ def problemSizeParams(problemType, problem, factorDim):
     for sc in problemType.setConstStrideA:
         index = problemType.indices[sc[0]]
         if type(index) == FreeIndex:
-            assert(index.isA)
+            assert index.isA
             astrides[index.i] = sc[1]
         else:
             astrides[index.a] = sc[1]
@@ -388,7 +388,7 @@ def problemSizeParams(problemType, problem, factorDim):
     for sc in problemType.setConstStrideB:
         index = problemType.indices[sc[0]]
         if type(index) == FreeIndex:
-            assert(not index.isA)
+            assert not index.isA
             bstrides[index.i] = sc[1]
         else:
             bstrides[index.b] = sc[1]

@@ -199,7 +199,7 @@ class AddrCalculation:
             #   - tmp+2 is scratch
             idxChar= INDEX_CHARS[idx]
             module.addComment0("extract %s"%kw.sizeRef(idx))
-            assert(tmpVgpr+1 != packedBits) # bad since we still need packedBits below for remainder (can't overwrite here)
+            assert tmpVgpr+1 != packedBits # bad since we still need packedBits below for remainder (can't overwrite here)
             module.add(MacroInstruction("V_MAGIC_DIV", \
                            args=[tmpVgpr+1, vgpr(packedBits), sgpr("MagicNumberSize%s"%idxChar), \
                            sgpr("MagicShiftSize%s"%idxChar), sgpr("MagicAbitSize%s"%idxChar) if kernel["MagicDivAlg"]==2 else "0"]))
@@ -837,7 +837,7 @@ class AddrCalculation:
         if ss.optSrdIncForRow:
             if numRows:
                 packedC1 = kernel["PackedC1IndicesX"]
-                assert(len(packedC1) == 1)  # would need to extract each dim and scale
+                assert len(packedC1) == 1   # would need to extract each dim and scale
                 if tc == 'Bias' and (not kernel["WorkGroupReduction"]):
                     index = packedC1[0] - 1
                     strideCD1 = "Size%s" % "I" if index == 0 else ("J" if index == 1 else (self.kernelWriter.states.indexChars[index]))
