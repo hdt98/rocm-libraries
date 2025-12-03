@@ -69,12 +69,14 @@ public:
                       uint32_t                   workgroupSize,
                       size_t                     instrDwords,
                       size_t                     strideMultiplier,
-                      const std::vector<size_t>& baseAddresses)
+                      const std::vector<size_t>& baseAddresses,
+                      bool                       write)
         : AssemblyTestKernel(context)
         , m_workgroupSize(workgroupSize)
         , m_instrDwords(instrDwords)
         , m_strideMultiplier(strideMultiplier)
         , m_baseAddresses(baseAddresses)
+        , m_write(write)
     {
         auto k = m_context->kernel();
         k->setKernelDimensions(1);
@@ -142,21 +144,57 @@ protected:
 
             co_yield m_context->mem()->barrier({});
 
-            for(int i = 0; i < 20; i++)
+            const bool weaveInstrAndWaitcnt = true;
+            if(weaveInstrAndWaitcnt)
             {
-                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
-                co_yield m_context->mem()->loadLocal(
-                    readDst->subset(Generated(iota(start, end))), ldsAddr, 0, 4 * m_instrDwords);
-            }
-
-            {
-                int i = 18;
-                do
+                for(int i = 0; i < 20; i++)
                 {
-                    i /= 2;
+                    const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
+                    const auto numBytes     = m_instrDwords * 4;
+
+                    if(m_write)
+                    {
+                        co_yield m_context->mem()->storeLocal(
+                            ldsAddr, readDst->subset(Generated(iota(start, end))), 0, numBytes);
+                    }
+                    else
+                    {
+                        co_yield m_context->mem()->loadLocal(
+                            readDst->subset(Generated(iota(start, end))), ldsAddr, 0, numBytes);
+                    }
+
                     co_yield Instruction::Wait(
-                        WaitCount::DSCnt(m_context->targetArchitecture(), i));
-                } while(i > 0);
+                        WaitCount::DSCnt(m_context->targetArchitecture(), 0));
+                }
+            }
+            else
+            {
+                for(int i = 0; i < 20; i++)
+                {
+                    const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
+                    const auto numBytes     = m_instrDwords * 4;
+
+                    if(m_write)
+                    {
+                        co_yield m_context->mem()->storeLocal(
+                            ldsAddr, readDst->subset(Generated(iota(start, end))), 0, numBytes);
+                    }
+                    else
+                    {
+                        co_yield m_context->mem()->loadLocal(
+                            readDst->subset(Generated(iota(start, end))), ldsAddr, 0, numBytes);
+                    }
+                }
+
+                {
+                    int i = 18;
+                    do
+                    {
+                        i /= 2;
+                        co_yield Instruction::Wait(
+                            WaitCount::DSCnt(m_context->targetArchitecture(), i));
+                    } while(i > 0);
+                }
             }
         };
 
@@ -180,6 +218,7 @@ private:
     size_t                   m_strideMultiplier;
     std::vector<size_t>      m_baseAddresses;
     std::vector<Instruction> m_instructions;
+    bool                     m_write;
 };
 
 TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
@@ -189,9 +228,11 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
     constexpr auto workgroupSize    = 64u;
     constexpr auto strideMultiplier = 8u;
 
-    auto instrDwords = GENERATE(4);
+    auto instrDwords = GENERATE(2);
+    auto write       = GENERATE(true);
 
-    SECTION("Waitcnt sequence 7 to 0, dwords " + std::to_string(instrDwords))
+    SECTION("Waitcnt sequence 7 to 0, dwords " + std::to_string(instrDwords) + ", "
+            + (write ? "write" : "read"))
     {
         rocRoller::profiler::reset();
 
@@ -206,7 +247,7 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
         WaitcntTestKernel kernel(
-            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses);
+            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
 
@@ -238,8 +279,16 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
             }
         }
 
-        CHECK(dsReadCount == 20);
-        CHECK(dsWriteCount == 0);
+        if(write)
+        {
+            CHECK(dsReadCount == 0);
+            CHECK(dsWriteCount == 20);
+        }
+        else
+        {
+            CHECK(dsReadCount == 20);
+            CHECK(dsWriteCount == 0);
+        }
         CHECK(waitcntCount == 8);
 
         Log::info(context.output());

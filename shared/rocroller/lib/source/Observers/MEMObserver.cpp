@@ -194,7 +194,7 @@ namespace rocRoller
                     = (LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 * multiplier) - 1;
             }
             const auto waitcnt = inst.getWaitCount().dscnt();
-            if(waitcnt > -1)
+            if(waitcnt >= 0)
             {
                 AssertFatal(status.stallCycles == 0,
                             "No logic to handle both waitcnt stalls and instruction stalls yet");
