@@ -1,6 +1,8 @@
 import os
 import json
 import time
+import re
+import datetime
 from invoke import task
 
 # Paths
@@ -18,16 +20,102 @@ ENV = os.environ.copy()
 ENV["LD_LIBRARY_PATH"] = f"{LIBRARY_DIR}:/opt/rocm/lib:{ENV.get('LD_LIBRARY_PATH', '')}"
 
 
-def run_test_command(c, args="", log_prefix="test", env=None):
+def parse_patch_name(patch_name):
+    """
+    Parse patch filename into structured metadata.
+    Expected format: cat_X_NN_description.patch
+    Returns: {"category": "X", "number": NN, "description": "description", "full_name": "..."}
+    """
+    match = re.match(r"cat_([a-e])_(\d+)_(.+)\.patch", patch_name, re.IGNORECASE)
+    if match:
+        return {
+            "category": match.group(1).upper(),
+            "number": int(match.group(2)),
+            "description": match.group(3),
+            "full_name": patch_name,
+        }
+    return {
+        "category": "unknown",
+        "number": 0,
+        "description": patch_name,
+        "full_name": patch_name,
+    }
+
+
+def extract_log_summary(log_file):
+    """
+    Extract quick summary stats from a gtest log file.
+    Returns dict with test counts, failure info, GPU errors, etc.
+    """
+    summary = {
+        "total_tests": 0,
+        "passed_tests": 0,
+        "failed_tests": 0,
+        "disabled_tests": 0,
+        "failed_test_names": [],
+        "gpu_errors": [],
+        "crashed": False,
+        "completed": False,
+        "first_failure": None,
+    }
+
+    if not os.path.exists(log_file):
+        return summary
+
+    try:
+        with open(log_file, "r", errors="replace") as f:
+            content = f.read()
+
+        # Check for GPU errors
+        gpu_errors = re.findall(r"(?:Hip error|Error code|hipError).*?(\d+)", content)
+        summary["gpu_errors"] = list(set(gpu_errors))
+
+        # Check completion
+        if re.search(r"\[\s*PASSED\s*\]|\d+ tests from \d+ test suites ran", content):
+            summary["completed"] = True
+        else:
+            summary["crashed"] = True
+
+        # Extract test counts from final summary
+        total_match = re.search(r"\[==========\] (\d+) tests? from", content)
+        if total_match:
+            summary["total_tests"] = int(total_match.group(1))
+
+        passed_match = re.search(r"\[\s*PASSED\s*\]\s*(\d+)\s*tests?", content)
+        if passed_match:
+            summary["passed_tests"] = int(passed_match.group(1))
+
+        failed_match = re.search(r"\[\s*FAILED\s*\]\s*(\d+)\s*tests?", content)
+        if failed_match:
+            summary["failed_tests"] = int(failed_match.group(1))
+
+        # Extract failed test names
+        failed_tests = re.findall(r"\[\s*FAILED\s*\]\s*([^\s,]+)", content)
+        summary["failed_test_names"] = failed_tests
+
+        # Find first failure (for FIDT analysis)
+        first_fail_match = re.search(r"\[\s*FAILED\s*\]\s*([^\s,]+)", content)
+        if first_fail_match:
+            summary["first_failure"] = first_fail_match.group(1)
+
+    except Exception as e:
+        summary["parse_error"] = str(e)
+
+    return summary
+
+
+def run_test_command(c, args="", log_prefix="test", env=None, output_dir=None):
     """
     Helper to run the test binary, save logs, and measure time.
     """
     if env is None:
         env = ENV
+    if output_dir is None:
+        output_dir = PROJECT_ROOT
 
     timestamp = int(time.time())
-    log_file = os.path.join(PROJECT_ROOT, f"{log_prefix}_{timestamp}.log")
-    json_file = os.path.join(PROJECT_ROOT, f"{log_prefix}_{timestamp}.json")
+    log_file = os.path.join(output_dir, f"{log_prefix}_{timestamp}.log")
+    json_file = os.path.join(output_dir, f"{log_prefix}_{timestamp}.json")
 
     # We use --gtest_output=json to easily parse results later
     full_cmd = f"{TEST_BINARY} {args} --gtest_output=json:{json_file}"
@@ -48,6 +136,7 @@ def run_test_command(c, args="", log_prefix="test", env=None):
         "duration": duration,
         "command": full_cmd,
         "failed": result.failed,
+        "exit_code": result.return_code,
     }
 
 
@@ -269,3 +358,281 @@ def experiment_d(c):
 
     revert_all(c)
     print("Experiment D completed.")
+
+
+# =============================================================================
+# COMPREHENSIVE DATA COLLECTION
+# =============================================================================
+
+@task
+def collect_all(c, output_dir="results", category=None, patch=None, skip_build=False):
+    """
+    Comprehensive data collection for all patches.
+    
+    Runs the FULL test suite for each patch and collects:
+    - Complete test log (.log)
+    - GTest JSON output (.json)  
+    - Quick summary stats extracted from logs
+    
+    All data is organized in a single output directory with a master
+    summary.json that serves as an index for later analysis.
+    
+    Options:
+        --output-dir: Directory to store results (default: "results")
+        --category: Only run patches from this category (a, b, c, d, e)
+        --patch: Only run a specific patch file
+        --skip-build: Skip the build step (use existing build)
+    
+    Example:
+        invoke collect-all
+        invoke collect-all --output-dir=run_2024_01_15
+        invoke collect-all --category=e
+        invoke collect-all --patch=cat_a_01_hipblaslt_swap_rows_cols.patch
+    """
+    print("=" * 80)
+    print("COMPREHENSIVE DATA COLLECTION")
+    print("=" * 80)
+    
+    # Create timestamped output directory
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    output_path = os.path.join(PROJECT_ROOT, f"{output_dir}_{timestamp}")
+    os.makedirs(output_path, exist_ok=True)
+    
+    print(f"Output directory: {output_path}")
+    
+    # Find patches to process
+    all_patches = sorted([f for f in os.listdir(PATCH_DIR) if f.endswith(".patch")])
+    
+    # Filter by category if specified
+    if category:
+        cat_prefix = f"cat_{category.lower()}_"
+        all_patches = [p for p in all_patches if p.startswith(cat_prefix)]
+        print(f"Filtering to category {category.upper()}: {len(all_patches)} patches")
+    
+    # Filter by specific patch if specified
+    if patch:
+        if patch in all_patches:
+            all_patches = [patch]
+        else:
+            print(f"ERROR: Patch '{patch}' not found in {PATCH_DIR}")
+            return
+    
+    print(f"Processing {len(all_patches)} patches...")
+    
+    # Master summary structure
+    master_summary = {
+        "metadata": {
+            "created": timestamp,
+            "output_dir": output_path,
+            "total_patches": len(all_patches),
+            "repo_root": REPO_ROOT,
+            "build_dir": BUILD_DIR,
+        },
+        "patches": {},
+        "categories": {
+            "A": {"patches": [], "detected": 0, "escaped": 0},
+            "B": {"patches": [], "detected": 0, "escaped": 0},
+            "C": {"patches": [], "detected": 0, "escaped": 0},
+            "D": {"patches": [], "detected": 0, "escaped": 0},
+            "E": {"patches": [], "detected": 0, "escaped": 0},
+        },
+        "summary": {
+            "total_detected": 0,
+            "total_escaped": 0,
+            "total_crashed": 0,
+            "total_completed": 0,
+        }
+    }
+    
+    for i, patch_name in enumerate(all_patches, 1):
+        print(f"\n{'='*60}")
+        print(f"[{i}/{len(all_patches)}] Processing: {patch_name}")
+        print(f"{'='*60}")
+        
+        patch_meta = parse_patch_name(patch_name)
+        patch_id = f"cat_{patch_meta['category'].lower()}_{patch_meta['number']:02d}"
+        
+        patch_result = {
+            "patch_file": patch_name,
+            "patch_id": patch_id,
+            **patch_meta,
+            "log_file": None,
+            "json_file": None,
+            "duration": 0,
+            "exit_code": None,
+            "build_success": False,
+            "apply_success": False,
+            "test_summary": {},
+            "detected": False,
+            "error": None,
+        }
+        
+        try:
+            # 1. Revert any previous changes
+            revert_all(c)
+            
+            # 2. Apply patch
+            print(f"  Applying patch...")
+            apply_patch(c, patch_name)
+            patch_result["apply_success"] = True
+            
+            # 3. Build (unless skipped)
+            if not skip_build:
+                print(f"  Building...")
+                build(c)
+            patch_result["build_success"] = True
+            
+            # 4. Run full test suite (no fail-fast to get complete picture)
+            print(f"  Running tests...")
+            test_res = run_test_command(
+                c,
+                args="",  # No filters, no fail-fast - run everything
+                log_prefix=patch_id,
+                output_dir=output_path,
+            )
+            
+            patch_result["log_file"] = test_res["log_file"]
+            patch_result["json_file"] = test_res["json_file"]
+            patch_result["duration"] = test_res["duration"]
+            patch_result["exit_code"] = test_res.get("exit_code")
+            
+            # 5. Extract summary from log
+            print(f"  Extracting summary...")
+            log_summary = extract_log_summary(test_res["log_file"])
+            patch_result["test_summary"] = log_summary
+            
+            # 6. Determine detection status
+            detected = (
+                log_summary["failed_tests"] > 0 or 
+                log_summary["crashed"] or
+                test_res["failed"]
+            )
+            patch_result["detected"] = detected
+            
+            # Update category stats
+            cat = patch_meta["category"]
+            if cat in master_summary["categories"]:
+                master_summary["categories"][cat]["patches"].append(patch_id)
+                if detected:
+                    master_summary["categories"][cat]["detected"] += 1
+                else:
+                    master_summary["categories"][cat]["escaped"] += 1
+            
+            # Update global stats
+            if detected:
+                master_summary["summary"]["total_detected"] += 1
+            else:
+                master_summary["summary"]["total_escaped"] += 1
+            
+            if log_summary["crashed"]:
+                master_summary["summary"]["total_crashed"] += 1
+            if log_summary["completed"]:
+                master_summary["summary"]["total_completed"] += 1
+            
+            status = "DETECTED" if detected else "ESCAPED"
+            print(f"  Result: {status} (duration: {test_res['duration']:.1f}s)")
+            
+        except Exception as e:
+            patch_result["error"] = str(e)
+            print(f"  ERROR: {e}")
+        
+        finally:
+            # Always revert changes
+            try:
+                revert_all(c)
+            except:
+                pass
+        
+        # Store result
+        master_summary["patches"][patch_name] = patch_result
+        
+        # Save intermediate summary (in case of crash)
+        summary_file = os.path.join(output_path, "summary.json")
+        with open(summary_file, "w") as f:
+            json.dump(master_summary, f, indent=2)
+    
+    # Final summary
+    print("\n" + "=" * 80)
+    print("DATA COLLECTION COMPLETE")
+    print("=" * 80)
+    print(f"\nResults saved to: {output_path}")
+    print(f"Summary file: {summary_file}")
+    print(f"\nDetection Summary:")
+    print(f"  Total patches: {len(all_patches)}")
+    print(f"  Detected:      {master_summary['summary']['total_detected']}")
+    print(f"  Escaped:       {master_summary['summary']['total_escaped']}")
+    print(f"  Crashed:       {master_summary['summary']['total_crashed']}")
+    print(f"  Completed:     {master_summary['summary']['total_completed']}")
+    
+    print("\nBy Category:")
+    for cat, stats in master_summary["categories"].items():
+        if stats["patches"]:
+            total = len(stats["patches"])
+            pct = 100 * stats["detected"] / total if total > 0 else 0
+            print(f"  Category {cat}: {stats['detected']}/{total} detected ({pct:.0f}%)")
+    
+    return master_summary
+
+
+@task
+def collect_baseline(c, output_dir="baseline"):
+    """
+    Collect baseline test results with NO patches applied.
+    This provides a reference for comparing mutated behavior.
+    """
+    print("=" * 80)
+    print("BASELINE DATA COLLECTION (no patches)")
+    print("=" * 80)
+    
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    output_path = os.path.join(PROJECT_ROOT, f"{output_dir}_{timestamp}")
+    os.makedirs(output_path, exist_ok=True)
+    
+    print(f"Output directory: {output_path}")
+    
+    # Ensure clean state
+    revert_all(c)
+    
+    # Build clean
+    print("Building baseline (no patches)...")
+    build(c)
+    
+    # Run full test suite
+    print("Running baseline tests...")
+    test_res = run_test_command(
+        c,
+        args="",
+        log_prefix="baseline",
+        output_dir=output_path,
+    )
+    
+    # Extract summary
+    log_summary = extract_log_summary(test_res["log_file"])
+    
+    # Save baseline info
+    baseline_info = {
+        "metadata": {
+            "created": timestamp,
+            "type": "baseline",
+            "output_dir": output_path,
+        },
+        "results": {
+            "log_file": test_res["log_file"],
+            "json_file": test_res["json_file"],
+            "duration": test_res["duration"],
+            "exit_code": test_res.get("exit_code"),
+            "summary": log_summary,
+        }
+    }
+    
+    summary_file = os.path.join(output_path, "baseline_summary.json")
+    with open(summary_file, "w") as f:
+        json.dump(baseline_info, f, indent=2)
+    
+    print(f"\nBaseline collection complete.")
+    print(f"Results: {output_path}")
+    print(f"Total tests: {log_summary['total_tests']}")
+    print(f"Passed: {log_summary['passed_tests']}")
+    print(f"Failed: {log_summary['failed_tests']}")
+    
+    return baseline_info
