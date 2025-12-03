@@ -294,6 +294,7 @@ def hasCustomSchedule(kernel):
     is16bit = kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16()
     is8bit = kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()
     isMixed = kernel["ProblemType"]["DataTypeA"].numBytes() != kernel["ProblemType"]["DataTypeB"].numBytes()
+    isTF32 = kernel["UseF32XEmulation"]
 
     MT0, MT1, DU, PGR, PLR, DTL = kernel["MacroTile0"], kernel["MacroTile1"], kernel["DepthU"], kernel["PrefetchGlobalRead"], kernel["PrefetchLocalRead"], kernel["DirectToLds"]
     GRVWA, GRVWB = kernel["GlobalReadVectorWidthA"], kernel["GlobalReadVectorWidthB"]
@@ -306,6 +307,7 @@ def hasCustomSchedule(kernel):
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 64, 2, 1, True]
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 64, 2, 1, True]
     is256x256x128DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 128, 2, 0, True]
+    is192x256x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 32, 2, 0, True]
 
 
     transA = kernel["ProblemType"]["TransposeA"]
@@ -316,7 +318,77 @@ def hasCustomSchedule(kernel):
     isTT = transA == True and transB == True
     isTN = transA == True and transB == False
 
-    # Custom main loop scheduling for 256x256x64 16bit
+    # Custom main loop scheduling for 192x256x32 TF32
+    if isTF32 and is192x256x32DTL and MI == [16, 16, 32, 1] and MIWG == [2, 2]:
+        kernel["MfmaInitCVgprs"] = True
+
+        optSchedule = dict()
+        syncCode = []
+        nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+        if isNN and useLDSTr and TLDS==1:
+            # Note: A/B Global read orders are swapped
+            # i.e. GRA contains GR for B
+            kernel["SwapGlobalReadOrder"] = True
+            syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
+                        SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                        SBarrier(comment=""),
+                        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                        SWaitCnt(dscnt=-1, vlcnt=14, vscnt=-1, comment="Wait for LRB0 to complete"),
+                        SBarrier(comment=""),
+                        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),]
+            optSchedule = {
+                'SYNC'  : [[-1,5,34,36,71,71,72,107,107,107]],
+                'GRIncA': [[1,1,1,2,2,2,3,3,3]],
+                'GRIncB': [[4,4,4,5,5,5,6,6,6]],
+                # LDS reads into first 4 vgprs of Valu!_X!_I!+offset, then next four into Valu!_T!_I!+offset
+                #  in order to avoid copies in the cvt code
+                'LRA0': [[1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12]],
+                'LRB0': [[13,14,15,16,17,18,19,20]],
+                # Pack code contains cvt ops for converting fp32 to bf16. A and B cvt ops are identical.
+                # There are 24 ops per block of 3 mfmas.
+                # This example puts all cvt ops for one mfma in a single block, but they should be split up
+                # There are 3 BF16 MFMAs, with an ordering of: mfma(AHigh, BHigh), mfma(AHigh, BLow), mfma(ALow, BHigh)
+                # The first mfma in each block of 3 then only needs the first 4 ops from A and B, and the second mfma
+                # needs all cvt ops only for A. The third needs all cvt ops for the block.
+                'PackA0' : [[35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35,
+                             38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
+                             41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41,
+                             ]],
+                'PackB0' : [[71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71,
+                             80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
+                             89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
+                             98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98,
+                             ]],
+                #Carson: GRA and GRB appear to have contents confusingly swapped
+                'GRA': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
+                'GRB': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
+                'LRSA': [[35]],
+                'LRSB': [[35]],
+                'LWSA': [[107]],
+                'LWSB': [[107]],
+                'LCC': [[143, 143]],
+                'LRA3': [[109,109,110,110,111,111,112,112,115,115,116,116,117,117,118,118,119,119,120,120,121,121,122,122]],
+                'LRB3': [[113,114,123,124,125,126,127,128]],
+                'PackA3' : [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                             5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+                             ]],
+                'PackB3' : [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                             5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+                             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+                             ]],
+            }
+            nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+        else:
+            return False, None
+
+        numMfma = 144
+        opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+        return True, opt1
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
 
         kernel["MfmaInitCVgprs"] = True
