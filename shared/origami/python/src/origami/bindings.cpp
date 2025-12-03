@@ -52,7 +52,6 @@ NB_MODULE(origami, m) {
   nanobind::enum_<origami::transpose_t>(m, "transpose_t")
       .value("T", origami::transpose_t::T)
       .value("N", origami::transpose_t::N)
-      // Optional: usually you don't expose Count, but you can if you want
       // .value("Count", origami::transpose_t::Count)
       .export_values();
 

@@ -90,8 +90,8 @@ if __name__ == "__main__":
     cpp_path = source_dir / "origami" / "*.cpp"
     cpp_files = sorted(glob.glob(str(cpp_path)))
     
-    # Add the Python module C++ file (in current directory)
-    origami_module_cpp = python_dir / "origami_module.cpp"
+    # Add the Python module C++ file (in src/origami/)
+    origami_module_cpp = python_dir / "src" / "origami" / "bindings.cpp"
     if not origami_module_cpp.exists():
         raise FileNotFoundError(f"Python module file not found: {origami_module_cpp}")
     
@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     ext_modules = [
         Extension(
-            "origami",
+            "origami.origami",  # Extension creates origami/origami.so, matches NB_MODULE(origami, m)
             cpp_files,
             include_dirs=[
                 nanobind.include_dir(),
@@ -149,6 +149,8 @@ if __name__ == "__main__":
         long_description_content_type="text/markdown",
         author="Advanced Micro Devices, Inc.",
         license="MIT",
+        package_dir={"": "src"},
+        packages=["origami"],
         ext_modules=ext_modules,
         cmdclass={"build_ext": HIPCCBuildExt},
         setup_requires=["nanobind>=2.0.0"],
