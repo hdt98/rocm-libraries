@@ -4,6 +4,7 @@ import time
 import re
 import datetime
 from invoke import task
+from invoke.exceptions import CommandTimedOut
 
 # Paths
 # This script is located in test_symposium_experiments/
@@ -88,10 +89,29 @@ def extract_log_summary(log_file):
         failed_match = re.search(r"\[\s*FAILED\s*\]\s*(\d+)\s*tests?", content)
         if failed_match:
             summary["failed_tests"] = int(failed_match.group(1))
+        
+        # If total tests is still 0 (crash before summary), try to recover from start
+        if summary["total_tests"] == 0:
+             # Start line format: [==========] Running 40101 tests from 11 test suites.
+             start_total_match = re.search(r"\[==========\] Running (\d+) tests? from", content)
+             if start_total_match:
+                 summary["total_tests"] = int(start_total_match.group(1))
+             
+             # Count [ OK ] and [ FAILED ] lines from the body
+             # We use re.MULTILINE with ^ to match start of lines
+             summary["passed_tests"] = len(re.findall(r"^\[\s*OK\s*\] ", content, re.MULTILINE))
+             
+             # For failures, look for the execution line which usually ends with time: (xx ms)
+             # This helps distinguish from the summary list at the bottom if it partially exists.
+             summary["failed_tests"] = len(re.findall(r"^\[\s*FAILED\s*\] .*\(", content, re.MULTILINE))
 
         # Extract failed test names
         failed_tests = re.findall(r"\[\s*FAILED\s*\]\s*([^\s,]+)", content)
-        summary["failed_test_names"] = failed_tests
+        summary["failed_test_names"] = sorted(list(set(failed_tests)))
+        
+        # Sync failed_tests count if we have names but 0 count (fallback safety)
+        if summary["failed_tests"] == 0 and len(summary["failed_test_names"]) > 0:
+             summary["failed_tests"] = len(summary["failed_test_names"])
 
         # Find first failure (for FIDT analysis)
         first_fail_match = re.search(r"\[\s*FAILED\s*\]\s*([^\s,]+)", content)
@@ -104,7 +124,7 @@ def extract_log_summary(log_file):
     return summary
 
 
-def run_test_command(c, args="", log_prefix="test", env=None, output_dir=None):
+def run_test_command(c, args="", log_prefix="test", env=None, output_dir=None, timeout=None):
     """
     Helper to run the test binary, save logs, and measure time.
     """
@@ -122,11 +142,25 @@ def run_test_command(c, args="", log_prefix="test", env=None, output_dir=None):
 
     print(f"Running: {full_cmd}")
     start_time = time.time()
+    
+    timed_out = False
+    exit_code = -1
+    failed = True
+    result = None
 
     # Run in build directory
     with c.cd(BUILD_DIR):
-        # warn=True allows the script to continue even if tests fail (which they should)
-        result = c.run(f"{full_cmd} > {log_file} 2>&1", env=env, warn=True)
+        try:
+            # warn=True allows the script to continue even if tests fail (which they should)
+            result = c.run(f"{full_cmd} > {log_file} 2>&1", env=env, warn=True, timeout=timeout)
+            failed = result.failed
+            exit_code = result.return_code
+        except CommandTimedOut:
+            print(f"TIMEOUT reached ({timeout}s)")
+            timed_out = True
+            # Log the timeout event to the log file so it's recorded
+            with open(log_file, "a") as f:
+                f.write(f"\n\n[FATAL] Test execution timed out after {timeout} seconds.\n")
 
     duration = time.time() - start_time
 
@@ -135,8 +169,9 @@ def run_test_command(c, args="", log_prefix="test", env=None, output_dir=None):
         "json_file": json_file,
         "duration": duration,
         "command": full_cmd,
-        "failed": result.failed,
-        "exit_code": result.return_code,
+        "failed": failed or timed_out,
+        "exit_code": exit_code,
+        "timed_out": timed_out
     }
 
 
@@ -145,7 +180,8 @@ def build(c):
     """Build the hipBLASLt project."""
     print("Building project...")
     with c.cd(BUILD_DIR):
-        c.run("make -j$(nproc)")
+        # -s: Silent mode (don't echo commands), only shows CMake progress for changed files
+        c.run("make -j$(nproc) -s")
 
 
 @task
@@ -365,7 +401,7 @@ def experiment_d(c):
 # =============================================================================
 
 @task
-def collect_all(c, output_dir="results", category=None, patch=None, skip_build=False):
+def collect_all(c, output_dir="results", category=None, patch=None, skip_build=False, timeout=1800):
     """
     Comprehensive data collection for all patches.
     
@@ -382,21 +418,36 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
         --category: Only run patches from this category (a, b, c, d, e)
         --patch: Only run a specific patch file
         --skip-build: Skip the build step (use existing build)
+        --timeout: Timeout in seconds for each test run (default: 1800 = 30 min)
     
     Example:
         invoke collect-all
         invoke collect-all --output-dir=run_2024_01_15
         invoke collect-all --category=e
         invoke collect-all --patch=cat_a_01_hipblaslt_swap_rows_cols.patch
+        invoke collect-all --output-dir=results_2025-12-03_200832  # Resumes from existing
     """
     print("=" * 80)
     print("COMPREHENSIVE DATA COLLECTION")
     print("=" * 80)
     
-    # Create timestamped output directory
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    output_path = os.path.join(PROJECT_ROOT, f"{output_dir}_{timestamp}")
-    os.makedirs(output_path, exist_ok=True)
+    # Handle Resume Logic
+    # If output_dir matches an existing directory, resume from it.
+    # Otherwise treat it as a prefix for a new timestamped directory.
+    
+    target_path = os.path.join(PROJECT_ROOT, output_dir)
+    is_resume = False
+    
+    if os.path.exists(target_path) and os.path.isdir(target_path):
+        output_path = target_path
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") # Just for metadata update if needed
+        is_resume = True
+        print(f"RESUMING from existing directory: {output_path}")
+    else:
+        # Create timestamped output directory
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        output_path = os.path.join(PROJECT_ROOT, f"{output_dir}_{timestamp}")
+        os.makedirs(output_path, exist_ok=True)
     
     print(f"Output directory: {output_path}")
     
@@ -420,34 +471,51 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
     print(f"Processing {len(all_patches)} patches...")
     
     # Master summary structure
-    master_summary = {
-        "metadata": {
-            "created": timestamp,
-            "output_dir": output_path,
-            "total_patches": len(all_patches),
-            "repo_root": REPO_ROOT,
-            "build_dir": BUILD_DIR,
-        },
-        "patches": {},
-        "categories": {
-            "A": {"patches": [], "detected": 0, "escaped": 0},
-            "B": {"patches": [], "detected": 0, "escaped": 0},
-            "C": {"patches": [], "detected": 0, "escaped": 0},
-            "D": {"patches": [], "detected": 0, "escaped": 0},
-            "E": {"patches": [], "detected": 0, "escaped": 0},
-        },
-        "summary": {
-            "total_detected": 0,
-            "total_escaped": 0,
-            "total_crashed": 0,
-            "total_completed": 0,
+    summary_file = os.path.join(output_path, "summary.json")
+    
+    if is_resume and os.path.exists(summary_file):
+        print(f"Loading existing summary from {summary_file}")
+        with open(summary_file, "r") as f:
+            master_summary = json.load(f)
+    else:
+        master_summary = {
+            "metadata": {
+                "created": timestamp,
+                "output_dir": output_path,
+                "total_patches": len(all_patches),
+                "repo_root": REPO_ROOT,
+                "build_dir": BUILD_DIR,
+            },
+            "patches": {},
+            "categories": {
+                "A": {"patches": [], "detected": 0, "escaped": 0},
+                "B": {"patches": [], "detected": 0, "escaped": 0},
+                "C": {"patches": [], "detected": 0, "escaped": 0},
+                "D": {"patches": [], "detected": 0, "escaped": 0},
+                "E": {"patches": [], "detected": 0, "escaped": 0},
+            },
+            "summary": {
+                "total_detected": 0,
+                "total_escaped": 0,
+                "total_crashed": 0,
+                "total_completed": 0,
+                "total_timed_out": 0,
+            }
         }
-    }
     
     for i, patch_name in enumerate(all_patches, 1):
         print(f"\n{'='*60}")
         print(f"[{i}/{len(all_patches)}] Processing: {patch_name}")
         print(f"{'='*60}")
+        
+        # Check if already processed (Resume Logic)
+        if patch_name in master_summary["patches"]:
+            existing = master_summary["patches"][patch_name]
+            # Consider done if we have a result status (detected/escaped) stored
+            # or if log file exists.
+            if existing.get("log_file") and os.path.exists(existing["log_file"]):
+                print(f"  Skipping {patch_name} - Already processed.")
+                continue
         
         patch_meta = parse_patch_name(patch_name)
         patch_id = f"cat_{patch_meta['category'].lower()}_{patch_meta['number']:02d}"
@@ -465,6 +533,7 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
             "test_summary": {},
             "detected": False,
             "error": None,
+            "timed_out": False
         }
         
         try:
@@ -483,18 +552,20 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
             patch_result["build_success"] = True
             
             # 4. Run full test suite (no fail-fast to get complete picture)
-            print(f"  Running tests...")
+            print(f"  Running tests (timeout={timeout}s)...")
             test_res = run_test_command(
                 c,
                 args="",  # No filters, no fail-fast - run everything
                 log_prefix=patch_id,
                 output_dir=output_path,
+                timeout=timeout
             )
             
             patch_result["log_file"] = test_res["log_file"]
             patch_result["json_file"] = test_res["json_file"]
             patch_result["duration"] = test_res["duration"]
             patch_result["exit_code"] = test_res.get("exit_code")
+            patch_result["timed_out"] = test_res.get("timed_out", False)
             
             # 5. Extract summary from log
             print(f"  Extracting summary...")
@@ -505,14 +576,17 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
             detected = (
                 log_summary["failed_tests"] > 0 or 
                 log_summary["crashed"] or
-                test_res["failed"]
+                test_res["failed"] or
+                patch_result["timed_out"]
             )
             patch_result["detected"] = detected
             
             # Update category stats
             cat = patch_meta["category"]
             if cat in master_summary["categories"]:
-                master_summary["categories"][cat]["patches"].append(patch_id)
+                if patch_id not in master_summary["categories"][cat]["patches"]:
+                    master_summary["categories"][cat]["patches"].append(patch_id)
+                
                 if detected:
                     master_summary["categories"][cat]["detected"] += 1
                 else:
@@ -528,8 +602,12 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
                 master_summary["summary"]["total_crashed"] += 1
             if log_summary["completed"]:
                 master_summary["summary"]["total_completed"] += 1
+            if patch_result["timed_out"]:
+                master_summary["summary"]["total_timed_out"] = master_summary["summary"].get("total_timed_out", 0) + 1
             
             status = "DETECTED" if detected else "ESCAPED"
+            if patch_result["timed_out"]:
+                status += " (TIMEOUT)"
             print(f"  Result: {status} (duration: {test_res['duration']:.1f}s)")
             
         except Exception as e:
@@ -547,7 +625,6 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
         master_summary["patches"][patch_name] = patch_result
         
         # Save intermediate summary (in case of crash)
-        summary_file = os.path.join(output_path, "summary.json")
         with open(summary_file, "w") as f:
             json.dump(master_summary, f, indent=2)
     
@@ -563,6 +640,7 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
     print(f"  Escaped:       {master_summary['summary']['total_escaped']}")
     print(f"  Crashed:       {master_summary['summary']['total_crashed']}")
     print(f"  Completed:     {master_summary['summary']['total_completed']}")
+    print(f"  Timed Out:     {master_summary['summary'].get('total_timed_out', 0)}")
     
     print("\nBy Category:")
     for cat, stats in master_summary["categories"].items():
