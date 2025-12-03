@@ -1,0 +1,16 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1741,8 +1741,11 @@ namespace
+ 
+         // Descriptor for input matrix C
+         tensileProblem.resetTensor(TensileLite::ContractionProblemGemm::TENSOR::C,
+                                    c_type,
+-                                   {prob.m, prob.n, prob.batch_count},
++                                   // FAILURE TYPE 7: SWAP M AND N FOR C TENSOR
++                                   // This creates a dimension mismatch between
++                                   // the C tensor setup and actual problem dimensions
++                                   {prob.n, prob.m, prob.batch_count},
+                                    {prob.row_stride_c, prob.col_stride_c, prob.batch_stride_c});
+
+         // Descriptor for output matrix D
+

@@ -1,0 +1,19 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1880,7 +1880,14 @@ namespace
+         inputs.ws            = prob.workspace;
+         inputs.workspaceSize = prob.workspaceSize;
+
+-        inputs.Synchronizer = prob.Synchronizer;
++        // FAILURE TYPE 22: SYNCHRONIZER RACE CONDITION
++        // Conditionally nullify the synchronizer for batched operations
++        // This causes race conditions in multi-stream or batched scenarios
++        // where synchronization is needed for GSU (Global Split-U) kernels
++        // Very hard to detect - causes intermittent incorrect results
++        inputs.Synchronizer = (prob.batch_count > 1 && prob.grouped_gemm)
++                            ? nullptr
++                            : prob.Synchronizer;
+
+         // set bias vector
+         if(is_bias_enabled(prob.epilogue))
+

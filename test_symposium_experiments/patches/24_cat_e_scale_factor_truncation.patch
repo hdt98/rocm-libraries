@@ -1,0 +1,21 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1889,8 +1889,15 @@ namespace
+         else
+             inputs.bias = nullptr;
+         inputs.scaleA        = reinterpret_cast<const void*>(prob.scaleA);
+-        inputs.scaleB        = reinterpret_cast<const void*>(prob.scaleB);
+-        inputs.scaleC        = reinterpret_cast<const void*>(prob.scaleC);
++        // FAILURE TYPE 24: SCALE FACTOR TRUNCATION (Level 2 - Moderate)
++        // Swap scaleB and scaleC pointers when scales are provided
++        // This causes incorrect scaling: scaleB applied to C and vice versa
++        // Results in numerical errors that scale with the difference between
++        // scaleB and scaleC values - harder to detect with similar scales
++        inputs.scaleB        = prob.scaleC != nullptr
++                             ? reinterpret_cast<const void*>(prob.scaleC)
++                             : reinterpret_cast<const void*>(prob.scaleB);
++        inputs.scaleC        = reinterpret_cast<const void*>(prob.scaleB);
+         inputs.scaleD        = reinterpret_cast<const void*>(prob.scaleD);
+         inputs.scaleAlphaVec = reinterpret_cast<const void*>(prob.scaleAlphaVec);
+         inputs.amaxD         = reinterpret_cast<void*>(prob.amaxD);
+

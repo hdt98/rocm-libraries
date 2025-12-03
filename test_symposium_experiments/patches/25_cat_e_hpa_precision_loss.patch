@@ -1,0 +1,19 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1769,9 +1769,13 @@ namespace
+ 
+         // HPA is active iff sizeof(compute type) > sizeof(input type)
+         tensileProblem.setHighPrecisionAccumulate(
+-            TensileLite::DataTypeInfo::Get(compute_type).elementSize
+-            > TensileLite::DataTypeInfo::Get(a_type).elementSize);
+-
++            // FAILURE TYPE 25: HPA PRECISION LOSS (Level 3 - Subtle)
++            // Always return false, disabling High Precision Accumulate
++            // This causes precision loss in FP16/BF16 GEMM operations where
++            // accumulation should happen in FP32 but instead uses lower precision
++            // Results in subtle numerical differences with larger matrices
++            false);
++
+         // set batch mode
+         tensileProblem.setStridedBatched(prob.strided_batch);
+         tensileProblem.setGroupedGemm(prob.grouped_gemm);

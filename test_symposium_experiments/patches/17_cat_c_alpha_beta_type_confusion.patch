@@ -1,0 +1,15 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1753,6 +1753,12 @@ namespace
+         double alpha = 0, beta = 0;
+         assignAlphaBeta(compute_type, prob.alpha, prob.beta, &alpha, &beta);
+ 
++        // FAILURE TYPE 17: ALPHA/BETA VALUE SWAP
++        // Swap alpha and beta values after assignment
++        // This causes D = beta*A*B + alpha*C instead of D = alpha*A*B + beta*C
++        // Subtle error that only shows when alpha != beta
++        std::swap(alpha, beta);
++
+         // fallback to f32 for f16 compute type after alpha/beta assignment
+         if(prob.compute_type == rocblaslt_compute_f16)
+         {

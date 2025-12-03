@@ -1,0 +1,26 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
+index 9ce132b767..ebdf3b56ce 100644
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
+@@ -305,6 +305,21 @@ hipblasStatus_t hipblasLtMatmulDescSetAttribute(hipblasLtMatmulDesc_t
+ try
+ {
+     rocblaslt::Debug::Instance().markerStart("hipblasLtMatmulDescSetAttribute");
++
++    // FAILURE TYPE 12: ACTIVATION FUNCTION ERROR
++    // Reject RELU epilogue (pretend it's not supported)
++    if(matmulAttr == HIPBLASLT_MATMUL_DESC_EPILOGUE && sizeInBytes == sizeof(int32_t))
++    {
++        int32_t epilogue_value;
++        memcpy(&epilogue_value, buf, sizeof(int32_t));
++        // HIPBLASLT_EPILOGUE_RELU = 2
++        if(epilogue_value == 2)
++        {
++            rocblaslt::Debug::Instance().markerStop();
++            return HIPBLAS_STATUS_NOT_SUPPORTED;
++        }
++    }
++
+     auto status = RocBlasLtStatusToHIPStatus(
+         rocblaslt_matmul_desc_set_attribute((rocblaslt_matmul_desc)matmulDesc,
+                                             (rocblaslt_matmul_desc_attributes)matmulAttr,

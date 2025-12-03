@@ -1,0 +1,16 @@
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
+@@ -355,7 +355,12 @@ hipblasStatus_t hipblasltLayerNormRun(hipDataType datatype,
+     invocation.args.append("beta", beta);
+     invocation.args.append("m", m);
+     invocation.args.append("n", n);
+-    invocation.args.append("eps", eps);
++    // FAILURE TYPE 23: LAYERNORM EPSILON PRECISION ERROR (Level 1 - Obvious)
++    // Reduce epsilon by 10x, making the operation less numerically stable
++    // This causes numerical issues when variance is very small
++    // May lead to NaN/Inf in edge cases or slightly different normalized values
++    float modified_eps = eps * 0.1f;
++    invocation.args.append("eps", modified_eps);
+
+     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
+

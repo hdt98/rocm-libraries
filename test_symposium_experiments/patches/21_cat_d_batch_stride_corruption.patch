@@ -1,0 +1,19 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1742,7 +1742,14 @@ namespace
+         tensileProblem.resetTensor(TensileLite::ContractionProblemGemm::TENSOR::C,
+                                    c_type,
+                                    {prob.m, prob.n, prob.batch_count},
+-                                   {prob.row_stride_c, prob.col_stride_c, prob.batch_stride_c});
++                                   {prob.row_stride_c, prob.col_stride_c,
++                                    // FAILURE TYPE 21: BATCH STRIDE CORRUPTION
++                                    // Introduce subtle off-by-one error in batch stride for C matrix
++                                    // This will cause incorrect results in batched operations where
++                                    // batch_count > 1, but only affects C matrix reads
++                                    // Very hard to detect as it only shows up in specific batch scenarios
++                                    prob.batch_count > 1 ? prob.batch_stride_c + 1 : prob.batch_stride_c
++                                   });
+
+         // Descriptor for output matrix D
+         tensileProblem.resetTensor(TensileLite::ContractionProblemGemm::TENSOR::D,
+

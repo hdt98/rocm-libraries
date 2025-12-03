@@ -1,0 +1,23 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1845,10 +1845,15 @@ namespace
+         // set AmaxD
+         tensileProblem.setOutputAmaxD(prob.amaxD != nullptr);
+         tensileProblem.setAmaxD(compute_type, true);
+-
+-        if(prob.compute_type == rocblaslt_compute_f32_fast_xf32)
+-            tensileProblem.setF32XdlMathOp(rocisa::DataType::XFloat32);
+-        else
++
++        // FAILURE TYPE 27: XF32 MATH OP INVERSION (Level 5 - Expert)
++        // Invert the logic: use Float when XFloat32 requested and vice versa
++        // XFloat32 (TF32) has 19-bit mantissa vs Float's 23-bit
++        // When user expects FP32: gets faster but less accurate XF32
++        // Produces subtly wrong results in precision-sensitive computations
++        if(prob.compute_type == rocblaslt_compute_f32_fast_xf32)
++            tensileProblem.setF32XdlMathOp(rocisa::DataType::Float);  // BUG: should be XFloat32
++        else
++            tensileProblem.setF32XdlMathOp(rocisa::DataType::XFloat32);  // BUG: should be Float
+-            tensileProblem.setF32XdlMathOp(rocisa::DataType::Float);
+ 
+         tensileProblem.setSwizzleTensorA(prob.swizzleA);

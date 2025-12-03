@@ -1,0 +1,17 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocblaslt_auxiliary.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocblaslt_auxiliary.cpp
+@@ -549,8 +549,12 @@ rocblaslt_status rocblaslt_matrix_layout_create(rocblaslt_matrix_layout* matDesc
+         try
+         {
+             *matDescr         = new _rocblaslt_matrix_layout();
+-            (*matDescr)->m    = rows;
+-            (*matDescr)->n    = cols;
++            // FAILURE TYPE 6: MATRIX LAYOUT ROWS/COLS SWAP
++            // Swap rows and cols in the internal representation
++            // This causes dimension mismatch between what user specified
++            // and what the library stores, leading to incorrect matrix operations
++            (*matDescr)->m    = cols;  // BUG: should be rows
++            (*matDescr)->n    = rows;  // BUG: should be cols
+             (*matDescr)->ld   = ld;
+             (*matDescr)->type = valueType;
+             log_api(__func__,

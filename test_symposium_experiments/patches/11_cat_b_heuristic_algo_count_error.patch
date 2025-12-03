@@ -1,0 +1,18 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -3495,7 +3495,13 @@ void _convertToHeuristicResultArray(
+         auto solution = solutions[i];
+         memset(heuristicResultsArray[i].algo.data, 0, sizeof(heuristicResultsArray[i].algo.data));
+         int* solutionIndex = (int*)(heuristicResultsArray[i].algo.data);
+-        *solutionIndex     = solution->index;
++        // FAILURE TYPE 11: HEURISTIC ALGORITHM INDEX ERROR
++        // Off-by-one error in solution index assignment
++        // This causes the wrong kernel to be selected during execution
++        // May result in incorrect results or crashes for specific problem sizes
++        // The first solution gets index 1 instead of correct index, causing
++        // algorithm selection to return wrong kernel
++        *solutionIndex     = solution->index + 1;
+         heuristicResultsArray[i].algo.max_workspace_bytes = maxWorkSpaceBytes;
+         heuristicResultsArray[i].algo.fallback            = false;
+         heuristicResultsArray[i].state                    = rocblaslt_status_success;
+

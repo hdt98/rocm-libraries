@@ -1,0 +1,20 @@
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1762,8 +1762,15 @@ namespace
+ 
+         tensileProblem.updateProblem(freeIndex, batchIndex, boundIndex, beta, prob.workspaceSize);
+
+-        tensileProblem.setComputeInputType(
+-            roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
++        // FAILURE TYPE 26: COMPUTE INPUT TYPE MISMATCH (Level 4 - Advanced)
++        // Swap a_type and b_type in compute input type determination
++        // In mixed precision scenarios (e.g., FP8xFP16), this causes the kernel
++        // to interpret the inputs with swapped precision assumptions
++        // Results in very subtle numerical differences that only manifest
++        // when A and B have different precisions - hard to catch in tests
++        // that use same-type inputs
++        tensileProblem.setComputeInputType(
++            roc2TensileComputeInputType(b_type, a_type, prob.compute_type));
+         tensileProblem.setAlphaType(compute_type);
+         tensileProblem.setBetaType(compute_type);
+
