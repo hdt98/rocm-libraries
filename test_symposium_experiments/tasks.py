@@ -7,6 +7,7 @@ from invoke import task
 # This script is located in test_symposium_experiments/
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) 
 REPO_ROOT = os.path.dirname(PROJECT_ROOT)
+PATCH_DIR = os.path.join(PROJECT_ROOT, "patches")
 BUILD_DIR = os.path.join(REPO_ROOT, "projects", "hipblaslt", "build", "release")
 TEST_BINARY = "./clients/hipblaslt-test"
 LIBRARY_DIR = os.path.join(BUILD_DIR, "library")
@@ -58,7 +59,7 @@ def build(c):
 @task
 def apply_patch(c, patch_name):
     """Apply a specific patch file."""
-    patch_path = os.path.join(PROJECT_ROOT, patch_name)
+    patch_path = os.path.join(PATCH_DIR, patch_name)
     print(f"Applying patch: {patch_name}")
     with c.cd(REPO_ROOT):
         c.run(f"git apply {patch_path}")
@@ -79,7 +80,7 @@ def experiment_a(c):
     print("=== Experiment A: Test Suite Minimization ===")
     
     # Find all .patch files
-    patches = sorted([f for f in os.listdir(PROJECT_ROOT) if f.endswith(".patch")])
+    patches = sorted([f for f in os.listdir(PATCH_DIR) if f.endswith(".patch")])
     
     results = {}
     
