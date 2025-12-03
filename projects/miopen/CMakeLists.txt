@@ -73,7 +73,7 @@ endif()
 
 project ( MIOpen C CXX )
 # ==============================================================================
-# [DCR DEBUG] - COMPILER WARNINGS CONFIG (VERIFIED)
+# [DCR DEBUG] - COMPILER WARNINGS CONFIG
 # ==============================================================================
 
 message(STATUS ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -92,8 +92,8 @@ set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR OFF" FORCE)
 set(MIOPEN_USE_COMPOSABLE_KERNEL OFF CACHE BOOL "Disable CK" FORCE)
 set(MIOPEN_USE_COMPOSABLEKERNEL OFF CACHE BOOL "Disable CK Alias" FORCE)
 
-set(AMDGPU_TARGETS "gfx1101" CACHE STRING "Force legacy arch" FORCE)
-set(GPU_TARGETS "gfx1101" CACHE STRING "Force new arch" FORCE)
+set(AMDGPU_TARGETS "gfx115x" CACHE STRING "Force legacy arch" FORCE)
+set(GPU_TARGETS "gfx115x" CACHE STRING "Force new arch" FORCE)
 
 message(STATUS ">>> [DCR DEBUG] MIOPEN_USE_MLIR is set to: ${MIOPEN_USE_MLIR}")
 message(STATUS ">>> [DCR DEBUG] CK is set to: ${MIOPEN_USE_COMPOSABLE_KERNEL}")
