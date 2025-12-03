@@ -4,17 +4,6 @@
 #include "ck/utility/numeric_limits.hpp"
 #include "ck/utility/mxfp_utils.hpp"
 
-#if defined(__gfx950__) && __HIP_DEVICE_COMPILE__
-#define CK_MX_ARCH_950 1
-#else
-#define CK_MX_ARCH_950 0
-#endif
-#if defined(__gfx1250__) && __HIP_DEVICE_COMPILE__
-#define CK_MX_ARCH_1250 1
-#else
-#define CK_MX_ARCH_1250 0
-#endif
-
 #if CK_MX_ARCH_950 || CK_MX_ARCH_1250
 #define CK_MX_FP8_CVT_FAST_PATH 1
 #else
@@ -36,7 +25,7 @@ static __device__ float cast_to_f32_from_f8_scaled(float scale, fp8_storage_t v)
 template <ck_fp8_interpretation_t interpret>
 static __device__ float2_t cast_to_f32_from_f8_scaled(float scale, fp8x2_storage_t v);
 
-template <ck_fp8_interpretation_t interpret, typename Ts = uint32_t, int Opsel = 0>
+template <ck_fp8_interpretation_t interpret, typename Ts = float, int Opsel = 0>
 static __device__ float8_t cast_to_f32_from_f8_scaled(Ts scale, fp8x8_storage_t v);
 
 template <ck_fp8_interpretation_t interpret, bool stochastic_rounding = false>
@@ -60,7 +49,7 @@ static __device__ half_t cast_to_f16_from_f8_scaled(float scale, fp8_storage_t v
 template <ck_fp8_interpretation_t interpret>
 static __device__ half2_t cast_to_f16_from_f8_scaled(float scale, fp8x2_storage_t v);
 
-template <ck_fp8_interpretation_t interpret, typename Ts = uint32_t, int Opsel = 0>
+template <ck_fp8_interpretation_t interpret, typename Ts = float, int Opsel = 0>
 static __device__ half8_t cast_to_f16_from_f8_scaled(Ts scale, fp8x8_storage_t v);
 
 template <ck_fp8_interpretation_t interpret, bool stochastic_rounding = false>
@@ -84,7 +73,7 @@ static __device__ bhalf_t cast_to_bf16_from_f8_scaled(float scale, fp8_storage_t
 template <ck_fp8_interpretation_t interpret>
 static __device__ bhalf2_t cast_to_bf16_from_f8_scaled(float scale, fp8x2_storage_t v);
 
-template <ck_fp8_interpretation_t interpret, typename Ts = uint32_t, int Opsel = 0>
+template <ck_fp8_interpretation_t interpret, typename Ts = float, int Opsel = 0>
 static __device__ bhalf8_t cast_to_bf16_from_f8_scaled(Ts scale, fp8x8_storage_t v);
 
 template <ck_fp8_interpretation_t interpret, bool stochastic_rounding = false>

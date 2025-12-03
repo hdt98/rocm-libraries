@@ -105,6 +105,7 @@ struct NumericLimits<half_t>
     static constexpr unsigned short binary_max    = 0x7BFF;
     static constexpr unsigned short binary_lowest = 0xFBFF;
     static constexpr unsigned short binary_qnan   = 0x7FFF;
+    static constexpr unsigned short binary_inf    = 0x7C00;
 
     __host__ __device__ static constexpr half_t Min() { return bit_cast<half_t>(binary_min); }
 
@@ -113,6 +114,8 @@ struct NumericLimits<half_t>
     __host__ __device__ static constexpr half_t Lowest() { return bit_cast<half_t>(binary_lowest); }
 
     __host__ __device__ static constexpr half_t QuietNaN() { return bit_cast<half_t>(binary_qnan); }
+
+    __host__ __device__ static constexpr half_t Infinity() { return bit_cast<half_t>(binary_inf); }
 };
 
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
@@ -324,6 +327,7 @@ struct NumericLimits<half_t>
     static constexpr unsigned short binary_max    = 0x7BFF;
     static constexpr unsigned short binary_lowest = 0xFBFF;
     static constexpr unsigned short binary_qnan   = 0x7FFF;
+    static constexpr unsigned short binary_inf    = 0x7C00;
 
     __host__ __device__ static constexpr half_t Min() { return bit_cast<half_t>(binary_min); }
 
@@ -332,6 +336,8 @@ struct NumericLimits<half_t>
     __host__ __device__ static constexpr half_t Lowest() { return bit_cast<half_t>(binary_lowest); }
 
     __host__ __device__ static constexpr half_t QuietNaN() { return bit_cast<half_t>(binary_qnan); }
+
+    __host__ __device__ static constexpr half_t Infinity() { return bit_cast<half_t>(binary_inf); }
 };
 
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4

@@ -1483,221 +1483,182 @@ inline __host__ __device__ half_t type_convert<half_t, bf8_fnuz_t>(bf8_fnuz_t x)
     return utils::cast_from_f8<bf8_fnuz_t, half_t, negative_zero_nan>(x);
 #endif
 }
+
 #ifndef CK_CODE_GEN_RTC
-// convert fp32 to fp4 with rounding to nearest even
-inline __host__ __device__ f4_t f4_convert_rne(float x, float scale = 1.0f)
+// convert fp32 to fp4 with round to nearest even
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 1>>
+inline __host__ __device__ f4_t f4_convert_rne(T x, float scale = 1.f)
 {
-#if defined(__gfx950__)
-    union
-    {
-        uint32_t bitwise;
-        f4_t f4_array[4];
-    } value{0};
-    value.bitwise = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(value.bitwise, x, x, scale, 0);
-    return value.f4_array[0];
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_to_f4_scaled<T, false>(x, scale);
 #else
-    return utils::sat_convert_to_type<f4_t>(x / scale);
+    float f = type_convert<float>(x);
+    return utils::sat_convert_to_type<f4_t>(f / scale);
 #endif
 }
 
-// convert vector of 2 fp32 to vector of 2 fp4 with rne
-inline __host__ __device__ f4x2_t f4_convert_rne(float2_t x, float scale = 1.0f)
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 2>>
+inline __host__ __device__ f4x2_t f4_convert_rne(T x, float scale = 1.f)
 {
-#if defined(__gfx950__)
-    union
-    {
-        uint32_t bitwise;
-        f4x2_t f4x2_array[4];
-    } value{0};
-    value.bitwise = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(value.bitwise, x[0], x[1], scale, 0);
-    return value.f4x2_array[0];
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_to_f4_scaled<T, false>(x, scale);
 #else
     union
     {
         uint32_t bitwise;
         f4x2_t f4x2_array[4];
     } value{0};
-    uint8_t l     = utils::sat_convert_to_type<f4_t>(x[0] / scale);
-    uint8_t h     = utils::sat_convert_to_type<f4_t>(x[1] / scale);
+    float f0      = type_convert<float>(x[0]);
+    float f1      = type_convert<float>(x[1]);
+    uint8_t l     = utils::sat_convert_to_type<f4_t>(f0 / scale);
+    uint8_t h     = utils::sat_convert_to_type<f4_t>(f1 / scale);
     value.bitwise = (h << 4) | l;
     return value.f4x2_array[0];
 #endif
 }
 
-// convert vector of 32 fp32 to vector of 32 fp4 with rne
-inline __host__ __device__ f4x32_t f4_convert_rne(float32_t x, float scale = 1.0f)
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 8>>
+inline __host__ __device__ f4x8_t f4_convert_rne(T x, float scale = 1.f)
 {
-#if defined(__gfx950__)
-    union
-    {
-        __uint128_t bitwise;
-        f4x2_t f4x2_array[16];
-        f4x32_t f4x32_array;
-    } f4_values{}, tmp_values{};
-
-    ck::static_for<0, 32 / 2, 1>{}([&](auto idx) {
-        tmp_values.bitwise = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-            tmp_values.bitwise, x[2 * idx], x[2 * idx + 1], scale, 0);
-        f4_values.f4x2_array[idx] = tmp_values.f4x2_array[0];
-    });
-
-    return f4_values.f4x32_array;
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_to_f4_scaled<T, false>(x, scale);
 #else
     union
     {
-        __uint128_t bitwise;
-        f4x2_t f4x2_array[16];
-        f4x32_t f4x32_array;
-    } f4_values{};
+        uint8_t i8x4[4];
+        f4x8_t f4x8;
+    } ret{};
 
-    f4_t tmp;
-
-    ck::static_for<0, 32, 1>{}([&](auto idx) {
-        tmp = utils::sat_convert_to_type<f4_t>(x[static_cast<int>(idx)] / scale);
-        f4_values.bitwise <<= 4;
-        f4_values.bitwise |= tmp;
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        float f0    = type_convert<float>(x[static_cast<int>(2 * i)]);
+        float f1    = type_convert<float>(x[static_cast<int>(2 * i + 1)]);
+        uint8_t l   = utils::sat_convert_to_type<f4_t>(f0 / scale);
+        uint8_t h   = utils::sat_convert_to_type<f4_t>(f1 / scale);
+        ret.i8x4[i] = (h << 4) | l;
     });
-
-    return f4_values.f4x32_array;
+    return ret.f4x8;
 #endif
 }
 
-// convert fp32 to fp4 with stochastic rounding
-inline __host__ __device__ f4_t f4_convert_sr(float x, float scale = 1.0f)
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 32>>
+inline __host__ __device__ f4x32_t f4_convert_rne(T x, float scale = 1.f)
 {
-#if defined(__gfx950__)
-    // use HW clock for stochastic input multiply by incremented thread id
-    uint32_t rng =
-        __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
-    union
-    {
-        uint32_t bitwise;
-        f4_t f4_array[4];
-    } value{0};
-    union
-    {
-        float float_array[2];
-        float2_t float2_array;
-    } float_values{{x}};
+    using BaseT         = typename scalar_type<T>::type;
+    constexpr int Npack = scalar_type<T>::vector_size / 8;
 
-    value.bitwise = __builtin_amdgcn_cvt_scalef32_sr_pk_fp4_f32(
-        value.bitwise, float_values.float2_array, rng, scale, 0);
-    return value.f4_array[0];
-#else // #if defined(__gfx950__)
-// keep slow gfx1250 conversions for now
-#if defined(__gfx1250__)
-    // use HW clock for stochastic input multiply by incremented thread id
-    uint32_t rng =
-        __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
-#else // #if defined(__gfx1250__)
+    union
+    {
+        f4x32_t v32f4;
+        f4x8_t v8f4x4[Npack];
+    } ret{};
+    union
+    {
+        T v32;
+        typename vector_type<BaseT, 8>::type v8_array[Npack];
+    } value{x};
+
+    ck::static_for<0, Npack, 1>{}(
+        [&](auto idx) { ret.v8f4x4[Number<idx>{}] = f4_convert_rne(value.v8_array[idx], scale); });
+
+    return ret.v32f4;
+}
+
+// convert fp32 to fp4 with stochastic rounding
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 1>>
+inline __host__ __device__ f4_t f4_convert_sr(T x, float scale = 1.f)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_to_f4_scaled<T, true>(x, scale);
+#else
     constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
 #else
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
 #endif // #ifndef CK_CODE_GEN_RTC
-#endif // #if defined(__gfx1250__)
-    return utils::sat_convert_to_type_sr<f4_t>(x / scale, rng);
-#endif // #if defined(__gfx950__)
+    float f = type_convert<float>(x);
+    return utils::sat_convert_to_type_sr<f4_t>(f / scale, rng);
+#endif
 }
 
-// convert vector of 2 fp32 to vector of 2 fp4 with sr
-inline __host__ __device__ f4x2_t f4_convert_sr(float2_t x, float scale = 1.0f)
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 2>>
+inline __host__ __device__ f4x2_t f4_convert_sr(T x, float scale = 1.f)
 {
-#if defined(__gfx950__)
-    // use HW clock for stochastic input multiply by incremented thread id
-    uint32_t rng =
-        __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_to_f4_scaled<T, true>(x, scale);
+#else
     union
     {
         uint32_t bitwise;
         f4x2_t f4x2_array[4];
     } value{0};
-    value.bitwise = __builtin_amdgcn_cvt_scalef32_sr_pk_fp4_f32(value.bitwise, x, rng, scale, 0);
-    return value.f4x2_array[0];
-#else // #if defined(__gfx950__)
-// keep slow gfx1250 conversions for now
-#if defined(__gfx1250__)
-    // use HW clock for stochastic input multiply by incremented thread id
-    uint32_t rng =
-        __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
-#else // #if defined(__gfx1250__)
     constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x[0]);
 #else
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x[0]);
 #endif // #ifndef CK_CODE_GEN_RTC
-#endif // #if defined(__gfx1250__)
-    union
-    {
-        uint32_t bitwise;
-        f4x2_t f4x2_array[4];
-    } value{0};
-    uint8_t l     = utils::sat_convert_to_type_sr<f4_t>(x[0] / scale, rng);
-    uint8_t h     = utils::sat_convert_to_type_sr<f4_t>(x[1] / scale, rng);
+
+    float f0      = type_convert<float>(x[0]);
+    float f1      = type_convert<float>(x[1]);
+    uint8_t l     = utils::sat_convert_to_type_sr<f4_t>(f0 / scale, rng);
+    uint8_t h     = utils::sat_convert_to_type_sr<f4_t>(f1 / scale, rng);
     value.bitwise = (h << 4) | l;
     return value.f4x2_array[0];
-#endif // #if defined(__gfx950__)
+#endif
 }
 
-// convert vector of 32 fp32 to vector of 32 fp4 with sr
-inline __host__ __device__ f4x32_t f4_convert_sr(float32_t x, float scale = 1.0f)
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 8>>
+inline __host__ __device__ f4x8_t f4_convert_sr(T x, float scale = 1.f)
 {
-#if defined(__gfx950__)
-    // use HW clock for stochastic input multiply by incremented thread id
-    uint32_t rng =
-        __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_to_f4_scaled<T, false>(x, scale);
+#else
     union
     {
-        __uint128_t bitwise;
-        f4x2_t f4x2_array[16];
-        f4x32_t f4x32_array;
-    } f4_values{0};
-    union
-    {
-        float2_t floatx2_array[16];
-        float32_t floatx32_array;
-    } float_values{{0}};
-    float_values.floatx32_array = x;
+        uint8_t i8x4[4];
+        f4x8_t f4x8;
+    } ret{};
 
-    ck::static_for<0, 32 / 2, 1>{}([&](auto idx) {
-        f4_values.f4x2_array[idx] = __builtin_amdgcn_cvt_scalef32_sr_pk_fp4_f32(
-            f4_values.bitwise, float_values.floatx2_array[idx], rng, scale, 0);
-    });
-
-    return f4_values.f4x32_array;
-#else // #if defined(__gfx950__)
-// keep slow gfx1250 conversions for now
-#if defined(__gfx1250__)
-    // use HW clock for stochastic input multiply by incremented thread id
-    uint32_t rng =
-        __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
-#else // #if defined(__gfx1250__)
     constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x[0]);
 #else
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x[0]);
 #endif // #ifndef CK_CODE_GEN_RTC
-#endif // #if defined(__gfx1250__)
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        float f0    = type_convert<float>(x[static_cast<int>(2 * i)]);
+        float f1    = type_convert<float>(x[static_cast<int>(2 * i + 1)]);
+        uint8_t l   = utils::sat_convert_to_type_sr<f4_t>(f0 / scale, rng);
+        uint8_t h   = utils::sat_convert_to_type_sr<f4_t>(f1 / scale, rng);
+        ret.i8x4[i] = (h << 4) | l;
+    });
+    return ret.f4x8;
+#endif
+}
+
+template <typename T, typename = enable_if_t<scalar_type<T>::vector_size == 32>>
+inline __host__ __device__ f4x32_t f4_convert_sr(T x, float scale = 1.f)
+{
+    using BaseT         = typename scalar_type<T>::type;
+    constexpr int Npack = scalar_type<T>::vector_size / 8;
+
     union
     {
-        __uint128_t bitwise;
-        f4x2_t f4x2_array[16];
-        f4x32_t f4x32_array;
-    } f4_values{0};
+        f4x32_t v32f4;
+        f4x8_t v8f4x4[Npack];
+    } ret{};
+    union
+    {
+        T v32;
+        typename vector_type<BaseT, 8>::type v8_array[Npack];
+    } value{x};
 
-    f4_t tmp;
+    ck::static_for<0, Npack, 1>{}(
+        [&](auto idx) { ret.v8f4x4[Number<idx>{}] = f4_convert_sr(value.v8_array[idx], scale); });
 
-    ck::static_for<0, 32, 1>{}([&](auto idx) {
-        tmp = utils::sat_convert_to_type_sr<f4_t>(x[static_cast<int>(idx)] / scale, rng);
-        f4_values.bitwise <<= 4;
-        f4_values.bitwise |= tmp;
-    });
-
-    return f4_values.f4x32_array;
-#endif // #if defined(__gfx950__)
+    return ret.v32f4;
 }
 
 // convert fp32 to fp4
@@ -1727,6 +1688,17 @@ inline __host__ __device__ f4x2_pk_t type_convert<f4x2_pk_t, float2_t>(float2_t 
     return static_cast<f4x2_pk_t>(type_convert<f4x2_t>(x));
 }
 
+// convert vector of 8 fp32 to vector of 8 fp4
+template <>
+inline __host__ __device__ f4x8_t type_convert<f4x8_t, float8_t>(float8_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+
 // convert vector of 32 fp32 to vector of 32 fp4
 template <>
 inline __host__ __device__ f4x32_t type_convert<f4x32_t, float32_t>(float32_t x)
@@ -1742,15 +1714,8 @@ inline __host__ __device__ f4x32_t type_convert<f4x32_t, float32_t>(float32_t x)
 template <>
 inline __host__ __device__ float type_convert<float, f4_t>(f4_t x)
 {
-#if defined(__gfx950__)
-    union
-    {
-        float float_array[2];
-        float2_t float2_array;
-    } float_values{};
-    float scale               = 1.0f;
-    float_values.float2_array = __builtin_amdgcn_cvt_scalef32_pk_f32_fp4(x, scale, 0);
-    return float_values.float_array[0];
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<float>(x);
 #else
     return utils::to_float<f4_t>(NumericLimits<e8m0_bexp_t>::Binary_1(), x);
 #endif
@@ -1760,15 +1725,8 @@ inline __host__ __device__ float type_convert<float, f4_t>(f4_t x)
 template <>
 inline __host__ __device__ float2_t type_convert<float2_t, f4x2_t>(f4x2_t x)
 {
-#if defined(__gfx950__)
-    union
-    {
-        uint32_t bitwise;
-        f4x2_t f4x2_array[4];
-    } value{};
-    value.f4x2_array[0] = x;
-    float scale         = 1.0f;
-    return __builtin_amdgcn_cvt_scalef32_pk_f32_fp4(value.bitwise, scale, 0);
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<float2_t>(x);
 #else
     float2_t ret{
         utils::to_float<f4_t>(NumericLimits<e8m0_bexp_t>::Binary_1(),
@@ -1779,54 +1737,288 @@ inline __host__ __device__ float2_t type_convert<float2_t, f4x2_t>(f4x2_t x)
 #endif
 }
 
+// convert vector of 8 fp4 to vector of 8 fp32
+template <>
+inline __host__ __device__ float8_t type_convert<float8_t, f4x8_t>(f4x8_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<float8_t>(x);
+#else
+    union
+    {
+        float8_t vf32_8x1;
+        float vf32[8];
+    } ret{};
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        ret.vf32[2 * i] = utils::to_float<f4_t>(
+            NumericLimits<e8m0_bexp_t>::Binary_1(),
+            x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<0>{}));
+        ret.vf32[2 * i + 1] = utils::to_float<f4_t>(
+            NumericLimits<e8m0_bexp_t>::Binary_1(),
+            x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<1>{}));
+    });
+    return ret.vf32_8x1;
+#endif
+}
+
 // convert vector of 32 fp4 to vector of 32 fp32
 template <>
 inline __host__ __device__ float32_t type_convert<float32_t, f4x32_t>(f4x32_t x)
 {
-#if defined(__gfx950__)
+    constexpr int N = 32 / 8;
     union
     {
-        f4x32_t f4x32_array;
-        f4x2_t fp4x2[16];
+        f4x32_t vf4;
+        f4x8_t v8f4[N];
     } value{x};
-    float2_t op;
-    float32_t ret;
-    float scale = 1.0f;
+    union
+    {
+        float32_t vf32;
+        float8_t v8f32[N];
+    } ret{};
 
-    ck::static_for<0, 32 / 2, 1>{}([&](auto idx) {
-        op               = __builtin_amdgcn_cvt_scalef32_pk_f32_fp4(value.fp4x2[idx], scale, 0);
-        ret[2 * idx]     = op[0];
-        ret[2 * idx + 1] = op[1];
-    });
+    ck::static_for<0, N, 1>{}(
+        [&](auto idx) { ret.v8f32[idx] = type_convert<float8_t>(value.v8f4[idx]); });
+    return ret.vf32;
+}
 
+// convert f16 to f4
+template <>
+inline __host__ __device__ f4_t type_convert<f4_t, half_t>(half_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x2_t type_convert<f4x2_t, half2_t>(half2_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+template <>
+inline __host__ __device__ f4x2_pk_t type_convert<f4x2_pk_t, half2_t>(half2_t x)
+{
+    return static_cast<f4x2_pk_t>(type_convert<f4x2_t>(x));
+}
+
+// convert vector of 8 fp32 to vector of 8 fp4
+template <>
+inline __host__ __device__ f4x8_t type_convert<f4x8_t, half8_t>(half8_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+
+// convert vector of 32 fp32 to vector of 32 fp4
+template <>
+inline __host__ __device__ f4x32_t type_convert<f4x32_t, half32_t>(half32_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+
+// convert fp4 to fp16
+template <>
+inline __host__ __device__ half_t type_convert<half_t, f4_t>(f4_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<half_t>(x);
+#else
+    return type_convert<half_t>(utils::to_float<f4_t>(NumericLimits<e8m0_bexp_t>::Binary_1(), x));
+#endif
+}
+
+template <>
+inline __host__ __device__ half2_t type_convert<half2_t, f4x2_t>(f4x2_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<half2_t>(x);
+#else
+    half2_t ret{type_convert<half_t>(utils::to_float<f4_t>(
+                    NumericLimits<e8m0_bexp_t>::Binary_1(),
+                    x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<0>{}))),
+                type_convert<half_t>(utils::to_float<f4_t>(
+                    NumericLimits<e8m0_bexp_t>::Binary_1(),
+                    x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<1>{})))};
     return ret;
+#endif
+}
+
+template <>
+inline __host__ __device__ half8_t type_convert<half8_t, f4x8_t>(f4x8_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<half8_t>(x);
 #else
     union
     {
-        float32_t float32_array;
-        float float_array[32];
-    } float_values{};
+        half8_t vf16_8x1;
+        half_t vf16[8];
+    } ret{};
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        ret.vf16[2 * i]     = type_convert<half_t>(utils::to_float<f4_t>(
+            NumericLimits<e8m0_bexp_t>::Binary_1(),
+            x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<0>{})));
+        ret.vf16[2 * i + 1] = type_convert<half_t>(utils::to_float<f4_t>(
+            NumericLimits<e8m0_bexp_t>::Binary_1(),
+            x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<1>{})));
+    });
+    return ret.vf16_8x1;
+#endif
+}
+
+template <>
+inline __host__ __device__ half32_t type_convert<half32_t, f4x32_t>(f4x32_t x)
+{
+    constexpr int N = 32 / 8;
     union
     {
-        __uint128_t bitwise;
-        f4x2_t f4x2_array[16];
-        f4x32_t f4x32_array;
-    } f4_values{bit_cast<__uint128_t>(x)};
+        f4x32_t vf4;
+        f4x8_t v8f4[N];
+    } value{x};
+    union
+    {
+        half32_t vf16;
+        half8_t v8f16[N];
+    } ret{};
 
-    ck::static_for<0, 32 / 2, 1>{}([&](auto idx) {
-        float_values.float_array[2 * idx] = utils::to_float<f4_t>(
-            NumericLimits<e8m0_bexp_t>::Binary_1(),
-            f4_values.f4x2_array[idx].template AsType<f4x2_pk_t>()[Number<0>{}].template unpack<>(
-                Number<0>{}));
+    ck::static_for<0, N, 1>{}(
+        [&](auto idx) { ret.v8f16[idx] = type_convert<half8_t>(value.v8f4[idx]); });
+    return ret.vf16;
+}
 
-        float_values.float_array[2 * idx + 1] = utils::to_float<f4_t>(
-            NumericLimits<e8m0_bexp_t>::Binary_1(),
-            f4_values.f4x2_array[idx].template AsType<f4x2_pk_t>()[Number<0>{}].template unpack<>(
-                Number<1>{}));
-    });
-
-    return float_values.float32_array;
+// convert bf16 to f4
+template <>
+inline __host__ __device__ f4_t type_convert<f4_t, bhalf_t>(bhalf_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
 #endif
+}
+
+template <>
+inline __host__ __device__ f4x2_t type_convert<f4x2_t, bhalf2_t>(bhalf2_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+template <>
+inline __host__ __device__ f4x2_pk_t type_convert<f4x2_pk_t, bhalf2_t>(bhalf2_t x)
+{
+    return static_cast<f4x2_pk_t>(type_convert<f4x2_t>(x));
+}
+
+// convert vector of 8 fp32 to vector of 8 fp4
+template <>
+inline __host__ __device__ f4x8_t type_convert<f4x8_t, bhalf8_t>(bhalf8_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+
+// convert vector of 32 fp32 to vector of 32 fp4
+template <>
+inline __host__ __device__ f4x32_t type_convert<f4x32_t, bhalf32_t>(bhalf32_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x);
+#else
+    return f4_convert_rne(x);
+#endif
+}
+
+// convert fp4 to bf16
+template <>
+inline __host__ __device__ bhalf_t type_convert<bhalf_t, f4_t>(f4_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<bhalf_t>(x);
+#else
+    return type_convert<bhalf_t>(utils::to_float<f4_t>(NumericLimits<e8m0_bexp_t>::Binary_1(), x));
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf2_t type_convert<bhalf2_t, f4x2_t>(f4x2_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<bhalf2_t>(x);
+#else
+    bhalf2_t ret{type_convert<bhalf_t>(utils::to_float<f4_t>(
+                     NumericLimits<e8m0_bexp_t>::Binary_1(),
+                     x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<0>{}))),
+                 type_convert<bhalf_t>(utils::to_float<f4_t>(
+                     NumericLimits<e8m0_bexp_t>::Binary_1(),
+                     x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<1>{})))};
+    return ret;
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf8_t type_convert<bhalf8_t, f4x8_t>(f4x8_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<bhalf8_t>(x);
+#else
+    union
+    {
+        bhalf8_t vf16_8x1;
+        bhalf_t vf16[8];
+    } ret{};
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        ret.vf16[2 * i]     = type_convert<bhalf_t>(utils::to_float<f4_t>(
+            NumericLimits<e8m0_bexp_t>::Binary_1(),
+            x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<0>{})));
+        ret.vf16[2 * i + 1] = type_convert<bhalf_t>(utils::to_float<f4_t>(
+            NumericLimits<e8m0_bexp_t>::Binary_1(),
+            x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<1>{})));
+    });
+    return ret.vf16_8x1;
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf32_t type_convert<bhalf32_t, f4x32_t>(f4x32_t x)
+{
+    constexpr int N = 32 / 8;
+    union
+    {
+        f4x32_t vf4;
+        f4x8_t v8f4[N];
+    } value{x};
+    union
+    {
+        bhalf32_t vf16;
+        bhalf8_t v8f16[N];
+    } ret{};
+
+    ck::static_for<0, N, 1>{}(
+        [&](auto idx) { ret.v8f16[idx] = type_convert<bhalf8_t>(value.v8f4[idx]); });
+    return ret.vf16;
 }
 
 /**

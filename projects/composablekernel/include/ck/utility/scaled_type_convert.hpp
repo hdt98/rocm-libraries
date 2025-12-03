@@ -445,15 +445,8 @@ inline __host__ bf8x32_ocp_t scaled_type_convert<bf8x32_ocp_t, float32_t>(e8m0_b
 template <>
 inline __host__ __device__ float scaled_type_convert<float, f4_t>(e8m0_bexp_t scale, f4_t x)
 {
-#if defined(__gfx950__)
-    union
-    {
-        float float_array[2];
-        float2_t float2_array;
-    } float_values{};
-    float_values.float2_array =
-        __builtin_amdgcn_cvt_scalef32_pk_f32_fp4(x, type_convert<float>(scale), 0);
-    return float_values.float_array[0];
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<float>(x, type_convert<float>(scale));
 #else
     return utils::to_float<f4_t>(scale, x);
 #endif
@@ -464,14 +457,8 @@ template <>
 inline __host__ __device__ float2_t scaled_type_convert<float2_t, f4x2_t>(e8m0_bexp_t scale,
                                                                           f4x2_t x)
 {
-#if defined(__gfx950__)
-    union
-    {
-        uint32_t bitwise;
-        f4x2_t f4x2_array[4];
-    } value{};
-    value.f4x2_array[0] = x;
-    return __builtin_amdgcn_cvt_scalef32_pk_f32_fp4(value.bitwise, type_convert<float>(scale), 0);
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<float2_t>(x, type_convert<float>(scale));
 #else
     float2_t ret{utils::to_float<f4_t>(
                      scale, x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<0>{})),
@@ -481,55 +468,52 @@ inline __host__ __device__ float2_t scaled_type_convert<float2_t, f4x2_t>(e8m0_b
 #endif
 }
 
+// convert vector of 8 fp4 to vector of 8 fp32
+template <>
+inline __host__ __device__ float8_t scaled_type_convert<float8_t, f4x8_t>(e8m0_bexp_t scale,
+                                                                          f4x8_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<float8_t>(x, type_convert<float>(scale));
+#else
+    union
+    {
+        float8_t vf32_8x1;
+        float vf32[8];
+    } ret{};
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        ret.vf32[2 * i] = utils::to_float<f4_t>(
+            scale, x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<0>{}));
+        ret.vf32[2 * i + 1] = utils::to_float<f4_t>(
+            scale, x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<1>{}));
+    });
+    return ret.vf32_8x1;
+#endif
+}
+
 // convert vector of 32 fp4 to vector of 32 fp32
 template <>
 inline __host__ __device__ float32_t scaled_type_convert<float32_t, f4x32_t>(e8m0_bexp_t scale,
                                                                              f4x32_t x)
 {
-#if defined(__gfx950__)
+    constexpr int N = 32 / 8;
     union
     {
         f4x32_t f4x32_array;
-        f4x2_t fp4x2[16];
+        f4x8_t v8fp4x4[N];
     } value{x};
-    float2_t op;
-    float32_t ret;
-    float f_scale = type_convert<float>(scale);
 
-    ck::static_for<0, 32 / 2, 1>{}([&](auto idx) {
-        op               = __builtin_amdgcn_cvt_scalef32_pk_f32_fp4(value.fp4x2[idx], f_scale, 0);
-        ret[2 * idx]     = op[0];
-        ret[2 * idx + 1] = op[1];
-    });
-
-    return ret;
-#else
     union
     {
-        float32_t float32_array;
-        float float_array[32];
-    } float_values{};
-    union
-    {
-        __uint128_t bitwise;
-        f4x2_t f4x2_array[16];
-        f4x32_t f4x32_array;
-    } f4_values{bit_cast<__uint128_t>(x)};
+        float32_t vf32;
+        float8_t v8f32x4[N];
+    } ret;
 
-    ck::static_for<0, 32 / 2, 1>{}([&](auto idx) {
-        float_values.float_array[2 * idx] = utils::to_float<f4_t>(
-            scale,
-            f4_values.f4x2_array[idx].template AsType<f4x2_pk_t>()[Number<0>{}].template unpack<>(
-                Number<0>{}));
-
-        float_values.float_array[2 * idx + 1] = utils::to_float<f4_t>(
-            scale,
-            f4_values.f4x2_array[idx].template AsType<f4x2_pk_t>()[Number<0>{}].template unpack<>(
-                Number<1>{}));
+    ck::static_for<0, N, 1>{}([&](auto idx) {
+        ret.v8f32x4[idx] = scaled_type_convert<float8_t>(scale, value.v8fp4x4[idx]);
     });
-
-    return float_values.float32_array;
-#endif
+    return ret.vf32;
 }
 
 // convert fp32 to fp4
@@ -555,6 +539,18 @@ inline __host__ __device__ f4x2_t scaled_type_convert<f4x2_t, float2_t>(e8m0_bex
 #endif
 }
 
+// convert vector of 8 fp32 to vector of 8 fp4
+template <>
+inline __host__ __device__ f4x8_t scaled_type_convert<f4x8_t, float8_t>(e8m0_bexp_t scale,
+                                                                        float8_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
 // convert vector of 32 fp32 to vector of 32 fp4
 template <>
 inline __host__ __device__ f4x32_t scaled_type_convert<f4x32_t, float32_t>(e8m0_bexp_t scale,
@@ -567,6 +563,227 @@ inline __host__ __device__ f4x32_t scaled_type_convert<f4x32_t, float32_t>(e8m0_
 #endif
 }
 
+// float16 <-> fp4
+template <>
+inline __host__ __device__ half_t scaled_type_convert<half_t, f4_t>(e8m0_bexp_t scale, f4_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<half_t>(x, type_convert<float>(scale));
+#else
+    return type_convert<half_t>(utils::to_float<f4_t>(scale, x));
+#endif
+}
+
+template <>
+inline __host__ __device__ half2_t scaled_type_convert<half2_t, f4x2_t>(e8m0_bexp_t scale, f4x2_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<half2_t>(x, type_convert<float>(scale));
+#else
+    return half2_t{type_convert<half_t>(utils::to_float<f4_t>(
+                       scale, x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<0>{}))),
+                   type_convert<half_t>(utils::to_float<f4_t>(
+                       scale, x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<1>{})))};
+#endif
+}
+
+template <>
+inline __host__ __device__ half8_t scaled_type_convert<half8_t, f4x8_t>(e8m0_bexp_t scale, f4x8_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<half8_t>(x, type_convert<float>(scale));
+#else
+    union
+    {
+        half8_t vf16_8x1;
+        half_t vf16[8];
+    } ret{};
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        ret.vf16[2 * i]     = type_convert<half_t>(utils::to_float<f4_t>(
+            scale, x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<0>{})));
+        ret.vf16[2 * i + 1] = type_convert<half_t>(utils::to_float<f4_t>(
+            scale, x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<1>{})));
+    });
+    return ret.vf16_8x1;
+#endif
+}
+
+template <>
+inline __host__ __device__ half32_t scaled_type_convert<half32_t, f4x32_t>(e8m0_bexp_t scale,
+                                                                           f4x32_t x)
+{
+    constexpr int N = 32 / 8;
+    union
+    {
+        f4x32_t vf4;
+        f4x8_t v8f4[N];
+    } value{x};
+    union
+    {
+        half32_t vf16;
+        half8_t v8f16[N];
+    } ret{};
+
+    ck::static_for<0, N, 1>{}(
+        [&](auto idx) { ret.v8f16[idx] = scaled_type_convert<half8_t>(scale, value.v8f4[idx]); });
+    return ret.vf16;
+}
+
+// convert fp16 to fp4
+template <>
+inline __host__ __device__ f4_t scaled_type_convert<f4_t, half_t>(e8m0_bexp_t scale, half_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x2_t scaled_type_convert<f4x2_t, half2_t>(e8m0_bexp_t scale, half2_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x8_t scaled_type_convert<f4x8_t, half8_t>(e8m0_bexp_t scale, half8_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x32_t scaled_type_convert<f4x32_t, half32_t>(e8m0_bexp_t scale,
+                                                                          half32_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+// bfloat16 <-> fp4
+template <>
+inline __host__ __device__ bhalf_t scaled_type_convert<bhalf_t, f4_t>(e8m0_bexp_t scale, f4_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<bhalf_t>(x, type_convert<float>(scale));
+#else
+    return type_convert<bhalf_t>(utils::to_float<f4_t>(scale, x));
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf2_t scaled_type_convert<bhalf2_t, f4x2_t>(e8m0_bexp_t scale,
+                                                                          f4x2_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<bhalf2_t>(x, type_convert<float>(scale));
+#else
+    return bhalf2_t{type_convert<bhalf_t>(utils::to_float<f4_t>(
+                        scale, x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<0>{}))),
+                    type_convert<bhalf_t>(utils::to_float<f4_t>(
+                        scale, x.template AsType<f4x2_pk_t>()[Number<0>{}].unpack<>(Number<1>{})))};
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf8_t scaled_type_convert<bhalf8_t, f4x8_t>(e8m0_bexp_t scale,
+                                                                          f4x8_t x)
+{
+#if CK_MX_FP4_CVT_FAST_PATH
+    return cast_from_f4_scaled<bhalf8_t>(x, type_convert<float>(scale));
+#else
+    union
+    {
+        bhalf8_t vf16_8x1;
+        bhalf_t vf16[8];
+    } ret{};
+
+    ck::static_for<0, 4, 1>{}([&](auto i) {
+        ret.vf16[2 * i]     = type_convert<bhalf_t>(utils::to_float<f4_t>(
+            scale, x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<0>{})));
+        ret.vf16[2 * i + 1] = type_convert<bhalf_t>(utils::to_float<f4_t>(
+            scale, x.AsType<f4x2_pk_t>()[Number<i>{}].template unpack<>(Number<1>{})));
+    });
+    return ret.vf16_8x1;
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf32_t scaled_type_convert<bhalf32_t, f4x32_t>(e8m0_bexp_t scale,
+                                                                             f4x32_t x)
+{
+    constexpr int N = 32 / 8;
+    union
+    {
+        f4x32_t vf4;
+        f4x8_t v8f4[N];
+    } value{x};
+    union
+    {
+        bhalf32_t vf16;
+        bhalf8_t v8f16[N];
+    } ret{};
+
+    ck::static_for<0, N, 1>{}(
+        [&](auto idx) { ret.v8f16[idx] = scaled_type_convert<bhalf8_t>(scale, value.v8f4[idx]); });
+    return ret.vf16;
+}
+
+// convert fp16 to fp4
+template <>
+inline __host__ __device__ f4_t scaled_type_convert<f4_t, bhalf_t>(e8m0_bexp_t scale, bhalf_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x2_t scaled_type_convert<f4x2_t, bhalf2_t>(e8m0_bexp_t scale,
+                                                                        bhalf2_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x8_t scaled_type_convert<f4x8_t, bhalf8_t>(e8m0_bexp_t scale,
+                                                                        bhalf8_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f4x32_t scaled_type_convert<f4x32_t, bhalf32_t>(e8m0_bexp_t scale,
+                                                                           bhalf32_t x)
+{
+#if CK_USE_SR_F4_CONVERSION
+    return f4_convert_sr(x, type_convert<float>(scale));
+#else
+    return f4_convert_rne(x, type_convert<float>(scale));
+#endif
+}
 /**
  * @brief Converts a 6-bit floating-point value (f6_t) to a 32-bit float,
  *        applying the specified scaling factor.
@@ -1290,19 +1507,7 @@ inline __host__ __device__ bf8x8_ocp_t scaled_type_convert<bf8x8_ocp_t, bhalf8_t
 
 #if CK_MX_ARCH_1250
 // Declare a template function for wave-wise scaled conversion
-/* scale is packed 4 form
- * Scale_sel: select different scale set and apply to the tensor[16x16] represented by a wave,
- *            th[0-15]: 16x8 and th[16-31]: 16x8
- *      Block 32 :
- *      0: scale[7:0]  -th[0:15]
- *      1: scale[7:0]  -th[16:31]
- *      2: scale[23:16]-th[0:15]
- *      3: scale[23:16]-th[16:31]
- *      4: scale[15:8] -th[0:15]
- *      5: scale[15:8] -th[16:31]
- *      6: scale[31:24]-th[0:15]
- *      7: scale[31:24]-th[16:31]
- *      Block 16 : not ready */
+/* scale is packed 4 form, see details for FP8/BF8, FP4, FP6 */
 template <typename Y, typename X, int Scale_sel>
 struct pk4scaled_type_convert_impl
 {
@@ -1315,6 +1520,27 @@ __device__ constexpr Y pk4scaled_type_convert(uint32_t scale, X x)
     return pk4scaled_type_convert_impl<Y, X, Scale_sel>::run(scale, x);
 }
 
+/* scale is packed 4 form [FP8/BF8]
+ * Scale_sel: select different scale set and apply to the tensor[16x16] represented by a wave,
+ *            th[0-15]: 16x8 and th[16-31]: 16x8
+ *      Block 32 :
+ *      0(0000): src[th[0:31]]  * scale[th[0:15]][7:0]
+ *      1(0001): src[th[0:31]]  * scale[th[16:31]][7:0]
+ *      2(0010): src[th[0:31]]  * scale[th[0:15]][23:16]
+ *      3(0011): src[th[0:31]]  * scale[th[16:31]][23:16]
+ *      4(0100): src[th[0:31]]  * scale[th[0:15]][15:8]
+ *      5(0101): src[th[0:31]]  * scale[th[16:31]][15:8]
+ *      6(0110): src[th[0:31]]  * scale[th[0:15]][31:24]
+ *      7(0111): src[th[0:31]]  * scale[th[16:31]][31:24]
+ *      Block 16 : Available for certain revision
+ *      8(1000) : src[th[0:15]]  * scale[th[0:15]][7:0]
+ *                src[th[16:31]] * scale[th[0:15]][15:8]
+ *      9(1001) : src[th[0:15]]  * scale[th[16:31]][7:0]
+ *                src[th[16:31]] * scale[th[16:31]][15:8]
+ *      10(1010): src[th[0:15]]  * scale[th[0:15]][23:16]
+ *                src[th[16:31]] * scale[th[0:15]][31:24]
+ *      11(1011): src[th[0:15]]  * scale[th[16:31]][23:16]
+ *                src[th[16:31]] * scale[th[16:31]][31:24] */
 // float16
 template <int Scale_sel>
 struct pk4scaled_type_convert_impl<half8_t, f8x8_ocp_t, Scale_sel>
@@ -1429,6 +1655,82 @@ struct pk4scaled_type_convert_impl<float8_t, bf8x8_ocp_t, Scale_sel>
         return fp8_impl::
             cast_to_f32_from_f8_scaled<bf8_ocp_t::default_interpret, uint32_t, Scale_sel>(
                 scale, x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+    }
+};
+
+/* scale is packed 4 form [FP4]
+ * Scale_sel: select different scale set and apply to the tensor[16x16] represented by a wave,
+ *            th[0-15]: 16x8 and th[16-31]: 16x8
+ *      Block 32 :
+ *      0(000): src[th[0-15]]  * scale[th[0-15]][7:0]
+                src[th[16-31]] * scale[th[0-15]][15:8]
+ *      1(001): src[th[0-15]]  * scale[th[16-31]][7:0]
+                src[th[16-31]] * scale[th[16-31]][15:8]
+ *      2(010): src[th[0-15]]  * scale[th[0-15]][23:16]
+                src[th[16-31]] * scale[th[0-15]][31:24]
+ *      3(011): src[th[0-15]]  * scale[th[16-31]][23:16]
+                src[th[16-31]] * scale[th[16-31]][31:24]
+ *      Block 16 : Available for certain revision
+ *      4(100): src[th[0-15]]  * scale[th[0-15]][7:0]
+                src[th[16-31]] * scale[th[0-15]][23:16]
+ *      5(101): src[th[0-15]]  * scale[th[16-31]][7:0]
+                src[th[16-31]] * scale[th[16-31]][23:16]
+ *      6(110): src[th[0-15]]  * scale[th[0-15]][15:8]
+                src[th[16-31]] * scale[th[0-15]][31:24]
+ *      7(111): src[th[0-15]]  * scale[th[16-31]][15:8]
+                src[th[16-31]] * scale[th[16-31]][31:24]
+ */
+// FP4 to float
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<float8_t, f4x8_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 4-bit floating-point(fp4) values to a vector of 8 float32,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp4) to convert.
+     * @return      The converted float32 vector.
+     */
+    __device__ static float8_t run(uint32_t scale, f4x8_t x)
+    {
+        return cast_from_f4_scaled<float8_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+// FP4 to float16
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<half8_t, f4x8_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 4-bit floating-point(fp4) values to a vector of 8 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp4) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static half8_t run(uint32_t scale, f4x8_t x)
+    {
+        return cast_from_f4_scaled<half8_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+// FP4 to bfloat16
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<bhalf8_t, f4x8_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 4-bit floating-point(fp4) values to a vector of 8 bfloat16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp4) to convert.
+     * @return      The converted bfloat16 vector.
+     */
+    __device__ static bhalf8_t run(uint32_t scale, f4x8_t x)
+    {
+        return cast_from_f4_scaled<bhalf8_t, uint32_t, Scale_sel>(x, scale);
     }
 };
 #endif // #if CK_MX_ARCH_1250
