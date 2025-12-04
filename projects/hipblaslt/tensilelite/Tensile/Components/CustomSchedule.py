@@ -698,9 +698,8 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     #         SBarrier(comment="")
     #     ]
     if isNT(kernel) and useLDSTr and TLDS == 0:
-        # Fixed schedule - SYNC[0] at -1 to ensure LRA1/LRB1 complete BEFORE MFMA 0
         optSchedule = {
-            'SYNC': [[-1, 16, 16, 25, 36, 36, 36, 36, 47]],
+            'SYNC': [[-1, 16, 16, 25, 36, 36]],
             'LRA0': [[2, 3, 4, 5, 6, 7]],
             'LRB0': [[2, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15]],
             'GRIncA': [[2, 2, 2, 3, 3, 3, 4, 4, 4]],
@@ -722,10 +721,10 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
             SBarrier(comment=""),
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all local reads for second depth"),
             SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
-            SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait for previous set of global reads"),
-            SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait for previous set of global reads"),
+            # SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait for previous set of global reads"),
+            # SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait for previous set of global reads"),
             SBarrier(comment=""),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LR in pre-loop to complete")
+            # SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LR in pre-loop to complete")
         ]
         nglshift = nllshift = 11
     else:
