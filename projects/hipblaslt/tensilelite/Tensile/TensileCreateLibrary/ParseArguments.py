@@ -203,7 +203,7 @@ def parseArguments(input: Optional[List[str]] = None) -> Dict[str, Any]:
     # tensilelite runtime lookup and selection for these predicates is complete.
     # As a staged approach, the TensileCreateLibrary code to enable this feature
     # is implemented, but will remain disabled until the work is complete.
-    # DS: need to remove this
+    # FIXME: DS need to remove this
     # predicatePattern = re.compile(r"\[(.*?)\]")
     # if predicatePattern.search(args.Architecture):
     #     printExit(

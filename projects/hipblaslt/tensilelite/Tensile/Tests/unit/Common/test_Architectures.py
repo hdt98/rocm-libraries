@@ -212,7 +212,7 @@ def test_filterLogicFilesByPredicates_match_emulation_ids(mock_logic_file):
     }
     
     with patch("Tensile.Common.Architectures._extractArchInfo") as mock_extract:
-        # DS: Otherwise this test fails
+        # FIXME: DS Otherwise this test fails
         mock_extract.return_value = ArchInfo("test", "gfx950", {"id=75a0"}, None)
         result = filterLogicFilesByPredicates(logicFiles, predicateMap)
         assert len(result) == 1
