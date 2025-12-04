@@ -2335,6 +2335,9 @@ def _get_schedule_224x256x64_16bit(kernel, userLDSTr, TLDS):
     return True, opt1
 
 def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
+    print("USING CMS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    kernel["MfmaInitCVgprs"] = True
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     optSchedule = {
     'SYNC': [[-1, 13, 22, 22, 27, 38, 38]],
     'LRA0': [[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],
@@ -2361,7 +2364,7 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
         SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
         SBarrier(comment="")
     ]
-    nglshift = nllshift = 11
+    # nglshift = nllshift = 11
     numMfma = 56
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
@@ -2946,6 +2949,7 @@ def hasCustomSchedule(kernel):
     is192x320x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [192, 320, 64, 2, 1, True, 0, 0]
     is320x192x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [320, 192, 64, 2, 1, True, 0, 0]
     is128x224x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [128, 224, 64, 2, 1, True, 0, 0]
+    is224x128x64DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [224, 128, 64, 2, 1, True]
 
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS)
@@ -2979,4 +2983,6 @@ def hasCustomSchedule(kernel):
         return _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS)
     elif is128x224x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16, 16, 32, 1] and MIWG == [2, 2]:
         return _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS)
+    elif is224x128x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [1,4]:
+        return _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS)
     return False, None
