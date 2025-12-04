@@ -128,7 +128,11 @@ bool run_grouped_conv_bwd_weight(const ExecutionConfig& config,
 
         wei_device_buf.FromDevice(wei_device_result.mData.data());
 
-        return ck::utils::check_err(wei_device_result.mData, wei_host_result.mData);
+        return ck::utils::check_err(wei_device_result.mData,
+                                    wei_host_result.mData,
+                                    "Error: Incorrect results!",
+                                    get_rtol<WeiDataType, float>(),
+                                    get_atol<WeiDataType, float>());
     }
 
     float avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});

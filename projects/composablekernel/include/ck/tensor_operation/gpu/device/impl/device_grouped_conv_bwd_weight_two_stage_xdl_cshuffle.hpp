@@ -1765,6 +1765,15 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             return false;
         }
 
+        if(!ck::is_xdl_wmma_k_supported<ComputeTypeA, KPerBlock, K1>())
+        {
+            return false;
+        }
+        if(!ck::is_xdl_wmma_k_supported<ComputeTypeB, KPerBlock, K1>())
+        {
+            return false;
+        }
+
         if constexpr(NDimSpatial == 2)
         {
             if constexpr(!(is_NHWGC_GKYXC_NHWGK<InLayout, WeiLayout, OutLayout>() ||

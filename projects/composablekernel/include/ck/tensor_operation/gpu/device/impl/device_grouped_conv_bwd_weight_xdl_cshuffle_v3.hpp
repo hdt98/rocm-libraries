@@ -1353,6 +1353,14 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         {
             return false;
         }
+        if(!is_xdl_wmma_k_supported<ComputeTypeA, K0PerBlock, K1>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<ComputeTypeB, K0PerBlock, K1>())
+        {
+            return false;
+        }
         if(is_gfx11_supported() && arg.k_batch_ > 1)
         {
             return false;

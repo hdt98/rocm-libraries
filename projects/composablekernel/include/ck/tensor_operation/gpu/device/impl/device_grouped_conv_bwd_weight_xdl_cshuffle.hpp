@@ -950,6 +950,14 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
         {
             return false;
         }
+        if(!is_xdl_wmma_k_supported<ComputeTypeA, Number<K0PerBlock * K1>{}, K1>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<ComputeTypeB, Number<K0PerBlock * K1>{}, K1>())
+        {
+            return false;
+        }
         if(!is_bf16_atomic_supported() && std::is_same_v<CDataType, ck::bhalf_t>)
         {
             return false;

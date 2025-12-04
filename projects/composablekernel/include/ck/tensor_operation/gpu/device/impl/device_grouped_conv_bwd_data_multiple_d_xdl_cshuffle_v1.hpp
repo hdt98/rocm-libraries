@@ -1494,6 +1494,14 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
         {
             return false;
         }
+        if(!is_xdl_wmma_k_supported<AComputeType, KPerBlock, AK1>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<BComputeType, KPerBlock, BK1>())
+        {
+            return false;
+        }
         if(!is_bf16_atomic_supported() && std::is_same_v<EDataType, ck::bhalf_t> &&
            arg.k_batch_ > 1)
         {
