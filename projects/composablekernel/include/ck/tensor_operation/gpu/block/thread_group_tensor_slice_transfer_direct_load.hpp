@@ -167,10 +167,13 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
         //     AreThreadClusterLengthsValid(),
         //     "Thread cluster lengths are incorrect. They must be set in a way that allows a single
         //     " "wavefront to write contiguous DWORDs into LDS memory. ");
-
         const auto thread_cluster_idx =
             thread_cluster_desc_.CalculateBottomIndex(make_multi_index(ThreadGroup::GetThreadId()));
-
+        const auto thread_data_idx_begin = thread_cluster_idx * thread_single_load_size;
+        SetSrcSliceOrigin(src_desc, src_block_slice_origin + thread_data_idx_begin);
+#if defined(__gfx125__)
+        SetDstSliceOrigin(dst_desc, dst_block_slice_origin + thread_data_idx_begin);
+#else
         constexpr auto wave_cluster_lengths = generate_sequence_v2(
             [&](auto i) {
                 // FIXME: wave parallelism is not always in that dimension.
@@ -191,17 +194,13 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
             wave_thread_cluster_lengths * thread_single_load_size;
         constexpr auto wave_cluster_desc_ =
             make_cluster_descriptor(wave_cluster_lengths, ThreadClusterArrangeOrder{});
-
         const auto wave_cluster_idx = wave_cluster_desc_.CalculateBottomIndex(
             make_multi_index(ThreadGroup::GetThreadId() / 64));
-
-        const auto thread_data_idx_begin = thread_cluster_idx * thread_single_load_size;
-        const auto wave_data_idx_begin   = wave_cluster_idx * wave_single_load_size;
-
-        SetSrcSliceOrigin(src_desc, src_block_slice_origin + thread_data_idx_begin);
+        const auto wave_data_idx_begin = wave_cluster_idx * wave_single_load_size;
         // We don't need threadwise offset for lds since it was calculate by HW
         // We still need input the wavewise offset.
         SetDstSliceOrigin(dst_desc, dst_block_slice_origin + wave_data_idx_begin);
+#endif
     }
 
     __device__ void SetSrcSliceOrigin(const SrcDesc& src_desc, const Index& src_slice_origin_idx)
@@ -249,15 +248,18 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
         // Loop over the destination block and copy data.
         static_ford<decltype(dst_access_lengths)>{}([&](auto ordered_dst_access_idx) {
             const auto src_offset = src_coord_.GetOffset();
-            const auto dst_offset = __builtin_amdgcn_readfirstlane(dst_coord_.GetOffset());
-
             // Check if src data is not in the logic padding area.
             const bool is_src_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
 
+#if defined(__gfx125__)
+            src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
+                dst_buf, src_offset, dst_coord_.GetOffset(), is_src_valid);
+#else
+            const auto dst_offset = __builtin_amdgcn_readfirstlane(dst_coord_.GetOffset());
             src_buf.template DirectCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
                 dst_buf, src_offset, dst_offset, is_src_valid);
-
+#endif
             constexpr auto move_on_dim = [&]() constexpr {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
 

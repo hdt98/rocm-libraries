@@ -58,7 +58,8 @@ template <typename ALayout,
           index_t CDEBlockTransferScalarPerVector_NPerBlock,
           LoopScheduler LoopSched     = make_default_loop_scheduler(),
           PipelineVersion PipelineVer = PipelineVersion::v4,
-          typename ComputeDataType    = EDataType>
+          typename ComputeDataType    = EDataType,
+          index_t MinimumOccupancy    = CK_MIN_BLOCK_PER_CU>
 struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
                                                                  BLayout,
                                                                  ELayout,
@@ -162,7 +163,8 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
                     typename GridwiseGemm::DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
                     typename GridwiseGemm::EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
                     typename GridwiseGemm::Block2ETileMap,
-                    has_main_loop>;
+                    has_main_loop,
+                    MinimumOccupancy>;
 
                 return launch_and_time_kernel(stream_config,
                                               kernel,

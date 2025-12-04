@@ -153,7 +153,7 @@ inline bool is_lds_direct_load_supported()
 {
     // Check if direct loads from global memory to LDS are supported.
     return ck::get_device_name() == "gfx90a" || ck::get_device_name() == "gfx942" ||
-           ck::get_device_name() == "gfx950";
+           ck::get_device_name() == "gfx950" || is_gfx125_supported();
 }
 
 inline bool is_bf16_atomic_supported()
@@ -170,6 +170,23 @@ inline bool is_wmma_supported()
 inline bool is_tf32_supported()
 {
     return ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950";
+}
+
+inline int __host__ get_lds_size()
+{
+    int device  = 0;
+    int result  = 0;
+    auto status = hipGetDevice(&device);
+    if(status == hipSuccess)
+    {
+        status = hipDeviceGetAttribute(&result, hipDeviceAttributeMaxSharedMemoryPerBlock, device);
+        if(status == hipSuccess)
+        {
+            return result;
+        }
+    }
+
+    return 64 * 1024;
 }
 
 } // namespace ck

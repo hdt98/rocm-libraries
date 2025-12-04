@@ -32,7 +32,8 @@ template <BlockGemmPipelineScheduler BlkGemmPipelineVer,
           index_t NPerXDL,
           index_t MRepeat,
           index_t NRepeat,
-          index_t KPacks>
+          index_t KPacks,
+          bool TransposeC = false>
 struct BlockwiseGemmXdlops_pipeline_v3
 {
 };
@@ -55,9 +56,8 @@ template <index_t BlockSize,
           index_t NPerXDL,
           index_t MRepeat,
           index_t NRepeat,
-          index_t KPack
-          // ,bool TransposeC //disable transposec right now...
-          >
+          index_t KPack,
+          bool TransposeC>
 struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                        BlockSize,
                                        ADataType,
@@ -77,7 +77,8 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                        NPerXDL,
                                        MRepeat,
                                        NRepeat,
-                                       KPack>
+                                       KPack,
+                                       TransposeC>
     : BlockwiseGemmXdlops_pipeline_base<BlockSize,
                                         ADataType,
                                         BDataType,
@@ -96,7 +97,8 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                         NPerXDL,
                                         MRepeat,
                                         NRepeat,
-                                        KPack>
+                                        KPack,
+                                        TransposeC>
 
 {
     using Base = BlockwiseGemmXdlops_pipeline_base<BlockSize,
@@ -117,7 +119,8 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                                    NPerXDL,
                                                    MRepeat,
                                                    NRepeat,
-                                                   KPack>;
+                                                   KPack,
+                                                   TransposeC>;
     using Base::I0;
     using Base::I1;
     using Base::KRepeat;
@@ -161,7 +164,7 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
     __device__ static constexpr auto HotLoopScheduler()
     {
-#if !defined(__gfx11__) && !defined(__gfx12__)
+#if !defined(__gfx11__)
         // A/B split schedule
         // compiler is likely to use ds_read2 when instruction width smaller than 16bytes
         constexpr auto num_ds_read_inst_a =

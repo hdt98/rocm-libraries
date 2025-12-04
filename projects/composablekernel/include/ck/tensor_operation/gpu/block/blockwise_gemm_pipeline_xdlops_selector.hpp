@@ -32,7 +32,8 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool DirectLoad = false>
+          bool DirectLoad = false,
+          bool TransposeC = false>
 constexpr auto BlockGemmPipeline_Selector()
 {
     if constexpr(DirectLoad)
@@ -58,7 +59,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                              NPerXDL,
                                                              MRepeat,
                                                              NRepeat,
-                                                             KPack>{};
+                                                             KPack,
+                                                             TransposeC>{};
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
         {
@@ -81,7 +83,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                              NPerXDL,
                                                              MRepeat,
                                                              NRepeat,
-                                                             KPack>{};
+                                                             KPack,
+                                                             TransposeC>{};
         }
         else
         {
@@ -111,7 +114,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    NPerXDL,
                                                    MRepeat,
                                                    NRepeat,
-                                                   KPack>{};
+                                                   KPack,
+                                                   TransposeC>{};
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v2)
         {
@@ -134,7 +138,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    NPerXDL,
                                                    MRepeat,
                                                    NRepeat,
-                                                   KPack>{};
+                                                   KPack,
+                                                   TransposeC>{};
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
         {
@@ -157,7 +162,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    NPerXDL,
                                                    MRepeat,
                                                    NRepeat,
-                                                   KPack>{};
+                                                   KPack,
+                                                   TransposeC>{};
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
         {
@@ -180,7 +186,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    NPerXDL,
                                                    MRepeat,
                                                    NRepeat,
-                                                   KPack>{};
+                                                   KPack,
+                                                   TransposeC>{};
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v5)
         {
@@ -203,7 +210,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                    NPerXDL,
                                                    MRepeat,
                                                    NRepeat,
-                                                   KPack>{};
+                                                   KPack,
+                                                   TransposeC>{};
         }
         else
         {
