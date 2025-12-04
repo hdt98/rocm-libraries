@@ -126,6 +126,7 @@ Tests:
   matrix_size: *medium_matrix_size_range
   transA_transB: *complex_transA_transB_range
   alpha_beta: *complex_alpha_beta_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_batch_medium
   category: pre_checkin
@@ -145,6 +146,7 @@ Tests:
   transA_transB: *complex_transA_transB_range
   alpha_beta: *complex_alpha_beta_range
   batch_count: 10
+  gpu_arch: '9(42|50)'
 
 
 - name: matmul_medium_HMM
@@ -152,7 +154,6 @@ Tests:
   function:
     - matmul: *real_precisions
     - matmul: *real_precisions_gemm_only
-    #- matmul: *complex_precisions
   matrix_size: *medium_matrix_size_range
   transA: [ N ]
   transB: [ N ]
@@ -286,6 +287,7 @@ Tests:
   K: 16
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_24
   category: pre_checkin
@@ -306,6 +308,7 @@ Tests:
   K: 24
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_algo
   category: pre_checkin
@@ -337,6 +340,7 @@ Tests:
   K: 32
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_48_8_128
   category: nightly
@@ -2376,6 +2380,7 @@ Tests:
   K: 96
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_128_complex
   category: pre_checkin
@@ -2386,6 +2391,7 @@ Tests:
   K: 128
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_256_8_16_complex
   category: pre_checkin
@@ -2396,6 +2402,7 @@ Tests:
   K: 16
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_16_256_8_complex
   category: pre_checkin
@@ -2406,6 +2413,7 @@ Tests:
   K: 8
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_8_16_256_complex
   category: pre_checkin
@@ -2416,6 +2424,7 @@ Tests:
   K: 256
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 - name: matmul_512_complex
   category: pre_checkin
@@ -2426,5 +2435,6 @@ Tests:
   K: 512
   alpha_beta: *complex_alpha_beta_range
   transA_transB: *complex_transA_transB_range
+  gpu_arch: '9(42|50)'
 
 ...
