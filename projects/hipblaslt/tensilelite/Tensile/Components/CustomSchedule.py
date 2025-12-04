@@ -473,6 +473,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
 
     for _, indexList in opt1.optSchedule.items():
+        print(f"{len(indexList)} <= {opt1.numCodePaths}")
         assert len(indexList) <= opt1.numCodePaths
 
     if len(opt1.mfmaReorder) > 0:
@@ -699,30 +700,34 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     if isNT(kernel) and useLDSTr and TLDS == 0:
         # Fixed schedule - SYNC[0] at -1 to ensure LRA1/LRB1 complete BEFORE MFMA 0
         optSchedule = {
-            'SYNC': [[-1, 15, 15, 24, 35, 35]],  # Changed first sync from 0 to -1
-            'LRA0': [[1, 2, 3, 4, 5, 6]],
-            'LRB0': [[1, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14]],
-            'GRIncA': [[1, 1, 1, 2, 2, 2, 3, 3, 3]],
-            'GRIncB': [[4, 4, 4, 5, 5, 5, 6, 6, 6]],
-            'GRA': [[15, 15, 16, 16, 18, 18]],
-            'GRB': [[20, 20, 22, 22, 24, 24, 25, 25, 27, 27, 29, 29, 31, 31, 33, 33]],
-            'LRSA': [[23]],
-            'LRSB': [[23]],
-            'LWSA': [[33]],
-            'LWSB': [[33]],
-            'LRA1': [[36, 37, 38, 39, 40, 41]],
-            'LRB1': [[36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 41, 41, 42, 42, 43, 43]],
+            'SYNC': [[-1, 16, 16, 25, 36, 36, 36, 36, 47]],
+            'LRA0': [[2, 3, 4, 5, 6, 7]],
+            'LRB0': [[2, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15]],
+            'GRIncA': [[2, 2, 2, 3, 3, 3, 4, 4, 4]],
+            'GRIncB': [[5, 5, 5, 6, 6, 6, 7, 7, 7]],
+            'GRA': [[16, 16, 17, 17, 19, 19]],
+            'GRB': [[21, 21, 23, 23, 25, 25, 26, 26, 28, 28, 30, 30, 32, 32, 34, 34]],
+            'LRSA':[[24]],
+            'LRSB': [[24]],
+            'LWSA': [[34]],
+            'LWSB': [[34]],
+            'LRA1': [[37, 38, 39, 40, 41, 42]],
+            'LRB1': [[37, 37, 38, 38, 39, 39, 40, 40, 41, 41, 42, 42, 43, 43, 44, 44]],
             'LCC': [[47, 47]],
         }
-        nglshift = nllshift = 11
+
         syncCode = [
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1 before MFMA 0"),
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRA0/LRB0"),
             SBarrier(comment=""),
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all local reads for second depth"),
             SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
-            SBarrier(comment="")
+            SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait for previous set of global reads"),
+            SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait for previous set of global reads"),
+            SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LR in pre-loop to complete")
         ]
+        nglshift = nllshift = 11
     else:
         return False, None
     numMfma = 48
