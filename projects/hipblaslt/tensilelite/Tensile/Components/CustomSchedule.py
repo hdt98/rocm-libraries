@@ -2335,13 +2335,28 @@ def _get_schedule_224x256x64_16bit(kernel, userLDSTr, TLDS):
     return True, opt1
 
 def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
+    """
+    Questions: 
+    1. LRA0 and LRA1 are reading from LDSA0 and LDSA1 ? If so we have to keep issuing LWSA after every LRA0 and LRA1 right?
+    2. Why is there GRIncA 3 times in a row ? Shouldn't there be an increment followed by GRA
+    3. The schedule is for 1 SIMD ? 
+    4. The schedule is for 1 ITERATION ? as opposed to SUBITERATION ? 
+        * One subiteraton is 
+    5. Shouldn't we be alternating instructions of LRA0 and LRA1 and hence many LWSA instructions ?
+
+    """
+    if not (isTN(kernel) and TLDS):
+        return False, None
+
     print("USING CMS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     kernel["MfmaInitCVgprs"] = True
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     optSchedule = {
-    'SYNC': [[-1, 13, 22, 22, 27, 38, 38]],
-    'LRA0': [[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],
-    'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
+    'SYNC': [[-1, 13, 22, 22, 27, 38, 38]],                                                  # iter0 : GR Red
+    'LRA0': [[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],                               # iter1 : GR Black
+                                                                                             #         LR Black, LR Red
+                                                                                             #         
+    'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],                                                 # iter2 : LR Red, LR Black
     'LRB0': [[1, 15]],
     'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
     'GRA': [[22, 22, 23, 23, 24, 24, 26, 26, 27, 27, 29, 29, 30, 30]],
