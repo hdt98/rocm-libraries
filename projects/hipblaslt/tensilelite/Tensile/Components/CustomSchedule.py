@@ -233,6 +233,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
     _, opt1 = hasCustomSchedule(kernel)
     numCodePath = opt1.numCodePaths
+    print(f"{opt1.numMfma} == {len(mfmaCode)}")
     assert opt1.numMfma == len(mfmaCode)
 
 
@@ -417,6 +418,86 @@ def isTT(kernel):
 @CallableGuard
 def isTN(kernel):
     return kernel["ProblemType"]["TransposeA"] and not kernel["ProblemType"]["TransposeB"]
+
+def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+
+    # if isNT(kernel) and useLDSTr and TLDS == 0:
+    #     optSchedule = {
+    #         'SYNC': [[0, 15, 15, 24, 35, 35]],
+    #         'LRA0': [[1, 2, 3, 4, 5, 6]],
+    #         'LRB0': [[1, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14]],
+    #         'GRIncA': [[1, 1, 1, 2, 2, 2, 3, 3, 3]],
+    #         'GRIncB': [[4, 4, 4, 5, 5, 5, 6, 6, 6]],
+    #         'GRA': [[15, 15, 16, 16, 18, 18]],
+    #         'GRB': [[20, 20, 22, 22, 24, 24, 25, 25, 27, 27, 29, 29, 31, 31, 33, 33]],
+    #         'LRSA': [[23]],
+    #         'LRSB': [[23]],
+    #         'LWSA': [[33]],
+    #         'LWSB': [[33]],
+    #         'LRA1': [[36, 37, 38, 39, 40, 41]],
+    #         'LRB1': [[36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 41, 41, 42, 42, 43, 43]],
+    #         'LCC': [[47, 47]],
+    #     }
+    #     nglshift = nllshift = 11
+    #     syncCode = [
+    #         SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+    #         SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+    #         SBarrier(comment=""),
+    #         SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+    #         SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
+    #         SBarrier(comment="")
+    #     ]
+    if isNT(kernel) and useLDSTr and TLDS == 0:
+      optSchedule = {
+          # Keep sync points EXACTLY the same
+          'SYNC': [[0, 15, 15, 24, 35, 35]],
+
+          # Keep local reads EXACTLY the same
+          'LRA0': [[1, 2, 3, 4, 5, 6]],
+          'LRB0': [[1, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14]],
+
+          # Keep address increments the same
+          'GRIncA': [[1, 1, 1, 2, 2, 2, 3, 3, 3]],
+          'GRIncB': [[4, 4, 4, 5, 5, 5, 6, 6, 6]],
+
+          # Pack global reads tighter - but AFTER barrier at MFMA 15!
+          # Original GRA: [[15, 15, 16, 16, 18, 18]] - ends at 18
+          # Original GRB: [[20, 20, 22, 22, 24, 24, 25, 25, 27, 27, 29, 29, 31, 31, 33, 33]] - ends at 33
+          # Tighter GRA: starts at 15 (after barrier), packed to end at 17
+          'GRA': [[15, 15, 16, 16, 17, 17]],
+          # Tighter GRB: starts at 18 (after GRA), packed to end at 25 (8 MFMAs earlier!)
+          'GRB': [[18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 23, 24, 24, 25, 25]],
+
+          # Keep LDS swaps the same
+          'LRSA': [[23]],
+          'LRSB': [[23]],
+          'LWSA': [[33]],
+          'LWSB': [[33]],
+
+          # Keep next-iter prefetch the same
+          'LRA1': [[36, 37, 38, 39, 40, 41]],
+          'LRB1': [[36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 41, 41, 42, 42, 43, 43]],
+
+          'LCC': [[47, 47]],
+      }
+      nglshift = nllshift = 11  # Keep the same
+      syncCode = [
+          SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+          SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+          SBarrier(comment=""),
+          SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+          SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
+          SBarrier(comment="")
+      ]
+    else:
+        return False, None
+    numMfma = 48
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    return True, opt1
+
 
 def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
 
@@ -1732,7 +1813,8 @@ def hasCustomSchedule(kernel):
     MIWG = kernel["MIWaveGroup"]
     useLDSTr = kernel["LDSTrInst"]
     TLDS = kernel["TransposeLDS"]
-
+    
+    is96x256x64DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [96, 256, 64, 2, 1, True]
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 64, 2, 1, True]
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 64, 2, 1, True]
     is256x256x128DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 128, 2, 0, True]
@@ -1750,7 +1832,9 @@ def hasCustomSchedule(kernel):
     is192x320x64DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 320, 64, 2, 1, True]
     is320x192x64DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [320, 192, 64, 2, 1, True]
 
-    if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
+    if is96x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
+        return _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS)
+    elif is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS)
     elif is256x256x128DTL and is8bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [16, 16, 16]) and MI == [16,16,128,1] and MIWG == [2,2]:
         return _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS)
