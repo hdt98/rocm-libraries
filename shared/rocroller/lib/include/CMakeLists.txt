@@ -286,6 +286,8 @@ target_sources(rocroller-public-interface
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/Operations_fwd.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/Operations_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/RandomNumberGenerator.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/Scratch.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/Scratch_fwd.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/T_Execute.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/T_Execute_fwd.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Operations/T_Execute_impl.hpp"
