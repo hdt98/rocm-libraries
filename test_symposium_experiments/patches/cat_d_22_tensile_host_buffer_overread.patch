@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -3509,8 +3509,9 @@ void _convertToHeuristicResultArray(
+         heuristicResultsArray[i].workspaceSize = solution->requiredWorkspaceSize(problem, hardware);
+     }
+     for(size_t i = *returnAlgoCount; i < requestedAlgoCount; i++)
+     {
+-        heuristicResultsArray[i].state = rocblaslt_status_invalid_value;
++        // Bug: Buffer overread by accessing one past the end
++        heuristicResultsArray[i + 1].state = rocblaslt_status_invalid_value;
+     }
+ }
+ 
+

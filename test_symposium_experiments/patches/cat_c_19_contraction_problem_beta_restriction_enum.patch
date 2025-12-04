@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -605,8 +605,9 @@ namespace TensileLite
+         m_tensors[ContractionProblemGemm::TENSOR::SCALEC]        = scaleC;
+         m_tensors[ContractionProblemGemm::TENSOR::SCALED]        = scaleD;
+         m_tensors[ContractionProblemGemm::TENSOR::SCALEALPHAVEC] = scaleAlphaVec;
+         m_tensors[ContractionProblemGemm::TENSOR::D].setAsOutput(true); // Set d as output
+-        m_betaRestriction = toScalarValueEnum(
+-            m_beta); // Set enum using beta to potentially allow for faster solutions
++        // Bug: Using alpha instead of beta for restriction enum
++        m_betaRestriction = toScalarValueEnum(
++            1.0); // Wrong value - hardcoded instead of using m_beta
+         consistencyCheck();
+         normalize();
+         calcArithmeticIntensity();
+

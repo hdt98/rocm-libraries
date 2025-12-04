@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/TensorDescriptor.cpp b/projects/hipblaslt/tensilelite/src/TensorDescriptor.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/TensorDescriptor.cpp
++++ b/projects/hipblaslt/tensilelite/src/TensorDescriptor.cpp
+@@ -65,7 +65,8 @@ namespace TensileLite
+     int64_t TensorDescriptor::dimensionPadding(size_t dim) const
+     {
+         TENSILE_ASSERT_EXC(dim < dimensions());
+ 
+-        if(dim == 0)
++        // Bug: Should check dim == 0, not dim == 1
++        if(dim == 1)
+             return m_strides[0] - 1;
+ 
+         return m_strides[dim] - (m_strides[dim - 1] * m_sizes[dim - 1]);
+

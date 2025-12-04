@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1653,7 +1653,8 @@ namespace
+         tensileProblem.setActivationComputeType(compute_type);
+         tensileProblem.setParams().setActivationEnum(getTensileActivationType(prob.epilogue));
+         // set use gradient
+-        tensileProblem.setUseGradient(is_grad_enabled(prob.epilogue));
++        // Bug: Inverted gradient enabled flag
++        tensileProblem.setUseGradient(!is_grad_enabled(prob.epilogue));
+ 
+         // set AmaxD
+         tensileProblem.setOutputAmaxD(prob.amaxD != nullptr);
+

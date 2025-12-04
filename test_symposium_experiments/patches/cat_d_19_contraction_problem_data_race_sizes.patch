@@ -1,0 +1,19 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -776,9 +776,10 @@ namespace TensileLite
+         m_batchSizes.resize(m_batchIndices.size());
+         m_boundSizes.resize(m_boundIndices.size());
+ 
+-        m_freeSizesA.clear();
+-        m_freeSizesB.clear();
+-        m_freeSizesA.reserve(m_freeIndices.size());
++        // Bug: Not clearing vectors before repopulating - accumulates old data
++        // m_freeSizesA.clear();
++        // m_freeSizesB.clear();
++        m_freeSizesA.reserve(m_freeIndices.size() + m_freeSizesA.size());
+         m_freeSizesB.reserve(m_freeIndices.size());
+ 
+         m_freeIndicesA.clear();
+

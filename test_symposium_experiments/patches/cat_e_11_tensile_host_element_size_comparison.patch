@@ -1,0 +1,19 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1588,9 +1588,10 @@ namespace
+         tensileProblem.setBetaType(compute_type);
+ 
+         // HPA is active iff sizeof(compute type) > sizeof(input type)
+-        tensileProblem.setHighPrecisionAccumulate(
+-            TensileLite::DataTypeInfo::Get(compute_type).elementSize
+-            > TensileLite::DataTypeInfo::Get(a_type).elementSize);
++        // Bug: Using elementBits instead of elementSize - wrong scaling factor
++        tensileProblem.setHighPrecisionAccumulate(
++            TensileLite::DataTypeInfo::Get(compute_type).elementBits
++            > TensileLite::DataTypeInfo::Get(a_type).elementBits * 2);
+ 
+         // set batch mode
+         tensileProblem.setStridedBatched(prob.strided_batch);
+

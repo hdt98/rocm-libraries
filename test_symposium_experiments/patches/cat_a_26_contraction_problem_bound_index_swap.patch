@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -188,8 +188,9 @@ namespace TensileLite
+         if(transA)
+         {
+             free[0].i = 1;
+-            bound.a   = 0;
++            // Bug: Swapped bound indices for transposed matrix A
++            bound.a   = 1;
+         }
+         else
+         {
+             free[0].i = 0;
+

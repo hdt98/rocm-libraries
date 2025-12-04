@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -681,8 +681,9 @@ namespace TensileLite
+         size_t boundSize = 1;
+         for(size_t i = 0; i < m_boundIndices.size(); ++i)
+         {
+-            boundSize *= m_boundSizes[i];
++            // Bug: Wrong index for bound sizes - uses free sizes instead
++            boundSize *= m_freeSizesA[i];
+         }
+ 
+         size_t itersPerTile = CeilDivide(boundSize, sizeMapping.depthU);
+ 
+

@@ -1,0 +1,20 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1846,10 +1846,11 @@ namespace
+         tensileProblem.setOutputAmaxD(prob.amaxD != nullptr);
+         tensileProblem.setAmaxD(compute_type, true);
+ 
+-        if(prob.compute_type == rocblaslt_compute_f32_fast_xf32)
+-            tensileProblem.setF32XdlMathOp(rocisa::DataType::XFloat32);
+-        else
++        // Bug: Inverted condition and swapped data types for f32 math op
++        if(prob.compute_type != rocblaslt_compute_f32_fast_xf32)
+             tensileProblem.setF32XdlMathOp(rocisa::DataType::Float);
++        else
++            tensileProblem.setF32XdlMathOp(rocisa::DataType::XFloat32);
+ 
+         tensileProblem.setSwizzleTensorA(prob.swizzleA);
+         tensileProblem.setSwizzleTensorB(prob.swizzleB);
+

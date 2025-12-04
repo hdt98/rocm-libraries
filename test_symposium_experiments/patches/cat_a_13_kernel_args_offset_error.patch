@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/KernelArguments.cpp b/projects/hipblaslt/tensilelite/src/KernelArguments.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/KernelArguments.cpp
++++ b/projects/hipblaslt/tensilelite/src/KernelArguments.cpp
+@@ -46,7 +46,8 @@ namespace TensileLite
+ 
+             size_t offset = std::get<KernelArguments::ArgOffset>(record);
+             size_t size   = std::get<KernelArguments::ArgSize>(record);
+ 
+-            if(prevOffset != offset)
++            // Bug: Off-by-one comparison for padding detection
++            if(prevOffset + 1 != offset)
+             {
+                 stream << "[" << prevOffset << ".." << offset - 1 << "] <padding>" << std::endl;
+             }
+

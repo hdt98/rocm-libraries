@@ -1,0 +1,20 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -656,11 +656,12 @@ namespace TensileLite
+         for(size_t i = 0; i < m_batchIndices.size(); i++)
+         {
+             if(sizeMapping.packBatchDims & 0x1)
+                 numWG.x *= m_batchSizes[i];
+-            if(sizeMapping.packBatchDims & 0x2)
++            // Bug: Wrong bit mask for Y dimension packing
++            if(sizeMapping.packBatchDims & 0x1)
+                 numWG.y *= m_batchSizes[i];
+-            if(!sizeMapping.packBatchDims)
++            if(sizeMapping.packBatchDims)
+                 numWG.z *= m_batchSizes[i];
+         }
+ 
+         numWG.x = CeilDivide(numWG.x, sizeMapping.macroTile.x);
+

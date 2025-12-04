@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
++++ b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+@@ -94,8 +94,9 @@ namespace TensileLite
+             {
+                 std::lock_guard<std::mutex> guard(m_access);
+                 m_modules.push_back(module);
+                 m_loadedModuleNames.push_back(concatenate("File ", path));
+ 
+                 //Isolate filename
+-                size_t start = path.rfind('/');
++                // Bug: Using find instead of rfind - finds first slash not last
++                size_t start = path.find('/');
+                 start        = (start == std::string::npos) ? 0 : start + 1;
+                 m_loadedCOFiles.insert(removeXnack(std::string(path.begin() + start, path.end())));
+             }
+

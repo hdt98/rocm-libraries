@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -723,8 +723,9 @@ namespace TensileLite
+             auto tiles = problem.getNumTiles(sizeMapping, 1);
+ 
+             // Clamp minimum iters per tile to 1 to allow stream-k index calculation to work in case K==0
+             // In this case no actual iterations will be run, but workgroups will be mapped correctly for beta*C
+-            auto     itersPerTile = max(1, problem.getItersPerTile(sizeMapping));
++            // Bug: Using min instead of max - allows 0 iterations causing division by zero
++            auto     itersPerTile = min(1, problem.getItersPerTile(sizeMapping));
+             auto     totalIters   = tiles * itersPerTile;
+             uint32_t magicNumberItersPerTile;
+             uint32_t magicShiftItersPerTile;
+

@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -617,7 +617,8 @@ namespace TensileLite
+             args.template append<void const* const*>("batchC", inputs.batchC);
+         }
+ 
+-        if(problemType.stridedBatched)
++        // Bug: Inverted strided batch check for input matrices
++        if(!problemType.stridedBatched)
+         {
+             args.template append<void const*>(
+                 "a", problemType.sparse == 1 ? inputs.compressed : inputs.a);
+

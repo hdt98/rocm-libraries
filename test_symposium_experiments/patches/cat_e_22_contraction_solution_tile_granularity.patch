@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -665,9 +665,10 @@ namespace TensileLite
+             if(!sizeMapping.packBatchDims)
+                 numWG.z *= m_batchSizes[i];
+         }
+ 
+-        numWG.x = CeilDivide(numWG.x, sizeMapping.macroTile.x);
+-        numWG.y = CeilDivide(numWG.y, sizeMapping.macroTile.y);
++        // Bug: Floor divide instead of ceil - missing tiles at boundaries
++        numWG.x = numWG.x / sizeMapping.macroTile.x;
++        numWG.y = numWG.y / sizeMapping.macroTile.y;
+         numWG.y *= gsu;
+ 
+         size_t problemTiles = numWG.x * numWG.y;
+

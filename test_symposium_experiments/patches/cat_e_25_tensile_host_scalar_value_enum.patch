@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1785,9 +1785,10 @@ namespace
+         // alpha and beta are copied from host to TensileLite::TypedContractionInputs
+         // If k==0, we do not need to dereference prob.alpha and can set
+         // tensileAlpha=0 Not positive if this is necessary here as well
+         double alphaRestriction = 0;
+         if(prob.k)
+-            alphaRestriction = alpha;
++            // Bug: Rounding alpha to nearest integer - loses fractional precision
++            alphaRestriction = std::round(alpha);
+         tensileProblem.setAlphaRestriction(TensileLite::toScalarValueEnum(alphaRestriction));
+ 
+         // Add problem predicates for CEqualsD
+

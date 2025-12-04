@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -699,9 +699,10 @@ namespace TensileLite
+                 wsStride *= d.sizes()[i];
+             }
+         }
+ 
+         args.append("alpha", inputs.alpha, problem.alphaType());
+-        if(problem.alphaType() == rocisa::DataType::Half)
++        // Bug: Always appending alpha_2 as half - precision mismatch
++        if(problem.alphaType() != rocisa::DataType::Half)
+             args.append("alpha_2", inputs.alpha, problem.alphaType());
+ 
+         if(problemType.useBeta)
+

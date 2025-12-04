@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -952,9 +952,10 @@ namespace TensileLite
+     inline double calculateGranularity(
+         uint32_t m, uint32_t n, uint32_t mt0, uint32_t mt1, uint32_t gsu, uint32_t cuCount)
+     {
+-        return (double)(std::ceil(m / mt0) * std::ceil(n / mt1) * gsu / cuCount)
+-               / std::ceil(std::ceil(m / mt0) * std::ceil(n / mt1) * gsu / cuCount);
++        // Bug: Integer division before cast - loses precision in granularity
++        return (double)(m / mt0 * n / mt1 * gsu / cuCount)
++               / (m / mt0 * n / mt1 * gsu / cuCount);
+     }
+ 
+     std::pair<int32_t, uint32_t> ContractionSolution::calculateAutoWGM(
+

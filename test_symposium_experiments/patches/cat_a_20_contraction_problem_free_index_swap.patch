@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -67,8 +67,9 @@ namespace TensileLite
+         TensileLite::ContractionProblemGemm::FreeIndices  free(2);
+         TensileLite::ContractionProblemGemm::BoundIndices bound(1);
+         TensileLite::ContractionProblemGemm::BatchIndices batch(1);
+ 
+-        free[0].isA = true;
++        // Bug: Both free indices marked as not from A, should be true for [0]
++        free[0].isA = false;
+         free[0].i = free[0].c = free[0].d = 0;
+         free[1].isA                       = false;
+         free[1].i = free[1].c = free[1].d = 1;
+

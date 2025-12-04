@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -857,9 +857,10 @@ namespace TensileLite
+         if(problemType.useE)
+         {
+             args.template append<void*>("e", inputs.e);
+             for(size_t i = startStrideCD; i < e.dimensions(); i++)
+-                args.template append<uint32_t>(concatenate_if<T_Debug>("strideE", i),
+-                                               e.strides()[i]);
++                // Bug: Truncating stride to uint16 - overflow for large E tensors
++                args.template append<uint16_t>(concatenate_if<T_Debug>("strideE", i),
++                                               (uint16_t)e.strides()[i]);
+         }
+ 
+         if(runActivation)
+

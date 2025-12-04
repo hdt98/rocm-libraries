@@ -1,0 +1,21 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1633,10 +1633,11 @@ namespace
+         tensileProblem.setParams().setBiasEnum(
+             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
+ 
+-        tensileProblem.setUseScaleAB(
+-            (prob.scaleA == nullptr && prob.scaleB == nullptr)
+-                ? ""
+-                : ((prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
++        // Bug: Inverted AND to OR in scale check - wrong logic
++        tensileProblem.setUseScaleAB(
++            (prob.scaleA == nullptr || prob.scaleB == nullptr)
++                ? ""
++                : ((prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
+                        ? "Vector"
+                        : "Scalar"));
+         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
+

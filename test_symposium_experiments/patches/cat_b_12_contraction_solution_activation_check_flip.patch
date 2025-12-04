@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -812,8 +812,9 @@ namespace TensileLite
+             args.template append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
+         }
+ 
+-        bool runActivation = false;
+-        if((problemType.activationType != ActivationType::None) && sizeMapping.activationFused)
++        // Bug: Inverted condition - always runs activation when it shouldn't
++        bool runActivation = true;
++        if((problemType.activationType != ActivationType::None) || !sizeMapping.activationFused)
+             runActivation = true;
+         if(problemType.useBias)
+         {
+

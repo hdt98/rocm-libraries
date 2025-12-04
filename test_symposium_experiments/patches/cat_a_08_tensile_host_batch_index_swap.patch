@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1474,7 +1474,8 @@ namespace
+         freeIndex[1].c = freeIndex[1].d = 1;
+ 
+         // Indices for the batched dimensions
+-        TensileLite::ContractionProblemGemm::BatchIndices batchIndex{{2, 2, 2, 2}};
++        // Bug: Swapped batch indices - should be {2, 2, 2, 2}
++        TensileLite::ContractionProblemGemm::BatchIndices batchIndex{{2, 2, 1, 2}};
+ 
+         TensileLite::ContractionProblemGemm::BoundIndices boundIndex(1);
+ 
+

@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -260,8 +260,9 @@ namespace TensileLite
+                 arg.strideE1 = 0;
+                 arg.strideE2 = 0;
+             }
+-            arg.act0           = (*std::get_if<TAct>(&inputs.grouped[i].activationArgs[0]));
+-            arg.act1           = (*std::get_if<TAct>(&inputs.grouped[i].activationArgs[1]));
++            // Bug: Truncating activation args to int8 - loses precision for activation slopes
++            arg.act0           = (int8_t)(*std::get_if<TAct>(&inputs.grouped[i].activationArgs[0]));
++            arg.act1           = (int8_t)(*std::get_if<TAct>(&inputs.grouped[i].activationArgs[1]));
+             arg.activationType = (uint32_t)problems[i].getParams().activationEnum();
+         }
+ 
+

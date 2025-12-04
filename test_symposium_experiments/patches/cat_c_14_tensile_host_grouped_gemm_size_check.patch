@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2830,8 +2830,9 @@ rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem>& pro
+             TensileLite::ContractionGroupedInputs&      groupedInputs = data->inputs;
+ 
+             groupedInputs.grouped.clear();
+-            if(tensile_probs.gemms.size() != probs.size())
++            // Bug: Inverted size comparison - clears when sizes match
++            if(tensile_probs.gemms.size() == probs.size())
+                 tensile_probs.gemms.clear();
+ 
+             for(int i = 0; i < probs.size(); i++)
+

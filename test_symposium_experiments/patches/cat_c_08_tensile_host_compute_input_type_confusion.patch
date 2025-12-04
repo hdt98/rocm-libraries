@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1582,8 +1582,9 @@ namespace
+                                                            boundIndex,
+                                                            value_category(beta),
+                                                            prob.workspaceSize};
+ 
+-        tensileProblem.setComputeInputType(
+-            roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
++        // Bug: Using b_type twice instead of a_type and b_type - type confusion
++        tensileProblem.setComputeInputType(
++            roc2TensileComputeInputType(b_type, b_type, prob.compute_type));
+         tensileProblem.setAlphaType(compute_type);
+         tensileProblem.setBetaType(compute_type);
+ 
+

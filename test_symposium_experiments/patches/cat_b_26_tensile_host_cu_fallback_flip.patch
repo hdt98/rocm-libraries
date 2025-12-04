@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2683,8 +2683,9 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+         else
+         {
+             // cu-fallback detection
+-            bool isCUFallback = solution->isFallbackForHW(*hardware);
+-            if(isCUFallback)
++            // Bug: Inverted CU fallback detection
++            bool isCUFallback = !solution->isFallbackForHW(*hardware);
++            if(!isCUFallback)
+             {
+                 if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+                 {
+

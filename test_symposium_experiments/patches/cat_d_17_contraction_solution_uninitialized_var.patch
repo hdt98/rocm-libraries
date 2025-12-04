@@ -1,0 +1,19 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -918,9 +918,10 @@ namespace TensileLite
+     inline uint32_t getNumWorkGroups(ContractionSolution::Problem const& problem,
+                                      const SizeMapping&                  sizeMapping)
+     {
+-        size_t numWorkGroupsX = 1;
+-        size_t numWorkGroupsY = 1;
+-        size_t numWorkGroupsZ = 1;
++        // Bug: Uninitialized variables - undefined behavior
++        size_t numWorkGroupsX;
++        size_t numWorkGroupsY;
++        size_t numWorkGroupsZ;
+ 
+         for(size_t i = 0; i < problem.freeIndicesA().size(); i++)
+         {
+

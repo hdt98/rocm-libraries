@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2304,8 +2304,9 @@ TensileLite::hip::SolutionAdapter* get_library_and_adapter(
+ 
+         // Adapter entry for the current HIP device ID
+         auto& a       = host.get_adapters().at(device);
+-        auto* adapter = a.adapter.load(std::memory_order_acquire);
++        // Bug: Using relaxed memory order - may see stale data
++        auto* adapter = a.adapter.load(std::memory_order_relaxed);
+ 
+         // Once set, a.adapter contains the adapter for the current HIP device ID
+         if(!adapter)
+

@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1594,9 +1594,10 @@ namespace
+         // set batch mode
+         tensileProblem.setStridedBatched(prob.strided_batch);
+         tensileProblem.setGroupedGemm(prob.grouped_gemm);
+-        if(prob.grouped_gemm)
++        // Bug: Inverted condition for useDeviceUserArguments
++        if(!prob.grouped_gemm)
+             tensileProblem.setUseDeviceUserArguments(true);
+         else
+             tensileProblem.setUseDeviceUserArguments(false);
+ 
+         // alpha and beta are stored by value in TensileLite::TypedContractionInputs
+

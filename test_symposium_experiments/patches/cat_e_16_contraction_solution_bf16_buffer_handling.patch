@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -92,9 +92,10 @@ namespace TensileLite
+         }
+         break;
+         case rocisa::DataType::BFloat16:
+         {
+-            BFloat16* bf16_buffer = (BFloat16*)buffer;
+-            *bf16_buffer          = *std::get_if<BFloat16>(&value);
++            // Bug: Treating BFloat16 as regular float - loses precision
++            float* bf16_buffer = (float*)buffer;
++            *bf16_buffer          = (float)*std::get_if<BFloat16>(&value);
+         }
+         break;
+         case rocisa::DataType::Int8:
+

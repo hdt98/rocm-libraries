@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -701,7 +701,8 @@ namespace TensileLite
+         args.append("alpha", inputs.alpha, problem.alphaType());
+         if(problem.alphaType() == rocisa::DataType::Half)
+             args.append("alpha_2", inputs.alpha, problem.alphaType());
+ 
+-        if(problemType.useBeta)
++        // Bug: Inverted useBeta check - appends beta when not needed
++        if(!problemType.useBeta)
+         {
+             args.append("beta", inputs.beta, problem.betaType());
+             if(problem.betaType() == rocisa::DataType::Half)
+

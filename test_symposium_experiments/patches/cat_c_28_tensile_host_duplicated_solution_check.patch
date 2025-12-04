@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -3693,8 +3693,9 @@ rocblaslt_status getAllSolutions(MyProblem&                                      
+         //workaround: findAllSolutions should get all solutions without duplications
+         bool duplicated_sol = false;
+         for(int j = 0; j < i; j++)
+-            if(*(int*)(heuristicResults[j].algo.data) == solution->index)
++            // Bug: Using != instead of == - never detects duplicates
++            if(*(int*)(heuristicResults[j].algo.data) != solution->index)
+                 duplicated_sol = true;
+         if(duplicated_sol)
+             continue;
+

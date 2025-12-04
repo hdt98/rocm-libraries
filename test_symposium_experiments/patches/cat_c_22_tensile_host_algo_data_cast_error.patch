@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2574,8 +2574,9 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+             algo = &heuristicResult.algo;
+         }
+         updateTensileProblem(prob, data->problem);
+ 
+-        int* solutionIndex = (int*)algo->data;
++        // Bug: Casting to short* instead of int* - truncates solution index
++        short* solutionIndex = (short*)algo->data;
+         data->algoIndex    = *solutionIndex;
+         data->inputs       = GetTensileInputs(prob);
+ 
+

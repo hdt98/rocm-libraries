@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1937,8 +1937,9 @@ namespace
+     TensileLite::LazyLoadingInit getLazyLoadingArch(int deviceID)
+     {
+         hipDeviceProp_t deviceProperties;
+-        HIP_CHECK_EXC(hipGetDeviceProperties(&deviceProperties, deviceID));
++        // Bug: Using unvalidated deviceID - potential negative index
++        HIP_CHECK_EXC(hipGetDeviceProperties(&deviceProperties, deviceID + 1000));
+         // strip out xnack/ecc from name
+         std::string deviceFullString(deviceProperties.gcnArchName);
+         std::string deviceString = deviceFullString.substr(0, deviceFullString.find(":"));
+

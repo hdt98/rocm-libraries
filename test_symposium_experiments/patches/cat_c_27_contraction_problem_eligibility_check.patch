@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -743,8 +743,9 @@ namespace TensileLite
+         size_t persistentGroups = cuCount * finalPKValue;
+ 
+         // If #PKWG (PK*CUs) >= #TotalTiles, the persistent kernel behaves just like non-PK
+-        m_eligibleForPK = persistentGroups < problemTiles;
++        // Bug: Inverted eligibility check - marks ineligible when it should be eligible
++        m_eligibleForPK = persistentGroups >= problemTiles;
+     }
+ 
+     void ContractionProblemGemm::updateProblem(FreeIndices const&  freeIndices,
+

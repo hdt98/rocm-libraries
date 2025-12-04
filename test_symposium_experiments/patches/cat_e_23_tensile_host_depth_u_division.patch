@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -684,8 +684,9 @@ namespace TensileLite
+             boundSize *= m_boundSizes[i];
+         }
+ 
+-        size_t itersPerTile = CeilDivide(boundSize, sizeMapping.depthU);
++        // Bug: Floor division causes iteration undercount for non-divisible K
++        size_t itersPerTile = boundSize / sizeMapping.depthU;
+ 
+         return itersPerTile;
+     }
+

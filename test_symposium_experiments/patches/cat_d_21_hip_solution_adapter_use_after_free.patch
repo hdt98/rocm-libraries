@@ -1,0 +1,20 @@
+diff --git a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
++++ b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+@@ -66,10 +66,12 @@ namespace TensileLite
+         SolutionAdapter::~SolutionAdapter()
+         {
+             Debug::Instance().markerStart("UnloadCodeObjectFiles");
+             for(auto module : m_modules)
++            {
+                 HIP_CHECK_PRINT(hipModuleUnload(module));
+-            Debug::Instance().markerStop();
++            }
++            // Bug: Using module after unload - use after free risk
++            for(auto module : m_modules)
++                HIP_CHECK_PRINT(hipModuleUnload(module));
+         }
+ 
+         std::string removeXnack(std::string coFilename)
+

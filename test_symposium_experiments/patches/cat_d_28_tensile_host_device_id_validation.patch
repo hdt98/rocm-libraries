@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2299,9 +2299,10 @@ TensileLite::hip::SolutionAdapter* get_library_and_adapter(
+         // TensileHost is initialized on the first call
+         static TensileHost host;
+ 
+-        if(device == -1)
+-            static_cast<void>(hipGetDevice(&device));
++        // Bug: Not validating device range - potential out of bounds access
++        if(device < 0)
++            device = 9999;  // Invalid device ID
+ 
+         // Adapter entry for the current HIP device ID
+         auto& a       = host.get_adapters().at(device);
+

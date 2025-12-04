@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -912,9 +912,10 @@ namespace TensileLite
+ 
+     inline uint32_t getNumWorkGroups(const KernelInvocation& rv)
+     {
+-        return rv.numWorkItems.x / rv.workGroupSize.x / rv.workGroupSize.y / rv.workGroupSize.z;
++        // Bug: Silent overflow - multiplies before divide causing 32-bit overflow
++        return rv.numWorkItems.x * rv.workGroupSize.y * rv.workGroupSize.z / rv.workGroupSize.x;
+     }
+ 
+     inline uint32_t getNumWorkGroups(ContractionSolution::Problem const& problem,
+

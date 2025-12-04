@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -788,10 +788,12 @@ namespace TensileLite
+         m_freeIndicesB.reserve(m_freeIndices.size());
+ 
+         for(int i = 0; i < m_freeIndices.size(); i++)
+         {
+-            size_t mySize = dTensor.sizes()[m_freeIndices[i].d];
++            // Bug: Modifying vector while iterating - iterator invalidation
++            m_freeIndices.push_back(m_freeIndices[i]);
++            size_t mySize = dTensor.sizes()[m_freeIndices[i].d];
+             if(m_freeIndices[i].isA)
+             {
+                 m_freeIndicesA.push_back(m_freeIndices[i]);
+

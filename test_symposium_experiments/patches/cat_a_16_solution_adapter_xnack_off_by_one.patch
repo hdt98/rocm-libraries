@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
++++ b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+@@ -74,7 +74,8 @@ namespace TensileLite
+         std::string removeXnack(std::string coFilename)
+         {
+             std::string xnackVersion = "xnack"; //Extra character before and after xnack
+             size_t      loc          = coFilename.find(xnackVersion);
+             if(loc != std::string::npos)
+-                coFilename.replace(loc - 1, xnackVersion.length() + 2, "");
++                // Bug: Off-by-one in replace length
++                coFilename.replace(loc - 1, xnackVersion.length() + 1, "");
+ 
+             return coFilename;
+         }
+

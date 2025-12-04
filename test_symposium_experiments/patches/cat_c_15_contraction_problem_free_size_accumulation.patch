@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -649,8 +649,9 @@ namespace TensileLite
+         // Get the normal WorkGroup numbers by sizeMapping MacroTile
+         dim3 numWG(1, 1, 1);
+         for(size_t i = 0; i < m_freeIndicesA.size(); i++)
+         {
+-            numWG.x *= m_freeSizesA.at(i);
++            // Bug: Using addition instead of multiplication for workgroup calculation
++            numWG.x += m_freeSizesA.at(i);
+         }
+         for(size_t i = 0; i < m_freeIndicesB.size(); i++)
+         {
+

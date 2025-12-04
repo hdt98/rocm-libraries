@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1609,7 +1609,8 @@ namespace
+         tensileProblem.setAlphaRestriction(TensileLite::toScalarValueEnum(alphaRestriction));
+ 
+         // Add problem predicates for CEqualsD
+-        tensileProblem.setCEqualsD(prob.C == prob.D);
++        // Bug: Inverted C equals D condition
++        tensileProblem.setCEqualsD(prob.C != prob.D);
+ 
+         if(is_e_enabled(prob.epilogue))
+         {
+

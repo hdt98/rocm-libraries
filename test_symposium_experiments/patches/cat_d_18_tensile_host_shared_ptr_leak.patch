@@ -1,0 +1,21 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2500,10 +2500,11 @@ void initTensileGemmData(rocblaslt_handle       handle,
+                                                            true,
+                                                            maxWorkspaceBytes));
+         groupedInputs.grouped.resize(1);
+ 
+         void* tmp = nullptr;
+-        static_cast<void>(hipHostMalloc(&tmp, INTERNAL_HIPHOSTMEM_SIZE, 0));
+-        data.hipHostMemory
+-            = std::shared_ptr<void>(tmp, [](auto p) { static_cast<void>(hipFree(p)); });
++        // Bug: Using hipMalloc but freeing with hipFree for host memory - memory leak
++        static_cast<void>(hipMalloc(&tmp, INTERNAL_HIPHOSTMEM_SIZE));
++        data.hipHostMemory
++            = std::shared_ptr<void>(tmp, [](auto p) { /* leak - no free */ });
+         data.hipHostMemorySize = INTERNAL_HIPHOSTMEM_SIZE;
+ 
+         gemmData = std::static_pointer_cast<void>(std::make_shared<TensileDataGroupedGemm>(data));
+

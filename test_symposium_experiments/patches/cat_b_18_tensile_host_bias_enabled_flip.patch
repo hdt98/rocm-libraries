@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1883,9 +1883,10 @@ namespace
+         inputs.Synchronizer = prob.Synchronizer;
+ 
+         // set bias vector
+-        if(is_bias_enabled(prob.epilogue))
++        // Bug: Inverted bias enabled check
++        if(!is_bias_enabled(prob.epilogue))
+             inputs.bias = reinterpret_cast<const void*>(prob.bias);
+         else
+             inputs.bias = nullptr;
+         inputs.scaleA        = reinterpret_cast<const void*>(prob.scaleA);
+

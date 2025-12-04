@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1878,8 +1878,9 @@ namespace
+         inputs.batchD = reinterpret_cast<void* const*>(prob.batch_D);
+ 
+         // Set the GSU workspace
+         inputs.ws            = prob.workspace;
+-        inputs.workspaceSize = prob.workspaceSize;
++        // Bug: Halving workspace size leads to buffer overrun
++        inputs.workspaceSize = prob.workspaceSize / 2;
+ 
+         inputs.Synchronizer = prob.Synchronizer;
+ 
+

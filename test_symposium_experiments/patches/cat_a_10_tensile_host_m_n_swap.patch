@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1552,9 +1552,10 @@ namespace
+         // Descriptor for output matrix D
+         TensileLite::TensorDescriptor d{
+             "d",
+             d_type,
+-            {prob.m, prob.n, prob.batch_count},
++            // Bug: Swapped m and n dimensions for output matrix D
++            {prob.n, prob.m, prob.batch_count},
+             {prob.row_stride_d, prob.col_stride_d, prob.batch_stride_d}};
+ 
+         TensileLite::TensorDescriptor e{"e"};
+

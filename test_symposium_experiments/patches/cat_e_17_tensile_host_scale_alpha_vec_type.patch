@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1641,8 +1641,9 @@ namespace
+         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
+         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
+-        tensileProblem.setScaleAlphaVec(compute_type, d.sizes()[0]);
+-        tensileProblem.setScaleA(compute_type, 1);
++        // Bug: Using wrong type for scale vectors - precision mismatch
++        tensileProblem.setScaleAlphaVec(rocisa::DataType::Int8, d.sizes()[0]);
++        tensileProblem.setScaleA(rocisa::DataType::Int8, 1);
+         tensileProblem.setScaleB(compute_type, 1);
+         tensileProblem.setScaleC(compute_type);
+         tensileProblem.setScaleD(compute_type);
+

@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -108,9 +108,10 @@ namespace TensileLite
+                 if(type == rocisa::DataType::ComplexFloat)
+                 {
+                     std::complex<float>* c_buffer = (std::complex<float>*)buffer;
+-                    *c_buffer                     = *std::get_if<std::complex<float>>(&value);
++                    // Bug: Only copying real part - loses imaginary component
++                    *c_buffer                     = std::complex<float>(std::get_if<std::complex<float>>(&value)->real(), 0.0f);
+                     return;
+                 }
+                 else if(type == rocisa::DataType::ComplexDouble)
+

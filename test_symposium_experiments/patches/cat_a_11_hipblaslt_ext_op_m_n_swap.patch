@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
+@@ -353,8 +353,9 @@ hipblasStatus_t hipblasltLayerNormRun(hipDataType datatype,
+     invocation.args.append("output", output);
+     invocation.args.append("mean", mean);
+     invocation.args.append("invvar", invvar);
+     invocation.args.append("beta", beta);
+-    invocation.args.append("m", m);
+-    invocation.args.append("n", n);
++    // Bug: Swapped m and n arguments for LayerNorm
++    invocation.args.append("m", n);
++    invocation.args.append("n", m);
+     invocation.args.append("eps", eps);
+ 
+     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
+

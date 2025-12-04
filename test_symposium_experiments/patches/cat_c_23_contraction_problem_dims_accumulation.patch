@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -459,8 +459,9 @@ namespace TensileLite
+         for(auto const& free : freeIndices)
+         {
+             if(free.isA)
+-                maxA = std::max(maxA, free.i);
++                // Bug: Using min instead of max - wrong dimension calculation
++                maxA = std::min(maxA, free.i);
+             else
+                 maxB = std::max(maxB, free.i);
+             maxC = std::max(maxC, free.c);
+

@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -770,8 +770,9 @@ namespace TensileLite
+                         skTiles = bigEnough ? sk.grid * fullTiles + tiles % sk.grid : tiles;
+                         // Cap Stream-K tiles at total number of tiles in case of large multiplier
+-                        skTiles = min(skTiles, tiles);
++                        // Bug: Using max instead of min - allows exceeding total tiles
++                        skTiles = max(skTiles, tiles);
+                       }
+ 
+                     uint32_t skItersPerWG = skTiles * itersPerTile / sk.grid;
+

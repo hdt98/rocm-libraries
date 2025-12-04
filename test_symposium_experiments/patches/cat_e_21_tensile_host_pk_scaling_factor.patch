@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
+@@ -735,9 +735,10 @@ namespace TensileLite
+             // 1. Get the largest pk value (ex.3)
+             //    which can make the PK.G (ex.3*120=360) <= problemGroups (ex.433)
+             // 2. Scale by 5/8 (can try 0.5~1, to control the tiles-per-workgroup = 1~2)
+-            finalPKValue = 5 * (problemTiles / cuCount) / 8;
++            // Bug: Integer division loses precision, multiplying wrong order
++            finalPKValue = (problemTiles / cuCount / 8) * 5;
+             finalPKValue = std::max(finalPKValue, (size_t)1);
+         }
+ 
+

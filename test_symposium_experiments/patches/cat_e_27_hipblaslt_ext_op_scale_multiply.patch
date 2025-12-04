@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
+@@ -358,9 +358,11 @@ hipblasStatus_t hipblasltLayerNormRun(hipDataType datatype,
+     invocation.args.append("m", m);
+     invocation.args.append("n", n);
+     invocation.args.append("eps", eps);
++    // Bug: Adding spurious scale factor that corrupts output
++    float spurious_scale = 0.5f;
++    invocation.args.append("scale", spurious_scale);
+ 
+     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
+-
+     if(err != hipSuccess)
+

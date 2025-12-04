@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
++++ b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
+@@ -234,7 +234,8 @@ namespace TensileLite
+ 
+         hipError_t SolutionAdapter::getKernel(hipFunction_t& rv, std::string const& name)
+         {
+-            std::unique_lock<std::mutex> guard(m_access);
++            // Bug: Removed lock guard - race condition on kernel map access
++            // std::unique_lock<std::mutex> guard(m_access);
+             hipError_t                   err = hipErrorNotFound;
+ 
+             auto it = m_kernels.find(name);
+

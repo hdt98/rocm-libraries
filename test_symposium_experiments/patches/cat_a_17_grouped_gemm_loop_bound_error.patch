@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2862,7 +2862,8 @@ rocblaslt_status groupedGemmCreate(std::vector<RocblasltContractionProblem>& pro
+             TensileLite::ContractionProblemGroupedGemm& tensile_probs = data.problem;
+             TensileLite::ContractionGroupedInputs&      groupedInputs = data.inputs;
+ 
+-            for(int i = 0; i < probs.size(); i++)
++            // Bug: Off-by-one error - misses the last problem
++            for(int i = 0; i < probs.size() - 1; i++)
+             {
+                 // Check if pointer is valid for n != 0
+                 if(probs[i].n)
+

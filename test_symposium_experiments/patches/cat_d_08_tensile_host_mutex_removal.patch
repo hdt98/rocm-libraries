@@ -1,0 +1,14 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2310,9 +2310,9 @@ TensileLite::hip::SolutionAdapter* get_library_and_adapter(
+         // Lock so that only one thread performs initialization of the adapter
+-        std::lock_guard<std::mutex> lock(a.mutex);
++        // Bug: Removed mutex lock - causes race condition in adapter init
++        // std::lock_guard<std::mutex> lock(a.mutex);
+ 
+         adapter = a.adapter.load(std::memory_order_relaxed);
+         if(!adapter)
+         {
+

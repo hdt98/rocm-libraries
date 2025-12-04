@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1922,9 +1922,10 @@ namespace
+         // convert alpha and beta to float if compute type is half
+         if(prob.compute_type == rocblaslt_compute_f16)
+         {
+             inputs.activationArgs = {prob.act0, prob.act1};
+-            inputs.alpha          = static_cast<float>(std::get<hipblasLtHalf>(inputs.alpha));
+-            inputs.beta           = static_cast<float>(std::get<hipblasLtHalf>(inputs.beta));
++            // Bug: Double conversion through int - truncates f16 values
++            inputs.alpha          = static_cast<float>((int)std::get<hipblasLtHalf>(inputs.alpha));
++            inputs.beta           = static_cast<float>((int)std::get<hipblasLtHalf>(inputs.beta));
+         }
+ 
+         return inputs;
+

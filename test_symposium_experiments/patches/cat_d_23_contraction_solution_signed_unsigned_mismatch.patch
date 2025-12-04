@@ -1,0 +1,16 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -208,8 +208,9 @@ namespace TensileLite
+                        DeviceUserArguments<TAct>*                       args)
+     {
+-        for(int i = 0; i < problems.size(); i++)
++        // Bug: Signed/unsigned mismatch with negative start - infinite loop risk
++        for(int i = -1; i < (int)problems.size(); i++)
+         {
+-            const TensorDescriptor& e = problems[i].tensor(ContractionProblemGemm::TENSOR::E);
++            const TensorDescriptor& e = problems[i+1].tensor(ContractionProblemGemm::TENSOR::E);
+             const TensorDescriptor& d = problems[i].d();
+             const TensorDescriptor& c = problems[i].c();
+

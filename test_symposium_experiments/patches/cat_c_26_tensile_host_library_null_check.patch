@@ -1,0 +1,17 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2547,8 +2547,9 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+ 
+         auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+ 
+-        if(!library)
++        // Bug: Changed from null check to truthy check - proceeds when null
++        if(library)
+         {
+-            return rocblaslt_status_invalid_pointer;
++            return rocblaslt_status_success;
+         }
+ 
+

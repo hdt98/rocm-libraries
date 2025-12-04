@@ -1,0 +1,15 @@
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -3559,8 +3559,9 @@ std::vector<std::shared_ptr<TensileLite::ContractionSolution>>
+         = getSolutions(prob, library, hardware, data->problem, enableEpilogue, requestedAlgoCount);
+ 
+     // when there is no solution for xfloat32, fallback comput_type to fp32
+-    if(solutions.size() == 0 && prob.compute_type == rocblaslt_compute_f32_fast_xf32)
++    // Bug: Inverted fallback condition - falls back when solutions exist
++    if(solutions.size() != 0 && prob.compute_type == rocblaslt_compute_f32_fast_xf32)
+     {
+         log_api(__func__, "no solutions found, try to fallback");
+         data->problem.setF32XdlMathOp(rocisa::DataType::Float);
+

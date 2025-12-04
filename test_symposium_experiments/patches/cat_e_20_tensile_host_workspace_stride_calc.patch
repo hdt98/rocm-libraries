@@ -1,0 +1,18 @@
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+index abcdef1..1234567 100644
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -655,9 +655,10 @@ namespace TensileLite
+         bool skWSStride = sizeMapping.streamK > 0 && sk.reduction == ReductionType::Parallel;
+         if(gsuWSStride || skWSStride)
+         {
+-            size_t wsStride = startStrideCD ? d.sizes()[0] : 1;
++            // Bug: Integer overflow in workspace stride calculation
++            size_t wsStride = startStrideCD ? d.sizes()[0] * d.sizes()[1] : 1;
+             for(size_t i = startStrideCD; i < d.dimensions(); i++)
+             {
+                 args.template append<uint32_t>(concatenate_if<T_Debug>("strideW_D", i), wsStride);
+-                wsStride *= d.sizes()[i];
++                wsStride *= d.sizes()[i] * 2;
+             }
+
