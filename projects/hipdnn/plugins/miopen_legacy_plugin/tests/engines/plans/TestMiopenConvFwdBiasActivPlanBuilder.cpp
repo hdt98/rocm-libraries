@@ -89,7 +89,8 @@ struct ConvolutionBiasActivationTestParam
     friend std::ostream& operator<<(std::ostream& os, const ConvolutionBiasActivationTestParam& tc)
     {
         using namespace hipdnn_sdk::utilities;
-        os << "Conv: " << tc.convTestCase;
+        os << tc.label;
+        os << "\nConv: " << tc.convTestCase;
         os << "\nlayout: "
            << (tc.layout.name.empty() ? vecToString(tc.layout.strideOrder) : tc.layout.name);
         os << "\nactiv: " << tc.activTestCase;
@@ -257,13 +258,6 @@ protected:
 
     hipdnn_frontend::graph::Graph _graphObj;
     bool _isApplicable;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> xTensorAttr;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> wTensorAttr;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> convTensorAttr;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> yConvTensorAttr;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> biasTensorAttr;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> yBiasTensorAttr;
-    // std::shared_ptr<hipdnn_frontend::graph::TensorAttributes> yTensorAttr;
 };
 
 TEST_P(TestGpuMiopenConvFwdBiasActivPlanBuilder, IsApplicable)
@@ -304,21 +298,10 @@ test_activation_common::ActivTestCase validActivTestCase()
             std::nullopt};
 };
 
-// struct ConvolutionBiasActivationTestParam
-// {
-//     test_conv_common::ConvTestCase convTestCase;
-//     hipdnn_sdk::utilities::TensorLayout layout;
-//     test_activation_common::ActivTestCase activTestCase;
-//     hipdnn_frontend::DataType defaultDataType;
-//     std::unordered_map<TypeKey, hipdnn_frontend::DataType> dataTypes;
-//     bool isApplicable;
-
-//     std::string label;
-// };
-
 std::vector<ConvolutionBiasActivationTestParam> testParams()
 {
     using Param = ConvolutionBiasActivationTestParam;
+    using DataType = hipdnn_frontend::DataType;
 
     std::vector<Param> params = {
         Param{validConvTestCase4d(),
@@ -328,7 +311,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               true,
-              ""},
+              "Valid NCHW"},
         Param{validConvTestCase5d(),
               TensorLayout::NCDHW,
               validActivTestCase(),
@@ -336,7 +319,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               true,
-              ""},
+              "Valid NCDHW"},
         Param{validConvTestCase4d(),
               TensorLayout::NHWC,
               validActivTestCase(),
@@ -344,7 +327,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               true,
-              ""},
+              "Valid NHWC"},
         Param{validConvTestCase5d(),
               TensorLayout::NDHWC,
               validActivTestCase(),
@@ -352,7 +335,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               true,
-              ""},
+              "Valid NDHWC"},
         Param{validConvTestCase4d(),
               TensorLayout{"", {0, 1, 2, 3}},
               validActivTestCase(),
@@ -360,7 +343,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Unsupported layout WHCN"},
         Param{validConvTestCase5d(),
               TensorLayout{"", {0, 1, 2, 3, 4}},
               validActivTestCase(),
@@ -368,75 +351,76 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Unsupported layout WHDCN"},
         // Virtual checks
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::FLOAT,
               {},
               {TypeKey::Y_CONV},
               false,
-              ""},
+              "Invalid, y_bias is non-virtual"},
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::FLOAT,
               {},
               {TypeKey::Y_BIAS},
               false,
-              ""},
+              "Invalid, y_conv is non-virtual"},
         // Intermediate datatypes and compute type
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::BFLOAT16,
               {{TypeKey::BIAS_COMPUTE, DataType::BFLOAT16}},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               true,
-              ""},
+              "Valid Bfloat16"},
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::BFLOAT16,
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Invalid Bfloat16, bias compute_data_type should be Bfloat16"},
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::FLOAT,
               {{TypeKey::CONV_COMPUTE, DataType::BFLOAT16},
                {TypeKey::BIAS_COMPUTE, DataType::BFLOAT16}},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Invalid Bfloat16, conv compute_data_type should be Float"},
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
-              hipdnn_frontend::DataType::FLOAT,
-              {{TypeKey::CONV_COMPUTE, DataType::BFLOAT16},
-               {TypeKey::BIAS_COMPUTE, DataType::BFLOAT16}},
-              {TypeKey::Y_CONV, TypeKey::Y_BIAS},
-              false,
-              ""},
-        Param{validConvTestCase4d(),
-              TensorLayout::NCHW,
+              validActivTestCase(),
+
               hipdnn_frontend::DataType::FLOAT,
               {{TypeKey::ACTIV_COMPUTE, DataType::BFLOAT16},
                {TypeKey::BIAS_COMPUTE, DataType::BFLOAT16}},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Invalid Bfloat16, activation compute_data_type should be float"},
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::FLOAT,
               {{TypeKey::BIAS_COMPUTE, DataType::BFLOAT16}, {TypeKey::Y_CONV, DataType::HALF}},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Invalid Bfloat16, y_conv intermediate tensor must be Bfloat16 or Float"},
         Param{validConvTestCase4d(),
               TensorLayout::NCHW,
+              validActivTestCase(),
               hipdnn_frontend::DataType::FLOAT,
               {{TypeKey::BIAS_COMPUTE, DataType::BFLOAT16}, {TypeKey::Y_BIAS, DataType::HALF}},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
               false,
-              ""},
+              "Invalid Bfloat16, y_bias intermediate tensor must be Bfloat16 or Float"},
     };
 
     return params;
