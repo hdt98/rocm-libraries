@@ -35,7 +35,7 @@ find_package(ROCmCMakeBuildTools 0.11.0 CONFIG QUIET) # First version with Sphin
 if(NOT ROCmCMakeBuildTools_FOUND)
   set(PROJECT_EXTERN_DIR ${CMAKE_CURRENT_BINARY_DIR}/extern)
   set(rocm_cmake_tag "rocm-6.4.1" CACHE STRING "rocm-cmake tag to download")
-  file(DOWNLOAD https://github.com/RadeonOpenCompute/rocm-cmake/archive/${rocm_cmake_tag}.zip
+  file(DOWNLOAD https://github.com/ROCm/rocm-cmake/archive/${rocm_cmake_tag}.zip
        ${PROJECT_EXTERN_DIR}/rocm-cmake-${rocm_cmake_tag}.zip STATUS status LOG log)
 
   list(GET status 0 status_code)
@@ -43,7 +43,7 @@ if(NOT ROCmCMakeBuildTools_FOUND)
 
   if(NOT status_code EQUAL 0)
     message(FATAL_ERROR "error: downloading
-    'https://github.com/RadeonOpenCompute/rocm-cmake/archive/${rocm_cmake_tag}.zip' failed
+    'https://github.com/ROCm/rocm-cmake/archive/${rocm_cmake_tag}.zip' failed
     status_code: ${status_code}
     status_string: ${status_string}
     log: ${log}
