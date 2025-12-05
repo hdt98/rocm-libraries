@@ -110,8 +110,8 @@ enum struct MfmaInstr
     wmma_f32_16x16x64_bf8bf8_gfx125,
     wmma_i32_16x16x64_iu8_gfx125,
 
-    wmma_f32_16x16x128_f8f6f4_gfx125,         // not implemented
-    wmma_scale16_f32_16x16x128_f8f6f4_gfx125, // not implemented
+    wmma_f32_16x16x128_f8f6f4_gfx125, // not implemented
+    wmma_scale16_f32_16x16x128_f8f6f4_gfx125,
     wmma_scale_f32_16x16x128_f8f6f4_gfx125,
     wmma_scale16_f32_32x16x128_f4_gfx125, // not implemented
     wmma_scale_f32_32x16x128_f4_gfx125,
@@ -932,7 +932,7 @@ struct mfma_type<MfmaInstr::mfma_scale_f32_32x32x64f8f6f4>
                         FloatC& reg_c) const
     {
         intrin_mfma_scale_f32_32x32x64f8f6f4<MPerXdlops, NPerXdlops, OpselA, OpselB>::Run(
-            a, bit_cast<uint32_t>(scale_a), b, bit_cast<uint32_t>(scale_b), reg_c);
+            a, bit_cast<int32_t>(scale_a), b, bit_cast<int32_t>(scale_b), reg_c);
     }
 };
 
@@ -970,7 +970,7 @@ struct mfma_type<MfmaInstr::mfma_scale_f32_16x16x128f8f6f4>
     {
 
         intrin_mfma_scale_f32_16x16x128f8f6f4<MPerXdlops, NPerXdlops, OpselA, OpselB>::Run(
-            a, bit_cast<uint32_t>(scale_a), b, bit_cast<uint32_t>(scale_b), reg_c);
+            a, bit_cast<int32_t>(scale_a), b, bit_cast<int32_t>(scale_b), reg_c);
     }
 };
 
@@ -1415,6 +1415,8 @@ template <>
 struct mfma_type<MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125>
     : public mfma_type_gfx125_base_128
 {
+    static constexpr index_t scale_blk_size = 32;
+
     template <index_t MPerWmma,
               index_t NPerWmma,
               index_t ScaleOpselA,
@@ -1432,7 +1434,33 @@ struct mfma_type<MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125>
     {
 
         intrin_wmma_scale_f32_16x16x128_f8f6f4<MPerWmma, NPerWmma, ScaleOpselA, ScaleOpselB>::Run(
-            a, bit_cast<uint32_t>(scale_a), b, bit_cast<uint32_t>(scale_b), reg_c);
+            a, bit_cast<int32_t>(scale_a), b, bit_cast<int32_t>(scale_b), reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125>
+    : public mfma_type_gfx125_base_128
+{
+    static constexpr index_t scale_blk_size = 16;
+
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              index_t ScaleOpselA,
+              index_t ScaleOpselB,
+              class FloatA,
+              class ScaleA,
+              class FloatB,
+              class ScaleB,
+              class FloatC>
+    __device__ void run(const FloatA& a,
+                        const ScaleA& scale_a,
+                        const FloatB& b,
+                        const ScaleB& scale_b,
+                        FloatC& reg_c) const
+    {
+        intrin_wmma_scale16_f32_16x16x128_f8f6f4<MPerWmma, NPerWmma, ScaleOpselA, ScaleOpselB>::Run(
+            a, bit_cast<int64_t>(scale_a), b, bit_cast<int64_t>(scale_b), reg_c);
     }
 };
 
@@ -1450,6 +1478,7 @@ struct mfma_type<MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125> : public mfma_ty
     static constexpr index_t m_per_blk           = 32;
     static constexpr index_t n_per_blk           = 16;
     static constexpr index_t k_per_blk           = 64;
+    static constexpr index_t scale_blk_size      = 32;
     static constexpr bool is_k_reduction         = true;
     // clang-format on
 
@@ -1469,7 +1498,7 @@ struct mfma_type<MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125> : public mfma_ty
     {
 
         intrin_wmma_scale_f32_32x16x128_f4<MPerWmma, NPerWmma, ScaleOpselB>::Run(
-            a, bit_cast<uint32_t>(scale_a), b, bit_cast<uint32_t>(scale_b), reg_c);
+            a, bit_cast<int32_t>(scale_a), b, bit_cast<int32_t>(scale_b), reg_c);
     }
 };
 
