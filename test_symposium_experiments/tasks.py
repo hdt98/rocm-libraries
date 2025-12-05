@@ -185,12 +185,15 @@ def build(c):
 
 
 @task
-def apply_patch(c, patch_name):
+def apply_patch(c, patch_name, check=False):
     """Apply a specific patch file."""
     patch_path = os.path.join(PATCH_DIR, patch_name)
     print(f"> Applying patch: {patch_name}")
     with c.cd(REPO_ROOT):
-        c.run(f"git apply {patch_path}")
+        if check:
+            c.run(f"git apply --check --ignore-space-change {patch_path}")
+        else:
+            c.run(f"git apply --ignore-space-change {patch_path}")
 
 
 @task
@@ -205,22 +208,22 @@ def revert_all(c):
 def test_patches(c):
     """Test all patches."""
     patches = sorted([f for f in os.listdir(PATCH_DIR) if f.endswith(".patch")])
-    found_exception = False
+    found_exception = 0
 
-    revert_all(c)
+    # revert_all(c)
     for patch in patches:
         print(f"Testing patch: {patch}")
         try:
-            apply_patch(c, patch)
-            revert_all(c)
+            apply_patch(c, patch, check=True)
+            # revert_all(c)
         except Exception as e:
             print(f"Error applying {patch}: {e}")
-            found_exception = True
+            found_exception += 1
 
     print(
         "All patches applied successfully."
-        if not found_exception
-        else "Some patches failed to apply."
+        if found_exception == 0
+        else f"Some patches failed to apply. {found_exception} exceptions found."
     )
 
 
