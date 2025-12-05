@@ -66,6 +66,10 @@ struct ford_wrapper
 {
     template <class... Ts>
     auto operator()(Ts... xs) const MIOPEN_RETURNS(std::bind(T{}, std::placeholders::_1, xs...));
+
+    template <class... Ts>
+    auto operator()(max_threads mt, Ts... xs) const
+        MIOPEN_RETURNS(std::bind(T{}, std::placeholders::_1, mt, xs...));
 };
 
 // Multidimensional for loop
@@ -95,6 +99,12 @@ struct par_ford_impl
     template <class F, class... Ts>
     void operator()(F f, Ts... xs) const
     {
+        (*this)(f, max_threads{0}, xs...);
+    }
+
+    template <class F, class... Ts>
+    void operator()(F f, max_threads mt, Ts... xs) const
+    {
         using array_type = std::array<std::size_t, sizeof...(Ts)>;
         array_type lens  = {{static_cast<std::size_t>(xs)...}};
         array_type strides;
@@ -103,15 +113,31 @@ struct par_ford_impl
             lens.rbegin(), lens.rend() - 1, strides.rbegin() + 1, std::multiplies<std::size_t>());
         auto size = std::accumulate(
             lens.begin(), lens.end(), static_cast<std::size_t>(1), std::multiplies<std::size_t>());
-        par_for(size, [&](std::size_t i) {
-            array_type indices;
-            std::transform(strides.begin(),
-                           strides.end(),
-                           lens.begin(),
-                           indices.begin(),
-                           [&](size_t stride, size_t len) { return (i / stride) % len; });
-            unpack(f, indices);
-        });
+
+        if(mt.n == 0)
+        {
+            par_for(size, [&](std::size_t i) {
+                array_type indices;
+                std::transform(strides.begin(),
+                               strides.end(),
+                               lens.begin(),
+                               indices.begin(),
+                               [&](size_t stride, size_t len) { return (i / stride) % len; });
+                unpack(f, indices);
+            });
+        }
+        else
+        {
+            par_for(size, mt, [&](std::size_t i) {
+                array_type indices;
+                std::transform(strides.begin(),
+                               strides.end(),
+                               lens.begin(),
+                               indices.begin(),
+                               [&](size_t stride, size_t len) { return (i / stride) % len; });
+                unpack(f, indices);
+            });
+        }
     }
 };
 

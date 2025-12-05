@@ -97,7 +97,7 @@ private:
     bool isForward = false;
 
     bool isTime = false;
-    bool isMT   = false;
+    int jobs    = 0;
 };
 
 template <typename Tgpu, typename Tref>
@@ -146,7 +146,8 @@ int SoftmaxDriver<Tgpu, Tref>::GetandSetData()
     mode  = miopenSoftmaxMode_t(inflags.GetValueInt("mode"));
 
     isTime = (inflags.GetValueInt("time") == 1);
-    isMT   = (inflags.GetValueInt("mt") == 1);
+    jobs   = inflags.GetValueInt("jobs");
+
     return (0);
 }
 
@@ -174,7 +175,8 @@ int SoftmaxDriver<Tgpu, Tref>::AddCmdLineArgs()
     inflags.AddInputFlag("time", 't', "0", "Time Each Layer (Default=0)", "int");
     inflags.AddInputFlag(
         "wall", 'w', "0", "Wall-clock Time Each Layer, Requires time == 1 (Default=0)", "int");
-    inflags.AddInputFlag("mt", 'u', "0", "Run Multithreaded version (Desfault=0)", "int");
+    inflags.AddInputFlag(
+        "jobs", 'j', "0", "Run cpu solver in N threads (Default=0 => on all cores)", "int");
 
     return miopenStatusSuccess;
 }
@@ -414,16 +416,8 @@ int SoftmaxDriver<Tgpu, Tref>::VerifyForward()
 {
     const auto t1 = std::chrono::high_resolution_clock::now();
 
-    if(isMT)
-    {
-        mloSoftmaxForwardRunHostMT<Tgpu, Tref>(
-            inputTensor, outputTensor, in.data(), outhost.data(), alpha, beta, algo, mode);
-    }
-    else
-    {
-        mloSoftmaxForwardRunHost<Tgpu, Tref>(
-            inputTensor, outputTensor, in.data(), outhost.data(), alpha, beta, algo, mode);
-    }
+    mloSoftmaxForwardRunHost<Tgpu, Tref>(
+        inputTensor, outputTensor, in.data(), outhost.data(), alpha, beta, algo, mode, jobs);
 
     const auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -459,30 +453,16 @@ int SoftmaxDriver<Tgpu, Tref>::VerifyBackward()
 {
     const auto t1 = std::chrono::high_resolution_clock::now();
 
-    if(isMT)
-    {
-        mloSoftmaxBackwardRunHostMT<Tgpu, Tref>(inputTensor,
-                                                outputTensor,
-                                                out.data(),
-                                                dout.data(),
-                                                dinhost.data(),
-                                                alpha,
-                                                beta,
-                                                algo,
-                                                mode);
-    }
-    else
-    {
-        mloSoftmaxBackwardRunHost<Tgpu, Tref>(inputTensor,
-                                              outputTensor,
-                                              out.data(),
-                                              dout.data(),
-                                              dinhost.data(),
-                                              alpha,
-                                              beta,
-                                              algo,
-                                              mode);
-    }
+    mloSoftmaxBackwardRunHost<Tgpu, Tref>(inputTensor,
+                                          outputTensor,
+                                          out.data(),
+                                          dout.data(),
+                                          dinhost.data(),
+                                          alpha,
+                                          beta,
+                                          algo,
+                                          mode,
+                                          jobs);
 
     const auto t2 = std::chrono::high_resolution_clock::now();
 
