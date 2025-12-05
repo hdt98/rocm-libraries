@@ -70,15 +70,9 @@ struct GroupedGemmKernelArgument
         for(auto sd : StrideDs)
             str << sd << ",";
 
-        std::cout << "arg {"
-                  << "M:" << M << ", "
-                  << "N:" << N << ", "
-                  << "K:" << K << ", "
-                  << "SA:" << StrideA << ", "
-                  << "SB:" << StrideB << ", "
-                  << "SE:" << StrideE << ", "
-                  << "SDs: {" << str.str() << "}"
-                  << "}" << std::endl;
+        std::cout << "arg {" << "M:" << M << ", " << "N:" << N << ", " << "K:" << K << ", "
+                  << "SA:" << StrideA << ", " << "SB:" << StrideB << ", " << "SE:" << StrideE
+                  << ", " << "SDs: {" << str.str() << "}" << "}" << std::endl;
     }
 };
 
@@ -100,7 +94,8 @@ template <typename ALayout,
           typename EDataType,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
-          typename CElementwiseOperation>
+          typename CElementwiseOperation,
+          typename ComputeDataType = ADataType>
 struct DeviceGroupedGemm : public BaseOperator
 {
     static constexpr index_t NumDTensor = DsDataType::Size();

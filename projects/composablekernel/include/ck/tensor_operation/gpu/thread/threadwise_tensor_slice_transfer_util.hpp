@@ -75,5 +75,4 @@ struct lambda_wave_cluster_dimension
 };
 
 } // namespace detail
-
 } // namespace ck

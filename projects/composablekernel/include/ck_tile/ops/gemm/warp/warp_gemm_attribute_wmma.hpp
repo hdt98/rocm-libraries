@@ -1,26 +1,21 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/host/device_prop.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_attribute_wmma_impl.hpp"
 
 namespace ck_tile {
 
 // TODO: currently only support 16 bit input, which means only support tr16_b128; will use ADataType
 // to determine the layout in the future
-template <typename ADataType, typename Impl, bool TransLdA>
-struct AWarpDstrEncodingTrait;
-
-template <typename BDataType, typename Impl, bool TransLdB>
-struct BWarpDstrEncodingTrait;
-
-template <typename ADataType, typename Impl>
-struct AWarpDstrEncodingTrait<ADataType, Impl, false>
+template <typename Impl>
+struct AWarpDstrEncodingTrait
 {
     using type = tile_distribution_encoding<
-        sequence<>,
+        sequence<Impl::kRepeat>,
         tuple<sequence<Impl::kAMLane>,
               sequence<Impl::kABK0PerLane, Impl::kABKLane, Impl::kABK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
@@ -29,22 +24,11 @@ struct AWarpDstrEncodingTrait<ADataType, Impl, false>
         typename Impl::kABYs2RHsMinor>;
 };
 
-template <typename ADataType, typename Impl>
-struct AWarpDstrEncodingTrait<ADataType, Impl, true>
-{
-    using type = tile_distribution_encoding<sequence<>,
-                                            tuple<sequence<4, 4>, sequence<2, 8>>,
-                                            tuple<sequence<1, 2, 1>>,
-                                            tuple<sequence<0, 0, 1>>,
-                                            sequence<2>,
-                                            sequence<1>>;
-};
-
-template <typename BDataType, typename Impl>
-struct BWarpDstrEncodingTrait<BDataType, Impl, false>
+template <typename Impl>
+struct BWarpDstrEncodingTrait
 {
     using type = tile_distribution_encoding<
-        sequence<>,
+        sequence<Impl::kRepeat>,
         tuple<sequence<Impl::kBNLane>,
               sequence<Impl::kABK0PerLane, Impl::kABKLane, Impl::kABK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
@@ -53,22 +37,34 @@ struct BWarpDstrEncodingTrait<BDataType, Impl, false>
         typename Impl::kABYs2RHsMinor>;
 };
 
-template <typename BDataType, typename Impl>
-struct BWarpDstrEncodingTrait<BDataType, Impl, true>
+template <typename Impl>
+struct CWarpDstrEncodingTrait
 {
-    using type = tile_distribution_encoding<sequence<>,
-                                            tuple<sequence<4, 4>, sequence<2, 8>>,
-                                            tuple<sequence<1, 2, 1>>,
-                                            tuple<sequence<0, 0, 1>>,
-                                            sequence<2>,
-                                            sequence<1>>;
+    using type = tile_distribution_encoding<
+        sequence<>,
+        tuple<sequence<Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>,
+              sequence<Impl::kCNLane>>,
+        tuple<typename Impl::kCPs2RHssMajor>,
+        tuple<typename Impl::kCPs2RHssMinor>,
+        typename Impl::kCYs2RHsMajor,
+        typename Impl::kCYs2RHsMinor>;
 };
 
-template <typename WarpGemmAttributeWmmaImpl_,
-          bool kTransLdA = false,
-          bool kTransLdB = false,
-          bool kTransC   = false>
-struct WarpGemmAtrributeWmma
+template <typename Impl>
+struct CTransposedWarpDstrEncodingTrait
+{
+    using type = tile_distribution_encoding<
+        sequence<>,
+        tuple<sequence<Impl::kCNLane>,
+              sequence<Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>>,
+        tuple<typename Impl::kCTPs2RHssMajor>,
+        tuple<typename Impl::kCTPs2RHssMinor>,
+        typename Impl::kCTYs2RHsMajor,
+        typename Impl::kCTYs2RHsMinor>;
+};
+
+template <typename WarpGemmAttributeWmmaImpl_, bool kTransC = false>
+struct WarpGemmAttributeWmma
 {
     using Impl = remove_cvref_t<WarpGemmAttributeWmmaImpl_>;
 
@@ -83,27 +79,21 @@ struct WarpGemmAtrributeWmma
     static constexpr index_t kM          = Impl::kM;
     static constexpr index_t kN          = Impl::kN;
     static constexpr index_t kK          = Impl::kK;
+    static constexpr index_t kCMLane     = Impl::kCMLane;
     static constexpr index_t kKPerThread = Impl::kABK0PerLane * Impl::kABK1PerLane;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return 1; }
 
-    // for gfx13 wmma,
     // 16 bit input, kAMLane = 16, kABK0PerLane = 4, kABKLane = 2, kABK1PerLane = 2
     // 8  bit input, kAMLane = 16, kABK0PerLane = 2, kABKLane = 2, kABK1PerLane = 4
-    using AWarpDstrEncoding = typename AWarpDstrEncodingTrait<ADataType, Impl, kTransLdA>::type;
-    using BWarpDstrEncoding = typename BWarpDstrEncodingTrait<BDataType, Impl, kTransLdB>::type;
+    using AWarpDstrEncoding = typename AWarpDstrEncodingTrait<Impl>::type;
+    using BWarpDstrEncoding = typename BWarpDstrEncodingTrait<Impl>::type;
 
-    // for gfx13 wmma
-    // kCM0PerLane = 4, kCMLane = 2, kCM1PerLane = 2, kCNLane = 16 for 16 bit input
-    // kCM0PerLane = 2, kCMLane = 2, kCM1PerLane = 4, kCNLane = 16 for 8 bit input
-    using CWarpDstrEncoding = tile_distribution_encoding<
-        sequence<>,
-        tuple<sequence<Impl::kCNLane>,
-              sequence<Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>>,
-        tuple<typename Impl::kCPs2RHssMajor>,
-        tuple<typename Impl::kCPs2RHssMinor>,
-        typename Impl::kCYs2RHsMajor,
-        typename Impl::kCYs2RHsMinor>;
+    // kCM0PerLane = 1, kCMLane = 2, kCM1PerLane = 2, kCNLane = 16
+    using CWarpDstrEncoding =
+        std::conditional_t<kTransC,
+                           typename CTransposedWarpDstrEncodingTrait<Impl>::type,
+                           typename CWarpDstrEncodingTrait<Impl>::type>;
 
     // c_vec += a_vec * b_vec
     template <bool post_nop_ = false>
@@ -135,5 +125,49 @@ struct WarpGemmAtrributeWmma
         }
     }
 };
+
+template <typename ADataType,
+          typename BDataType,
+          typename AccDataType,
+          index_t M_Warp_Tile,
+          index_t N_Warp_Tile,
+          index_t K_Warp_Tile>
+CK_TILE_HOST bool check_wmma_supported()
+{
+    if(is_gfx12_supported())
+    {
+        return has_wmma_traits_v<gfx12_t,
+                                 ADataType,
+                                 BDataType,
+                                 AccDataType,
+                                 M_Warp_Tile,
+                                 N_Warp_Tile,
+                                 K_Warp_Tile>;
+    }
+    else if(is_gfx11_supported())
+    {
+        return has_wmma_traits_v<gfx11_t,
+                                 ADataType,
+                                 BDataType,
+                                 AccDataType,
+                                 M_Warp_Tile,
+                                 N_Warp_Tile,
+                                 K_Warp_Tile>;
+    }
+    else if(is_gfx13_supported())
+    {
+        return has_wmma_traits_v<gfx13_t,
+                                 ADataType,
+                                 BDataType,
+                                 AccDataType,
+                                 M_Warp_Tile,
+                                 N_Warp_Tile,
+                                 K_Warp_Tile>;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 } // namespace ck_tile

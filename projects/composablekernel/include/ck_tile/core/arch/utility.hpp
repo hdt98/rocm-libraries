@@ -37,7 +37,7 @@ CK_TILE_DEVICE T warp_shuffle_up(const T& v_local, uint32_t lane_delta)
 
     const uint32_t wrap_around_lane_delta = get_warp_size() - lane_delta;
 #if(defined(__gfx13__))
-    const int32_t v_remote_tmp            = __builtin_amdgcn_bpermute_b32(
+    const int32_t v_remote_tmp = __builtin_amdgcn_bpermute_b32(
         bit_cast<int32_t>(v_local), __lane_id() + wrap_around_lane_delta);
 #else
     const int32_t v_remote_tmp = __builtin_amdgcn_ds_bpermute(
@@ -63,6 +63,21 @@ CK_TILE_DEVICE T warp_shuffle_down(const T& v_local, uint32_t lane_delta)
 #endif
     return bit_cast<T>(v_remote_tmp);
 #endif
+}
+
+template <typename T>
+CK_TILE_DEVICE auto warp_shuffle_down_pair(const T& v_local)
+{
+    static_assert(sizeof(T) == sizeof(int32_t), "wrong!");
+
+    const int32x2_t x = __builtin_amdgcn_permlane32_swap(
+        bit_cast<int32_t>(v_local), bit_cast<int32_t>(v_local), false, false);
+
+    thread_buffer<T, 2> v;
+    v(0) = bit_cast<T>(x[0]);
+    v(1) = bit_cast<T>(x[1]);
+
+    return v;
 }
 
 template <typename T>
@@ -108,7 +123,7 @@ CK_TILE_DEVICE T warp_shuffle(const T& v_local, uint32_t src_lane)
         auto vs_remote        = vector_type{};
         static_for<0, elm, 1>{}([&](auto i_e) {
 #if(defined(__gfx13__))
-            int32_t tmp    = __builtin_amdgcn_bpermute_b32(bit_cast<int32_t>(vs[i_e]), src_lane);
+            int32_t tmp = __builtin_amdgcn_bpermute_b32(bit_cast<int32_t>(vs[i_e]), src_lane);
 #else
             int32_t tmp = __builtin_amdgcn_ds_bpermute(src_lane << 2, bit_cast<int32_t>(vs[i_e]));
 #endif

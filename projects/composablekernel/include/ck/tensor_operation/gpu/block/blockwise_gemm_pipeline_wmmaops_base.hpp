@@ -30,6 +30,7 @@ template <index_t BlockSize,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
+          index_t KInner,
           bool TransposeC = false>
 struct BlockwiseGemmWmmaops_pipeline_base
 {
@@ -38,6 +39,7 @@ struct BlockwiseGemmWmmaops_pipeline_base
     static constexpr auto I2 = Number<2>{};
     static constexpr auto I3 = Number<3>{};
     static constexpr auto I5 = Number<5>{};
+    static constexpr auto I6 = Number<6>{};
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
@@ -55,21 +57,31 @@ struct BlockwiseGemmWmmaops_pipeline_base
     static constexpr index_t B_KRow = 1;
 #endif
 
-    static constexpr index_t A_K1 = AWmmaTileDesc{}.GetLength(I5);
-    static constexpr index_t B_K1 = BWmmaTileDesc{}.GetLength(I5);
-
-    static_assert(KPack % (A_K1 * A_KRow) == 0, "wrong!");
-    static_assert(KPack % (B_K1 * B_KRow) == 0, "wrong!");
-
+#if defined(__gfx13__)
     static constexpr auto wmma_gemm = WmmaGemm<ComputeTypeA,
                                                ComputeTypeB,
                                                AccDataType,
                                                MPerWmma,
                                                NPerWmma,
                                                KPerWmma,
-                                               KPack,
+                                               KPack / KInner,
                                                TransposeC>{};
+#else
+    static constexpr auto wmma_gemm = WmmaGemm<ComputeTypeA,
+                                               ComputeTypeB,
+                                               AccDataType,
+                                               MPerWmma,
+                                               NPerWmma,
+                                               KPack / KInner,
+                                               TransposeC>{};
+#endif
 
+    static constexpr index_t KPerThread = wmma_gemm.wmma_instr.k_per_blk * KInner;
+    static constexpr index_t A_K1       = ck::math::min(AWmmaTileDesc{}.GetLength(I6), KPerThread);
+    static constexpr index_t B_K1       = ck::math::min(BWmmaTileDesc{}.GetLength(I6), KPerThread);
+
+    static_assert(KPack % (A_K1 * A_KRow) == 0, "wrong!");
+    static_assert(KPack % (B_K1 * B_KRow) == 0, "wrong!");
     static constexpr index_t KRepeat = KPerBlock / KPack;
 
     static constexpr auto WmmaK = Number<wmma_gemm.wmma_instr.k_per_wmma>{};
@@ -97,6 +109,78 @@ struct BlockwiseGemmWmmaops_pipeline_base
                               wmma_gemm.GetRegSizePerWmma(),
                               true>
         c_thread_buf_;
+
+    struct Empty
+    {
+        __device__ Empty() {};
+        template <index_t NBuffer>
+        __device__ void GlobalLoad(bool cond)
+        {
+            ignore = NBuffer;
+            ignore = cond;
+        }
+    };
+
+    template <index_t ScaleSliceSizeN,
+              index_t ScaleSliceSizeK,
+              index_t NWaves,
+              index_t ScaleBlockK,
+              index_t NumberOfBuffers,
+              typename GridDesc,
+              typename ThreadCopy,
+              typename GridBuffer,
+              typename ThreadStaticBuffer,
+              typename BScaleThreadDesc>
+    struct BScale
+    {
+        __device__ BScale(GridDesc b_scale_grid_desc_,
+                          ThreadCopy b_scale_thread_copy_,
+                          GridBuffer b_scale_grid_buf_)
+            : b_scale_thread_copy(b_scale_thread_copy_),
+              b_scale_grid_desc(b_scale_grid_desc_),
+              b_scale_grid_buf(b_scale_grid_buf_) {};
+
+        static constexpr index_t num_scale_k_block = BScaleThreadDesc{}.GetLength(Number<1>{});
+        static constexpr index_t num_scale_krepeat = KRepeat / num_scale_k_block;
+
+        static constexpr auto b_scale_thread_desc = BScaleThreadDesc{};
+
+        static constexpr auto b_scale_thread_copy_step =
+            make_tuple(make_multi_index(NWaves * NPerWmma, 0),
+                       make_multi_index(-NPerBlock, 0),
+                       make_multi_index(-NPerBlock, (KPerBlock + ScaleBlockK - 1) / ScaleBlockK));
+
+        template <index_t NBuffer>
+        __device__ void GlobalLoad(bool cond)
+        {
+            static_for<0, NRepeat, 1>{}([&](auto n0) {
+                b_scale_thread_copy.Run(b_scale_grid_desc,
+                                        b_scale_grid_buf,
+                                        b_scale_thread_desc,
+                                        make_tuple(n0, Number<0>{}),
+                                        b_scale_thread_bufs(Number<NBuffer>{}));
+
+                b_scale_thread_copy.MoveSrcSliceWindow(b_scale_grid_desc,
+                                                       b_scale_thread_copy_step.At(Number<0>{}));
+            });
+
+            if(cond)
+            {
+                b_scale_thread_copy.MoveSrcSliceWindow(b_scale_grid_desc,
+                                                       b_scale_thread_copy_step.At(Number<2>{}));
+            }
+            else
+            {
+                b_scale_thread_copy.MoveSrcSliceWindow(b_scale_grid_desc,
+                                                       b_scale_thread_copy_step.At(Number<1>{}));
+            }
+        }
+
+        ThreadCopy b_scale_thread_copy;
+        GridDesc b_scale_grid_desc;
+        GridBuffer b_scale_grid_buf;
+        StaticallyIndexedArray<ThreadStaticBuffer, Number<NumberOfBuffers>{}> b_scale_thread_bufs;
+    };
 
     __host__ __device__ constexpr auto& GetCThreadBuffer() { return c_thread_buf_; }
 
@@ -126,8 +210,7 @@ struct BlockwiseGemmWmmaops_pipeline_base
         const auto wmma_krow = 0;
 #endif
 
-        //  |KRepeat   |MRepeat|MWave    |KRow  |MLane  |KPack
-        return make_tuple(0, 0, waveId_m, wmma_krow, wmma_a_idx, 0);
+        return make_tuple(0, 0, 0, waveId_m, wmma_krow, wmma_a_idx, 0);
     }
 
     __device__ static auto CalculateBThreadOriginDataIndex()
@@ -144,8 +227,7 @@ struct BlockwiseGemmWmmaops_pipeline_base
         const auto wmma_krow = 0;
 #endif
 
-        //  |KRepeat   |NRepeat|Nwave     |KRow  |NLane  |KPack
-        return make_tuple(0, 0, waveId_n, wmma_krow, wmma_b_idx, 0);
+        return make_tuple(0, 0, 0, waveId_n, wmma_krow, wmma_b_idx, 0);
     }
 
     template <index_t m0, index_t n0>
@@ -176,7 +258,7 @@ struct BlockwiseGemmWmmaops_pipeline_base
         return make_tuple(c_thread_m, c_thread_n);
     }
 
-    using Tuple6 = decltype(CalculateAThreadOriginDataIndex());
+    using Tuple7 = decltype(CalculateAThreadOriginDataIndex());
 
     /**
      * @brief Constructor for BlockwiseGemmWmmaops_pipeline_base.
@@ -196,8 +278,8 @@ struct BlockwiseGemmWmmaops_pipeline_base
      * repeat dimensions.
      */
     __host__ __device__
-    BlockwiseGemmWmmaops_pipeline_base(Tuple6 a_origin = CalculateAThreadOriginDataIndex(),
-                                       Tuple6 b_origin = CalculateBThreadOriginDataIndex())
+    BlockwiseGemmWmmaops_pipeline_base(Tuple7 a_origin = CalculateAThreadOriginDataIndex(),
+                                       Tuple7 b_origin = CalculateBThreadOriginDataIndex())
         : a_thread_copy_(a_origin), b_thread_copy_(b_origin)
     {
         static_assert(AWmmaTileDesc::IsKnownAtCompileTime() &&
@@ -212,13 +294,30 @@ struct BlockwiseGemmWmmaops_pipeline_base
                       "wrong!");
     }
 
+    // transposed WMMA output C' = B' * A'
+    __host__ __device__ static constexpr auto
+    GetCThreadDescriptor_MRepeat_MWave_MThreadPerSubGroup_NRepeat_NWave_NSubGroup_NAccVgprs()
+    {
+        constexpr auto c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens =
+            wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths();
+
+        constexpr auto NAccVgprs = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
+
+        return make_naive_tensor_descriptor_packed(
+            //        |MRepeat            |MWave |MSubGroup |NRepeat           |NWave
+            //        |NThreadPerSubGroup |MAccVgprs
+            make_tuple(Number<MRepeat>{}, I1, I1, Number<NRepeat>{}, I1, I1, NAccVgprs));
+    }
+
+    static constexpr auto MAccVgprs =
+        wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths()[I2];
+
     __host__ __device__ static constexpr auto
     GetCThreadDescriptor_MRepeat_MWave_MSubGroup_NRepeat_NWave_NThreadPerSubGroup_MAccVgprs()
     {
         constexpr auto c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens =
             wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths();
 
-        constexpr auto MAccVgprs = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
         constexpr auto AccStride = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I3];
         return make_naive_tensor_descriptor(
             //        |MRepeat           |MWave |MSubGroup |NRepeat           |NWave
@@ -261,10 +360,12 @@ struct BlockwiseGemmWmmaops_pipeline_base
                                                 Number<KRepeat>{},
                                                 I1,
                                                 I1,
+                                                I1,
                                                 Number<A_K1>{}),
                                      make_tuple(Number<A_K1>{},
                                                 Number<KPack / A_KRow>{},
                                                 Number<KPack / A_KRow * MRepeat>{},
+                                                I0,
                                                 I0,
                                                 I0,
                                                 I1));
@@ -275,10 +376,12 @@ struct BlockwiseGemmWmmaops_pipeline_base
                                                 Number<KRepeat>{},
                                                 I1,
                                                 I1,
+                                                I1,
                                                 Number<B_K1>{}),
                                      make_tuple(Number<B_K1>{},
                                                 Number<KPack / B_KRow>{},
                                                 Number<KPack / B_KRow * NRepeat>{},
+                                                I0,
                                                 I0,
                                                 I0,
                                                 I1));
@@ -292,9 +395,9 @@ struct BlockwiseGemmWmmaops_pipeline_base
                                          ComputeTypeA,
                                          decltype(a_block_desc_k0_m0_m1_m2_k1),
                                          decltype(a_thread_desc_),
-                                         Sequence<KPack / A_K1 / A_KRow, MRepeat, 1, 1, 1, A_K1>,
-                                         Sequence<0, 1, 2, 3, 4, 5>,
-                                         5,
+                                         Sequence<KPack / A_K1 / A_KRow, 1, 1, 1, 1, 1, A_K1>,
+                                         Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                         6,
                                          A_K1,
                                          A_K1>;
 
@@ -303,9 +406,9 @@ struct BlockwiseGemmWmmaops_pipeline_base
                                          ComputeTypeB,
                                          decltype(b_block_desc_k0_n0_n1_n2_k1),
                                          decltype(b_thread_desc_),
-                                         Sequence<KPack / B_K1 / B_KRow, NRepeat, 1, 1, 1, B_K1>,
-                                         Sequence<0, 1, 2, 3, 4, 5>,
-                                         5,
+                                         Sequence<KPack / B_K1 / B_KRow, 1, 1, 1, 1, 1, B_K1>,
+                                         Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                         6,
                                          B_K1,
                                          B_K1>;
 

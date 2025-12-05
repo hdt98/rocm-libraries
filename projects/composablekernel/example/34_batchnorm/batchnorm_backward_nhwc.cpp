@@ -406,7 +406,8 @@ bool bnorm_bwd_nhwc_test(bool do_verification,
 int main(int argc, char* argv[])
 {
     static const double epsilon = std::numeric_limits<float>::epsilon();
-    bool pass                   = true;
+
+    bool pass = true;
 
     if(argc > 1)
     {

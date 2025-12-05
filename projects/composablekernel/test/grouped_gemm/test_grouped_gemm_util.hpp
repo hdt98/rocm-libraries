@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -23,6 +23,9 @@
 #include "ck/utility/number.hpp"
 #include "profiler/profile_grouped_gemm_impl.hpp"
 
+extern ck::index_t param_mask;
+extern ck::index_t instance_index;
+
 namespace ck {
 namespace test {
 
@@ -38,7 +41,7 @@ std::string serialize_range(const Range& range)
     return std::string(str.begin(), str.end() - 2);
 }
 
-template <typename Tuple>
+template <typename Tuple, bool FailIfNoSupportedInstances = false>
 class TestGroupedGemm : public testing::Test
 {
     protected:
@@ -61,7 +64,24 @@ class TestGroupedGemm : public testing::Test
     static constexpr int n_iter_      = 1;
     std::vector<int> k_batches_;
 
-    void SetUp() override { k_batches_ = {1, 2, 3, 5, 8}; }
+    bool fail_if_no_supported_instances_ = FailIfNoSupportedInstances;
+
+    void SetUp() override
+    {
+        constexpr bool require_16bit_atomic_add =
+            std::is_same_v<EDataType, ck::half_t> || std::is_same_v<EDataType, ck::bhalf_t>;
+        if(require_16bit_atomic_add && ck::is_gfx11_supported())
+        {
+            // gfx11 does not support split-K due to missing atomic add for fp16/bf16
+            // Technically, we could still use split-K for fp32, but we currently don't have
+            // instances for it so we disable it entirely
+            k_batches_ = {1};
+        }
+        else
+        {
+            k_batches_ = {1, 2, 3, 5, 8};
+        }
+    }
 
     private:
     template <typename Layout>
@@ -109,8 +129,16 @@ class TestGroupedGemm : public testing::Test
         {
             SetStrides<ELayout>(stride_cs, Ms, Ns);
         }
+        std::vector<int> k_batches;
+        for(size_t i = 0; i < k_batches_.size(); i++)
+        {
+            if(param_mask & (1 << i))
+            {
+                k_batches.push_back(k_batches_[i]);
+            }
+        }
 
-        RunSingle(Ms, Ns, Ks, stride_as, stride_bs, stride_cs, k_batches_);
+        RunSingle(Ms, Ns, Ks, stride_as, stride_bs, stride_cs, k_batches);
     }
 
     void RunSingle(const std::vector<int>& Ms,
@@ -121,25 +149,28 @@ class TestGroupedGemm : public testing::Test
                    const std::vector<int>& StrideCs,
                    const std::vector<int>& kbatches)
     {
-        bool pass = ck::profiler::profile_grouped_gemm_impl<ADataType,
-                                                            BDataType,
-                                                            EDataType,
-                                                            float,
-                                                            ALayout,
-                                                            BLayout,
-                                                            ELayout>(verify_,
-                                                                     init_method_,
-                                                                     log_,
-                                                                     bench_,
-                                                                     Ms,
-                                                                     Ns,
-                                                                     Ks,
-                                                                     StrideAs,
-                                                                     StrideBs,
-                                                                     StrideCs,
-                                                                     kbatches,
-                                                                     n_warmup_,
-                                                                     n_iter_);
+        bool pass =
+            ck::profiler::profile_grouped_gemm_impl<ADataType,
+                                                    BDataType,
+                                                    EDataType,
+                                                    float,
+                                                    ALayout,
+                                                    BLayout,
+                                                    ELayout>(verify_,
+                                                             init_method_,
+                                                             log_,
+                                                             bench_,
+                                                             Ms,
+                                                             Ns,
+                                                             Ks,
+                                                             StrideAs,
+                                                             StrideBs,
+                                                             StrideCs,
+                                                             kbatches,
+                                                             n_warmup_,
+                                                             n_iter_,
+                                                             instance_index,
+                                                             fail_if_no_supported_instances_);
         EXPECT_TRUE(pass);
     }
 };
@@ -210,10 +241,10 @@ struct DeviceGroupedGemmSplitkInstanceWrapper
             KPerBlock,
             K1,
             K1,
-            32,
-            32,
+            16,
+            16,
+            8,
             4,
-            2,
             S<1, 4, 16, 1>,
             ABlockTransferThreadClusterArrageOrder,
             ABlockTransferSrcAccessOrder,
@@ -303,12 +334,19 @@ struct DeviceGroupedGemmSplitkInstanceWrapper
         {
             ggemm_instance.SetKBatchSize(&argument, kbatch);
         }
-
-        EXPECT_TRUE(ggemm_instance.IsSupportedArgument(argument));
-        auto invoker = ggemm_instance.MakeInvoker();
-        DeviceMem dev_gemm_kargs(ggemm_instance.GetDeviceKernelArgSize(&argument));
-        ggemm_instance.SetDeviceKernelArgs(&argument, dev_gemm_kargs.GetDeviceBuffer());
-        return invoker.Run(argument, StreamConfig{nullptr, false});
+        if(kbatch > 1 && ck::is_gfx11_supported())
+        {
+            EXPECT_FALSE(ggemm_instance.IsSupportedArgument(argument));
+            return 0;
+        }
+        else
+        {
+            EXPECT_TRUE(ggemm_instance.IsSupportedArgument(argument));
+            auto invoker = ggemm_instance.MakeInvoker();
+            DeviceMem dev_gemm_kargs(ggemm_instance.GetDeviceKernelArgSize(&argument));
+            ggemm_instance.SetDeviceKernelArgs(&argument, dev_gemm_kargs.GetDeviceBuffer());
+            return invoker.Run(argument, StreamConfig{nullptr, false});
+        }
     }
 };
 

@@ -14,6 +14,8 @@
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/device/device_base.hpp"
 
+#include "ck/host_utility/device_prop.hpp"
+
 #include "ck/library/utility/algorithm.hpp"
 #include "ck/library/utility/check_err.hpp"
 #include "ck/library/utility/fill.hpp"
@@ -59,6 +61,7 @@ template <ck::index_t NDimSpatial,
           ck::index_t NumAElementwiseTensor                                         = 0,
           ck::index_t NumBElementwiseTensor                                         = 0,
           ck::index_t NumDElementwiseTensor                                         = 0,
+          typename ComputeDataType                                                  = InDataType,
           typename std::enable_if<NDimSpatial >= 1 && NDimSpatial <= 3, bool>::type = false>
 struct ReferenceConvFwd : public device::BaseOperator
 {
@@ -94,6 +97,7 @@ struct ReferenceConvFwd : public device::BaseOperator
               in_element_op_{in_element_op},
               wei_element_op_{wei_element_op},
               out_element_op_{out_element_op},
+              device_name_{ck::get_device_name()},
               acc_convert_interval_(acc_convert_interval),
               disable_bhalf_rne_(disable_bhalf_rne)
         {
@@ -115,6 +119,7 @@ struct ReferenceConvFwd : public device::BaseOperator
         InElementwiseOperation in_element_op_;
         WeiElementwiseOperation wei_element_op_;
         OutElementwiseOperation out_element_op_;
+        ::std::string device_name_; // the device which this conv is compared with
         size_t acc_convert_interval_;
         bool disable_bhalf_rne_;
     };
@@ -169,8 +174,18 @@ struct ReferenceConvFwd : public device::BaseOperator
                                                      k,
                                                      c,
                                                      x);
-                                v_acc +=
-                                    ck::type_convert<float>(v_in) * ck::type_convert<float>(v_wei);
+                                if constexpr(is_same_v<ComputeDataType, ck::tf32_t>)
+                                {
+                                    v_acc += ck::type_convert<float>(
+                                                 ck::type_convert<ComputeDataType>(v_in)) *
+                                             ck::type_convert<float>(
+                                                 ck::type_convert<ComputeDataType>(v_wei));
+                                }
+                                else
+                                {
+                                    v_acc += ck::type_convert<float>(v_in) *
+                                             ck::type_convert<float>(v_wei);
+                                }
                             }
                         }
                         if(arg.acc_convert_interval_ > 0 &&
@@ -264,8 +279,47 @@ struct ReferenceConvFwd : public device::BaseOperator
                                                          c,
                                                          y,
                                                          x);
-                                    v_acc += ck::type_convert<float>(v_in) *
-                                             ck::type_convert<float>(v_wei);
+                                    if constexpr(is_same_v<ComputeDataType, ck::tf32_t>)
+                                    {
+                                        if(arg.device_name_ == "gfx942")
+                                        {
+                                            v_acc += ck::type_convert<float>(
+                                                         ck::type_convert<ck::tf32_t>(v_in)) *
+                                                     ck::type_convert<float>(
+                                                         ck::type_convert<ck::tf32_t>(v_wei));
+                                        }
+                                        else if(arg.device_name_ == "gfx950")
+                                        {
+                                            ck::bhalf_t v_in_bf16_big =
+                                                ck::type_convert<ck::bhalf_t>(v_in);
+                                            ck::bhalf_t v_in_bf16_small =
+                                                ck::type_convert<ck::bhalf_t>(
+                                                    v_in - type_convert<float>(v_in_bf16_big));
+                                            ck::bhalf_t v_wei_bf16_big =
+                                                ck::type_convert<ck::bhalf_t>(v_wei);
+                                            ck::bhalf_t v_wei_bf16_small =
+                                                ck::type_convert<ck::bhalf_t>(
+                                                    v_wei - type_convert<float>(v_wei_bf16_big));
+
+                                            v_acc += ck::type_convert<float>(v_in_bf16_big) *
+                                                         ck::type_convert<float>(v_wei_bf16_small) +
+                                                     ck::type_convert<float>(v_in_bf16_small) *
+                                                         ck::type_convert<float>(v_wei_bf16_big) +
+                                                     ck::type_convert<float>(v_in_bf16_big) *
+                                                         ck::type_convert<float>(v_wei_bf16_big);
+                                        }
+                                        else
+                                        {
+                                            throw std::runtime_error(
+                                                "Unsupported device: " + arg.device_name_ +
+                                                " for tf32 computation");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        v_acc += ck::type_convert<float>(v_in) *
+                                                 ck::type_convert<float>(v_wei);
+                                    }
                                 }
                             }
                         }
@@ -373,8 +427,49 @@ struct ReferenceConvFwd : public device::BaseOperator
                                                              z,
                                                              y,
                                                              x);
-                                        v_acc += ck::type_convert<float>(v_in) *
-                                                 ck::type_convert<float>(v_wei);
+                                        if constexpr(is_same_v<ComputeDataType, ck::tf32_t>)
+                                        {
+                                            if(arg.device_name_ == "gfx942")
+                                            {
+                                                v_acc += ck::type_convert<float>(
+                                                             ck::type_convert<ck::tf32_t>(v_in)) *
+                                                         ck::type_convert<float>(
+                                                             ck::type_convert<ck::tf32_t>(v_wei));
+                                            }
+                                            else if(arg.device_name_ == "gfx950")
+                                            {
+                                                ck::bhalf_t v_in_bf16_big =
+                                                    ck::type_convert<ck::bhalf_t>(v_in);
+                                                ck::bhalf_t v_in_bf16_small =
+                                                    ck::type_convert<ck::bhalf_t>(
+                                                        v_in - type_convert<float>(v_in_bf16_big));
+                                                ck::bhalf_t v_wei_bf16_big =
+                                                    ck::type_convert<ck::bhalf_t>(v_wei);
+                                                ck::bhalf_t v_wei_bf16_small =
+                                                    ck::type_convert<ck::bhalf_t>(
+                                                        v_wei -
+                                                        type_convert<float>(v_wei_bf16_big));
+
+                                                v_acc +=
+                                                    ck::type_convert<float>(v_in_bf16_big) *
+                                                        ck::type_convert<float>(v_wei_bf16_small) +
+                                                    ck::type_convert<float>(v_in_bf16_small) *
+                                                        ck::type_convert<float>(v_wei_bf16_big) +
+                                                    ck::type_convert<float>(v_in_bf16_big) *
+                                                        ck::type_convert<float>(v_wei_bf16_big);
+                                            }
+                                            else
+                                            {
+                                                throw std::runtime_error(
+                                                    "Unsupported device: " + arg.device_name_ +
+                                                    " for tf32 computation");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            v_acc += ck::type_convert<float>(v_in) *
+                                                     ck::type_convert<float>(v_wei);
+                                        }
                                     }
                                 }
                             }

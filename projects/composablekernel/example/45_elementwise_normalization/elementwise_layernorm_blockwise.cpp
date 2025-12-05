@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -79,28 +79,32 @@ void host_elementwise2D(HostTensorC& C,
 
 int main(int argc, char* argv[])
 {
-    bool time_kernel = true;
+    bool do_verification = true;
+    bool time_kernel     = true;
 
     ck::index_t M = 48 * 256;
     ck::index_t N = 1024;
+
     if(argc == 1)
     {
-        // use default case
+        // use default
     }
-    else if(argc == 2)
+    else if(argc == 3 || argc == 5)
     {
-        time_kernel = std::stoi(argv[1]);
-    }
-    else if(argc == 4)
-    {
-        time_kernel = std::stoi(argv[1]);
-        M           = std::stoi(argv[2]);
-        N           = std::stoi(argv[3]);
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+        if(argc == 5)
+        {
+            M = std::stoi(argv[3]);
+            N = std::stoi(argv[4]);
+        }
     }
     else
     {
-        std::cerr << "arg1 to 2: M, N" << std::endl;
-        return 1;
+        printf("arg1: verification (0=no, 1=yes)\n");
+        printf("arg2: time kernel (0=no, 1=yes)\n");
+        printf("arg3-4: M, N\n");
+        exit(1);
     }
 
     ck::index_t Stride = N;
@@ -177,6 +181,7 @@ int main(int argc, char* argv[])
     std::cout << "Time elapase is : " << ela_time << " ms . " << std::endl;
 
     bool pass = true;
+    if(do_verification)
     {
         std::vector<std::size_t> mn = {static_cast<unsigned long>(M),
                                        static_cast<unsigned long>(N)};

@@ -38,18 +38,18 @@ class TestGroupedConvndBwdDataWmma : public ::testing::Test
             }
             auto& param = conv_params[i];
             pass        = pass && ck::profiler::profile_grouped_conv_bwd_data_impl<NDimSpatial,
-                                                                            OutLayout,
-                                                                            WeiLayout,
-                                                                            InLayout,
-                                                                            DataType,
-                                                                            DataType,
-                                                                            DataType>(
+                                                                                   OutLayout,
+                                                                                   WeiLayout,
+                                                                                   InLayout,
+                                                                                   DataType,
+                                                                                   DataType,
+                                                                                   DataType>(
                                true,  // do_verification
                                1,     // init_method: integer value
                                false, // do_log
                                false, // time_kernel
                                param,
-                               1, // split_k
+                               1, // splitK
                                instance_index);
         }
         EXPECT_TRUE(pass);

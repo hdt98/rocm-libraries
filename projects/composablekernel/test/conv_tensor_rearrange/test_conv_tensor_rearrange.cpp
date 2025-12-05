@@ -36,10 +36,10 @@ class TestConvTensorRearrange : public ::testing::Test
             }
             auto& param = conv_params[i];
             pass        = pass && ck::profiler::profile_conv_tensor_rearrange_impl<NDimSpatial,
-                                                                            ImLayout,
-                                                                            InDataType,
-                                                                            OutDataType,
-                                                                            ConvTensorRearrangeOp>(
+                                                                                   ImLayout,
+                                                                                   InDataType,
+                                                                                   OutDataType,
+                                                                                   ConvTensorRearrangeOp>(
                                true,  // do_verification
                                1,     // init_method: integer value
                                false, // do_log

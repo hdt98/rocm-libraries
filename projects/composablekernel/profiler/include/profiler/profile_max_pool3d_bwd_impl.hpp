@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -85,7 +85,8 @@ bool profile_max_pool3d_bwd_impl(int do_verification,
             using namespace ck::literals;
 
             return HostTensorDescriptor({N_, C_, D, H, W},
-                                        {D * C_ * H * W, 1_uz, C_ * H * W, W * C_, C_});
+                                        {D * C_ * H * W, 1_uz, C_ * H * W, W * C_, C_},
+                                        ck::tensor_layout::convolution::NDHWC{});
         };
 
     Tensor<InDataType> in_n_c_di_hi_wi(f_host_tensor_descriptor(N, C, Di, Hi, Wi));

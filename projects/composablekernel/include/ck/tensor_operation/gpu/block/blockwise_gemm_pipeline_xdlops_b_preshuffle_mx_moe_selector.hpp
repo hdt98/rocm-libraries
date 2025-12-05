@@ -3,9 +3,8 @@
 
 #pragma once
 
-#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_mx_moe_v1.hpp"
-#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_mx_moe_gufusion_v1.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_mx_moe_v3.hpp"
+#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_mx_moe_v1.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_mx_moe_gufusion_v3.hpp"
 
 namespace ck {
@@ -43,29 +42,7 @@ constexpr auto BlockGemmMXBPreshufflePipeline_Selector()
     {
         if constexpr(GUFusion)
         {
-            return BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_gufusion_v1<
-                BlkGemmPipeSche,
-                ThreadBlockSize,
-                ScaleBlockSize,
-                ADataType,
-                AScaleDataType,
-                BDataType,
-                BScaleDataType,
-                ATileDesc,
-                BTileDesc,
-                AMmaTileDesc,
-                BMmaTileDesc,
-                ABlockTransferSrcScalarPerVector,
-                BBlockTransferSrcScalarPerVector,
-                MPerBlock,
-                NPerBlock,
-                KPerBlock,
-                MPerXDL,
-                NPerXDL,
-                MRepeat,
-                NRepeat,
-                KPack>{};
-            ;
+            return nullptr;
         }
         else
         {

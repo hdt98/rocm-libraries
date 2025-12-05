@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -77,18 +77,21 @@ int main(int argc, char* argv[])
     {
         // Use default value
     }
-    else if(argc == 4)
+    else if(argc == 5)
     {
-        time_kernel  = atoi(argv[1]);
-        num_rows     = atoi(argv[2]);
+        time_kernel  = std::stoi(argv[1]);
+        num_rows     = std::stoi(argv[2]);
         dim_mask     = strtol(argv[3], nullptr, 0);
-        index_length = atoi(argv[4]);
+        index_length = std::stoi(argv[4]);
     }
     else
     {
         std::cout << "Usage of " << argv[0] << std::endl;
-        std::cout << "Arg1-4: time_kernel num_rows dim_mask index_length" << std::endl;
+        std::cout << "arg1: time kernel (0=no, 1=yes)" << std::endl;
+        std::cout << "arg2-4: num_rows dim_mask index_length" << std::endl;
+        return 1;
     }
+
     ck::static_for<0, dims.Size(), 1>{}([&](auto I) {
         if(dim_mask & (1 << I.value))
         {
@@ -146,11 +149,11 @@ int main(int argc, char* argv[])
             auto argument_ptr    = device_instance.MakeArgumentPointer(
                 out_dev.GetDeviceBuffer(),
                 {ck::type_convert<EmbType*>(emb_a_dev.GetDeviceBuffer()),
-                 ck::type_convert<EmbType*>(emb_b_dev.GetDeviceBuffer()),
-                 ck::type_convert<EmbType*>(emb_c_dev.GetDeviceBuffer())},
+                    ck::type_convert<EmbType*>(emb_b_dev.GetDeviceBuffer()),
+                    ck::type_convert<EmbType*>(emb_c_dev.GetDeviceBuffer())},
                 {ck::type_convert<IndexType*>(index_a_dev.GetDeviceBuffer()),
-                 ck::type_convert<IndexType*>(index_b_dev.GetDeviceBuffer()),
-                 ck::type_convert<IndexType*>(index_c_dev.GetDeviceBuffer())},
+                    ck::type_convert<IndexType*>(index_b_dev.GetDeviceBuffer()),
+                    ck::type_convert<IndexType*>(index_c_dev.GetDeviceBuffer())},
                 gamma_dev.GetDeviceBuffer(),
                 beta_dev.GetDeviceBuffer(),
                 current_dim,
@@ -161,11 +164,10 @@ int main(int argc, char* argv[])
                       << std::endl
                       << std::flush;
 
-            bool is_supported = device_instance.IsSupportedArgument(argument_ptr.get());
-
-            if(!is_supported)
+            if(!device_instance.IsSupportedArgument(argument_ptr.get()))
             {
-                std::cout << "Runtime parameters are not supported" << std::endl;
+                std::cerr << device_instance.GetTypeString() << " does not support this problem"
+                          << std::endl;
                 return;
             }
 

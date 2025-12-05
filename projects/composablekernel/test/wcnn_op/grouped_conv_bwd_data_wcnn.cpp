@@ -4,8 +4,8 @@
 #include "common_wcnn.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd_transposed.hpp"
 
-//#define ENABLE_WAVEGROUP 1
-//#define ENABLE_CONST_LAYOUT 1
+// #define ENABLE_WAVEGROUP 1
+// #define ENABLE_CONST_LAYOUT 1
 
 #define DEFAULT_H_PERWAVE 8
 #define DEFAULT_W_PERWAVE 8

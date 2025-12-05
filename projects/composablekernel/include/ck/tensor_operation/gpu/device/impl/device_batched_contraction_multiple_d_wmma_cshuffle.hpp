@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include <iostream>
 #include <sstream>
 
+#include "ck/utility/env.hpp"
 #include "ck/utility/common_header.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -237,10 +238,10 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                 a_grid_desc_m_k,
                 make_tuple(make_unmerge_transform(make_tuple(
                                A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
-                           make_unmerge_transform(make_tuple(
-                               M0, Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{}))),
+                           make_unmerge_transform(
+                               make_tuple(M0 * MRepeat, Number<MWaves>{}, Number<MPerWmma>{}))),
                 make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
+                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
         }
     }
 
@@ -329,10 +330,10 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                 b_grid_desc_n_k,
                 make_tuple(make_unmerge_transform(make_tuple(
                                B_KWmma, Number<B_K0PerWmma>{}, Number<B_KRow>{}, K1Number)),
-                           make_unmerge_transform(make_tuple(
-                               N0, Number<NRepeat>{}, Number<NWaves>{}, Number<NPerWmma>{}))),
+                           make_unmerge_transform(
+                               make_tuple(N0 * NRepeat, Number<NWaves>{}, Number<NPerWmma>{}))),
                 make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
+                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
         }
     }
 
@@ -761,8 +762,8 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                 }
                 else
                 {
-                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I4) *
-                           arg.a_grid_desc_.GetLength(I5) * arg.a_grid_desc_.GetLength(I7);
+                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
+                           arg.a_grid_desc_.GetLength(I4) * arg.a_grid_desc_.GetLength(I6);
                 }
             }();
 
@@ -852,7 +853,10 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                                       arg.e_grid_desc_m_n_,
                                       arg.block_2_ctile_map_))
         {
-            printf("GridwiseOp: Validity check failure\n");
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                printf("GridwiseOp: Validity check failure\n");
+            }
             return false;
         }
 
@@ -875,15 +879,8 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         {
             if(!(arg.a_kz_stride_ == 1))
             {
-                index_t LastK;
-                if constexpr(AEnableLds)
-                {
-                    LastK = arg.a_grid_desc_.GetLength(I2);
-                }
-                else
-                {
-                    LastK = arg.a_grid_desc_.GetLength(I7);
-                }
+                index_t LastK =
+                    AEnableLds ? arg.a_grid_desc_.GetLength(I2) : arg.a_grid_desc_.GetLength(I6);
                 if(LastK % ABlockTransferSrcScalarPerVector == 0)
                 {
                     printf("DeviceOp: Vector Access A-k check failure\n");
@@ -904,22 +901,11 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         }
         else
         {
-            if(!(arg.b_kz_stride_ == 1))
+            if(!(arg.b_kz_stride_ == 1 &&
+                 arg.b_grid_desc_.GetLength(I2) % BBlockTransferSrcScalarPerVector == 0))
             {
-                index_t LastK;
-                if constexpr(BEnableLds)
-                {
-                    LastK = arg.b_grid_desc_.GetLength(I2);
-                }
-                else
-                {
-                    LastK = arg.b_grid_desc_.GetLength(I7);
-                }
-                if(LastK % ABlockTransferSrcScalarPerVector == 0)
-                {
-                    printf("DeviceOp: Vector Access B-k check failure\n");
-                    return false;
-                }
+                printf("DeviceOp: Vector Access B-k check failure\n");
+                return false;
             }
         }
 

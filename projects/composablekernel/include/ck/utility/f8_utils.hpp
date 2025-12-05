@@ -39,7 +39,7 @@ __host__ __device__ Y run_cast_to_f8(X x, uint32_t rng)
     int exponent, bias;
     uint32_t head, mantissa, sign;
     // nan code is same for float and half
-    constexpr Y nan_code        = negative_zero_nan ? 0x80 : ((out_exp == 5) ? 0x7C : 0x7F);
+    constexpr uint8_t nan_code  = 0x80;
     constexpr uint32_t nan_mask = NumericUtils<X>::nan_mask;
 
     // convert to bitwise
@@ -60,19 +60,17 @@ __host__ __device__ Y run_cast_to_f8(X x, uint32_t rng)
     if constexpr(negative_zero_nan)
     {
         if((x_bitwise & nan_mask) == nan_mask)
-            return nan_code;
+            return Y{nan_code};
     }
     else
     {
         if((x_bitwise & nan_mask) == nan_mask)
-        {
-            return nan_code + (sign ? 0x80 : 0) + (((out_exp == 5) && (mantissa != 0)) ? 1 : 0);
-        }
+            return Y{static_cast<uint8_t>(signed_inf + (mantissa != 0 ? 1 : 0))};
     }
 
     // check if x is 0.0
     if(x_bitwise == 0)
-        return 0;
+        return Y{0};
 
     // First need to check if it is normal or denorm as there is a difference of implict 1
     // Then need to adjust the exponent to align with the F8 exponent, in the meanwhile, shift
@@ -181,9 +179,10 @@ In this case, the fp16 mantissa should be shift left by 1 */
 
     // check if x is 0.0 or -0.0
     if(out_exponent == 0 && mantissa == 0)
-        return negative_zero_nan ? 0 : (sign << (out_exp + out_mant));
+        return Y{negative_zero_nan ? 0 : static_cast<uint8_t>(sign << (out_exp + out_mant))};
     mantissa &= (1 << out_mant) - 1;
-    return (sign << (out_exp + out_mant)) | (out_exponent << out_mant) | mantissa;
+    return Y{static_cast<uint8_t>((sign << (out_exp + out_mant)) | (out_exponent << out_mant) |
+                                  mantissa)};
 }
 
 template <typename X, typename Y, bool negative_zero_nan>
@@ -198,8 +197,8 @@ __host__ __device__ Y run_cast_from_f8(X x)
     constexpr int out_mant = NumericUtils<Y>::mant;
 
     // prepare the codes
-    constexpr X nan_code = 0x80;
-    using T_bitwise      = typename NumericUtils<Y>::bitwise_type;
+    constexpr uint8_t nan_code = 0x80;
+    using T_bitwise            = typename NumericUtils<Y>::bitwise_type;
 
     constexpr T_bitwise Inf_bitwise    = NumericUtils<Y>::Inf;
     constexpr T_bitwise NegInf_bitwise = NumericUtils<Y>::NegInf;
@@ -212,13 +211,13 @@ __host__ __device__ Y run_cast_from_f8(X x)
     constexpr Y Neg0   = bit_cast<Y>(Neg0_bitwise);
 
     // check if x is 0.0
-    if(x == 0)
+    if(!static_cast<uint8_t>(x))
         return static_cast<Y>(0);
 
     // unpack the input
-    uint32_t sign     = x >> (in_exp + in_mant);
-    uint32_t mantissa = x & ((1 << in_mant) - 1);
-    int exponent      = (x & 0x7F) >> in_mant;
+    uint32_t sign     = static_cast<uint8_t>(x) >> (in_exp + in_mant);
+    uint32_t mantissa = static_cast<uint8_t>(x) & ((1 << in_mant) - 1);
+    int exponent      = (static_cast<uint8_t>(x) & 0x7F) >> in_mant;
 
     constexpr int in_bias = (1 << (in_exp - 1)) - 1 + (negative_zero_nan ? 1 : 0);
     static_assert(in_bias == NumericUtils<X>::bias);
@@ -227,12 +226,12 @@ __host__ __device__ Y run_cast_from_f8(X x)
 
     if constexpr(negative_zero_nan)
     {
-        if(x == nan_code)
+        if(static_cast<uint8_t>(x) == nan_code)
             return NaN;
     }
     else
     {
-        if(x == nan_code)
+        if(static_cast<uint8_t>(x) == nan_code)
             return Neg0;
         if(exponent == ((1 << in_exp) - 1))
             return (mantissa == 0) ? (sign ? NegInf : Inf) : NaN;
@@ -276,8 +275,8 @@ template <typename X, typename Y, bool negative_zero_nan, bool clip, bool stoch>
 __host__ __device__ Y cast_to_f8(X x, uint32_t rng)
 {
     // check datatypes
-    constexpr bool is_half  = std::is_same<X, half_t>::value;
-    constexpr bool is_float = std::is_same<X, float>::value;
+    constexpr bool is_half  = is_same<X, half_t>::value;
+    constexpr bool is_float = is_same<X, float>::value;
     static_assert(is_half || is_float, "Only half and float can be casted.");
 
     return run_cast_to_f8<X, Y, negative_zero_nan, clip, stoch>(x, rng);
@@ -287,8 +286,8 @@ template <typename X, typename Y, bool negative_zero_nan>
 __host__ __device__ Y cast_from_f8(X x)
 {
     // check datatype
-    constexpr bool is_half  = std::is_same<Y, half_t>::value;
-    constexpr bool is_float = std::is_same<Y, float>::value;
+    constexpr bool is_half  = is_same<Y, half_t>::value;
+    constexpr bool is_float = is_same<Y, float>::value;
     static_assert(is_half || is_float, "only half and float are supported.");
 
     return run_cast_from_f8<X, Y, negative_zero_nan>(x);

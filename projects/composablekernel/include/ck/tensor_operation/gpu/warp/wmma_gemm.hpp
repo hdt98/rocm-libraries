@@ -114,6 +114,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16,
     static constexpr index_t m_per_wmma      = 16;
     static constexpr index_t n_per_wmma      = 16;
     static constexpr index_t k_per_wmma      = 16;
+    static constexpr index_t k_per_blk       = 8;
     static constexpr index_t src_a_data_size = 2;
     static constexpr index_t src_b_data_size = 2;
     static constexpr index_t acc_data_size   = 4;
@@ -132,12 +133,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16,
         m_per_wmma * n_per_wmma * acc_data_size * acc_pack_number / wave_size / 4;
     static constexpr index_t num_subgroups = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         if constexpr(wave_size == 32)
@@ -160,6 +156,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -174,12 +171,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16,
         m_per_wmma * n_per_wmma * acc_data_size * acc_pack_number / wave_size / 4;
     static constexpr index_t num_subgroups = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         if constexpr(wave_size == 32)
@@ -202,6 +194,7 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 2;
@@ -216,12 +209,7 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16,
         m_per_wmma * n_per_wmma * acc_data_size * acc_pack_number / wave_size / 4;
     static constexpr index_t num_subgroups = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         if constexpr(wave_size == 32)
@@ -243,6 +231,7 @@ struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 2;
@@ -259,7 +248,6 @@ struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16,
 
     template <index_t MPerWmma,
               index_t NPerWmma,
-              index_t KPerWmma,
               index_t Opsel,
               class FloatA,
               class FloatB,
@@ -286,6 +274,7 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t src_a_data_size          = 2;
     static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -302,12 +291,11 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8,
 
     template <index_t MPerWmma,
               index_t NPerWmma,
-              index_t KPerWmma,
               class FloatA,
               class FloatB,
               class FloatC,
-              bool neg_a = false,
-              bool neg_b = false,
+              bool neg_a = true,
+              bool neg_b = true,
               bool clamp = false>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
@@ -337,6 +325,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 16;
+    static constexpr index_t k_per_blk  = 8;
     // static constexpr index_t src_a_data_size = 2;
     // static constexpr index_t src_b_data_size = 2;
     // static constexpr index_t acc_data_size   = 4;
@@ -355,12 +344,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -380,6 +364,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 16;
+    static constexpr index_t k_per_blk  = 8;
     // static constexpr index_t src_a_data_size          = 2;
     // static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -393,12 +378,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -437,12 +417,7 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -475,12 +450,7 @@ struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -500,6 +470,7 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
     static constexpr index_t m_per_wmma = 16;
     static constexpr index_t n_per_wmma = 16;
     static constexpr index_t k_per_wmma = 16;
+    static constexpr index_t k_per_blk  = 8;
     // static constexpr index_t src_a_data_size          = 2;
     // static constexpr index_t src_b_data_size          = 2;
     static constexpr index_t acc_data_size            = 4;
@@ -515,12 +486,11 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
 
     template <index_t MPerWmma,
               index_t NPerWmma,
-              index_t KPerWmma,
               class FloatA,
               class FloatB,
               class FloatC,
-              bool neg_a = false,
-              bool neg_b = false,
+              bool neg_a = true,
+              bool neg_b = true,
               bool clamp = false>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
@@ -542,6 +512,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f8f8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -551,12 +522,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f8f8_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -582,6 +548,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f8bf8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -591,12 +558,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f8bf8_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -622,6 +584,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf8f8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -631,12 +594,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf8f8_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -662,6 +620,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf8bf8_gfx12,
     static constexpr index_t m_per_wmma               = 16;
     static constexpr index_t n_per_wmma               = 16;
     static constexpr index_t k_per_wmma               = 16;
+    static constexpr index_t k_per_blk                = 8;
     static constexpr index_t acc_data_size            = 4;
     static constexpr index_t acc_pack_number          = 1;
     static constexpr index_t num_thread_per_subgroups = n_per_wmma;
@@ -671,12 +630,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf8bf8_gfx12,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
 
-    template <index_t MPerWmma,
-              index_t NPerWmma,
-              index_t KPerWmma,
-              class FloatA,
-              class FloatB,
-              class FloatC>
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
@@ -1563,6 +1517,7 @@ struct WmmaSelector
     }
 };
 
+#if defined(__gfx13__)
 template <typename src_type_a,
           typename src_type_b,
           typename dst_type,
@@ -1573,6 +1528,16 @@ template <typename src_type_a,
           bool TransposeC      = false,
           bool WaveGroup       = false,
           bool AssemblyBackend = false>
+#else
+template <typename src_type_a,
+          typename src_type_b,
+          typename dst_type,
+          index_t MPerWmma,
+          index_t NPerWmma,
+          index_t KPack,
+          bool TransposeC      = false,
+          bool AssemblyBackend = false>
+#endif
 struct WmmaGemm
 {
     static constexpr auto I0 = Number<0>{};
@@ -1589,8 +1554,9 @@ struct WmmaGemm
     {
         static_assert(NPerWmma == 16 && MPerWmma == 16,
                       "Only support GemmNPerWmma == 16 and GemmMPerWmma == 16 for wmma");
-
+#if defined(__gfx13__)
         static_assert(KPack % KPerWmma == 0, "KPack should be multiple of k_per_wmma");
+#endif
     }
 
     // WMMA output supporting C = A * B
@@ -1735,6 +1701,9 @@ struct WmmaGemm
 
     __device__ static constexpr index_t GetWaveSize() { return wmma_instr.wave_size; }
 
+    __device__ static constexpr index_t GetKPerWaveBlk() { return wmma_instr.k_per_blk; }
+
+#if defined(__gfx13__)
     template <class FloatA, class FloatB, class FloatC>
     __device__ void Run(const FloatA& p_a_wave, const FloatB& p_b_wave, FloatC& p_c_thread) const
     {
@@ -1818,6 +1787,46 @@ struct WmmaGemm
             });
         }
     }
+#else
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void Run(const FloatA& p_a_wave, const FloatB& p_b_wave, FloatC& p_c_thread) const
+    {
+        static_assert(
+            (is_same<src_type_a, half_t>::value && is_same<src_type_b, half_t>::value &&
+             is_same<dst_type, float>::value) ||
+                (is_same<src_type_a, bhalf_t>::value && is_same<src_type_b, bhalf_t>::value &&
+                 is_same<dst_type, float>::value) ||
+                (is_same<src_type_a, half_t>::value && is_same<src_type_b, half_t>::value &&
+                 is_same<dst_type, half_t>::value) ||
+                (is_same<src_type_a, bhalf_t>::value && is_same<src_type_b, bhalf_t>::value &&
+                 is_same<dst_type, bhalf_t>::value) ||
+                (is_same<src_type_a, int8_t>::value && is_same<src_type_b, int8_t>::value &&
+                 is_same<dst_type, int32_t>::value) ||
+                ((is_same<src_type_a, f8_t>::value || is_same<src_type_a, bf8_t>::value) &&
+                 (is_same<src_type_b, f8_t>::value || is_same<src_type_b, bf8_t>::value) &&
+                 is_same<dst_type, float>::value) ||
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+                (is_same<src_type_a, int4_t>::value && is_same<src_type_b, int4_t>::value &&
+                 is_same<dst_type, int32_t>::value) ||
+#endif
+                false,
+            "base type couple must be (half, float), (bhalf, float), (half, half), (bhalf, bhalf), "
+            "((f8 or bf8, f8 or bf8), float), (int8, int32) or (int4, int32)!");
+        static_for<0, KPack / wmma_instr.k_per_wmma, 1>{}([&](auto k) {
+            // Integer wmma operators need extra input flags to indicate if the input is signed or
+            // unsigned. At the moment CK supports only signed integer inputs, so these flags are
+            // hardcoded.
+            if constexpr(!TransposeC)
+            {
+                wmma_instr.template run<MPerWmma, NPerWmma>(p_a_wave[k], p_b_wave[k], p_c_thread);
+            }
+            else
+            {
+                wmma_instr.template run<MPerWmma, NPerWmma>(p_b_wave[k], p_a_wave[k], p_c_thread);
+            }
+        });
+    }
+#endif
 
 #ifdef CK_EXTENSION_MX_TYPE
     template <int AScaleSel, int BScaleSel, class FloatA, class FloatB, class FloatC>
@@ -1846,11 +1855,13 @@ struct WmmaGemm
 
     __device__ static auto GetLaneId()
     {
+#if(defined(__gfx13__))
         if constexpr(WaveGroup == false)
         {
             return get_thread_local_1d_id() % wmma_instr.wave_size;
         }
         else
+#endif
         {
             return get_lane_id();
         }

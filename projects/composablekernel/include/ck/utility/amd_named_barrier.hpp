@@ -4,7 +4,7 @@
 #ifndef CK_AMD_NAMED_BARRIER_HPP
 #define CK_AMD_NAMED_BARRIER_HPP
 
-//#define CK_USE_AMD_NAMED_BARRIER_ASM 1
+// #define CK_USE_AMD_NAMED_BARRIER_ASM 1
 
 namespace ck {
 

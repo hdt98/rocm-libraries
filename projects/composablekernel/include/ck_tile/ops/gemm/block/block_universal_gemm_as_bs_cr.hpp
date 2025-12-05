@@ -1,9 +1,10 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/common/load_interleaved_pk_type.hpp"
 #include "ck_tile/ops/gemm/block/block_gemm_asmem_bsmem_creg_v1_default_policy.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_scheduler.hpp"
 #include "ck_tile/ops/elementwise.hpp"
@@ -13,7 +14,9 @@ namespace ck_tile {
 // A is block window on shared memory
 // B is block window on shared memory
 // C is block distributed tensor
-template <typename Problem_, typename Policy_ = BlockGemmASmemBSmemCRegV1DefaultPolicy>
+template <typename Problem_,
+          typename Policy_     = BlockGemmASmemBSmemCRegV1DefaultPolicy,
+          index_t UnaryOpSize_ = 8>
 struct BlockUniversalGemmAsBsCr
 {
     private:
@@ -35,11 +38,6 @@ struct BlockUniversalGemmAsBsCr
         static constexpr index_t MPerBlock = BlockGemmShape::kM;
         static constexpr index_t NPerBlock = BlockGemmShape::kN;
         static constexpr index_t KPerBlock = BlockGemmShape::kK;
-
-        // these two is used to decide whether to transpose load A and B in gfx13 or
-        // gfx12(such as tr16_b128)
-        static constexpr bool kTransLdA = Policy::kTransLdA;
-        static constexpr bool kTransLdB = Policy::kTransLdB;
 
         static constexpr auto config = Policy::template GetWarpGemmMWarpNWarp<Problem>();
 
@@ -96,6 +94,11 @@ struct BlockUniversalGemmAsBsCr
     using ComputeDataType = remove_cvref_t<typename Traits::ComputeDataType>;
     using CDataType       = remove_cvref_t<typename Traits::CDataType>;
 
+    using ATypeToUse =
+        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>;
+    using BTypeToUse =
+        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>;
+
     using WarpGemm = remove_cvref_t<typename Traits::WarpGemm>;
 
     static constexpr index_t KIterPerWarp = Traits::KIterPerWarp;
@@ -104,9 +107,6 @@ struct BlockUniversalGemmAsBsCr
 
     static constexpr index_t MWarp = Traits::MWarp;
     static constexpr index_t NWarp = Traits::NWarp;
-
-    static constexpr bool TransLdA = Traits::kTransLdA;
-    static constexpr bool TransLdB = Traits::kTransLdB;
 
     static constexpr auto Scheduler = Traits::Scheduler;
 
@@ -133,11 +133,6 @@ struct BlockUniversalGemmAsBsCr
         ck_tile::numeric_traits<remove_cvref_t<ADataType>>::PackedSize;
     static constexpr index_t BPackedSize =
         ck_tile::numeric_traits<remove_cvref_t<BDataType>>::PackedSize;
-
-    using CLayout = remove_cvref_t<typename Problem_::CLayout>;
-
-    static constexpr bool is_c_column_major =
-        std::is_same_v<CLayout, tensor_layout::gemm::ColumnMajor>;
 
     using I0 = number<0>;
     using I1 = number<1>;
@@ -192,25 +187,6 @@ struct BlockUniversalGemmAsBsCr
         return b_block_dstr_encode;
     }
 
-    private:
-    template <typename WarpWindow, typename WarpTile>
-    CK_TILE_DEVICE static void load_interleaved_pk_type(WarpTile& warp_tile,
-                                                        const WarpWindow& warp_window)
-    {
-        constexpr index_t UnaryOpSize = 8;
-        const element_wise::PassThroughPack8 elementwise_op{};
-        constexpr index_t thread_buffer_size = WarpTile::get_thread_buffer_size() / UnaryOpSize;
-        const auto in_dstr_tensors           = load_tile(warp_window);
-
-        static_assert(WarpTile::get_thread_buffer_size() % UnaryOpSize == 0);
-
-        using ComputeVectorType = ComputeDataType __attribute__((ext_vector_type(UnaryOpSize)));
-        static_for<0, thread_buffer_size, 1>{}([&](auto i) {
-            elementwise_op(warp_tile.get_thread_buffer().template get_as<ComputeVectorType>()(i),
-                           in_dstr_tensors.get_thread_buffer().template get_as<pk_int4x4_t>()[i]);
-        });
-    }
-
     template <GemmPipelineScheduler Scheduler, typename GemmTraits>
     struct BlockGemmImpl
     {
@@ -219,38 +195,29 @@ struct BlockUniversalGemmAsBsCr
     template <typename GemmTraits>
     struct BlockGemmImpl<GemmPipelineScheduler::Default, GemmTraits>
     {
-        // add a function to load tile from window with transpose option
-        template <bool transpose_load_en, typename WindowType>
-        CK_TILE_DEVICE auto load_warp_tile(WindowType& window)
-        {
-            if constexpr(transpose_load_en)
-            {
-                return tr_load_tile(window);
-            }
-            else
-            {
-                return load_tile(window);
-            }
-        }
         static constexpr auto ALdsTileDistr =
             decltype(make_static_tile_distribution(MakeABlockDistributionEncode())){};
         static constexpr auto BLdsTileDistr =
             decltype(make_static_tile_distribution(MakeBBlockDistributionEncode())){};
 
-        using ALdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(ALdsTileDistr));
-        using BLdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(BLdsTileDistr));
+        using ALdsTile = decltype(make_static_distributed_tensor<ATypeToUse>(ALdsTileDistr));
+        using BLdsTile = decltype(make_static_distributed_tensor<BTypeToUse>(BLdsTileDistr));
 
         ALdsTile a_warp_tile_;
         BLdsTile b_warp_tile_;
 
         // C += A * B
-        template <typename CBlockTensor, typename ASmemBlockWindow, typename BSmemBlockWindow>
+        template <typename CBlockTensor,
+                  typename ASmemBlockWindow,
+                  typename BSmemBlockWindow,
+                  bool ALoadTranspose = false,
+                  bool BLoadTranspose = false>
         CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
                                        const ASmemBlockWindow& a_block_window,
-                                       const BSmemBlockWindow& b_block_window)
+                                       const BSmemBlockWindow& b_block_window,
+                                       bool_constant<ALoadTranspose> = {},
+                                       bool_constant<BLoadTranspose> = {})
         {
-#if 0
-            // Disable stg code in gfx1300 branch temporarily
             static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
                           "The CDataType as defined in traits should be the same as correspoinding "
                           "C block tensor data type!");
@@ -258,37 +225,11 @@ struct BlockUniversalGemmAsBsCr
                               std::is_same_v<BDataType, typename BSmemBlockWindow::DataType>,
                           "The ADataType and BDataType as defined in "
                           "traits should be the same as correspoinding block window data type!");
-            if constexpr(std::is_same_v<ADataType, pk_int4_t>)
-            {
-                load_interleaved_pk_type(a_warp_tile_, a_block_window);
-            }
-            else
-            {
-                if constexpr(TransLdA)
-                {
-                    a_warp_tile_ = tr_load_tile(a_block_window);
-                }
-                else
-                {
-                    load_tile(a_warp_tile_, a_block_window);
-                }
-            }
-            if constexpr(std::is_same_v<BDataType, pk_int4_t>)
-            {
-                load_interleaved_pk_type(b_warp_tile_, b_block_window);
-            }
-            else
-            {
-                if constexpr(TransLdB)
-                {
-                    b_warp_tile_ = tr_load_tile(b_block_window);
-                }
-                else
-                {
-                    load_tile(b_warp_tile_, b_block_window);
-                }
-            }
 
+            load_int4_tile<ADataType, ATypeToUse, UnaryOpSize_, ALoadTranspose>(a_warp_tile_,
+                                                                                a_block_window);
+            load_int4_tile<BDataType, BTypeToUse, UnaryOpSize_, BLoadTranspose>(b_warp_tile_,
+                                                                                b_block_window);
             // hot loop:
             static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
                 static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
@@ -310,12 +251,8 @@ struct BlockUniversalGemmAsBsCr
                         // read C warp tensor from C block tensor-
                         CWarpTensor c_warp_tensor;
 
-                        const auto c_warp_seq = std::conditional_t<is_c_column_major,
-                                                                   sequence<nIter, mIter>,
-                                                                   sequence<mIter, nIter>>{};
-
                         c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
-                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
+                            merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
 
                         // warp GEMM
@@ -323,165 +260,7 @@ struct BlockUniversalGemmAsBsCr
 
                         // write C warp tensor into C block tensor
                         c_block_tensor.set_y_sliced_thread_data(
-                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
-                            merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
-                            c_warp_tensor.get_thread_buffer());
-                    });
-                });
-            });
-#endif
-            static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
-                          "The CDataType as defined in traits should be the same as correspoinding "
-                          "C block tensor data type!");
-            static_assert(std::is_same_v<ADataType, typename ASmemBlockWindow::DataType> &&
-                              std::is_same_v<BDataType, typename BSmemBlockWindow::DataType>,
-                          "The ADataType and BDataType as defined in "
-                          "traits should be the same as correspoinding block window data type!");
-
-            using ASemMIndex = std::conditional_t<TransLdA, number<1>, number<0>>;
-            using ASemKIndex = std::conditional_t<TransLdA, number<0>, number<1>>;
-            using BSemNIndex = std::conditional_t<TransLdB, number<1>, number<0>>;
-
-            static_assert(
-                GemmTraits::MPerBlock == ASmemBlockWindow{}.get_window_lengths()[ASemMIndex{}] &&
-                    GemmTraits::NPerBlock ==
-                        BSmemBlockWindow{}.get_window_lengths()[BSemNIndex{}] &&
-                    GemmTraits::KPerBlock == ASmemBlockWindow{}.get_window_lengths()[ASemKIndex{}],
-                "MPerBlock, NPerBlock, KPerBlock defined in "
-                " BlockGemmShape are different from A/B block smem windows apropriate dims!");
-
-            const auto warp_indices = [&]() constexpr
-            {
-                if constexpr(is_c_column_major)
-                {
-                    // Column-major layout
-                    const index_t n = get_warp_id() / MWarp;
-                    const index_t m = get_warp_id() - (n * MWarp);
-                    return std::make_pair(m, n);
-                }
-                else
-                {
-                    // Row-major layout
-                    const index_t m = get_warp_id() / NWarp;
-                    const index_t n = get_warp_id() - (m * NWarp);
-                    return std::make_pair(m, n);
-                }
-            }
-            ();
-
-            const index_t iMWarp = warp_indices.first;
-            const index_t iNWarp = warp_indices.second;
-
-            // TODO: refactor warp_window tile type to class member as it should be
-            // compile-time known information.
-            auto a_warp_window_tmp = make_tile_window(
-                a_block_window.get_bottom_tensor_view(),
-                // Use constexpr if to determine dimensions at compile time
-                []() constexpr {
-                    if constexpr(TransLdA)
-                        return make_tuple(number<WarpGemm::kK>{}, number<WarpGemm::kM>{});
-                    else
-                        return make_tuple(number<WarpGemm::kM>{}, number<WarpGemm::kK>{});
-                }(),
-                a_block_window.get_window_origin() +
-                    [&iMWarp]() constexpr {
-                        if constexpr(TransLdA)
-                            return multi_index<2>{0, iMWarp * WarpGemm::kM};
-                        else
-                            return multi_index<2>{iMWarp * WarpGemm::kM, 0};
-                    }(),
-                make_static_tile_distribution(typename WarpGemm::AWarpDstrEncoding{}));
-
-            using AWarpWindow = remove_cvref_t<decltype(a_warp_window_tmp)>;
-
-            statically_indexed_array<
-                statically_indexed_array<AWarpWindow, GemmTraits::KIterPerWarp>,
-                MIterPerWarp>
-                a_warp_windows;
-
-            // construct B-warp-window
-            auto b_warp_window_tmp = make_tile_window(
-                b_block_window.get_bottom_tensor_view(),
-                []() constexpr {
-                    if constexpr(TransLdB)
-                        return make_tuple(number<WarpGemm::kK>{}, number<WarpGemm::kN>{});
-                    else
-                        return make_tuple(number<WarpGemm::kN>{}, number<WarpGemm::kK>{});
-                }(),
-                b_block_window.get_window_origin() +
-                    [&iNWarp]() constexpr {
-                        if constexpr(TransLdB)
-                            return multi_index<2>{0, iNWarp * WarpGemm::kN};
-                        else
-                            return multi_index<2>{iNWarp * WarpGemm::kN, 0};
-                    }(),
-                make_static_tile_distribution(typename WarpGemm::BWarpDstrEncoding{}));
-
-            using BWarpWindow = remove_cvref_t<decltype(b_warp_window_tmp)>;
-            statically_indexed_array<
-                statically_indexed_array<BWarpWindow, GemmTraits::KIterPerWarp>,
-                NIterPerWarp>
-                b_warp_windows;
-
-            static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-                static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
-                    a_warp_windows(mIter)(kIter) = a_warp_window_tmp;
-
-                    // TODO: I don't have to move 0,0 window!
-                    move_tile_window(
-                        a_warp_windows(mIter)(kIter), [&]() constexpr {
-                            if constexpr(TransLdA)
-                                return multi_index<2>{kIter * GemmTraits::KPerBlockPerIter,
-                                                      mIter * GemmTraits::MPerBlockPerIter};
-                            else
-                                return multi_index<2>{mIter * GemmTraits::MPerBlockPerIter,
-                                                      kIter * GemmTraits::KPerBlockPerIter};
-                        }());
-                });
-            });
-
-            static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
-                static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
-                    b_warp_windows(nIter)(kIter) = b_warp_window_tmp;
-
-                    move_tile_window(
-                        b_warp_windows(nIter)(kIter), [&]() constexpr {
-                            if constexpr(TransLdB)
-                                return multi_index<2>{kIter * GemmTraits::KPerBlockPerIter,
-                                                      nIter * GemmTraits::NPerBlockPerIter};
-                            else
-                                return multi_index<2>{nIter * GemmTraits::NPerBlockPerIter,
-                                                      kIter * GemmTraits::KPerBlockPerIter};
-                        }());
-                });
-            });
-
-            // hot loop:
-            static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
-                static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-                    const auto a_warp_tile = load_warp_tile<TransLdA>(a_warp_windows(mIter)(kIter));
-
-                    static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
-                        const auto b_warp_tile =
-                            load_warp_tile<TransLdB>(b_warp_windows(nIter)(kIter));
-
-                        // read C warp tensor from C block tensor-
-                        CWarpTensor c_warp_tensor;
-
-                        const auto c_warp_seq = std::conditional_t<is_c_column_major,
-                                                                   sequence<nIter, mIter>,
-                                                                   sequence<mIter, nIter>>{};
-
-                        c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
-                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
-                            merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
-
-                        // warp GEMM
-                        WarpGemm{}(c_warp_tensor, a_warp_tile, b_warp_tile);
-
-                        // write C warp tensor into C block tensor
-                        c_block_tensor.set_y_sliced_thread_data(
-                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
+                            merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
                             c_warp_tensor.get_thread_buffer());
                     });
@@ -498,39 +277,38 @@ struct BlockUniversalGemmAsBsCr
         static constexpr auto BLdsTileDistr =
             decltype(make_static_tile_distribution(MakeBBlockDistributionEncode())){};
 
-        using ALdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(ALdsTileDistr));
-        using BLdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(BLdsTileDistr));
+        using ALdsTile = decltype(make_static_distributed_tensor<ATypeToUse>(ALdsTileDistr));
+        using BLdsTile = decltype(make_static_distributed_tensor<BTypeToUse>(BLdsTileDistr));
 
         ALdsTile a_warp_tile_;
         BLdsTile b_warp_tile_;
 
-        template <typename ASmemBlockWindow, typename BSmemBlockWindow>
+        template <typename ASmemBlockWindow,
+                  typename BSmemBlockWindow,
+                  bool ALoadTranspose = false,
+                  bool BLoadTranspose = false>
         CK_TILE_DEVICE void LocalPrefetch(const ASmemBlockWindow& a_block_window,
-                                          const BSmemBlockWindow& b_block_window)
+                                          const BSmemBlockWindow& b_block_window,
+                                          bool_constant<ALoadTranspose> = {},
+                                          bool_constant<BLoadTranspose> = {})
         {
-            if constexpr(std::is_same_v<ADataType, pk_int4_t>)
-            {
-                load_interleaved_pk_type(a_warp_tile_, a_block_window);
-            }
-            else
-            {
-                load_tile(a_warp_tile_, a_block_window);
-            }
-            if constexpr(std::is_same_v<BDataType, pk_int4_t>)
-            {
-                load_interleaved_pk_type(b_warp_tile_, b_block_window);
-            }
-            else
-            {
-                load_tile(b_warp_tile_, b_block_window);
-            }
+            load_int4_tile<ADataType, ATypeToUse, UnaryOpSize_, ALoadTranspose>(a_warp_tile_,
+                                                                                a_block_window);
+            load_int4_tile<BDataType, BTypeToUse, UnaryOpSize_, BLoadTranspose>(b_warp_tile_,
+                                                                                b_block_window);
         }
 
         // C += A * B
-        template <typename CBlockTensor, typename ASmemBlockWindow, typename BSmemBlockWindow>
+        template <typename CBlockTensor,
+                  typename ASmemBlockWindow,
+                  typename BSmemBlockWindow,
+                  bool ALoadTranspose = false,
+                  bool BLoadTranspose = false>
         CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
-                                       [[maybe_unused]] ASmemBlockWindow& a_block_window,
-                                       [[maybe_unused]] BSmemBlockWindow& b_block_window)
+                                       const ASmemBlockWindow&,
+                                       const BSmemBlockWindow&,
+                                       bool_constant<ALoadTranspose> = {},
+                                       bool_constant<BLoadTranspose> = {})
         {
             static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
                           "The CDataType as defined in traits should be the same as correspoinding "
@@ -586,59 +364,82 @@ struct BlockUniversalGemmAsBsCr
         static constexpr index_t KInnerLoopIter = KPerInnerLoop / WarpGemm::kKPerThread;
 
         static constexpr auto ALdsTileDistr =
-            decltype(make_static_tile_distribution(MakeABlockDistributionEncode())){};
+            make_static_tile_distribution(MakeABlockDistributionEncode());
         static constexpr auto BLdsTileDistr =
-            decltype(make_static_tile_distribution(MakeBBlockDistributionEncode())){};
+            make_static_tile_distribution(MakeBBlockDistributionEncode());
 
-        using ALdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(ALdsTileDistr));
-        using BLdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(BLdsTileDistr));
+        using ALdsTile = decltype(make_static_distributed_tensor<ATypeToUse>(ALdsTileDistr));
+        using BLdsTile = decltype(make_static_distributed_tensor<BTypeToUse>(BLdsTileDistr));
 
         ALdsTile a_warp_tile_;
-        ALdsTile b_warp_tile_;
+        BLdsTile b_warp_tile_;
 
-        template <index_t KIdx, typename ASmemBlockWindow, typename BSmemBlockWindow>
+        template <index_t KIdx,
+                  typename ASmemBlockWindow,
+                  typename BSmemBlockWindow,
+                  bool ALoadTranspose = false,
+                  bool BLoadTranspose = false>
         CK_TILE_DEVICE void LocalPrefetch(const ASmemBlockWindow& a_block_window,
-                                          const BSmemBlockWindow& b_block_window)
+                                          const BSmemBlockWindow& b_block_window,
+                                          bool_constant<ALoadTranspose> = {},
+                                          bool_constant<BLoadTranspose> = {})
         {
-            constexpr auto a_lds_load_tile_distr =
-                make_static_tile_distribution(MakeABlockDistributionEncode());
-            constexpr auto b_lds_load_tile_distr =
-                make_static_tile_distribution(MakeBBlockDistributionEncode());
+            constexpr auto a_lds_load_distr = [&]() {
+                if constexpr(ALoadTranspose)
+                    return make_static_tile_distribution(typename InputTileDistributionTraits<
+                                                         decltype(MakeABlockDistributionEncode()),
+                                                         ADataType>::TransposedDstrEncode{});
+                else
+                    return make_static_tile_distribution(MakeABlockDistributionEncode());
+            }();
+            constexpr auto b_lds_load_distr = [&]() {
+                if constexpr(BLoadTranspose)
+                    return make_static_tile_distribution(typename InputTileDistributionTraits<
+                                                         decltype(MakeBBlockDistributionEncode()),
+                                                         BDataType>::TransposedDstrEncode{});
+                else
+                    return make_static_tile_distribution(MakeBBlockDistributionEncode());
+            }();
+            constexpr auto a_lds_shape = []() {
+                if constexpr(ALoadTranspose)
+                    return make_tuple(number<KPerInnerLoop>{}, number<GemmTraits::MPerBlock>{});
+                else
+                    return make_tuple(number<GemmTraits::MPerBlock>{}, number<KPerInnerLoop>{});
+            }();
+            constexpr auto b_lds_shape = []() {
+                if constexpr(BLoadTranspose)
+                    return make_tuple(number<KPerInnerLoop>{}, number<GemmTraits::NPerBlock>{});
+                else
+                    return make_tuple(number<GemmTraits::NPerBlock>{}, number<KPerInnerLoop>{});
+            }();
+            constexpr auto k_idx_offset = KIdx * KPerInnerLoop;
+            constexpr auto a_offset =
+                ALoadTranspose ? multi_index<2>{k_idx_offset, 0} : multi_index<2>{0, k_idx_offset};
+            constexpr auto b_offset =
+                BLoadTranspose ? multi_index<2>{k_idx_offset, 0} : multi_index<2>{0, k_idx_offset};
 
             auto a_lds_gemm_window = make_tile_window(
-                a_block_window.get_bottom_tensor_view(),
-                make_tuple(number<GemmTraits::MPerBlock>{}, number<KPerInnerLoop>{}),
-                {0, KIdx * KPerInnerLoop},
-                a_lds_load_tile_distr);
+                a_block_window.get_bottom_tensor_view(), a_lds_shape, a_offset, a_lds_load_distr);
             auto b_lds_gemm_window = make_tile_window(
-                b_block_window.get_bottom_tensor_view(),
-                make_tuple(number<GemmTraits::NPerBlock>{}, number<KPerInnerLoop>{}),
-                {0, KIdx * KPerInnerLoop},
-                b_lds_load_tile_distr);
+                b_block_window.get_bottom_tensor_view(), b_lds_shape, b_offset, b_lds_load_distr);
 
-            if constexpr(std::is_same_v<ADataType, pk_int4_t>)
-            {
-                load_interleaved_pk_type(a_warp_tile_, a_block_window);
-            }
-            else
-            {
-                load_tile(a_warp_tile_, a_lds_gemm_window);
-            }
-            if constexpr(std::is_same_v<BDataType, pk_int4_t>)
-            {
-                load_interleaved_pk_type(b_warp_tile_, b_block_window);
-            }
-            else
-            {
-                load_tile(b_warp_tile_, b_lds_gemm_window);
-            }
+            load_int4_tile<ADataType, ATypeToUse, UnaryOpSize_, ALoadTranspose>(a_warp_tile_,
+                                                                                a_lds_gemm_window);
+            load_int4_tile<BDataType, BTypeToUse, UnaryOpSize_, BLoadTranspose>(b_warp_tile_,
+                                                                                b_lds_gemm_window);
         }
 
         // C += A * B
-        template <typename CBlockTensor, typename ASmemBlockWindow, typename BSmemBlockWindow>
+        template <typename CBlockTensor,
+                  typename ASmemBlockWindow,
+                  typename BSmemBlockWindow,
+                  bool ALoadTranspose = false,
+                  bool BLoadTranspose = false>
         CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
                                        const ASmemBlockWindow& a_block_window,
-                                       const BSmemBlockWindow& b_block_window)
+                                       const BSmemBlockWindow& b_block_window,
+                                       bool_constant<ALoadTranspose> a_load_tr = {},
+                                       bool_constant<BLoadTranspose> b_load_tr = {})
         {
             static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
                           "The CDataType as defined in traits should be the same as correspoinding "
@@ -646,7 +447,7 @@ struct BlockUniversalGemmAsBsCr
 
             // hot loop:
             static_for<0, KRepeat, 1>{}([&](auto kIter) {
-                LocalPrefetch<kIter.value>(a_block_window, b_block_window);
+                LocalPrefetch<kIter.value>(a_block_window, b_block_window, a_load_tr, b_load_tr);
                 __builtin_amdgcn_sched_barrier(0);
                 // NOTE: Synchronize threads in a workgroup at the start of each MAC
                 // cluster, but except the first, as we can shorten non-MAC cluster a bit
@@ -733,9 +534,7 @@ struct BlockUniversalGemmAsBsCr
     {
         constexpr auto c_block_outer_dstr_encoding = tile_distribution_encoding<
             sequence<>,
-            std::conditional_t<is_c_column_major,
-                               tuple<sequence<NIterPerWarp, NWarp>, sequence<MIterPerWarp, MWarp>>,
-                               tuple<sequence<MIterPerWarp, MWarp>, sequence<NIterPerWarp, NWarp>>>,
+            tuple<sequence<MIterPerWarp, MWarp>, sequence<NIterPerWarp, NWarp>>,
             tuple<sequence<1, 2>>,
             tuple<sequence<1, 1>>,
             sequence<1, 2>,
@@ -749,29 +548,45 @@ struct BlockUniversalGemmAsBsCr
         return c_block_tensor;
     }
 
-    template <typename ASmemBlockWindow, typename BSmemBlockWindow>
+    template <typename ASmemBlockWindow,
+              typename BSmemBlockWindow,
+              bool ALoadTranspose = false,
+              bool BLoadTranspose = false>
     CK_TILE_DEVICE void LocalPrefetch(const ASmemBlockWindow& a_block_window,
-                                      const BSmemBlockWindow& b_block_window)
+                                      const BSmemBlockWindow& b_block_window,
+                                      bool_constant<ALoadTranspose> a_load_tr = {},
+                                      bool_constant<BLoadTranspose> b_load_tr = {})
     {
-        block_gemm_impl_.LocalPrefetch(a_block_window, b_block_window);
+        block_gemm_impl_.LocalPrefetch(a_block_window, b_block_window, a_load_tr, b_load_tr);
     }
 
     // C += A * B
-    template <typename CBlockTensor, typename ASmemBlockWindow, typename BSmemBlockWindow>
+    template <typename CBlockTensor,
+              typename ASmemBlockWindow,
+              typename BSmemBlockWindow,
+              bool ALoadTranspose = false,
+              bool BLoadTranspose = false>
     CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
                                    const ASmemBlockWindow& a_block_window,
-                                   const BSmemBlockWindow& b_block_window)
+                                   const BSmemBlockWindow& b_block_window,
+                                   bool_constant<ALoadTranspose> a_load_tr = {},
+                                   bool_constant<BLoadTranspose> b_load_tr = {})
     {
-        block_gemm_impl_(c_block_tensor, a_block_window, b_block_window);
+        block_gemm_impl_(c_block_tensor, a_block_window, b_block_window, a_load_tr, b_load_tr);
     }
 
     // C = A * B
-    template <typename ASmemBlockWindow, typename BSmemBlockWindow>
+    template <typename ASmemBlockWindow,
+              typename BSmemBlockWindow,
+              bool ALoadTranspose = false,
+              bool BLoadTranspose = false>
     CK_TILE_DEVICE auto operator()(const ASmemBlockWindow& a_block_window,
-                                   const BSmemBlockWindow& b_block_window)
+                                   const BSmemBlockWindow& b_block_window,
+                                   bool_constant<ALoadTranspose> a_load_tr = {},
+                                   bool_constant<BLoadTranspose> b_load_tr = {})
     {
         auto c_block_tensor = MakeCBlockTile();
-        block_gemm_impl_(c_block_tensor, a_block_window, b_block_window);
+        block_gemm_impl_(c_block_tensor, a_block_window, b_block_window, a_load_tr, b_load_tr);
         return c_block_tensor;
     }
 

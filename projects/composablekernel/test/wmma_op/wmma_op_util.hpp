@@ -97,7 +97,7 @@ builtin_wmma_naive_selector<int8x16_t,
 #endif
 
 // gfx12
-
+#if defined(__gfx12__)
 template <>
 __device__ void
 builtin_wmma_naive_selector<half8_t,
@@ -157,7 +157,9 @@ builtin_wmma_naive_selector<int8x8_t,
     intrin_wmma_i32_16x16x16_iu8_w32<16, 16, true, true, false>::Run(
         reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}));
 }
+#endif
 
+#if defined(__gfx13__)
 // WMMAVecType is used in gfx13
 template <typename T, index_t kMultiplier, typename = void>
 struct WMMAVecType
@@ -342,6 +344,7 @@ __device__ void builtin_wmma_naive_selector(
         }
     }
 }
+#endif
 
 #if defined(__gfx12__)
 template <typename src_t, typename dst_t, typename acc_t>
@@ -765,7 +768,7 @@ struct WMMA_ACCNumber_traits<ck::bhalf_t>
     static constexpr index_t ACC_NUMBER = 16;
 };
 
-template <typename src_t, typename dst_t, typename acc_t>
+template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
     __shared__ src_t p_shared[16 * 16 * 2];
@@ -773,10 +776,9 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     // a and b fragments are stored in 8 VGPRs each, in packed format, so 16 elements each for a and
     // b a_frag will store one column of the 16x16 matrix tile b_frag will store one row of the
     // 16x16 matrix tile
-    using src_vec             = typename vector_type<src_t, 16>::type;
-    constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
-    src_vec a_frag            = {};
-    src_vec b_frag            = {};
+    using src_vec  = typename vector_type<src_t, 16>::type;
+    src_vec a_frag = {};
+    src_vec b_frag = {};
 
     src_vec a_temp = {};
     src_vec b_temp = {};
@@ -812,10 +814,18 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         p_shared[8 * 16 * lane_hi + 8 * lane_lo + ele + 16 * 16] = b_temp[ele];
     }
 
+#ifdef __gfx12__
+    asm volatile("\
+    s_wait_dscnt 0x0 \n \
+    s_barrier_signal -1 \n \
+    s_barrier_wait -1 \
+    " ::);
+#else
     asm volatile("\
     s_waitcnt lgkmcnt(0) \n \
     s_barrier \
     " ::);
+#endif
 
     for(int ele = 0; ele < 16; ++ele)
     {
@@ -827,10 +837,18 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         a_frag[ele] = p_shared[(ele / 8) * 16 * 8 + 8 * lane + ele % 8];
     }
 
+#ifdef __gfx12__
+    asm volatile("\
+    s_wait_dscnt 0x0 \n \
+    s_barrier_signal -1 \n \
+    s_barrier_wait -1 \
+    " ::);
+#else
     asm volatile("\
     s_waitcnt lgkmcnt(0) \n \
     s_barrier \
     " ::);
+#endif
 
     // sync threads, similar to mma_sync
     // __syncthreads();
@@ -847,16 +865,15 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-template <typename src_t, typename dst_t, typename acc_t>
+template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 {
     const int lIdx = threadIdx.x;
 
-    using src_vec             = typename vector_type<src_t, 16>::type;
-    constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
-    src_vec a_frag            = {};
-    src_vec b_frag            = {};
-    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
+    using src_vec  = typename vector_type<src_t, 16>::type;
+    src_vec a_frag = {};
+    src_vec b_frag = {};
+    using acc_vec  = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
     acc_vec c_thread_buf_;
 
     const int lane = lIdx % 16;
@@ -919,7 +936,6 @@ __global__ void matmul_mixedfp(const typename src0_t::type_t* a,
     ignore = b_block_scale;
     ignore = c;
 }
-
 #endif
 struct GemmParams
 {
@@ -991,12 +1007,23 @@ void RunHostMixedTypeGEMM(const Tensor<ADataType>& A,
                           BElementwiseOperation b_element_op,
                           CElementwiseOperation c_element_op)
 {
+#if defined(__gfx13__)
     auto ref_gemm     = GemmInstance{};
     auto ref_invoker  = ref_gemm.MakeInvoker();
     auto ref_argument = ref_gemm.MakeArgument(
         A, B, a_block_scale, b_block_scale, C, a_element_op, b_element_op, c_element_op);
 
     ref_invoker.Run(ref_argument);
+#else
+    ignore = A;
+    ignore = B;
+    ignore = a_block_scale;
+    ignore = b_block_scale;
+    ignore = C;
+    ignore = a_element_op;
+    ignore = b_element_op;
+    ignore = c_element_op;
+#endif
 }
 
 template <typename KernelType, typename ADataType, typename BDataType, typename CDataType>
@@ -1058,6 +1085,14 @@ bool RunMixedTypeDeviceGEMM(KernelType kernel,
                             DeviceAType,
                             DeviceBType)
 {
+#if defined(__gfx13__)
+    auto ref_gemm     = GemmInstance{};
+    auto ref_invoker  = ref_gemm.MakeInvoker();
+    auto ref_argument = ref_gemm.MakeArgument(
+        A, B, a_block_scale, b_block_scale, C, a_element_op, b_element_op, c_element_op);
+
+    ref_invoker.Run(ref_argument);
+
     DeviceMem a_m_k_device_buf(sizeof(typename DeviceAType::type_t) *
                                A.mDesc.GetElementSpaceSize());
     DeviceMem b_n_k_device_buf(sizeof(typename DeviceBType::type_t) *
@@ -1081,6 +1116,15 @@ bool RunMixedTypeDeviceGEMM(KernelType kernel,
     c_m_n_device_buf.FromDevice(C.mData.data());
 
     return true;
+#else
+    ignore = kernel;
+    ignore = A;
+    ignore = B;
+    ignore = a_block_scale;
+    ignore = b_block_scale;
+    ignore = C;
+    return true;
+#endif
 }
 
 template <typename DeviceWmma,
@@ -1095,7 +1139,8 @@ template <typename DeviceWmma,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
-          index_t KMultiplier>
+          index_t CAccNum,
+          index_t KMultiplier = 1>
 struct TestWmma
 {
     auto PrepareGemmTensor(const ck::wmma_op_util::GemmParams& params)

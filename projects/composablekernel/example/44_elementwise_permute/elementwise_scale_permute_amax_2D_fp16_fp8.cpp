@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <cstdlib>
@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
 
     if(argc == 1)
     {
-        // use default case
+        // use default
     }
     else if(argc == 3)
     {
@@ -142,9 +142,10 @@ int main(int argc, char* argv[])
     }
     else
     {
-        std::cerr << "arg1 to 4: do_verification, time_kernel, M, K" << std::endl;
-
-        return 1;
+        printf("arg1: verification (0=no, 1=yes)\n");
+        printf("arg2: time kernel (0=no, 1=yes)\n");
+        printf("arg3-4: M(default=1024), K(default=1024)\n");
+        exit(1);
     }
 
     std::array<ck::index_t, 2> dims        = {M, K};
@@ -169,7 +170,7 @@ int main(int argc, char* argv[])
 
     std::array<const void*, 1> inputs = {input_dev_buf.GetDeviceBuffer()};
     std::array<void*, 2> outputs      = {output_scaled_casted_transposed_dev_buf.GetDeviceBuffer(),
-                                    output_scaled_casted_dev_buf.GetDeviceBuffer()};
+                                         output_scaled_casted_dev_buf.GetDeviceBuffer()};
 
     std::cout << "Input: " << input.mDesc << std::endl;
     std::cout << "Scale: " << scale << std::endl;
@@ -181,8 +182,8 @@ int main(int argc, char* argv[])
     auto launch_transpose_scale = [&]() {
         auto transposeScale = DeviceElementwisePermuteInstance{};
         auto argument       = transposeScale.MakeArgumentPointer(dims,
-                                                           {in_strides},
-                                                           {out_strides, in_strides},
+                                                                 {in_strides},
+                                                                 {out_strides, in_strides},
                                                            inputs,
                                                            outputs,
                                                            ScalePassThrough{scale});

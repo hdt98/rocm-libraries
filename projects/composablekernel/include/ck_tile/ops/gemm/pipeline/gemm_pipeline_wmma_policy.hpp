@@ -159,8 +159,7 @@ struct GemmPipelineWmmaPolicy
         // column major, use A * B for gfx13; for better performance
         using CLayout = remove_cvref_t<typename Problem::CLayout>;
 
-        constexpr bool TransposeC = []() constexpr
-        {
+        constexpr bool TransposeC = []() constexpr {
             if constexpr(std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor>)
             {
                 return true;
@@ -169,8 +168,7 @@ struct GemmPipelineWmmaPolicy
             {
                 return false;
             }
-        }
-        ();
+        }();
         constexpr auto I0 = number<0>{};
         constexpr auto I1 = number<1>{};
         constexpr auto I2 = number<2>{};
@@ -184,15 +182,13 @@ struct GemmPipelineWmmaPolicy
 
         using BlockWarps      = typename Problem::BlockGemmShape::BlockWarps;
         using WmmaTile        = typename Problem::BlockGemmShape::WarpTile;
-        using WarpGemm        = WarpGemmWmmaDispatcher<typename Problem::ADataType,
-                                                typename Problem::BDataType,
-                                                typename Problem::CDataType,
-                                                WmmaTile::at(I0),
-                                                WmmaTile::at(I1),
-                                                WmmaTile::at(I2),
-                                                TransLdA,
-                                                TransLdB,
-                                                TransposeC>;
+        using WarpGemm        = WarpGemmDispatcher<typename Problem::ADataType,
+                                                   typename Problem::BDataType,
+                                                   typename Problem::CDataType,
+                                                   WmmaTile::at(I0),
+                                                   WmmaTile::at(I1),
+                                                   WmmaTile::at(I2),
+                                                   TransposeC>;
         using BlockGemmPolicy = BlockGemmASmemBSmemCRegV1CustomPolicy<typename Problem::ADataType,
                                                                       typename Problem::BDataType,
                                                                       typename Problem::CDataType,

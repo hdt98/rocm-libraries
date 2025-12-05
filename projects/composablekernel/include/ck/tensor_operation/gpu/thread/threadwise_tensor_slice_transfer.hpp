@@ -398,9 +398,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                 {
                     if constexpr(UseTrLoad)
                     {
+                        // Todo need use amd_global_load_transpose_to_vgpr;
+#if 0
                         src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                             src_buf.template trLoad<src_vector_t>(
                                 src_coord_.GetOffset() / PackedSize, is_src_valid);
+#endif
                     }
                     else if constexpr(UseTileLoad)
                     {
@@ -463,8 +466,11 @@ struct ThreadwiseTensorSliceTransfer_v2
                         reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
                     if constexpr(UseTrLoad)
                     {
+                        // Todo need use amd_global_load_transpose_to_vgpr;
+#if 0
                         *dst_buf_ptr = src_buf.template trLoad<src_vector_t>(
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
+#endif
                     }
                     else if constexpr(UseTileLoad)
                     {
@@ -497,9 +503,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                 // copy data from src_buf into src_vector
                 if constexpr(UseTrLoad)
                 {
+                    // Todo need use amd_global_load_transpose_to_vgpr;
+#if 0
                     src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                         src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset() / PackedSize,
                                                               is_src_valid);
+#endif
                 }
                 else if constexpr(UseTileLoad)
                 {
@@ -1029,8 +1038,7 @@ struct ThreadwiseTensorSliceTransfer_v3
                 buffer_(Number<buffer_offset>{}) = src_tmp_vector.template AsType<SrcData>()[i];
             });
 
-            constexpr auto move_on_dim = [&]() constexpr
-            {
+            constexpr auto move_on_dim = [&]() constexpr {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
 
                 static_for<0, nDim, 1>{}([&](auto i) {
@@ -1043,8 +1051,7 @@ struct ThreadwiseTensorSliceTransfer_v3
                 });
 
                 return move_on_dim_;
-            }
-            ();
+            }();
 
             // move
             static_for<0, nDim, 1>{}([&](auto i) {
@@ -1189,8 +1196,7 @@ struct ThreadwiseTensorSliceTransfer_v3
                 is_dst_valid,
                 dst_tmp_vector.template AsType<dst_vector_t>()[Number<0>{}]);
 
-            constexpr auto move_on_dim = [&]() constexpr
-            {
+            constexpr auto move_on_dim = [&]() constexpr {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
 
                 static_for<0, nDim, 1>{}([&](auto i) {
@@ -1203,8 +1209,7 @@ struct ThreadwiseTensorSliceTransfer_v3
                 });
 
                 return move_on_dim_;
-            }
-            ();
+            }();
 
             // move
             static_for<0, nDim, 1>{}([&](auto i) {
@@ -2386,6 +2391,7 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic_InterRow
                         const DstSliceOriginIdx&,
                         DstBuffer& dst_buf) const
     {
+        ElementwiseOperation element_op_{};
         static_assert(SrcDesc::IsKnownAtCompileTime() && DstDesc::IsKnownAtCompileTime(),
                       "wrong! Desc need to known at compile-time");
 
@@ -2471,7 +2477,6 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic_InterRow
             });
         });
     }
-    ElementwiseOperation element_op_{};
 };
 
 // Specialized for gfx12

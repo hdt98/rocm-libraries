@@ -18,7 +18,11 @@ static ck::index_t test_case_id = -1;
 
 static ck::index_t case_id = 0;
 
-template <typename SrcType, typename DstType, typename GPUAccType, typename CPUAccType>
+template <typename SrcType,
+          typename DstType,
+          typename GPUAccType,
+          typename CPUAccType,
+          ck::index_t AccNum>
 bool run_test()
 {
     if(ck::is_gfx13_supported()) // gfx13 uses another test
@@ -36,8 +40,9 @@ bool run_test()
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     bool pass         = true;
 
-    const auto matmul_default   = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType>;
-    const auto matmul_swizzle_a = ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
+    const auto matmul_default = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType, AccNum>;
+    const auto matmul_swizzle_a =
+        ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType, AccNum>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
@@ -55,7 +60,7 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       1>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
+                                       AccNum>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;
@@ -174,14 +179,12 @@ int main(int argc, char* argv[])
         test_case_id = atoi(argv[1]);
     }
     // clang-format off
-    //              |SrcType     |DstType     |GPUAccType  |CPUAccType
-    pass &= run_test<ck::half_t,  ck::half_t,  float,       float      >();
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float      >();
-    pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t >();
-    //# wmma_op crash on gfx12 CI for unknown reason. it looks it is a regression in clang,
-    // disable it temporarily
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float      >();
-    pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t    >();
+    //              |SrcType     |DstType     |GPUAccType  |CPUAccType |AccNum
+    pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8     >();
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
+    pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();
+    pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
     // the below are gfx13 only
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
     pass &= run_test<ck::half_t,  ck::half_t,   float,       float,       float              >(); // V_WMMA_F32_16X16_F16

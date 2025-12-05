@@ -158,10 +158,10 @@ struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,
                 a_grid_desc_m_k,
                 make_tuple(make_unmerge_transform(make_tuple(
                                A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
-                           make_unmerge_transform(make_tuple(
-                               M0, Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{}))),
+                           make_unmerge_transform(
+                               make_tuple(M0 * MRepeat, Number<MWaves>{}, Number<MPerWmma>{}))),
                 make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
+                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
         }
     }
 
@@ -212,10 +212,10 @@ struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,
                 b_grid_desc_n_k,
                 make_tuple(make_unmerge_transform(make_tuple(
                                B_KWmma, Number<B_K0PerWmma>{}, Number<B_KRow>{}, K1Number)),
-                           make_unmerge_transform(make_tuple(
-                               N0, Number<NRepeat>{}, Number<NWaves>{}, Number<NPerWmma>{}))),
+                           make_unmerge_transform(
+                               make_tuple(N0 * NRepeat, Number<NWaves>{}, Number<NPerWmma>{}))),
                 make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
+                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
         }
     }
 
@@ -388,8 +388,8 @@ struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,
                 }
                 else
                 {
-                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I4) *
-                           arg.a_grid_desc_.GetLength(I5) * arg.a_grid_desc_.GetLength(I7);
+                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
+                           arg.a_grid_desc_.GetLength(I4) * arg.a_grid_desc_.GetLength(I6);
                 }
             }();
             auto launch_kernel = [&](auto has_main_k_block_loop) {

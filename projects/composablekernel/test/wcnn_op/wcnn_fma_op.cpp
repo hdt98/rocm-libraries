@@ -52,10 +52,10 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
     using InDataTileVec = typename decltype(wcnn_conv)::InDataTileVec::type;
     using AccDataVec    = typename decltype(wcnn_conv)::AccDataVec;
     using AccVec        = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                             AccDataType,
-                                             AccVectorCount,
-                                             wcnn_conv.GetNumAccumComponents(),
-                                             true>;
+                                                    AccDataType,
+                                                    AccVectorCount,
+                                                    wcnn_conv.GetNumAccumComponents(),
+                                                    true>;
     const int lIdx      = threadIdx.x;
 
     // Data layout: HWC, unit: InDataType

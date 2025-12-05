@@ -37,22 +37,22 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_grouped_conv_fwd_wcnn(const InDataType* __restrict__ p_in_grid,
-                                     const WeiDataType* __restrict__ p_wei_grid,
-                                     DsPointer p_ds_grid,
-                                     EDataType* __restrict__ p_e_grid,
-                                     const InElementwiseOperation in_element_op,
-                                     const WeiElementwiseOperation wei_element_op,
-                                     const AccElementwiseOperation acc_element_op,
-                                     const index_t batch_count,
-                                     const InGridDesc in_grid_desc,
-                                     const WeiGridDesc wei_grid_desc,
-                                     const DsGridDesc ds_grid_desc,
-                                     const EGridDesc e_grid_desc,
-                                     const Block2CTileMap block_2_ctile_map,
-                                     const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
+    kernel_grouped_conv_fwd_wcnn(const InDataType* __restrict__ p_in_grid,
+                                 const WeiDataType* __restrict__ p_wei_grid,
+                                 DsPointer p_ds_grid,
+                                 EDataType* __restrict__ p_e_grid,
+                                 const InElementwiseOperation in_element_op,
+                                 const WeiElementwiseOperation wei_element_op,
+                                 const AccElementwiseOperation acc_element_op,
+                                 const index_t batch_count,
+                                 const InGridDesc in_grid_desc,
+                                 const WeiGridDesc wei_grid_desc,
+                                 const DsGridDesc ds_grid_desc,
+                                 const EGridDesc e_grid_desc,
+                                 const Block2CTileMap block_2_ctile_map,
+                                 const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
 #if defined(__gfx13__)
     // offset base pointer for each work-group
@@ -234,8 +234,8 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop,
           index_t ClusterSize>
 #if defined(__gfx13__)
-__attribute__((amdgpu_spatial_cluster_kernel)) __attribute__((cluster_dims(ClusterSize)))
-__exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+__attribute__((amdgpu_spatial_cluster_kernel))
+__attribute__((cluster_dims(ClusterSize))) __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
 #endif
     __global__ void kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
@@ -345,8 +345,8 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop,
           index_t ClusterSize>
 #if defined(__gfx13__)
-__attribute__((amdgpu_spatial_cluster_kernel)) __attribute__((cluster_dims(ClusterSize)))
-__exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
+__attribute__((amdgpu_spatial_cluster_kernel))
+__attribute__((cluster_dims(ClusterSize))) __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
 #endif
     __global__ void kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
@@ -713,17 +713,17 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
 
     static constexpr index_t WaveFilterSize = (FilterSize == 2) ? 1 : FilterSize;
     static constexpr auto wcnn_conv         = WcnnConv<WeiDataType,
-                                               InDataType,
-                                               AccDataType,
-                                               HPerWcnn,
-                                               WPerWcnn,
-                                               WaveFilterSize,
-                                               DilationX,
-                                               DilationY,
-                                               1,
-                                               EnableWaveGroup,
-                                               false,
-                                               false>{};
+                                                       InDataType,
+                                                       AccDataType,
+                                                       HPerWcnn,
+                                                       WPerWcnn,
+                                                       WaveFilterSize,
+                                                       DilationX,
+                                                       DilationY,
+                                                       1,
+                                                       EnableWaveGroup,
+                                                       false,
+                                                       false>{};
 
     using GridwiseConvPipe =
         remove_cvref_t<decltype(GridwiseConvPipeline_Selector<NumConvCPrefetchStage,
@@ -1460,18 +1460,16 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                 // tuple of reference to C/Ds tensor descriptors
                 const auto c_ds_desc_refs = concat_tuple_of_reference(
                     tie(out_tensor_block_desc),
-                    generate_tie(
-                        [&](auto i) -> const auto& // return type should be reference
-                        { return ds_grid_desc[i]; },
-                        Number<NumDTensor>{}));
+                    generate_tie([&](auto i) -> const auto& // return type should be reference
+                                 { return ds_grid_desc[i]; },
+                                 Number<NumDTensor>{}));
 
                 // tuple of reference to C/Ds tensor buffers
                 const auto c_ds_buf_refs = concat_tuple_of_reference(
                     tie(out_tensor_block_buf),
-                    generate_tie(
-                        [&](auto i) -> const auto& // return type should be reference
-                        { return ds_grid_buf[i]; },
-                        Number<NumDTensor>{}));
+                    generate_tie([&](auto i) -> const auto& // return type should be reference
+                                 { return ds_grid_buf[i]; },
+                                 Number<NumDTensor>{}));
 
                 // tuple of starting index of C/Ds blockwise copy
                 const auto idx_c_ds_block_begin =
@@ -2683,9 +2681,9 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                         if constexpr(EnableWaveGroup)
                         {
                             return make_static_buffer_v5<
-                                AddressSpaceEnum::Vgpr,
-                                DDataType,
-                                laneSharedMemTrait.ds_block_space_offset[i] / sizeof(DDataType)>(
+                                    AddressSpaceEnum::Vgpr,
+                                    DDataType,
+                                    laneSharedMemTrait.ds_block_space_offset[i] / sizeof(DDataType)>(
                                 ds_wave_desc[Number<i>{}].GetElementSpaceSize(),
                                 static_cast<DDataType*>(p_lane_shared));
                         }

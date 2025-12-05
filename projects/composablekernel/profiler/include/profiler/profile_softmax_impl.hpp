@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -104,12 +104,12 @@ bool profile_softmax_impl(int do_verification,
     // add device softmax instances
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     using DeviceOp    = tensor_operation::device::DeviceSoftmax<InDataType,
-                                                             AccDataType,
-                                                             OutDataType,
-                                                             PassThrough,
-                                                             PassThrough,
-                                                             Rank,
-                                                             NumReduceDim>;
+                                                                AccDataType,
+                                                                OutDataType,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                Rank,
+                                                                NumReduceDim>;
 
     // get device op instances
     const auto instances = tensor_operation::device::instance::DeviceOperationInstanceFactory<
@@ -142,8 +142,7 @@ bool profile_softmax_impl(int do_verification,
         {
             std::cout << inst_ptr->GetTypeString() << " skipped due to unsupported argument: ";
             LogRange(std::cout << "input lengths = [", in_length, ", ")
-                << "], "
-                << "scaler = [" << alpha << ", " << beta << "]";
+                << "], " << "scaler = [" << alpha << ", " << beta << "]";
             LogRange(std::cout << ", reduce dims = [", reduce_dims, ", ") << "]." << std::endl;
             instance_pass.push_back(true);
             continue;
@@ -212,8 +211,7 @@ bool profile_softmax_impl(int do_verification,
             {
                 std::cout << inst_ptr->GetTypeString() << " failed verification: ";
                 LogRange(std::cout << "input lengths = [", in_length, ", ")
-                    << "], "
-                    << "scaler = [" << alpha << ", " << beta << "]." << std::endl;
+                    << "], " << "scaler = [" << alpha << ", " << beta << "]." << std::endl;
             }
             instance_pass.push_back(pass);
         }
@@ -225,9 +223,13 @@ bool profile_softmax_impl(int do_verification,
         LogRange(std::cout << "length = ", in_tensor_lengths, ",") << ", ";
         LogRange(std::cout << "stride = ", in_tensor_strides, ",") << ", ";
         LogRange(std::cout << "reduce dims ", reduce_dims, ",") << ", ";
-        std::cout << "alpha = " << alpha << ", "
-                  << "beta = " << beta << ", " << best_avg_time << " ms, " << best_gb_per_sec
-                  << " GB/s, " << best_instance_name << std::endl;
+        std::cout << "alpha = " << alpha << ", " << "beta = " << beta << ", " << best_avg_time
+                  << " ms, " << best_gb_per_sec << " GB/s, " << best_instance_name << std::endl;
+    }
+    if(instance_index != -1)
+    {
+        std::cout << "reduce_instance (" << instance_index << "/" << num_kernel << "): Passed"
+                  << std::endl;
     }
     if(instance_index != -1)
     {

@@ -52,6 +52,25 @@ inline std::string get_device_name()
     }
 }
 
+inline bool is_gfx11_supported()
+{
+    return get_device_name() == "gfx1100" || get_device_name() == "gfx1101" ||
+           get_device_name() == "gfx1102" || get_device_name() == "gfx1103" ||
+           get_device_name() == "gfx1150" || get_device_name() == "gfx1151" ||
+           get_device_name() == "gfx1152";
+}
+
+inline bool is_gfx12_supported()
+{
+    return get_device_name() == "gfx1200" || get_device_name() == "gfx1201";
+}
+
+inline bool is_load_tr_supported()
+{
+    // Check if load transpose is supported.
+    return get_device_name() == "gfx950";
+}
+
 inline bool is_gfx13_supported()
 {
     return ck_tile::get_device_name() == "gfx1310" || ck_tile::get_device_name() == "gfx1370" ||
