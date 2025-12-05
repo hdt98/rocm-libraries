@@ -2353,7 +2353,8 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     optSchedule = {
     'SYNC': [[-1, 13, 22, 22, 27, 31, 31]],                                                  # iter0 : GR Red
-    'LRA0': [[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],                               # iter1 : GR Black
+    'LRA0': [[0, 2, 4, 6, 8, 10, 12, 14, 16, 17, 18, 19, 20, 21]],
+                                       # iter1 : GR Black
                                                                                              #                    LR1 Red
     'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],                                                 # iter2 :         GR Red
                                                                                              #         LR0 Red,    LR1 Black                                       
@@ -2365,7 +2366,7 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     'GRB': [[                                                                                                           32, 32, 33, 33, 35, 35, 36, 36]],
     'LWSA': [[36]],
     'LWSB': [[36]],
-    'LRA1': [[                                                                                                       32, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53]],
+    'LRA1': [[                                                                                                       32, 34, 36, 38, 42, 44, 46, 47, 48, 49, 50, 51, 52, 54]],
     'LRB1': [[40, 54]],
     'LCC': [[55, 55]],
     }
@@ -2373,12 +2374,43 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     syncCode = [
         SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=1 newLW=0 newLR=1 for iteration == 0"),
         SWaitCnt(dscnt=14, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
-        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+        SWaitCnt(dscnt=18, vlcnt=-1, vscnt=-1, comment=""), # 
         SBarrier(comment=""),
         SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
         SWaitCnt(dscnt=-1, vlcnt=7, vscnt=-1, comment="wait for previous set of global reads"),
         SBarrier(comment="")
     ]
+
+    """
+
+    optSchedule = {
+    'GRA': [[22,22,23,23,24,24,26,26,27,27,29,29,30,30]],
+    'GRB': [[32,32,33,33,35,35,36,36]],
+    'GRIncA': [[0,0,0,1,1,1,2,2,2]],
+    'GRIncB': [[3,3,3,4,4,4,5,5,5]],
+    'LCC': [[55,55]],
+    'LRA0': [[0,2,3,4,5,6,7,8,9,10,11,12,13,14]],
+    'LRA1': [[39,41,42,43,44,45,46,47,48,49,50,51,52,53]],
+    'LRB0': [[1,15]],
+    'LRB1': [[40,54]],
+    'LRSA': [[26]],
+    'LRSB': [[26]],
+    'LWSA': [[36]],
+    'LWSB': [[36]],
+    'SYNC': [[-1,13,22,22,27,38,38]]
+}
+
+    syncCode = [
+        SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=1 newLW=0 newLR=1 for iteration == 0"),
+        SWaitCnt(dscnt=14, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+        SBarrier(comment=""),
+        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+        SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
+        SBarrier(comment="")
+    ]
+    """
+
     # nglshift = nllshift = 11
     numMfma = 56
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
