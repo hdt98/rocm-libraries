@@ -300,6 +300,225 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu]")
     }
 }
 
+TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
+{
+    using namespace Scheduling::LDSBankModel;
+
+    constexpr auto workgroupSize = 64u;
+
+    int instrDwords;
+    int strideMultiplier;
+    int write;
+
+    constexpr auto testIndividual = false;
+    if(testIndividual)
+    {
+        instrDwords      = GENERATE(2);
+        strideMultiplier = GENERATE(4);
+        write            = GENERATE(false);
+    }
+    else
+    {
+        instrDwords      = GENERATE(1, 2, 4);
+        strideMultiplier = GENERATE(1, 2, 4, 8);
+        write            = GENERATE(true, false);
+    }
+
+    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+
+    const auto name = fmt::format("lds_weave_waitcnt_{}_b{}_stride{}",
+                                  write ? "write" : "read",
+                                  instrDwords * 32,
+                                  strideMultiplier);
+
+    rocRoller::profiler::reset();
+
+    auto context = TestContext::ForTestDevice({}, name);
+
+    if(not context->targetArchitecture().target().isCDNA35GPU())
+    {
+        SKIP("Currently only testing on gfx950");
+    }
+
+    SECTION(name)
+    {
+        auto command = std::make_shared<Command>();
+        auto k       = context->kernel();
+
+        k->setKernelDimensions(1);
+
+        const auto one  = std::make_shared<Expression::Expression>(1u);
+        const auto zero = std::make_shared<Expression::Expression>(0u);
+
+        auto workitemCount = Expression::literal(workgroupSize * 256);
+        k->setWorkgroupSize({workgroupSize, 1, 1});
+        k->setWorkitemCount({workitemCount, one, one});
+        k->setDynamicSharedMemBytes(zero);
+
+        context->schedule(k->preamble());
+        context->schedule(k->prolog());
+
+        auto ldsData = Register::Value::AllocateLDS(
+            context.get(),
+            DataType::Raw32,
+            context->targetArchitecture().GetCapability(GPUCapability::MaxLdsSize) / 4);
+
+        auto ldsWithOffset = Register::Value::Placeholder(
+            context.get(), Register::Type::Vector, DataType::UInt32, 1);
+        auto workitemIndex = context->kernel()->workitemIndex()[0];
+
+        auto kb = [&]() -> Generator<Instruction> {
+            co_yield Expression::generate(
+                ldsWithOffset,
+                Expression::literal(ldsData->getLDSAllocation()->offset())
+                    + workitemIndex->expression()
+                          * Expression::literal((4 * strideMultiplier * instrDwords)
+                                                % ldsData->getLDSAllocation()->size()),
+                context.get());
+
+            auto ldsDst = Register::Value::Placeholder(
+                context.get(),
+                Register::Type::Vector,
+                DataType::Raw32,
+                248,
+                Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                                            .alignment            = instrDwords});
+            co_yield ldsDst->allocate();
+
+            co_yield context->mem()->barrier({});
+
+            int counter = 0;
+            for(int i = 0; i < 32; ++i)
+            {
+                const auto [start, end]
+                    = getAlignedSubset(ldsDst->registerCount(), instrDwords, counter++);
+                auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
+
+                if(write)
+                    co_yield context->mem()->storeLocal(ldsWithOffset, dstRegs, 0, 4 * instrDwords);
+                else
+                    co_yield context->mem()->loadLocal(dstRegs, ldsWithOffset, 0, 4 * instrDwords);
+
+                co_yield Instruction::Wait(WaitCount::DSCnt(context->targetArchitecture(), 0));
+            }
+        };
+
+        auto scheduler = Component::GetNew<Scheduling::Scheduler>(
+            std::make_tuple(Scheduling::SchedulerProcedure::Priority,
+                            Scheduling::CostFunction::LinearWeighted,
+                            context.get()));
+
+        std::vector<Instruction> instructions;
+        for(auto inst : kb())
+        {
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+                inst.setAddresses(baseAddresses);
+            context->schedule(inst);
+            instructions.push_back(inst);
+        }
+        instructions.push_back(Instruction("s_endpgm", {}, {}, {}, ""));
+
+        context->schedule(k->postamble());
+        context->schedule(k->amdgpu_metadata());
+
+        CommandKernel commandKernel;
+        commandKernel.setContext(context.get());
+        commandKernel.generateKernel();
+
+        CommandArguments commandArgs = command->createArguments();
+
+        std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
+
+        for(int run = 0; run < NUM_RUNS; ++run)
+        {
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData(
+                [&]() { commandKernel.launchKernel(commandArgs.runtimeArguments()); });
+            allLatencies.push_back(latencies);
+        }
+
+        // Filter instructions and verify alignment with profiler data
+        const auto filteredInstructions
+            = filterAndVerifyInstructions(instructions, allLatencies[0]);
+
+        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
+        INFO(infoStr);
+
+        size_t expectedSize = allLatencies[0].size();
+        REQUIRE(std::all_of(
+            allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
+                return latencies.size() == expectedSize;
+            }));
+
+        std::vector<std::tuple<std::string, size_t>> medianLatencies;
+        for(size_t i = 0; i < filteredInstructions.size(); ++i)
+        {
+            std::vector<uint64_t> latenciesPerRun;
+            for(const auto& runLatencies : allLatencies)
+            {
+                latenciesPerRun.push_back(runLatencies[i].meanLatency());
+            }
+            auto       medianLatency = median_of_odd_elements(latenciesPerRun);
+            const auto instrString   = allLatencies[0][i].instruction;
+            medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
+        }
+
+        size_t totalAbsoluteDelta       = 0;
+        size_t incorrectPredictionCount = 0;
+        size_t ldsInstructionCount      = 0;
+        size_t waitcntInstructionCount  = 0;
+
+        for(size_t i = 0; i < filteredInstructions.size(); ++i)
+        {
+            const auto& inst = filteredInstructions[i];
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+            {
+                using namespace Scheduling::LDSBankModel;
+
+                int modelLatency = inst.totalCycles() * 4;
+
+                auto actualLatency = std::get<1>(medianLatencies[i]);
+                auto delta         = static_cast<int>(actualLatency) - modelLatency;
+
+                totalAbsoluteDelta += std::abs(delta);
+                ldsInstructionCount++;
+
+                if(write && instrDwords == 4)
+                {
+                    if(std::abs(delta) > 12)
+                        incorrectPredictionCount++;
+                }
+                else if(delta != 0)
+                {
+                    incorrectPredictionCount++;
+                }
+            }
+            else if(inst.getOpCode().find("s_waitcnt") != std::string::npos)
+            {
+                waitcntInstructionCount++;
+            }
+        }
+
+        INFO(fmt::format(
+            "Total absolute delta: {}, Incorrect predictions: {}/{}, Waitcnt instructions: {}",
+            totalAbsoluteDelta,
+            incorrectPredictionCount,
+            ldsInstructionCount,
+            waitcntInstructionCount));
+
+        CHECK(waitcntInstructionCount == 32);
+
+        if(write && instrDwords == 4)
+            CHECK(totalAbsoluteDelta <= 6 * ldsInstructionCount);
+        else
+            CHECK(totalAbsoluteDelta * 2 <= ldsInstructionCount);
+
+        CHECK(incorrectPredictionCount <= 4);
+
+        if(testIndividual)
+            Log::trace(context.output());
+    }
+}
+
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
 {
     using namespace Scheduling::LDSBankModel;
