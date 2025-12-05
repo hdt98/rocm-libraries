@@ -15,3 +15,4 @@ index abcdef1..1234567 100644
                  if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
                  {
 
+

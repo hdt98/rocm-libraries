@@ -16,3 +16,4 @@ index abcdef1..1234567 100644
                  m_loadedCOFiles.insert(removeXnack(std::string(path.begin() + start, path.end())));
              }
 
+

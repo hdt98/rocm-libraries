@@ -13,3 +13,4 @@ index abcdef1..1234567 100644
              b          = TensorDescriptor("b", bType, {n, k, batchSize}, {1, ldb, bStride});
              free[1].i  = 0;
 
+

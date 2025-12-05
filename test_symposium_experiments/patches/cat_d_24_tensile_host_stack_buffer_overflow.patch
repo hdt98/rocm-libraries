@@ -13,3 +13,4 @@ index abcdef1..1234567 100644
          std::string deviceFullString(deviceProperties.gcnArchName);
          std::string deviceString = deviceFullString.substr(0, deviceFullString.find(":"));
 
+

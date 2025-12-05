@@ -13,3 +13,4 @@ index abcdef1..1234567 100644
              arg.strideD2 = d.strides()[startStrideCD + 1];
              arg.strideC1 = c.strides()[startStrideCD];
 
+

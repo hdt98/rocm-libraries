@@ -16,3 +16,4 @@ index abcdef1..1234567 100644
  
          bool SolutionAdapter::FindCodeObject(std::string const& codeObjectFile)
 
+

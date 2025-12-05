@@ -13,3 +13,4 @@ index abcdef1..1234567 100644
          // Once set, a.adapter contains the adapter for the current HIP device ID
          if(!adapter)
 
+

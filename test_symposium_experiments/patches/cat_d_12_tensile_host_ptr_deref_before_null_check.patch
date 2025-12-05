@@ -18,3 +18,4 @@ index abcdef1..1234567 100644
              status = getBestSolutions(
                  prob, handle, gemmData, 1, &heuristicResult, &returnAlgoCount, prob.workspaceSize);
 
+

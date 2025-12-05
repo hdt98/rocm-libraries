@@ -15,3 +15,4 @@ index abcdef1..1234567 100644
  
      std::pair<int32_t, uint32_t> ContractionSolution::calculateAutoWGM(
 
+
