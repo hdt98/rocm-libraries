@@ -21,9 +21,6 @@ from config_loader import load_repo_config
 logging.basicConfig(level=logging.INFO)
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-# Paths matching any of these patterns are considered to have no influence over
-# build or test workflows so any related jobs can be skipped if all paths
-# modified by a commit/PR match a pattern in this list.
 SKIPPABLE_PATH_PATTERNS = [
     "docs/*",
     ".gitignore",
@@ -125,20 +122,17 @@ def get_changed_path_projects(paths: Optional[Iterable[str]]) -> Iterable[str]:
 
 
 def retrieve_projects(args):
-    # For pushes and pull_requests, we only want to test changed projects
+
     base_ref = args.get("base_ref")
     modified_paths = get_modified_paths(base_ref)
 
-    # by default, we select full tests
+
     test_type = "full"
 
-    # Check if CI should be skipped based on modified paths
-    # (only for push and pull_request events, not workflow_dispatch or nightly)
     if args.get("is_push") or args.get("is_pull_request"):
         paths_set = set(modified_paths)
         contains_non_skippable_files = check_for_non_skippable_path(paths_set)
-        
-        # If only skippable paths were modified, skip CI
+
         if not contains_non_skippable_files:
             logging.info("Only skippable paths were modified, skipping CI")
             return [], test_type
@@ -151,7 +145,6 @@ def retrieve_projects(args):
         else:
             subtrees = args.get("input_projects").split()
 
-    # If .github/*/therock* were changed for a push or pull request, run all subtrees
     if args.get("is_push") or args.get("is_pull_request"):
         related_to_therock_ci = check_for_workflow_file_related_to_ci(modified_paths)
         if related_to_therock_ci:
@@ -159,7 +152,7 @@ def retrieve_projects(args):
             subtrees = list(subtree_to_project_map.keys())
             test_type = "smoke"
 
-    # for nightly runs, run everything with full tests
+
     if args.get("is_nightly"):
         subtrees = list(subtree_to_project_map.keys())
 
