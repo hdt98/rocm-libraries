@@ -89,8 +89,8 @@ add_link_options("-Wl,--gc-sections" "-Wl,--print-gc-sections")
 set(CMAKE_CXX_VISIBILITY_PRESET hidden CACHE STRING "Force hidden" FORCE)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON CACHE BOOL "Force hidden inlines" FORCE)
 
-set(AMDGPU_TARGETS "gfx908" CACHE STRING "Force legacy arch" FORCE)
-set(GPU_TARGETS "gfx908" CACHE STRING "Force new arch" FORCE)
+set(AMDGPU_TARGETS "gfx90a" CACHE STRING "Force legacy arch" FORCE)
+set(GPU_TARGETS "gfx90a" CACHE STRING "Force new arch" FORCE)
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Force Shared" FORCE)
 set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "RelWithDebInfo" FORCE)
