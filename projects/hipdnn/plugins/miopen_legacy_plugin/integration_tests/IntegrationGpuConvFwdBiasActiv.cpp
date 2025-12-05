@@ -82,6 +82,7 @@ protected:
             graph::PointwiseAttributes biasAttrs;
             biasAttrs.set_name("bias");
             biasAttrs.set_mode(hipdnn_frontend::PointwiseMode::ADD);
+            biasAttrs.set_compute_data_type(dataType);
 
             yBiasTensorAttr = graphObj.pointwise(yConvTensorAttr, biasTensorAttr, biasAttrs);
             yBiasTensorAttr->set_name("y_bias");

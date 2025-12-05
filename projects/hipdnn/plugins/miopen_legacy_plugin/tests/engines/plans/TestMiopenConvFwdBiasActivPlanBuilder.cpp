@@ -88,18 +88,19 @@ struct ConvolutionBiasActivationTestParam
     {
         using namespace hipdnn_sdk::utilities;
         os << tc.label;
-        os << "\nOperation:" << tc.op;
-        os << "\nConv: " << tc.convTestCase;
-        os << "\nLayout: "
+        os << ", Operation:" << tc.op;
+        os << ", Conv: " << tc.convTestCase;
+        os << ", Layout: "
            << (tc.layout.name.empty() ? vecToString(tc.layout.strideOrder) : tc.layout.name);
-        os << "\nActiv: " << tc.activTestCase;
-        os << "\nDefault DataType: " << tc.defaultDataType;
-        os << "\nDataTypes:\n";
+        os << ", Activ: " << tc.activTestCase;
+        os << ", DefaultDataType: " << tc.defaultDataType;
+        os << ", DataTypes: [";
         for(const auto& [typeKey, dataType] : tc.dataTypes)
         {
-            os << "\t" << typeKey << ": " << dataType << "\n";
+            os << typeKey << ": " << dataType << ", ";
         }
-        os << "Virtual tensors: " << vecToString(tc.virtualTensors) << "\n";
+        os << "], ";
+        os << "Virtual tensors: " << vecToString(tc.virtualTensors);
 
         return os;
     }
@@ -249,23 +250,6 @@ protected:
     bool _isApplicable;
 };
 
-TEST_P(TestGpuMiopenConvFwdBiasActivPlanBuilder, IsApplicableGetWorkspaceSizeAndBuildPlan)
-{
-    auto graphBuffer = _graphObj.buildFlatbufferOperationGraph();
-    auto graph = GraphWrapper(graphBuffer.data(), graphBuffer.size());
-
-    EXPECT_EQ(_planBuilder.isApplicable(_handle, graph), _isApplicable);
-
-    if(_isApplicable)
-    {
-        EXPECT_NO_THROW(_planBuilder.getWorkspaceSize(_handle, graph));
-
-        HipdnnEnginePluginExecutionContext ctx;
-        ASSERT_NO_THROW(_planBuilder.buildPlan(_handle, graph, ctx));
-        EXPECT_TRUE(ctx.hasValidPlan());
-    }
-}
-
 test_conv_common::ConvTestCase validConvTestCase4d()
 {
     return {{2, 3, 4, 4}, {1, 3, 2, 2}, {0, 0}, {0, 0}, {1, 1}, {1, 1}, 0};
@@ -278,7 +262,7 @@ test_conv_common::ConvTestCase validConvTestCase5d()
 
 test_activation_common::ActivTestCase validActivTestCase()
 {
-    return {PointwiseMode::RELU_FWD,
+    return {hipdnn_sdk::data_objects::PointwiseMode::RELU_FWD,
             std::nullopt,
             std::nullopt,
             std::nullopt,
@@ -527,6 +511,23 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
                  "Invalid Bfloat16, y_conv intermediate tensor must be Float"}};
 
     return params;
+}
+
+TEST_P(TestGpuMiopenConvFwdBiasActivPlanBuilder, IsApplicableGetWorkspaceSizeAndBuildPlan)
+{
+    auto graphBuffer = _graphObj.buildFlatbufferOperationGraph();
+    auto graph = GraphWrapper(graphBuffer.data(), graphBuffer.size());
+
+    EXPECT_EQ(_planBuilder.isApplicable(_handle, graph), _isApplicable);
+
+    if(_isApplicable)
+    {
+        EXPECT_NO_THROW(_planBuilder.getWorkspaceSize(_handle, graph));
+
+        HipdnnEnginePluginExecutionContext ctx;
+        ASSERT_NO_THROW(_planBuilder.buildPlan(_handle, graph, ctx));
+        EXPECT_TRUE(ctx.hasValidPlan());
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(,

@@ -101,8 +101,6 @@ TEST(TestMiopenEngine, IsApplicableReturnsTrueIfAnyPlanBuilderApplicable)
 
     MockGraph mockGraph;
     auto graphBuilder = hipdnn_sdk::test_utilities::createEmptyValidGraph();
-    auto graphPtr = hipdnn_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
-    EXPECT_CALL(mockGraph, getGraph()).WillOnce(::testing::ReturnRef(*graphPtr));
 
     HipdnnEnginePluginHandle dummyHandle;
     EXPECT_TRUE(engine.isApplicable(dummyHandle, mockGraph));
@@ -123,8 +121,6 @@ TEST(TestMiopenEngine, IsApplicableReturnsAfterTheFirstApplicablePlanBuilder)
 
     MockGraph mockGraph;
     auto graphBuilder = hipdnn_sdk::test_utilities::createEmptyValidGraph();
-    auto graphPtr = hipdnn_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
-    EXPECT_CALL(mockGraph, getGraph()).WillOnce(::testing::ReturnRef(*graphPtr));
 
     HipdnnEnginePluginHandle dummyHandle;
     EXPECT_TRUE(engine.isApplicable(dummyHandle, mockGraph));
@@ -136,8 +132,6 @@ TEST(TestMiopenEngine, IsApplicableReturnsFalseIfNoPlanBuilders)
 
     MockGraph mockGraph;
     auto graphBuilder = hipdnn_sdk::test_utilities::createEmptyValidGraph();
-    auto graphPtr = hipdnn_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
-    EXPECT_CALL(mockGraph, getGraph()).WillOnce(::testing::ReturnRef(*graphPtr));
 
     HipdnnEnginePluginHandle dummyHandle;
     EXPECT_FALSE(engine.isApplicable(dummyHandle, mockGraph));
@@ -154,8 +148,6 @@ TEST(TestMiopenEngine, IsApplicableReturnsFalseIfNoPlanBuilderApplicable)
 
     MockGraph mockGraph;
     auto graphBuilder = hipdnn_sdk::test_utilities::createEmptyValidGraph();
-    auto graphPtr = hipdnn_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
-    EXPECT_CALL(mockGraph, getGraph()).WillOnce(::testing::ReturnRef(*graphPtr));
 
     HipdnnEnginePluginHandle dummyHandle;
     EXPECT_FALSE(engine.isApplicable(dummyHandle, mockGraph));
