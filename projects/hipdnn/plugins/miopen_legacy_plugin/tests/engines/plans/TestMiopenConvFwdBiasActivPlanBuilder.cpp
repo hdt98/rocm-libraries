@@ -246,12 +246,21 @@ protected:
     bool _isApplicable;
 };
 
-TEST_P(TestGpuMiopenConvFwdBiasActivPlanBuilder, IsApplicable)
+TEST_P(TestGpuMiopenConvFwdBiasActivPlanBuilder, IsApplicableGetWorkspaceSizeAndBuildPlan)
 {
     auto graphBuffer = _graphObj.buildFlatbufferOperationGraph();
     auto graph = GraphWrapper(graphBuffer.data(), graphBuffer.size());
 
     EXPECT_EQ(_planBuilder.isApplicable(_handle, graph), _isApplicable);
+
+    if(_isApplicable)
+    {
+        EXPECT_NO_THROW(_planBuilder.getWorkspaceSize(_handle, graph));
+
+        HipdnnEnginePluginExecutionContext ctx;
+        ASSERT_NO_THROW(_planBuilder.buildPlan(_handle, graph, ctx));
+        EXPECT_TRUE(ctx.hasValidPlan());
+    }
 }
 
 test_conv_common::ConvTestCase validConvTestCase4d()
@@ -603,15 +612,6 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, GetWorkspaceSizeThrowsForUnsupport
                  hipdnn_plugin::HipdnnPluginException);
 }
 
-// BRING THIS ONE BACK
-// TEST_F(TestGpuMiopenConvFwdBiasActivPlanBuilder, GetWorkspaceSizeReturnsValueForSupportedGraph)
-// {
-//     auto builder = hipdnn_sdk::test_utilities::createValidConvFwdBiasActivGraph();
-//     hipdnn_plugin::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
-
-//     EXPECT_NO_THROW(_planBuilder.getWorkspaceSize(_handle, graph));
-// }
-
 TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, BuildPlanThrowsForWrongNodeCountGraph)
 {
     {
@@ -643,14 +643,4 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, BuildPlanThrowsForUnsupportedGraph
     EXPECT_THROW(_planBuilder.buildPlan(_dummyHandle, graph, ctx),
                  hipdnn_plugin::HipdnnPluginException);
     EXPECT_FALSE(ctx.hasValidPlan());
-}
-
-TEST_F(TestGpuMiopenConvFwdBiasActivPlanBuilder, BuildPlanCreatesValidPlanForSupportedGraph)
-{
-    auto builder = hipdnn_sdk::test_utilities::createValidConvFwdBiasActivGraph();
-    hipdnn_plugin::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
-    HipdnnEnginePluginExecutionContext ctx;
-
-    EXPECT_NO_THROW(_planBuilder.buildPlan(_handle, graph, ctx));
-    EXPECT_TRUE(ctx.hasValidPlan());
 }
