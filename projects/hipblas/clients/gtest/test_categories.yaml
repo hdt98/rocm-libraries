@@ -2,7 +2,7 @@
 # This file defines test categories for selective test execution with CTest
 
 test_categories:
-  auxil:
+  level1:
     description: "Auxiliary functions (set/get operations, utility functions)"
     test_patterns:
       - "*auxiliary*"
@@ -14,10 +14,10 @@ test_categories:
       - "auxil/set_get_matrix_vector_gtest.cpp"
     labels:
       - "auxil"
-      - "utility"
+      - "level1"
       - "basic"
 
-  blas1:
+  level2:
     description: "BLAS Level 1 operations (vector-vector operations)"
     test_patterns:
       - "*asum*"
@@ -48,9 +48,9 @@ test_categories:
       - "*iamin*"
     labels:
       - "blas1"
-      - "level1"
+      - "level2"
 
-  blas2:
+  level3:
     description: "BLAS Level 2 operations (matrix-vector operations)"
     test_patterns:
       - "*gbmv*"
@@ -103,9 +103,9 @@ test_categories:
     exclude:
     labels:
       - "blas2"
-      - "level2"
+      - "level3"
 
-  blas3:
+  level4:
     description: "BLAS Level 3 operations (matrix-matrix operations)"
     test_patterns:
       - "*dgmm*"
@@ -144,9 +144,9 @@ test_categories:
       - "*trtri*"
     labels:
       - "blas3"
-      - "level3"
+      - "level4"
 
-  blas_ex:
+  level5:
     description: "BLAS Extended operations (mixed precision, enhanced functionality)"
     test_patterns:
       - "*_ex*"
@@ -175,9 +175,9 @@ test_categories:
     labels:
       - "blas_ex"
       - "extended"
-      - "level4"
+      - "level5"
 
-  solver:
+  level6:
     description: "Linear algebra solver operations"
     test_patterns:
       - "*gels*"
@@ -194,15 +194,15 @@ test_categories:
       - "solver/getrs_gtest.cpp"
     labels:
       - "solver"
-      - "level5"
+      - "level6"
 
 # Test execution settings
 execution_settings:
   default_timeout: 300  # 5 minutes per test
   category_timeouts:
-    auxil: 120      # 2 minutes for auxiliary tests
-    blas1: 300      # 5 minutes for BLAS1 tests
-    blas2: 600      # 10 minutes for BLAS2 tests
-    blas3: 900      # 15 minutes for BLAS3 tests (more intensive)
-    blas_ex: 600    # 10 minutes for extended BLAS tests
-    solver: 1200    # 20 minutes for solver tests (most intensive)
+    level1: 120      # 2 minutes for auxiliary tests
+    level2: 300      # 5 minutes for BLAS1 tests
+    level3: 600      # 10 minutes for BLAS2 tests
+    level4: 900      # 15 minutes for BLAS3 tests (more intensive)
+    level5: 600    # 10 minutes for extended BLAS tests
+    level6: 1200    # 20 minutes for solver tests (most intensive)

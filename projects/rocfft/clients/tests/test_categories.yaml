@@ -1,62 +1,17 @@
 # rocFFT Test Categories Configuration
 # This file defines test categories for selective test execution with CTest
-
 test_categories:
-  pow2_1D:
-    description: "1D Power-of-2 FFT tests (fundamental 1D transforms with radix-2 decomposition)"
+  level1:
+    description: "Power-of-X FFT tests"
     test_patterns:
       - "*pow2_1D*"
       - "*offset_pow2_1D*"
-    test_files:
-      - "tests/accuracy_test_1D.cpp"
-    labels:
-      - "pow2_1D"
-      - "1d"
-      - "power_of_2"
-      - "accuracy"
-
-  pow2_2D:
-    description: "2D Power-of-2 FFT tests (2D transforms with radix-2 decomposition)"
-    test_patterns:
       - "*pow2_2D*"
       - "*offset_pow2_2D*"
-    test_files:
-      - "tests/accuracy_test_2D.cpp"
-    labels:
-      - "pow2_2D"
-      - "2d"
-      - "power_of_2"
-      - "accuracy"
-
-  pow2_3D:
-    description: "3D Power-of-2 FFT tests (3D transforms with radix-2 decomposition)"
-    test_patterns:
       - "*pow2_3D*"
       - "*offset_pow2_3D*"
-    test_files:
-      - "tests/accuracy_test_3D.cpp"
-    labels:
-      - "pow2_3D"
-      - "3d"
-      - "power_of_2"
-      - "accuracy"
-
-  prime_1D:
-    description: "1D Prime-length FFT tests (prime number length transforms)"
-    test_patterns:
       - "*prime_1D*"
       - "*offset_prime_1D*"
-    test_files:
-      - "tests/accuracy_test_1D.cpp"
-    labels:
-      - "prime_1D"
-      - "1d"
-      - "prime"
-      - "accuracy"
-
-  mix_1D:
-    description: "1D Mixed-radix FFT tests (composite number length transforms)"
-    test_patterns:
       - "*mix_1D*"
       - "*offset_mix_1D*"
       - "*radX_1D*"
@@ -64,152 +19,80 @@ test_categories:
       - "*pow5_1D*"
     test_files:
       - "tests/accuracy_test_1D.cpp"
+      - "tests/accuracy_test_2D.cpp"
+      - "tests/accuracy_test_3D.cpp"
     labels:
-      - "mix_1D"
-      - "1d"
-      - "mixed_radix"
+      - "level1"
       - "accuracy"
 
-  callback_tests:
-    description: "Callback function tests (user-defined callback functions for data processing)"
+  level2:
+    description: "Callback function and hermitian tests" 
     test_patterns:
       - "*callback*"
       - "*scaling*"
-    test_files:
-      - "tests/accuracy_test_callback.cpp"
-      - "tests/callback_change_type.cpp"
-      - "tests/default_callbacks_test.cpp"
-    labels:
-      - "callback"
-      - "advanced"
-      - "accuracy"
-
-  hermitian_tests:
-    description: "Hermitian FFT tests (real-to-complex and complex-to-real transforms)"
-    test_patterns:
       - "*hermitian*"
       - "*real_to_complex*"
       - "*complex_to_real*"
     test_files:
+      - "tests/accuracy_test_callback.cpp"
+      - "tests/callback_change_type.cpp"
+      - "tests/default_callbacks_test.cpp"
       - "tests/hermitian_test.cpp"
     labels:
-      - "hermitian"
-      - "real_complex"
-      - "accuracy"
+      - "level2"
+      - "advanced"
 
-  unit_test:
-    description: "Unit tests (API validation, parameter checking, utility functions)"
+  level3:
+    description: "Unit tests and Adhoc"
     test_patterns:
       - "*unit_test*"
       - "*rocfft_UnitTest*"
+      - "*adhoc*"
+      - "*offset_adhoc*"
     test_files:
       - "tests/unit_test.cpp"
       - "tests/buffer_hash_test.cpp"
       - "tests/validate_length_stride.cpp"
+      - "accuracy_test_adhoc.cpp"
     exclude:
       - "*multithread*"
       - "*multi_device*"
     labels:
       - "unit_test"
-      - "api"
-      - "validation"
+      - "level3"
 
-  adhoc:
-    description: "Ad-hoc tests (specific edge cases and regression tests)"
-    test_patterns:
-      - "*adhoc*"
-      - "*offset_adhoc*"
-    test_files:
-      - "accuracy_test_adhoc.cpp"
-    labels:
-      - "adhoc"
-      - "edge_cases"
-      - "accuracy"
-
-  performance:
-    description: "Performance and optimization tests (buffer management, hashing, threading)"
+  level4:
+    description: "Performance, mpi and emulation tests"
     test_patterns:
       - "*buffer_hash*"
       - "*multithread*"
       - "*multi_device*"
+      - "*emulation*"
+      - "*checkstride*"
+      - "*mpi*"
+      - "*worker*"
+      - "*half*"
+      - "*fp16*"
       - "*hipGraph*"
     test_files:
       - "tests/buffer_hash_test.cpp"
       - "tests/multithread_test.cpp"
       - "tests/multi_device_test.cpp"
       - "tests/hipGraph_test.cpp"
-    labels:
-      - "performance"
-      - "optimization"
-      - "threading"
-
-  emulation:
-    description: "Emulation and checkstride tests (stride validation and emulation mode)"
-    test_patterns:
-      - "*emulation*"
-      - "*checkstride*"
-    test_files:
       - "tests/accuracy_test_emulation.cpp"
       - "tests/accuracy_test_checkstride.cpp"
-    labels:
-      - "emulation"
-      - "stride"
-      - "validation"
-
-  mpi:
-    description: "MPI parallel processing tests (multi-process FFT computation)"
-    test_patterns:
-      - "*mpi*"
-      - "*worker*"
-    test_files:
       - "tests/rocfft_mpi_worker.cpp"
-    labels:
-      - "mpi"
-      - "parallel"
-      - "distributed"
-
-  smoke:
-    description: "Quick smoke tests (basic functionality verification)"
-    test_patterns:
-      - "*pow2_1D*"
-    test_files:
-      - "tests/accuracy_test_1D.cpp"
-    exclude:
-      - "*offset*"
-      - "*DISABLED*"
-    labels:
-      - "smoke"
-      - "quick"
-      - "basic"
-
-  half_precision:
-    description: "Half-precision floating point tests (FP16 accuracy verification)"
-    test_patterns:
-      - "*half*"
-      - "*fp16*"
-    test_files:
       - "tests/accuracy_test_1D.cpp"
     labels:
-      - "half_precision"
-      - "fp16"
-      - "accuracy"
+      - "performance"
+      - "level4"
 
 # Test execution settings
 execution_settings:
   default_timeout: 300  # 5 minutes per test
   category_timeouts:
-    pow2_1D: 300        # 5 minutes for basic 1D tests
-    pow2_2D: 600        # 10 minutes for 2D tests (more complex)
-    pow2_3D: 900        # 15 minutes for 3D tests (most complex)
-    prime_1D: 600       # 10 minutes for prime length tests
-    mix_1D: 600         # 10 minutes for mixed radix tests
-    callback: 600       # 10 minutes for callback tests
-    hermitian: 600      # 10 minutes for hermitian tests
-    unit_test: 300      # 5 minutes for unit tests
-    adhoc: 900          # 15 minutes for adhoc tests (edge cases)
-    performance: 1200   # 20 minutes for performance tests
-    emulation: 600      # 10 minutes for emulation tests
-    mpi: 600            # 10 minutes for MPI tests
-    smoke: 120          # 2 minutes for smoke tests
-    half_precision: 300 # 5 minutes for half precision tests
+    level1: 600        # 10 minutes
+    level2: 900        # 15 minutes 
+    level3: 1200       # 20 minutes for prime length tests
+    level4: 1500         # 25 minutes for mixed radix tests
 
