@@ -113,6 +113,9 @@ protected:
     {
         namespace graph = hipdnn_frontend::graph;
 
+        // Re-enable in Windows once CK is supported
+        SKIP_IF_WINDOWS();
+
         SKIP_IF_NO_DEVICES();
         ASSERT_EQ(miopenCreate(&_handle.miopenHandle), miopenStatusSuccess);
 

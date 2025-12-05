@@ -1,0 +1,21 @@
+# ninja log v5
+0	21	1761768369191766035	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-mkdir	a0cab4367048dcca
+0	21	1761768369191766035	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-mkdir	a0cab4367048dcca
+21	525	1761768369695750393	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-download	94249c1cb1d54a6b
+21	525	1761768369695750393	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-download	94249c1cb1d54a6b
+525	541	1761768369711749896	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-update	29d2ef60202dc55c
+525	541	1761768369711749896	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-update	29d2ef60202dc55c
+541	557	1761768369727749400	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-patch	d5757a9d6bc9b3d4
+541	557	1761768369727749400	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-patch	d5757a9d6bc9b3d4
+557	573	1761768369743748904	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-configure	69ba10ecad099cfa
+557	573	1761768369743748904	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-configure	69ba10ecad099cfa
+573	590	1761768369759748407	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-build	607303dcead8b905
+573	590	1761768369759748407	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-build	607303dcead8b905
+590	605	1761768369775747910	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-install	2df4b67cb323c10d
+590	605	1761768369775747910	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-install	2df4b67cb323c10d
+605	622	1761768369791747413	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-test	1c715a3b946b5cf
+605	622	1761768369791747413	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-test	1c715a3b946b5cf
+622	657	1761768369827746296	CMakeFiles/gtest-populate-complete	7ca5a78f9bf21a66
+622	657	1761768369827746296	gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-done	7ca5a78f9bf21a66
+622	657	1761768369827746296	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/CMakeFiles/gtest-populate-complete	7ca5a78f9bf21a66
+622	657	1761768369827746296	/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/gtest-populate-prefix/src/gtest-populate-stamp/gtest-populate-done	7ca5a78f9bf21a66

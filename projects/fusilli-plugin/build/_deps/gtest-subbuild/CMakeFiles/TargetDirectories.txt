@@ -1,0 +1,3 @@
+/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/CMakeFiles/gtest-populate.dir
+/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/CMakeFiles/edit_cache.dir
+/data/rocm-libraries/projects/fusilli-plugin/build/_deps/gtest-subbuild/CMakeFiles/rebuild_cache.dir
