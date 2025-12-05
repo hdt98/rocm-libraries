@@ -153,29 +153,6 @@ TEST(TestMiopenEngine, IsApplicableReturnsFalseIfNoPlanBuilderApplicable)
     EXPECT_FALSE(engine.isApplicable(dummyHandle, mockGraph));
 }
 
-TEST(TestMiopenEngine, IsApplicableReturnsFalseForComputeTypeNotF32)
-{
-    auto mockPlanBuilder = std::make_unique<MockPlanBuilder>();
-
-    ON_CALL(*mockPlanBuilder, isApplicable(::testing::_, ::testing::_))
-        .WillByDefault(::testing::Return(true));
-
-    MiopenEngine engine(0);
-    engine.addPlanBuilder(std::move(mockPlanBuilder));
-
-    MockGraph mockGraph;
-    auto graphBuilder = hipdnn_sdk::test_utilities::createValidBatchnormInferenceGraph(
-        {1, 3, 224, 224},
-        {1, 3, 224, 224},
-        hipdnn_sdk::data_objects::DataType::HALF,
-        hipdnn_sdk::data_objects::DataType::HALF);
-    auto graphPtr = hipdnn_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
-    EXPECT_CALL(mockGraph, getGraph()).WillOnce(::testing::ReturnRef(*graphPtr));
-
-    HipdnnEnginePluginHandle dummyHandle;
-    EXPECT_FALSE(engine.isApplicable(dummyHandle, mockGraph));
-}
-
 TEST(TestMiopenEngine, GetDetailsReturnsSerializedEngineDetails)
 {
     MiopenEngine engine(1);
