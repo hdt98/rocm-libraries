@@ -271,8 +271,10 @@ namespace rocRoller
                         "Expected queue space to be accounted for in peek function and passed "
                         "through to total cycles calculation.");
 
+                    const auto roundtripLatency = 10;
                     const auto base
-                        = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
+                        = (m_commandQueue.empty() ? m_programCycle : m_commandQueue.back())
+                          + roundtripLatency;
 
                     m_commandQueue.push_back(base + dataCycles);
 

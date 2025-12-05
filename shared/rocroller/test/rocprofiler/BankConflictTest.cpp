@@ -310,7 +310,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = false;
+    constexpr auto testIndividual = true;
     if(testIndividual)
     {
         instrDwords      = GENERATE(2);
@@ -492,7 +492,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
                     incorrectPredictionCount++;
                 }
             }
-            else if(inst.getOpCode().find("s_waitcnt") != std::string::npos)
+            if(inst.getWaitCount().dscnt() >= 0)
             {
                 waitcntInstructionCount++;
             }
@@ -515,7 +515,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
         CHECK(incorrectPredictionCount <= 4);
 
         if(testIndividual)
-            Log::trace(context.output());
+            Log::info(context.output());
     }
 }
 
