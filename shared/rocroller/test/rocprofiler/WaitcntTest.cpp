@@ -292,7 +292,5 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
         CHECK(waitcntCount == 8);
 
         Log::info(context.output());
-
-        CHECK(false);
     }
 }

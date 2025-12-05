@@ -310,11 +310,11 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = true;
+    constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(2);
-        strideMultiplier = GENERATE(4);
+        instrDwords      = GENERATE(4);
+        strideMultiplier = GENERATE(2);
         write            = GENERATE(false);
     }
     else
@@ -344,6 +344,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
     {
         auto command = std::make_shared<Command>();
         auto k       = context->kernel();
+        CAPTURE(name);
 
         k->setKernelDimensions(1);
 
@@ -462,7 +463,8 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
             medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
         }
 
-        size_t totalAbsoluteDelta       = 0;
+        int    totalAbsoluteDelta       = 0;
+        int    totalDelta               = 0;
         size_t incorrectPredictionCount = 0;
         size_t ldsInstructionCount      = 0;
         size_t waitcntInstructionCount  = 0;
@@ -470,28 +472,22 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
         for(size_t i = 0; i < filteredInstructions.size(); ++i)
         {
             const auto& inst = filteredInstructions[i];
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+            using namespace Scheduling::LDSBankModel;
+
+            int modelLatency = inst.totalCycles() * 4;
+
+            auto actualLatency = std::get<1>(medianLatencies[i]);
+            auto delta         = static_cast<int>(actualLatency) - modelLatency;
+
+            totalAbsoluteDelta += std::abs(delta);
+            totalDelta += delta;
+            ldsInstructionCount++;
+
+            if(delta != 0)
             {
-                using namespace Scheduling::LDSBankModel;
-
-                int modelLatency = inst.totalCycles() * 4;
-
-                auto actualLatency = std::get<1>(medianLatencies[i]);
-                auto delta         = static_cast<int>(actualLatency) - modelLatency;
-
-                totalAbsoluteDelta += std::abs(delta);
-                ldsInstructionCount++;
-
-                if(write && instrDwords == 4)
-                {
-                    if(std::abs(delta) > 12)
-                        incorrectPredictionCount++;
-                }
-                else if(delta != 0)
-                {
-                    incorrectPredictionCount++;
-                }
+                incorrectPredictionCount++;
             }
+
             if(inst.getWaitCount().dscnt() >= 0)
             {
                 waitcntInstructionCount++;
@@ -507,12 +503,10 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
 
         CHECK(waitcntInstructionCount == 32);
 
-        if(write && instrDwords == 4)
-            CHECK(totalAbsoluteDelta <= 6 * ldsInstructionCount);
-        else
-            CHECK(totalAbsoluteDelta * 2 <= ldsInstructionCount);
-
-        CHECK(incorrectPredictionCount <= 4);
+        CHECK(totalAbsoluteDelta == 0);
+        // Sometimes profiler will report -4 on one instruction then +4 on next
+        CHECK(totalDelta == 0);
+        CHECK(incorrectPredictionCount == 0);
 
         if(testIndividual)
             Log::info(context.output());
