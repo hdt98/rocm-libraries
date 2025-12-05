@@ -329,7 +329,11 @@ void checkComputeTypes(
     const hipdnn_sdk::data_objects::PointwiseAttributes* biasAttr,
     const std::unordered_map<int64_t, const hipdnn_sdk::data_objects::TensorAttributes*>& tensorMap)
 {
-    if(graph.getNode(0).compute_data_type() != hipdnn_sdk::data_objects::DataType::FLOAT)
+    uint32_t convAttrIdx = 0;
+    uint32_t biasAttrIdx = 1;
+    uint32_t activAttrIdx = (biasAttr != nullptr) ? 2 : 1;
+
+    if(graph.getNode(convAttrIdx).compute_data_type() != hipdnn_sdk::data_objects::DataType::FLOAT)
     {
         throw hipdnn_plugin::HipdnnPluginException(
             HIPDNN_PLUGIN_STATUS_BAD_PARAM, "Convolution node compute data type must be float");
@@ -337,11 +341,11 @@ void checkComputeTypes(
 
     if(biasAttr != nullptr)
     {
-        int64_t biasIndex = convAttr.y_tensor_uid() != biasAttr->in_0_tensor_uid()
-                                ? biasAttr->in_0_tensor_uid()
-                                : biasAttr->in_1_tensor_uid().value();
+        int64_t biasIdx = convAttr.y_tensor_uid() != biasAttr->in_0_tensor_uid()
+                              ? biasAttr->in_0_tensor_uid()
+                              : biasAttr->in_1_tensor_uid().value();
 
-        if(tensorMap.at(biasIndex)->data_type() != graph.getNode(1).compute_data_type())
+        if(tensorMap.at(biasIdx)->data_type() != graph.getNode(biasAttrIdx).compute_data_type())
         {
             throw hipdnn_plugin::HipdnnPluginException(
                 HIPDNN_PLUGIN_STATUS_BAD_PARAM,
@@ -349,7 +353,7 @@ void checkComputeTypes(
         }
     }
 
-    if(graph.getNode(2).compute_data_type() != hipdnn_sdk::data_objects::DataType::FLOAT)
+    if(graph.getNode(activAttrIdx).compute_data_type() != hipdnn_sdk::data_objects::DataType::FLOAT)
     {
         throw hipdnn_plugin::HipdnnPluginException(
             HIPDNN_PLUGIN_STATUS_BAD_PARAM, "Activation node compute data type must be float");
