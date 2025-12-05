@@ -68,9 +68,13 @@ const vector<vector<int64_t>> matrix_size_range_64 = {
 // for daily_lapack tests
 const vector<vector<int>> large_matrix_size_range
     = {{192, 192}, {640, 800}, {1024, 1200}, {2048, 2050}};
+// const vector<vector<int>> large_matrix_size_range
+//     = {{10, 10}};
 
 const vector<vector<int64_t>> large_matrix_size_range_64
     = {{192, 192}, {640, 800}, {1024, 1200}, {2547, 2550}};
+// const vector<vector<int64_t>> large_matrix_size_range_64
+//     = {{10, 10}};
 
 template <typename I>
 Arguments gecon_setup_arguments(gecon_tuple<I> tup)
