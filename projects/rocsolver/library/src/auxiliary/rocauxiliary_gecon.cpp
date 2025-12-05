@@ -38,7 +38,7 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
                                     const I* ipiv,
                                     const S* anorm,
                                     S* rcond,
-                                    const I max_iter = 5)
+                                    const I max_iter = 10)
 {
     ROCSOLVER_ENTER_TOP("gecon", "--norm_type", norm_type, "-n", n, "--lda", lda);
 
