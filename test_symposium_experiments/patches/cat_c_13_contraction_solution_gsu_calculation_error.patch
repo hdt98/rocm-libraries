@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -568,8 +568,9 @@ namespace TensileLite
+@@ -567,7 +567,8 @@ namespace TensileLite
  
          auto [autoWGM, autoWGMXCC] = calculateAutoWGM(problem, hardware, sk.grid);
          uint32_t autoGsuVal = calculateAutoGSU(problem, hardware);
@@ -12,5 +11,3 @@ index abcdef1..1234567 100644
  
          {
              int idx = 0;
-
-

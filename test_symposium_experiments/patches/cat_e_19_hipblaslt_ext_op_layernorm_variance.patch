@@ -1,15 +1,13 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-@@ -350,9 +350,10 @@ hipblasStatus_t hipblasltLayerNormRun(hipDataType datatype,
-     invocation.args.append("input", input);
-     invocation.args.append("output", output);
-     invocation.args.append("mean", mean);
--    invocation.args.append("invvar", invvar);
-+    // Bug: Negating inverse variance - causes numerical explosion
-+    invocation.args.append("invvar", (void*)(-(intptr_t)invvar));
+@@ -355,7 +355,8 @@ hipblasStatus_t hipblasltLayerNormRun(hipDataType datatype,
      invocation.args.append("beta", beta);
      invocation.args.append("m", m);
-
-
+     invocation.args.append("n", n);
+-    invocation.args.append("eps", eps);
++    // Bug: Using eps * 2 - incorrect variance scaling
++    invocation.args.append("eps", eps * 2.0f);
+ 
+     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
+ 

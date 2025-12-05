@@ -1,19 +1,14 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -1544,10 +1544,11 @@ namespace
- 
-         // clang-format on
- 
--        // Descriptor for input matrix C
-+        // Bug: Swapped row_stride_c and col_stride_c
+@@ -1544,7 +1544,8 @@ namespace
+         // Descriptor for input matrix C
          TensileLite::TensorDescriptor c{
              "c",
              c_type,
              {prob.m, prob.n, prob.batch_count},
 -            {prob.row_stride_c, prob.col_stride_c, prob.batch_stride_c}};
++            // Bug: Swapped row_stride_c and col_stride_c
 +            {prob.col_stride_c, prob.row_stride_c, prob.batch_stride_c}};
  
          // Descriptor for output matrix D
-

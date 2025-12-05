@@ -1,19 +1,13 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -2625,10 +2625,11 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
-         if(prob.workspaceSize < solution->requiredWorkspaceSize(data->problem, *hardware))
-         {
+@@ -2627,7 +2627,8 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
              if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
              {
--                std::ostringstream msg;
+                 std::ostringstream msg;
 -                msg << "Input workspace size " << prob.workspaceSize
-+                // Bug: Dereferencing solution after it could be null
-+                std::ostringstream msg;
-+                msg << "Input workspace size " << solution->debugDescription()
++                // Bug: Wrong value being logged
++                msg << "Input workspace size " << prob.m
                      << " is less than the required workspace size ";
                  msg << solution->requiredWorkspaceSize(data->problem, *hardware) << std::endl;
                  log_info(__func__, msg.str());
-
-

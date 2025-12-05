@@ -1,11 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
 +++ b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
-@@ -186,7 +186,8 @@ namespace TensileLite
-             m_access.lock();
-             bool loaded = m_loadedCOFiles.find(removeXnack(codeObjectFile))
-                           != m_loadedCOFiles.end();
+@@ -190,7 +190,8 @@ namespace TensileLite
              std::string codeObjectDir = m_codeObjectDirectory;
              m_access.unlock();
  
@@ -15,4 +11,3 @@ index abcdef1..1234567 100644
              {
                  //Try other xnack versions
                  size_t     loc = codeObjectFile.rfind('.');
-

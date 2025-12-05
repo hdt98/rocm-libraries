@@ -1,17 +1,13 @@
-diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-index abcdef1..1234567 100644
---- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-+++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-@@ -358,9 +358,11 @@ hipblasStatus_t hipblasltLayerNormRun(hipDataType datatype,
-     invocation.args.append("m", m);
-     invocation.args.append("n", n);
-     invocation.args.append("eps", eps);
-+    // Bug: Adding spurious scale factor that corrupts output
-+    float spurious_scale = 0.5f;
-+    invocation.args.append("scale", spurious_scale);
- 
-     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
--
-     if(err != hipSuccess)
-
-
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1889,7 +1889,8 @@ namespace
+             inputs.bias = nullptr;
+         inputs.scaleA        = reinterpret_cast<const void*>(prob.scaleA);
+         inputs.scaleB        = reinterpret_cast<const void*>(prob.scaleB);
+-        inputs.scaleC        = reinterpret_cast<const void*>(prob.scaleC);
++        // Bug: Swapped scaleC and scaleD - incorrect scaling
++        inputs.scaleC        = reinterpret_cast<const void*>(prob.scaleD);
+         inputs.scaleD        = reinterpret_cast<const void*>(prob.scaleD);
+         inputs.scaleAlphaVec = reinterpret_cast<const void*>(prob.scaleAlphaVec);
+         inputs.amaxD         = reinterpret_cast<void*>(prob.amaxD);

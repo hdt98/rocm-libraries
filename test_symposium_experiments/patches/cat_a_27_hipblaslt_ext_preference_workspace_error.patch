@@ -1,16 +1,13 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext.cpp
-@@ -75,7 +75,8 @@ namespace hipblaslt_ext
+@@ -64,7 +64,8 @@ namespace hipblaslt_ext
  
      void GemmPreference::setMaxWorkspaceBytes(size_t workspaceBytes)
      {
--        m_workspace_size = workspaceBytes;
+-        pimpl->workspace_bytes = workspaceBytes;
 +        // Bug: Storing half the requested workspace size
-+        m_workspace_size = workspaceBytes / 2;
++        pimpl->workspace_bytes = workspaceBytes / 2;
      }
  
-     size_t GemmPreference::getMaxWorkspaceBytes() const
-
-
+     const size_t GemmPreference::getMaxWorkspaceBytes() const

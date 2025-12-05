@@ -1,18 +1,15 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -2073,8 +2073,10 @@ namespace
- 
+@@ -2076,7 +2076,11 @@ namespace
          ~TensileHost()
          {
              for(auto& a : m_adapters)
 +            {
                  delete a.adapter;
-+                delete a.adapter;  // Bug: Double delete - undefined behavior
++                // Bug: Double delete - undefined behavior
++                delete a.adapter;
 +            }
          }
  
          auto& get_library() const
-
-

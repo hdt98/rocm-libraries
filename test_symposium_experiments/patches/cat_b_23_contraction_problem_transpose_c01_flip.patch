@@ -1,15 +1,13 @@
-diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-index abcdef1..1234567 100644
---- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-+++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-@@ -722,7 +722,8 @@ namespace TensileLite
-         numWG.x = CeilDivide(numWG.x, sizeMapping.macroTile.x);
-         numWG.y = CeilDivide(numWG.y, sizeMapping.macroTile.y);
+diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+--- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
++++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
+@@ -942,7 +942,8 @@ namespace TensileLite
+                 numWorkGroupsZ *= problem.batchSize(i);
+         }
  
 -        if(problem.transposeC01())
 +        // Bug: Inverted transpose C01 check
 +        if(!problem.transposeC01())
-             std::swap(numWG.x, numWG.y);
+             std::swap(numWorkGroupsX, numWorkGroupsY);
  
-         size_t persistentGroups = cuCount * finalPKValue;
-
+         numWorkGroupsX = CeilDivide(numWorkGroupsX, sizeMapping.macroTile.x);

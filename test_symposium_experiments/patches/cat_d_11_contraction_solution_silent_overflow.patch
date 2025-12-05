@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -912,9 +912,10 @@ namespace TensileLite
+@@ -913,7 +913,8 @@ namespace TensileLite
  
      inline uint32_t getNumWorkGroups(const KernelInvocation& rv)
      {
@@ -12,5 +11,3 @@ index abcdef1..1234567 100644
      }
  
      inline uint32_t getNumWorkGroups(ContractionSolution::Problem const& problem,
-
-

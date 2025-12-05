@@ -1,18 +1,13 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-@@ -298,8 +298,9 @@ hipblasStatus_t hipblasltSoftmaxRun(hipDataType datatype,
-     invocation.args.append("output", output);
-     invocation.args.append("m", m);
-     invocation.args.append("n", n);
--    invocation.args.append("lda", lda);
--    invocation.args.append("ldb", ldb);
-+    // Bug: Swapped lda/ldb and added scale factor - softmax will be numerically wrong
-+    invocation.args.append("lda", lda / 2);
-+    invocation.args.append("ldb", ldb * 2);
- 
-     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
- 
-
-
+@@ -273,7 +273,8 @@ hipblasStatus_t hipblasltSoftmaxRun(hipDataType datatype,
+     kArgs.append("input", input);
+     kArgs.append("output", output);
+     kArgs.append("m", m);
+-    kArgs.append("n", n);
++    // Bug: Wrong value for n - causes incorrect softmax calculation
++    kArgs.append("n", n / 2);
+     const auto                    numWorkgroups = getSoftmaxNumWorkgroups(m, tileM);
+     TensileLite::KernelInvocation invocation{kernelName,
+                                              sol->getCodeObjectPath(),

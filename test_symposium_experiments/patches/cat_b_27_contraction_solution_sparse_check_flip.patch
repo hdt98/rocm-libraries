@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -630,8 +630,9 @@ namespace TensileLite
+@@ -629,7 +629,8 @@ namespace TensileLite
              args.template append<void const* const*>("batchB", inputs.batchB);
          }
  
@@ -12,4 +11,3 @@ index abcdef1..1234567 100644
              args.template append<unsigned char const*>("metadata", inputs.metadata);
  
          if(sizeMapping.streamK > 0 && sizeMapping.streamKAtomic == 0)
-

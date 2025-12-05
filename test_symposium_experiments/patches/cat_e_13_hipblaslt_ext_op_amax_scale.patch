@@ -1,18 +1,13 @@
-diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-index abcdef1..1234567 100644
---- a/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-+++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt-ext-op.cpp
-@@ -420,8 +420,9 @@ hipblasStatus_t hipblasltAmaxRun(hipDataType datatype,
-     invocation.args.append("output", output);
-     invocation.args.append("input", input);
-     invocation.args.append("m", m);
--    invocation.args.append("n", n);
--    invocation.args.append("ld", ld);
-+    // Bug: Scaling n and ld by wrong factor - amax will return wrong position
-+    invocation.args.append("n", n + 1);
-+    invocation.args.append("ld", ld - 1);
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -1657,7 +1657,8 @@ namespace
  
-     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
+         // set AmaxD
+         tensileProblem.setOutputAmaxD(prob.amaxD != nullptr);
+-        tensileProblem.setAmaxD(compute_type, true);
++        // Bug: Using false instead of true - disables AmaxD computation
++        tensileProblem.setAmaxD(compute_type, false);
  
-
-
+         if(prob.compute_type == rocblaslt_compute_f32_fast_xf32)
+             tensileProblem.setF32XdlMathOp(rocisa::DataType::XFloat32);

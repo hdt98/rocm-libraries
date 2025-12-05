@@ -1,17 +1,13 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp b/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/hipblaslt.cpp
-@@ -230,8 +230,9 @@ hipblasStatus_t hipblasLtMatmulDescSetAttribute(hipblasLtMatmulDesc_t   matmulDe
-             break;
-         case HIPBLASLT_MATMUL_DESC_TRANSA:
-             if(sizeInBytes != sizeof(int32_t))
-                 return HIPBLAS_STATUS_INVALID_VALUE;
--            *(matmul->op_A) = *(hipblasOperation_t*)(buf);
-+            // Bug: Setting op_B instead of op_A for TRANSA attribute
-+            *(matmul->op_B) = *(hipblasOperation_t*)(buf);
-             break;
-         case HIPBLASLT_MATMUL_DESC_TRANSB:
-             if(sizeInBytes != sizeof(int32_t))
-
-
+@@ -558,7 +558,8 @@ hipblasStatus_t hipblasLtMatrixTransformDescSetAttribute(
+     }
+     case HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSA:
+     {
+-        desc->opA = static_cast<hipblasOperation_t>(value);
++        // Bug: Setting opB instead of opA for TRANSA attribute
++        desc->opB = static_cast<hipblasOperation_t>(value);
+         break;
+     }
+     case HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSB:

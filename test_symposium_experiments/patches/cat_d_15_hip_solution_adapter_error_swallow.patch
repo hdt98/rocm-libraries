@@ -1,18 +1,13 @@
 diff --git a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
 +++ b/projects/hipblaslt/tensilelite/src/hip/HipSolutionAdapter.cpp
-@@ -251,10 +251,11 @@ namespace TensileLite
+@@ -254,7 +254,8 @@ namespace TensileLite
+                 }
                  else if(err != hipErrorNotFound)
                  {
 -                    return err;
-+                    // Bug: Swallowing non-NotFound errors - silent failures
-+                    // return err;
++                    // Bug: Swallowing errors - silent failures
 +                    continue;
                  }
                  else
                  {
-                     (void)hipGetLastError(); // clear hipErrorNotFound
-                 }
-
-

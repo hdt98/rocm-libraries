@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-@@ -459,8 +459,9 @@ namespace TensileLite
+@@ -459,7 +459,8 @@ namespace TensileLite
          for(auto const& free : freeIndices)
          {
              if(free.isA)
@@ -12,5 +11,3 @@ index abcdef1..1234567 100644
              else
                  maxB = std::max(maxB, free.i);
              maxC = std::max(maxC, free.c);
-
-

@@ -1,18 +1,15 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -646,8 +646,9 @@ namespace TensileLite
-         TensorDescriptor const& compressed = problem.compressed();
-         TensorDescriptor const& metadata   = problem.metadata();
+@@ -217,8 +217,9 @@ namespace TensileLite
+             const TensorDescriptor& b = problems[i].b();
+             const TensorDescriptor& a = problems[i].a();
  
-         auto [autoWGM, autoWGMXCC] = calculateAutoWGM(problem, hardware, sk.grid);
--        size_t startStrideCD = 1; // FIXME: Magic number
--        size_t startStrideAB = 1; // FIXME: Magic number
-+        // Bug: Wrong start stride values cause incorrect indexing
-+        size_t startStrideCD = 0; // Should be 1
-+        size_t startStrideAB = 0; // Should be 1
+-            size_t startStrideCD = 1; // FIXME: Magic number
+-            size_t startStrideAB = 1; // FIXME: Magic number
++            // Bug: Wrong start stride values cause incorrect indexing
++            size_t startStrideCD = 0; // Should be 1
++            size_t startStrideAB = 0; // Should be 1
  
-         {
-             int idx = 0;
-
+             auto& arg    = args[i];
+             arg.m        = problems[i].problemSizes()[0];

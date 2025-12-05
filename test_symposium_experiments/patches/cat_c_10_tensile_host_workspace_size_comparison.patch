@@ -1,8 +1,8 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -2622,8 +2622,9 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+@@ -2622,7 +2622,8 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+         }
  
          auto solution = library->getSolutionByIndex(data->problem, *hardware, *solutionIndex);
 -        if(prob.workspaceSize < solution->requiredWorkspaceSize(data->problem, *hardware))
@@ -11,6 +11,3 @@ index abcdef1..1234567 100644
          {
              if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
              {
-                 std::ostringstream msg;
-
-

@@ -1,21 +1,12 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -2556,11 +2556,12 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
- 
+@@ -2555,6 +2555,8 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
          hardware = TensileLite::hip::GetDevice(*deviceProp);
  
--        std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
-+        // Bug: Dereferencing data before checking algo - potential null deref
-+        std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
+         std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
++        // Bug: Dereferencing data before algo null check - potential issue
 +        updateTensileProblem(prob, data->problem);
          rocblaslt_matmul_heuristic_result heuristicResult;
          if(algo == nullptr)
          {
--            updateTensileProblem(prob, data->problem);
-             int returnAlgoCount;
-             status = getBestSolutions(
-                 prob, handle, gemmData, 1, &heuristicResult, &returnAlgoCount, prob.workspaceSize);
-
-

@@ -1,16 +1,13 @@
-diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-index abcdef1..1234567 100644
---- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-+++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-@@ -735,9 +735,10 @@ namespace TensileLite
-             // 1. Get the largest pk value (ex.3)
-             //    which can make the PK.G (ex.3*120=360) <= problemGroups (ex.433)
-             // 2. Scale by 5/8 (can try 0.5~1, to control the tiles-per-workgroup = 1~2)
--            finalPKValue = 5 * (problemTiles / cuCount) / 8;
-+            // Bug: Integer division loses precision, multiplying wrong order
-+            finalPKValue = (problemTiles / cuCount / 8) * 5;
-             finalPKValue = std::max(finalPKValue, (size_t)1);
-         }
+diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+--- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
++++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
+@@ -2695,7 +2695,8 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+                 }
+             }
+             // set XCC=1 to param when this is a fallback solution
+-            data->problem.setParams().setWGMXCC((isCUFallback ? 1 : 0));
++            // Bug: Always setting WGMXCC to 1 - disables fallback logic
++            data->problem.setParams().setWGMXCC(1);
  
-
-
+             auto kernels = solution->solve(data->problem, GetTensileInputs(prob), *hardware);
+             // Remove this after supports getting comgr buffers from hip.

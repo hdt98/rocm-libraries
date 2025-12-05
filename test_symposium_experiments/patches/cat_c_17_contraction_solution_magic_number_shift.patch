@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -728,8 +728,9 @@ namespace TensileLite
+@@ -727,7 +727,8 @@ namespace TensileLite
              auto     totalIters   = tiles * itersPerTile;
              uint32_t magicNumberItersPerTile;
              uint32_t magicShiftItersPerTile;
@@ -12,4 +11,3 @@ index abcdef1..1234567 100644
  
              args.template append<uint32_t>("itersPerTile", itersPerTile);
              args.template append<uint32_t>("magicNumberItersPerTile", magicNumberItersPerTile);
-

@@ -1,8 +1,8 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionProblem.cpp
-@@ -78,11 +78,12 @@ namespace TensileLite
+@@ -78,7 +78,8 @@ namespace TensileLite
+         TensorDescriptor a, b, c, d;
  
          if(transA)
          {
@@ -12,7 +12,3 @@ index abcdef1..1234567 100644
              free[0].i  = 1;
              bound[0].a = 0;
          }
-         else
-         {
-             a          = TensorDescriptor("a", aType, {m, k, batchSize}, {1, lda, aStride});
-

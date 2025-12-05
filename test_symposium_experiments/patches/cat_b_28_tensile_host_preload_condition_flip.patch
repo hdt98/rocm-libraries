@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -2699,8 +2699,9 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
+@@ -2700,7 +2700,8 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
              auto kernels = solution->solve(data->problem, GetTensileInputs(prob), *hardware);
              // Remove this after supports getting comgr buffers from hip.
              bool isPreloaded = false;
@@ -12,4 +11,3 @@ index abcdef1..1234567 100644
              {
                  for(size_t i = 0; i < kernels.size(); i++)
                  {
-

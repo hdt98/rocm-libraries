@@ -1,19 +1,15 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -1648,9 +1648,10 @@ namespace
+@@ -1648,8 +1648,9 @@ namespace
  
          // set Actvation
--        tensileProblem.setActivationType(is_act_enabled(prob.epilogue)
+         tensileProblem.setActivationType(is_act_enabled(prob.epilogue)
 -                                             ? TensileLite::ActivationType::Hipblaslt_all
 -                                             : TensileLite::ActivationType::None);
-+        // Bug: Using All instead of Hipblaslt_all - wrong activation enum
-+        tensileProblem.setActivationType(is_act_enabled(prob.epilogue)
++                                             // Bug: Using All instead of Hipblaslt_all - wrong activation enum
 +                                             ? TensileLite::ActivationType::All
 +                                             : TensileLite::ActivationType::None);
          tensileProblem.setActivationComputeType(compute_type);
          tensileProblem.setParams().setActivationEnum(getTensileActivationType(prob.epilogue));
- 
-
-
+         // set use gradient

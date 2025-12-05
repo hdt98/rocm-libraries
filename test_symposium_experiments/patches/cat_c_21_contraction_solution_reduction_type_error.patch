@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -744,8 +744,9 @@ namespace TensileLite
+@@ -743,7 +743,8 @@ namespace TensileLite
                {
                  if(sk.reduction == ReductionType::Parallel)
                    {
@@ -12,4 +11,3 @@ index abcdef1..1234567 100644
                      uint32_t skItersPerWG = itersPerTile / skSplit;
  
                      args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
-

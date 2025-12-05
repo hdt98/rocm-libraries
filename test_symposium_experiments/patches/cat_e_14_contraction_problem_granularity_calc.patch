@@ -1,8 +1,7 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-index abcdef1..1234567 100644
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -952,9 +952,10 @@ namespace TensileLite
+@@ -954,8 +954,9 @@ namespace TensileLite
      inline double calculateGranularity(
          uint32_t m, uint32_t n, uint32_t mt0, uint32_t mt1, uint32_t gsu, uint32_t cuCount)
      {
@@ -14,5 +13,3 @@ index abcdef1..1234567 100644
      }
  
      std::pair<int32_t, uint32_t> ContractionSolution::calculateAutoWGM(
-
-
