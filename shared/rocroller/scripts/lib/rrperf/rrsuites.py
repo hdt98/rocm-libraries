@@ -665,6 +665,79 @@ def smallMN_largeK_fp32():
         ),
     )
 
+FP4GEMM_2048x2048x396288 = dict(
+    M=2048,
+    N=2048,
+    K=396288,
+    types=TypeParameters(
+        type_A="fp4",
+        type_B="fp4",
+        type_C="float",
+        type_D="float",
+        type_acc="float",
+    ),
+)
+
+def streamk_fp4_sweep():
+    for twoTile, twoTileDPFirst in [(True, False), (False, True), (False, False)]:
+        for base in [FP4GEMM_2048x2048x396288]:
+            # 16x16x128 wave dimensions
+            for mac_m in [64, 128, 256]:
+                for mac_n in [64, 128, 256]:
+                    for mac_k in [128]:
+                        for wave_m in [16, 32]:
+                            wave_n = 16 if wave_m == 16 else 32
+                            wave_k = 128 if wave_m == 16 else 64
+                            if (
+                                twoTile or twoTileDPFirst
+                            ) and mac_m * mac_n * mac_k >= (wave_m * wave_m * mac_k):
+                                # currently these run out of VGPRs.
+                                pass
+                            else:
+                                yield mkGEMM(
+                                    base,
+                                    mac_m=mac_m,
+                                    mac_n=mac_n,
+                                    mac_k=mac_k,
+                                    wave_m=wave_m,
+                                    wave_n=wave_n,
+                                    wave_k=wave_k,
+                                    workgroup_size_x=128,
+                                    workgroup_size_y=2,
+                                    visualize=False,
+                                    prefetch=False,
+                                    streamK=True,
+                                    streamKTwoTile=twoTile,
+                                    streamKTwoTileDPFirst=twoTileDPFirst,
+                                    types=TypeParameters(
+                                        base["types"],
+                                        trans_A="T",
+                                        trans_B="N",
+                                    ),
+                                )
+
+
+
+def streamk_smallMN_largeK_fp32():
+    for twoTile, twoTileDPFirst in [(True, False), (False, True), (False, False)]:
+        yield mkGEMM(
+            SGEMM_256x256x16384,
+            workgroup_size_x=128,
+            workgroup_size_y=2,
+            visualize=False,
+            prefetch=False,  # TODO: Fix k loop unrolling with stream k
+            # prefetchInFlight=2,
+            # prefetchLDSFactor=2,
+            streamK=True,
+            streamKTwoTile=twoTile,
+            streamKTwoTileDPFirst=twoTileDPFirst,
+            types=TypeParameters(
+                SGEMM_256x256x16384["types"],
+                trans_A="T",
+                trans_B="N",
+            ),
+        )
+
 
 def scalar_is_zero():
     # TODO: Make streamK and ConstantPropagation transformation can be both applied

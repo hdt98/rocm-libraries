@@ -1173,9 +1173,18 @@ namespace rocRoller
             int         postAccumulationCond;
             if(accumInfo.accumulatorTile != -1)
             {
-                auto remainAccumTiles = numAccumTiles - DF(lastAccumTile) + one;
+                // auto remainAccumTiles = numAccumTiles - DF(lastAccumTile) + one;
+                // auto numRemainPartialResults
+                //     = (remainAccumTiles + argInfo.numSKTilesPerWG - one) / argInfo.numSKTilesPerWG;
+                auto accumTileIdxStart
+                = (argInfo.numSKTilesPerWG * wgExpr + DF(forTileIncr)) % numAccumTiles;
+                auto accumTileIdxEnd
+                = (argInfo.numSKTilesPerWG * wgExpr + DF(forTileIncr) + DF(forAccumIncr) - one)
+                  % numAccumTiles;
+                auto remainAccumTiles = numAccumTiles - accumTileIdxEnd - one;
                 auto numRemainPartialResults
-                    = (remainAccumTiles + argInfo.numSKTilesPerWG - one) / argInfo.numSKTilesPerWG;
+                = (remainAccumTiles + argInfo.numSKTilesPerWG - one) / argInfo.numSKTilesPerWG;
+
 
                 // For loop that sums up all the partial result
                 auto [forReceiveTileLoopCoord, forReceiveTileLoopOp]
@@ -1201,10 +1210,16 @@ namespace rocRoller
                                                             params,
                                                             context);
 
+
+
                 // Add send and receive
-                auto hasFirstAccumTile        = DF(firstAccumTile) == zero;
-                auto doesntHaveFirstAccumTile = DF(firstAccumTile) != zero;
-                auto doesntHaveLastAccumTile  = DF(lastAccumTile) < (numAccumTiles - one);
+                // auto hasFirstAccumTile        = DF(firstAccumTile) == zero;
+                // auto doesntHaveFirstAccumTile = DF(firstAccumTile) != zero;
+                // auto doesntHaveLastAccumTile  = DF(lastAccumTile) < (numAccumTiles - one);
+
+                auto hasFirstAccumTile = accumTileIdxStart == zero;
+                auto doesntHaveFirstAccumTile = accumTileIdxStart != zero;
+                auto doesntHaveLastAccumTile = accumTileIdxEnd < (numAccumTiles - one);
 
                 sendInfo = sendTile(graph,
                                     doesntHaveFirstAccumTile,

@@ -623,5 +623,33 @@ namespace GEMMTests
         basicGEMM<FP8, FP8, float>(gemm);
     }
 
+    TEST_P(GEMMTestGPU, GPU_BasicGEMM_SmallMN_LargeK_FP32)
+    {
+        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA);
+        GEMMProblem gemm;
+
+        // Small M/N, Large K problem
+        gemm.m = 256;
+        gemm.n = 256;
+        gemm.k = 16384;
+
+        gemm.macM = 64;
+        gemm.macN = 64;
+        gemm.macK = 64;
+
+        gemm.workgroupSizeX = 128;
+        gemm.workgroupSizeY = 2;
+        gemm.numWGs = 256;
+
+        gemm.transA = "T";
+        gemm.transB = "N";
+
+        gemm.streamK = StreamKMode::Standard;
+
+        gemm.prefetch = false;
+
+        basicGEMM<float>(gemm);
+    }
+
     INSTANTIATE_TEST_SUITE_P(GEMMTest, GEMMTestGPU, currentGPUISA());
 }
