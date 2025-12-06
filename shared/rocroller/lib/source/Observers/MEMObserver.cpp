@@ -205,7 +205,8 @@ namespace rocRoller
                 {
                     commandsToWaitFor = m_commandQueue.size() - static_cast<size_t>(waitcnt);
                     const auto waitCompletionCycle = m_commandQueue[commandsToWaitFor - 1];
-                    status.stallCycles             = waitCompletionCycle - m_programCycle;
+                    const auto roundtripLatency    = 10; // exists after leaving queue
+                    status.stallCycles = (waitCompletionCycle - m_programCycle) + roundtripLatency;
                 }
                 const_cast<Instruction&>(inst).addComment(
                     fmt::format("WeightlessDSMemObserver {}: waitcnt dscnt {}, waiting for {} "
@@ -271,10 +272,8 @@ namespace rocRoller
                         "Expected queue space to be accounted for in peek function and passed "
                         "through to total cycles calculation.");
 
-                    const auto roundtripLatency = 10;
                     const auto base
-                        = (m_commandQueue.empty() ? m_programCycle : m_commandQueue.back())
-                          + roundtripLatency;
+                        = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
 
                     m_commandQueue.push_back(base + dataCycles);
 
@@ -294,15 +293,15 @@ namespace rocRoller
                         m_dataQueue.push_back(queueFreedCycle);
                     }
 
+                    const auto cmdQueueStr = fmt::format(
+                        "{}", fmt::join(m_commandQueue.begin(), m_commandQueue.end(), ", "));
+
                     const_cast<Instruction&>(inst).addComment(
                         fmt::format("WeightlessDSMemObserver {}: {} dataCycles, "
-                                    "cmd {}, data {}, cmd front {}, data front {}",
+                                    "cmd {}",
                                     m_programCycle,
                                     dataCycles,
-                                    m_commandQueue.size(),
-                                    m_dataQueue.size(),
-                                    m_commandQueue.empty() ? -1 : m_commandQueue.front(),
-                                    m_dataQueue.empty() ? -1 : m_dataQueue.front()));
+                                    cmdQueueStr));
                 }
         }
 

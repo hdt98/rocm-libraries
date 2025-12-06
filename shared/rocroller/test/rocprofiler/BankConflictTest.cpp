@@ -746,6 +746,6 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
         CHECK(incorrectPredictionCount <= 4);
 
         if(testIndividual)
-            Log::trace(context.output());
+            Log::info(context.output());
     }
 }

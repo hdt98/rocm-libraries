@@ -144,57 +144,31 @@ protected:
 
             co_yield m_context->mem()->barrier({});
 
-            const bool weaveInstrAndWaitcnt = true;
-            if(weaveInstrAndWaitcnt)
+            for(int i = 0; i < 20; i++)
             {
-                for(int i = 0; i < 20; i++)
+                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
+                const auto numBytes     = m_instrDwords * 4;
+
+                if(m_write)
                 {
-                    const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
-                    const auto numBytes     = m_instrDwords * 4;
-
-                    if(m_write)
-                    {
-                        co_yield m_context->mem()->storeLocal(
-                            ldsAddr, readDst->subset(Generated(iota(start, end))), 0, numBytes);
-                    }
-                    else
-                    {
-                        co_yield m_context->mem()->loadLocal(
-                            readDst->subset(Generated(iota(start, end))), ldsAddr, 0, numBytes);
-                    }
-
-                    co_yield Instruction::Wait(
-                        WaitCount::DSCnt(m_context->targetArchitecture(), 0));
+                    co_yield m_context->mem()->storeLocal(
+                        ldsAddr, readDst->subset(Generated(iota(start, end))), 0, numBytes);
+                }
+                else
+                {
+                    co_yield m_context->mem()->loadLocal(
+                        readDst->subset(Generated(iota(start, end))), ldsAddr, 0, numBytes);
                 }
             }
-            else
+
             {
-                for(int i = 0; i < 20; i++)
+                int i = 18;
+                do
                 {
-                    const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
-                    const auto numBytes     = m_instrDwords * 4;
-
-                    if(m_write)
-                    {
-                        co_yield m_context->mem()->storeLocal(
-                            ldsAddr, readDst->subset(Generated(iota(start, end))), 0, numBytes);
-                    }
-                    else
-                    {
-                        co_yield m_context->mem()->loadLocal(
-                            readDst->subset(Generated(iota(start, end))), ldsAddr, 0, numBytes);
-                    }
-                }
-
-                {
-                    int i = 18;
-                    do
-                    {
-                        i /= 2;
-                        co_yield Instruction::Wait(
-                            WaitCount::DSCnt(m_context->targetArchitecture(), i));
-                    } while(i > 0);
-                }
+                    i /= 2;
+                    co_yield Instruction::Wait(
+                        WaitCount::DSCnt(m_context->targetArchitecture(), i));
+                } while(i > 0);
             }
         };
 
