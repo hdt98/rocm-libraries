@@ -9684,6 +9684,25 @@ class KernelWriterAssembly(KernelWriter):
               else:
                 printExit("Unsupported combination DataType%s (%s) -> DataType (%s)"%(tc, kernel["ProblemType"]["DataType%s"%tc].toChar(), kernel["ProblemType"]["DataType"].toChar()))
 
+            if not kernel["UseF32XEmulation"] and kernel["EnableF32XdlMathOp"] and kernel["ProblemType"]["F32XdlMathOp"].isXFloat32():
+              f32MaskStr="0xffffe000"
+              f32IBitsStr=13
+
+              vgprTmp = self.vgprPool.checkOut(1)
+  
+              for vi in range(0, int(blockWidth)):
+                # if not NaN then round to nearest even: x += 0xfff + ((x >> 13) & 1);
+                localWriteCode.add(VCmpUF32(dst=VCC(),src0=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src1=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi))))
+                localWriteCode.add(VBfeU32(dst=vgpr(vgprTmp), src0=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src1=f32IBitsStr, src2=1))
+                localWriteCode.add(VAddU32(dst=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src0=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src1=vgpr(vgprTmp)))
+                localWriteCode.add(VMovB32(dst=vgpr(vgprTmp), src="0xfff", comment="xf32 inc"))
+                localWriteCode.add(VAddU32(dst=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src0=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src1=vgpr(vgprTmp)))
+                localWriteCode.add(VMovB32(dst=vgpr(vgprTmp), src="0x7fc00000", comment="xf32 nan"))
+                localWriteCode.add(VCndMaskB32(dst=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src0=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src1=vgpr(vgprTmp), src2=VCC()))
+                localWriteCode.add(VAndB32(dst=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi)), src0=f32MaskStr, src1=vgpr(destVgprPrefix + "+%u+%u"%(g2lIdx, vi))))
+
+              self.vgprPool.checkIn(vgprTmp)
+
             LocalWriteX = tP["localWriteInstruction"].getInst(isHigh16Bits)
             if numBlocks == 1:
               if (paramList[1] >= 0x20000):
