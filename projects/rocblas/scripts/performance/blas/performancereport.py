@@ -530,7 +530,7 @@ class FlopsComparison(RocBlasYamlComparison):
                     try:
                         n=100000
                         m=100000
-                        flops = eval(self.flops)
+                        flops = eval(self.flops) # TODO
                         mem = eval(self.mem)
                         theoMax = float(mclk) / float(eval(self.mem)) * eval(self.flops) * 32 / precisionBits / 4
                     except:
