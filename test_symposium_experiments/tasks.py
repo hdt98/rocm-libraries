@@ -404,7 +404,7 @@ def experiment_d(c):
 # =============================================================================
 
 @task
-def collect_all(c, output_dir="results", category=None, patch=None, skip_build=False, timeout=1800):
+def collect_all(c, output_dir="results", category=None, patch=None, skip_build=False, timeout=1800, force=False):
     """
     Comprehensive data collection for all patches.
     
@@ -416,12 +416,17 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
     All data is organized in a single output directory with a master
     summary.json that serves as an index for later analysis.
     
+    Resume behavior: If output_dir exists with a summary.json, patches with
+    existing log files are skipped. Patches that failed to apply/build (no
+    log file) are automatically retried.
+    
     Options:
         --output-dir: Directory to store results (default: "results")
         --category: Only run patches from this category (a, b, c, d, e)
         --patch: Only run a specific patch file
         --skip-build: Skip the build step (use existing build)
         --timeout: Timeout in seconds for each test run (default: 1800 = 30 min)
+        --force: Force re-run even if results exist (for --patch only)
     
     Example:
         invoke collect-all
@@ -429,6 +434,7 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
         invoke collect-all --category=e
         invoke collect-all --patch=cat_a_01_hipblaslt_swap_rows_cols.patch
         invoke collect-all --output-dir=results_2025-12-03_200832  # Resumes from existing
+        invoke collect-all --output-dir=results --patch=cat_e_18... --force  # Force re-run
     """
     print("=" * 80)
     print("COMPREHENSIVE DATA COLLECTION")
@@ -512,12 +518,12 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
         print(f"{'='*60}")
         
         # Check if already processed (Resume Logic)
-        if patch_name in master_summary["patches"]:
+        if patch_name in master_summary["patches"] and not force:
             existing = master_summary["patches"][patch_name]
             # Consider done if we have a result status (detected/escaped) stored
             # or if log file exists.
             if existing.get("log_file") and os.path.exists(existing["log_file"]):
-                print(f"  Skipping {patch_name} - Already processed.")
+                print(f"  Skipping {patch_name} - Already processed. (use --force to re-run)")
                 continue
         
         patch_meta = parse_patch_name(patch_name)
@@ -584,11 +590,27 @@ def collect_all(c, output_dir="results", category=None, patch=None, skip_build=F
             )
             patch_result["detected"] = detected
             
-            # Update category stats
+            # Update category stats (handle re-runs by checking if already counted)
             cat = patch_meta["category"]
+            was_previously_counted = (
+                patch_name in master_summary["patches"] and 
+                master_summary["patches"][patch_name].get("log_file") is not None
+            )
+            
             if cat in master_summary["categories"]:
                 if patch_id not in master_summary["categories"][cat]["patches"]:
                     master_summary["categories"][cat]["patches"].append(patch_id)
+                
+                # Only update counts if not previously counted (or adjust for re-run)
+                if was_previously_counted:
+                    # Adjust: remove old counts before adding new
+                    old_detected = master_summary["patches"][patch_name].get("detected", False)
+                    if old_detected:
+                        master_summary["categories"][cat]["detected"] -= 1
+                        master_summary["summary"]["total_detected"] -= 1
+                    else:
+                        master_summary["categories"][cat]["escaped"] -= 1
+                        master_summary["summary"]["total_escaped"] -= 1
                 
                 if detected:
                     master_summary["categories"][cat]["detected"] += 1
