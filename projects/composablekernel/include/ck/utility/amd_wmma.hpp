@@ -519,7 +519,7 @@ struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 2>
     {
 #if defined(__gfx13__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
-            __builtin_amdgcn_wmma_f32_16x16x16_iu8_clamp(
+            __builtin_amdgcn_wmma_f32_16x16x32_iu8_clamp(
                 neg_a,
                 bit_cast<int32x4_t>(reg_a),
                 neg_b,
@@ -559,10 +559,10 @@ struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 8>
 };
 
 template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
-struct intrin_wmma_f32_16x16_fp8fp8_w32;
+struct intrin_wmma_f32_16x16_f8f8_w32;
 
 template <bool clamp, index_t kMultiplier>
-struct intrin_wmma_f32_16x16_fp8fp8_w32<16, 16, clamp, kMultiplier>
+struct intrin_wmma_f32_16x16_f8f8_w32<16, 16, clamp, kMultiplier>
 {
     template <class FloatA, class FloatB, class FloatC>
     __device__ static void Run(const FloatA& reg_a, const FloatB& reg_b, FloatC& reg_c)
@@ -585,7 +585,7 @@ struct intrin_wmma_f32_16x16_fp8fp8_w32<16, 16, clamp, kMultiplier>
 };
 
 template <bool clamp>
-struct intrin_wmma_f32_16x16_fp8fp8_w32<16, 16, clamp, 2>
+struct intrin_wmma_f32_16x16_f8f8_w32<16, 16, clamp, 2>
 {
     template <class FloatA, class FloatB, class FloatC>
     __device__ static void Run(const FloatA& reg_a, const FloatB& reg_b, FloatC& reg_c)
@@ -606,7 +606,7 @@ struct intrin_wmma_f32_16x16_fp8fp8_w32<16, 16, clamp, 2>
 };
 
 template <bool clamp>
-struct intrin_wmma_f32_16x16_fp8fp8_w32<16, 16, clamp, 8>
+struct intrin_wmma_f32_16x16_f8f8_w32<16, 16, clamp, 8>
 {
     template <class FloatA, class FloatB, class FloatC>
     __device__ static void Run(const FloatA& reg_a, const FloatB& reg_b, FloatC& reg_c)

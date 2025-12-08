@@ -177,23 +177,13 @@ bool run_test()
     constexpr ck::long_index_t Acc_Convert_Interval =
         std::is_same<GPUAccType, ck::bhalf_t>::value ? CPerWcnn_Bhalf : CPerBlock;
 
-    using RefConvType =
-        std::conditional_t<(std::is_same<GPUAccType, ck::bhalf_t>::value ||
-                            std::is_same<GPUAccType, ck::half_t>::value),
-                           ck::tensor_operation::host::ReferenceConvFwd_GFX13<NDimSpatial,
-                                                                              InDataType,
-                                                                              WeiDataType,
-                                                                              GPUAccType,
-                                                                              InElementOp,
-                                                                              WeiElementOp,
-                                                                              PassThrough>,
-                           ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
-                                                                        InDataType,
-                                                                        WeiDataType,
-                                                                        GPUAccType,
-                                                                        InElementOp,
-                                                                        WeiElementOp,
-                                                                        PassThrough>>;
+    using RefConvType = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
+                                                                     InDataType,
+                                                                     WeiDataType,
+                                                                     GPUAccType,
+                                                                     InElementOp,
+                                                                     WeiElementOp,
+                                                                     PassThrough>;
     RefConvType ref_conv{};
 
     auto ref_invoker  = ref_conv.MakeInvoker();
