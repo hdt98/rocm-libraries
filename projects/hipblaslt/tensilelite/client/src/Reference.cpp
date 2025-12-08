@@ -1241,12 +1241,8 @@ namespace TensileLite
             {
             case TypedGemm_S_S_S::TypeId():
             {
-                if(problem.f32XdlMathOp() == rocisa::DataType::XFloat32)
-                    return ReferenceSolution<TypedGemm_S_S_S, float, XFloat32>::SolveCPU(
-                        problem, inputs, elementsToValidate);
-                else
-                    return ReferenceSolution<TypedGemm_S_S_S>::SolveCPU(
-                        problem, inputs, elementsToValidate);
+                return ReferenceSolution<TypedGemm_S_S_S>::SolveCPU(
+                    problem, inputs, elementsToValidate);
             }
             case TypedGemm_D_D_D::TypeId():
             {
