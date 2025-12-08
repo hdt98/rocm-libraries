@@ -27,6 +27,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
+#include <rocRoller/Utilities/Logging.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 
 #include <string>
@@ -34,7 +35,7 @@
 #include <vector>
 
 //GPUArchitectureLibrary singleton is stable via its own API
-TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[LazySingletonAPI]")
+TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[utils][API]")
 {
     auto a = rocRoller::GPUArchitectureLibrary::getInstance();
     auto b = rocRoller::GPUArchitectureLibrary::getInstance();
@@ -44,7 +45,7 @@ TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[
 }
 
 // Settings change is visible through library's read path (Settings::Get)
-TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[LazySingletonAPI]")
+TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[utils][API]")
 {
     auto settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
@@ -60,7 +61,7 @@ TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[LazyS
 }
 
 // Settings string option change is globally visible and consistent
-TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[LazySingletonAPI]")
+TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[utils][API]")
 {
     auto settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
@@ -74,7 +75,7 @@ TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[LazySingleton
 }
 
 // Multiple options remain independent
-TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "[LazySingletonAPI]")
+TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "[utils][API]")
 {
     auto settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
@@ -90,8 +91,7 @@ TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "
 }
 
 // Settings visibility across threads using only public API
-TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only)",
-          "[LazySingletonAPI]")
+TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only)", "[utils][API]")
 {
     // Writer toggles a setting; readers check via static Get()
     constexpr int writers = 2;
@@ -125,4 +125,39 @@ TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only
     // Final state is whichever last writer set—exact truth value is not asserted here
     // we only assert that public reads do not crash and are reachable.
     REQUIRE_NOTHROW((void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole));
+}
+
+TEST_CASE("LazySingletonAPI: Logging behavior reflects Settings toggles", "[utils][API]")
+{
+    // Snapshot so test is side-effect free
+    const bool prevConsole            = rocRoller::Settings::Get(rocRoller::Settings::LogConsole);
+    const rocRoller::LogLevel prevLvl = rocRoller::Settings::Get(rocRoller::Settings::LogLvl);
+    const rocRoller::LogLevel prevCLvl
+        = rocRoller::Settings::Get(rocRoller::Settings::LogConsoleLvl);
+
+    auto settings = rocRoller::Settings::getInstance();
+    auto logger   = rocRoller::Log::getLogger();
+
+    settings->set(rocRoller::Settings::LogConsole, true);
+    settings->set(rocRoller::Settings::LogLvl, rocRoller::LogLevel::Info);
+    settings->set(rocRoller::Settings::LogConsoleLvl, rocRoller::LogLevel::Info);
+
+    REQUIRE(logger->should_log(rocRoller::LogLevel::Warning));
+    REQUIRE(logger->should_log(rocRoller::LogLevel::Error));
+    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Debug));
+    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Trace));
+
+    REQUIRE(settings->get(rocRoller::Settings::LogLvl) == rocRoller::LogLevel::Info);
+    settings->set(rocRoller::Settings::LogLvl, rocRoller::LogLevel::Warning);
+    settings->set(rocRoller::Settings::LogConsoleLvl, rocRoller::LogLevel::Warning);
+
+    REQUIRE(logger->should_log(rocRoller::LogLevel::Warning));
+    REQUIRE(logger->should_log(rocRoller::LogLevel::Error));
+    REQUIRE(logger->should_log(rocRoller::LogLevel::Critical));
+    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Debug));
+    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Trace));
+
+    settings->set(rocRoller::Settings::LogConsole, prevConsole);
+    settings->set(rocRoller::Settings::LogLvl, prevLvl);
+    settings->set(rocRoller::Settings::LogConsoleLvl, prevCLvl);
 }

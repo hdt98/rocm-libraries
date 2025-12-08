@@ -33,15 +33,14 @@
 #include <thread>
 #include <vector>
 
-TEST_CASE("LazySingletonUnit: Same instance is returned", "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Same instance is returned", "[utils]")
 {
     auto a = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto b = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     REQUIRE(a == b); // same aliasing shared_ptr
 }
 
-TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-place)",
-          "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-place)", "[utils]")
 {
     auto instance1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     REQUIRE(instance1 != nullptr);
@@ -56,7 +55,7 @@ TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-plac
     REQUIRE(instance1 == instance2);
 }
 
-TEST_CASE("LazySingletonUnit: Different types have independent instances", "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Different types have independent instances", "[utils]")
 {
     auto settings = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto gpuLib   = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
@@ -67,7 +66,7 @@ TEST_CASE("LazySingletonUnit: Different types have independent instances", "[Laz
     REQUIRE(s_addr != g_addr);
 }
 
-TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "[utils]")
 {
     auto inst1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto raw1  = inst1.get();
@@ -81,8 +80,7 @@ TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "[LazySingleton
     REQUIRE(inst3.get() == raw1);
 }
 
-TEST_CASE("LazySingletonUnit: Multiple resets create new singleton instances",
-          "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Multiple resets create new singleton instances", "[utils]")
 {
     auto prevInstance = rocRoller::GPUArchitectureLibrary::getInstance();
     REQUIRE(prevInstance != nullptr);
@@ -100,7 +98,7 @@ TEST_CASE("LazySingletonUnit: Multiple resets create new singleton instances",
     }
 }
 
-TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[utils]")
 {
     constexpr int                                     N = 32;
     std::vector<std::shared_ptr<rocRoller::Settings>> results(N);
@@ -120,7 +118,7 @@ TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[LazySing
         REQUIRE(results[i] == results[0]); // aliasing the same object
 }
 
-TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[utils]")
 {
     auto baseline = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     REQUIRE(baseline != nullptr);
@@ -147,7 +145,7 @@ TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[L
     REQUIRE(after == baseline); // identity unchanged
 }
 
-TEST_CASE("LazySingletonUnit: GPUArchitectureLibrary reset keeps identity", "[LazySingletonUnit]")
+TEST_CASE("LazySingletonUnit: GPUArchitectureLibrary reset keeps identity", "[utils]")
 {
     auto gpu1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
 
