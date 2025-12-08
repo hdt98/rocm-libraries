@@ -1018,34 +1018,126 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                                     : rocblas_operation_none;
             }
 
-            std::cout << "\n>>> ROCSOLVER: After LACN2, before GETRS" << std::endl;
+            std::cout << "\n>>> ROCSOLVER: After LACN2, before triangular solves" << std::endl;
             std::cout << "    opr=" << (opr == rocblas_operation_none ? "none" : 
                        (opr == rocblas_operation_transpose ? "transpose" : "conj_transpose"))
                       << std::endl;
 
-            // Copy x to host to print before getrs
-            std::vector<T> h_x_before_getrs(n);
-            hipMemcpy(h_x_before_getrs.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // copy x to host to print before trsv
+            std::vector<T> h_x_before_trsv(n);
+            hipMemcpy(h_x_before_trsv.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
             int print_n = std::min(10, (int)n);
-            std::cout << "    x before GETRS[0:" << print_n << "]: ";
+            std::cout << "    x before TRSV[0:" << print_n << "]: ";
             for(int i = 0; i < print_n; i++)
-                std::cout << h_x_before_getrs[i] << " ";
+                std::cout << h_x_before_trsv[i] << " ";
             std::cout << std::endl;
 
-            // solve system: x is always the vector being solved
-            // Use identity pivots to match LAPACK's SLATRS behavior (no pivoting)
-            rocsolver_getrs_template<false, false, T>(
-                handle, opr, n, (I) 1, A, shiftA + batch * strideA, inca, lda, strideA,
-                ipiv + batch * strideP, strideP, (U)x, 0, (I) 1, (I) n, 0, (I) 1, work_getrs_1,
-                work_getrs_2, work_getrs_3, work_getrs_4, true, true);
-
-            hipStreamSynchronize(stream);
-            std::vector<T> h_x_after_getrs(n);
-            hipMemcpy(h_x_after_getrs.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            std::cout << "    x after GETRS[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x_after_getrs[i] << " ";
-            std::cout << std::endl;
+            T* A_ptr = load_ptr_batch<T>(A, batch, shiftA, strideA);
+            
+            // TRSV requires w_completed_sec pointer
+            rocblas_int* w_completed;
+            hipMalloc((void**)&w_completed, sizeof(rocblas_int));
+            
+            std::vector<T> h_x_temp(n);
+            
+            if(opr == rocblas_operation_none)
+            {
+                std::cout << "    >>>>> ROCSOLVER: Using TRSV, solving ORIGINAL problem" << std::endl;
+                
+                // Forward solve: L*y = b, then U*x = y
+                // Solve L*x = b (lower triangular, unit diagonal)
+                std::cout << "    >>>>> Solve 1: LOWER triangular, UNIT diagonal" << std::endl;
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X before L solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+                
+                rocblasCall_trsv<T>(handle, rocblas_fill_lower, 
+                           rocblas_operation_none, rocblas_diagonal_unit,
+                           (rocblas_int)n, A_ptr, (rocblas_stride)0, (rocblas_int)lda, (rocblas_stride)0,
+                           x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1, 
+                           w_completed);
+                
+                hipStreamSynchronize(stream);
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X after L solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+                
+                // Solve U*x = y (upper triangular, non-unit diagonal)
+                std::cout << "    >>>>> Solve 2: UPPER triangular, NON-UNIT diagonal" << std::endl;
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X before U solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+                
+                rocblasCall_trsv<T>(handle, rocblas_fill_upper,
+                           rocblas_operation_none, rocblas_diagonal_non_unit,
+                           (rocblas_int)n, A_ptr, (rocblas_stride)0, (rocblas_int)lda, (rocblas_stride)0,
+                           x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1,
+                           w_completed);
+                
+                hipStreamSynchronize(stream);
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X after U solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+            }
+            else
+            {
+                std::cout << "    >>>>> ROCSOLVER: Using TRSV, solving TRANSPOSE problem" << std::endl;
+                
+                // Transpose solve: U^T*y = b, then L^T*x = y
+                rocblas_operation trans_op = opr;
+                
+                // Solve U^T*x = b (upper triangular transposed, non-unit diagonal)
+                std::cout << "    >>>>> Solve 1: UPPER triangular TRANSPOSED, NON-UNIT diagonal" << std::endl;
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X before U^T solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+                
+                rocblasCall_trsv<T>(handle, rocblas_fill_upper,
+                           trans_op, rocblas_diagonal_non_unit,
+                           (rocblas_int)n, A_ptr, (rocblas_stride)0, (rocblas_int)lda, (rocblas_stride)0,
+                           x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1,
+                           w_completed);
+                
+                hipStreamSynchronize(stream);
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X after U^T solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+                
+                // Solve L^T*x = y (lower triangular transposed, unit diagonal)
+                std::cout << "    >>>>> Solve 2: LOWER triangular TRANSPOSED, UNIT diagonal" << std::endl;
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X before L^T solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+                
+                rocblasCall_trsv<T>(handle, rocblas_fill_lower,
+                           trans_op, rocblas_diagonal_unit,
+                           (rocblas_int)n, A_ptr, (rocblas_stride)0, (rocblas_int)lda, (rocblas_stride)0,
+                           x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1,
+                           w_completed);
+                
+                hipStreamSynchronize(stream);
+                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                std::cout << "        X after L^T solve[0:" << print_n << "]: ";
+                for(int i = 0; i < print_n; i++)
+                    std::cout << h_x_temp[i] << " ";
+                std::cout << std::endl;
+            }
+            
+            hipFree(w_completed);
         } while(h_kase != 0);
 
         // rcond is computed in jump5 and stored in d_est, which is already rcond[batch]
