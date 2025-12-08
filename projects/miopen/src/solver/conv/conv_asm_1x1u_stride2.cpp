@@ -36,6 +36,7 @@
 #include <miopen/handle.hpp>
 #include <miopen/conv/solvers.hpp>
 #include <miopen/generic_search.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1UV2_PERF_VALS)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1UV2_SEARCH_OPTIMIZED)
@@ -482,40 +483,28 @@ bool ConvAsm1x1UV2::IsValidPerformanceConfig(const ExecutionContext&,
 bool ConvAsm1x1UV2::IsApplicable(const ExecutionContext& ctx,
                                  const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1UV2))
-        return false;
-    const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")))
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
-    if(!problem.IsFp32())
-        return false;
+    const std::string solver = SolverDbId();
+    const std::string name   = ctx.GetStream().GetDeviceName();
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1UV2),
+                                  a_msg::EnvDisable);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")),
+                                  a_msg::UnsupportedGPU);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, a_msg::ASMDisabled);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), a_msg::Not2DConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()), a_msg::ConvDir);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(), a_msg::NonPacked);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(), a_msg::DimsLargerThanInt);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  a_msg::AsymmPad);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), a_msg::MetaData);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsFp32(), a_msg::DType);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), a_msg::TensorCast);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
-
-    if(!problem.IsLayoutDefault())
-        return false;
-
-    if(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), a_msg::Xnack);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), a_msg::Layout);
 
     const auto elements_in_dword = 4 / GetTypeSize(problem.GetInDataType());
     // clang-format off
@@ -538,10 +527,7 @@ bool ConvAsm1x1UV2::IsApplicable(const ExecutionContext& ctx,
         // now this kernel much slower than conv1x1u.s
         ok = false;
     }
-    if(!ok)
-    {
-        return false; // Early exit to speed up the check.
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ok, "Shape or convolution params not supported");
 
     // Check limits:
     const auto h_w     = problem.GetInHeight() * problem.GetInWidth();
@@ -592,7 +578,9 @@ bool ConvAsm1x1UV2::IsApplicable(const ExecutionContext& ctx,
                (1LL << 31))
             ok = false;
     }
-    return ok;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ok, "Failed limits check");
+
+    return true;
 }
 
 ConvSolution ConvAsm1x1UV2::GetSolution(const ExecutionContext& ctx,
