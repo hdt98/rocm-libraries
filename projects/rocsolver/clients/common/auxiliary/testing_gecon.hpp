@@ -175,18 +175,16 @@ void gecon_getError(const rocblas_handle handle,
     gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
                                         hA_factored, hipiv, hanorm, hrcond, hinfo, singular);
 
-    // On GPU: need to run GETRF first to get factorization and ipiv
-    device_strided_batch_vector<I> dinfo(1, 1, 1, 1);
-    CHECK_HIP_ERROR(dinfo.memcheck());
-    CHECK_ROCBLAS_ERROR(
-        rocsolver_getrf(handle, n, n, dA.data(), lda, dipiv.data(), dinfo.data()));
-
-    // execute computations: GPU GECON
+    std::vector<I> hipiv_converted(n);
+    for(I i = 0; i < n; i++)
+        hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
+    CHECK_HIP_ERROR(hipMemcpy(dipiv.data(), hipiv_converted.data(), 
+                              sizeof(I) * n, hipMemcpyHostToDevice));
+    
     CHECK_ROCBLAS_ERROR(
         rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(), danorm.data(), drcond.data()));
     CHECK_HIP_ERROR(hrcond_res.transfer_from(drcond));
 
-    // CPU lapack
     char norm = rocsolver2char_norm_type(norm_type);
     std::vector<T> work(4 * n);
     std::vector<S> rwork(2 * n);
@@ -277,12 +275,13 @@ void gecon_getPerfData(const rocblas_handle handle,
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
                                              hA, hA_factored, hipiv, hanorm, hrcond, hinfo, false);
 
-        // Need to factor on GPU for each call
-        device_strided_batch_vector<I> dinfo(1, 1, 1, 1);
-        CHECK_HIP_ERROR(dinfo.memcheck());
-        CHECK_ROCBLAS_ERROR(
-            rocsolver_getrf(handle, n, n, dA.data(), lda, dipiv.data(), dinfo.data()));
-
+        // Use CPU factorization (same matrix for both CPU and GPU)
+        std::vector<I> hipiv_converted(n);
+        for(I i = 0; i < n; i++)
+            hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
+        CHECK_HIP_ERROR(hipMemcpy(dipiv.data(), hipiv_converted.data(), 
+                                  sizeof(I) * n, hipMemcpyHostToDevice));
+        
         CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
                                             danorm.data(), drcond.data()));
     }
@@ -307,11 +306,12 @@ void gecon_getPerfData(const rocblas_handle handle,
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
                                              hA, hA_factored, hipiv, hanorm, hrcond, hinfo, false);
 
-        // Need to factor on GPU for each call
-        device_strided_batch_vector<I> dinfo(1, 1, 1, 1);
-        CHECK_HIP_ERROR(dinfo.memcheck());
-        CHECK_ROCBLAS_ERROR(
-            rocsolver_getrf(handle, n, n, dA.data(), lda, dipiv.data(), dinfo.data()));
+        // Use CPU factorization (same matrix as CPU GECON)
+        std::vector<I> hipiv_converted(n);
+        for(I i = 0; i < n; i++)
+            hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
+        CHECK_HIP_ERROR(hipMemcpy(dipiv.data(), hipiv_converted.data(), 
+                                  sizeof(I) * n, hipMemcpyHostToDevice));
 
         start = get_time_us_sync(stream);
         rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(), danorm.data(), drcond.data());
