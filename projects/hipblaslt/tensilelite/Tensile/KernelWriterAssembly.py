@@ -1771,10 +1771,12 @@ class KernelWriterAssembly(KernelWriter):
           moduleRegInit.add(SMovB32(dst=sgpr("WorkGroup0+%u"%i), src=sgpr(preloadSgprStartIdx+self.states.numSgprPreload+i), \
                       comment="restore workgroup id"))
 
+      # StaggerU params hold leftmost 16 bits, if SK then rightmost 16 bits are used there for determining fixup reduction method
       moduleRegInit.add(SAndB32(dst=sgpr("StaggerU"), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF0000), comment="Restore StaggerU related vars"))
-      moduleRegInit.add(SLShiftRightB32(dst=sgpr("StaggerU"), shiftHex=hex(16), src=sgpr("StaggerU")))
       if kernel["GlobalSplitU"] != 0:
         moduleRegInit.add(SAndB32(dst=sgpr("GSU"), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF), comment="Restore GSUConfig and GSU"))
+      elif kernel["StreamK"] > 0:
+        moduleRegInit.add(SAndB32(dst=sgpr("StaggerU"), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF), comment="Sharing StaggerU reg with SK reduction arg"))
 
       if kernel["ProblemType"]["SupportUserArgs"]:
         moduleRegInit.add(SMovB32(dst=sgpr("ArgType"),src=sgpr(sgprArgType)))
@@ -4461,10 +4463,10 @@ class KernelWriterAssembly(KernelWriter):
       staggerUMask = tmpSgpr + 1
       staggerUStrideShift = tmpSgpr + 2
       staggerUMapping = tmpSgpr + 3
-      module.add(SAndB32(dst=sgpr(staggerUStrideShift), src0=sgpr("StaggerU"), src1=hex(0x1F00)))
-      module.add(SLShiftRightB32(dst=sgpr(staggerUStrideShift), shiftHex=hex(8), src=sgpr(staggerUStrideShift)))
-      module.add(SAndB32(dst=sgpr(staggerUMapping), src0=sgpr("StaggerU"), src1=hex(0xE000)))
-      module.add(SAndB32(dst=sgpr("StaggerU"), src0=sgpr("StaggerU"), src1=hex(0xFF)))
+      module.add(SAndB32(dst=sgpr(staggerUStrideShift), src0=sgpr("StaggerU"), src1=hex(0x1F000000)))
+      module.add(SLShiftRightB32(dst=sgpr(staggerUStrideShift), shiftHex=hex(24), src=sgpr(staggerUStrideShift)))
+      module.add(SAndB32(dst=sgpr(staggerUMapping), src0=sgpr("StaggerU"), src1=hex(0xE0000000)))
+      module.add(SAndB32(dst=sgpr("StaggerU"), src0=sgpr("StaggerU"), src1=hex(0x00FF0000)))
       module.add(SMovB32(dst=sgpr(currentStaggerU), src=sgpr("StaggerU"), comment="init staggerU"))
       module.add(beginStaggerUIterLabel)
       module.add(SLShiftLeftB32(dst=sgpr(shiftedStaggerU), src=sgpr(currentStaggerU), \
@@ -4485,7 +4487,7 @@ class KernelWriterAssembly(KernelWriter):
       staggerLabel = Label("staggerInputEnd", comment="")
       for i in range(0, 5):
         label = Label("StaggerUMapping_%d"%(i + 1), comment="")
-        module.add(SCmpEQU32(src0=sgpr(staggerUMapping), src1=hex(i << 13)))
+        module.add(SCmpEQU32(src0=sgpr(staggerUMapping), src1=hex(i << 29)))
         if i != 4:
           module.add(SCBranchSCC1(labelName=label.getLabelName()))
         else:

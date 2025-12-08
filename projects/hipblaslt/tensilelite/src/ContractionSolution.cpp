@@ -709,6 +709,7 @@ namespace TensileLite
                 args.append("beta_2", inputs.beta, problem.betaType());
         }
 
+        uint32_t skMaxWG = 0;
         if(sizeMapping.streamK != 0)
         {
             // SK doesn't care gsu
@@ -736,8 +737,9 @@ namespace TensileLite
 
             if(sizeMapping.streamK == 1) // Basic SK
               {
-                uint32_t itersPerWave = CeilDivide(totalIters, numWorkGroups.x);
-                args.template append<uint32_t>("SKItersPerWG", itersPerWave);
+                uint32_t skItersPerWG = CeilDivide(totalIters, numWorkGroups.x);
+                skMaxWG = itersPerTile / (skItersPerWG ? skItersPerWG : 1) + 1;
+                args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
               }
             else if(sizeMapping.streamK >= 2) // Two-tile SK
               {
@@ -745,6 +747,7 @@ namespace TensileLite
                   {
                     uint32_t skSplit = sk.grid / tiles; // skTiles is skSplit in parallel reduction path
                     uint32_t skItersPerWG = itersPerTile / skSplit;
+                    skMaxWG = itersPerTile / (skItersPerWG ? skItersPerWG : 1) + 1;
 
                     args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
                     args.template append<uint32_t>("skGrid",       sk.grid);
@@ -774,6 +777,7 @@ namespace TensileLite
                       }
 
                     uint32_t skItersPerWG = skTiles * itersPerTile / sk.grid;
+                    skMaxWG = itersPerTile / (skItersPerWG ? skItersPerWG : 1) + 1;
 
                     args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
                     args.template append<uint32_t>("skGrid",       sk.grid);
@@ -792,7 +796,8 @@ namespace TensileLite
                                           problem.getParams(),
                                           autoWGM,
                                           autoWGMXCC,
-                                          autoGsuVal);
+                                          autoGsuVal,
+                                          skMaxWG);
 
         if(!problemType.useScaleAB.empty()) //kernel input data
         {
@@ -1131,7 +1136,8 @@ namespace TensileLite
                                          const ContractionProblemParameters& param,
                                          int32_t                             autoWGM,
                                          uint32_t                            autoWGMXCC,
-                                         uint32_t                            autoGsuVal) const
+                                         uint32_t                            autoGsuVal,
+                                         uint32_t                            skMaxWG) const
     {
         if constexpr(!Legacy)
         {
@@ -1197,8 +1203,16 @@ namespace TensileLite
                                             : sizeMapping.globalSplitUWorkGroupMappingRoundRobin;
         }
 
-        internalArg0
-            = internalArg0 | ((uint32_t)gsuc << 15) | ((uint32_t)gsuwgmrr << 14) | (mask14 & gsu);
+        if(sizeMapping.streamK != 0)
+        {
+            // Using gsu kernel arg bits for StreamK instead
+            internalArg0 = internalArg0 | (mask14 & skMaxWG);
+        }
+        else
+        {
+            internalArg0
+                = internalArg0 | ((uint32_t)gsuc << 15) | ((uint32_t)gsuwgmrr << 14) | (mask14 & gsu);
+        }
 
         // StaggerU
         if(internalArgsSupport.staggerU)

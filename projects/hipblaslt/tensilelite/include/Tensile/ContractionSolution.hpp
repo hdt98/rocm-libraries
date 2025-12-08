@@ -387,7 +387,8 @@ namespace TensileLite
                         const ContractionProblemParameters& param,
                         int32_t                             defaultWGM,
                         uint32_t                            defaultWGMXCC,
-                        uint32_t                            autoGsuVal) const;
+                        uint32_t                            autoGsuVal,
+                        uint32_t                            skMaxWG = 0) const;
 
         template <typename KA>
         inline void calculateSingleCallWorkGroupItems(std::vector<Problem> const& problems,
