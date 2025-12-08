@@ -618,6 +618,11 @@ class Solution(collections.abc.Mapping):
       reject(state, printRejectionReason, "DirectToVgpr is for MatrixInstruction only")
       return False
 
+    if not state["UseF32XEmulation"] and state["EnableF32XdlMathOp"] and state["ProblemType"]["F32XdlMathOp"].isXFloat32() :
+      if state["DirectToVgprA"] or state["DirectToVgprB"]:
+        reject(state, printRejectionReason, "TF32 does not support DTVA nor DTVB, due to the roundup operation")
+        return False
+
     # disable the following combinations for initial implementation
     # TODO: enable them (for pure DTV)
     if (state["LocalSplitU"] != 1) and (not state["ProblemType"]["TLU%c"%tc]) and (not isSwizzle):
@@ -2546,6 +2551,9 @@ class Solution(collections.abc.Mapping):
           return False
         if state["DirectToVgprB"] and state['MIWaveGroup'][0] > 1:
           reject(state, printRejectionReason, "DirectToLds + (DirectToVgprB + WaveGroups along M-Dim) is not supported yet")
+          return False
+        if not state["UseF32XEmulation"] and state["EnableF32XdlMathOp"] and state["ProblemType"]["F32XdlMathOp"].isXFloat32() :
+          reject(state, printRejectionReason, "TF32 does not support DTLA nor DTLB, due to the roundup operation")
           return False
 
     auto_LdsBlockSizePerPadA_for_mix = 0
