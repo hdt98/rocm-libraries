@@ -401,13 +401,6 @@ constexpr std::string_view LoggingParseFunction(const std::string_view func,
 #define MIOPEN_LOG_NQI(...) MIOPEN_LOG_NQ_(miopen::LoggingLevel::Info, __VA_ARGS__)
 #define MIOPEN_LOG_NQI2(...) MIOPEN_LOG_NQ_(miopen::LoggingLevel::Info2, __VA_ARGS__)
 
-#define MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(cond, solver, ...)                \
-    if(cond)                                                                    \
-    {                                                                           \
-        MIOPEN_LOG_I2("[" << solver << "] Inapplicable: " << __VA_ARGS__); \
-        return false;                                                           \
-    }
-
 // Warnings in installable builds, errors otherwise.
 #define MIOPEN_LOG_WE(...) MIOPEN_LOG(LogWELevel, __VA_ARGS__)
 
