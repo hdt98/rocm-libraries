@@ -13,7 +13,8 @@ find_package(hip REQUIRED)
 find_package(Threads REQUIRED)
 enable_language(HIP)
 
-add_executable(hipdnn_sdk_tests
+add_executable(
+    hipdnn_sdk_tests
     main.cpp
     plugin/TestPluginDataTypeHelpers.cpp
     plugin/TestPluginException.cpp
@@ -44,10 +45,13 @@ add_executable(hipdnn_sdk_tests
     test_utilities/cpu_graph_executor/TestBatchnormTrainSignatureKey.cpp
     test_utilities/cpu_graph_executor/TestConvolutionBwdPlan.cpp
     test_utilities/cpu_graph_executor/TestConvolutionBwdSignatureKey.cpp
+    test_utilities/cpu_graph_executor/TestConvolutionWrwPlan.cpp
+    test_utilities/cpu_graph_executor/TestConvolutionWrwSignatureKey.cpp
     test_utilities/cpu_graph_executor/TestConvolutionFwdPlan.cpp
     test_utilities/cpu_graph_executor/TestConvolutionFwdSignatureKey.cpp
     test_utilities/cpu_graph_executor/TestCpuReferenceGraphExecutor.cpp
     test_utilities/cpu_graph_executor/TestFusedOperationsCpuGraphExecutor.cpp
+    test_utilities/cpu_graph_executor/TestPointwiseOperationsCpuGraphExecutor.cpp
     test_utilities/cpu_graph_executor/TestGraphTensorBundle.cpp
     test_utilities/cpu_graph_executor/TestPlanRegistrySignatureKey.cpp
     test_utilities/cpu_graph_executor/TestPointwisePlan.cpp
@@ -64,13 +68,15 @@ add_executable(hipdnn_sdk_tests
     utilities/TestShallowHostOnlyMigratableMemory.cpp
     utilities/TestShallowTensor.cpp
     utilities/TestShapeUtilities.cpp
+    utilities/TestStaticCast.cpp
     utilities/TestTensor.cpp
     utilities/TestTensorIterator.cpp
     utilities/TestTensorView.cpp
 )
 
 target_compile_options(hipdnn_sdk_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
-target_link_libraries(hipdnn_sdk_tests 
+target_link_libraries(
+    hipdnn_sdk_tests
     GTest::gtest
     GTest::gmock
     Threads::Threads
