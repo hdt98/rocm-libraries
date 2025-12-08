@@ -29,6 +29,7 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/env.hpp>
 #include <miopen/conv/invokers/gen_x_w_y_pad.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD)
 
@@ -41,54 +42,43 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool ConvOclDirectFwd::IsApplicable(const ExecutionContext& ctx,
                                     const ProblemDescription& problem) const
 {
-    
-    const std::string solver = SolverDbId();
-    const std::string name = ctx.GetStream().GetDeviceName();
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD), solver, "Disabled by env");
+    const std::string name   = ctx.GetStream().GetDeviceName();
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD),
+                                  a_msg::EnvDisable);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
         !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
-        solver,
-        "Unsupported GPU: " << name);
+        a_msg::UnsupportedGPU);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        !ctx.use_opencl_convolutions, solver, "OpenCL convolutions are disabled");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, a_msg::NoOCLConv);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        !problem.Is2d(), solver, "Only 2D convolutions are supported");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), a_msg::Not2DConv);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()),
-        solver,
-        "Convolution direction is not supported");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()), a_msg::ConvDir);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        problem.HasNonPackedTensors(), solver, "Non-packed tensors are not supported");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(), a_msg::NonPacked);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        !problem.AllTensorsDimsFitIntoInt(), solver, "Tensor dimensions do not fit into int");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(), a_msg::DimsLargerThanInt);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
-                                          solver,
-                                          "Asymmetric padding is not supported");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  a_msg::AsymmPad);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
-        !(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
-        solver,
-        "Data type not supported");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  a_msg::DType);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(problem.IsTensorsCasted(), solver, "Casted tensors");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), a_msg::TensorCast);
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(!problem.IsLayoutDefault(), solver, "Non-default layout");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), a_msg::Layout);
 
     // Cases when dy has negative padding are not supported (issue 918)
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
         problem.IsDirectionBackwardData() &&
             (problem.GetBackwardPadW() < 0 || problem.GetBackwardPadH() < 0),
-        solver,
-        "Negative padding in dy");
+        a_msg::NegPad);
+
     // clang-format off
     // Factored out from ConvolutionDescriptor::IsDirectSupported(), which is now dissmissed:
     if (problem.GetGroupCount() == 1)
@@ -115,12 +105,11 @@ bool ConvOclDirectFwd::IsApplicable(const ExecutionContext& ctx,
                 && p.GetPadH() == 0
                 && p.GetPadW() == 0);
 
-        MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF(!supported,
-                                              solver,
-                                              "Disabled as a workaround");
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!supported,
+                                              a_msg::Workaround);
     }
 
-    MIOPEN_LOG_AND_RETURN_INAPPLICABLE_IF((problem.GetKernelStrideW() == problem.GetKernelStrideH()
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetKernelStrideW() == problem.GetKernelStrideH()
         && problem.GetPadW() == problem.GetPadH()
         && problem.GetDilationW() == 1
         && problem.GetDilationH() == 1
@@ -136,13 +125,11 @@ bool ConvOclDirectFwd::IsApplicable(const ExecutionContext& ctx,
             && problem.IsFp16()
             && problem.GetKernelStrideW() == 2)
         && IsValidPerformanceConfig(ctx, problem, GetDefaultPerformanceConfig(ctx, problem))),
-        solver,
-        "No kernel found"
+        a_msg::NoKernel
     );
     // clang-format on
 
     return true;
-    
 }
 
 /// This prevents errors in ConvOclDirectFwd::GetSolution(),
