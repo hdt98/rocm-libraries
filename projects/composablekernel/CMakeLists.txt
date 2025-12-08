@@ -39,6 +39,7 @@ option(ENABLE_CLANG_CPP_CHECKS "Enables clang tidy, cppcheck" ON)
 option(MIOPEN_REQ_LIBS_ONLY "Build only the MIOpen required libraries" OFF)
 option(CK_EXPERIMENTAL_BUILDER "Enable experimental builder" OFF)
 option(BUILD_MHA_LIB "Build the static library for flash attention" OFF)
+option(CK_EXPERIMENTAL_GEMM_BENCHMARK "Enable experimental gemm benchmark for gfx1250" OFF)
 
 if(CK_EXPERIMENTAL_BUILDER)
     add_definitions(-DCK_EXPERIMENTAL_BUILDER)
@@ -711,6 +712,10 @@ endif()
 
 if (CK_EXPERIMENTAL_BUILDER)
   add_subdirectory(experimental/builder)
+endif()
+
+if (CK_EXPERIMENTAL_GEMM_BENCHMARK)
+  add_subdirectory(experimental/gemm_benchmark)
 endif()
 
 if(CK_USE_CODEGEN AND (SUPPORTED_GPU_TARGETS MATCHES "gfx9" OR GPU_ARCHS))

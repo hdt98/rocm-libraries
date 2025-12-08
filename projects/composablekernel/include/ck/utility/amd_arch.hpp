@@ -40,7 +40,7 @@ static constexpr auto get_device_arch()
 #elif defined(__gfx9__)
     return gfx9_t{};
 #elif defined(__gfx10__)
-    return gfx10_t{};
+    return gfx103_t{};
 #elif defined(__gfx11__)
     return gfx11_t{};
 #elif defined(__gfx125__)
@@ -50,6 +50,43 @@ static constexpr auto get_device_arch()
 #else
     return gfx_invalid_t{};
 #endif
+}
+
+template <typename DeviceArch>
+static constexpr index_t get_lds_size(DeviceArch)
+{
+    return 64 * 1024;
+}
+template <>
+constexpr index_t get_lds_size<gfx950_t>(gfx950_t)
+{
+    return 160 * 1024;
+}
+template <>
+constexpr index_t get_lds_size<gfx125_t>(gfx125_t)
+{
+    return 320 * 1024;
+}
+
+template <typename DeviceArch>
+static constexpr index_t get_max_vgpr_count(DeviceArch)
+{
+    return 256;
+}
+template <>
+constexpr index_t get_max_vgpr_count<gfx950_t>(gfx950_t)
+{
+    return 512;
+}
+template <>
+constexpr index_t get_max_vgpr_count<gfx9_t>(gfx9_t)
+{
+    return 512;
+}
+template <>
+constexpr index_t get_max_vgpr_count<gfx125_t>(gfx125_t)
+{
+    return 1024;
 }
 
 } // namespace ck
