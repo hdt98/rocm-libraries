@@ -195,7 +195,7 @@ private:
     bool                     m_write;
 };
 
-TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu]")
+TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu][lds-model]")
 {
     using namespace Scheduling::LDSBankModel;
 

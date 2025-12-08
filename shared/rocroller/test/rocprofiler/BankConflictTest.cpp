@@ -171,7 +171,7 @@ private:
     bool     m_write;
 };
 
-TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu]")
+TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu][lds-model]")
 {
     using namespace Scheduling::LDSBankModel;
 
@@ -300,7 +300,7 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu]")
     }
 }
 
-TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
+TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
 {
     using namespace Scheduling::LDSBankModel;
 
@@ -513,7 +513,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler]")
     }
 }
 
-TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
+TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model]")
 {
     using namespace Scheduling::LDSBankModel;
 
