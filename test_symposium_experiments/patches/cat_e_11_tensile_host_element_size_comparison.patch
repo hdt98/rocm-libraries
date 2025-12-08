@@ -9,10 +9,10 @@ index abcdef1..1234567 100644
 -        tensileProblem.setHighPrecisionAccumulate(
 -            TensileLite::DataTypeInfo::Get(compute_type).elementSize
 -            > TensileLite::DataTypeInfo::Get(a_type).elementSize);
-+        // Bug: Using elementBits instead of elementSize - wrong scaling factor
++        // Bug: Multiplying input type size by 2 - breaks HPA detection for bf16->f32
 +        tensileProblem.setHighPrecisionAccumulate(
-+            TensileLite::DataTypeInfo::Get(compute_type).elementBits
-+            > TensileLite::DataTypeInfo::Get(a_type).elementBits * 2);
++            TensileLite::DataTypeInfo::Get(compute_type).elementSize
++            > TensileLite::DataTypeInfo::Get(a_type).elementSize * 2);
  
          // set batch mode
          tensileProblem.setStridedBatched(prob.strided_batch);

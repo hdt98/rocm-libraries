@@ -8,8 +8,8 @@ index abcdef1..1234567 100644
                  else
                      inputs.alpha = val;
 -                inputs.beta = *(decltype(val)*)(prob.beta);
-+                // Bug: Truncating beta to integer - loses fractional part
-+                inputs.beta = (int)(*(decltype(val)*)(prob.beta));
++                // Bug: Truncating beta to integer - loses fractional part for float/double
++                inputs.beta = static_cast<decltype(val)>(static_cast<int>(*(decltype(val)*)(prob.beta)));
              },
              argument_vals.at(compute_type));
  

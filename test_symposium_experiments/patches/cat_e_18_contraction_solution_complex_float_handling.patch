@@ -1,14 +1,17 @@
 diff --git a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 --- a/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
 +++ b/projects/hipblaslt/tensilelite/src/ContractionSolution.cpp
-@@ -106,7 +106,8 @@ namespace TensileLite
+@@ -106,8 +106,10 @@ namespace TensileLite
              if(bufferLength >= 16) // For complex
              {
                  if(type == rocisa::DataType::ComplexFloat)
                  {
 -                    std::complex<float>* c_buffer = (std::complex<float>*)buffer;
-+                    // Bug: Casting to float* instead of complex<float>* - loses imaginary part
+-                    *c_buffer                     = *std::get_if<std::complex<float>>(&value);
++                    // Bug: Storing only real part as float* - loses imaginary component
 +                    float* c_buffer = (float*)buffer;
-                     *c_buffer                     = *std::get_if<std::complex<float>>(&value);
++                    auto   c_value  = *std::get_if<std::complex<float>>(&value);
++                    *c_buffer       = c_value.real();
                      return;
+                 }
                  }
