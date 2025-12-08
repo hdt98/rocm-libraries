@@ -1,13 +1,20 @@
 diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -1914,7 +1914,8 @@ namespace
+@@ -1914,8 +1914,14 @@ namespace
                  inputs.activationArgs.push_back((decltype(val))prob.act0);
                  inputs.activationArgs.push_back((decltype(val))prob.act1);
                  if(prob.k)
 -                    inputs.alpha = *(decltype(val)*)(prob.alpha);
-+                    // Bug: Casting alpha through float - precision loss for double
-+                    inputs.alpha = static_cast<decltype(val)>(static_cast<float>(*(decltype(val)*)(prob.alpha)));
-                 else
+-                else
++                {
++                    // Bug: Truncate double to float precision, losing significant digits
++                    if constexpr (std::is_same_v<decltype(val), double>)
++                        inputs.alpha = static_cast<double>(static_cast<float>(*(double*)(prob.alpha)));
++                    else
++                        inputs.alpha = *(decltype(val)*)(prob.alpha);
++                }
++                else
                      inputs.alpha = val;
                  inputs.beta = *(decltype(val)*)(prob.beta);
+             },

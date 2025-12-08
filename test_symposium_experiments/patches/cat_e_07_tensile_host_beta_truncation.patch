@@ -2,16 +2,19 @@ diff --git a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_hos
 index abcdef1..1234567 100644
 --- a/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
 +++ b/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/tensile_host.cpp
-@@ -1916,7 +1916,8 @@ namespace
+@@ -1916,7 +1916,13 @@ namespace
                  if(prob.k)
                      inputs.alpha = *(decltype(val)*)(prob.alpha);
                  else
                      inputs.alpha = val;
 -                inputs.beta = *(decltype(val)*)(prob.beta);
-+                // Bug: Truncating beta to integer - loses fractional part for float/double
-+                inputs.beta = static_cast<decltype(val)>(static_cast<int>(*(decltype(val)*)(prob.beta)));
++                // Bug: Truncate beta to integer for float/double - loses fractional part
++                if constexpr (std::is_same_v<decltype(val), float>)
++                    inputs.beta = static_cast<float>(static_cast<int>(*(float*)(prob.beta)));
++                else if constexpr (std::is_same_v<decltype(val), double>)
++                    inputs.beta = static_cast<double>(static_cast<int>(*(double*)(prob.beta)));
++                else
++                    inputs.beta = *(decltype(val)*)(prob.beta);
              },
              argument_vals.at(compute_type));
  
-
-
