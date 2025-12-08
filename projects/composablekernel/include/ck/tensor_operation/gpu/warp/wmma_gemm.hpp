@@ -1005,7 +1005,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16_f8f8_gfx13,
         static_assert(wave_size == 32, "only support wave32 for gfx13 wmma");
         if constexpr(wave_size == 32)
         {
-            intrin_wmma_f32_16x16_fp8fp8_w32<MPerWmma, NPerWmma, clamp, KPerWmma / 16>::Run(
+            intrin_wmma_f32_16x16_f8f8_w32<MPerWmma, NPerWmma, clamp, KPerWmma / 16>::Run(
                 a, b, reg_c);
         }
     }
