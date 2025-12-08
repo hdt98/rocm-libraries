@@ -328,79 +328,80 @@ BenchmarkProblems:
           - Exact: [1, 127, 1, 127]
           - Exact: [127, 1, 1, 127]
 
-  ########################################
-  # XFloat TN SWIZZLED_B
-  ########################################
-  -
-    - # ProblemType
-      OperationType: GEMM
-      DataType: s
-      DestDataType: s
-      ComputeDataType: s
-      F32XdlMathOp: X
-      HighPrecisionAccumulate: False
-      TransposeA: 1
-      TransposeB: 0
-      SwizzleTensorB: True
-      UseBeta: True
-      Batched: True
-    - # BenchmarkProblemSizeGroup - Standard - All problem
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 8, 1,  1,   16, 4, 1,4 ] # MT = 256x256
-          - [16, 16, 8, 1,  1,   8,  8, 1,4 ] # MT = 128x512
-          - [16, 16, 8, 1,  1,   16, 8, 1,4 ] # MT = 256x512
-          - [16, 16, 8, 1,  1,   8,  5, 1,2 ] # MT = 128x160
-
-          - [16, 16, 8, 1,  1,   8,  4, 2,2 ] # MT = 256x128
-          - [16, 16, 8, 1,  1,   4,  8, 2,2 ] # MT = 128x256
-          - [16, 16, 8, 1,  1,   8,  8, 2,2 ] # MT = 256x256
-        - WorkGroup:
-          - [16, 16, 1] # LSU=1, minDU=16
-          - [16, 16, 2] # LSU=2, minDU=32
-          - [16, 16, 4] # LSU=4, minDU=64
-        - GlobalReadVectorWidthA: [-1]
-        - GlobalReadVectorWidthB: [4]
-        - PrefetchGlobalRead: [2]
-        - PrefetchLocalRead: [1]
-        - ClusterLocalRead: [1]
-        - NumElementsPerBatchStore: [0]
-        - DepthU: [32,64]
-        - VectorWidthA: [-1]
-        - VectorWidthB: [1,8]
-        - LocalWritePerMfma: [-1]
-        - StaggerU: [4]
-        - StaggerUStride: [256]
-        - StaggerUMapping: [0]
-        - WorkGroupMappingXCC: [8]
-        - ScheduleIterAlg: [3]
-        - LdsBlockSizePerPadA: [-1]
-        - LdsBlockSizePerPadB: [-1]
-        - StorePriorityOpt: [0]
-        - VectorStore: [-1]
-        - StoreSyncOpt: [0]
-        - LdsPadA: [-1]
-        - LdsPadB: [-1]
-        - 1LDSBuffer: [1]
-        - GlobalSplitU: [1,3]
-        - GlobalSplitUAlgorithm: ["MultipleBuffer"]
-        - LocalReadVectorWidth: [2,4,8]
-        - DirectToVgprB: [1]
-        - UseSgprForGRO: [0,1]
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [256,   160, 1, 224]
-          - Exact: [256,   160, 1, 256]
-          - Exact: [256,   160, 1, 288]
-          - Exact: [127, 127, 1, 127]
-          - Exact: [127, 128, 1, 127]
-          - Exact: [1, 127, 1, 127]
-          - Exact: [127, 1, 1, 127]
-
+#  #xf32 not support DTVB
+#  ########################################
+#  # XFloat TN SWIZZLED_B
+#  ########################################
+#  -
+#    - # ProblemType
+#      OperationType: GEMM
+#      DataType: s
+#      DestDataType: s
+#      ComputeDataType: s
+#      F32XdlMathOp: X
+#      HighPrecisionAccumulate: False
+#      TransposeA: 1
+#      TransposeB: 0
+#      SwizzleTensorB: True
+#      UseBeta: True
+#      Batched: True
+#    - # BenchmarkProblemSizeGroup - Standard - All problem
+#      InitialSolutionParameters:
+#      BenchmarkCommonParameters:
+#        - KernelLanguage: ["Assembly"]
+#      ForkParameters:
+#        - MatrixInstruction:
+#          - [16, 16, 8, 1,  1,   16, 4, 1,4 ] # MT = 256x256
+#          - [16, 16, 8, 1,  1,   8,  8, 1,4 ] # MT = 128x512
+#          - [16, 16, 8, 1,  1,   16, 8, 1,4 ] # MT = 256x512
+#          - [16, 16, 8, 1,  1,   8,  5, 1,2 ] # MT = 128x160
+#
+#          - [16, 16, 8, 1,  1,   8,  4, 2,2 ] # MT = 256x128
+#          - [16, 16, 8, 1,  1,   4,  8, 2,2 ] # MT = 128x256
+#          - [16, 16, 8, 1,  1,   8,  8, 2,2 ] # MT = 256x256
+#        - WorkGroup:
+#          - [16, 16, 1] # LSU=1, minDU=16
+#          - [16, 16, 2] # LSU=2, minDU=32
+#          - [16, 16, 4] # LSU=4, minDU=64
+#        - GlobalReadVectorWidthA: [-1]
+#        - GlobalReadVectorWidthB: [4]
+#        - PrefetchGlobalRead: [2]
+#        - PrefetchLocalRead: [1]
+#        - ClusterLocalRead: [1]
+#        - NumElementsPerBatchStore: [0]
+#        - DepthU: [32,64]
+#        - VectorWidthA: [-1]
+#        - VectorWidthB: [1,8]
+#        - LocalWritePerMfma: [-1]
+#        - StaggerU: [4]
+#        - StaggerUStride: [256]
+#        - StaggerUMapping: [0]
+#        - WorkGroupMappingXCC: [8]
+#        - ScheduleIterAlg: [3]
+#        - LdsBlockSizePerPadA: [-1]
+#        - LdsBlockSizePerPadB: [-1]
+#        - StorePriorityOpt: [0]
+#        - VectorStore: [-1]
+#        - StoreSyncOpt: [0]
+#        - LdsPadA: [-1]
+#        - LdsPadB: [-1]
+#        - 1LDSBuffer: [1]
+#        - GlobalSplitU: [1,3]
+#        - GlobalSplitUAlgorithm: ["MultipleBuffer"]
+#        - LocalReadVectorWidth: [2,4,8]
+#        - DirectToVgprB: [1]
+#        - UseSgprForGRO: [0,1]
+#      BenchmarkJoinParameters:
+#      BenchmarkFinalParameters:
+#        - ProblemSizes:
+#          - Exact: [256,   160, 1, 224]
+#          - Exact: [256,   160, 1, 256]
+#          - Exact: [256,   160, 1, 288]
+#          - Exact: [127, 127, 1, 127]
+#          - Exact: [127, 128, 1, 127]
+#          - Exact: [1, 127, 1, 127]
+#          - Exact: [127, 1, 1, 127]
+#
   ########################################
   # SSS TN SWIZZLED_B
   ########################################
