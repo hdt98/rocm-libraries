@@ -1,7 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 #pragma once
-
 #include "grouped_convolution_utils.hpp"
 
 struct GroupedConvolutionBackwardWeightInvoker
@@ -58,7 +57,9 @@ struct GroupedConvolutionBackwardWeightInvoker
             GroupedConvTraitsType::FixedGemmParams::UseStructuredSparsity,
             GroupedConvTraitsType::FixedGemmParams::Persistent,
             ConvConfig::NumWaveGroups>;
+        constexpr auto scheduler = ConvConfig::Scheduler;
 
+<<<<<<< HEAD
         using GemmPipelineProblem = ck_tile::GemmPipelineProblem<
             OutDataType,
             InDataType,
@@ -97,6 +98,9 @@ struct GroupedConvolutionBackwardWeightInvoker
             constexpr bool has_hot_loop_v   = has_hot_loop_.value;
             constexpr auto tail_number_v    = tail_number_.value;
             constexpr auto scheduler        = ConvConfig::Scheduler;
+=======
+        const auto Run = [&](const auto memory_operation_) {
+>>>>>>> develop
             constexpr auto memory_operation = memory_operation_.value;
 
             using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
@@ -106,8 +110,6 @@ struct GroupedConvolutionBackwardWeightInvoker
                 GemmShape,
                 GemmUniversalTraits,
                 scheduler,
-                has_hot_loop_v,
-                tail_number_v,
                 ck_tile::element_wise::PassThrough,
                 ck_tile::element_wise::PassThrough,
                 WeiDataType,
@@ -179,26 +181,19 @@ struct GroupedConvolutionBackwardWeightInvoker
                 }
             };
 
-            ave_time = ck_tile::launch_kernel_time_mask(
+            return ck_tile::launch_kernel_time_mask(
                 s,
                 preprocess,
                 ck_tile::make_kernel<ConvConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
-
-            return ave_time;
         };
 
-        const auto RunSplitk = [&](const auto has_hot_loop_, const auto tail_number_) {
-            if(args.k_batch == 1)
-            {
-                Run(has_hot_loop_, tail_number_, MemoryOpSet{});
-            }
-            else
-            {
-                Run(has_hot_loop_, tail_number_, MemoryOpAtomicAdd{});
-            }
-        };
-
-        BaseGemmPipeline::TailHandler(RunSplitk, has_hot_loop, tail_num);
-        return ave_time;
+        if(args.k_batch == 1)
+        {
+            return Run(MemoryOpSet{});
+        }
+        else
+        {
+            return Run(MemoryOpAtomicAdd{});
+        }
     }
 };

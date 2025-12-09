@@ -1,5 +1,5 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -8,15 +8,16 @@
 #include "ck_tile/host/concat.hpp"
 
 namespace ck_tile {
-namespace reboot {
 
-/// @brief The Stream K GEMM kernel host arguments.
-///
-/// @par Overview
-///      This structure is passed to @ref StreamKKernel "StreamKKernel" when creating the kernel
-///      arguments object. It contains all necessary information required to build proper kernel
-///      arguments and launch the kernel on GPU. This structure defines the GEMM problem
-///      configuration by stating all required information like M,N,K sizes and respective strides.
+/**
+ * @brief The Stream K GEMM kernel host arguments.
+ *
+ * @par Overview
+ *      This structure is passed to @ref StreamKKernel "StreamKKernel" when creating the kernel
+ *      arguments object. It contains all necessary information required to build proper kernel
+ *      arguments and launch the kernel on GPU. This structure defines the GEMM problem
+ *      configuration by stating all required information like M,N,K sizes and respective strides.
+ */
 struct StreamKHostArgs : public ck_tile::UniversalGemmHostArgs<>
 {
     CK_TILE_HOST explicit StreamKHostArgs(const void* a_ptr_,
@@ -27,8 +28,7 @@ struct StreamKHostArgs : public ck_tile::UniversalGemmHostArgs<>
                                           index_t K_,
                                           index_t stride_A_,
                                           index_t stride_B_,
-                                          index_t stride_C_,
-                                          StreamKReductionStrategy reduction_strategy_)
+                                          index_t stride_C_)
         : UniversalGemmHostArgs<>({a_ptr_},
                                   {b_ptr_},
                                   {/*ds_ptr*/},
@@ -40,30 +40,31 @@ struct StreamKHostArgs : public ck_tile::UniversalGemmHostArgs<>
                                   {stride_A_},
                                   {stride_B_},
                                   {/*stride_Ds_*/},
-                                  stride_C_),
-          reduction_strategy{reduction_strategy_}
+                                  stride_C_)
     {
     }
-
-    ck_tile::StreamKReductionStrategy reduction_strategy;
 };
 
-/// @brief The Stream K GEMM kernel class.
-///
-/// @par Overview
-///      This class is responsible for the Stream-K kernel, making use of UniversalGemm.
-//	 The main kernel functions are the operator() functions. There is one for Persistent
-//	 and one for Non-Persistent data parallel sections of the Stream-K algorithm.
-//
-//	 Both the Non-Persistent and Persistent kernels make use of `BaseGemm()` and
-//	 `StreamKGemm()`. `BaseGemm()` computes offsets into the A,B,C tensors, then calls
-//	 `RunGemm()` which runs the GEMM pipeline and epilogue. `StreamKGemm()` performs the
-//	 main Stream-K algorithm. Each iteration of the Stream-K loop calls `BaseGemm()`.
+/**
+ * @brief The Stream K GEMM kernel class.
+ *
+ * @par Overview
+ *      This class is responsible for the Stream-K kernel, making use of UniversalGemm.
+ *	 The main kernel functions are the operator() functions. There is one for Persistent
+ *	 and one for Non-Persistent data parallel sections of the Stream-K algorithm.
+ *
+ *	 Both the Non-Persistent and Persistent kernels make use of `BaseGemm()` and
+ *	 `StreamKGemm()`. `BaseGemm()` computes offsets into the A,B,C tensors, then calls
+ *	 `RunGemm()` which runs the GEMM pipeline and epilogue. `StreamKGemm()` performs the
+ *	 main Stream-K algorithm. Each iteration of the Stream-K loop calls `BaseGemm()`.
+ */
 template <typename TilePartitioner_, typename GemmPipeline_, typename EpiloguePipeline_>
 struct StreamKKernel
 {
-    /// @brief Inject the UniversalGemmKernel base class to support execution of all necessary
-    /// functions.
+    /**
+     *@brief Inject the UniversalGemmKernel base class to support execution of all necessary
+     *functions.
+     */
     using UniversalGemmKernel =
         UniversalGemmKernel<TilePartitioner_, GemmPipeline_, EpiloguePipeline_>;
 
@@ -78,12 +79,16 @@ struct StreamKKernel
         TilePartitioner::PERSISTENT == PersistentDP,
         "Persistent flag from TilePartitioner must match Persistent flag from UniversalGemm.");
 
-    /// @brief  Specify the layout configurations for A, B, and C
+    /**
+     * @brief  Specify the layout configurations for A, B, and C
+     */
     using ALayout = typename GemmPipeline::ALayout;
     using BLayout = typename GemmPipeline::BLayout;
     using CLayout = typename GemmPipeline::CLayout;
 
-    /// @brief  Specify the data type configurations for A, B, and C
+    /**
+     * @brief  Specify the data type configurations for A, B, and C
+     */
     using ADataType   = typename GemmPipeline::ADataType;
     using BDataType   = typename GemmPipeline::BDataType;
     using CDataType   = typename EpiloguePipeline::ODataType;
@@ -91,16 +96,21 @@ struct StreamKKernel
 
     template <typename T>
     static constexpr bool is_tuple_v = is_detected<is_tuple, T>::value;
-
-    /// @brief  ALayout and ADataType are expected to be scalars, not a tuple.
+    /**
+     *@brief ALayout and ADataType are expected to be scalars, not a tuple.
+     */
     static_assert(!is_tuple_v<ALayout> && !is_tuple_v<ADataType>,
                   "ALayout and ADataType must be scalars.");
 
-    /// @brief  BLayout and BDataType are expected to be scalars, not a tuple.
+    /**
+     *@brief BLayout and BDataType are expected to be scalars, not a tuple.
+     */
     static_assert(!is_tuple_v<BLayout> && !is_tuple_v<BDataType>,
                   "BLayout and BDataType must be scalars.");
 
-    /// @brief  CLayout and CDataType are expected to be scalars, not a tuple.
+    /**
+     *@brief CLayout and CDataType are expected to be scalars, not a tuple.
+     */
     static_assert(!is_tuple_v<CLayout> && !is_tuple_v<CDataType>,
                   "CLayout and CDataType must be scalars.");
 
@@ -119,7 +129,6 @@ struct StreamKKernel
                                       host_args.stride_Ds,
                                       host_args.stride_E,
                                       host_args.k_batch},
-              reduction_strategy{host_args.reduction_strategy},
               // The workspace pointer is set to nullptr because we must first
               // instantiate the TilePartitioner to get the necessary size
               workspace_ptr{nullptr},
@@ -127,14 +136,15 @@ struct StreamKKernel
 
         {
         }
-
-        /// @brief  The strategy used by work groups to compute final results in C tensor.
-        StreamKReductionStrategy reduction_strategy;
-        /// @brief  A pointer to a buffer in device memory for accumulating partial via reduction
-        /// strategy.
+        /**
+         * @brief  A pointer to a buffer in device memory for accumulating partial via reduction
+         * strategy.
+         */
         void* workspace_ptr;
-        /// @brief  An instance of the TilePartioner class for assisting with mapping workgroups to
-        /// the C tensor.
+        /**
+         * @brief  An instance of the TilePartioner class for assisting with mapping workgroups to
+         * the C tensor.
+         */
         TilePartitioner tile_partitioner;
     };
 
@@ -155,17 +165,21 @@ struct StreamKKernel
         // clang-format on
     }
 
-    /// @brief Compute the grid size for the Stream K kernel using the tile_partitioner.
-    /// @return The grid size.
+    /**
+     * @brief Compute the grid size for the Stream K kernel using the tile_partitioner.
+     * @return The grid size.
+     */
     CK_TILE_HOST static auto GridSize(const TilePartitioner& tile_partitioner) -> dim3
     {
         return tile_partitioner.grid_size();
     }
 
-    /// @brief Get the maximum occupancy grid size for the persistent kernel on the current device.
-    /// @return The maximum occupancy grid size.
-    /// @note This function queries the maximum occupancy of the kernel using
-    /// `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
+    /**
+     * @brief Get the maximum occupancy grid size for the persistent kernel on the current device.
+     * @return The maximum occupancy grid size.
+     * @note This function queries the maximum occupancy of the kernel using
+     * `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
+     */
     CK_TILE_HOST static auto MaxOccupancyGridSize(const stream_config& s) -> dim3
     {
         return UniversalGemmKernel::MaxOccupancyGridSize(s);
@@ -176,13 +190,15 @@ struct StreamKKernel
         return UniversalGemmKernel::BlockSize();
     }
 
-    /// @brief Constructs kernel arguments for the Stream-K kernel.
-    /// @param host_args Stream-K host arguments.
-    /// @param num_cu Number of compute units (CUs). The default is the number of CUs on the device.
-    /// The caller may select their own to assist with test reproducibility, etc.
-    /// @param occupancy The maximum number of active blocks per CU for this kernel. The caller may
-    /// select their own to assist with test reproducibility, etc.
-    /// @return The kernel arguments for Stream-K.
+    /**
+     * @brief Constructs kernel arguments for the Stream-K kernel.
+     * @param host_args Stream-K host arguments.
+     * @param num_cu Number of compute units (CUs). The default is the number of CUs on the device.
+     * The caller may select their own to assist with test reproducibility, etc.
+     * @param occupancy The maximum number of active blocks per CU for this kernel. The caller may
+     * select their own to assist with test reproducibility, etc.
+     * @return The kernel arguments for Stream-K.
+     */
     CK_TILE_HOST static StreamKKernelArgs MakeKernelArgs(const StreamKHostArgs& host_args,
                                                          int num_cu    = NumCU(),
                                                          int occupancy = Occupancy())
@@ -247,30 +263,35 @@ struct StreamKKernel
         return UniversalGemmKernel::IsSupportedArgument(kargs);
     }
 
-    /// @brief Computes the buffer size needed to store accumulation results for Stream K.
-    /// @return The buffer size needed.
+    /**
+     * @brief Computes the buffer size needed to store accumulation results for Stream K.
+     * @return The buffer size needed.
+     */
     CK_TILE_HOST static uint32_t GetWorkSpaceSize(const StreamKKernelArgs& kargs)
     {
         return kargs.tile_partitioner.get_workspace_size(sizeof(AccDataType));
     }
-
-    /// @brief Sets the kargs' current workspace_ptr to the given workspace_ptr.
-    /// @note Assumes that the given workspace_ptr points to allocated device memory.
+    /**
+     *@brief Sets the kargs' current workspace_ptr to the given workspace_ptr.
+     * @note Assumes that the given workspace_ptr points to allocated device memory.
+     */
     CK_TILE_HOST static void SetWorkSpacePointer(StreamKKernelArgs& kargs, void* workspace_ptr)
     {
         kargs.workspace_ptr = workspace_ptr;
     }
 
-    /// @brief Computes offsets into A, B, and C tensors then runs the GEMM pipeline and epilogue.
-    /// @param kargs Stream-K kernel arguments.
-    /// @param tile_idx The 1D tile index in the C tensor for this workgroup.
-    /// @param num_loop The number of iterations (at the macro tile level) in the K dimension this
-    /// workgroup will perform in the C tile.
-    /// @param i_k_a The K offset in the A tensor.
-    /// @param i_k_b The K offset in the B tensor.
-    /// @param k_size The portion of the K dimension this workgroup processes in the assigned
-    /// `tile_idx`.
-    /// @param smem_ptr_0 Pointer to LDS.
+    /**
+     * @brief Computes offsets into A, B, and C tensors then runs the GEMM pipeline and epilogue.
+     * @param kargs Stream-K kernel arguments.
+     * @param tile_idx The 1D tile index in the C tensor for this workgroup.
+     * @param num_loop The number of iterations (at the macro tile level) in the K dimension this
+     * workgroup will perform in the C tile.
+     * @param i_k_a The K offset in the A tensor.
+     * @param i_k_b The K offset in the B tensor.
+     * @param k_size The portion of the K dimension this workgroup processes in the assigned
+     * `tile_idx`.
+     * @param smem_ptr_0 Pointer to LDS.
+     */
     CK_TILE_DEVICE void BaseGemm(StreamKKernelArgs& kargs,
                                  index_t tile_idx,
                                  index_t num_loop,
@@ -292,12 +313,14 @@ struct StreamKKernel
             {a_ptr}, {b_ptr}, {/*ds_ptr*/}, c_ptr, smem_ptr_0, kargs, num_loop, i_m, i_n, k_size);
     }
 
-    /// @brief Signals that the current thread block (CTA) has completed storing its partial
-    /// results.
-    /// @param kargs Kernel arguments, including the workspace pointer.
-    /// @param cta_idx The index of the current thread block (CTA).
-    /// @note This function utilizes a workgroup barrier to set a synchronization flag for the given
-    /// CTA index.
+    /**
+     *@brief Signals that the current thread block(CTA) has completed storing its partial
+     * results.
+     * @param kargs Kernel arguments, including the workspace pointer.
+     * @param cta_idx The index of the current thread block (CTA).
+     * @note This function utilizes a workgroup barrier to set a synchronization flag for the given
+     * CTA index.
+     */
     CK_TILE_DEVICE void SignalStorePartialDone(const StreamKKernelArgs& kargs,
                                                index_t cta_idx) const
     {
@@ -306,11 +329,13 @@ struct StreamKKernel
         sk_flags.wait_set(0, 1, cta_idx);
     }
 
-    /// @brief Waits for the thread block (cta_idx) to complete storing its partial results.
-    /// @param kargs Kernel arguments, including the workspace pointer.
-    /// @param cta_idx The index of the thread block (CTA).
-    /// @note This function utilizes a workgroup barrier to wait for the synchronization flag to be
-    /// set by the given CTA index.
+    /**
+     * @brief Waits for the thread block (cta_idx) to complete storing its partial results.
+     * @param kargs Kernel arguments, including the workspace pointer.
+     * @param cta_idx The index of the thread block (CTA).
+     * @note This function utilizes a workgroup barrier to wait for the synchronization flag to be
+     * set by the given CTA index.
+     */
     CK_TILE_DEVICE void WaitStorePartialDone(const StreamKKernelArgs& kargs, index_t cta_idx) const
     {
         auto sk_flags_ptr = static_cast<uint32_t*>(kargs.workspace_ptr);
@@ -318,11 +343,13 @@ struct StreamKKernel
         sk_flags.wait_eq(1, cta_idx);
     }
 
-    /// @brief Adds the values of a block tile to an output block tile.
-    /// @param in_out_block_tile The output block tile to which values are added.
-    /// @param in_block_tile The input block tile whose values are added.
-    /// @note This function iterates over the distributed spans of the block tiles and updates the
-    /// output block tile with accumulated values.
+    /**
+     * @brief Adds the values of a block tile to an output block tile.
+     * @param in_out_block_tile The output block tile to which values are added.
+     * @param in_block_tile The input block tile whose values are added.
+     * @note This function iterates over the distributed spans of the block tiles and updates the
+     * output block tile with accumulated values.
+     */
     template <typename OAccTile>
     CK_TILE_DEVICE void AddBlockTile(OAccTile& in_out_block_tile,
                                      const OAccTile& in_block_tile) const
@@ -337,13 +364,15 @@ struct StreamKKernel
         });
     }
 
-    /// @brief Loads a partial block tile from the workspace buffer.
-    /// @param kargs Kernel arguments, including the workspace pointer.
-    /// @param cta_idx The index of the thread block (CTA).
-    /// @param c_block_tile_dist The tile distribution for the block.
-    /// @return The loaded partial block tile.
-    /// @note This function calculates the buffer pointer and uses the tile distribution for loading
-    /// the partial block tile.
+    /**
+     * @brief Loads a partial block tile from the workspace buffer.
+     * @param kargs Kernel arguments, including the workspace pointer.
+     * @param cta_idx The index of the thread block (CTA).
+     * @param c_block_tile_dist The tile distribution for the block.
+     * @return The loaded partial block tile.
+     * @note This function calculates the buffer pointer and uses the tile distribution for loading
+     * the partial block tile.
+     */
     template <typename DataType, typename OAccTileDist>
     CK_TILE_DEVICE auto LoadPartial(const StreamKKernelArgs& kargs,
                                     index_t cta_idx,
@@ -371,12 +400,14 @@ struct StreamKKernel
         return load_tile(partial_tile_window);
     }
 
-    /// @brief Stores a partial block tile to the workspace buffer.
-    /// @param kargs Kernel arguments, including the workspace pointer.
-    /// @param cta_idx The index of the thread block (CTA).
-    /// @param c_block_tile The block tile to be stored.
-    /// @note This function calculates the buffer pointer and uses the tile window for storing the
-    /// partial block tile.
+    /**
+     * @brief Stores a partial block tile to the workspace buffer.
+     * @param kargs Kernel arguments, including the workspace pointer.
+     * @param cta_idx The index of the thread block (CTA).
+     * @param c_block_tile The block tile to be stored.
+     * @note This function calculates the buffer pointer and uses the tile window for storing the
+     * partial block tile.
+     */
     template <typename OAccTile>
     CK_TILE_DEVICE void StorePartial(const StreamKKernelArgs& kargs,
                                      index_t cta_idx,
@@ -404,15 +435,17 @@ struct StreamKKernel
         store_tile(partial_tile_window, c_block_tile);
     }
 
-    /// @brief Runs the main Stream-K algorithm.
-    /// @param kargs Stream-K kernel arguments.
-    /// @param cta_idx The current Stream-K workgroup's index.
-    /// @param smem_ptr_0 Pointer to LDS.
-    /// @note It is assumed that the first Stream-K workgroup has a `cta_idx` of zero. If a
-    /// non-persistent data-parallel (DP) section is used, then a Stream-K workgroup's `cta_idx`
-    /// should be something like `blockIdx.x` minus number of DP workgroups.
-    CK_TILE_DEVICE void
-    StreamKGemm(StreamKKernelArgs& kargs, index_t cta_idx, void* smem_ptr_0) const
+    /**
+     * @brief Runs the main Stream - K algorithm.
+     * @param kargs Stream - K kernel arguments.
+     * @param cta_idx The current Stream - K workgroup's index.
+     * @param smem_ptr_0 Pointer to LDS.
+     * @note It is assumed that the first Stream - K workgroup has a `cta_idx` of zero. If a
+     * non-persistent data-parallel (DP) section is used, then a Stream-K workgroup's `cta_idx`
+     * *should be something like `blockIdx.x` minus number of DP workgroups.
+     */
+    CK_TILE_DEVICE
+    void StreamKGemm(StreamKKernelArgs& kargs, index_t cta_idx, void* smem_ptr_0) const
     {
         index_t iter_start, iter_end;
         kargs.tile_partitioner.get_iter_boundaries(iter_start, iter_end, cta_idx);
@@ -542,13 +575,15 @@ struct StreamKKernel
         }
     }
 
-    /// @brief Entry point for the Stream-K Kernel with non-persistent DP.
-    ///
-    /// @par Overview
-    ///     For the Non-Persistent kernel, each data parallel workgroup will
-    ///     compute the results for their assigned macro-tile by calling `BaseGemm()`.
-    ///     The Stream-K workgroups will do their assigned work by calling
-    ///     `StreamKGemm()`, which calls `BaseGemm()` in the Stream-K loop.
+    /**
+     * @brief Entry point for the Stream-K Kernel with non-persistent DP.
+     *
+     * @par Overview
+     *     For the Non-Persistent kernel, each data parallel workgroup will
+     *     compute the results for their assigned macro-tile by calling `BaseGemm()`.
+     *     The Stream-K workgroups will do their assigned work by calling
+     *     `StreamKGemm()`, which calls `BaseGemm()` in the Stream-K loop.
+     */
     template <bool U = PersistentDP>
     CK_TILE_DEVICE typename std::enable_if_t<!U> operator()(StreamKKernelArgs kargs) const
     {
@@ -572,14 +607,16 @@ struct StreamKKernel
         }
     }
 
-    /// @brief Entry point for the Stream-K Kernel with persistent DP.
-    ///
-    /// @par Overview
-    ///     For the Persistent kernel, each workgroup will first compute their
-    ///     assigned data-parallel tiles. Each data parallel tile will be computed
-    ///     by calling `BaseGemm()`. Then the workgroups will proceed with the
-    ///     Stream-K portion by calling `StreamKGemm()`, which calls `BaseGemm()`
-    ///     in the Stream-K loop.
+    /**
+     * @brief Entry point for the Stream-K Kernel with persistent DP.
+     *
+     * @par Overview
+     *     For the Persistent kernel, each workgroup will first compute their
+     *     assigned data-parallel tiles. Each data parallel tile will be computed
+     *     by calling `BaseGemm()`. Then the workgroups will proceed with the
+     *     Stream-K portion by calling `StreamKGemm()`, which calls `BaseGemm()`
+     *     in the Stream-K loop.
+     */
     template <bool U = PersistentDP>
     CK_TILE_DEVICE typename std::enable_if_t<U> operator()(StreamKKernelArgs kargs) const
     {
@@ -602,12 +639,14 @@ struct StreamKKernel
     }
 
     private:
-    /// @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset is
-    /// the starting macro tile index in the K dimension for the workgroup.
-    /// @return A tuple containing the offsets into the A and B tensors accounting for the layouts
-    /// of A and B.
-    /// @note The default case is that A is assumed to be row major and B is assumed to be column
-    /// major.
+    /**
+     * @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset is
+     * the starting macro tile index in the K dimension for the workgroup.
+     * @return A tuple containing the offsets into the A and B tensors accounting for the layouts
+     * of A and B.
+     * @note The default case is that A is assumed to be row major and B is assumed to be column
+     * major.
+     */
     template <typename ALayout, typename BLayout>
     CK_TILE_DEVICE static tuple<index_t, index_t>
     GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
@@ -648,10 +687,12 @@ struct StreamKKernel
         return num_cu;
     }
 
-    /// @brief Computes the occupancy (i.e. maximum number of active blocks per CU) for the kernel
-    /// @return The occupancy
-    /// @note This function queries the maximum occupancy of the kernel using
-    /// `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
+    /**
+     * @brief Computes the occupancy (i.e. maximum number of active blocks per CU) for the kernel
+     * @return The occupancy
+     * @note This function queries the maximum occupancy of the kernel using
+     * `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
+     */
     CK_TILE_HOST static int Occupancy()
     {
         int occupancy;
@@ -666,6 +707,7 @@ struct StreamKKernel
         return max(occupancy, 1);
     }
 };
+<<<<<<< HEAD
 } // namespace reboot
 
 /// @brief The Stream K GEMM kernel host arguments.
@@ -1064,4 +1106,6 @@ struct StreamKKernel
     }
 };
 
+=======
+>>>>>>> develop
 } // namespace ck_tile

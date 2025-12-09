@@ -1,4 +1,4 @@
-// Copyright © Advanced Micro Devices, Inc. or its affiliates.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
 #ifdef CK_ENABLE_JSON_DUMP
@@ -611,29 +611,29 @@ inline void dump_fused_moe_json(const std::string& json_filename,
     END_JSON_DUMP_FILE();
 }
 
-inline void dump_fmha_fwd_json_results(const std::string& json_filename,
-                                       const std::string& prec,
-                                       const std::string& mode,
-                                       const std::string& io_layout,
-                                       int batch,
-                                       int nhead,
-                                       int nhead_k,
-                                       int seqlen_qs,
-                                       int seqlen_ks,
-                                       int seqlen_kpads,
-                                       int hdim_q,
-                                       int hdim_v,
-                                       float scale_s,
-                                       float p_drop,
-                                       bool lse,
-                                       bool squant,
-                                       const std::string& bias,
-                                       const std::string& vlayout,
-                                       bool pass,
-                                       float ave_time,
-                                       float tflops,
-                                       float gb_per_sec,
-                                       const std::string& kernel_name = "fmha_fwd")
+void dump_fmha_fwd_json_results(const std::string& json_filename,
+                                const std::string& prec,
+                                const std::string& mode,
+                                const std::string& io_layout,
+                                int batch,
+                                int nhead,
+                                int nhead_k,
+                                int seqlen_qs,
+                                int seqlen_ks,
+                                int seqlen_kpads,
+                                int hdim_q,
+                                int hdim_v,
+                                float scale_s,
+                                float p_drop,
+                                bool lse,
+                                const std::string& qscale,
+                                const std::string& bias,
+                                const std::string& vlayout,
+                                bool pass,
+                                float ave_time,
+                                float tflops,
+                                float gb_per_sec,
+                                const std::string& kernel_name = "fmha_fwd")
 {
     START_JSON_DUMP_FILE(json_filename);
     ADD_KEY_VALUE("name", kernel_name);
@@ -651,7 +651,7 @@ inline void dump_fmha_fwd_json_results(const std::string& json_filename,
     ADD_KEY_VALUE("scale_s", scale_s);
     ADD_KEY_VALUE("p_drop", p_drop);
     ADD_KEY_VALUE("lse", lse);
-    ADD_KEY_VALUE("squant", squant);
+    ADD_KEY_VALUE("qscale", qscale);
     ADD_KEY_VALUE("bias", bias);
     ADD_KEY_VALUE("vlayout", vlayout);
     ADD_KEY_VALUE("verification", pass ? "pass" : "fail");

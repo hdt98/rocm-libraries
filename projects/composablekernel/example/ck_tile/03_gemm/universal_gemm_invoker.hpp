@@ -1,7 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 #pragma once
-
 #include <functional>
 #include "gemm_utils.hpp"
 
@@ -54,14 +53,6 @@ struct UniversalInvoker
                                                        GemmConfig::TileParitionerGroupNum,
                                                        GemmConfig::TileParitionerM01>>;
 
-        using Traits = ck_tile::TileGemmTraits<GemmConfig::kPadM,
-                                               GemmConfig::kPadN,
-                                               GemmConfig::kPadK,
-                                               ALayout,
-                                               BLayout,
-                                               ELayout,
-                                               GemmConfig::NumWaveGroups>;
-
         using GemmUniversalTraits =
             ck_tile::TileGemmUniversalTraits<GemmConfig::kPadM,
                                              GemmConfig::kPadN,
@@ -75,6 +66,7 @@ struct UniversalInvoker
                                              Persistent,
                                              GemmConfig::NumWaveGroups,
                                              GemmConfig::Preshuffle>;
+<<<<<<< HEAD
         using GemmPipelineProblem = ck_tile::GemmPipelineProblem<ADataType,
                                                                  BDataType,
                                                                  AccDataType,
@@ -83,25 +75,25 @@ struct UniversalInvoker
                                                                  ck_tile::element_wise::PassThrough,
                                                                  ck_tile::element_wise::PassThrough,
                                                                  ComputeDataType>;
+=======
+>>>>>>> develop
 
-        using BaseGemmPipeline = typename PipelineTypeTraits<
-            GemmConfig::Pipeline>::template UniversalGemmPipeline<GemmPipelineProblem>;
+        constexpr auto scheduler = GemmConfig::Scheduler;
 
-        const ck_tile::index_t k_grain     = args.k_batch * GemmConfig::K_Tile;
-        const ck_tile::index_t K_split     = (args.K + k_grain - 1) / k_grain * GemmConfig::K_Tile;
-        const ck_tile::index_t num_loop    = TilePartitioner::GetLoopNum(K_split);
-        const bool has_hot_loop            = BaseGemmPipeline::BlockHasHotloop(num_loop);
-        const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
-        float ave_time{0};
+        using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
+                                                                           BDataType,
+                                                                           AccDataType,
+                                                                           GemmShape,
+                                                                           GemmUniversalTraits,
+                                                                           scheduler>;
 
-        const auto Run = [&](const auto has_hot_loop_,
-                             const auto tail_number_,
-                             const auto memory_operation_) {
-            constexpr bool has_hot_loop_v   = has_hot_loop_.value;
-            constexpr auto tail_number_v    = tail_number_.value;
-            constexpr auto scheduler        = GemmConfig::Scheduler;
+        using GemmPipeline = typename PipelineTypeTraits<
+            GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
+
+        const auto Run = [&](const auto memory_operation_) {
             constexpr auto memory_operation = memory_operation_.value;
 
+<<<<<<< HEAD
             using UniversalGemmProblem =
                 ck_tile::UniversalGemmPipelineProblem<ADataType,
                                                       BDataType,
@@ -120,6 +112,9 @@ struct UniversalInvoker
 
             using GemmEpilogue = typename EpilogueTypeTraits<
                 GemmConfig::Pipeline,
+=======
+            using GemmEpilogue = ck_tile::CShuffleEpilogue<
+>>>>>>> develop
                 ck_tile::CShuffleEpilogueProblem<ADataType,
                                                  BDataType,
                                                  DsDataType,
@@ -213,6 +208,7 @@ struct UniversalInvoker
             {
                 preprocess = clear_gemm_output;
             }
+<<<<<<< HEAD
             if constexpr(ClusterLaunch)
             {
                 dim3 clusters = Kernel::ClusterSize();
@@ -231,19 +227,22 @@ struct UniversalInvoker
                                                          Kernel{}, grids, blocks, 0, kargs));
             }
             return ave_time;
+=======
+
+            return ck_tile::launch_kernel_time_mask(
+                s,
+                preprocess,
+                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+>>>>>>> develop
         };
 
-        const auto RunSplitk = [&](const auto has_hot_loop_, const auto tail_number_) {
-            if(args.k_batch == 1)
-            {
-                return Run(has_hot_loop_, tail_number_, MemoryOpSet{});
-            }
-            else
-            {
-                return Run(has_hot_loop_, tail_number_, MemoryOpAtomicAdd{});
-            }
-        };
-
-        return ave_time = BaseGemmPipeline::TailHandler(RunSplitk, has_hot_loop, tail_num);
+        if(args.k_batch == 1)
+        {
+            return Run(MemoryOpSet{});
+        }
+        else
+        {
+            return Run(MemoryOpAtomicAdd{});
+        }
     }
 };

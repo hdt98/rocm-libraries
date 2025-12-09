@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "gtest/gtest.h"
 #include "ck/library/utility/device_memory.hpp"
@@ -25,7 +25,13 @@ using ck::scaled_type_convert;
 using ck::type_convert;
 using ck::fp8_impl::fp8x2_storage_t;
 
+<<<<<<< HEAD
 constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6 + 16;
+=======
+using ::ck::DeviceMem;
+
+constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6;
+>>>>>>> develop
 
 /**
  * @brief Tests conversion of FP8 values to float using E8M0 exponent scaling.
