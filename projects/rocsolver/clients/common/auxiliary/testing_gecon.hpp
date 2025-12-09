@@ -128,25 +128,25 @@ void gecon_initData(const rocblas_handle handle,
                 hA[0][i + i * lda] += 400;
         }
 
-        // Copy original matrix for factorization
-        for(I i = 0; i < n; i++)
-            for(I j = 0; j < n; j++)
-                hA_factored[0][i + j * lda] = hA[0][i + j * lda];
+        // copy original matrix for factorization
+        // for(I i = 0; i < n; i++)
+        //     for(I j = 0; j < n; j++)
+        //         hA_factored[0][i + j * lda] = hA[0][i + j * lda];
 
-        // Compute matrix norm before factorization
+        // compute matrix norm before factorization
         std::vector<S> work(n);
         char norm = rocsolver2char_norm_type(norm_type);
         hanorm[0][0] = cpu_lange<T, S>(norm, n, n, hA[0], lda, work.data());
 
-        // Factor matrix with CPU GETRF
+        // factor matrix with CPU GETRF
         hinfo.resize(1);
-        cpu_getrf(n, n, hA_factored[0], lda, hipiv[0], hinfo.data());
+        cpu_getrf(n, n, hA[0], lda, hipiv[0], hinfo.data());
     }
 
     if(GPU)
     {
         // copy data from CPU to device
-        CHECK_HIP_ERROR(dA.transfer_from(hA_factored));
+        CHECK_HIP_ERROR(dA.transfer_from(hA));
         CHECK_HIP_ERROR(danorm.transfer_from(hanorm));
     }
 }
@@ -189,7 +189,7 @@ void gecon_getError(const rocblas_handle handle,
     std::vector<T> work(4 * n);
     std::vector<S> rwork(2 * n);
     std::vector<rocblas_int> iwork(n);
-    hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA_factored[0], lda, hanorm[0][0], work.data(),
+    hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA[0], lda, hanorm[0][0], work.data(),
                                    rwork.data(), iwork.data());
 
     // TEMPORARY: print estimates
@@ -198,28 +198,28 @@ void gecon_getError(const rocblas_handle handle,
 
     // TEMPORARY: compute traditional condition number ||A|| * ||A^-1||
     // invert A
-    size_t size_A_inv = size_t(lda) * n;
-    std::vector<rocblas_int> hinfo_inv(1);
-    host_strided_batch_vector<T> hA_inv(size_A_inv, 1, size_A_inv, 1);
-    for(size_t i = 0; i < size_A_inv; i++) hA_inv[0][i] = hA_factored[0][i];
+    // size_t size_A_inv = size_t(lda) * n;
+    // std::vector<rocblas_int> hinfo_inv(1);
+    // host_strided_batch_vector<T> hA_inv(size_A_inv, 1, size_A_inv, 1);
+    // for(size_t i = 0; i < size_A_inv; i++) hA_inv[0][i] = hA_factored[0][i];
     
     // need workspace for getri
-    int lwork_query = -1;
-    T work_query;
-    cpu_getri(n, hA_inv[0], lda, hipiv[0], &work_query, lwork_query, hinfo_inv.data());
-    int lwork = (int)std::real(work_query);
-    if (lwork < n) lwork = n;
-    std::vector<T> work_inv(lwork);
+    // int lwork_query = -1;
+    // T work_query;
+    // cpu_getri(n, hA_inv[0], lda, hipiv[0], &work_query, lwork_query, hinfo_inv.data());
+    // int lwork = (int)std::real(work_query);
+    // if (lwork < n) lwork = n;
+    // std::vector<T> work_inv(lwork);
 
-    cpu_getri(n, hA_inv[0], lda, hipiv[0], work_inv.data(), lwork, hinfo_inv.data());
+    // cpu_getri(n, hA_inv[0], lda, hipiv[0], work_inv.data(), lwork, hinfo_inv.data());
 
     // compute norm of inverse
-    std::vector<S> work_inv_norm(n);
-    S inv_norm = cpu_lange<T, S>(norm, n, n, hA_inv[0], lda, work_inv_norm.data());
+    // std::vector<S> work_inv_norm(n);
+    // S inv_norm = cpu_lange<T, S>(norm, n, n, hA_inv[0], lda, work_inv_norm.data());
     
     // condition number = 1 / (||A|| * ||A^-1||)  (reciprocal)
-    S cond_num = S(1.0) / (hanorm[0][0] * inv_norm);
-    std::cout << "Traditional condition number (reciprocal): " << cond_num << std::endl;
+    // S cond_num = S(1.0) / (hanorm[0][0] * inv_norm);
+    // std::cout << "Traditional condition number (reciprocal): " << cond_num << std::endl;
     // END TEMPORARY
 
     // error is ||hrcond - hrcond_res|| / ||hrcond||
