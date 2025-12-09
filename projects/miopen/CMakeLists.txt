@@ -73,24 +73,13 @@ endif()
 
 project ( MIOpen C CXX )
 # ==============================================================================
-# [DCR DEBUG] - LINKER GC CONFIGURATION (VERIFIED & TRACED)
+# [DCR DEBUG] - COMPILER WARNINGS CONFIG (VERIFIED)
 # ==============================================================================
 
 message(STATUS ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-message(STATUS ">>> [DCR DEBUG] INJECTING LINKER GC FLAGS...")
+message(STATUS ">>> [DCR DEBUG] INJECTING CUSTOM FLAGS...")
 
-message(STATUS ">>> [DCR DEBUG] ENV{AMDGPU_TARGETS}: $ENV{AMDGPU_TARGETS}")
-message(STATUS ">>> [DCR DEBUG] ENV{GPU_TARGETS}:    $ENV{GPU_TARGETS}")
-
-add_compile_options("-ffunction-sections" "-fdata-sections")
-
-add_link_options("-Wl,--gc-sections" "-Wl,--print-gc-sections")
-
-set(CMAKE_CXX_VISIBILITY_PRESET hidden CACHE STRING "Force hidden" FORCE)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN ON CACHE BOOL "Force hidden inlines" FORCE)
-
-set(AMDGPU_TARGETS "gfx1100" CACHE STRING "Force legacy arch" FORCE)
-set(GPU_TARGETS "gfx1100" CACHE STRING "Force new arch" FORCE)
+add_compile_options("-Wall" "-Wextra" "-Wunused-function" "-Wunused-variable" "-Wunreachable-code")
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Force Shared" FORCE)
 set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "RelWithDebInfo" FORCE)
@@ -99,13 +88,17 @@ set(BUILD_TESTING ON CACHE BOOL "Enable Testing" FORCE)
 set(MIOPEN_TEST_GTEST ON CACHE BOOL "Enable GTest" FORCE)
 
 set(MIOPEN_USE_MLIR OFF CACHE BOOL "Force MLIR OFF" FORCE)
+# Пробуем оба варианта написания, чтобы наверняка (иногда бывает путаница с underscore)
 set(MIOPEN_USE_COMPOSABLE_KERNEL OFF CACHE BOOL "Disable CK" FORCE)
 set(MIOPEN_USE_COMPOSABLEKERNEL OFF CACHE BOOL "Disable CK Alias" FORCE)
 
-message(STATUS ">>> [DCR DEBUG] ----------------------------------------------")
-message(STATUS ">>> [DCR DEBUG] FINAL GPU_TARGETS: ${GPU_TARGETS}")
-message(STATUS ">>> [DCR DEBUG] VISIBILITY PRESET: ${CMAKE_CXX_VISIBILITY_PRESET}")
-message(STATUS ">>> [DCR DEBUG] BUILD_TESTING:     ${BUILD_TESTING}")
+set(AMDGPU_TARGETS "gfx950" CACHE STRING "Force legacy arch" FORCE)
+set(GPU_TARGETS "gfx950" CACHE STRING "Force new arch" FORCE)
+
+message(STATUS ">>> [DCR DEBUG] MIOPEN_USE_MLIR is set to: ${MIOPEN_USE_MLIR}")
+message(STATUS ">>> [DCR DEBUG] CK is set to: ${MIOPEN_USE_COMPOSABLE_KERNEL}")
+message(STATUS ">>> [DCR DEBUG] GPU_TARGETS is set to: ${GPU_TARGETS}")
+message(STATUS ">>> [DCR DEBUG] BUILD_TESTING is set to: ${BUILD_TESTING}")
 message(STATUS ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
 # ==============================================================================
