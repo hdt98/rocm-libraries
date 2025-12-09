@@ -33,6 +33,8 @@ struct DefaultAlgorithm
         } tile_size;
     } thread_block;
 
+    static_assert(ckb::ThreadBlockDescriptor<ThreadBlock>);
+
     struct GridwiseGemm
     {
         int ak1            = 8;
@@ -42,6 +44,8 @@ struct DefaultAlgorithm
         int m_xdl_per_wave = 1;
         int n_xdl_per_wave = 1;
     } gridwise_gemm;
+
+    static_assert(ckb::GridwiseXdlGemmDescriptor<GridwiseGemm>);
 
     struct TransferABC
     {
@@ -83,7 +87,7 @@ struct DefaultAlgorithm
             } thread_cluster_dims;
             struct Epilogue
             {
-                int m_per_wave_per_shuffle = 1;
+                int m_xdl_per_wave_per_shuffle = 1;
                 int n_per_wave_per_shuffle = 1;
                 int scalar_per_vector      = 8;
             } epilogue;
@@ -100,13 +104,42 @@ struct DefaultAlgorithm
     } block_gemm;
 };
 
+static_assert(ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm>);
+// static_assert(ckb::ConvAlgorithmDescriptor<DefaultAlgorithm> && ckb::SpecifiesThreadBlock<DefaultAlgorithm> && ckb::SpecifiesGridwiseXdlGemm<DefaultAlgorithm> &&
+//            ckb::SpecifiesBlockTransfer<DefaultAlgorithm> && ckb::SpecifiesLdsTransfer<DefaultAlgorithm> &&
+//            ckb::SpecifiesThreadClusterAccessOrder<DefaultAlgorithm> && ckb::SpecifiesSourceAccessOrder<DefaultAlgorithm> &&
+//            ckb::SpecifiesFwdConvSpecialization<DefaultAlgorithm> && ckb::SpecifiesGemmSpecialization<DefaultAlgorithm> &&
+//            ckb::SpecifiesBlockGemm<DefaultAlgorithm>);
+
 // Define a struct to specify the signature
 struct Signature
 {
     int spatial_dim = 2;
     // TODO: This direction should be OK as default, but the factory fails.
     ckb::ConvDirection direction = ckb::ConvDirection::FORWARD;
-    ckb::GroupConvLayout layout  = ckb::GroupConvLayout2D::NGCHW_GKCYX_NGKHW;
+    struct InputTensorDescriptor {
+        struct Config {
+            ckb::TensorLayout layout = ckb::TensorLayout::NHWGC;
+            ckb::DataType data_type = ckb::DataType::FP32;
+            ckb::DataType compute_type = ckb::DataType::FP32;
+        } config;
+    } input;
+    
+    struct WeightTensorDescriptor {
+        struct Config {
+            ckb::TensorLayout layout = ckb::TensorLayout::GKCYX;
+            ckb::DataType data_type = ckb::DataType::FP32;
+            ckb::DataType compute_type = ckb::DataType::FP32;
+        } config;
+    } weight;
+
+    struct OutputTensorDescriptor {
+        struct Config {
+            ckb::TensorLayout layout = ckb::TensorLayout::NHWGK;
+            ckb::DataType data_type = ckb::DataType::FP32;
+            ckb::DataType compute_type = ckb::DataType::FP32;
+        } config;
+    } output;
     ckb::DataType data_type      = ckb::DataType::FP32;
 };
 
