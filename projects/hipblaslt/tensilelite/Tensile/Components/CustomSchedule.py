@@ -2385,28 +2385,29 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
 
     optSchedule = {
         'GRA': [[22,22,23,23,24,24,26,26,27,27,29,29,30,30]],
-        'GRB': [[32,32,33,33,35,35,36,36]],
-        'GRIncA': [[0,0,0,1,1,1,2,2,2]],
+        'GRB': [[30,31,32,33,33,35,35,36]],
+        'GRIncA': [[0,0,0,1,1,2,2,2,3]],
         'GRIncB': [[3,3,3,4,4,4,5,5,5]],
         'LCC': [[55,55]],
         'LRA0': [[0,2,3,4,5,6,7,8,9,10,11,12,13,14]],
-        'LRA1': [[39,41,42,43,44,45,46,47,48,49,50,51,52,53]],
+        'LRA1': [[37,38,39,40,41,42,43,44,45,46,47,48,49,50]], # we are waiting too long for LRA1 to complete at -1. So how can we start LRA1 earlier ? 
         'LRB0': [[1,15]],
         'LRB1': [[40,54]],
         'LRSA': [[26]],
         'LRSB': [[26]],
         'LWSA': [[36]],
         'LWSB': [[36]],
-        'SYNC': [[-1,13,21,21,27,38,38]]
+        'SYNC': [[-1,13,21,21,27,36,36]] # The last barrier has a dependency with both GRA and GRB. 
     }
 
+    # Question: Where is the sync for LRB ? 
     syncCode = [
-        SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=1 newLW=0 newLR=1 for iteration == 0"),
-        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
-        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+        SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=1 newLW=0 newLR=1 for iteration == 0"), # This should be len(lrb0)-2
+        SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"), # wait for the rest of LRB1 to complete
+        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRA0 to complete before GRA DirectToLds"), # wait for LRA0 to complete before GRA DirectToLds
         SBarrier(comment=""),
-        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
-        SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"),
+        SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"), # This is symmetric to what happens at -1 The reason that it has to be 0 is that at index 27 we are waiting for LRA0 which ends at 14
+        SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="wait for previous set of global reads"), 
         SBarrier(comment="")
     ]
     
