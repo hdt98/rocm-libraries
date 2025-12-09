@@ -265,6 +265,6 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu][lds-model]
         }
         CHECK(waitcntCount == 8);
 
-        Log::info(context.output());
+        Log::trace(context.output());
     }
 }
