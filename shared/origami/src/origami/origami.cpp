@@ -1,5 +1,28 @@
-// Copyright Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright 2025 AMD ROCm(TM) Software
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 
 #include <algorithm>
 #include <chrono>
@@ -366,22 +389,21 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                              return a.config.mt.m > b.config.mt.m;
                            }
                          });
-      }
-      else{ //sqaure sizes (M == N)
+      } else {  // sqaure sizes (M == N)
 
-      // Final tie-breaker: when all else is equal (including square problems),
-      // consistently prefer tiles with larger MT_M
-      // This ensures deterministic selection regardless of input order
-      std::stable_sort(results.begin(),
-                       results.begin() + num_same_ai,
-                       [](const prediction_result_t& a, const prediction_result_t& b) {
-                         // Prefer larger MT_M first
-                         if (a.config.mt.m != b.config.mt.m) return a.config.mt.m > b.config.mt.m;
-                         // If MT_M is same, prefer larger MT_N
-                         if (a.config.mt.n != b.config.mt.n) return a.config.mt.n > b.config.mt.n;
-                         // If both MT_M and MT_N are same, prefer larger MT_K
-                         return a.config.mt.k > b.config.mt.k;
-                       });
+        // Final tie-breaker: when all else is equal (including square problems),
+        // consistently prefer tiles with larger MT_M
+        // This ensures deterministic selection regardless of input order
+        std::stable_sort(results.begin(),
+                         results.begin() + num_same_ai,
+                         [](const prediction_result_t& a, const prediction_result_t& b) {
+                           // Prefer larger MT_M first
+                           if (a.config.mt.m != b.config.mt.m) return a.config.mt.m > b.config.mt.m;
+                           // If MT_M is same, prefer larger MT_N
+                           if (a.config.mt.n != b.config.mt.n) return a.config.mt.n > b.config.mt.n;
+                           // If both MT_M and MT_N are same, prefer larger MT_K
+                           return a.config.mt.k > b.config.mt.k;
+                         });
       }
     }
   }
