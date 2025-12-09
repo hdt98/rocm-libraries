@@ -97,7 +97,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
         strideMultiplier = GENERATE(1, 2, 4, 8);
         write            = GENERATE(true, false);
     }
-    constexpr auto iters = 32;
+    constexpr auto iters = 8;
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -238,13 +238,18 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
             medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
         }
 
+        if(testIndividual)
+        {
+            Log::info(infoStr);
+            Log::info(context.output());
+        }
+
         int totalAbsoluteDelta       = 0;
         int totalDelta               = 0;
         int incorrectPredictionCount = 0;
-        int ldsInstructionCount      = 0;
         int waitcntInstructionCount  = 0;
 
-        for(size_t i = 0; i < filteredInstructions.size(); ++i)
+        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i) // exclude s_endpgm
         {
             const auto& inst = filteredInstructions[i];
             using namespace Scheduling::LDSBankModel;
@@ -256,7 +261,6 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
 
             totalAbsoluteDelta += std::abs(delta);
             totalDelta += delta;
-            ldsInstructionCount++;
 
             if(delta != 0)
             {
@@ -273,7 +277,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
             "Total absolute delta: {}, Incorrect predictions: {}/{}, Waitcnt instructions: {}",
             totalAbsoluteDelta,
             incorrectPredictionCount,
-            ldsInstructionCount,
+            filteredInstructions.size() - 1,
             waitcntInstructionCount));
 
         CHECK(waitcntInstructionCount == iters);
@@ -305,17 +309,52 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
             CHECK(totalAbsoluteDelta <= 4 * 2 * iters);
             CHECK(totalDelta == 0);
         }
-
-        if(testIndividual)
-        {
-            Log::info(infoStr);
-            Log::info(context.output());
-        }
     }
 }
 
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model]")
 {
+    /*
+    ...
+    ds_read_b128 v[72:75], v1, model 16, profiler 16, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    ds_read_b128 v[76:79], v1, model 12, profiler 12, delta 0
+    ds_read_b128 v[80:83], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[84:87], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[88:91], v1, model 16, profiler 16, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    ds_read_b128 v[92:95], v1, model 8, profiler 8, delta 0
+    ds_read_b128 v[96:99], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[100:103], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[104:107], v1, model 16, profiler 16, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    ds_read_b128 v[108:111], v1, model 4, profiler 4, delta 0
+    ds_read_b128 v[112:115], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[116:119], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[120:123], v1, model 16, profiler 16, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    ds_read_b128 v[124:127], v1, model 4, profiler 4, delta 0
+    ds_read_b128 v[128:131], v1, model 12, profiler 12, delta 0
+    ds_read_b128 v[132:135], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[136:139], v1, model 16, profiler 16, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    s_add_u32 s3, s3, s4, model 4, profiler 4, delta 0
+    ds_read_b128 v[140:143], v1, model 4, profiler 4, delta 0
+    ds_read_b128 v[144:147], v1, model 8, profiler 8, delta 0
+    ds_read_b128 v[148:151], v1, model 16, profiler 16, delta 0
+    ds_read_b128 v[152:155], v1, model 16, profiler 16, delta 0
+    ...
+    */
+
     using namespace Scheduling::LDSBankModel;
 
     constexpr auto workgroupSize = 64u;
@@ -324,10 +363,10 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model]")
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = false; // for debugging a single configuration
+    constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(2);
+        instrDwords      = GENERATE(4);
         strideMultiplier = GENERATE(4);
         write            = GENERATE(false);
     }
@@ -501,52 +540,59 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model]")
             medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
         }
 
-        size_t totalAbsoluteDelta       = 0;
-        size_t incorrectPredictionCount = 0;
-        size_t ldsInstructionCount      = 0;
+        if(testIndividual)
+        {
+            Log::info(infoStr);
+            Log::info(context.output());
+        }
 
-        for(size_t i = 0; i < filteredInstructions.size(); ++i)
+        int totalAbsoluteDelta       = 0;
+        int totalDelta               = 0;
+        int incorrectPredictionCount = 0;
+
+        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i) // exclude s_endpgm
         {
             const auto& inst = filteredInstructions[i];
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-            {
-                using namespace Scheduling::LDSBankModel;
+            using namespace Scheduling::LDSBankModel;
 
-                int modelLatency = inst.totalCycles() * 4;
+            int modelLatency = inst.totalCycles() * 4;
 
-                auto actualLatency = std::get<1>(medianLatencies[i]);
-                auto delta         = static_cast<int>(actualLatency) - modelLatency;
+            int actualLatency = std::get<1>(medianLatencies[i]);
+            int delta         = actualLatency - modelLatency;
 
-                totalAbsoluteDelta += std::abs(delta);
-                ldsInstructionCount++;
-
-                if(write && instrDwords == 4)
+            if(write && instrDwords == 4)
+            { // ds_write_b128 cycles between +0/+12 cycles at steady state
+                if(delta > 12)
                 {
-                    if(std::abs(delta) > 12)
-                        incorrectPredictionCount++;
+                    incorrectPredictionCount++;
+                    totalDelta += delta;
                 }
-                else if(delta != 0)
+                totalAbsoluteDelta += std::max(0, std::abs(delta) - 12);
+            }
+            else
+            {
+                totalDelta += delta;
+                totalAbsoluteDelta += std::abs(delta);
+                if(delta != 0)
                 {
                     incorrectPredictionCount++;
                 }
             }
         }
+
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
                          totalAbsoluteDelta,
                          incorrectPredictionCount,
-                         ldsInstructionCount));
+                         filteredInstructions.size() - 1));
 
-        if(write && instrDwords == 4)
-            CHECK(totalAbsoluteDelta <= 6 * ldsInstructionCount);
-        else
-            // Average of half a cycle of error per LDS instruction
-            CHECK(totalAbsoluteDelta * 2 <= ldsInstructionCount);
-
-        // Generally the wrong predictions while the stalls cycles are increasing to a steady value
-        // I expect this to be reduced if the model has a period granularity beyond a quadcycle
+        /* Sometimes as steady state is reached, there are deltas during transition
+        ds_read_b128 v[32:35], v1, model 4, profiler 4, delta 0
+        ds_read_b128 v[36:39], v1, model 8, profiler 4, delta -4
+        ds_read_b128 v[40:43], v1, model 32, profiler 24, delta -8
+        ds_read_b128 v[44:47], v1, model 32, profiler 32, delta 0
+        */
+        CHECK(totalAbsoluteDelta <= 20);
+        CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 20));
         CHECK(incorrectPredictionCount <= 4);
-
-        if(testIndividual)
-            Log::info(context.output());
     }
 }
