@@ -65,6 +65,17 @@ const int NUM_RUNS = 5; // Should be odd, as median is used
 
 TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
 {
+    /*
+    v_lshlrev_b32_e32 v1, 5, v0, model 4, profiler 4, delta 0
+    s_barrier, model 4, profiler 4, delta 0
+    ds_read_b128 v[4:7], v1, model 4, profiler 4, delta 0
+    s_waitcnt lgkmcnt(0), model 52, profiler 52, delta 0
+    ds_read_b128 v[8:11], v1, model 4, profiler 4, delta 0
+    s_waitcnt lgkmcnt(0), model 52, profiler 52, delta 0
+    ds_read_b128 v[12:15], v1, model 4, profiler 4, delta 0
+    ...
+    */
+
     using namespace Scheduling::LDSBankModel;
 
     constexpr auto workgroupSize = 64u;
@@ -86,6 +97,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
         strideMultiplier = GENERATE(1, 2, 4, 8);
         write            = GENERATE(true, false);
     }
+    constexpr auto iters = 32;
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -152,7 +164,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
             co_yield context->mem()->barrier({});
 
             int counter = 0;
-            for(int i = 0; i < 32; ++i)
+            for(int i = 0; i < iters; ++i)
             {
                 const auto [start, end]
                     = getAlignedSubset(ldsDst->registerCount(), instrDwords, counter++);
@@ -264,7 +276,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
             ldsInstructionCount,
             waitcntInstructionCount));
 
-        CHECK(waitcntInstructionCount == 32);
+        CHECK(waitcntInstructionCount == iters);
 
         if(strideMultiplier == 1)
         {
@@ -281,7 +293,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
                 s_waitcnt lgkmcnt(0), model 48, profiler 44, delta -4
             */
 
-            CHECK(totalAbsoluteDelta <= 16 * 32); // for case 1)
+            CHECK(totalAbsoluteDelta <= 16 * iters); // for case 1)
             CHECK(totalDelta >= -8 * waitcntInstructionCount); // for case 1)/2)
         }
         else
@@ -290,12 +302,15 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model]")
                 ds_read_b32 v2, v1, model 4, profiler 8, delta 4
                 s_waitcnt lgkmcnt(0), model 52, profiler 48, delta -4
             */
-            CHECK(totalAbsoluteDelta <= 4 * 64);
+            CHECK(totalAbsoluteDelta <= 4 * 2 * iters);
             CHECK(totalDelta == 0);
         }
 
         if(testIndividual)
+        {
+            Log::info(infoStr);
             Log::info(context.output());
+        }
     }
 }
 
