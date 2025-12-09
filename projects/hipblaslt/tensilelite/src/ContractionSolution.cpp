@@ -1206,7 +1206,7 @@ namespace TensileLite
         if(sizeMapping.streamK != 0)
         {
             // Using gsu kernel arg bits for StreamK instead
-            internalArg0 = internalArg0 | (mask14 & skMaxWG);
+            internalArg0 = internalArg0 | (mask16 & skMaxWG);
         }
         else
         {
