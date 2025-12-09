@@ -2018,9 +2018,9 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
                    || rocfft_plan_description_t::multiple_devices_in_rank(outField);
 
     // check if RCCL is available for single-process multi-GPU
-    bool rccl_available = false;
 #ifdef ROCFFT_RCCL_ENABLED
-    rccl_available = use_p2p && rocfft_rccl::RCCLCommunicator::instance().is_available();
+    bool rccl_available = false;
+    rccl_available      = use_p2p && rocfft_rccl::RCCLCommunicator::instance().is_available();
 #endif
 
     // All-to-all transpose is preferred as it's faster. This requires

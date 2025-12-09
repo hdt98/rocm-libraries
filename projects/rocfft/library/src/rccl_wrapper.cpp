@@ -198,9 +198,13 @@ namespace rocfft_rccl
 
     int RCCLCommunicator::get_nranks() const
     {
+#ifdef ROCFFT_RCCL_ENABLED
         if(!pimpl || !pimpl->initialized)
             return 0;
         return static_cast<int>(pimpl->devices.size());
+#else
+        return 0;
+#endif
     }
 
     int RCCLCommunicator::get_device_for_rank(int rank) const
@@ -232,7 +236,11 @@ namespace rocfft_rccl
     const std::vector<int>& RCCLCommunicator::get_devices() const
     {
         static const std::vector<int> empty;
+#ifdef ROCFFT_RCCL_ENABLED
         return (pimpl && pimpl->initialized) ? pimpl->devices : empty;
+#else
+        return empty;
+#endif
     }
 
     bool RCCLCommunicator::has_device(int device_id) const
