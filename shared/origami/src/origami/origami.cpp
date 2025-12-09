@@ -367,6 +367,7 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                            }
                          });
       }
+      else{ //sqaure sizes (M == N)
 
       // Final tie-breaker: when all else is equal (including square problems),
       // consistently prefer tiles with larger MT_M
@@ -381,6 +382,7 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                          // If both MT_M and MT_N are same, prefer larger MT_K
                          return a.config.mt.k > b.config.mt.k;
                        });
+      }
     }
   }
 
