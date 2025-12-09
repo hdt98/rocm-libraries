@@ -69,6 +69,22 @@ constexpr index_t get_lds_size<gfx125_t>(gfx125_t)
 }
 
 template <typename DeviceArch>
+static constexpr index_t get_n_lds_banks(DeviceArch)
+{
+    return 32;
+}
+template <>
+constexpr index_t get_n_lds_banks<gfx950_t>(gfx950_t)
+{
+    return 64;
+}
+template <>
+constexpr index_t get_n_lds_banks<gfx125_t>(gfx125_t)
+{
+    return 64;
+}
+
+template <typename DeviceArch>
 static constexpr index_t get_max_vgpr_count(DeviceArch)
 {
     return 256;

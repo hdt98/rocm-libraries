@@ -68,6 +68,7 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         b_k_n.GenerateTensorValue(GeneratorTensor_1<BDataType>{1});
         break;
     case 1:
+    default:
         a_m_k.GenerateTensorValue(GeneratorTensor_2<ADataType>{-2, 2});
         b_k_n.GenerateTensorValue(GeneratorTensor_2<BDataType>{-2, 2});
         break;
@@ -79,9 +80,19 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         a_m_k.GenerateTensorValue(GeneratorTensor_2<ADataType>{-2, 2});
         b_k_n.GenerateTensorValue(GeneratorTensor_1<BDataType>{1});
         break;
-    default:
-        a_m_k.GenerateTensorValue(GeneratorTensor_3<ADataType>{0.0, 1.0});
-        b_k_n.GenerateTensorValue(GeneratorTensor_3<BDataType>{-0.5, 0.5});
+    }
+
+    Tensor<float> a_m_k_f32({M, K});
+    Tensor<float> b_k_n_f32({K, N});
+
+    if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t>)
+    {
+        permute_a_pk_i4(a_m_k, M, K, a_m_k_f32, config.use_gfx9_i4);
+    }
+
+    if constexpr(ck::is_same_v<BDataType, ck::pk_i4_t>)
+    {
+        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, config.use_gfx9_i4);
     }
 
     Tensor<CDataType> c_m_n_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
@@ -152,13 +163,38 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     bool pass = true;
     if((config.do_verification == 1) || (config.do_verification == 3))
     {
-        auto ref_gemm    = ReferenceGemmInstance{};
-        auto ref_invoker = ref_gemm.MakeInvoker();
+        if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t> && ck::is_same_v<BDataType, ck::pk_i4_t>)
+        {
+            using PkInt4ReferenceGemmInstance =
+                ck::tensor_operation::host::ReferenceGemm<float,
+                                                          float,
+                                                          CDataType,
+                                                          AccDataType,
+                                                          PassThrough,
+                                                          PassThrough,
+                                                          PassThrough>;
+            auto ref_gemm    = PkInt4ReferenceGemmInstance{};
+            auto ref_invoker = ref_gemm.MakeInvoker();
 
-        auto ref_argument = ref_gemm.MakeArgument(
-            a_m_k, b_k_n, c_m_n_host_result, a_element_op, b_element_op, c_element_op);
+            auto ref_argument = ref_gemm.MakeArgument(a_m_k_f32,
+                                                      b_k_n_f32,
+                                                      c_m_n_host_result,
+                                                      PassThrough{},
+                                                      PassThrough{},
+                                                      PassThrough{});
 
-        ref_invoker.Run(ref_argument);
+            ref_invoker.Run(ref_argument);
+        }
+        else
+        {
+            auto ref_gemm    = ReferenceGemmInstance{};
+            auto ref_invoker = ref_gemm.MakeInvoker();
+
+            auto ref_argument = ref_gemm.MakeArgument(
+                a_m_k, b_k_n, c_m_n_host_result, a_element_op, b_element_op, c_element_op);
+
+            ref_invoker.Run(ref_argument);
+        }
 
         ave_time = invoker.Run(argument, StreamConfig{nullptr, false, 1});
 #ifdef BUILD_INT4_EXAMPLE

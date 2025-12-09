@@ -206,28 +206,31 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
     {
         constexpr index_t WaveSize =
             (is_same_v<DeviceArch_, gfx950_t> || is_same_v<DeviceArch_, gfx9_t>) ? 64 : 32;
-        constexpr index_t MVgprSize = MPerBlock * KPerBlock / MWarp / WaveSize * sizeof(ADataType) /
+        constexpr index_t AVgprSize = MPerBlock * KPerBlock / MWarp / WaveSize * sizeof(ADataType) /
                                       GetPackedSize<ADataType>() / sizeof(uint32_t);
-        constexpr index_t NVgprSize = NPerBlock * KPerBlock / NWarp / WaveSize * sizeof(BDataType) /
+        constexpr index_t BVgprSize = NPerBlock * KPerBlock / NWarp / WaveSize * sizeof(BDataType) /
                                       GetPackedSize<BDataType>() / sizeof(uint32_t);
         constexpr index_t AccVgprSize = MPerBlock * NPerBlock / (MWarp * NWarp * WaveSize) *
-                                        sizeof(CShuffleDataType) / sizeof(uint32_t);
-        if constexpr(PipelineVer == ck_tile::GemmPipeline::BASIC_V1 ||
-                     PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC ||
-                     PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
-                     PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V2)
+                                        sizeof(GemmAccDataType) / sizeof(uint32_t);
+        if constexpr(PipelineVer == ck_tile::GemmPipeline::BASIC_V1)
         {
-            return MVgprSize + NVgprSize + AccVgprSize;
+            return AVgprSize + BVgprSize + AccVgprSize;
         }
         else if constexpr((PipelineVer == ck_tile::GemmPipeline::BASIC_V2) ||
                           (PipelineVer == ck_tile::GemmPipeline::COMPUTE_V3) ||
-                          (PipelineVer == ck_tile::GemmPipeline::MEMORY))
+                          (PipelineVer == ck_tile::GemmPipeline::MEMORY) ||
+                          (PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC))
         {
-            return 2 * (MVgprSize + NVgprSize) + AccVgprSize;
+            return 2 * (AVgprSize + BVgprSize) + AccVgprSize;
         }
         else if constexpr(PipelineVer == ck_tile::GemmPipeline::COMPUTE_V4)
         {
-            return 3 * (MVgprSize + NVgprSize) + AccVgprSize;
+            return 3 * (AVgprSize + BVgprSize) + AccVgprSize;
+        }
+        else if constexpr(PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
+                          PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V2)
+        {
+            return math::min(2 * (AVgprSize + BVgprSize), 256) + AccVgprSize;
         }
         else
         {
@@ -275,6 +278,14 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
         if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V2)
         {
             if constexpr(GemmConfig::M_Warp * GemmConfig::N_Warp != 4)
+            {
+                return false;
+            }
+        }
+        if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::BASIC_V1)
+        {
+            if constexpr(is_same_v<ALayoutCk, ck::tensor_layout::gemm::ColumnMajor> ||
+                         is_same_v<BLayoutCk, ck::tensor_layout::gemm::RowMajor>)
             {
                 return false;
             }

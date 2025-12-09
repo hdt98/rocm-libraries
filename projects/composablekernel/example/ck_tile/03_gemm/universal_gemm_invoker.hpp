@@ -109,7 +109,7 @@ struct UniversalInvoker
                                                  false,
                                                  1,
                                                  false,
-                                                 1,
+                                                 GemmConfig::BlockedXDLN_PerWarp,
                                                  ComputeDataType>>::Epilogue;
 
             using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;

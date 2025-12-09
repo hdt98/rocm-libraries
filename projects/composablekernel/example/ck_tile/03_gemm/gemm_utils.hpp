@@ -78,8 +78,9 @@ struct GemmConfigBase
     static constexpr bool Preshuffle                = false;
     static constexpr bool TiledMMAPermuteN          = false;
 
-    static constexpr ck_tile::index_t kClusterSizeM = 1;
-    static constexpr ck_tile::index_t kClusterSizeN = 1;
+    static constexpr ck_tile::index_t kClusterSizeM       = 1;
+    static constexpr ck_tile::index_t kClusterSizeN       = 1;
+    static constexpr ck_tile::index_t BlockedXDLN_PerWarp = 1;
 };
 
 template <typename PrecType>
