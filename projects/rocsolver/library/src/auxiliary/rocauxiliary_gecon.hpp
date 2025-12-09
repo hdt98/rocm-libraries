@@ -663,39 +663,39 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             *h_jump = 2;
 
             // DEBUG: Detailed instrumentation
-            hipStreamSynchronize(stream);
-            hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
-            if constexpr(!rocblas_is_complex<T>)
-                hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
-            hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
+            // hipStreamSynchronize(stream);
+            // hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // if constexpr(!rocblas_is_complex<T>)
+            //     hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
 
-            std::cout << "========================================" << std::endl;
-            std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
-            std::cout << "Iteration: " << *h_iters << std::endl;
-            std::cout << "kase: " << *h_kase << std::endl;
-            std::cout << "jump: " << *h_jump << std::endl;
-            std::cout << "est: " << h_est << std::endl;
-            std::cout << "max_idx: " << h_max_idx_val << std::endl;
+            // std::cout << "========================================" << std::endl;
+            // std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
+            // std::cout << "Iteration: " << *h_iters << std::endl;
+            // std::cout << "kase: " << *h_kase << std::endl;
+            // std::cout << "jump: " << *h_jump << std::endl;
+            // std::cout << "est: " << h_est << std::endl;
+            // std::cout << "max_idx: " << h_max_idx_val << std::endl;
+            //
+            // std::cout << "x[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_x[i] << " ";
+            // std::cout << std::endl;
             
-            std::cout << "x[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x[i] << " ";
-            std::cout << std::endl;
+            // std::cout << "v[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_v[i] << " ";
+            // std::cout << std::endl;
             
-            std::cout << "v[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_v[i] << " ";
-            std::cout << std::endl;
-            
-            if constexpr(!rocblas_is_complex<T>) {
-                std::cout << "isgn[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_isgn_vec[i] << " ";
-                std::cout << std::endl;
-            }
-            std::cout << "========================================" << std::endl;
+            // if constexpr(!rocblas_is_complex<T>) {
+            //     std::cout << "isgn[0:" << print_n << "]: ";
+            //     for(int i = 0; i < print_n; i++)
+            //         std::cout << h_isgn_vec[i] << " ";
+            //     std::cout << std::endl;
+            // }
+            // std::cout << "========================================" << std::endl;
 
             return rocblas_status_success;
             break;
@@ -713,39 +713,39 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             *h_iters = 2;
 
             // DEBUG: Detailed instrumentation
-            hipStreamSynchronize(stream);
-            hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
-            if constexpr(!rocblas_is_complex<T>)
-                hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
-            hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
-
-            std::cout << "========================================" << std::endl;
-            std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
-            std::cout << "Iteration: " << *h_iters << std::endl;
-            std::cout << "kase: " << *h_kase << std::endl;
-            std::cout << "jump: " << *h_jump << std::endl;
-            std::cout << "est: " << h_est << std::endl;
-            std::cout << "max_idx: " << h_max_idx_val << std::endl;
-            
-            std::cout << "x[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x[i] << " ";
-            std::cout << std::endl;
-            
-            std::cout << "v[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_v[i] << " ";
-            std::cout << std::endl;
-            
-            if constexpr(!rocblas_is_complex<T>) {
-                std::cout << "isgn[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_isgn_vec[i] << " ";
-                std::cout << std::endl;
-            }
-            std::cout << "========================================" << std::endl;
+            // hipStreamSynchronize(stream);
+            // hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // if constexpr(!rocblas_is_complex<T>)
+            //     hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
+            //
+            // std::cout << "========================================" << std::endl;
+            // std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
+            // std::cout << "Iteration: " << *h_iters << std::endl;
+            // std::cout << "kase: " << *h_kase << std::endl;
+            // std::cout << "jump: " << *h_jump << std::endl;
+            // std::cout << "est: " << h_est << std::endl;
+            // std::cout << "max_idx: " << h_max_idx_val << std::endl;
+            //
+            // std::cout << "x[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_x[i] << " ";
+            // std::cout << std::endl;
+            //
+            // std::cout << "v[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_v[i] << " ";
+            // std::cout << std::endl;
+            //
+            // if constexpr(!rocblas_is_complex<T>) {
+            //     std::cout << "isgn[0:" << print_n << "]: ";
+            //     for(int i = 0; i < print_n; i++)
+            //         std::cout << h_isgn_vec[i] << " ";
+            //     std::cout << std::endl;
+            // }
+            // std::cout << "========================================" << std::endl;
 
             return rocblas_status_success;
             break;
@@ -762,38 +762,38 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             // TODO: transfer updated jump and case from device to host
 
             // DEBUG: Detailed instrumentation
-            hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
-            if constexpr(!rocblas_is_complex<T>)
-                hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
-            hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
-
-            std::cout << "========================================" << std::endl;
-            std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
-            std::cout << "Iteration: " << *h_iters << std::endl;
-            std::cout << "kase: " << *h_kase << std::endl;
-            std::cout << "jump: " << *h_jump << std::endl;
-            std::cout << "est: " << h_est << std::endl;
-            std::cout << "max_idx: " << h_max_idx_val << std::endl;
-            
-            std::cout << "x[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x[i] << " ";
-            std::cout << std::endl;
-            
-            std::cout << "v[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_v[i] << " ";
-            std::cout << std::endl;
-            
-            if constexpr(!rocblas_is_complex<T>) {
-                std::cout << "isgn[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_isgn_vec[i] << " ";
-                std::cout << std::endl;
-            }
-            std::cout << "========================================" << std::endl;
+            // hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // if constexpr(!rocblas_is_complex<T>)
+            //     hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
+            //
+            // std::cout << "========================================" << std::endl;
+            // std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
+            // std::cout << "Iteration: " << *h_iters << std::endl;
+            // std::cout << "kase: " << *h_kase << std::endl;
+            // std::cout << "jump: " << *h_jump << std::endl;
+            // std::cout << "est: " << h_est << std::endl;
+            // std::cout << "max_idx: " << h_max_idx_val << std::endl;
+            //
+            // std::cout << "x[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_x[i] << " ";
+            // std::cout << std::endl;
+            //
+            // std::cout << "v[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_v[i] << " ";
+            // std::cout << std::endl;
+            //
+            // if constexpr(!rocblas_is_complex<T>) {
+            //     std::cout << "isgn[0:" << print_n << "]: ";
+            //     for(int i = 0; i < print_n; i++)
+            //         std::cout << h_isgn_vec[i] << " ";
+            //     std::cout << std::endl;
+            // }
+            // std::cout << "========================================" << std::endl;
             return rocblas_status_success;
             break;
         case 4:
@@ -811,38 +811,38 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
                 *h_iters = *h_iters+1;
 
             // DEBUG: Detailed instrumentation
-            hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
-            if constexpr(!rocblas_is_complex<T>)
-                hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
-            hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
-
-            std::cout << "========================================" << std::endl;
-            std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
-            std::cout << "Iteration: " << *h_iters << std::endl;
-            std::cout << "kase: " << *h_kase << std::endl;
-            std::cout << "jump: " << *h_jump << std::endl;
-            std::cout << "est: " << h_est << std::endl;
-            std::cout << "max_idx: " << h_max_idx_val << std::endl;
-            
-            std::cout << "x[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x[i] << " ";
-            std::cout << std::endl;
-            
-            std::cout << "v[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_v[i] << " ";
-            std::cout << std::endl;
-            
-            if constexpr(!rocblas_is_complex<T>) {
-                std::cout << "isgn[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_isgn_vec[i] << " ";
-                std::cout << std::endl;
-            }
-            std::cout << "========================================" << std::endl;
+            // hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // if constexpr(!rocblas_is_complex<T>)
+            //     hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
+            //
+            // std::cout << "========================================" << std::endl;
+            // std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
+            // std::cout << "Iteration: " << *h_iters << std::endl;
+            // std::cout << "kase: " << *h_kase << std::endl;
+            // std::cout << "jump: " << *h_jump << std::endl;
+            // std::cout << "est: " << h_est << std::endl;
+            // std::cout << "max_idx: " << h_max_idx_val << std::endl;
+            //
+            // std::cout << "x[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_x[i] << " ";
+            // std::cout << std::endl;
+            //
+            // std::cout << "v[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_v[i] << " ";
+            // std::cout << std::endl;
+            //
+            // if constexpr(!rocblas_is_complex<T>) {
+            //     std::cout << "isgn[0:" << print_n << "]: ";
+            //     for(int i = 0; i < print_n; i++)
+            //         std::cout << h_isgn_vec[i] << " ";
+            //     std::cout << std::endl;
+            // }
+            // std::cout << "========================================" << std::endl;
 
             return rocblas_status_success;
             break;
@@ -855,39 +855,39 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             *h_kase = 0;
 
             // DEBUG: Detailed instrumentation
-            hipStreamSynchronize(stream);
-            hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
-            if constexpr(!rocblas_is_complex<T>)
-                hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
-            hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
-            hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
-
-            std::cout << "========================================" << std::endl;
-            std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
-            std::cout << "Iteration: " << *h_iters << std::endl;
-            std::cout << "kase: " << *h_kase << std::endl;
-            std::cout << "jump: " << *h_jump << std::endl;
-            std::cout << "est: " << h_est << std::endl;
-            std::cout << "max_idx: " << h_max_idx_val << std::endl;
-            
-            std::cout << "x[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x[i] << " ";
-            std::cout << std::endl;
-            
-            std::cout << "v[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_v[i] << " ";
-            std::cout << std::endl;
-            
-            if constexpr(!rocblas_is_complex<T>) {
-                std::cout << "isgn[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_isgn_vec[i] << " ";
-                std::cout << std::endl;
-            }
-            std::cout << "========================================" << std::endl;
+            // hipStreamSynchronize(stream);
+            // hipMemcpy(h_x.data(), *x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(h_v.data(), *v, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // if constexpr(!rocblas_is_complex<T>)
+            //     hipMemcpy(h_isgn_vec.data(), isgn, sizeof(I) * n, hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_est, d_est, sizeof(S), hipMemcpyDeviceToHost);
+            // hipMemcpy(&h_max_idx_val, d_max_idx, sizeof(I), hipMemcpyDeviceToHost);
+            //
+            // std::cout << "========================================" << std::endl;
+            // std::cout << "=== ROCSOLVER Jump " << *h_jump << " ===" << std::endl;
+            // std::cout << "Iteration: " << *h_iters << std::endl;
+            // std::cout << "kase: " << *h_kase << std::endl;
+            // std::cout << "jump: " << *h_jump << std::endl;
+            // std::cout << "est: " << h_est << std::endl;
+            // std::cout << "max_idx: " << h_max_idx_val << std::endl;
+            //
+            // std::cout << "x[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_x[i] << " ";
+            // std::cout << std::endl;
+            //
+            // std::cout << "v[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_v[i] << " ";
+            // std::cout << std::endl;
+            //
+            // if constexpr(!rocblas_is_complex<T>) {
+            //     std::cout << "isgn[0:" << print_n << "]: ";
+            //     for(int i = 0; i < print_n; i++)
+            //         std::cout << h_isgn_vec[i] << " ";
+            //     std::cout << std::endl;
+            // }
+            // std::cout << "========================================" << std::endl;
 
             return rocblas_status_success;
             break;
@@ -948,7 +948,7 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         return rocblas_status_success;
     }
 
-    // Return not implemented for Frobenius and max norms
+    // return not implemented for Frobenius and max norms
     if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
         return rocblas_status_not_implemented;
 
@@ -978,23 +978,22 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         rocblas_int* d_jump = scalars_jump + batch;
 
 
-        // initialize state
+        // initialize lacn2 state
         rocblas_int h_kase = 0;
         rocblas_int h_jump = 0;
         I h_iters = 1;
 
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "=== ROCSOLVER GECON START (batch=" << batch << ") ===" << std::endl;
-        std::cout << "n=" << n << ", anorm=" << h_anorm[batch] << std::endl;
-        std::cout << "========================================\n" << std::endl;
+        // std::cout << "\n========================================" << std::endl;
+        // std::cout << "=== ROCSOLVER GECON START (batch=" << batch << ") ===" << std::endl;
+        // std::cout << "n=" << n << ", anorm=" << h_anorm[batch] << std::endl;
+        // std::cout << "========================================\n" << std::endl;
 
-        // main LACN2 iteration loop
+        // main LACN2 and trsv iteration loop
         do
         {
-            std::cout << "\n>>> ROCSOLVER: Before LACN2" << std::endl;
-            std::cout << "    iter=" << h_iters << ", kase=" << h_kase << ", jump=" << h_jump << std::endl;
+            // std::cout << "\n>>> ROCSOLVER: Before LACN2" << std::endl;
+            // std::cout << "    iter=" << h_iters << ", kase=" << h_kase << ", jump=" << h_jump << std::endl;
 
-            // call LACN2 to update state and prepare next vector
             gecon_lacn2<T, I, S>(handle, norm_type, n, A, shiftA + batch * strideA, inca, lda,
                                  strideA, ipiv + batch * strideP, strideP, stream, &v, &x, isgn,
                                  max_iter, &h_iters, d_max_idx, d_est, d_anorm, d_jump, d_kase,
@@ -1018,19 +1017,19 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                                     : rocblas_operation_none;
             }
 
-            std::cout << "\n>>> ROCSOLVER: After LACN2, before triangular solves" << std::endl;
-            std::cout << "    opr=" << (opr == rocblas_operation_none ? "none" : 
-                       (opr == rocblas_operation_transpose ? "transpose" : "conj_transpose"))
-                      << std::endl;
+            // std::cout << "\n>>> ROCSOLVER: After LACN2, before triangular solves" << std::endl;
+            // std::cout << "    opr=" << (opr == rocblas_operation_none ? "none" : 
+            //            (opr == rocblas_operation_transpose ? "transpose" : "conj_transpose"))
+            //           << std::endl;
 
             // copy x to host to print before trsv
-            std::vector<T> h_x_before_trsv(n);
-            hipMemcpy(h_x_before_trsv.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-            int print_n = std::min(10, (int)n);
-            std::cout << "    x before TRSV[0:" << print_n << "]: ";
-            for(int i = 0; i < print_n; i++)
-                std::cout << h_x_before_trsv[i] << " ";
-            std::cout << std::endl;
+            // std::vector<T> h_x_before_trsv(n);
+            // hipMemcpy(h_x_before_trsv.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+            // int print_n = std::min(10, (int)n);
+            // std::cout << "    x before TRSV[0:" << print_n << "]: ";
+            // for(int i = 0; i < print_n; i++)
+            //     std::cout << h_x_before_trsv[i] << " ";
+            // std::cout << std::endl;
 
             T* A_ptr = load_ptr_batch<T>(A, batch, shiftA, strideA);
             
@@ -1042,16 +1041,16 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
             
             if(opr == rocblas_operation_none)
             {
-                std::cout << "    >>>>> ROCSOLVER: Using TRSV, solving ORIGINAL problem" << std::endl;
+                // std::cout << "    >>>>> ROCSOLVER: Using TRSV, solving ORIGINAL problem" << std::endl;
                 
                 // Forward solve: L*y = b, then U*x = y
                 // Solve L*x = b (lower triangular, unit diagonal)
-                std::cout << "    >>>>> Solve 1: LOWER triangular, UNIT diagonal" << std::endl;
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X before L solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
+                // std::cout << "    >>>>> Solve 1: LOWER triangular, UNIT diagonal" << std::endl;
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X before L solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
                 
                 rocblasCall_trsv<T>(handle, rocblas_fill_lower, 
                            rocblas_operation_none, rocblas_diagonal_unit,
@@ -1059,48 +1058,48 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                            x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1, 
                            w_completed);
                 
-                hipStreamSynchronize(stream);
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X after L solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
-                
+                // hipStreamSynchronize(stream);
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X after L solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
+                //
                 // Solve U*x = y (upper triangular, non-unit diagonal)
-                std::cout << "    >>>>> Solve 2: UPPER triangular, NON-UNIT diagonal" << std::endl;
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X before U solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
-                
+                // std::cout << "    >>>>> Solve 2: UPPER triangular, NON-UNIT diagonal" << std::endl;
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X before U solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
+                //
                 rocblasCall_trsv<T>(handle, rocblas_fill_upper,
                            rocblas_operation_none, rocblas_diagonal_non_unit,
                            (rocblas_int)n, A_ptr, (rocblas_stride)0, (rocblas_int)lda, (rocblas_stride)0,
                            x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1,
                            w_completed);
                 
-                hipStreamSynchronize(stream);
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X after U solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
+                // hipStreamSynchronize(stream);
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X after U solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
             }
             else
             {
-                std::cout << "    >>>>> ROCSOLVER: Using TRSV, solving TRANSPOSE problem" << std::endl;
+                // std::cout << "    >>>>> ROCSOLVER: Using TRSV, solving TRANSPOSE problem" << std::endl;
                 
                 // Transpose solve: U^T*y = b, then L^T*x = y
                 rocblas_operation trans_op = opr;
                 
                 // Solve U^T*x = b (upper triangular transposed, non-unit diagonal)
-                std::cout << "    >>>>> Solve 1: UPPER triangular TRANSPOSED, NON-UNIT diagonal" << std::endl;
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X before U^T solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
+                // std::cout << "    >>>>> Solve 1: UPPER triangular TRANSPOSED, NON-UNIT diagonal" << std::endl;
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X before U^T solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
                 
                 rocblasCall_trsv<T>(handle, rocblas_fill_upper,
                            trans_op, rocblas_diagonal_non_unit,
@@ -1108,20 +1107,20 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                            x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1,
                            w_completed);
                 
-                hipStreamSynchronize(stream);
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X after U^T solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
+                // hipStreamSynchronize(stream);
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X after U^T solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
                 
                 // Solve L^T*x = y (lower triangular transposed, unit diagonal)
-                std::cout << "    >>>>> Solve 2: LOWER triangular TRANSPOSED, UNIT diagonal" << std::endl;
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X before L^T solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
+                // std::cout << "    >>>>> Solve 2: LOWER triangular TRANSPOSED, UNIT diagonal" << std::endl;
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X before L^T solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
                 
                 rocblasCall_trsv<T>(handle, rocblas_fill_lower,
                            trans_op, rocblas_diagonal_unit,
@@ -1129,12 +1128,12 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                            x, (rocblas_stride)0, (rocblas_int)1, (rocblas_stride)0, (rocblas_int)1,
                            w_completed);
                 
-                hipStreamSynchronize(stream);
-                hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
-                std::cout << "        X after L^T solve[0:" << print_n << "]: ";
-                for(int i = 0; i < print_n; i++)
-                    std::cout << h_x_temp[i] << " ";
-                std::cout << std::endl;
+                // hipStreamSynchronize(stream);
+                // hipMemcpy(h_x_temp.data(), x, sizeof(T) * n, hipMemcpyDeviceToHost);
+                // std::cout << "        X after L^T solve[0:" << print_n << "]: ";
+                // for(int i = 0; i < print_n; i++)
+                //     std::cout << h_x_temp[i] << " ";
+                // std::cout << std::endl;
             }
             
             hipFree(w_completed);
@@ -1143,13 +1142,13 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         // rcond is computed in jump5 and stored in d_est, which is already rcond[batch]
         // note: d_est and rcond[batch] point to the same location
         
-        S h_final_rcond;
-        hipMemcpy(&h_final_rcond, rcond + batch, sizeof(S), hipMemcpyDeviceToHost);
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "=== ROCSOLVER GECON END (batch=" << batch << ") ===" << std::endl;
-        std::cout << "Final RCOND=" << h_final_rcond << std::endl;
-        std::cout << "Total iterations: " << h_iters << std::endl;
-        std::cout << "========================================\n" << std::endl;
+        // S h_final_rcond;
+        // hipMemcpy(&h_final_rcond, rcond + batch, sizeof(S), hipMemcpyDeviceToHost);
+        // std::cout << "\n========================================" << std::endl;
+        // std::cout << "=== ROCSOLVER GECON END (batch=" << batch << ") ===" << std::endl;
+        // std::cout << "Final RCOND=" << h_final_rcond << std::endl;
+        // std::cout << "Total iterations: " << h_iters << std::endl;
+        // std::cout << "========================================\n" << std::endl;
     }
 
     return rocblas_status_success;
