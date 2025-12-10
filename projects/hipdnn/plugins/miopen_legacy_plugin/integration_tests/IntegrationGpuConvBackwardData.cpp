@@ -16,6 +16,7 @@
 using namespace hipdnn_frontend;
 using namespace hipdnn_sdk::utilities;
 using namespace hipdnn_sdk::test_utilities;
+using namespace miopen_legacy_plugin::test_utilities;
 using namespace test_conv_common;
 
 namespace
@@ -27,6 +28,9 @@ class ConvBackwardData : public IntegrationGraphVerificationHarness<DataType, Co
 protected:
     void runGraphTest(DataType tolerance, const TensorLayout& layout = TensorLayout::NCHW) override
     {
+        // Skipping until CK is working on Windows
+        SKIP_IF_WINDOWS();
+
         const ConvTestCase& testCase = this->GetParam();
 
         hipdnn_frontend::graph::Graph graphObj;
@@ -34,18 +38,14 @@ protected:
         graphObj.set_name("ConvolutionBackwardDataTest");
         graphObj.set_compute_data_type(hipdnn_frontend::DataType::FLOAT);
 
-        int64_t uid = 1;
-
         auto dataType = getDataTypeEnumFromType<DataType>();
 
         auto dyAttr = graph::makeTensorAttributes(
             "dy", dataType, testCase.yDims, generateStrides(testCase.yDims, layout.strideOrder));
-        dyAttr.set_uid(uid++);
         auto dyTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(dyAttr));
 
         auto wAttr = graph::makeTensorAttributes(
             "w", dataType, testCase.wDims, generateStrides(testCase.wDims, layout.strideOrder));
-        wAttr.set_uid(uid++);
         auto wTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(wAttr));
 
         graph::ConvDgradAttributes convAttrs;
@@ -57,10 +57,6 @@ protected:
 
         auto dxTensorAttr = graphObj.conv_dgrad(dyTensorAttr, wTensorAttr, convAttrs);
 
-        if(!dxTensorAttr->has_uid())
-        {
-            dxTensorAttr->set_uid(uid++);
-        }
         dxTensorAttr->set_dim(testCase.xDims);
         dxTensorAttr->set_stride(generateStrides(testCase.xDims, layout.strideOrder));
         dxTensorAttr->set_output(true);
