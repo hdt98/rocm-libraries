@@ -170,7 +170,7 @@ namespace Tensilelite
     }
 
     Formocast::HardwareConstants
-    Formocast::getHardwareConstants(std::shared_ptr<origami::hardware_t> hardware) const
+    Formocast::getHardwareConstants() const
     {
         HardwareConstants hw;
         if(hardware->arch == origami::hardware_t::architecture_t::gfx950)
@@ -183,11 +183,6 @@ namespace Tensilelite
             unsigned char magic[184] = {0, 0, 0, 0, 0, 0, 224, 64, 0, 0, 0, 0, 0, 0, 80, 65, 0, 0, 0, 0, 0, 0, 176, 65, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 80, 148, 64, 118, 98, 39, 118, 98, 7, 162, 64, 118, 98, 39, 118, 98, 7, 178, 64, 0, 0, 0, 0, 0, 48, 145, 64, 1, 96, 132, 2, 0, 0, 0, 0, 154, 153, 153, 153, 153, 153, 5, 64, 64, 96, 132, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 160, 64, 0, 0, 0, 0, 0, 0, 115, 64, 0, 0, 0, 0, 0, 0, 80, 64, 205, 204, 204, 204, 204, 204, 236, 63, 143, 194, 245, 40, 92, 143, 226, 63, 8, 0, 0, 0, 0, 0, 0, 0};
             hw = archConstantMap(magic, 184);
         }
-        else if(hardware->arch == origami::hardware_t::architecture_t::gfx1201)
-        {
-            unsigned char magic[184] = {0, 0, 0, 0, 0, 0, 224, 64, 0, 0, 0, 0, 0, 0, 96, 65, 0, 0, 0, 0, 0, 0, 144, 65, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 228, 63, 0, 0, 0, 0, 0, 168, 147, 64, 20, 174, 71, 225, 122, 132, 78, 64, 104, 145, 237, 124, 63, 119, 123, 64, 0, 0, 0, 0, 0, 92, 162, 64, 0, 0, 0, 0, 0, 136, 163, 64, 51, 51, 51, 51, 51, 51, 45, 64, 205, 204, 204, 204, 204, 204, 44, 64, 0, 0, 0, 0, 0, 0, 160, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 64, 64, 205, 204, 204, 204, 204, 204, 236, 63, 0, 0, 0, 0, 0, 0, 232, 63, 1, 0, 0, 0, 0, 0, 0, 0};
-            hw = archConstantMap(magic, 184);
-        }
         else
         {
             throw std::runtime_error(
@@ -197,7 +192,7 @@ namespace Tensilelite
         hw.NumCUs               = hardware->N_CU;
         hw.NumXCDs              = hardware->NUM_XCD;
         hw.L2CacheCapacity      = hardware->L2_capacity;
-        //hw.boost_frequency      = hardware->compute_clock_ghz * 11750 / 11;    //FIXME: Use Formocast default frequency.
+        hw.boost_frequency      = hardware->compute_clock_ghz * 1000;
         return hw;
     }
 
@@ -445,14 +440,42 @@ namespace Tensilelite
 
     bool Formocast::isBetter(ProblemInfo problem, TieBreakerInfo previousSolution) const
     {
-        auto currSol = getTieBreakerInfo();
-        
-        // Call standalone tie-breaker function
-        return compareConfigTieBreaker(
-            problem.M, problem.N, problem.K, problem.NumBatches,
-            currSol.mt0, currSol.mt1, currSol.du, currSol.svw,
-            previousSolution.mt0, previousSolution.mt1, previousSolution.du, previousSolution.svw
-        );
+        double M = problem.M;
+        double N = problem.N;
+        double NumBatches = problem.NumBatches;
+        double K = problem.K;
+
+        assert(M != 0);
+
+        if (N <= 32 && M >= 1024 && K >= 1024)
+        {
+            auto currSol = getTieBreakerInfo();
+            auto currSkinny = currSol.mt0 * currSol.du / M;
+            auto prevSkinny = previousSolution.mt0 * previousSolution.du / M;
+            if (currSol.mt1 == N && currSkinny > prevSkinny)
+            {
+                return true;
+            }
+        }
+        if (M <= 32 && N >= 1024 && K >= 1024)
+        {
+            auto currSol = getTieBreakerInfo();
+            auto currSkinny = currSol.mt1 * currSol.du / M;
+            auto prevSkinny = previousSolution.mt1 * previousSolution.du / M;
+            if (currSol.mt0 == M && currSkinny > prevSkinny)
+            {
+                return true;
+            }
+        }
+        if (NumBatches == 1 && K <= 512 && M >= 1024 && N >= 1024)
+        {
+            auto currSol = getTieBreakerInfo();
+            if (currSol.svw > previousSolution.svw)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // NB:
@@ -461,12 +484,39 @@ namespace Tensilelite
     //   False doesn't means worse, means tie (equal) --> IMPORTANT note since this would be used in std::sort
     bool Formocast::isBetter(TieBreakerInfo previousSolution, TieBreakerInfo currentSolution) const
     {
-        // Call standalone tie-breaker function
-        return compareConfigTieBreaker(
-            problem.M, problem.N, problem.K, problem.NumBatches,
-            currentSolution.mt0, currentSolution.mt1, currentSolution.du, currentSolution.svw,
-            previousSolution.mt0, previousSolution.mt1, previousSolution.du, previousSolution.svw
-        );
+        double M = problem.M;
+        double N = problem.N;
+        double NumBatches = problem.NumBatches;
+        double K = problem.K;
+
+        assert(M != 0);
+
+        if (N <= 32 && M >= 1024 && K >= 1024)
+        {
+            auto currSkinny = currentSolution.mt0 * currentSolution.du / M;
+            auto prevSkinny = previousSolution.mt0 * previousSolution.du / M;
+            if (currentSolution.mt1 == N && currSkinny > prevSkinny)
+            {
+                return true;
+            }
+        }
+        if (M <= 32 && N >= 1024 && K >= 1024)
+        {
+            auto currSkinny = currentSolution.mt1 * currentSolution.du / M;
+            auto prevSkinny = previousSolution.mt1 * previousSolution.du / M;
+            if (currentSolution.mt0 == M && currSkinny > prevSkinny)
+            {
+                return true;
+            }
+        }
+        if (NumBatches == 1 && K <= 512 && M >= 1024 && N >= 1024)
+        {
+            if (currentSolution.svw > previousSolution.svw)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     Formocast::TieBreakerInfo Formocast::getTieBreakerInfo() const
@@ -484,12 +534,39 @@ namespace Tensilelite
         if(previousSolution == currentSolution)
             return false;
 
-        // Call standalone tie-breaker function
-        return compareConfigTieBreaker(
-            problem.M, problem.N, problem.K, problem.NumBatches,
-            currentSolution.mt0, currentSolution.mt1, currentSolution.du, currentSolution.svw,
-            previousSolution.mt0, previousSolution.mt1, previousSolution.du, previousSolution.svw
-        );
+        double M = problem.M;
+        double N = problem.N;
+        double NumBatches = problem.NumBatches;
+        double K = problem.K;
+
+        assert(M != 0);
+
+        if (N <= 32 && M >= 1024 && K >= 1024)
+        {
+            auto currSkinny = currentSolution.mt0 * currentSolution.du / M;
+            auto prevSkinny = previousSolution.mt0 * previousSolution.du / M;
+            if (currentSolution.mt1 == N && currSkinny > prevSkinny)
+            {
+                return true;
+            }
+        }
+        if (M <= 32 && N >= 1024 && K >= 1024)
+        {
+            auto currSkinny = currentSolution.mt1 * currentSolution.du / M;
+            auto prevSkinny = previousSolution.mt1 * previousSolution.du / M;
+            if (currentSolution.mt0 == M && currSkinny > prevSkinny)
+            {
+                return true;
+            }
+        }
+        if (NumBatches == 1 && K <= 512 && M >= 1024 && N >= 1024)
+        {
+            if (currentSolution.svw > previousSolution.svw)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     Formocast::MinTieBreakerInfo Formocast::getMinTieBreakerInfo() const
@@ -526,7 +603,7 @@ namespace Tensilelite
         bool     isSwizzleB = problem.swizzleTensorB;
 
         // 2. Hardware Parameter Extraction
-        //HardwareConstants hw_consts = getHardwareConstants();
+        HardwareConstants hw_consts = getHardwareConstants();
         //hw_consts.print();
 
         // 3. Variables directly from sizeMapping
@@ -615,7 +692,7 @@ namespace Tensilelite
             if(problem.bpeA == 2 && problem.bpeB == 2)
                 if (((K >= 64 && depthU <=32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) && NumBatches < hw_consts.NumCUs && sizeMapping.matrixInstruction[2] >= 32)
                 {
-                    //std::cout<<"K:"<<K<<",depthU:"<<depthU<<",NumBatches:"<<NumBatches<<",sizeMapping.matrixInstruction[2]:"<<sizeMapping.matrixInstruction[2]<<std::endl;
+                    std::cout<<"K:"<<K<<",depthU:"<<depthU<<",NumBatches:"<<NumBatches<<",sizeMapping.matrixInstruction[2]:"<<sizeMapping.matrixInstruction[2]<<std::endl;
                     pp.microSeconds = 9999999.9;
                     pp.hitRate = 0;
                     return pp;
@@ -852,9 +929,6 @@ namespace Tensilelite
     void Formocast::setProblem(ProblemInfo p)
     {
         problem = p;
-        if (problem.M == 0 || problem.N == 0 || problem.K == 0)
-            throw std::runtime_error(
-                "Problem size is invalid");
     }
 
     void Formocast::setSolution(SizeMapping sm)
@@ -864,7 +938,7 @@ namespace Tensilelite
 
     void Formocast::setHardware(std::shared_ptr<origami::hardware_t> hw)
     {
-        hw_consts = getHardwareConstants(hw);
+        hardware = hw;
     }
 
     int Formocast::checkGlobalReadFIFOFull(int currentCycle, std::queue<int>& fifo, int bpRead, int numWaves, bool isStall) const
@@ -885,44 +959,5 @@ namespace Tensilelite
     void Formocast::pushLocalRead(int currentCycle, std::queue<int>& fifo, int bpr, bool isGfx950)
     {
         Simulator::pushLocalRead(currentCycle, fifo, bpr, isGfx950);
-    }
-
-    // Standalone tie-breaker function implementation
-    bool compareConfigTieBreaker(
-        double M, double N, double K, size_t batch,
-        double mt0_a, double mt1_a, double du_a, int svw_a,
-        double mt0_b, double mt1_b, double du_b, int svw_b
-    )
-    {
-        // Skinny N case: N <= 32 && M >= 1024 && K >= 1024
-        // Prefer configurations with larger "skinny ratio" when mt1 matches N
-        if (N <= 32 && M >= 1024 && K >= 1024) {
-            auto skinny_a = mt0_a * du_a / M;
-            auto skinny_b = mt0_b * du_b / M;
-            if (mt1_a == N && mt1_b == N && skinny_a != skinny_b) {
-                return skinny_a > skinny_b;
-            }
-        }
-
-        // Skinny M case: M <= 32 && N >= 1024 && K >= 1024
-        // Prefer configurations with larger "skinny ratio" when mt0 matches M
-        if (M <= 32 && N >= 1024 && K >= 1024) {
-            auto skinny_a = mt1_a * du_a / N;
-            auto skinny_b = mt1_b * du_b / N;
-            if (mt0_a == M && mt0_b == M && skinny_a != skinny_b) {
-                return skinny_a > skinny_b;
-            }
-        }
-
-        // Wide & short K case: batch == 1 && K <= 512 && M >= 1024 && N >= 1024
-        // Prefer larger store vector width for better memory efficiency
-        if (batch == 1 && K <= 512 && M >= 1024 && N >= 1024) {
-            if (svw_a != svw_b) {
-                return svw_a > svw_b;
-            }
-        }
-
-        // No preference - configurations are considered equal
-        return false;
     }
 } // namespace Tensilelite

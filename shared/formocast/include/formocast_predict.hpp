@@ -220,7 +220,7 @@ namespace Tensilelite
         void setProblem(ProblemInfo p);
         void setSolution(SizeMapping sm);
         void setHardware(std::shared_ptr<origami::hardware_t> hw);
-        HardwareConstants getHardwareConstants(std::shared_ptr<origami::hardware_t> hardware) const;
+        HardwareConstants getHardwareConstants(void) const;
         void calculateStorePerformance(double M,
                                        double N,
                                        double NumBatches,
@@ -298,35 +298,9 @@ namespace Tensilelite
     public:
         SizeMapping sizeMapping;
         ProblemInfo problem;
-        HardwareConstants hw_consts;
+        std::shared_ptr<origami::hardware_t> hardware;
         // TODO- need this mutable member data? or we can just create a new one to return (i.e. MinTieBreakerInfo)
         //  (std::sort with this data casues seg.fault. Using the un-mutable version "MinTieBreakerInfo" works fine)
         mutable TieBreakerInfo perfInfo;
     };
-
-    // Standalone tie-breaker comparison function for configuration selection
-    // Returns true if config_a is better than config_b based on problem-specific heuristics
-    // This function is used when prediction_mode is set to "accurate"
-    /**
-     * @brief Compare two configurations using Formocast tie-breaking heuristics
-     * @param M Problem dimension M
-     * @param N Problem dimension N
-     * @param K Problem dimension K
-     * @param batch Number of batches
-     * @param mt0_a Config A's macro tile M dimension
-     * @param mt1_a Config A's macro tile N dimension
-     * @param du_a Config A's depth U (K dimension)
-     * @param svw_a Config A's store vector width
-     * @param mt0_b Config B's macro tile M dimension
-     * @param mt1_b Config B's macro tile N dimension
-     * @param du_b Config B's depth U (K dimension)
-     * @param svw_b Config B's store vector width
-     * @return true if config A is better than config B, false otherwise
-     */
-    bool compareConfigTieBreaker(
-        double M, double N, double K, size_t batch,
-        double mt0_a, double mt1_a, double du_a, int svw_a,
-        double mt0_b, double mt1_b, double du_b, int svw_b
-    );
-
 } // namespace Tensilelite
