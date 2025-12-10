@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "common.hpp"
 
@@ -21,32 +21,38 @@ using CElementOp = PassThrough;
 
 static constexpr auto GemmDefault = ck::tensor_operation::device::GemmSpecialization::Default;
 
-// clang-format off
-using DeviceGemmV3InstanceWithDataCachePrefetch = 
-    ck::tensor_operation::device::DeviceGemm_Xdl_CShuffleV3<
-        ALayout,   BLayout,  CLayout,   
-        ADataType,   BDataType,  CDataType,  AccDataType,  CShuffleDataType, 
-        PassThrough, PassThrough, PassThrough, GemmDefault, 
-        256,
-        128, 128, 
-        64, 8, 8,
-        16,   16,
-        4,    4,
-        S<8, 32, 1>,  S<1, 0, 2>,  S<1, 0, 2>, 
-        2, 8, 8, 0,
-        S<8, 32, 1>,  S<1, 0, 2>,  S<1, 0, 2>, 
-        2, 8, 8, 0,
-        1, 2, S<1, 32, 1, 8>, 8,
-        ck::BlockGemmPipelineScheduler::Intrawave,ck::BlockGemmPipelineVersion::v3,
-        CDataType,
-        CDataType,
-        false,
-        false,
-        true>; // enable data cache prefetching
-// clang-format on
+#if 1
+static const uint32_t AB_K1 = 8;
 
 // clang-format off
-using DeviceGemmV3InstanceWithoutDataCachePrefetch = 
+template <bool UseDataCachePrefetch>
+using DeviceGemmV3Instance = 
+    ck::tensor_operation::device::DeviceGemm_Xdl_CShuffleV3<
+        ALayout,   BLayout,  CLayout,   
+        ADataType,   BDataType,  CDataType,  AccDataType,  CShuffleDataType, 
+        PassThrough, PassThrough, PassThrough, GemmDefault, 
+        128,
+        256, 256,
+        64, AB_K1, AB_K1,
+        16,   16,
+        8,    16,
+        S<8, 16, 1>,  S<1, 0, 2>,  S<1, 0, 2>, 
+        2, AB_K1, AB_K1, 0,
+        S<8, 16, 1>,  S<1, 0, 2>,  S<1, 0, 2>, 
+        2, AB_K1, AB_K1, 0,
+        2, 4, S<1, 8, 1, 16>, 8,
+        ck::BlockGemmPipelineScheduler::Intrawave,ck::BlockGemmPipelineVersion::v3,
+        CDataType,
+        CDataType,
+        false,
+        false,
+        UseDataCachePrefetch>;
+// clang-format on
+#else
+// prefetch is faster on these params
+// clang-format off
+template <bool UseDataCachePrefetch>
+using DeviceGemmV3Instance = 
     ck::tensor_operation::device::DeviceGemm_Xdl_CShuffleV3<
         ALayout,   BLayout,  CLayout,   
         ADataType,   BDataType,  CDataType,  AccDataType,  CShuffleDataType, 
@@ -66,8 +72,9 @@ using DeviceGemmV3InstanceWithoutDataCachePrefetch =
         CDataType,
         false,
         false,
-        false>; // disable data cache prefetching
+        UseDataCachePrefetch>;
 // clang-format on
+#endif
 
 using ReferenceGemmInstance = ck::tensor_operation::host::
     ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
@@ -75,10 +82,6 @@ using ReferenceGemmInstance = ck::tensor_operation::host::
 template <typename GemmInstanceType, typename ProblemType>
 std::pair<bool, float> run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 {
-#if defined(BUILD_INT4_EXAMPLE) && defined(CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4)
-    static_assert(sizeof(ck::int4_t) == sizeof(int8_t));
-#endif
-
     using namespace ck::literals;
 
     auto M       = problem_size.M;
@@ -156,25 +159,13 @@ std::pair<bool, float> run_gemm(const ProblemType& problem_size, const Execution
     std::cout << "b_k_n: " << b_k_n.mDesc << std::endl;
     std::cout << "c_m_n: " << c_m_n_host_result.mDesc << std::endl;
 
-#ifdef BUILD_INT4_EXAMPLE
-    DeviceMem a_m_k_device_buf(sizeof(KernelADataType) * a_m_k.mDesc.GetElementSpaceSize());
-    DeviceMem b_k_n_device_buf(sizeof(KernelBDataType) * b_k_n.mDesc.GetElementSpaceSize());
-    DeviceMem c_m_n_device_buf(sizeof(KernelCDataType) *
-                               c_m_n_device_result.mDesc.GetElementSpaceSize());
-
-    const Tensor<KernelADataType> a_m_k_converted(a_m_k);
-    const Tensor<KernelBDataType> b_k_n_converted(b_k_n);
-
-    a_m_k_device_buf.ToDevice(a_m_k_converted.mData.data());
-    b_k_n_device_buf.ToDevice(b_k_n_converted.mData.data());
-#else
     DeviceMem a_m_k_device_buf(sizeof(ADataType) * a_m_k.mDesc.GetElementSpaceSize());
     DeviceMem b_k_n_device_buf(sizeof(BDataType) * b_k_n.mDesc.GetElementSpaceSize());
     DeviceMem c_m_n_device_buf(sizeof(CDataType) * c_m_n_device_result.mDesc.GetElementSpaceSize());
 
     a_m_k_device_buf.ToDevice(a_m_k.mData.data());
     b_k_n_device_buf.ToDevice(b_k_n.mData.data());
-#endif
+
     DeviceMem workspace;
 
     auto a_element_op = AElementOp{};
@@ -186,26 +177,19 @@ std::pair<bool, float> run_gemm(const ProblemType& problem_size, const Execution
     auto invoker   = gemm.MakeInvoker();
     float ave_time = 0;
 
-    auto argument = gemm.MakeArgument(
-#ifdef BUILD_INT4_EXAMPLE
-        static_cast<KernelADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-        static_cast<KernelBDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
-        static_cast<KernelCDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
-#else
-        static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-        static_cast<BDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
-        static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
-#endif
-        M,
-        N,
-        K,
-        StrideA,
-        StrideB,
-        StrideC,
-        KBatch,
-        a_element_op,
-        b_element_op,
-        c_element_op);
+    auto argument = gemm.MakeArgument(static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
+                                      static_cast<BDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
+                                      static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
+                                      M,
+                                      N,
+                                      K,
+                                      StrideA,
+                                      StrideB,
+                                      StrideC,
+                                      KBatch,
+                                      a_element_op,
+                                      b_element_op,
+                                      c_element_op);
 
     if(!gemm.IsSupportedArgument(argument))
     {
@@ -226,16 +210,6 @@ std::pair<bool, float> run_gemm(const ProblemType& problem_size, const Execution
         ref_invoker.Run(ref_argument);
 
         ave_time = invoker.Run(argument, StreamConfig{nullptr, false, 1});
-#ifdef BUILD_INT4_EXAMPLE
-        Tensor<CDataType> c_m_n_device_result_converted(c_m_n_host_result.mDesc);
-
-        c_m_n_device_buf.FromDevice(c_m_n_device_result_converted.mData.data());
-
-        c_m_n_device_result = c_m_n_device_result_converted.CopyAsType<CDataType>();
-
-        return std::make_pair(
-            ck::utils::check_err(c_m_n_device_result_converted, c_m_n_host_result), ave_time);
-#else
         c_m_n_device_buf.FromDevice(c_m_n_device_result.mData.data());
 
         pass &= ck::utils::check_err(c_m_n_device_result,
@@ -243,7 +217,6 @@ std::pair<bool, float> run_gemm(const ProblemType& problem_size, const Execution
                                      "Error: Incorrect results!",
                                      get_rtol<CDataType>(),
                                      get_atol<CDataType>());
-#endif
     }
 
     if(config.time_kernel)
@@ -331,13 +304,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto [pass, ave_time] =
-        run_gemm<DeviceGemmV3InstanceWithDataCachePrefetch>(problem_size, config);
+    auto [pass, ave_time] = run_gemm<DeviceGemmV3Instance<true>>(problem_size, config);
 
     if(compareWithNonDataCachePrefetchImpl)
     {
-        auto [pass2, ave_time2] =
-            run_gemm<DeviceGemmV3InstanceWithoutDataCachePrefetch>(problem_size, config);
+        auto [pass2, ave_time2] = run_gemm<DeviceGemmV3Instance<false>>(problem_size, config);
         std::cout << "DataCache Prefetching enabled ave_time: " << ave_time << " ms" << std::endl;
         std::cout << "DataCache Prefetching disabled ave_time: " << ave_time2 << " ms" << std::endl;
         float speedup = ave_time2 / ave_time;

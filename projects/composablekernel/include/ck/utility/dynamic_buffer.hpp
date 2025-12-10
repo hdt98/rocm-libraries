@@ -154,7 +154,7 @@ struct DynamicBuffer
     struct GlobalPrefetchDataOp
     {
         // addr needs to point to global memory!
-        __device__ __forceinline__ void operator()(const void* addr) const
+        __device__ __forceinline__ void operator()([[maybe_unused]] const void* addr) const
         {
 #if defined(__gfx1250__)
             // NOTE: There's a bug in AM/GOPHER for gfx1250 when prefetching into L1, so we disable
@@ -164,9 +164,6 @@ struct DynamicBuffer
                 static_cast<index_t>(AmdBufferCoherenceEnum::GLC)
                     << 3); // static_cast<index_t>(coherence) << 3); // bits 0..2 are for Temporal
                            // Hints, bits 3..4 are for scope
-#else
-            // ignore - not supported
-            (void)addr;
 #endif
         }
     };
