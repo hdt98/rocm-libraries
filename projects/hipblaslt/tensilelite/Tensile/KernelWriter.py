@@ -2097,7 +2097,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # No Load Loop Body
   ##############################################################################
   def noLoadLoopBody( self, kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=0, NLLnum=1):
-    if kernel["UseCustomMainLoopSchedule"]:
+    if kernel["_UseCustomMainLoopSchedule"]:
       module = Module()
       if isNGLL:
         module.addComment0("Code-path 0, useGR=0, usePLR=1, useGRInc=1, useLoop = 0")
@@ -2415,7 +2415,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     openSum = self.openSumAtLeastUnroll(kernel, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL, NLLindex=NLLindex, NLLnum=NLLnum)
     module.add(openSum)
 
-    if not self.states.numItersPLR and not kernel["UseCustomMainLoopSchedule"]:
+    if not self.states.numItersPLR and not kernel["_UseCustomMainLoopSchedule"]:
       if kernel["DirectToLdsA"] or kernel["DirectToLdsB"]:
         vlcntVal = 1 if kernel["PrefetchGlobalRead"] == 2 and isNGLL else 0
         module.add(self._wait(kernel, tensorParametersA, tensorParametersB, vlcntVal, -1, -1, "10wait for global read"))
@@ -2449,7 +2449,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # not generate openLoop for firstIter
     if not firstIter:
       module.addComment2("Unrolled Loop %u/%u - Begin" % (lc+1, loopCopies))
-    if kernel["PrefetchGlobalRead"] and not self.states.numItersPLR and not kernel["ScheduleIterAlg"] == 2 and not kernel["UseCustomMainLoopSchedule"]:
+    if kernel["PrefetchGlobalRead"] and not self.states.numItersPLR and not kernel["ScheduleIterAlg"] == 2 and not kernel["_UseCustomMainLoopSchedule"]:
       if kernel["DirectToLdsA"] or kernel["DirectToLdsB"]:
         vlcntVal = 1 if kernel["PrefetchGlobalRead"] == 2 else 0
         module.add(self._wait(kernel, tensorParametersA, tensorParametersB, vlcntVal, -1, -1, "11wait for global read"))
@@ -2472,7 +2472,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # unrolled loop: global read A, B
     # M0 update for directToLds, skip if using custom main loop schedule
-    self.codes.dtlsM0UpdateA = self.directToLdsM0Update(kernel, 1, tensorParameters1st, kernel["UseCustomMainLoopSchedule"])
+    self.codes.dtlsM0UpdateA = self.directToLdsM0Update(kernel, 1, tensorParameters1st, kernel["_UseCustomMainLoopSchedule"])
     self.codes.dtlsM0UpdateB = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, True)
 
     g2lBufIdx1st = 0
@@ -2588,7 +2588,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # double/quadruple the number of compute loop for each DepthU's worth of data read
     for uIdx in range(0, kernel["LoopIters"]):
       u = uIdx % kernel["LoopIters"]    #   u: index in compute loop (in contrast to the notion of global read loop)
-      if kernel["UseCustomMainLoopSchedule"]:
+      if kernel["_UseCustomMainLoopSchedule"]:
         LRCodeAAllIters.append(Module())
         LRCodeBAllIters.append(Module())
         PackCodeAAllIters.append(Module())
@@ -2695,7 +2695,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReads.add(localReadCodeA)
           localReadsA.add(localReadCodeA)
           pack[plrIdx*self.states.numIterPerCoalescedReadA].add(packCodeA)
-          if kernel["UseCustomMainLoopSchedule"]:
+          if kernel["_UseCustomMainLoopSchedule"]:
             LRCodeAAllIters[uIdx].add(localReadCodeA)
             PackCodeAAllIters[uIdx].add(packCodeA)
           if kernel["ForceUnrollSubIter"]:
@@ -2719,7 +2719,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReadsB.add(localReadCodeB)
 
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
-          if kernel["UseCustomMainLoopSchedule"]:
+          if kernel["_UseCustomMainLoopSchedule"]:
             LRCodeBAllIters[uIdx].add(localReadCodeB)
             PackCodeBAllIters[uIdx].add(packCodeB)
           if kernel["ForceUnrollSubIter"]:
@@ -2765,7 +2765,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           pointerLWCode.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersA))
           pointerLWCode.addComment1("local write swap offsets b")
           pointerLWCode.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
-          if kernel["UseCustomMainLoopSchedule"]:
+          if kernel["_UseCustomMainLoopSchedule"]:
             LWSwapAAllIters.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersA))
             LWSwapBAllIters.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
 
@@ -2776,7 +2776,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if not kernel["ForceUnrollSubIter"] or (doReadA and (u<localWriteEndIter)):
             pointerLRCode.addComment1("local read swap offsets a")
             pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tensorParametersA))
-            if kernel["UseCustomMainLoopSchedule"]:
+            if kernel["_UseCustomMainLoopSchedule"]:
               LRSwapAAllIters.add(self.localReadSwapOffsets(kernel, expand, tensorParametersA))
           if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"] and\
              (not kernel["ForceUnrollSubIter"] or (doReadM and (u<localWriteEndIter))):
@@ -2785,7 +2785,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if not kernel["ForceUnrollSubIter"] or (doReadB and (u<localWriteEndIter)):
             pointerLRCode.addComment1("local read swap offsets b")
             pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tensorParametersB))
-            if kernel["UseCustomMainLoopSchedule"]:
+            if kernel["_UseCustomMainLoopSchedule"]:
               LRSwapBAllIters.add(self.localReadSwapOffsets(kernel, expand, tensorParametersB))
 
 
@@ -2805,7 +2805,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       luIdx = u % self.states.numVgprBuffer # local to use for MACs
       if kernel["EnableMatrixInstruction"]:
         mfmaIter = self.mfmaIter(kernel, tensorParametersA, tensorParametersB, u, kernel["InnerUnroll"], vregSetIdxMFMA, unrollLoopIdx=lc, unrollIdx = u)
-        if kernel["UseCustomMainLoopSchedule"]:
+        if kernel["_UseCustomMainLoopSchedule"]:
           MfmaCodeAllIters.add(mfmaIter)
         else:
           macIterCode.add(mfmaIter)
@@ -2833,7 +2833,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Is this test necessary because of the global variable this if was previously always true
       # after removing the global variable it is always false...
       # if self.states.numItersPLR:
-      if not kernel["UseCustomMainLoopSchedule"]:
+      if not kernel["_UseCustomMainLoopSchedule"]:
         if kernel["ForceUnrollSubIter"]:
           luIdx = u
         subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
@@ -2844,7 +2844,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       pack[luIdx] = Module()
 
 
-    if kernel["UseCustomMainLoopSchedule"]:
+    if kernel["_UseCustomMainLoopSchedule"]:
       optSchedule, numCodePath = customMainLoopSchedule(self, kernel, tensorParametersA, tensorParametersB, globalReadIncACode, globalReadIncBCode, \
                                                    LRCodeAAllIters, PackCodeAAllIters, LRCodeBAllIters, PackCodeBAllIters, \
                                                    LRSwapAAllIters, LRSwapBAllIters, self.codes.globalReadA, self.codes.globalReadB, \
@@ -2861,7 +2861,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.addComment2("Unrolled Loop - End%s"%(endStr))
 
     oddLabel = (lc == 0 and loopCopies == 2)
-    if not skipClose and not kernel["UseCustomMainLoopSchedule"]:
+    if not skipClose and not kernel["_UseCustomMainLoopSchedule"]:
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, finalLoop, oddLabel=oddLabel))
     return module
 
@@ -3029,7 +3029,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 module.add(SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA and LRB to complete"))
                 module.add(pack[plrIdx])
         self.states.SubTileIdx = (self.states.SubTileIdx + 1) % kernel["numSubTiles"]
-      elif self.states.numItersPLR == 0 and kernel["UseCustomMainLoopSchedule"]:
+      elif self.states.numItersPLR == 0 and kernel["_UseCustomMainLoopSchedule"]:
         # For numItersPLR=0 and CMS we prefetch only half the local reads
         localReadCodeA = Module()
         localReadCodeB = Module()

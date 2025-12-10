@@ -133,7 +133,7 @@ def _getName(state, requiredParameters: frozenset, splitGSU: bool, ignoreInterna
   else:
     requiredParametersTemp.add("ThreadTile")
 
-  if state["UseCustomMainLoopSchedule"]:
+  if state["_UseCustomMainLoopSchedule"]:
     components.append('CMS')
 
   components.append('SN')

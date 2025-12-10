@@ -91,6 +91,7 @@ def getRequiredParametersMin() -> set:
         'TransposeLDS',
         'UnrollLoopSwapGlobalReadOrder',
         'Use64bShadowLimit',
+        'UseCustomMainLoopSchedule',
         'UseInstOffsetForGRO',
         'UseSgprForGRO',
         'VectorStore',
