@@ -85,11 +85,7 @@ namespace rocRoller
     protected:
         virtual void generate() override;
 
-        virtual Generator<Instruction>
-            generateKernelBody(std::shared_ptr<Register::Value> ldsData,
-                               std::shared_ptr<Register::Value> ldsWithOffset,
-                               std::shared_ptr<Register::Value> workitemIndex)
-            = 0;
+        virtual Generator<Instruction> generateKernelBody() = 0;
 
     protected:
         uint32_t                 m_workgroupSize;
@@ -98,6 +94,10 @@ namespace rocRoller
         std::vector<size_t>      m_baseAddresses;
         bool                     m_write;
         std::vector<Instruction> m_instructions;
+
+        std::shared_ptr<Register::Value> m_ldsDst;
+        std::shared_ptr<Register::Value> m_ldsWithOffset;
+        std::shared_ptr<Register::Value> m_workitemIndex;
     };
 
     /**

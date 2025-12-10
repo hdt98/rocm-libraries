@@ -135,14 +135,36 @@ namespace rocRoller
             DataType::Raw32,
             m_context->targetArchitecture().GetCapability(GPUCapability::MaxLdsSize) / 4);
 
-        auto ldsWithOffset
+        m_ldsWithOffset
             = Register::Value::Placeholder(m_context, Register::Type::Vector, DataType::UInt32, 1);
-        auto workitemIndex = m_context->kernel()->workitemIndex()[0];
+        m_workitemIndex = m_context->kernel()->workitemIndex()[0];
 
-        auto kernelBody = generateKernelBody(ldsData, ldsWithOffset, workitemIndex);
+        auto kb = [&]() -> Generator<Instruction> {
+            co_yield Expression::generate(
+                m_ldsWithOffset,
+                Expression::literal(ldsData->getLDSAllocation()->offset())
+                    + m_workitemIndex->expression()
+                          * Expression::literal((4 * m_strideMultiplier * m_instrDwords)
+                                                    % ldsData->getLDSAllocation()->size(),
+                                                resultType(m_workitemIndex->expression()).varType),
+                m_context);
+
+            m_ldsDst = Register::Value::Placeholder(
+                m_context,
+                Register::Type::Vector,
+                DataType::Raw32,
+                248,
+                Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                                            .alignment = static_cast<int>(m_instrDwords)});
+            co_yield m_ldsDst->allocate();
+
+            co_yield m_context->mem()->barrier({});
+
+            co_yield generateKernelBody();
+        };
 
         m_instructions.clear();
-        for(auto inst : kernelBody)
+        for(auto inst : kb())
         {
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
                 inst.setAddresses(m_baseAddresses);

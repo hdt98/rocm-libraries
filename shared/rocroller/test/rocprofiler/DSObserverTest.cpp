@@ -80,42 +80,21 @@ public:
     }
 
 protected:
-    Generator<Instruction>
-        generateKernelBody(std::shared_ptr<Register::Value> ldsData,
-                           std::shared_ptr<Register::Value> ldsWithOffset,
-                           std::shared_ptr<Register::Value> workitemIndex) override
+    Generator<Instruction> generateKernelBody() override
     {
-        co_yield Expression::generate(
-            ldsWithOffset,
-            Expression::literal(ldsData->getLDSAllocation()->offset())
-                + workitemIndex->expression()
-                      * Expression::literal((4 * m_strideMultiplier * m_instrDwords)
-                                                % ldsData->getLDSAllocation()->size(),
-                                            resultType(workitemIndex->expression()).varType),
-            m_context);
-
-        auto ldsDst = Register::Value::Placeholder(
-            m_context,
-            Register::Type::Vector,
-            DataType::Raw32,
-            248,
-            Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
-                                        .alignment            = static_cast<int>(m_instrDwords)});
-        co_yield ldsDst->allocate();
-
-        co_yield m_context->mem()->barrier({});
-
         int counter = 0;
         for(int i = 0; i < m_iterations; ++i)
         {
             const auto [start, end]
-                = getAlignedSubset(ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
+                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
 
             if(m_write)
-                co_yield m_context->mem()->storeLocal(ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+                co_yield m_context->mem()->storeLocal(
+                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
             else
-                co_yield m_context->mem()->loadLocal(dstRegs, ldsWithOffset, 0, 4 * m_instrDwords);
+                co_yield m_context->mem()->loadLocal(
+                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
 
             co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
         }
@@ -140,29 +119,8 @@ public:
     }
 
 protected:
-    Generator<Instruction>
-        generateKernelBody(std::shared_ptr<Register::Value> ldsData,
-                           std::shared_ptr<Register::Value> ldsWithOffset,
-                           std::shared_ptr<Register::Value> workitemIndex) override
+    Generator<Instruction> generateKernelBody() override
     {
-        co_yield Expression::generate(
-            ldsWithOffset,
-            Expression::literal(ldsData->getLDSAllocation()->offset())
-                + workitemIndex->expression()
-                      * Expression::literal((4 * m_strideMultiplier * m_instrDwords)
-                                                % ldsData->getLDSAllocation()->size(),
-                                            resultType(workitemIndex->expression()).varType),
-            m_context);
-
-        auto ldsDst = Register::Value::Placeholder(
-            m_context,
-            Register::Type::Vector,
-            DataType::Raw32,
-            248,
-            Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
-                                        .alignment            = static_cast<int>(m_instrDwords)});
-        co_yield ldsDst->allocate();
-
         auto s0
             = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
         auto s1
@@ -170,18 +128,18 @@ protected:
         co_yield s0->allocate();
         co_yield s1->allocate();
 
-        co_yield m_context->mem()->barrier({});
-
         int counter = 0;
         for(int i = 0; i < 14; ++i)
         {
             const auto [start, end]
-                = getAlignedSubset(ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
+                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
             if(m_write)
-                co_yield m_context->mem()->storeLocal(ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+                co_yield m_context->mem()->storeLocal(
+                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
             else
-                co_yield m_context->mem()->loadLocal(dstRegs, ldsWithOffset, 0, 4 * m_instrDwords);
+                co_yield m_context->mem()->loadLocal(
+                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
         }
 
         for(int i = 1; i < 8; ++i)
@@ -189,14 +147,14 @@ protected:
             for(int k = 0; k < 4; ++k)
             {
                 const auto [start, end]
-                    = getAlignedSubset(ldsDst->registerCount(), m_instrDwords, counter++);
-                auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
+                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
                 if(m_write)
                     co_yield m_context->mem()->storeLocal(
-                        ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
                 else
                     co_yield m_context->mem()->loadLocal(
-                        dstRegs, ldsWithOffset, 0, 4 * m_instrDwords);
+                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
             }
             for(int j = 0; j < i; ++j)
             {
