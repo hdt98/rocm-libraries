@@ -41,11 +41,12 @@ from copy import deepcopy
 class ScheduleInfo:
     numCodePaths: int
     numMfma: int
-    def __init__(self, numCodePaths, numMfma, optSchedule, syncCode, nglshift, nllshift, mfmaReorder = []):
+    def __init__(self, numCodePaths, numMfma, optSchedule, syncCode, snopCode, nglshift, nllshift, mfmaReorder = []):
         self.numCodePaths = numCodePaths
         self.numMfma = numMfma
         self.optSchedule = optSchedule
         self.syncCode = syncCode
+        self.snopCode = snopCode
         self.nglshift = nglshift # vmcnt shift for noglobalload loop
         self.nllshift = nllshift # vmcnt shift for nolocalload loop
         self.mfmaReorder = mfmaReorder
@@ -145,6 +146,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         idMap["PackB%u"%uIdx] = PackCodeB[uIdx]
 
     idMap['SYNC'] = opt1.syncCode
+    idMap['SNOP'] = opt1.snopCode
 
     def convOptToStream(sched):
         InstStreams = dict()
@@ -308,6 +310,7 @@ def hasCustomSchedule(kernel):
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 64, 2, 1, True]
     is256x256x128DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 128, 2, 0, True]
     is192x256x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 32, 2, 0, True]
+    is128x256x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [128, 256, 32, 2, 0, True]
 
 
     transA = kernel["ProblemType"]["TransposeA"]
@@ -389,6 +392,81 @@ def hasCustomSchedule(kernel):
         numMfma = 144
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
         return True, opt1
+    if is128x256x32DTL and isTF32 and not isMixed and ([GRVWA, GRVWB, LRVW] == [4,4,4]) and MI == [16,16,32,1] and MIWG == [2,2]:
+        kernel["MfmaInitCVgprs"] = True
+
+        optSchedule = dict()
+        syncCode = []
+        nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+        if isTN and not useLDSTr and TLDS==1:
+            syncTable = [
+                -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+                3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+                23, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+                47, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                47, SBarrier(comment=""),
+                47, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+                71, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
+                71, SBarrier(comment=""),
+                71, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+            ]
+            snopTable = [
+                -1, SNop(0),
+                0, SNop(0),
+                1, SNop(0),
+                2, SNop(0),
+                3, SNop(0),
+                23, SNop(0),
+                24, SNop(0),
+                25, SNop(0),
+                26, SNop(0),
+                27, SNop(0),
+            ]
+            optSchedule = {
+                'SYNC': [syncTable[::2]],
+                'PackA3': [[-1, -1, -1, -1, 
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                            1, 1, 1, 1, 
+                            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]],
+                'PackB3': [[-1, -1, -1, -1, 
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                            0, 1, 1, 1, 
+                            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
+                            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],
+                'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
+                'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
+                'GRA': [[47, 47, 47, 47, 47, 47, 47, 47]],
+                'GRB': [[47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47]],
+                'LRSA': [[22]],
+                'LRSB': [[22]],
+                'LWSA': [[70]],
+                'LWSB': [[70]],
+                'PackA0': [[23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26]],
+                'PackB0': [[23, 23, 23, 23, 
+                            24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+                            25, 25, 25, 25,
+                            26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 
+                            27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]],
+                'SNOP': [snopTable[::2]],
+                
+                'LRA0': [[0, 1, 2, 3]],
+                'LRA3': [[72, 73, 76, 77]],
+                'LRB0': [[4, 5, 6, 7, 8, 9, 10, 11]],
+                'LRB3': [[74, 75, 78, 79, 80, 81, 82, 83]],
+                'SNOP': [[-1, 0, 1, 2, 3, 23, 24, 25, 26, 27]],
+                'LCC' : [[95, 95]],
+               # 'SNOP': [[-1, 0, 1, 2, 3, 23, 24, 25, 26, 27]],
+            }
+            syncCode = syncTable[1::2]
+            snopCode = snopTable[1::2]
+            nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+        else:
+            return False, None
+
+        numMfma = 96
+        opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, snopCode, nglshift, nllshift)
+        return True, opt1
+
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
 
         kernel["MfmaInitCVgprs"] = True
