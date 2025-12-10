@@ -1344,6 +1344,67 @@ def isTT(kernel):
 def isTN(kernel):
     return kernel["ProblemType"]["TransposeA"] and not kernel["ProblemType"]["TransposeB"]
 
+class CMSKey:
+    MT0: int
+    MT1: int
+    DU: int
+    PGR: bool
+    PLR: bool
+    DTL: bool
+    WSGRA: bool
+    WSGRB: bool
+    datatype: bool
+
+    def __init__(self, _MT0, _MT1, _DU, _PGR, _PLR, _DTL, _WSGRA, _WSGRB, _datatype):
+        self.MT0 = _MT0
+        self.MT1 = _MT1
+        self.DU = _DU
+        self.PGR = _PGR
+        self.PLR = _PLR
+        self.DTL = _DTL
+        self.WSGRA = _WSGRA
+        self.WSGRB = _WSGRB
+        self.datatype = _datatype
+
+    def __hash__(self):
+        return hash((self.MT0, self.MT1, self.DU, self.PGR, self.PLR, 
+                     self.DTL, self.WSGRA, self.WSGRB, self.datatype))
+    
+    def __eq__(self, other):
+        if not isinstance(other, CMSKey):
+            return False
+        return (self.MT0 == other.MT0 and self.MT1 == other.MT1 and 
+                self.DU == other.DU and self.PGR == other.PGR and 
+                self.PLR == other.PLR and self.DTL == other.DTL and
+                self.WSGRA == other.WSGRA and self.WSGRB == other.WSGRB and
+                self.datatype == other.datatype)
+
+class CMSRegistry:
+    def __init__(self):
+        self._registry = {}
+    
+    def register(self, cms_key):
+        def decorator(func):
+            self._registry[cms_key] = func
+            return func
+        return decorator
+    
+    def get(self, cms_key):
+        if cms_key not in self._registry:
+            raise KeyError(f"CMSKey {cms_key} not found in registry")
+        return self._registry[cms_key]
+    
+    def has(self, cms_key):
+        return cms_key in self._registry
+    
+    def __call__(self, cms_key, *args, **kwargs):
+        func = self.get(cms_key)
+        if func is None:
+            raise KeyError(f"CMSKey {cms_key} not found")
+        return func(*args, **kwargs)
+
+cmsRegistry = CMSRegistry()
+
 def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
 
     optSchedule = dict()
@@ -2852,6 +2913,7 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
 
+@cmsRegistry.register(CMSKey(192, 256, 32, 2, 0, True, 0, 0, "tf32"))
 def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     kernel["MfmaInitCVgprs"] = True
     optSchedule = dict()
@@ -2948,6 +3010,23 @@ def hasCustomSchedule(kernel):
     useLDSTr = kernel["LDSTrInst"]
     TLDS = kernel["TransposeLDS"]
     WSGRA, WSGRB = kernel["WaveSeparateGlobalReadA"], kernel["WaveSeparateGlobalReadB"]
+
+    type = "16bit"
+    if is8bit:
+        type = "8bit"
+    elif isMixed:
+        type = "mixed"
+    elif isTF32:
+        type = "tf32"
+    key = CMSKey(MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB, type)
+    print("Carson checking key: ",MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB, type)
+    if cmsRegistry.has(key):
+        print("Carson key found")
+        return cmsRegistry(key, kernel, useLDSTr, TLDS)
+    # else:
+    #     return False, None
+    
+    #TODO: Carson: add bf16 schedules to registry
 
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [256, 256, 64, 2, 1, True, 0, 0]
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [192, 256, 64, 2, 1, True, 0, 0]
