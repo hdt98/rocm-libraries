@@ -291,24 +291,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
         const auto Run = [&](const auto memory_operation_) {
             constexpr auto memory_operation = memory_operation_.value;
 
-<<<<<<< HEAD
-            using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                               BDataType,
-                                                                               AccDataType,
-                                                                               GemmShape,
-                                                                               GemmUniversalTraits,
-                                                                               Scheduler,
-                                                                               has_hot_loop_v,
-                                                                               tail_number_v>;
-
-            using GemmPipeline =
-                typename GemmPipelineTypeSelector<PipelineType, UniversalGemmProblem>::pipeline;
-
             using GemmEpilogue = typename GemmEpilogueTypeSelector<
                 PipelineType,
-=======
-            using GemmEpilogue = ck_tile::CShuffleEpilogue<
->>>>>>> develop
                 ck_tile::CShuffleEpilogueProblem<ADataType,
                                                  BDataType,
                                                  DsDataType,

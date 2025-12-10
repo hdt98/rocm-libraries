@@ -1118,11 +1118,7 @@ struct QuantGemmKernel
                     m = kargs.M;
                 }
                 return GemmPipeline{}.template operator()(
-<<<<<<< HEAD
-                    a_block_window, b_block_window, aq_block_window, kargs.M, num_loop, smem_ptr);
-=======
-                    a_block_window, b_block_window, aq_block_window, num_loop, smem_ptr_0, m);
->>>>>>> develop
+                    a_block_window, b_block_window, aq_block_window, num_loop, smem_ptr, m);
             }
             else if constexpr(kQuantType == QuantType::BQuantGrouped)
             {
@@ -1133,11 +1129,7 @@ struct QuantGemmKernel
                     n = kargs.N;
                 }
                 return GemmPipeline{}.template operator()(
-<<<<<<< HEAD
-                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr);
-=======
-                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr_0, n);
->>>>>>> develop
+                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
             }
             else if constexpr(kQuantType == QuantType::RowColQuant ||
                               kQuantType == QuantType::TensorQuant)
@@ -1176,10 +1168,7 @@ struct QuantGemmKernel
             const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
             const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
             EpiloguePipeline{}(
-<<<<<<< HEAD
                 c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
-=======
-                c_block_window, c_block_tile, c_block_window, smem_ptr_0, aq_scale, bq_scale);
         }
     }
     /**
@@ -1203,8 +1192,7 @@ struct QuantGemmKernel
                                            const AQDataType* aq_ptr,
                                            const BQDataType* bq_ptr,
                                            CDataType* c_ptr,
-                                           void* smem_ptr_0,
-                                           void* smem_ptr_1,
+                                           void* smem_ptr,
                                            const QuantGemmKernelArgs& kargs,
                                            const SplitKBatchOffset& splitk_batch_offset,
                                            const index_t block_idx_m,
@@ -1233,13 +1221,8 @@ struct QuantGemmKernel
                 {
                     n = kargs.N;
                 }
-                return GemmPipeline{}.template operator()(a_block_window,
-                                                          b_block_window,
-                                                          bq_block_window,
-                                                          num_loop,
-                                                          smem_ptr_0,
-                                                          smem_ptr_1,
-                                                          n);
+                return GemmPipeline{}.template operator()(
+                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
             }
             else
             {
@@ -1252,7 +1235,7 @@ struct QuantGemmKernel
 
         if constexpr(kQuantType == QuantType::BQuantGrouped)
         {
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr_0);
+            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
         }
         else
         {
@@ -1260,7 +1243,6 @@ struct QuantGemmKernel
             // throw std::runtime_error("DoubleSmemBuffer Not implemented for AQuantGrouped or
             // RowColQuant"); static_assert(kQuantType == QuantType::BQuantGrouped,
             // "DoubleSmemBuffer Not implemented");
->>>>>>> develop
         }
     }
 

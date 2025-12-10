@@ -182,7 +182,6 @@ struct GemmConfigComputeV3_2 : public GemmConfigBase
     static constexpr int kBlockPerCu = 2;
 };
 
-#if CK_TILE_USE_WMMA
 template <typename PrecType>
 struct GemmConfigComputeV3_WMMA : public GemmConfigBase
 {
@@ -203,7 +202,6 @@ struct GemmConfigComputeV3_WMMA : public GemmConfigBase
 
     static constexpr int kBlockPerCu = 2;
 };
-#endif
 
 template <typename PrecType>
 struct GemmConfigComputeV4 : public GemmConfigBase
@@ -440,6 +438,15 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V1>
 
 template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V3>
 {
     template <typename PipelineProblem>
     using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;

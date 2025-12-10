@@ -685,15 +685,6 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                    index_t num_loop,
                                    void* p_smem) const
     {
-<<<<<<< HEAD
-        return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
-            a_dram_block_window_tmp,
-            a_element_func,
-            b_dram_block_window_tmp,
-            b_element_func,
-            num_loop,
-            p_smem);
-=======
         const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
         const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
 
@@ -704,12 +695,10 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                 b_dram_block_window_tmp,
                 b_element_func,
                 num_loop,
-                p_smem_0,
-                p_smem_1);
+                p_smem);
         };
 
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
->>>>>>> develop
     }
 
     template <typename AsDramBlockWindowTmp,
@@ -722,15 +711,6 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                    const index_t num_loop,
                                    void* __restrict__ p_smem) const
     {
-<<<<<<< HEAD
-        return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
-            a_dram_block_window_tmp,
-            [](auto& e, const ADataType& a) { e = a; },
-            b_dram_block_window_tmp,
-            [](auto& e, const BDataType& b) { e = b; },
-            num_loop,
-            p_smem);
-=======
         const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
         const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
 
@@ -741,12 +721,10 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                 b_dram_block_window_tmp,
                 [](auto& e, const BDataType& b) { e = b; },
                 num_loop,
-                p_smem_0,
-                p_smem_1);
+                p_smem);
         };
 
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
->>>>>>> develop
     }
 
     template <typename AsDramBlockWindowTmp,

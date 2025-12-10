@@ -177,14 +177,8 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                                              /*UseStructuredSparsity*/ false,
                                              /*Persistent*/ false,
                                              /*NumWaveGroups*/ 1,
-<<<<<<< HEAD
                                              /*Preshuffle*/ true,
                                              VectorSize>;
-        using GemmPipelineProblem =
-            ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, GemmShape, Traits>;
-=======
-                                             /*Preshuffle*/ true>;
->>>>>>> develop
 
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataType,
@@ -283,14 +277,8 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                                              /*UseStructuredSparsity*/ false,
                                              /*Persistent*/ true, // Enable persistent mode
                                              /*NumWaveGroups*/ 1,
-<<<<<<< HEAD
                                              /*Preshuffle*/ true,
                                              VectorSize>;
-        using GemmPipelineProblem =
-            ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, GemmShape, Traits>;
-=======
-                                             /*Preshuffle*/ true>;
->>>>>>> develop
 
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataType,

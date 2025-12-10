@@ -562,13 +562,8 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
                                    const BFlatBlockWindowTmp& b_flat_dram_block_window_tmp,
                                    const BQDramBlockWindowTmp& bq_dram_block_window_tmp,
                                    index_t num_loop,
-<<<<<<< HEAD
-                                   void* p_smem) const
-=======
-                                   void* p_smem_ping,
-                                   void* p_smem_pong,
+                                   void* p_smem,
                                    index_t n = 0) const // Default value for non-preshuffle case
->>>>>>> develop
     {
         return operator()<TailNum>(
             a_dram_block_window_tmp,
@@ -588,13 +583,8 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
                                    const BQDramBlockWindowTmp& bq_dram_block_window_tmp,
                                    index_t num_loop,
                                    TailNumber tail_number,
-<<<<<<< HEAD
-                                   void* p_smem) const
-=======
-                                   void* p_smem_ping,
-                                   void* p_smem_pong,
+                                   void* p_smem,
                                    index_t n = 0) const
->>>>>>> develop
     {
         const auto RunPipeline = [&](auto bool_val, auto tail_num_) {
             (void)bool_val; // Suppress unused parameter warning

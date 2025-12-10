@@ -117,7 +117,6 @@ struct UniversalGemmBasePolicy
         using ADataType             = OverrideADataType;
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
-        constexpr index_t KPack     = GetSmemPackA<Problem>();
 
         if constexpr(is_a_load_tr<Problem>)
         {
@@ -132,7 +131,6 @@ struct UniversalGemmBasePolicy
         }
         else
         {
-<<<<<<< HEAD
             constexpr auto DataTypeSize = sizeof(ADataType);
 #if defined(__gfx125__)
             constexpr index_t BytesPerDword = 4;
@@ -142,7 +140,7 @@ struct UniversalGemmBasePolicy
 #endif
             constexpr auto MLdsLayer =
                 max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
-=======
+
             // Only use this ColumnMajor layout for Wave64 mode (gfx9)
             constexpr auto Wave64 = get_warp_size() == 64;
             if constexpr(Wave64 &&
@@ -169,7 +167,6 @@ struct UniversalGemmBasePolicy
                 // Get the warp tile size
                 using WarpTile         = typename Problem::BlockGemmShape::WarpTile;
                 constexpr auto MPerXdl = number<WarpTile::at(I0)>{};
->>>>>>> develop
 
                 // Number of threads covering K dimension
                 constexpr auto KThreadWrite     = TileEncodingPattern::Y0 * TileEncodingPattern::Y1;
@@ -264,10 +261,6 @@ struct UniversalGemmBasePolicy
             }
             else // A is in RowMajor
             {
-                constexpr auto DataTypeSize = sizeof(ADataType);
-                constexpr auto MLdsLayer =
-                    max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
-
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
                 constexpr index_t RowMul = (NBanks == 64) ? 2 : 1;
@@ -340,8 +333,6 @@ struct UniversalGemmBasePolicy
         }
         else
         {
-<<<<<<< HEAD
-
             constexpr auto DataTypeSize = sizeof(BDataType);
 #if defined(__gfx125__)
             constexpr index_t BytesPerDword = 4;
@@ -352,7 +343,6 @@ struct UniversalGemmBasePolicy
             constexpr auto BK0 = number<KPerBlock / KPack>{};
             constexpr auto NLdsLayer =
                 max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
-=======
             // Only use this RowMajor layout for Wave64 mode (gfx9)
             constexpr auto Wave64 = get_warp_size() == 64;
             if constexpr(Wave64 && std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
@@ -367,8 +357,6 @@ struct UniversalGemmBasePolicy
                                                           getBTileAccessPattern()>;
                 // BK1: the shuffled tile dstr has shape <X1, Y2>, use Y2 as BK1
                 constexpr auto BK1 = number<TileEncodingPattern::Y2>{};
-                constexpr auto BK0 = number<KPerBlock / BK1>{};
->>>>>>> develop
 
                 // How threads access data on N dim
                 constexpr auto N0 = TileEncodingPattern::X0; // # of threads in N dim
@@ -472,12 +460,6 @@ struct UniversalGemmBasePolicy
             }
             else // B is Column Major
             {
-                constexpr index_t KPack     = GetSmemPackB<Problem>();
-                constexpr auto BK0          = number<KPerBlock / KPack>{};
-                constexpr auto DataTypeSize = sizeof(BDataType);
-                constexpr auto NLdsLayer =
-                    max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
-
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
                 constexpr index_t RowMul = (NBanks == 64) ? 2 : 1;

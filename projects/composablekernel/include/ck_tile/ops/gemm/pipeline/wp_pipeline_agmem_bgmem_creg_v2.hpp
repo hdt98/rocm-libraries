@@ -1043,14 +1043,6 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
                                    index_t num_loop,
                                    void* p_smem) const
     {
-<<<<<<< HEAD
-        return operator()<TailNum>(
-            a_dram_block_window_tmp[number<0>{}],
-            [](const ADataType& a) { return a; },
-            b_flat_dram_block_window_tmp[number<0>{}],
-            num_loop,
-            p_smem);
-=======
         const auto tail_number = Base::GetBlockLoopTailNum(num_loop);
 
         const auto RunPipeline = [&](auto bool_val, auto tail_num_) {
@@ -1061,11 +1053,9 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
                                         PassThrough,
                                         b_flat_dram_block_window_tmp[number<0>{}],
                                         num_loop,
-                                        p_smem_ping,
-                                        p_smem_pong);
+                                        p_smem);
         };
         return Base::TailHandler(RunPipeline, true, tail_number);
->>>>>>> develop
     }
 
     // called from general gemm kernel
@@ -1079,14 +1069,6 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
                                    index_t num_loop,
                                    void* p_smem) const
     {
-<<<<<<< HEAD
-        return operator()<TailNum>(
-            a_dram_block_window_tmp,
-            [](const ADataType& a) { return a; },
-            b_flat_dram_block_window_tmp,
-            num_loop,
-            p_smem);
-=======
         const auto tail_number = Base::GetBlockLoopTailNum(num_loop);
 
         const auto RunPipeline = [&](auto bool_val, auto tail_num_) {
@@ -1097,11 +1079,9 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
                                         PassThrough,
                                         b_flat_dram_block_window_tmp,
                                         num_loop,
-                                        p_smem_ping,
-                                        p_smem_pong);
+                                        p_smem);
         };
         return Base::TailHandler(RunPipeline, true, tail_number);
->>>>>>> develop
     }
 
     // called from grouped gemm kernel

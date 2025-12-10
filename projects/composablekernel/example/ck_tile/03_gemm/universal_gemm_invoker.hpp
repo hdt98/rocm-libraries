@@ -66,26 +66,19 @@ struct UniversalInvoker
                                              Persistent,
                                              GemmConfig::NumWaveGroups,
                                              GemmConfig::Preshuffle>;
-<<<<<<< HEAD
-        using GemmPipelineProblem = ck_tile::GemmPipelineProblem<ADataType,
-                                                                 BDataType,
-                                                                 AccDataType,
-                                                                 GemmShape,
-                                                                 Traits,
-                                                                 ck_tile::element_wise::PassThrough,
-                                                                 ck_tile::element_wise::PassThrough,
-                                                                 ComputeDataType>;
-=======
->>>>>>> develop
 
         constexpr auto scheduler = GemmConfig::Scheduler;
 
-        using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                           BDataType,
-                                                                           AccDataType,
-                                                                           GemmShape,
-                                                                           GemmUniversalTraits,
-                                                                           scheduler>;
+        using UniversalGemmProblem =
+            ck_tile::UniversalGemmPipelineProblem<ADataType,
+                                                  BDataType,
+                                                  AccDataType,
+                                                  GemmShape,
+                                                  GemmUniversalTraits,
+                                                  scheduler,
+                                                  ck_tile::element_wise::PassThrough,
+                                                  ck_tile::element_wise::PassThrough,
+                                                  ComputeDataType>;
 
         using GemmPipeline = typename PipelineTypeTraits<
             GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
@@ -93,28 +86,8 @@ struct UniversalInvoker
         const auto Run = [&](const auto memory_operation_) {
             constexpr auto memory_operation = memory_operation_.value;
 
-<<<<<<< HEAD
-            using UniversalGemmProblem =
-                ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                      BDataType,
-                                                      AccDataType,
-                                                      GemmShape,
-                                                      GemmUniversalTraits,
-                                                      scheduler,
-                                                      has_hot_loop_v,
-                                                      tail_number_v,
-                                                      ck_tile::element_wise::PassThrough,
-                                                      ck_tile::element_wise::PassThrough,
-                                                      ComputeDataType>;
-
-            using GemmPipeline = typename PipelineTypeTraits<
-                GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
-
             using GemmEpilogue = typename EpilogueTypeTraits<
                 GemmConfig::Pipeline,
-=======
-            using GemmEpilogue = ck_tile::CShuffleEpilogue<
->>>>>>> develop
                 ck_tile::CShuffleEpilogueProblem<ADataType,
                                                  BDataType,
                                                  DsDataType,
@@ -208,11 +181,11 @@ struct UniversalInvoker
             {
                 preprocess = clear_gemm_output;
             }
-<<<<<<< HEAD
+
             if constexpr(ClusterLaunch)
             {
                 dim3 clusters = Kernel::ClusterSize();
-                ave_time      = ck_tile::launch_kernel_time_mask(
+                return ck_tile::launch_kernel_time_mask(
                     s,
                     preprocess,
                     ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
@@ -220,20 +193,12 @@ struct UniversalInvoker
             }
             else
             {
-                ave_time =
-                    ck_tile::launch_kernel_time_mask(s,
-                                                     preprocess,
-                                                     ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
-                                                         Kernel{}, grids, blocks, 0, kargs));
+                return ck_tile::launch_kernel_time_mask(
+                    s,
+                    preprocess,
+                    ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
+                        Kernel{}, grids, blocks, 0, kargs));
             }
-            return ave_time;
-=======
-
-            return ck_tile::launch_kernel_time_mask(
-                s,
-                preprocess,
-                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
->>>>>>> develop
         };
 
         if(args.k_batch == 1)

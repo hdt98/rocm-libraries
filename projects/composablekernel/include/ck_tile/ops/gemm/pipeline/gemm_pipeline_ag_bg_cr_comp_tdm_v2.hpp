@@ -525,9 +525,9 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
     {
         return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
             a_dram_block_window_tmp,
-            [](const Base::ADataType& a) { return a; },
+            [](const typename Base::ADataType& a) { return a; },
             b_dram_block_window_tmp,
-            [](const Base::BDataType& b) { return b; },
+            [](const typename Base::BDataType& b) { return b; },
             num_loop,
             p_smem);
     }

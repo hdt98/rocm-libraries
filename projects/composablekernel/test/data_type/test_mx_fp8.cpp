@@ -25,13 +25,9 @@ using ck::scaled_type_convert;
 using ck::type_convert;
 using ck::fp8_impl::fp8x2_storage_t;
 
-<<<<<<< HEAD
-constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6 + 16;
-=======
 using ::ck::DeviceMem;
 
-constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6;
->>>>>>> develop
+constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6 + 16;
 
 /**
  * @brief Tests conversion of FP8 values to float using E8M0 exponent scaling.

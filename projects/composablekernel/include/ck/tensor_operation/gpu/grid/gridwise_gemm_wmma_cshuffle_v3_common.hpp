@@ -218,12 +218,8 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
     static constexpr bool IsAWaveTransferApplicable =
         !ForceThreadTileTransfer && NumATensor == 1 && APackedSize == 1 &&
         GemmSpec == tensor_operation::device::GemmSpecialization::Default &&
-<<<<<<< HEAD
-        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 &&
+        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 && !IsBPreShuffled &&
         ATransferWaveTiles::KRepeat_ > 0 && ATransferWaveTiles::MNRepeat_ > 0;
-=======
-        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 && !IsBPreShuffled;
->>>>>>> develop
 
     static constexpr bool IsBWaveTransferApplicable =
         !ForceThreadTileTransfer && NumBTensor == 1 && BPackedSize == 1 &&
@@ -265,30 +261,6 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
         BBlockLdsExtraN || BlkGemmPipelineVer == BlockGemmPipelineVersion::v4;
 
     using BTransfer = typename std::conditional<
-<<<<<<< HEAD
-        IsBWaveTransferApplicable,
-        BTransferWaveTiles,
-        ABTransferThreadTiles<BLayout,
-                              tensor_layout::gemm::ColumnMajor,
-                              LDSTypeB,
-                              BlockSize,
-                              NPerBlock,
-                              KPerBlock,
-                              NPerWmma,
-                              BK1Value,
-                              KPack,
-                              KInner,
-                              KPerWmmaBlk,
-                              UseBlockPaddingB,
-                              PermuteB,
-                              BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                              BBlockTransferThreadClusterArrangeOrder,
-                              BBlockTransferSrcAccessOrder,
-                              BBlockTransferSrcVectorDim,
-                              BBlockTransferSrcScalarPerVector,
-                              BBlockTransferDstScalarPerVector_BK1,
-                              BThreadTransferSrcResetCoordinateAfterRun>>::type;
-=======
         IsBPreShuffled,
         ABTransferThreadTilesPreShuffle<BLayout,
                                         tensor_layout::gemm::ColumnMajor,
@@ -303,16 +275,7 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
                                         BThreadTransferSrcResetCoordinateAfterRun>,
         typename std::conditional<
             IsBWaveTransferApplicable,
-            ABTransferWaveTiles<BLayout,
-                                tensor_layout::gemm::ColumnMajor,
-                                LDSTypeB,
-                                BlockSize,
-                                NPerBlock,
-                                KPerBlock,
-                                NPerWmma,
-                                KPack,
-                                BK1Value,
-                                WaveSize>,
+            BTransferWaveTiles,
             ABTransferThreadTiles<BLayout,
                                   tensor_layout::gemm::ColumnMajor,
                                   LDSTypeB,
@@ -333,7 +296,6 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
                                   BBlockTransferSrcScalarPerVector,
                                   BBlockTransferDstScalarPerVector_BK1,
                                   BThreadTransferSrcResetCoordinateAfterRun>>::type>::type;
->>>>>>> develop
 
     static_assert(!(is_same_v<remove_cvref_t<LDSTypeB>, pk_i4_t> &&
                     GemmSpec != tensor_operation::device::GemmSpecialization::Default),

@@ -5,14 +5,10 @@
 #include "ck/library/utility/device_memory.hpp"
 #include "ck/utility/scaled_type_convert.hpp"
 
-<<<<<<< HEAD
 using ck::bhalf2_t;
 using ck::bhalf32_t;
 using ck::bhalf_t;
-=======
 using ::ck::DeviceMem;
-
->>>>>>> develop
 using ck::e8m0_bexp_t;
 using ck::float16_t;
 using ck::float2_t;

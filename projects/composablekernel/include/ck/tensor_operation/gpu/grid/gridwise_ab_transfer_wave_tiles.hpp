@@ -21,13 +21,7 @@ template <typename ABLayout,
           index_t WaveSize>
 struct ABTransferWaveTiles
 {
-<<<<<<< HEAD
-=======
     __device__ static constexpr bool IsLDSNeeded() { return true; }
-
-    static_assert(!(is_same_v<remove_cvref_t<LDSTypeAB>, pk_i4_t>),
-                  "wave tile transfer method does not support pk_i4_t");
->>>>>>> develop
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
     static constexpr auto I2 = Number<2>{};
