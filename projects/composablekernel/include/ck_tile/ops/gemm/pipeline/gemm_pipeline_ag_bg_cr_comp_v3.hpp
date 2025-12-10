@@ -318,6 +318,10 @@ struct GemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Problem>
                 {
                     return KPerXDL == 64 ? 64 : 32;
                 }
+                else
+                {
+                    return 32;
+                }
             }();
 
             constexpr auto ds_read_a_issue_cycle =

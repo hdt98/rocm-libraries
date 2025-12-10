@@ -1910,12 +1910,11 @@ struct GridwiseGemm_xdl_cshuffle_v3
 
         if(ck::is_gfx125_supported() && MinimumOccupancy != 0)
         {
-            constexpr index_t WaveSize       = 32;
-            constexpr auto EstimateVgprCount = GetEstimateVgprCount();
-            constexpr auto AvailableVgprCount =
+            index_t estimateVgprCount = GetEstimateVgprCount();
+            index_t availableVgprCount =
                 get_max_vgpr_count(gfx125_t{}) / MinimumOccupancy /
-                (math::integer_divide_ceil(BlockSize, WaveSize * 4));
-            if constexpr(EstimateVgprCount > (AvailableVgprCount + AvailableVgprCount / 4))
+                (math::integer_divide_ceil(BlockSize, ck::get_warp_size() * 4));
+            if(estimateVgprCount > (availableVgprCount + availableVgprCount / 4))
             {
                 return false;
             }
