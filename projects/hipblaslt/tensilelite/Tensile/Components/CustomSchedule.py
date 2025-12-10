@@ -41,15 +41,15 @@ from copy import deepcopy
 class ScheduleInfo:
     numCodePaths: int
     numMfma: int
-    def __init__(self, numCodePaths, numMfma, optSchedule, syncCode, snopCode, nglshift, nllshift, mfmaReorder = []):
+    def __init__(self, numCodePaths, numMfma, optSchedule, syncCode, nglshift, nllshift, mfmaReorder = [], snopCode = [] ):
         self.numCodePaths = numCodePaths
         self.numMfma = numMfma
         self.optSchedule = optSchedule
         self.syncCode = syncCode
-        self.snopCode = snopCode
         self.nglshift = nglshift # vmcnt shift for noglobalload loop
         self.nllshift = nllshift # vmcnt shift for nolocalload loop
         self.mfmaReorder = mfmaReorder
+        self.snopCode = snopCode
 
 
 def removeComments(module):
@@ -146,7 +146,9 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         idMap["PackB%u"%uIdx] = PackCodeB[uIdx]
 
     idMap['SYNC'] = opt1.syncCode
-    idMap['SNOP'] = opt1.snopCode
+
+    if len(opt1.snopCode) > 0:
+        idMap['SNOP'] = opt1.snopCode
 
     def convOptToStream(sched):
         InstStreams = dict()
@@ -412,15 +414,15 @@ def hasCustomSchedule(kernel):
             ]
             snopTable = [
                 -1, SNop(0),
-                0, SNop(0),
-                1, SNop(0),
-                2, SNop(0),
-                3, SNop(0),
-                23, SNop(0),
-                24, SNop(0),
-                25, SNop(0),
-                26, SNop(0),
-                27, SNop(0),
+              #  0, SNop(0),
+              #  1, SNop(0),
+              #  2, SNop(0),
+              #  3, SNop(0),
+            #    23, SNop(0),
+             #   24, SNop(0),
+            #    25, SNop(0),
+              #  26, SNop(0),
+             #   27, SNop(0),
             ]
             optSchedule = {
                 'SYNC': [syncTable[::2]],
@@ -429,9 +431,9 @@ def hasCustomSchedule(kernel):
                             1, 1, 1, 1, 
                             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]],
                 'PackB3': [[-1, -1, -1, -1, 
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                            -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
                             0, 1, 1, 1, 
-                            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
+                            1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
                             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],
                 'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
                 'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
@@ -453,9 +455,7 @@ def hasCustomSchedule(kernel):
                 'LRA3': [[72, 73, 76, 77]],
                 'LRB0': [[4, 5, 6, 7, 8, 9, 10, 11]],
                 'LRB3': [[74, 75, 78, 79, 80, 81, 82, 83]],
-                'SNOP': [[-1, 0, 1, 2, 3, 23, 24, 25, 26, 27]],
                 'LCC' : [[95, 95]],
-               # 'SNOP': [[-1, 0, 1, 2, 3, 23, 24, 25, 26, 27]],
             }
             syncCode = syncTable[1::2]
             snopCode = snopTable[1::2]
@@ -464,7 +464,7 @@ def hasCustomSchedule(kernel):
             return False, None
 
         numMfma = 96
-        opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, snopCode, nglshift, nllshift)
+        opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
         return True, opt1
 
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
