@@ -104,66 +104,6 @@ private:
     int m_iterations;
 };
 
-class LDSArithmeticWeaveTestKernel : public LDSTestKernelBase
-{
-public:
-    LDSArithmeticWeaveTestKernel(ContextPtr                 context,
-                                 uint32_t                   workgroupSize,
-                                 size_t                     instrDwords,
-                                 size_t                     strideMultiplier,
-                                 const std::vector<size_t>& baseAddresses,
-                                 bool                       write)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
-    {
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
-    {
-        auto s0
-            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
-        auto s1
-            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
-        co_yield s0->allocate();
-        co_yield s1->allocate();
-
-        int counter = 0;
-        for(int i = 0; i < 14; ++i)
-        {
-            const auto [start, end]
-                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-            if(m_write)
-                co_yield m_context->mem()->storeLocal(
-                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-            else
-                co_yield m_context->mem()->loadLocal(
-                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-        }
-
-        for(int i = 1; i < 8; ++i)
-        {
-            for(int k = 0; k < 4; ++k)
-            {
-                const auto [start, end]
-                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-                if(m_write)
-                    co_yield m_context->mem()->storeLocal(
-                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-                else
-                    co_yield m_context->mem()->loadLocal(
-                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-            }
-            for(int j = 0; j < i; ++j)
-            {
-                co_yield generateOp<Expression::Add>(s0, s0, s1);
-            }
-        }
-    }
-};
-
 TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
@@ -288,6 +228,66 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
     }
 }
 
+class LDSArithmeticWeaveTestKernel : public LDSTestKernelBase
+{
+public:
+    LDSArithmeticWeaveTestKernel(ContextPtr                 context,
+                                 uint32_t                   workgroupSize,
+                                 size_t                     instrDwords,
+                                 size_t                     strideMultiplier,
+                                 const std::vector<size_t>& baseAddresses,
+                                 bool                       write)
+        : LDSTestKernelBase(
+            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
+    {
+    }
+
+protected:
+    Generator<Instruction> generateKernelBody() override
+    {
+        auto s0
+            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
+        auto s1
+            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
+        co_yield s0->allocate();
+        co_yield s1->allocate();
+
+        int counter = 0;
+        for(int i = 0; i < 14; ++i)
+        {
+            const auto [start, end]
+                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
+            if(m_write)
+                co_yield m_context->mem()->storeLocal(
+                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+            else
+                co_yield m_context->mem()->loadLocal(
+                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+        }
+
+        for(int i = 1; i < 8; ++i)
+        {
+            for(int k = 0; k < 4; ++k)
+            {
+                const auto [start, end]
+                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
+                if(m_write)
+                    co_yield m_context->mem()->storeLocal(
+                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+                else
+                    co_yield m_context->mem()->loadLocal(
+                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+            }
+            for(int j = 0; j < i; ++j)
+            {
+                co_yield generateOp<Expression::Add>(s0, s0, s1);
+            }
+        }
+    }
+};
+
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
@@ -382,5 +382,127 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
         CHECK(totalAbsoluteDelta <= 20);
         CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 20));
         CHECK(incorrectPredictionCount <= 4);
+    }
+}
+
+class JustLdsInstructions : public LDSTestKernelBase
+{
+public:
+    JustLdsInstructions(ContextPtr                 context,
+                        uint32_t                   workgroupSize,
+                        size_t                     instrDwords,
+                        size_t                     strideMultiplier,
+                        const std::vector<size_t>& baseAddresses,
+                        bool                       write)
+        : LDSTestKernelBase(
+            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
+    {
+    }
+
+protected:
+    Generator<Instruction> generateKernelBody() override
+    {
+        int counter = 0;
+        for(int i = 0; i < 32; ++i)
+        {
+            const auto [start, end]
+                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
+            if(m_write)
+                co_yield m_context->mem()->storeLocal(
+                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+            else
+                co_yield m_context->mem()->loadLocal(
+                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+        }
+    }
+};
+
+TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
+{
+    using namespace Scheduling::LDSBankModel;
+
+    const auto workgroupSize = GENERATE(64u, 128u, 256u);
+
+    int instrDwords;
+    int strideMultiplier;
+    int write;
+
+    constexpr auto testIndividual = true;
+    if(testIndividual)
+    {
+        instrDwords      = GENERATE(4);
+        strideMultiplier = GENERATE(4);
+        write            = GENERATE(false);
+    }
+    else
+    {
+        instrDwords      = GENERATE(1, 2, 4);
+        strideMultiplier = GENERATE(1, 2, 4, 8);
+        write            = GENERATE(true, false);
+    }
+
+    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+
+    const auto name = fmt::format(
+        "lds_weave_{}_b{}_stride{}", write ? "write" : "read", instrDwords * 32, strideMultiplier);
+
+    rocRoller::profiler::reset();
+
+    auto context = TestContext::ForTestDevice({}, name);
+
+    if(not context->targetArchitecture().target().isCDNA35GPU())
+    {
+        SKIP("Currently only testing on gfx950");
+    }
+
+    SECTION(name)
+    {
+        JustLdsInstructions kernel(
+            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
+
+        auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        const auto& filteredInstructions = result.filteredInstructions;
+        const auto& medianLatencies      = result.medianLatencies;
+
+        int totalAbsoluteDelta       = 0;
+        int totalDelta               = 0;
+        int incorrectPredictionCount = 0;
+
+        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i)
+        {
+            const auto& inst = filteredInstructions[i];
+
+            int modelLatency = inst.totalCycles() * 4;
+
+            int actualLatency = std::get<1>(medianLatencies[i]);
+            int delta         = actualLatency - modelLatency;
+
+            if(write && instrDwords == 4)
+            {
+                if(delta > 12)
+                {
+                    incorrectPredictionCount++;
+                    totalDelta += delta;
+                }
+                totalAbsoluteDelta += std::max(0, std::abs(delta) - 12);
+            }
+            else
+            {
+                totalDelta += delta;
+                totalAbsoluteDelta += std::abs(delta);
+                if(delta != 0)
+                {
+                    incorrectPredictionCount++;
+                }
+            }
+        }
+
+        INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
+                         totalAbsoluteDelta,
+                         incorrectPredictionCount,
+                         filteredInstructions.size() - 1));
+
+        // TODO: add CHECK
     }
 }
