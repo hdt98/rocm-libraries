@@ -1270,22 +1270,35 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
             if len(ToSched[k]) > 1:
                 needIfMacro = True
 
+        def warn_cnt_exceeds_limit(dscnt: int, vmcnt: int, index: int, suffix: str|None = None):
+            maxLgkmcnt = writer.states.asmCaps["MaxLgkmcnt"]
+            maxVgkmcnt = writer.states.asmCaps["MaxVmcnt"]
+            suffix = f" at MFMA index {index}" if suffix is None else suffix
+            if dscnt > maxLgkmcnt:
+                print(f"WARNING: dscnt value of {(dscnt)} will be clamped to {maxLgkmcnt}{suffix}.")
+            if vmcnt > maxVgkmcnt:
+                print(f"WARNING: vmcnt value of {(vmcnt)} will be clamped to {maxVgkmcnt}{suffix}.")
+        
         def nllvmcntHandling(inst, shift0, shift1):
-            if isinstance(inst, SWaitCnt) and inst.vlcnt != -1:
-                macro.add(ValueIf("\\useGR == 1 && \\usePLR == 1")) # in main loop
-                macro.addComment0("vmcnt used in main loop")
-                macro.add(inst)
-                macro.add(ValueElseIf("\\useGR == 0 && \\usePLR == 1")) # in NGL
-                macro.addComment0("vmcnt used in ngl, applying %u shift"%shift0)
-                instModified = deepcopy(inst)
-                instModified.vlcnt = max(0, instModified.vlcnt - shift0)
-                macro.add(instModified)
-                macro.add(ValueElseIf("\\useGR == 0 && \\usePLR == 0")) # in NLL
-                macro.addComment0("vmcnt used in nll, applying %u shift"%shift1)
-                instModified = deepcopy(inst)
-                instModified.vlcnt = max(0, instModified.vlcnt - shift1)
-                macro.add(instModified)
-                macro.add(ValueEndif())
+            if isinstance(inst, SWaitCnt):
+                warn_cnt_exceeds_limit(inst.dscnt, inst.vlcnt, miIndex)
+                if inst.vlcnt != -1:
+                    macro.add(ValueIf("\\useGR == 1 && \\usePLR == 1")) # in main loop
+                    macro.addComment0("vmcnt used in main loop")
+                    macro.add(inst)
+                    macro.add(ValueElseIf("\\useGR == 0 && \\usePLR == 1")) # in NGL
+                    macro.addComment0("vmcnt used in ngl, applying %u shift"%shift0)
+                    instModified = deepcopy(inst)
+                    instModified.vlcnt = max(0, instModified.vlcnt - shift0)
+                    warn_cnt_exceeds_limit(instModified.dscnt, instModified.vlcnt, miIndex, suffix="in NGL modified SWaitCnt")
+                    macro.add(instModified)
+                    macro.add(ValueElseIf("\\useGR == 0 && \\usePLR == 0")) # in NLL
+                    macro.addComment0("vmcnt used in nll, applying %u shift"%shift1)
+                    instModified = deepcopy(inst)
+                    instModified.vlcnt = max(0, instModified.vlcnt - shift1)
+                    warn_cnt_exceeds_limit(instModified.dscnt, instModified.vlcnt, miIndex, suffix="in NLL modified SWaitCnt")
+                    macro.add(instModified)
+                    macro.add(ValueEndif())
             else:
                 macro.add(inst)
 

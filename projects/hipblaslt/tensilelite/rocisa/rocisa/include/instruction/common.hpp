@@ -1566,11 +1566,17 @@ namespace rocisa
                 if(lgkmcnt != -1)
                 {
                     int maxLgkmcnt = getAsmCaps()["MaxLgkmcnt"];
+                    if (maxLgkmcnt < lgkmcnt) {
+                        std::cout << "Warning: lgkmcnt " << lgkmcnt << " exceeds max value " << maxLgkmcnt << " and will be clamped" << std::endl;
+                    }
                     waitStr = "lgkmcnt(" + std::to_string(std::min(lgkmcnt, maxLgkmcnt)) + ")";
                 }
                 if(vmcnt != -1)
                 {
                     int maxVmcnt = getAsmCaps()["MaxVmcnt"];
+                    if (maxVmcnt < vmcnt) {
+                        std::cout << "Warning: vmcnt " << vmcnt << " exceeds max value " << maxVmcnt << " and will be clamped" << std::endl;
+                    }
                     waitStr += (waitStr != "" ? ", " : "");
                     waitStr += "vmcnt(" + std::to_string(std::min(vmcnt, maxVmcnt)) + ")";
                 }
