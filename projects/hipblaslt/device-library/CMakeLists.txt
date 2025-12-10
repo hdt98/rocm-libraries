@@ -13,10 +13,8 @@ set(TENSILELITE_ENABLE_ASM_COMMENTS OFF CACHE STRING "Turn on asm comments when 
 
 set(HIPBLASLT_TENSILE_LIBPATH "${hipblaslt_BINARY_DIR}/Tensile" CACHE STRING "Path to output the device gemm libraries.")
 file(MAKE_DIRECTORY "${HIPBLASLT_TENSILE_LIBPATH}/library")
-list(JOIN GPU_TARGETS "$<SEMICOLON>" TENSILELITE_GPU_TARGETS_SEMI_ESCAPED)
 
-add_subdirectory(extops)
-add_subdirectory(matrix-transform)
+list(JOIN GPU_TARGETS "$<SEMICOLON>" TENSILELITE_GPU_TARGETS_SEMI_ESCAPED)
 
 set(TENSILELITE_BUILD_OPTS ${TENSILELITE_BUILD_OPTS} "--architecture=${TENSILELITE_GPU_TARGETS_SEMI_ESCAPED}")
 set(TENSILELITE_BUILD_OPTS ${TENSILELITE_BUILD_OPTS} "--cxx-compiler=${CMAKE_CXX_COMPILER}")
@@ -83,5 +81,8 @@ block(SCOPE_FOR VARIABLES)
 endblock()
 
 add_custom_target(tensilelite-device-libraries ALL
-    DEPENDS "${output_stamp}" extop-library matrix-transform
+    DEPENDS "${output_stamp}"
 )
+
+add_subdirectory(extops)
+add_subdirectory(matrix-transform)
