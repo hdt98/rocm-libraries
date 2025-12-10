@@ -401,17 +401,6 @@ def hasCustomSchedule(kernel):
         syncCode = []
         nglshift = nllshift = 0 # vmcnt shift for ngl and nll
         if isTN and not useLDSTr and TLDS==1:
-            syncTable = [
-                -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
-                3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
-                23, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
-                47, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
-                47, SBarrier(comment=""),
-                47, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
-                71, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
-                71, SBarrier(comment=""),
-                71, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
-            ]
             snopTable = [
                 -1, SNop(0),
               #  0, SNop(0),
@@ -424,6 +413,20 @@ def hasCustomSchedule(kernel):
               #  26, SNop(0),
              #   27, SNop(0),
             ]
+            syncTable = [
+                -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+                3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+                18, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
+                18, SBarrier(comment=""),
+                23, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+
+                26, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
+                26, SBarrier(comment=""),
+                71, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
+                71, SBarrier(comment=""),
+               # 71, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+            ]
+           
             optSchedule = {
                 'SYNC': [syncTable[::2]],
                 'PackA3': [[-1, -1, -1, -1, 
@@ -437,8 +440,15 @@ def hasCustomSchedule(kernel):
                             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],
                 'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
                 'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
-                'GRA': [[47, 47, 47, 47, 47, 47, 47, 47]],
-                'GRB': [[47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47]],
+
+                'LRA0': [[-1, 0, 1, 2]],
+                'LRB0': [[3, 4, 6, 8, 10, 12, 14, 16]],
+                'GRA': [[18, 18, 20, 20, 22, 22, 24, 24]],
+
+                'GRB': [[26, 26, 28, 28, 30, 30, 32, 32, 34, 34, 36, 36, 38, 38, 40, 40]],
+                'LRA3': [[72, 73, 76, 77]],
+                'LRB3': [[74, 75, 78, 79, 80, 81, 82, 83]],
+
                 'LRSA': [[22]],
                 'LRSB': [[22]],
                 'LWSA': [[70]],
@@ -451,10 +461,6 @@ def hasCustomSchedule(kernel):
                             27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]],
                 'SNOP': [snopTable[::2]],
                 
-                'LRA0': [[0, 1, 2, 3]],
-                'LRA3': [[72, 73, 76, 77]],
-                'LRB0': [[4, 5, 6, 7, 8, 9, 10, 11]],
-                'LRB3': [[74, 75, 78, 79, 80, 81, 82, 83]],
                 'LCC' : [[95, 95]],
             }
             syncCode = syncTable[1::2]
