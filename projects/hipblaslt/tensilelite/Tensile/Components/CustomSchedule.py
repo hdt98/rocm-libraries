@@ -402,26 +402,18 @@ def hasCustomSchedule(kernel):
         nglshift = nllshift = 0 # vmcnt shift for ngl and nll
         if isTN and not useLDSTr and TLDS==1:
             snopTable = [
-                -1, SNop(0),
-              #  0, SNop(0),
-              #  1, SNop(0),
-              #  2, SNop(0),
-              #  3, SNop(0),
-            #    23, SNop(0),
-             #   24, SNop(0),
-            #    25, SNop(0),
-              #  26, SNop(0),
+                19, SNop(0),
              #   27, SNop(0),
             ]
             syncTable = [
                 -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
                 3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
-                18, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
-                18, SBarrier(comment=""),
-                23, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+                12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
+                12, SBarrier(comment=""),
+               # 16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
 
-                26, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
-                26, SBarrier(comment=""),
+                16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
+                16, SBarrier(comment=""),
                 71, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
                 71, SBarrier(comment=""),
                # 71, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
@@ -429,30 +421,30 @@ def hasCustomSchedule(kernel):
            
             optSchedule = {
                 'SYNC': [syncTable[::2]],
-                'PackA3': [[-1, -1, -1, -1,  # h[0, 3] -> vgprValuA_X0[0:3]
+                'PackA3': [[-1, -1, -1, -1,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
                              0, 0, 0, 0, 
                              0, 0, 0, 0,  
                              0, 0, 0, 0, 
                              0, 0, 0, 0, 
-                             0, 0, 0, 0,  # l[0, 3] -> vgprValuA_X0[4:7]
-                            1, 1, 1, 1, # h[4, 7] -> vgprValuA_X0[8:11]
-                            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]],# l[4, 7] -> vgprValuA_X0[12:15]
-                'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3]
-                            -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # l[0, 3] -> vgprValuB_X0[4:7]
-                            0, 1, 1, 1, # h[4, 7] -> vgprValuB_X0[8:11]
-                            1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, # l[4, 7] -> vgprValuB_X0[12:15]
-                            3, 3, 3, 3, # h[8, 11] -> vgprValuB_X0[16:19]
-                            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, # l[8, 11] -> vgprValuB_X0[20:23]
-                            3, 3, 3, 3, # h[12, 15] -> vgprValuB_X0[24:27]
-                            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[12, 15] -> vgprValuB_X0[28:31]
+                             0, 0, 0, 0,  # l[0, 3] -> vgprValuA_X0[4:7] mfma#1
+                            2, 2, 2, 2, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
+                            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
+                'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
+                            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
+                            4, 4, 4, 4, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
+                            5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
+                            8, 8, 8, 8, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
+                            9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
+                            14, 14, 14, 14, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
+                            15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 19, 19, 19, 19]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
                 'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
                 'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
 
                 'LRA0': [[-1, 0, 1, 2]],
-                'LRB0': [[3, 4, 6, 8, 10, 12, 14, 16]],
-                'GRA': [[18, 18, 20, 20, 22, 22, 24, 24]],
+                'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
+                'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
-                'GRB': [[26, 26, 28, 28, 30, 30, 32, 32, 34, 34, 36, 36, 38, 38, 40, 40]],
+                'GRB': [[16, 16, 17, 17, 18, 18, 19, 19, 34, 34, 36, 36, 38, 38, 40, 40]],
                 'LRA3': [[72, 73, 76, 77]],
                 'LRB3': [[74, 75, 78, 79, 80, 81, 82, 83]],
 
@@ -460,12 +452,19 @@ def hasCustomSchedule(kernel):
                 'LRSB': [[22]],
                 'LWSA': [[70]],
                 'LWSB': [[70]],
-                'PackA0': [[23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26]],
-                'PackB0': [[23, 23, 23, 23, 
-                            24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
-                            25, 25, 25, 25,
-                            26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 
-                            27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]],
+
+                'PackA0': [[23, 23, 23, 23, # vgprValuA_X0_I0[16:19] mfma#24
+                            24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,  # vgprValuA_X0_I0[20:23] mfma#25
+                            25, 25, 25, 25, # vgprValuA_X0_I0[24:27] mfma#27
+                            26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26]], # vgprValuA_X0_I0[28:31] mfma#28
+                'PackB0': [[23, 23, 23, 23, # vgprValuB_X0_I0[32:35] mfma#48
+                            24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, # vgprValuB_X0_I0[36:39] mfma#50
+                            25, 25, 25, 25, # vgprValuB_X0_I0[40:43] mfma#54
+                            26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, # vgprValuB_X0_I0[44:47] mfma#56
+                            27, 27, 27, 27, # vgprValuB_X0_I0[48:51] mfma#60
+                            27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, # vgprValuB_X0_I0[52:55] mfma#62
+                            27, 27, 27, 27, # vgprValuB_X0_I0[56:59] mfma#66
+                            27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]], # vgprValuB_X0_I0[60:63] mfma#68
                 'SNOP': [snopTable[::2]],
                 
                 'LCC' : [[95, 95]],
