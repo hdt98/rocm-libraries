@@ -174,17 +174,35 @@ namespace rocRoller
 
     inline int AssemblyKernel::sgpr_count() const
     {
-        return m_context.lock()->allocator(Register::Type::Scalar)->useCount();
+        auto ctx = m_context.lock();
+        AssertFatal(ctx, "AssemblyKernel::sgpr_count() called with invalid context");
+
+        auto allocator = ctx->allocator(Register::Type::Scalar);
+        AssertFatal(allocator, "AssemblyKernel::sgpr_count() allocator is null");
+
+        return allocator->useCount();
     }
 
     inline int AssemblyKernel::vgpr_count() const
     {
-        return m_context.lock()->allocator(Register::Type::Vector)->useCount();
+        auto ctx = m_context.lock();
+        AssertFatal(ctx, "AssemblyKernel::vgpr_count() called with invalid context");
+
+        auto allocator = ctx->allocator(Register::Type::Vector);
+        AssertFatal(allocator, "AssemblyKernel::vgpr_count() allocator is null");
+
+        return allocator->useCount();
     }
 
     inline int AssemblyKernel::agpr_count() const
     {
-        return m_context.lock()->allocator(Register::Type::Accumulator)->useCount();
+        auto ctx = m_context.lock();
+        AssertFatal(ctx, "AssemblyKernel::agpr_count() called with invalid context");
+
+        auto allocator = ctx->allocator(Register::Type::Accumulator);
+        AssertFatal(allocator, "AssemblyKernel::agpr_count() allocator is null");
+
+        return allocator->useCount();
     }
 
     inline int AssemblyKernel::accum_offset() const

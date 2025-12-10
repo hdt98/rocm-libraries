@@ -440,10 +440,17 @@ namespace rocRoller::Client::GEMMClient
         if(commandKernel->getContext() && commandKernel->getContext()->kernel())
         {
             auto assemblyKernel = commandKernel->getContext()->kernel();
-            result.sgprCount    = assemblyKernel->sgpr_count();
-            result.vgprCount    = assemblyKernel->vgpr_count();
-            result.agprCount    = assemblyKernel->agpr_count();
-            result.ldsBytes     = assemblyKernel->group_segment_fixed_size();
+
+            // Only query register counts if kernel was generated (not loaded from code object).
+            // When loaded, generation timer is 0; when generated, it records the time spent.
+            // TODO: Load these when deserializing the kernel from a code object.
+            if(result.kernelGenerate > 0)
+            {
+                result.sgprCount = assemblyKernel->sgpr_count();
+                result.vgprCount = assemblyKernel->vgpr_count();
+                result.agprCount = assemblyKernel->agpr_count();
+                result.ldsBytes  = assemblyKernel->group_segment_fixed_size();
+            }
         }
 
         if(benchmarkParams.check)
