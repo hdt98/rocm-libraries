@@ -64,137 +64,154 @@ using namespace rocRoller;
 
 const int NUM_RUNS = 5; // Should be odd, as median is used
 
-class WaitcntTestKernel : public AssemblyTestKernel
+class WaitcntCyclePredictionKernel : public LDSTestKernelBase
 {
 public:
-    WaitcntTestKernel(ContextPtr                 context,
-                      uint32_t                   workgroupSize,
-                      size_t                     instrDwords,
-                      size_t                     strideMultiplier,
-                      const std::vector<size_t>& baseAddresses,
-                      bool                       write)
-        : AssemblyTestKernel(context)
-        , m_workgroupSize(workgroupSize)
-        , m_instrDwords(instrDwords)
-        , m_strideMultiplier(strideMultiplier)
-        , m_baseAddresses(baseAddresses)
-        , m_write(write)
+    WaitcntCyclePredictionKernel(ContextPtr                 context,
+                                 uint32_t                   workgroupSize,
+                                 size_t                     instrDwords,
+                                 size_t                     strideMultiplier,
+                                 const std::vector<size_t>& baseAddresses,
+                                 bool                       write)
+        : LDSTestKernelBase(
+            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
     {
-        auto k = m_context->kernel();
-        k->setKernelDimensions(1);
-
-        const auto one  = std::make_shared<Expression::Expression>(1u);
-        const auto zero = std::make_shared<Expression::Expression>(0u);
-
-        auto workitemCount = Expression::literal(m_workgroupSize * 256);
-        k->setWorkgroupSize({m_workgroupSize, 1, 1});
-        k->setWorkitemCount({workitemCount, one, one});
-        k->setDynamicSharedMemBytes(zero);
-    }
-
-    void operator()()
-    {
-        KernelInvocation    invocation{{m_workgroupSize * 256, 1, 1}, {m_workgroupSize, 1, 1}, 0};
-        AssemblyTestKernel::operator()(invocation);
-    }
-
-    const std::vector<Instruction>& getInstructions() const
-    {
-        return m_instructions;
     }
 
 protected:
-    void generate() override
+    Generator<Instruction>
+        generateKernelBody(std::shared_ptr<Register::Value> ldsData,
+                           std::shared_ptr<Register::Value> ldsWithOffset,
+                           std::shared_ptr<Register::Value> workitemIndex) override
     {
-        auto k = m_context->kernel();
+        const auto alignment = static_cast<int>(m_instrDwords);
+        const auto regCount  = 248; // Leave some registers for other operations
 
-        m_context->schedule(k->preamble());
-        m_context->schedule(k->prolog());
+        auto readDst
+            = Register::Value::Placeholder(m_context,
+                                           Register::Type::Vector,
+                                           DataType::Raw32,
+                                           regCount,
+                                           Register::AllocationOptions{
+                                               .contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                                               .alignment            = alignment,
+                                           });
+        co_yield readDst->allocate();
 
-        auto kb = [&]() -> Generator<Instruction> {
-            const auto alignment = static_cast<int>(m_instrDwords);
-            const auto regCount  = 248; // Leave some registers for other operations
+        co_yield Expression::generate(
+            ldsWithOffset,
+            Expression::literal(ldsData->getLDSAllocation()->offset())
+                + workitemIndex->expression()
+                      * Expression::literal((4 * m_strideMultiplier * m_instrDwords)
+                                                % ldsData->getLDSAllocation()->size(),
+                                            resultType(workitemIndex->expression()).varType),
+            m_context);
 
-            auto readDst = Register::Value::Placeholder(
-                m_context,
-                Register::Type::Vector,
-                DataType::Raw32,
-                regCount,
-                Register::AllocationOptions{
-                    .contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
-                    .alignment            = alignment,
-                });
-            co_yield readDst->allocate();
+        co_yield m_context->mem()->barrier({});
 
-            auto lds = Register::Value::AllocateLDS(
-                m_context,
-                DataType::Raw32,
-                m_context->targetArchitecture().GetCapability(GPUCapability::MaxLdsSize) / 4);
-
-            auto ldsAddr = Register::Value::Placeholder(
-                m_context, Register::Type::Vector, DataType::UInt32, 1);
-            auto workitemIndex = m_context->kernel()->workitemIndex()[0];
-
-            co_yield Expression::generate(
-                ldsAddr,
-                Expression::literal(lds->getLDSAllocation()->offset())
-                    + workitemIndex->expression()
-                          * Expression::literal((4 * m_strideMultiplier * m_instrDwords)
-                                                    % lds->getLDSAllocation()->size(),
-                                                resultType(workitemIndex->expression()).varType),
-                m_context);
-
-            co_yield m_context->mem()->barrier({});
-
-            for(int i = 0; i < 20; i++)
-            {
-                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
-                const auto numBytes     = m_instrDwords * 4;
-
-                if(m_write)
-                {
-                    co_yield m_context->mem()->storeLocal(
-                        ldsAddr, readDst->subset(Generated(iota(start, end))), 0, numBytes);
-                }
-                else
-                {
-                    co_yield m_context->mem()->loadLocal(
-                        readDst->subset(Generated(iota(start, end))), ldsAddr, 0, numBytes);
-                }
-            }
-
-            {
-                int i = 4;
-                do
-                {
-                    co_yield Instruction::Wait(
-                        WaitCount::DSCnt(m_context->targetArchitecture(), i));
-                    i -= 4;
-                } while(i >= 0);
-            }
-        };
-
-        m_instructions.clear();
-        for(auto inst : kb())
+        for(int i = 0; i < 20; i++)
         {
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                inst.setAddresses(m_baseAddresses);
-            m_context->schedule(inst);
-            m_instructions.push_back(inst);
-        }
-        m_instructions.push_back(Instruction("s_endpgm", {}, {}, {}, ""));
+            const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
+            const auto numBytes     = m_instrDwords * 4;
 
-        m_context->schedule(k->postamble());
-        m_context->schedule(k->amdgpu_metadata());
+            if(m_write)
+            {
+                co_yield m_context->mem()->storeLocal(
+                    ldsWithOffset, readDst->subset(Generated(iota(start, end))), 0, numBytes);
+            }
+            else
+            {
+                co_yield m_context->mem()->loadLocal(
+                    readDst->subset(Generated(iota(start, end))), ldsWithOffset, 0, numBytes);
+            }
+        }
+
+        {
+            int i = 4;
+            do
+            {
+                co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), i));
+                i -= 4;
+            } while(i >= 0);
+        }
+    }
+};
+
+class LDSWaitcntWeaveKernel : public LDSTestKernelBase
+{
+public:
+    LDSWaitcntWeaveKernel(ContextPtr                 context,
+                          uint32_t                   workgroupSize,
+                          size_t                     instrDwords,
+                          size_t                     strideMultiplier,
+                          const std::vector<size_t>& baseAddresses,
+                          bool                       write)
+        : LDSTestKernelBase(
+            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
+    {
     }
 
-private:
-    uint32_t                 m_workgroupSize;
-    size_t                   m_instrDwords;
-    size_t                   m_strideMultiplier;
-    std::vector<size_t>      m_baseAddresses;
-    std::vector<Instruction> m_instructions;
-    bool                     m_write;
+protected:
+    Generator<Instruction>
+        generateKernelBody(std::shared_ptr<Register::Value> ldsData,
+                           std::shared_ptr<Register::Value> ldsWithOffset,
+                           std::shared_ptr<Register::Value> workitemIndex) override
+    {
+        co_yield Expression::generate(
+            ldsWithOffset,
+            Expression::literal(ldsData->getLDSAllocation()->offset())
+                + workitemIndex->expression()
+                      * Expression::literal((4 * m_strideMultiplier * m_instrDwords)
+                                            % ldsData->getLDSAllocation()->size()),
+            m_context);
+
+        auto ldsDst = Register::Value::Placeholder(
+            m_context,
+            Register::Type::Vector,
+            DataType::Raw32,
+            248, // Leave a few leftover for indexing
+            Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                                        .alignment            = static_cast<int>(m_instrDwords)});
+        co_yield ldsDst->allocate();
+
+        auto s0
+            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
+        auto s1
+            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
+        co_yield s0->allocate();
+        co_yield s1->allocate();
+
+        co_yield m_context->mem()->barrier({});
+
+        int counter = 0;
+        for(int i = 0; i < 14; ++i)
+        {
+            const auto [start, end]
+                = getAlignedSubset(ldsDst->registerCount(), m_instrDwords, counter++);
+            auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
+            if(m_write)
+                co_yield m_context->mem()->storeLocal(ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+            else
+                co_yield m_context->mem()->loadLocal(dstRegs, ldsWithOffset, 0, 4 * m_instrDwords);
+        }
+
+        for(int i = 1; i < 8; ++i)
+        {
+            for(int k = 0; k < i; ++k)
+            {
+                const auto [start, end]
+                    = getAlignedSubset(ldsDst->registerCount(), m_instrDwords, counter++);
+                auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
+                if(m_write)
+                    co_yield m_context->mem()->storeLocal(
+                        ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+                else
+                    co_yield m_context->mem()->loadLocal(
+                        dstRegs, ldsWithOffset, 0, 4 * m_instrDwords);
+            }
+            co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
+        }
+    }
 };
 
 TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu][lds-model]")
@@ -221,7 +238,7 @@ TEST_CASE("Cycle count predictions with waitcnt", "[rocprofiler][gpu][lds-model]
         const auto baseAddresses
             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
-        WaitcntTestKernel kernel(
+        WaitcntCyclePredictionKernel kernel(
             context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
@@ -310,155 +327,11 @@ TEST_CASE("Weave multiple LDS and waitcnt", "[rocprofiler][scheduler][lds-model]
 
     SECTION(name)
     {
-        auto command = std::make_shared<Command>();
-        auto k       = context->kernel();
+        LDSWaitcntWeaveKernel kernel(
+            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
-        k->setKernelDimensions(1);
-
-        const auto one  = std::make_shared<Expression::Expression>(1u);
-        const auto zero = std::make_shared<Expression::Expression>(0u);
-
-        auto workitemCount = Expression::literal(workgroupSize * 256);
-        k->setWorkgroupSize({workgroupSize, 1, 1});
-        k->setWorkitemCount({workitemCount, one, one});
-        k->setDynamicSharedMemBytes(zero);
-
-        context->schedule(k->preamble());
-        context->schedule(k->prolog());
-
-        auto ldsData = Register::Value::AllocateLDS(
-            context.get(),
-            DataType::Raw32,
-            context->targetArchitecture().GetCapability(GPUCapability::MaxLdsSize) / 4);
-
-        auto ldsWithOffset = Register::Value::Placeholder(
-            context.get(), Register::Type::Vector, DataType::UInt32, 1);
-        auto workitemIndex = context->kernel()->workitemIndex()[0];
-
-        auto kb = [&]() -> Generator<Instruction> {
-            co_yield Expression::generate(
-                ldsWithOffset,
-                Expression::literal(ldsData->getLDSAllocation()->offset())
-                    + workitemIndex->expression()
-                          * Expression::literal((4 * strideMultiplier * instrDwords)
-                                                % ldsData->getLDSAllocation()->size()),
-                context.get());
-
-            auto ldsDst = Register::Value::Placeholder(
-                context.get(),
-                Register::Type::Vector,
-                DataType::Raw32,
-                248, // Leave a few leftover for indexing
-                Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
-                                            .alignment            = instrDwords});
-            co_yield ldsDst->allocate();
-
-            auto s0 = Register::Value::Placeholder(
-                context.get(), Register::Type::Scalar, DataType::UInt32, 1);
-            auto s1 = Register::Value::Placeholder(
-                context.get(), Register::Type::Scalar, DataType::UInt32, 1);
-            co_yield s0->allocate();
-            co_yield s1->allocate();
-
-            co_yield context->mem()->barrier({});
-
-            int counter = 0;
-            for(int i = 0; i < 14; ++i)
-            {
-                const auto [start, end]
-                    = getAlignedSubset(ldsDst->registerCount(), instrDwords, counter++);
-                auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
-                if(write)
-                    co_yield context->mem()->storeLocal(ldsWithOffset, dstRegs, 0, 4 * instrDwords);
-                else
-                    co_yield context->mem()->loadLocal(dstRegs, ldsWithOffset, 0, 4 * instrDwords);
-            }
-
-            for(int i = 1; i < 8; ++i)
-            {
-                for(int k = 0; k < i; ++k)
-                {
-                    const auto [start, end]
-                        = getAlignedSubset(ldsDst->registerCount(), instrDwords, counter++);
-                    auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
-                    if(write)
-                        co_yield context->mem()->storeLocal(
-                            ldsWithOffset, dstRegs, 0, 4 * instrDwords);
-                    else
-                        co_yield context->mem()->loadLocal(
-                            dstRegs, ldsWithOffset, 0, 4 * instrDwords);
-                }
-                co_yield Instruction::Wait(WaitCount::DSCnt(context->targetArchitecture(), 0));
-            }
-        };
-
-        auto scheduler = Component::GetNew<Scheduling::Scheduler>(
-            std::make_tuple(Scheduling::SchedulerProcedure::Priority,
-                            Scheduling::CostFunction::LinearWeighted,
-                            context.get()));
-
-        std::vector<Instruction> instructions;
-        for(auto inst : kb())
-        {
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                inst.setAddresses(baseAddresses);
-            context->schedule(inst);
-            instructions.push_back(inst);
-        }
-        instructions.push_back(
-            Instruction("s_endpgm", {}, {}, {}, "")); // postamble too much other stuff
-
-        context->schedule(k->postamble());
-        context->schedule(k->amdgpu_metadata());
-
-        CommandKernel commandKernel;
-        commandKernel.setContext(context.get());
-        commandKernel.generateKernel();
-
-        CommandArguments commandArgs = command->createArguments();
-
-        std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
-
-        for(int run = 0; run < NUM_RUNS; ++run)
-        {
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData(
-                [&]() { commandKernel.launchKernel(commandArgs.runtimeArguments()); });
-            allLatencies.push_back(latencies);
-        }
-
-        // Filter instructions and verify alignment with profiler data
-        const auto filteredInstructions
-            = filterAndVerifyInstructions(instructions, allLatencies[0]);
-
-        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
-        INFO(infoStr);
-
-        { // All latencies have same number of instructions
-            size_t expectedSize = allLatencies[0].size();
-            REQUIRE(std::all_of(
-                allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
-                    return latencies.size() == expectedSize;
-                }));
-        }
-
-        std::vector<std::tuple<std::string, size_t>> medianLatencies;
-        for(size_t i = 0; i < filteredInstructions.size(); ++i)
-        {
-            std::vector<uint64_t> latenciesPerRun;
-            for(const auto& runLatencies : allLatencies)
-            {
-                latenciesPerRun.push_back(runLatencies[i].meanLatency());
-            }
-            auto       medianLatency = median_of_odd_elements(latenciesPerRun);
-            const auto instrString   = allLatencies[0][i].instruction;
-            medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
-        }
-
-        if(testIndividual)
-        {
-            Log::info(infoStr);
-            Log::info(context.output());
-        }
+        auto [filteredInstructions, medianLatencies]
+            = runKernelAndCollectLatencies(context, kernel, testIndividual);
 
         int totalAbsoluteDelta       = 0;
         int totalDelta               = 0;
