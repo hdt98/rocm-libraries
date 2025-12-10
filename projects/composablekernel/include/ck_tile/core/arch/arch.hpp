@@ -306,10 +306,16 @@ CK_TILE_DEVICE void s_waitcnt()
 {
 #if defined(__gfx12__)
     // GFX12 do't use __builtin_amdgcn_s_waitcnt
-    constexpr index_t dscnt_val   = waitcnt_arg::from_lgkmcnt<lgkmcnt>();
-    constexpr index_t loadcnt_val = waitcnt_arg::from_vmcnt<vmcnt>();
-    llvm_amdgcn_s_wait_dscnt(dscnt_val);
-    llvm_amdgcn_s_wait_loadcnt(loadcnt_val);
+    if constexpr(lgkmcnt != waitcnt_arg::kMaxLgkmCnt)
+    {
+        constexpr index_t dscnt_val = waitcnt_arg::from_lgkmcnt<lgkmcnt>();
+        llvm_amdgcn_s_wait_dscnt(dscnt_val);
+    }
+    if constexpr(vmcnt != waitcnt_arg::kMaxVmCnt)
+    {
+        constexpr index_t loadcnt_val = waitcnt_arg::from_vmcnt<vmcnt>();
+        llvm_amdgcn_s_wait_loadcnt(loadcnt_val);
+    }
 #else
     __builtin_amdgcn_s_waitcnt(waitcnt_arg::from_vmcnt<vmcnt>() |
                                waitcnt_arg::from_expcnt<expcnt>() |
@@ -325,11 +331,16 @@ CK_TILE_DEVICE void s_waitcnt_barrier()
 #if defined(__gfx12__)
     // GFX12 optimization: Manual barrier implementation avoids performance penalty
     // from __builtin_amdgcn_s_barrier which inserts extra s_wait_loadcnt_dscnt 0x0
-    constexpr index_t dscnt_val   = waitcnt_arg::from_lgkmcnt<lgkmcnt>();
-    constexpr index_t loadcnt_val = waitcnt_arg::from_vmcnt<vmcnt>();
-
-    llvm_amdgcn_s_wait_dscnt(dscnt_val);
-    llvm_amdgcn_s_wait_loadcnt(loadcnt_val);
+    if constexpr(lgkmcnt != waitcnt_arg::kMaxLgkmCnt)
+    {
+        constexpr index_t dscnt_val = waitcnt_arg::from_lgkmcnt<lgkmcnt>();
+        llvm_amdgcn_s_wait_dscnt(dscnt_val);
+    }
+    if constexpr(vmcnt != waitcnt_arg::kMaxVmCnt)
+    {
+        constexpr index_t loadcnt_val = waitcnt_arg::from_vmcnt<vmcnt>();
+        llvm_amdgcn_s_wait_loadcnt(loadcnt_val);
+    }
     __builtin_amdgcn_s_barrier_signal(-1);
     __builtin_amdgcn_s_barrier_wait(-1);
 #else
@@ -495,6 +506,36 @@ CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx950_t) { return 64; }
 
 CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx_invalid_t) { return 0; }
 
+// the below is for vgpr count per arch
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx9_t) { return 512; }
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx103_t) { return 256; }
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx11_t) { return 256; }
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx120_t) { return 256; }
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx125_t) { return 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx950_t) { return 512; }
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx_invalid_t) { return 0; }
+
+// the below is for lds size per arch
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx9_t) { return 64 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx103_t) { return 64 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx11_t) { return 64 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx120_t) { return 64 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx125_t) { return 320 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx950_t) { return 160 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx_invalid_t) { return 0; }
+
 } // namespace detail
 CK_TILE_DEVICE static constexpr auto get_n_lds_banks()
 {
@@ -516,4 +557,15 @@ enum LLVMSchedGroupMask : int32_t
     DS_WRITE   = 1 << 9,
     ALL        = (DS_WRITE << 1) - 1,
 };
+
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count()
+{
+    return detail::get_max_vgpr_count(get_device_arch());
+}
+
+CK_TILE_DEVICE static constexpr auto get_lds_size()
+{
+    return detail::get_lds_size(get_device_arch());
+}
+
 } // namespace ck_tile

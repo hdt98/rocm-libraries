@@ -82,7 +82,7 @@ struct BlockUniversalGemmAsBsCr
         static constexpr index_t InterWaveSchedulingMacClusters = 1;
 
         // should be at least equal to: WarpGemm::Impl::kABKPerLane
-        static constexpr index_t KPack      = WarpGemm::kKPerThread;
+        static constexpr index_t KPack      = WarpGemm::kKPack;
         static constexpr index_t KPerThread = KIterPerWarp * WarpGemm::kKPerThread;
     };
 

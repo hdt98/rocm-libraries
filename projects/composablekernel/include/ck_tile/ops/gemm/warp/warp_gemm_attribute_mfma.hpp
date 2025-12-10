@@ -37,6 +37,7 @@ struct WarpGemmAttributeMfma
     static constexpr index_t kN          = Impl::kN;
     static constexpr index_t kK          = Impl::kK;
     static constexpr index_t kKPerThread = Impl::kABKPerLane;
+    static constexpr index_t kKPack      = Impl::kABKPerLane;
     static constexpr index_t kCMLane     = Impl::kCMLane;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return 1; }
@@ -148,6 +149,7 @@ struct WarpGemmAttributeMfmaIterateK
     static constexpr index_t kN          = Impl::kN;
     static constexpr index_t kK          = Impl::kK * kKIter;
     static constexpr index_t kKPerThread = Impl::kABKPerLane * kKIter;
+    static constexpr index_t kKPack      = Impl::kABKPerLane * kKIter;
     static constexpr index_t kCMLane     = Impl::kCMLane;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return kKIter; }
@@ -409,6 +411,7 @@ struct WarpGemmAttributeMfmaTransposedCDistribution
     static constexpr index_t kN          = Impl::kM;
     static constexpr index_t kK          = Impl::kK;
     static constexpr index_t kKPerThread = Impl::kABKPerLane;
+    static constexpr index_t kKPack      = Impl::kABKPerLane;
     static constexpr index_t kCMLane     = Impl::kCMLane;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return 1; }
@@ -491,6 +494,7 @@ struct WarpGemmAttributeMfmaTransposedCDistribution_SwizzleB
     static constexpr index_t kN          = Impl::kM;
     static constexpr index_t kK          = Impl::kK;
     static constexpr index_t kKPerThread = Impl::kABKPerLane;
+    static constexpr index_t kKPack      = Impl::kABKPerLane;
     static constexpr index_t SFactor     = SFactor_; // group how many CM1 together
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return 1; }
@@ -591,6 +595,7 @@ struct WarpGemmAttributeMfmaIterateKAndTransposedCDistribution
     static constexpr index_t kN          = Impl::kM;
     static constexpr index_t kK          = Impl::kK * kKIter;
     static constexpr index_t kKPerThread = Impl::kABKPerLane * kKIter;
+    static constexpr index_t kKPack      = Impl::kABKPerLane * kKIter;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return kKIter; }
 
@@ -740,6 +745,7 @@ struct WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB
     static constexpr index_t kN          = Impl::kM;
     static constexpr index_t kK          = Impl::kK * kKIter;
     static constexpr index_t kKPerThread = Impl::kABKPerLane * kKIter;
+    static constexpr index_t kKPack      = Impl::kABKPerLane * kKIter;
     static constexpr index_t SFactor     = SFactor_; // group how many CM1 together
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return kKIter; }
@@ -883,6 +889,7 @@ struct WarpGemmAttributeMfmaIterateK_SwizzleA
     static constexpr index_t kN          = Impl::kN;
     static constexpr index_t kK          = Impl::kK * kKIter;
     static constexpr index_t kKPerThread = Impl::kABKPerLane * kKIter;
+    static constexpr index_t kKPack      = Impl::kABKPerLane * kKIter;
     static constexpr index_t SFactor     = SFactor_; // group how many CM1 together
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return kKIter; }

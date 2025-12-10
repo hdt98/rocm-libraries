@@ -320,26 +320,74 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
     }
 
     template <typename Problem>
-    CK_TILE_HOST_DEVICE static constexpr auto GetBlockGemm()
+    CK_TILE_DEVICE static constexpr auto GetEstimatedVgprCount()
+    {
+        constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
+        constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
+        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+
+        using ADataType = remove_cvref_t<typename Problem::ADataType>;
+        using BDataType = remove_cvref_t<typename Problem::BDataType>;
+        using CDataType = remove_cvref_t<typename Problem::CDataType>;
+
+        constexpr index_t MWarps       = Problem::BlockGemmShape::BlockWarps::at(Base::I0);
+        constexpr index_t NWarps       = Problem::BlockGemmShape::BlockWarps::at(Base::I1);
+        constexpr index_t warpSize     = get_warp_size();
+        constexpr index_t BlockSize    = Problem::kBlockSize;
+        constexpr index_t BytesPerVGPR = 4;
+        constexpr index_t AccVGPRNum =
+            sizeof(CDataType) * MPerBlock * NPerBlock / BlockSize / BytesPerVGPR;
+
+        // this is used to calculate DoubleBufferFactor which is 2.5; this is to make sure float
+        // calculation in constexpr is avoided
+        constexpr index_t DoubleBufferNumerator   = 5;
+        constexpr index_t DoubleBufferDenominator = 2;
+
+        constexpr index_t APackedSize = numeric_traits<ADataType>::PackedSize;
+        constexpr index_t BPackedSize = numeric_traits<BDataType>::PackedSize;
+
+        constexpr index_t ALoadVGPRNum = sizeof(ADataType) / APackedSize * MPerBlock * KPerBlock /
+                                         MWarps / warpSize / BytesPerVGPR * DoubleBufferNumerator /
+                                         DoubleBufferDenominator;
+
+        constexpr index_t BLoadVGPRNum = sizeof(BDataType) / BPackedSize * NPerBlock * KPerBlock /
+                                         NWarps / warpSize / BytesPerVGPR * DoubleBufferNumerator /
+                                         DoubleBufferDenominator;
+
+        constexpr index_t TotalInputVGPRNum = ALoadVGPRNum + BLoadVGPRNum;
+
+        return make_tuple(number<AccVGPRNum>{}, number<TotalInputVGPRNum>{});
+    }
+
+    // this function is used to get SubTile Number
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto GetPipelineSubTileNum()
+    {
+        constexpr auto estimated_vgpr = GetEstimatedVgprCount<Problem>();
+
+        constexpr auto acc_vgpr_num   = estimated_vgpr.at(number<0>{});
+        constexpr auto input_vgpr_num = estimated_vgpr.at(number<1>{});
+
+        constexpr index_t vgpr_capacity = get_max_vgpr_count();
+        // sub tile number; have 1, 2, 4 choices
+        constexpr index_t sub_tile_num = ((input_vgpr_num + acc_vgpr_num) <= vgpr_capacity) ? 1
+                                         : ((input_vgpr_num / 2 + acc_vgpr_num) <= vgpr_capacity)
+                                             ? 2
+                                             : 4;
+
+        return number<sub_tile_num>{};
+    }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto GetBlockGemm()
     {
         using BlockWarps = typename Problem::BlockGemmShape::BlockWarps;
         using WarpTile   = typename Problem::BlockGemmShape::WarpTile;
 
-#if defined(__gfx950__)
-        constexpr index_t vector_size =
-            DS_READ_TR_SIZE() / sizeof(typename Problem::ComputeDataType);
-        constexpr index_t thread_elements =
-            WarpTile::at(Base::I1) * WarpTile::at(Base::I2) / get_warp_size();
-        constexpr auto wg_attr_num_access =
-            !(Base::template is_a_load_tr<Problem> || Base::template is_b_load_tr<Problem>)
-                ? WGAttrNumAccessEnum::Single
-            : vector_size == thread_elements     ? WGAttrNumAccessEnum::Single
-            : vector_size * 2 == thread_elements ? WGAttrNumAccessEnum::Double
-            : vector_size * 4 == thread_elements ? WGAttrNumAccessEnum::Quad
-                                                 : WGAttrNumAccessEnum::Invalid;
-#else
-        constexpr auto wg_attr_num_access = WGAttrNumAccessEnum::Single;
-#endif
+        constexpr auto pipeline_tune_params = GetPipelineSubTileNum<Problem>();
+        constexpr index_t sub_tile_num      = pipeline_tune_params.value;
+        constexpr auto wg_attr_num_access   = WGAttrNumAccessEnum::Single;
+
         using WarpGemm = WarpGemmDispatcher<typename Problem::ADataType,
                                             typename Problem::BDataType,
                                             typename Problem::CDataType, // AccDataType
@@ -355,7 +403,8 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
                                                                     typename Problem::BDataType,
                                                                     typename Problem::CDataType,
                                                                     BlockWarps,
-                                                                    WarpGemm>;
+                                                                    WarpGemm,
+                                                                    sub_tile_num>;
 
         return BlockGemmARegBRegCRegV1<Problem, BlockGemmPolicy>{};
     }

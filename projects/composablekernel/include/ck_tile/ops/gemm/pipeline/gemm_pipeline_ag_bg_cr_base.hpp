@@ -8,6 +8,19 @@
 
 namespace ck_tile {
 
+template <typename Policy, typename Problem, typename = void>
+struct has_get_pipeline_subtile_params : std::false_type
+{
+};
+
+template <typename Policy, typename Problem>
+struct has_get_pipeline_subtile_params<
+    Policy,
+    Problem,
+    std::void_t<decltype(Policy::template GetPipelineSubTileNum<Problem>())>> : std::true_type
+{
+};
+
 template <typename Problem, typename Policy>
 struct GemmPipelineAgBgCrImplBase
 {
@@ -137,6 +150,43 @@ struct GemmPipelineAgBgCrImplBase
         return make_tuple(std::move(a_lds_block), std::move(b_lds_block));
     }
 
+    // this is used in gfx1250 to avoid lds partition conflict
+    template <index_t num_lds_buffers>
+    CK_TILE_DEVICE auto GetABLdsTensorViews(void* p_smem) const
+    {
+
+        constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
+        constexpr auto b_lds_block_desc = Policy::template MakeBLdsBlockDescriptor<Problem>();
+
+        constexpr index_t a_lds_block_space_size_aligned = integer_least_multiple(
+            sizeof(ADataType) * a_lds_block_desc.get_element_space_size(), 16);
+        constexpr index_t b_lds_block_space_size_aligned = integer_least_multiple(
+            sizeof(BDataType) * b_lds_block_desc.get_element_space_size(), 16);
+
+        constexpr index_t all_a_buffers_size = a_lds_block_space_size_aligned * num_lds_buffers;
+
+        // num_lds_buffers a_lds_block: [A_0][A_1]
+        auto a_lds_blocks = generate_tuple(
+            [&](auto i) {
+                ADataType* __restrict__ p_a_lds = static_cast<ADataType*>(static_cast<void*>(
+                    static_cast<char*>(p_smem) + a_lds_block_space_size_aligned * i.value));
+                return make_tensor_view<address_space_enum::lds>(p_a_lds, a_lds_block_desc);
+            },
+            number<num_lds_buffers>{});
+
+        // num_lds_buffers b_lds_block: [B_0][B_1]
+        auto b_lds_blocks = generate_tuple(
+            [&](auto i) {
+                BDataType* __restrict__ p_b_lds = static_cast<BDataType*>(
+                    static_cast<void*>(static_cast<char*>(p_smem) + all_a_buffers_size +
+                                       b_lds_block_space_size_aligned * i.value));
+                return make_tensor_view<address_space_enum::lds>(p_b_lds, b_lds_block_desc);
+            },
+            number<num_lds_buffers>{});
+
+        return make_tuple(std::move(a_lds_blocks), std::move(b_lds_blocks));
+    }
+
     template <typename DramBlockWindowTmp,
               typename std::enable_if_t<is_detected<is_tuple, DramBlockWindowTmp>::value, bool>* =
                   nullptr>
@@ -223,22 +273,17 @@ struct GemmPipelineAgBgCrImplBase
         return std::move(a_copy_dram_window);
     }
 
-    template <typename ADramBlockWindowTmp, typename ALdsTensorView, typename ALdsLoadTileDistr>
-    CK_TILE_DEVICE constexpr auto GetAWindows(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                              const ALdsTensorView& a_lds_block_view,
-                                              const ALdsLoadTileDistr&,
-                                              const array<index_t, 2>& offset = {0, 0}) const
+    template <typename ALdsTensorView, typename ALdsLoadTileDistr>
+    CK_TILE_DEVICE constexpr auto MakeALdsWindows(const ALdsTensorView& a_lds_block_view,
+                                                  const ALdsLoadTileDistr&) const
     {
-        // A DRAM tile window for load
-        auto a_copy_dram_window = CopyADramWindow(a_dram_block_window_tmp, offset);
-
-        // A LDS tile window for store
         auto a_lds_shape = []() {
             if constexpr(is_a_load_tr)
                 return make_tuple(number<KPerBlock>{}, number<MPerBlock>{});
             else
                 return make_tuple(number<MPerBlock>{}, number<KPerBlock>{});
         }();
+
         auto a_copy_lds_window = make_tile_window(a_lds_block_view, a_lds_shape, {0, 0});
 
         auto a_lds_load_tile_distr = []() {
@@ -250,32 +295,87 @@ struct GemmPipelineAgBgCrImplBase
             else
                 return ALdsLoadTileDistr{};
         }();
+
+        constexpr index_t KSubTileNum = []() {
+            if constexpr(has_get_pipeline_subtile_params<Policy, Problem>::value)
+                return Policy::template GetPipelineSubTileNum<Problem>().value;
+            else
+                return 1;
+        }();
+
+        auto a_lds_gemm_shape = []() {
+            if constexpr(is_a_load_tr)
+                return make_tuple(number<KPerBlock / KSubTileNum>{}, number<MPerBlock>{});
+            else
+                return make_tuple(number<MPerBlock>{}, number<KPerBlock / KSubTileNum>{});
+        }();
+
         auto a_lds_gemm_window =
-            make_tile_window(a_lds_block_view, a_lds_shape, {0, 0}, a_lds_load_tile_distr);
+            make_tile_window(a_lds_block_view, a_lds_gemm_shape, {0, 0}, a_lds_load_tile_distr);
+
+        return make_tuple(std::move(a_copy_lds_window), std::move(a_lds_gemm_window));
+    }
+
+    template <
+        typename ADramBlockWindowTmp,
+        typename ALdsTensorView,
+        typename ALdsLoadTileDistr,
+        typename std::enable_if_t<!is_detected<is_tuple, ALdsTensorView>::value, bool>* = nullptr>
+    CK_TILE_DEVICE constexpr auto GetAWindows(const ADramBlockWindowTmp& a_dram_block_window_tmp,
+                                              const ALdsTensorView& a_lds_block_view,
+                                              const ALdsLoadTileDistr& a_lds_load_tile_distr,
+                                              const array<index_t, 2>& offset = {0, 0}) const
+    {
+        // A DRAM tile window for load
+        auto a_copy_dram_window = CopyADramWindow(a_dram_block_window_tmp, offset);
+
+        // Create LDS windows
+        auto [a_copy_lds_window, a_lds_gemm_window] =
+            MakeALdsWindows(a_lds_block_view, a_lds_load_tile_distr);
 
         return make_tuple(std::move(a_copy_dram_window),
                           std::move(a_copy_lds_window),
                           std::move(a_lds_gemm_window));
     }
 
-    template <typename BDramBlockWindowTmp, typename BLdsTensorView, typename BLdsLoadTileDistr>
-    CK_TILE_DEVICE constexpr auto GetBWindows(const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                              const BLdsTensorView& b_lds_block_view,
-                                              const BLdsLoadTileDistr&,
+    // Unified GetAWindows that supports 1, 2, or 3 LDS buffers
+    template <typename ADramBlockWindowTmp,
+              typename ALdsTensorViewsTuple,
+              typename ALdsLoadTileDistr,
+              typename std::enable_if_t<is_detected<is_tuple, ALdsTensorViewsTuple>::value, bool>* =
+                  nullptr>
+    CK_TILE_DEVICE constexpr auto GetAWindows(const ADramBlockWindowTmp& a_dram_block_window_tmp,
+                                              const ALdsTensorViewsTuple& a_lds_block_views_tuple,
+                                              const ALdsLoadTileDistr& a_lds_load_tile_distr,
                                               const array<index_t, 2>& offset = {0, 0}) const
     {
         // A DRAM tile window for load
-        auto b_copy_dram_window = CopyBDramWindow(b_dram_block_window_tmp, offset);
+        auto a_copy_dram_window = CopyADramWindow(a_dram_block_window_tmp, offset);
 
-        // TODO: Do we really need those two tile windows???
-        // They're exactly same...
-        // B LDS tile window for store
+        // Create LDS windows for each buffer
+        constexpr index_t num_buffers = ALdsTensorViewsTuple::size();
+        auto a_lds_windows            = generate_tuple(
+            [&](auto i) {
+                return MakeALdsWindows(a_lds_block_views_tuple[i], a_lds_load_tile_distr);
+            },
+            number<num_buffers>{});
+
+        // Return: (dram_window, lds_windows_tuple)
+        // lds_windows_tuple[i] = (copy_lds_window_i, lds_gemm_window_i)
+        return make_tuple(std::move(a_copy_dram_window), std::move(a_lds_windows));
+    }
+
+    template <typename BLdsTensorView, typename BLdsLoadTileDistr>
+    CK_TILE_DEVICE constexpr auto MakeBLdsWindows(const BLdsTensorView& b_lds_block_view,
+                                                  const BLdsLoadTileDistr&) const
+    {
         auto b_lds_shape = []() {
             if constexpr(is_b_load_tr)
                 return make_tuple(number<KPerBlock>{}, number<NPerBlock>{});
             else
                 return make_tuple(number<NPerBlock>{}, number<KPerBlock>{});
         }();
+
         auto b_copy_lds_window = make_tile_window(b_lds_block_view, b_lds_shape, {0, 0});
 
         auto b_lds_load_tile_distr = []() {
@@ -287,12 +387,74 @@ struct GemmPipelineAgBgCrImplBase
             else
                 return BLdsLoadTileDistr{};
         }();
+
+        constexpr index_t KSubTileNum = []() {
+            if constexpr(has_get_pipeline_subtile_params<Policy, Problem>::value)
+                return Policy::template GetPipelineSubTileNum<Problem>().value;
+            else
+                return 1;
+        }();
+
+        auto b_lds_gemm_shape = []() {
+            if constexpr(is_b_load_tr)
+                return make_tuple(number<KPerBlock / KSubTileNum>{}, number<NPerBlock>{});
+            else
+                return make_tuple(number<NPerBlock>{}, number<KPerBlock / KSubTileNum>{});
+        }();
+
         auto b_lds_gemm_window =
-            make_tile_window(b_lds_block_view, b_lds_shape, {0, 0}, b_lds_load_tile_distr);
+            make_tile_window(b_lds_block_view, b_lds_gemm_shape, {0, 0}, b_lds_load_tile_distr);
+
+        return make_tuple(std::move(b_copy_lds_window), std::move(b_lds_gemm_window));
+    }
+
+    template <
+        typename BDramBlockWindowTmp,
+        typename BLdsTensorView,
+        typename BLdsLoadTileDistr,
+        typename std::enable_if_t<!is_detected<is_tuple, BLdsTensorView>::value, bool>* = nullptr>
+    CK_TILE_DEVICE constexpr auto GetBWindows(const BDramBlockWindowTmp& b_dram_block_window_tmp,
+                                              const BLdsTensorView& b_lds_block_view,
+                                              const BLdsLoadTileDistr& b_lds_load_tile_distr,
+                                              const array<index_t, 2>& offset = {0, 0}) const
+    {
+        // A DRAM tile window for load
+        auto b_copy_dram_window = CopyBDramWindow(b_dram_block_window_tmp, offset);
+
+        // Create LDS windows
+        auto [b_copy_lds_window, b_lds_gemm_window] =
+            MakeBLdsWindows(b_lds_block_view, b_lds_load_tile_distr);
 
         return make_tuple(std::move(b_copy_dram_window),
                           std::move(b_copy_lds_window),
                           std::move(b_lds_gemm_window));
+    }
+
+    // Unified GetBWindows that supports 1, 2, or 3 LDS buffers
+    template <typename BDramBlockWindowTmp,
+              typename BLdsTensorViewsTuple,
+              typename BLdsLoadTileDistr,
+              typename std::enable_if_t<is_detected<is_tuple, BLdsTensorViewsTuple>::value, bool>* =
+                  nullptr>
+    CK_TILE_DEVICE constexpr auto GetBWindows(const BDramBlockWindowTmp& b_dram_block_window_tmp,
+                                              const BLdsTensorViewsTuple& b_lds_block_views_tuple,
+                                              const BLdsLoadTileDistr& b_lds_load_tile_distr,
+                                              const array<index_t, 2>& offset = {0, 0}) const
+    {
+        // B DRAM tile window for load
+        auto b_copy_dram_window = CopyBDramWindow(b_dram_block_window_tmp, offset);
+
+        // Create LDS windows for each buffer
+        constexpr index_t num_buffers = BLdsTensorViewsTuple::size();
+        auto b_lds_windows            = generate_tuple(
+            [&](auto i) {
+                return MakeBLdsWindows(b_lds_block_views_tuple[i], b_lds_load_tile_distr);
+            },
+            number<num_buffers>{});
+
+        // Return: (dram_window, lds_windows_tuple)
+        // lds_windows_tuple[i] = (copy_lds_window_i, lds_gemm_window_i)
+        return make_tuple(std::move(b_copy_dram_window), std::move(b_lds_windows));
     }
 };
 
