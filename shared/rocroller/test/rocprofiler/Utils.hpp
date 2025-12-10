@@ -83,7 +83,7 @@ namespace rocRoller
         const std::vector<Instruction>& getInstructions() const;
 
     protected:
-        void generate() override;
+        virtual void generate() override;
 
         virtual Generator<Instruction>
             generateKernelBody(std::shared_ptr<Register::Value> ldsData,
@@ -103,54 +103,9 @@ namespace rocRoller
     /**
      * @brief Helper function for profiling and collecting median latencies
      */
-    template <typename KernelType>
     std::tuple<std::vector<Instruction>, std::vector<std::tuple<std::string, size_t>>>
-        runKernelAndCollectLatencies(TestContext& context, KernelType& kernel, bool testIndividual)
-    {
-        constexpr int NUM_RUNS = 5; // Should be odd, as median is used
-
-        std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
-
-        for(int run = 0; run < NUM_RUNS; ++run)
-        {
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
-            allLatencies.push_back(latencies);
-        }
-
-        const auto& instructions = kernel.getInstructions();
-
-        const auto filteredInstructions
-            = filterAndVerifyInstructions(instructions, allLatencies[0]);
-
-        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
-        INFO(infoStr);
-
-        size_t expectedSize = allLatencies[0].size();
-        REQUIRE(std::all_of(
-            allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
-                return latencies.size() == expectedSize;
-            }));
-
-        std::vector<std::tuple<std::string, size_t>> medianLatencies;
-        for(size_t i = 0; i < filteredInstructions.size(); ++i)
-        {
-            std::vector<uint64_t> latenciesPerRun;
-            for(const auto& runLatencies : allLatencies)
-            {
-                latenciesPerRun.push_back(runLatencies[i].meanLatency());
-            }
-            auto       medianLatency = median_of_odd_elements(latenciesPerRun);
-            const auto instrString   = allLatencies[0][i].instruction;
-            medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
-        }
-
-        if(testIndividual)
-        {
-            Log::info(context.output());
-            Log::info(infoStr);
-        }
-
-        return std::make_tuple(filteredInstructions, medianLatencies);
-    }
+        runKernelAndCollectLatencies(TestContext&       context,
+                                     LDSTestKernelBase& kernel,
+                                     bool               testIndividual);
 
 } // namespace rocRoller
