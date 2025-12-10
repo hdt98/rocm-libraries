@@ -80,7 +80,7 @@ static fs::path ComputeUserCachePath()
 #if !MIOPEN_BUILD_DEV
         /// \ref nfs-detection
         if(IsNetworkedFilesystem(p))
-            p = fs::temp_directory_path();
+            p = fs::temp_directory_path() / ".cache" / "miopen" / version;
 #endif
     }
     if(!fs::exists(p) && !MIOPEN_DISABLE_USERDB)

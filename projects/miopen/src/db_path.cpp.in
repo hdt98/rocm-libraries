@@ -102,7 +102,7 @@ fs::path PrepareUserDbPath()
     const auto udb_path = ExpandUser("${MIOPEN_USER_DB_PATH}");
 #if !MIOPEN_BUILD_DEV
     if(IsNetworkedFilesystem(udb_path))
-        return fs::temp_directory_path();
+        return fs::temp_directory_path() / ".config" / "miopen";
 #endif
     return udb_path;
 }
