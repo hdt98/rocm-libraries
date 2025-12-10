@@ -299,6 +299,11 @@ if(HIPBLASLT_ENABLE_HOST)
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/library"
     )
     add_subdirectory(library)
+
+    set_target_properties(hipblaslt PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+    )
 endif()
 
 if(HIPBLASLT_ENABLE_DEVICE)

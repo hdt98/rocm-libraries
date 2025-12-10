@@ -8,7 +8,7 @@ target_compile_options(hipblaslt-clients-common PRIVATE -g -O0 -fprofile-instr-g
 target_link_options(hipblaslt-clients-common PRIVATE -fprofile-instr-generate)
 target_compile_options(hipblaslt-bench PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
 target_link_options(hipblaslt-bench PRIVATE -fprofile-instr-generate)
-target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
+target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
 target_link_options(hipblaslt-test PRIVATE -fprofile-instr-generate)
 
 rocm_get_git_commit_tag(hipblaslt_COMMIT)
