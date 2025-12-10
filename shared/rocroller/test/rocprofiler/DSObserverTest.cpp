@@ -293,6 +293,53 @@ protected:
     }
 };
 
+template <typename KernelType>
+std::tuple<std::vector<Instruction>, std::vector<std::tuple<std::string, size_t>>>
+    runKernelAndCollectLatencies(TestContext& context, KernelType& kernel, bool testIndividual)
+{
+    std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
+
+    for(int run = 0; run < NUM_RUNS; ++run)
+    {
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
+        allLatencies.push_back(latencies);
+    }
+
+    const auto& instructions = kernel.getInstructions();
+
+    const auto filteredInstructions = filterAndVerifyInstructions(instructions, allLatencies[0]);
+
+    const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
+    INFO(infoStr);
+
+    size_t expectedSize = allLatencies[0].size();
+    REQUIRE(std::all_of(
+        allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
+            return latencies.size() == expectedSize;
+        }));
+
+    std::vector<std::tuple<std::string, size_t>> medianLatencies;
+    for(size_t i = 0; i < filteredInstructions.size(); ++i)
+    {
+        std::vector<uint64_t> latenciesPerRun;
+        for(const auto& runLatencies : allLatencies)
+        {
+            latenciesPerRun.push_back(runLatencies[i].meanLatency());
+        }
+        auto       medianLatency = median_of_odd_elements(latenciesPerRun);
+        const auto instrString   = allLatencies[0][i].instruction;
+        medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
+    }
+
+    if(testIndividual)
+    {
+        Log::info(infoStr);
+        Log::info(context.output());
+    }
+
+    return std::make_tuple(filteredInstructions, medianLatencies);
+}
+
 TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
@@ -346,46 +393,8 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
                                     write,
                                     iters);
 
-        std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
-
-        for(int run = 0; run < NUM_RUNS; ++run)
-        {
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
-            allLatencies.push_back(latencies);
-        }
-
-        const auto& instructions = kernel.getInstructions();
-
-        const auto filteredInstructions
-            = filterAndVerifyInstructions(instructions, allLatencies[0]);
-
-        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
-        INFO(infoStr);
-
-        size_t expectedSize = allLatencies[0].size();
-        REQUIRE(std::all_of(
-            allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
-                return latencies.size() == expectedSize;
-            }));
-
-        std::vector<std::tuple<std::string, size_t>> medianLatencies;
-        for(size_t i = 0; i < filteredInstructions.size(); ++i)
-        {
-            std::vector<uint64_t> latenciesPerRun;
-            for(const auto& runLatencies : allLatencies)
-            {
-                latenciesPerRun.push_back(runLatencies[i].meanLatency());
-            }
-            auto       medianLatency = median_of_odd_elements(latenciesPerRun);
-            const auto instrString   = allLatencies[0][i].instruction;
-            medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
-        }
-
-        if(testIndividual)
-        {
-            Log::info(infoStr);
-            Log::info(context.output());
-        }
+        auto [filteredInstructions, medianLatencies]
+            = runKernelAndCollectLatencies(context, kernel, testIndividual);
 
         int totalAbsoluteDelta       = 0;
         int totalDelta               = 0;
@@ -497,49 +506,8 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
         LDSArithmeticWeaveTestKernel kernel(
             context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
-        std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
-
-        for(int run = 0; run < NUM_RUNS; ++run)
-        {
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
-            allLatencies.push_back(latencies);
-        }
-
-        const auto& instructions = kernel.getInstructions();
-
-        // Filter instructions and verify alignment with profiler data
-        const auto filteredInstructions
-            = filterAndVerifyInstructions(instructions, allLatencies[0]);
-
-        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
-        INFO(infoStr);
-
-        {
-            size_t expectedSize = allLatencies[0].size();
-            REQUIRE(std::all_of(
-                allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
-                    return latencies.size() == expectedSize;
-                }));
-        }
-
-        std::vector<std::tuple<std::string, size_t>> medianLatencies;
-        for(size_t i = 0; i < filteredInstructions.size(); ++i)
-        {
-            std::vector<uint64_t> latenciesPerRun;
-            for(const auto& runLatencies : allLatencies)
-            {
-                latenciesPerRun.push_back(runLatencies[i].meanLatency());
-            }
-            auto       medianLatency = median_of_odd_elements(latenciesPerRun);
-            const auto instrString   = allLatencies[0][i].instruction;
-            medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
-        }
-
-        if(testIndividual)
-        {
-            Log::info(infoStr);
-            Log::info(context.output());
-        }
+        auto [filteredInstructions, medianLatencies]
+            = runKernelAndCollectLatencies(context, kernel, testIndividual);
 
         int totalAbsoluteDelta       = 0;
         int totalDelta               = 0;
