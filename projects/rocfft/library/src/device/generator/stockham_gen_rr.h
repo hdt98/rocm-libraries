@@ -113,7 +113,7 @@ struct StockhamKernelRR : public StockhamKernel
                               ThreadGuardMode::GUARD_BY_IF);
         }
 
-        return {If{inbound, stmts}};
+        return {If{inbound, stmts.statements}};
     }
 
     StatementList store_to_global(bool store_registers) override
@@ -159,7 +159,7 @@ struct StockhamKernelRR : public StockhamKernel
                               ThreadGuardMode::GUARD_BY_IF);
         }
 
-        return {If{inbound, stmts}};
+        return {If{inbound, stmts.statements}};
     }
 
     StatementList real_trans_pre_post() override

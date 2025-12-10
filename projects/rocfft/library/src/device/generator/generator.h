@@ -655,30 +655,6 @@ struct CommentLines
         : comments(il){};
 };
 
-using Statement = std::variant<Assign,
-                               ReturnExpr,
-                               Call,
-                               CallbackLoadDeclaration,
-                               CallbackStoreDeclaration,
-                               CommentLines,
-                               Declaration,
-                               LDSDeclaration,
-                               For,
-                               While,
-                               If,
-                               ElseIf,
-                               Else,
-                               StoreGlobal,
-                               StoreGlobalPlanar,
-                               LineBreak,
-                               Return,
-                               Break,
-                               SyncThreads,
-                               Butterfly,
-                               IntrinsicStore,
-                               IntrinsicStorePlanar,
-                               Printf>;
-
 class Assign
 {
 public:
@@ -862,65 +838,56 @@ public:
     }
 };
 
-class StatementList
-{
-public:
-    std::vector<Statement> statements;
-    StatementList();
-    StatementList(const std::initializer_list<Statement>& il);
-    std::string render() const;
-};
-
 class For
 {
 public:
-    Variable      var;
-    Expression    initial;
-    Expression    condition;
-    Expression    increment;
-    StatementList body;
-    bool          pragma_unroll;
-    For(const Variable&      var,
-        const Expression&    initial,
-        const Expression&    condition,
-        const Expression&    increment,
-        const StatementList& body          = {},
-        bool                 pragma_unroll = false);
+    Variable                var;
+    Expression              initial;
+    Expression              condition;
+    Expression              increment;
+    std::vector<Statement>  body;
+    bool                    pragma_unroll;
+    For(const Variable&               var,
+        const Expression&             initial,
+        const Expression&             condition,
+        const Expression&             increment,
+        const std::vector<Statement>& body          = {},
+        bool                          pragma_unroll = false);
     std::string render() const;
 };
 
 class While
 {
 public:
-    Expression    condition;
-    StatementList body;
-    While(const Expression& condition, const StatementList& body = {});
+    Expression              condition;
+    std::vector<Statement>  body;
+    While(const Expression& condition, const std::vector<Statement>& body = {});
     std::string render() const;
 };
 
 class If
 {
 public:
-    Expression    condition;
-    StatementList body;
-    If(const Expression& condition, const StatementList& body);
+    Expression              condition;
+    std::vector<Statement>  body;
+    If(const Expression& condition, const std::vector<Statement>& body);
     std::string render() const;
 };
 
 class ElseIf
 {
 public:
-    Expression    condition;
-    StatementList body;
-    ElseIf(const Expression& condition, const StatementList& body);
+    Expression              condition;
+    std::vector<Statement>  body;
+    ElseIf(const Expression& condition, const std::vector<Statement>& body);
     std::string render() const;
 };
 
 class Else
 {
 public:
-    StatementList body;
-    explicit Else(const StatementList& body);
+    std::vector<Statement>  body;
+    explicit Else(const std::vector<Statement>& body);
     std::string render() const;
 };
 
@@ -1064,6 +1031,42 @@ public:
 };
 
 // end of Statement class declarations
+
+// Now define Statement variant after all classes are complete.
+// This is required for C++20, which requires all types in std::variant to be complete.
+using Statement = std::variant<Assign,
+                               ReturnExpr,
+                               Call,
+                               CallbackLoadDeclaration,
+                               CallbackStoreDeclaration,
+                               CommentLines,
+                               Declaration,
+                               LDSDeclaration,
+                               For,
+                               While,
+                               If,
+                               ElseIf,
+                               Else,
+                               StoreGlobal,
+                               StoreGlobalPlanar,
+                               LineBreak,
+                               Return,
+                               Break,
+                               SyncThreads,
+                               Butterfly,
+                               IntrinsicStore,
+                               IntrinsicStorePlanar,
+                               Printf>;
+
+// StatementList must be defined after Statement since it contains std::vector<Statement>
+class StatementList
+{
+public:
+    std::vector<Statement> statements;
+    StatementList();
+    StatementList(const std::initializer_list<Statement>& il);
+    std::string render() const;
+};
 
 static void operator+=(StatementList& stmts, const Statement& s)
 {
@@ -1305,6 +1308,19 @@ struct BaseVisitor
         return y;
     }
 
+    // Helper to visit a vector of statements
+    virtual std::vector<Statement> visit_statements(const std::vector<Statement>& x)
+    {
+        std::vector<Statement> y;
+        for(const auto& s : x)
+        {
+            StatementList new_stmts = std::visit(*this, s);
+            for(auto& stmt : new_stmts.statements)
+                y.emplace_back(std::move(stmt));
+        }
+        return y;
+    }
+
     virtual ArgumentList visit_ArgumentList(const ArgumentList& x)
     {
         auto y = ArgumentList();
@@ -1355,34 +1371,34 @@ struct BaseVisitor
         auto initial   = std::visit(*this, x.initial);
         auto condition = std::visit(*this, x.condition);
         auto increment = std::visit(*this, x.increment);
-        auto body      = visit_StatementList(x.body);
+        auto body      = visit_statements(x.body);
         return StatementList{For(var, initial, condition, increment, body, x.pragma_unroll)};
     }
 
     virtual StatementList visit_While(const While& x)
     {
         auto condition = std::visit(*this, x.condition);
-        auto body      = visit_StatementList(x.body);
+        auto body      = visit_statements(x.body);
         return StatementList{While(condition, body)};
     }
 
     virtual StatementList visit_If(const If& x)
     {
         auto condition = std::visit(*this, x.condition);
-        auto body      = visit_StatementList(x.body);
+        auto body      = visit_statements(x.body);
         return StatementList{If(condition, body)};
     }
 
     virtual StatementList visit_ElseIf(const ElseIf& x)
     {
         auto condition = std::visit(*this, x.condition);
-        auto body      = visit_StatementList(x.body);
+        auto body      = visit_statements(x.body);
         return StatementList{ElseIf(condition, body)};
     }
 
     virtual StatementList visit_Else(const Else& x)
     {
-        auto body = visit_StatementList(x.body);
+        auto body = visit_statements(x.body);
         return StatementList{Else(body)};
     }
 

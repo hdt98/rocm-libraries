@@ -65,16 +65,16 @@ StatementList FFTGPUWork::lower() const
         if(params.threads_per_transform > params.length / params.width)
         {
             if(g == Guard::BOTH)
-                stmts += If(params.write && (params.thread < params.length / params.width), work);
+                stmts += If(params.write && (params.thread < params.length / params.width), work.statements);
             if(g == Guard::THREAD)
-                stmts += If(params.thread < params.length / params.width, work);
+                stmts += If(params.thread < params.length / params.width, work.statements);
             if(g == Guard::WRITE)
-                stmts += If(params.write, work);
+                stmts += If(params.write, work.statements);
         }
         else
         {
             if(g == Guard::WRITE || g == Guard::BOTH)
-                stmts += If(params.write, work);
+                stmts += If(params.write, work.statements);
             else
                 stmts += work;
         }
@@ -93,13 +93,13 @@ StatementList FFTGPUWork::lower() const
             stmts += If(params.write
                             && (params.thread + iheight * params.threads_per_transform
                                 < params.length / params.width),
-                        work);
+                        work.statements);
         if(g == Guard::THREAD)
             stmts += If(params.thread + iheight * params.threads_per_transform
                             < params.length / params.width,
-                        work);
+                        work.statements);
         if(g == Guard::WRITE)
-            stmts += If(params.write, work);
+            stmts += If(params.write, work.statements);
     }
 
     return stmts;

@@ -5,6 +5,10 @@ Documentation for rocFFT is available at
 
 ## rocFFT 1.0.36 (unreleased)
 
+### Changed
+
+* Moved library to C++20 standard.
+
 ### Optimized
 
 * Removed a potential unnecessary global transpose operation from MPI 3D multi-GPU pencil decompositions.
