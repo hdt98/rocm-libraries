@@ -1162,12 +1162,10 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
     _, opt1 = hasCustomSchedule(kernel)
     numCodePath = opt1.numCodePaths
-    # print(f"{opt1.numMfma} == {len(mfmaCode)}")
     assert opt1.numMfma == len(mfmaCode)
 
 
     for _, indexList in opt1.optSchedule.items():
-        # print(f"{len(indexList)} <= {opt1.numCodePaths}")
         assert len(indexList) <= opt1.numCodePaths
 
     if len(opt1.mfmaReorder) > 0:
@@ -1352,33 +1350,30 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
 
     if isNT(kernel) and useLDSTr and TLDS == 0:
-
         nglshift = nllshift = 11
         syncTable = [
-            -1, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment=""),
-            9, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            -1, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="Finish all LRA1 and 8/16 LRB1"),
+            9, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Finish all LRB1 and LRA0"),
             9, SBarrier(comment="finish LRA0"),
-            10, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment=""),
-            10, SBarrier(comment="for GRA/GRB start"),
+            10, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="4 LRB0 started"),
+            10, SBarrier(comment="for GRA start"),
             25, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
             26, SWaitCnt(dscnt=-1, vlcnt=11+8-3-8, vscnt=-1, comment="For GRA from previous iteration to be done"),
             26, SBarrier(comment="for LRA1 start"),
             34, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="For GRA from previous iteration to be done"),
             34, SBarrier(comment="for LRB1 start"),
-            # 47, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment=""),
-            # 47, SBarrier(comment="end of iteration"),
         ]
         syncCode = syncTable[1::2]
         optSchedule = {
             'SYNC'   : [syncTable[::2]],
             'LRA0': [[0, 0, 2, 2, 4, 4],
                      [1, 1, 3, 3, 5, 5]],
-            'LRB0': [[6, 6, 8, 8, 10, 10, 12, 12, 14,14, 16, 16,18, 18, 20,20],
+            'LRB0': [[6, 6, 8, 8, 10, 10, 12, 12, 14, 14, 16, 16,18, 18, 20,20],
                      [7, 7, 9, 9, 11, 11, 13, 13, 15, 15, 17, 17, 19, 19, 21, 21]],
             'GRIncA': [[1, 1, 1, 2, 2, 2, 3, 3, 3]],
             'GRIncB': [[4, 4, 4, 5, 5, 5, 6, 6, 6]],
             'GRA': [[11, 11, 12, 12, 13, 14]],
-            'GRB': [[26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32,33,33]],
+            'GRB': [[26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33]],
             'LRSA': [[25]],
             'LRSB': [[34]],
             'LWSA': [[21]],
@@ -1392,7 +1387,6 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     numMfma = 48
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
-
 
 def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
 
