@@ -45,6 +45,16 @@
 namespace rocRoller
 {
     /**
+     * @brief Results from kernel profiling and latency collection
+     */
+    struct KernelLatencyResults
+    {
+        std::vector<Instruction>                     filteredInstructions;
+        std::vector<std::tuple<std::string, size_t>> medianLatencies;
+        std::string                                  infoStr;
+    };
+
+    /**
      * @brief Formats a comparison between model predictions and profiler measurements
      * 
      * @param filteredInstructions The list of instructions to compare
@@ -103,9 +113,8 @@ namespace rocRoller
     /**
      * @brief Helper function for profiling and collecting median latencies
      */
-    std::tuple<std::vector<Instruction>, std::vector<std::tuple<std::string, size_t>>>
-        runKernelAndCollectLatencies(TestContext&       context,
-                                     LDSTestKernelBase& kernel,
-                                     bool               testIndividual);
+    KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
+                                                      LDSTestKernelBase& kernel,
+                                                      bool               testIndividual);
 
 } // namespace rocRoller

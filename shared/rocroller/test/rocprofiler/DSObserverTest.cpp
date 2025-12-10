@@ -217,8 +217,9 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
                                     write,
                                     iters);
 
-        auto [filteredInstructions, medianLatencies]
-            = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        const auto& filteredInstructions = result.filteredInstructions;
+        const auto& medianLatencies      = result.medianLatencies;
 
         int totalAbsoluteDelta       = 0;
         int totalDelta               = 0;
@@ -330,8 +331,9 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
         LDSArithmeticWeaveTestKernel kernel(
             context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
-        auto [filteredInstructions, medianLatencies]
-            = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        const auto& filteredInstructions = result.filteredInstructions;
+        const auto& medianLatencies      = result.medianLatencies;
 
         int totalAbsoluteDelta       = 0;
         int totalDelta               = 0;

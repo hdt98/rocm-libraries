@@ -177,10 +177,9 @@ namespace rocRoller
         m_context->schedule(k->amdgpu_metadata());
     }
 
-    std::tuple<std::vector<Instruction>, std::vector<std::tuple<std::string, size_t>>>
-        runKernelAndCollectLatencies(TestContext&       context,
-                                     LDSTestKernelBase& kernel,
-                                     bool               testIndividual)
+    KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
+                                                      LDSTestKernelBase& kernel,
+                                                      bool               testIndividual)
     {
         constexpr int NUM_RUNS = 5; // Should be odd, as median is used
 
@@ -198,7 +197,6 @@ namespace rocRoller
             = filterAndVerifyInstructions(instructions, allLatencies[0]);
 
         const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
-        INFO(infoStr);
 
         size_t expectedSize = allLatencies[0].size();
         REQUIRE(std::all_of(
@@ -225,7 +223,9 @@ namespace rocRoller
             Log::info(infoStr);
         }
 
-        return std::make_tuple(filteredInstructions, medianLatencies);
+        return KernelLatencyResults{.filteredInstructions = std::move(filteredInstructions),
+                                    .medianLatencies      = std::move(medianLatencies),
+                                    .infoStr              = infoStr};
     }
 
 } // namespace rocRoller
