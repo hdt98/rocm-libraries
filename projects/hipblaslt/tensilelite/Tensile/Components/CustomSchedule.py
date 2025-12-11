@@ -3047,7 +3047,7 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isTN(kernel)  and not useLDSTr and TLDS==1:
         snopTable = [
-            27, SNop(7),
+          #  27, SNop(7),
         ]
         syncTable = [
             -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
@@ -3095,14 +3095,14 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
                     21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24,  # vgprValuA_X0_I0[20:23] mfma#25
                     24, 24, 25, 25, # vgprValuA_X0_I0[24:27] mfma#27
                     25, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]], # vgprValuA_X0_I0[28:31] mfma#28
-            'PackB0': [[28, 28, 29, 29, # vgprValuB_X0_I0[32:35] mfma#48
-                    30, 30, 31, 31, 32, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37, 38, 38, 39, 39, # vgprValuB_X0_I0[36:39] mfma#50
-                    40, 40, 41, 41, # vgprValuB_X0_I0[40:43] mfma#54
-                    42, 42, 43, 43, 44, 44, 45, 45, 46, 46, 47, 47, 48, 48, 49, 49, 50, 50, 51, 51, # vgprValuB_X0_I0[44:47] mfma#56
-                    52, 52, 53, 53, # vgprValuB_X0_I0[48:51] mfma#60
-                    54, 54, 54, 54, 55, 55, 55, 55, 56, 56, 56, 56, 57, 57, 57, 57, 58, 58, 58, 58, # vgprValuB_X0_I0[52:55] mfma#62
-                    59, 59, 59, 59, # vgprValuB_X0_I0[56:59] mfma#66
-                    60, 60, 60, 60, 61, 61, 61, 61, 62, 62, 62, 62, 63, 63, 63, 63, 64, 64, 64, 64]], # vgprValuB_X0_I0[60:63] mfma#68
+            'PackB0': [[27, 27, 28, 28, # vgprValuB_X0_I0[32:35] mfma#48
+                    29, 29, 30, 30, 30, 31, 31, 31, 32, 32, 32, 33, 33, 33, 34, 34, 34, 35, 35, 35, # vgprValuB_X0_I0[36:39] mfma#50
+                    36, 36, 36, 37, # vgprValuB_X0_I0[40:43] mfma#54
+                    37, 37, 38, 38, 38, 39, 39, 39, 40, 40, 40, 41, 41, 41, 42, 42, 42, 43, 43, 43, # vgprValuB_X0_I0[44:47] mfma#56
+                    44, 44, 44, 45, # vgprValuB_X0_I0[48:51] mfma#60
+                    45, 45, 46, 46, 46, 47, 47, 47, 48, 48, 48, 49, 49, 49, 50, 50, 50, 51, 51, 51, # vgprValuB_X0_I0[52:55] mfma#62
+                    52, 52, 52, 53, # vgprValuB_X0_I0[56:59] mfma#66
+                    53, 53, 54, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 59]], # vgprValuB_X0_I0[60:63] mfma#68
             'SNOP': [snopTable[::2]],
 
             'LCC' : [[95, 95]],
