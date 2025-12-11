@@ -147,8 +147,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
     idMap['SYNC'] = opt1.syncCode
 
-    if len(opt1.snopCode) > 0:
-        idMap['SNOP'] = opt1.snopCode
+    idMap['SNOP'] = opt1.snopCode
 
     def convOptToStream(sched):
         InstStreams = dict()
@@ -402,31 +401,35 @@ def hasCustomSchedule(kernel):
         nglshift = nllshift = 0 # vmcnt shift for ngl and nll
         if isTN and not useLDSTr and TLDS==1:
             snopTable = [
+                -1, SNop(0),
+                0, SNop(0),
+                1, SNop(0),
+                2, SNop(0),
+                3, SNop(0),
+                7, SNop(0),
+                13, SNop(0),
                 19, SNop(0),
-             #   27, SNop(0),
+                24, SNop(0),
+                27, SNop(0),
             ]
+           # snopTable = []
             syncTable = [
                 -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
-                3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+           #     3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
                 12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
                 12, SBarrier(comment=""),
-               # 16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
-
                 16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
                 16, SBarrier(comment=""),
-                71, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
-                71, SBarrier(comment=""),
-               # 71, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+                72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
+                72, SBarrier(comment=""),
+                80, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
+                80, SBarrier(comment=""),
             ]
-           
+           # syncTable = []
             optSchedule = {
                 'SYNC': [syncTable[::2]],
                 'PackA3': [[-1, -1, -1, -1,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
-                             0, 0, 0, 0, 
-                             0, 0, 0, 0,  
-                             0, 0, 0, 0, 
-                             0, 0, 0, 0, 
-                             0, 0, 0, 0,  # l[0, 3] -> vgprValuA_X0[4:7] mfma#1
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  #l[0, 3] -> vgprValuA_X0[4:7] mfma#1
                             2, 2, 2, 2, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
                             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
                 'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
@@ -444,27 +447,27 @@ def hasCustomSchedule(kernel):
                 'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
                 'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
-                'GRB': [[16, 16, 17, 17, 18, 18, 19, 19, 34, 34, 36, 36, 38, 38, 40, 40]],
-                'LRA3': [[72, 73, 76, 77]],
-                'LRB3': [[74, 75, 78, 79, 80, 81, 82, 83]],
+                'GRB': [[16, 16, 18, 18, 20, 20, 22, 22, 34, 34, 44, 44, 54, 54, 64, 64]],
+                'LRA3': [[72, 74, 76, 78]],
+                'LRB3': [[80, 82, 84, 86, 88, 90, 91, 92]],
 
                 'LRSA': [[22]],
                 'LRSB': [[22]],
                 'LWSA': [[70]],
                 'LWSB': [[70]],
 
-                'PackA0': [[23, 23, 23, 23, # vgprValuA_X0_I0[16:19] mfma#24
-                            24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,  # vgprValuA_X0_I0[20:23] mfma#25
+                'PackA0': [[20, 20, 20, 20, # vgprValuA_X0_I0[16:19] mfma#24
+                            21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24,  # vgprValuA_X0_I0[20:23] mfma#25
                             25, 25, 25, 25, # vgprValuA_X0_I0[24:27] mfma#27
-                            26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26]], # vgprValuA_X0_I0[28:31] mfma#28
-                'PackB0': [[23, 23, 23, 23, # vgprValuB_X0_I0[32:35] mfma#48
-                            24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, # vgprValuB_X0_I0[36:39] mfma#50
-                            25, 25, 25, 25, # vgprValuB_X0_I0[40:43] mfma#54
-                            26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, # vgprValuB_X0_I0[44:47] mfma#56
-                            27, 27, 27, 27, # vgprValuB_X0_I0[48:51] mfma#60
-                            27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, # vgprValuB_X0_I0[52:55] mfma#62
-                            27, 27, 27, 27, # vgprValuB_X0_I0[56:59] mfma#66
-                            27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]], # vgprValuB_X0_I0[60:63] mfma#68
+                            26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]], # vgprValuA_X0_I0[28:31] mfma#28
+                'PackB0': [[28, 28, 29, 29, # vgprValuB_X0_I0[32:35] mfma#48
+                            30, 30, 31, 31, 32, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37, 38, 38, 39, 39, # vgprValuB_X0_I0[36:39] mfma#50
+                            40, 40, 41, 41, # vgprValuB_X0_I0[40:43] mfma#54
+                            42, 42, 43, 43, 44, 44, 45, 45, 46, 46, 47, 47, 48, 48, 49, 49, 50, 50, 51, 51, # vgprValuB_X0_I0[44:47] mfma#56
+                            52, 52, 53, 53, # vgprValuB_X0_I0[48:51] mfma#60
+                            54, 54, 54, 54, 55, 55, 55, 55, 56, 56, 56, 56, 57, 57, 57, 57, 58, 58, 58, 58, # vgprValuB_X0_I0[52:55] mfma#62
+                            59, 59, 59, 59, # vgprValuB_X0_I0[56:59] mfma#66
+                            60, 60, 60, 60, 61, 61, 61, 61, 62, 62, 62, 62, 63, 63, 63, 63, 64, 64, 64, 64]], # vgprValuB_X0_I0[60:63] mfma#68
                 'SNOP': [snopTable[::2]],
                 
                 'LCC' : [[95, 95]],
