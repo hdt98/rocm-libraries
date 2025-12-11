@@ -2920,9 +2920,6 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isNN(kernel) and useLDSTr and TLDS==1:
-        # Note: A/B Global read orders are swapped
-        # i.e. GRA contains GR for B
-        kernel["SwapGlobalReadOrder"] = True
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
                     SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
                     SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
@@ -2956,9 +2953,8 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
                             89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
                             98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98,
                             ]],
-            #Carson: GRA and GRB appear to have contents confusingly swapped
-            'GRA': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
-            'GRB': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
+            'GRB': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
+            'GRA': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
             'LRSA': [[35]],
             'LRSB': [[35]],
             'LWSA': [[107]],
