@@ -35,79 +35,117 @@
 #include <thread>
 #include <vector>
 
+namespace
+{
+    class DummySingletonA
+    {
+    public:
+        int value{0};
+
+        void reset()
+        {
+            value = 0;
+        }
+    };
+
+    class DummySingletonB
+    {
+    public:
+        int value{99};
+
+        void reset()
+        {
+            value = 99;
+        }
+    };
+}
+
 TEST_CASE("LazySingletonUnit: Same instance is returned", "[utils]")
 {
-    auto* a = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto* b = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    auto* a = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* b = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+
+    REQUIRE(a != nullptr);
+    REQUIRE(b != nullptr);
     REQUIRE(a == b);
 }
 
 TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-place)", "[utils]")
 {
-    auto* instance1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    auto* instance1 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
     REQUIRE(instance1 != nullptr);
 
-    rocRoller::LazySingleton<rocRoller::Settings>::reset();
+    instance1->value = 123; // mutate
 
-    auto* instance2 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    rocRoller::LazySingleton<DummySingletonA>::reset();
+
+    auto* instance2 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
     REQUIRE(instance2 != nullptr);
+
     REQUIRE(instance1 == instance2);
+    REQUIRE(instance2->value == 0);
 }
 
 TEST_CASE("LazySingletonUnit: Different types have independent instances", "[utils]")
 {
-    auto* settings = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto* gpuLib   = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+    auto* a = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* b = rocRoller::LazySingleton<DummySingletonB>::getInstance();
 
-    const void* s_addr = static_cast<const void*>(settings);
-    const void* g_addr = static_cast<const void*>(gpuLib);
-    REQUIRE(s_addr != g_addr);
+    REQUIRE(a != nullptr);
+    REQUIRE(b != nullptr);
+
+    REQUIRE(static_cast<const void*>(a) != static_cast<const void*>(b));
 }
 
 TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "[utils]")
 {
-    auto* inst1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    auto* inst1 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    REQUIRE(inst1 != nullptr);
 
     {
-        auto* inst2 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+        auto* inst2 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
         REQUIRE(inst2 == inst1);
     }
 
-    auto* inst3 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    auto* inst3 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
     REQUIRE(inst3 == inst1);
 }
 
 TEST_CASE("LazySingletonUnit: Multiple resets keep same singleton instance", "[utils]")
 {
-    auto* prevInstance = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+    auto* prevInstance = rocRoller::LazySingleton<DummySingletonB>::getInstance();
     REQUIRE(prevInstance != nullptr);
+
+    prevInstance->value = 100;
 
     for(int i = 0; i < 5; ++i)
     {
-        rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::reset();
-        auto* newInstance
-            = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+        rocRoller::LazySingleton<DummySingletonB>::reset();
+        auto* newInstance = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+
         REQUIRE(newInstance != nullptr);
-
         REQUIRE(prevInstance == newInstance);
+        REQUIRE(newInstance->value == 99);
 
-        prevInstance = newInstance;
+        newInstance->value = 999;
     }
 }
 
 TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[utils]")
 {
-    constexpr int                     N = 32;
-    std::vector<rocRoller::Settings*> results(N);
+    constexpr int                 N = 32;
+    std::vector<DummySingletonA*> results(N);
 
     std::vector<std::thread> threads;
     threads.reserve(N);
+
     for(int i = 0; i < N; ++i)
     {
         threads.emplace_back([&results, i] {
-            results[i] = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+            results[i] = rocRoller::LazySingleton<DummySingletonA>::getInstance();
         });
     }
+
     for(auto& t : threads)
         t.join();
 
@@ -117,7 +155,7 @@ TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[utils]")
 
 TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[utils]")
 {
-    auto* baseline = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    auto* baseline = rocRoller::LazySingleton<DummySingletonA>::getInstance();
     REQUIRE(baseline != nullptr);
 
     constexpr int            N = 16;
@@ -129,11 +167,11 @@ TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[u
         threads.emplace_back([i] {
             if(i % 5 == 0)
             {
-                rocRoller::LazySingleton<rocRoller::Settings>::reset();
+                rocRoller::LazySingleton<DummySingletonA>::reset();
             }
             else
             {
-                (void)rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+                (void)rocRoller::LazySingleton<DummySingletonA>::getInstance();
             }
         });
     }
@@ -141,22 +179,25 @@ TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[u
     for(auto& t : threads)
         t.join();
 
-    auto* after = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    auto* after = rocRoller::LazySingleton<DummySingletonA>::getInstance();
     REQUIRE(after != nullptr);
     REQUIRE(after == baseline);
 }
 
-TEST_CASE("LazySingletonUnit: GPUArchitectureLibrary reset keeps identity", "[utils]")
+TEST_CASE("LazySingletonUnit: DummySingletonB reset keeps identity", "[utils]")
 {
-    auto* gpu1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+    auto* obj1 = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+    REQUIRE(obj1 != nullptr);
 
-    rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::reset();
+    obj1->value = 777;
 
-    auto* gpu2 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+    rocRoller::LazySingleton<DummySingletonB>::reset();
 
-    REQUIRE(gpu1 != nullptr);
-    REQUIRE(gpu2 != nullptr);
-    REQUIRE(gpu1 == gpu2);
+    auto* obj2 = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+    REQUIRE(obj2 != nullptr);
+
+    REQUIRE(obj1 == obj2); // identity unchanged
+    REQUIRE(obj2->value == 99); // state reset
 }
 
 TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[utils][API]")
@@ -170,14 +211,18 @@ TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[
 
 TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[utils][API]")
 {
+    const bool original = rocRoller::Settings::Get(rocRoller::Settings::LogConsole);
+
     auto* settings = rocRoller::Settings::getInstance();
-    REQUIRE(settings != nullptr);
+    REQUIRE(settings != nullptr); // fundamental precondition
 
-    settings->set(rocRoller::Settings::LogConsole, false);
+    const bool flipped = !original;
+    settings->set(rocRoller::Settings::LogConsole, flipped);
 
-    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == false);
+    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == flipped);
 
-    settings->set(rocRoller::Settings::LogConsole, true);
+    settings->set(rocRoller::Settings::LogConsole, original);
+    CHECK(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == original);
 }
 
 TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[utils][API]")
@@ -188,7 +233,7 @@ TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[utils][API]")
     std::string customPath = "/tmp/rocm_custom";
     settings->set(rocRoller::Settings::ROCMPath, customPath);
 
-    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == customPath);
+    CHECK(settings->get(rocRoller::Settings::ROCMPath) == customPath);
     REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::ROCMPath) == customPath);
 }
 
