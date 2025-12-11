@@ -88,8 +88,8 @@ struct DefaultAlgorithm
             struct Epilogue
             {
                 int m_xdl_per_wave_per_shuffle = 1;
-                int n_per_wave_per_shuffle = 1;
-                int scalar_per_vector      = 8;
+                int n_per_wave_per_shuffle     = 1;
+                int scalar_per_vector          = 8;
             } epilogue;
         } c;
     } transfer;
@@ -105,42 +105,42 @@ struct DefaultAlgorithm
 };
 
 static_assert(ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm>);
-// static_assert(ckb::ConvAlgorithmDescriptor<DefaultAlgorithm> && ckb::SpecifiesThreadBlock<DefaultAlgorithm> && ckb::SpecifiesGridwiseXdlGemm<DefaultAlgorithm> &&
-//            ckb::SpecifiesBlockTransfer<DefaultAlgorithm> && ckb::SpecifiesLdsTransfer<DefaultAlgorithm> &&
-//            ckb::SpecifiesThreadClusterAccessOrder<DefaultAlgorithm> && ckb::SpecifiesSourceAccessOrder<DefaultAlgorithm> &&
-//            ckb::SpecifiesFwdConvSpecialization<DefaultAlgorithm> && ckb::SpecifiesGemmSpecialization<DefaultAlgorithm> &&
-//            ckb::SpecifiesBlockGemm<DefaultAlgorithm>);
 
-// Define a struct to specify the signature
 struct Signature
 {
-    int spatial_dim = 2;
-    // TODO: This direction should be OK as default, but the factory fails.
+    int spatial_dim              = 2;
     ckb::ConvDirection direction = ckb::ConvDirection::FORWARD;
-    struct InputTensorDescriptor {
-        struct Config {
-            ckb::TensorLayout layout = ckb::TensorLayout::NHWGC;
-            ckb::DataType data_type = ckb::DataType::FP32;
+    struct InputTensorDescriptor
+    {
+        struct Config
+        {
+            ckb::TensorLayout layout   = ckb::TensorLayout::NGCHW;
+            ckb::DataType data_type    = ckb::DataType::FP32;
             ckb::DataType compute_type = ckb::DataType::FP32;
         } config;
     } input;
-    
-    struct WeightTensorDescriptor {
-        struct Config {
-            ckb::TensorLayout layout = ckb::TensorLayout::GKCYX;
-            ckb::DataType data_type = ckb::DataType::FP32;
+
+    struct WeightTensorDescriptor
+    {
+        struct Config
+        {
+            ckb::TensorLayout layout   = ckb::TensorLayout::GKCYX;
+            ckb::DataType data_type    = ckb::DataType::FP32;
             ckb::DataType compute_type = ckb::DataType::FP32;
         } config;
     } weight;
 
-    struct OutputTensorDescriptor {
-        struct Config {
-            ckb::TensorLayout layout = ckb::TensorLayout::NHWGK;
-            ckb::DataType data_type = ckb::DataType::FP32;
+    struct OutputTensorDescriptor
+    {
+        struct Config
+        {
+            ckb::TensorLayout layout   = ckb::TensorLayout::NGKHW;
+            ckb::DataType data_type    = ckb::DataType::FP32;
             ckb::DataType compute_type = ckb::DataType::FP32;
         } config;
     } output;
-    ckb::DataType data_type      = ckb::DataType::FP32;
+    ckb::DataType data_type              = ckb::DataType::FP32;
+    ckb::DataType accumulation_data_type = ckb::DataType::FP32;
 };
 
 using InLayout                             = ck::tensor_layout::convolution::NGCHW;
@@ -168,7 +168,7 @@ using DeviceOpGFwdDefaultPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdDefault<DataType>>;
 
-TEST(CK_Builder, CreateExistingInstance)
+TEST(CK_Builder, CreateExistingInstance_Xdl_V3)
 {
     // Verify that the signature structure conforms to the signature concept.
     static_assert(ckb::ConvSignatureDescriptor<Signature>);
@@ -200,6 +200,8 @@ TEST(CK_Builder, CreateExistingInstance)
     // These are the instances that MIOpen currently gets from CK's static library
     auto factoryInstances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
 
+    ASSERT_GT(factoryInstances.size(), 0);
+
     auto result =
         std::find_if(factoryInstances.begin(),
                      factoryInstances.end(),
@@ -207,5 +209,5 @@ TEST(CK_Builder, CreateExistingInstance)
                          return kernelPtr->GetInstanceString() == builderKernelInstanceString;
                      });
 
-    EXPECT_TRUE(result != factoryInstances.end());
+    ASSERT_NE(result, factoryInstances.end());
 }
