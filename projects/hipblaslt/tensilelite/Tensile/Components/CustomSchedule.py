@@ -3047,28 +3047,16 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isTN(kernel)  and not useLDSTr and TLDS==1:
         snopTable = [
-            -1, SNop(8),
-            0, SNop(8),
-            1, SNop(8),
-            2, SNop(4),
-            3, SNop(8), 
-            4, SNop(8),
-            5, SNop(8),
-            6, SNop(8),
-            7, SNop(8),
-            8, SNop(8),
-            9, SNop(8),
-            10, SNop(8),
-            11, SNop(8),
-            12, SNop(8),
-            13, SNop(8),
-            14, SNop(8),
-            15, SNop(8),
-            16, SNop(8),
-            17, SNop(8),
-            18, SNop(8),
+            -1, SNop(7),
+            0, SNop(7),
+            1, SNop(7), 
+            2, SNop(7),
+            3, SNop(7), 
+            7, SNop(7),
+
+            24, SNop(7),
+            27, SNop(7),
         ]
-       # snopTable = []
         syncTable = [
             -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
        #     3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
