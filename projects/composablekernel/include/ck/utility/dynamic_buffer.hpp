@@ -156,7 +156,7 @@ struct DynamicBuffer
         // addr needs to point to global memory!
         __device__ __forceinline__ void operator()([[maybe_unused]] const void* addr) const
         {
-#if defined(__gfx1250__)
+#if defined(__gfx125__)
             // NOTE: There's a bug in AM/GOPHER for gfx1250 when prefetching into L1, so we disable
             // it for now!
             __builtin_amdgcn_global_prefetch(

@@ -28,7 +28,7 @@ struct GlobalPrefetchDataOp
     // addr needs to point to global memory!
     __device__ __forceinline__ void operator()([[maybe_unused]] const void* addr) const
     {
-#if defined(__gfx1250__)
+#if defined(__gfx125__)
         // NOTE: There's a bug in AM/GOPHER for gfx1250 when prefetching into L1, so we disable it
         // for now!
         __builtin_amdgcn_global_prefetch(
@@ -45,7 +45,7 @@ struct FlatPrefetchDataOp
 {
     __device__ __forceinline__ void operator()([[maybe_unused]] const void* addr) const
     {
-#if defined(__gfx1250__)
+#if defined(__gfx125__)
         // NOTE: There's a bug in AM/GOPHER for gfx1250 when prefetching into L1, so we disable it
         // for now!
         __builtin_amdgcn_flat_prefetch(
@@ -98,7 +98,7 @@ __global__ void kernel_with_prefetch(KernelArgs<T> args)
     if(tid < NUM_THREADS)
     {
         sum = src[tid]; // load from global mem to give time for prefetch to finish or be close to
-                        // finishs
+                        // finish
     }
     __syncthreads(); // waits on loads from global mem
     if(tid < NUM_THREADS)
@@ -163,7 +163,7 @@ __global__ void kernel_with_prefetch_and_shared_mem(KernelArgs<T> args)
     if(tid < NUM_THREADS)
     {
         sum = src[tid]; // load from global mem to give time for prefetch to finish or be close to
-                        // finishs
+                        // finish
     }
     __syncthreads(); // waits on loads from global mem
     if(tid < NUM_THREADS)
