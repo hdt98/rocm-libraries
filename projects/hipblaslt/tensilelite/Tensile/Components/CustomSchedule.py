@@ -1040,11 +1040,13 @@ class ScheduleInfo:
         nglshift,
         nllshift,
         mfmaReorder=[],
+        syncCodeTail=[],
     ):
         self.numCodePaths = numCodePaths
         self.numMfma = numMfma
         self.optSchedule = optSchedule
         self.syncCode = syncCode
+        self.syncCodeTail = syncCodeTail
         self.nglshift = nglshift  # vmcnt shift for noglobalload loop
         self.nllshift = nllshift  # vmcnt shift for nolocalload loop
         self.mfmaReorder = mfmaReorder
@@ -1193,6 +1195,9 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         idMap["PackB%u"%uIdx] = PackCodeB[uIdx]
 
     idMap['SYNC'] = opt1.syncCode
+    if opt1.syncCodeTail:
+        idMap['SYNC_TAIL'] = opt1.syncCodeTail
+
 
     status, message = opt1.isValid({'kernel' : kernel, "idMap": idMap})
     # create the case str (TN, NT, TT, or NN)
@@ -1495,6 +1500,7 @@ def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
             'LRA1'   : [[67,71,73,75,77,79,81,85,87,89,91,93],
                         [68,72,74,76,78,80,82,86,88,90,92,94]],
             'LCC'    : [[95, 95]],
+            'SYNC_TAIL'   : [[14, 15]],
         }
         syncCode = [SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
                     SBarrier(comment=""),
@@ -1577,6 +1583,7 @@ def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
             'PackB0': [[47, 47, 47, 47, 50, 50, 50, 50, 50, 50, 51, 51, 51, 51, 51, 51, 51, 51, 52, 52, 52, 52, 52, 52, 52, 52, 53, 53, 53, 53, 53, 53]],
             'PackA0': [[47, 47, 47, 47, 47, 47, 48, 48, 48, 48, 48, 48, 48, 48, 49, 49, 49, 49, 49, 49, 49, 49, 50, 50]],
             'LCC'   : [[95, 95]],
+            'SYNC_TAIL'   : [[14, 15]],
         }
 
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA1 to complete") ,
@@ -2918,6 +2925,7 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     kernel["MfmaInitCVgprs"] = True
     optSchedule = dict()
     syncCode = []
+    syncCodeTail = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     kernel["UsePLRPack"] = True
     if isNN(kernel) and useLDSTr and TLDS==1 and kernel["UsePLRPack"]:
@@ -2962,6 +2970,7 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
                             139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139,
                             ]],
             'SYNC'  : [[-1,-1,5,34,35,36,36,71,71,71,72,72,107,107,107,107]],
+            'SYNC_TAIL'   : [[14, 15]],
         }
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
                     SNop(0),
@@ -2980,6 +2989,9 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
                     SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
                     SNop(0),
                     ]
+
+        syncCodeTail = [SNop(0, comment="Just a snop"), SNop(0, comment="Just a snop 2")]
+
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
     elif isNN(kernel) and useLDSTr and TLDS==1 and not kernel["UsePLRPack"]:
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
@@ -3039,7 +3051,7 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
         return False, None
 
     numMfma = 144
-    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, mfmaReorder=[], syncCodeTail=syncCodeTail)
     return True, opt1
 
 def hasCustomSchedule(kernel):
