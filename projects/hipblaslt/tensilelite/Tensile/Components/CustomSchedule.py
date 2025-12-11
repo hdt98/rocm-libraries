@@ -2919,7 +2919,62 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
-    if isNN(kernel) and useLDSTr and TLDS==1:
+    kernel["UsePLRPack"] = True
+    if isNN(kernel) and useLDSTr and TLDS==1 and kernel["UsePLRPack"]:
+        syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
+                    SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SBarrier(comment=""),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SWaitCnt(dscnt=-1, vlcnt=14, vscnt=-1, comment="Wait for LRB0 to complete"),
+                    SBarrier(comment=""),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),]
+        optSchedule = {
+            'SYNC'  : [[-1,5,34,36,71,71,72,107,107,107]],
+            'GRIncA': [[1,1,1,2,2,2,3,3,3]],
+            'GRIncB': [[4,4,4,5,5,5,6,6,6]],
+            # LDS reads into first 4 vgprs of Valu!_X!_I!+offset, then next four into Valu!_T!_I!+offset
+            #  in order to avoid copies in the cvt code
+            'LRA0': [[1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12]],
+            'LRB0': [[13,14,15,16,17,18,19,20]],
+            # Pack code contains cvt ops for converting fp32 to bf16. A and B cvt ops are identical.
+            # There are 24 ops per block of 3 mfmas.
+            # This example puts all cvt ops for one mfma in a single block, but they should be split up
+            # There are 3 BF16 MFMAs, with an ordering of: mfma(AHigh, BHigh), mfma(AHigh, BLow), mfma(ALow, BHigh)
+            # The first mfma in each block of 3 then only needs the first 4 ops from A and B, and the second mfma
+            # needs all cvt ops only for A. The third needs all cvt ops for the block.
+            'PackA0' : [[35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35,
+                            38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
+                            41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41,
+                            ]],
+            'PackB0' : [[71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71, 71,
+                            80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
+                            89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
+                            98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98, 98,
+                            ]],
+            'GRB': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
+            'GRA': [[72,72, 72,72, 72,72, 72,72, 72,72, 72,72]],
+            'LRSA': [[35]],
+            'LRSB': [[35]],
+            'LWSA': [[107]],
+            'LWSB': [[107]],
+            'LCC': [[143, 143]],
+            'LRA3': [[109,109,110,110,111,111,112,112,115,115,116,116,117,117,118,118,119,119,120,120,121,121,122,122]],
+            'LRB3': [[113,114,123,124,125,126,127,128]],
+            'PackA3' : [[123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123,
+                            126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126,
+                            129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129, 129,
+                            ]],
+            'PackB3' : [[132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132,
+                            133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133, 133,
+                            136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136,
+                            139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139,
+                            ]],
+        }
+        nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+    elif isNN(kernel) and useLDSTr and TLDS==1 and not kernel["UsePLRPack"]:
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
                     SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
                     SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
