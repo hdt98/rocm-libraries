@@ -594,11 +594,11 @@ class GlobalWriteBatchWriter:
           # loop over registers within one scalar
           for rIdx in range(0, regsPerScalar):
             module.add(replaceHolder(self.codeAccVgprRead.popFirstItem(), self.ss.elementSumIdx[elementIdx]*regsPerScalar + regsPerScalar*vi + rIdx - self.parentWriter.states.c.startVgprValu))
-      
+
       if self.kernel["MIArchVgpr"] and self.kernel["LocalSplitU"] > 1:
         self.parentWriter.states.c.startVgprValu = tmpStartVgprValuC
         module.add(RegSet("v", "vgprValuC", tmpStartVgprValuC))
-        
+
     elif self.kernel["LocalSplitU"] > 1:
       # read from LSU VGPRs
       regsPerScalar = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr # register per scalar
@@ -1457,7 +1457,7 @@ class GlobalWriteBatchWriter:
           module.add(VMovB32(vgpr(dataV+2), vgpr(atomicDestVgpr), "dataV+2 = tmp (new original C)" ))
           module.add(VMovB32(vgpr(dataV+3), vgpr(atomicDestVgpr+1), "dataV+3 = tmp (new original C)" ))
         else:
-          module.add(VMovB32(vgpr(dataV+1), vgpr(atomicDestVgpr), "dataV+1 = tmp (new original C)" ))
+          module.add(VMovB32(dst=vgpr(dataV+1), src=vgpr(atomicDestVgpr), comment="dataV+1 = tmp (new original C)" ))
         module.add(self._chooseAddForAtomic(self.kernel, \
                         vgpr(dataV+0,vgprCnt), vgpr(dataV+1*vgprIdx,vgprCnt), vgpr("ValuC+%u"%newSumIdxV,vgprCnt), \
                         "newC = rC + originalC"))
@@ -1612,6 +1612,13 @@ class GlobalWriteBatchWriter:
           module.add(VMacF32(dst=vgpr("ValuC+%u"%(newSumIdx)), src0=(sgpr("Alpha+1").getMinus()), src1=vgpr("ValuC+%u"%(newSumIdx+1)), comment="*= alpha ( Cr += -Ai * Ci )"))
           module.add(VMulF32(dst=vgpr("ValuC+%u"%(newSumIdx+1)), src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%(newSumIdx+1)), comment="*= alpha ( Ci = Ar * Ci)"))
           module.add(VMacF32(dst=vgpr("ValuC+%u"%(newSumIdx+1)), src0=sgpr("Alpha+1"), src1=vgpr(tmpVgpr), comment="*= alpha ( Ci += Ai * Cr_backup )"))
+          if usePK:
+            newSumIdx2 = newSumIdx + 2
+            module.add(VMovB32(dst=vgpr(tmpVgpr), src=vgpr("ValuC+%u"%(newSumIdx2)), comment="store Cr"))
+            module.add(VMulF32(dst=vgpr("ValuC+%u"%(newSumIdx2)), src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%(newSumIdx2)), comment="*= alpha ( Cr = Ar * Cr)"))
+            module.add(VMacF32(dst=vgpr("ValuC+%u"%(newSumIdx2)), src0=(sgpr("Alpha+1").getMinus()), src1=vgpr("ValuC+%u"%(newSumIdx2+1)), comment="*= alpha ( Cr += -Ai * Ci )"))
+            module.add(VMulF32(dst=vgpr("ValuC+%u"%(newSumIdx2+1)), src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%(newSumIdx2+1)), comment="*= alpha ( Ci = Ar * Ci)"))
+            module.add(VMacF32(dst=vgpr("ValuC+%u"%(newSumIdx2+1)), src0=sgpr("Alpha+1"), src1=vgpr(tmpVgpr), comment="*= alpha ( Ci += Ai * Cr_backup )"))
           self.parentWriter.vgprPool.checkIn(tmpVgpr)
 
         # double precision complex

@@ -1790,6 +1790,12 @@ namespace TensileLite
                     std::cout << "Constant " << m_cdata[i].name << ". Type "
                               << DataTypeInfo::Get(prop.dataType).abbrev << std::endl;
             }
+            //mchirila: setting custom values for alpha/beta:
+            bool custom = true;
+            if(custom){
+            m_cdata[ContractionProblemGemm::CONST::ALPHA].value =  std::complex<float>(75.0, 48.0);
+            // m_cdata[ContractionProblemGemm::CONST::BETA].value =  std::complex<double>(-3.0, 1.0);
+            }
             return;
         }
 
@@ -2491,6 +2497,10 @@ namespace TensileLite
                 int32_t rotatingNum
                     = min(maxRotatingBufferNum, ceil((float)m_rotatingBuffer / rotatingSize))
                       - 1; // Minus the original buffer.
+
+                // <= 0 means don't rotating
+                rotatingNum = max(0, rotatingNum);
+
                 int32_t totalRotatingSizeNeeded = rotatingNum * rotatingSize;
                 std::cout << "Rotating buffer set to: " << m_rotatingBuffer
                           << ". Rotating num: " << rotatingNum << std::endl;
@@ -2549,6 +2559,10 @@ namespace TensileLite
                 int32_t rotatingNum
                     = min(maxRotatingBufferNum, ceil((float)m_rotatingBuffer / rotatingSize))
                       - 1; // Minus the original buffer.
+
+                // <= 0 means don't rotating
+                rotatingNum = max(0, rotatingNum);
+
                 int32_t totalRotatingSizeNeeded = rotatingNum * rotatingSize;
                 std::cout << "Rotating buffer set to: " << m_rotatingBuffer
                           << ". Rotating num: " << rotatingNum << std::endl;
