@@ -3038,6 +3038,106 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
 
+@cmsRegistry.register(CMSKey(128, 256, 32, 2, 0, True, 0, 0, "tf32"))
+def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    if isTN(kernel)  and not useLDSTr and TLDS==1:
+        snopTable = [
+            -1, SNop(8),
+            0, SNop(8),
+            1, SNop(8),
+            2, SNop(4),
+            3, SNop(8), 
+            4, SNop(8),
+            5, SNop(8),
+            6, SNop(8),
+            7, SNop(8),
+            8, SNop(8),
+            9, SNop(8),
+            10, SNop(8),
+            11, SNop(8),
+            12, SNop(8),
+            13, SNop(8),
+            14, SNop(8),
+            15, SNop(8),
+            16, SNop(8),
+            17, SNop(8),
+            18, SNop(8),
+        ]
+       # snopTable = []
+        syncTable = [
+            -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+       #     3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+            12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
+            12, SBarrier(comment=""),
+            16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
+            16, SBarrier(comment=""),
+            72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
+            72, SBarrier(comment=""),
+            80, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
+            80, SBarrier(comment=""),
+        ]
+       # syncTable = []
+        optSchedule = {
+            'SYNC': [syncTable[::2]],
+            'PackA3': [[-1, -1, -1, -1,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  #l[0, 3] -> vgprValuA_X0[4:7] mfma#1
+                    2, 2, 2, 2, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
+                    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
+            'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
+                    4, 4, 4, 4, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
+                    5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
+                    8, 8, 8, 8, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
+                    9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
+                    13, 13, 13, 13, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
+                    14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18,]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
+            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
+            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
+
+            'LRA0': [[-1, 0, 1, 2]],
+            'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
+            'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
+
+            'GRB': [[16, 16, 18, 18, 20, 20, 22, 22, 34, 34, 44, 44, 54, 54, 64, 64]],
+            'LRA3': [[72, 74, 76, 78]],
+            'LRB3': [[80, 82, 84, 86, 88, 90, 91, 92]],
+
+            'LRSA': [[22]],
+            'LRSB': [[22]],
+            'LWSA': [[70]],
+            'LWSB': [[70]],
+
+            'PackA0': [[20, 20, 20, 20, # vgprValuA_X0_I0[16:19] mfma#24
+                    21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24,  # vgprValuA_X0_I0[20:23] mfma#25
+                    25, 25, 25, 25, # vgprValuA_X0_I0[24:27] mfma#27
+                    26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]], # vgprValuA_X0_I0[28:31] mfma#28
+            'PackB0': [[28, 28, 29, 29, # vgprValuB_X0_I0[32:35] mfma#48
+                    30, 30, 31, 31, 32, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37, 38, 38, 39, 39, # vgprValuB_X0_I0[36:39] mfma#50
+                    40, 40, 41, 41, # vgprValuB_X0_I0[40:43] mfma#54
+                    42, 42, 43, 43, 44, 44, 45, 45, 46, 46, 47, 47, 48, 48, 49, 49, 50, 50, 51, 51, # vgprValuB_X0_I0[44:47] mfma#56
+                    52, 52, 53, 53, # vgprValuB_X0_I0[48:51] mfma#60
+                    54, 54, 54, 54, 55, 55, 55, 55, 56, 56, 56, 56, 57, 57, 57, 57, 58, 58, 58, 58, # vgprValuB_X0_I0[52:55] mfma#62
+                    59, 59, 59, 59, # vgprValuB_X0_I0[56:59] mfma#66
+                    60, 60, 60, 60, 61, 61, 61, 61, 62, 62, 62, 62, 63, 63, 63, 63, 64, 64, 64, 64]], # vgprValuB_X0_I0[60:63] mfma#68
+            'SNOP': [snopTable[::2]],
+
+            'LCC' : [[95, 95]],
+        }
+        syncCode = syncTable[1::2]
+        snopCode = snopTable[1::2]
+        nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+    else:
+        return False, None
+
+    numMfma = 96
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
+    return True, opt1
+
 def hasCustomSchedule(kernel):
 
     if not kernel["UseCustomMainLoopSchedule"]:
@@ -3100,6 +3200,7 @@ def hasCustomSchedule(kernel):
     is320x192x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [320, 192, 64, 2, 1, True, 0, 0]
     is128x224x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [128, 224, 64, 2, 1, True, 0, 0]
     is192x256x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [192, 256, 32, 2, 0, True, 0, 0]
+    is128x256x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [128, 256, 32, 2, 0, True, 0, 0]
 
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS)
@@ -3135,4 +3236,6 @@ def hasCustomSchedule(kernel):
         return _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS)
     elif is192x256x32DTL and isTF32 and not isMixed and ([GRVWA, GRVWB, LRVW] == [4,4,4]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS)
+    elif is128x256x32DTL and isTF32 and not isMixed and ([GRVWA, GRVWB, LRVW] == [4,4,4]) and MI == [16,16,32,1] and MIWG == [2,2]:
+        return _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS) 
     return False, None
