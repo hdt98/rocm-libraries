@@ -808,9 +808,9 @@ extern "C" __global__ void OpTensorFwdBiasGeneric(MIOPEN_TYPE* a,
 
 static_assert(PACK_T >= 1 && PACK_T <= 16, "PACK_T must be in [1..16]");
 
-// Adaptive selection between the narrow (32-bit) and wide (64-bit) index/offset types.
-// 32-bit for faster arithmetic when the address range allows that. 64-bit
-// to safely handle very large tensors or strides/offsets.
+// Adaptive selection between the narrow (32-bit) and wide (64-bit) index types.
+// len_t / idx_t use 32-bit when the address range allows that for faster arithmetic.
+// Offsets remain 64-bit to safely handle very large tensors or base offsets.
 #ifdef USE_INDEX32
 using offset_t = uint64_t;
 using len_t    = unsigned int;
@@ -1042,7 +1042,7 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
     for(wide_t i = static_cast<wide_t>(tid); i < static_cast<wide_t>(total_work);
         i += static_cast<wide_t>(tcount))
     {
-           // widen dims once
+        // widen dims once
         const wide_t cw  = static_cast<wide_t>(c_w);
         const wide_t ch  = static_cast<wide_t>(c_h);
         const wide_t cd  = static_cast<wide_t>(c_d);
@@ -1085,12 +1085,12 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
 
         if(!use_beta)
         {
-               c_base[static_cast<size_t>(c_off)] = tmp;
+            c_base[static_cast<size_t>(c_off)] = tmp;
         }
         else
         {
-               const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
-               c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
+            const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
+            c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
         }
     }
 #endif
