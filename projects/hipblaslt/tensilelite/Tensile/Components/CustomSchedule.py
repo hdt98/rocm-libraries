@@ -401,16 +401,26 @@ def hasCustomSchedule(kernel):
         nglshift = nllshift = 0 # vmcnt shift for ngl and nll
         if isTN and not useLDSTr and TLDS==1:
             snopTable = [
-                -1, SNop(0),
-                0, SNop(0),
-                1, SNop(0),
-                2, SNop(0),
-                3, SNop(0),
-                7, SNop(0),
-                13, SNop(0),
-                19, SNop(0),
-                24, SNop(0),
-                27, SNop(0),
+                -1, SNop(8),
+                0, SNop(8),
+                1, SNop(8),
+                2, SNop(4),
+                3, SNop(8), 
+                4, SNop(8),
+                5, SNop(8),
+                6, SNop(8),
+                7, SNop(8),
+                8, SNop(8),
+                9, SNop(8),
+                10, SNop(8),
+                11, SNop(8),
+                12, SNop(8),
+                13, SNop(8),
+                14, SNop(8),
+                15, SNop(8),
+                16, SNop(8),
+                17, SNop(8),
+                18, SNop(8),
             ]
            # snopTable = []
             syncTable = [
@@ -435,11 +445,11 @@ def hasCustomSchedule(kernel):
                 'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
                             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
                             4, 4, 4, 4, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
-                            5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
+                            5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
                             8, 8, 8, 8, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
-                            9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
-                            14, 14, 14, 14, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
-                            15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 19, 19, 19, 19]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
+                            9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
+                            13, 13, 13, 13, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
+                            14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18,]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
                 'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
                 'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
 
