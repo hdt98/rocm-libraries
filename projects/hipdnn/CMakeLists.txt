@@ -228,6 +228,10 @@ if(CODE_COVERAGE)
         ./${CMAKE_INSTALL_BINDIR}/public_hipdnn_backend_tests
         -object
         ./${CMAKE_INSTALL_BINDIR}/hipdnn_sdk_tests
+        -object
+        ./${CMAKE_INSTALL_BINDIR}/hipdnn_plugin_sdk_tests
+        -object
+        ./${CMAKE_INSTALL_BINDIR}/hipdnn_test_sdk_tests
         ${MIOPEN_PLUGIN_CODE_COVERAGE_OBJECT}
     )
 
