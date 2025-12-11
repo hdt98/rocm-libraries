@@ -3047,9 +3047,6 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isTN(kernel)  and not useLDSTr and TLDS==1:
         snopTable = [
-            0, SNop(7),
-            1, SNop(7), 
-            2, SNop(7),
             27, SNop(7),
         ]
         syncTable = [
@@ -3068,10 +3065,10 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'SYNC': [syncTable[::2]],
             'PackA3': [[-1, -1, -1, -1,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
                     -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  #l[0, 3] -> vgprValuA_X0[4:7] mfma#1
-                    2, 2, 2, 2, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
-                    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
+                    1, 1, 1, 1, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
+                    2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
             'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
-                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
+                    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
                     3, 3, 4, 4, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
                     4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
                     7, 7, 8, 8, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
