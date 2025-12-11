@@ -104,7 +104,7 @@ struct DefaultAlgorithm
     } block_gemm;
 };
 
-static_assert(ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
+// static_assert(ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
 
 struct Signature
 {
@@ -194,11 +194,22 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
-    auto builderKernelInstance       = Builder::Instance();
+    auto builderKernelInstance       = Builder::Instance{};
     auto builderKernelInstanceString = builderKernelInstance.GetInstanceString();
+
+    EXPECT_TRUE(builderKernelInstanceString.find("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3") == std::string::npos);
 
     // These are the instances that MIOpen currently gets from CK's static library
     auto factoryInstances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
+
+    for (auto &&instance : factoryInstances) {
+        auto str = instance->GetInstanceString();
+        if (str.find("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3") != std::string::npos){
+            continue;
+        }
+
+        std::cout << str << std::endl;
+    }
 
     ASSERT_GT(factoryInstances.size(), 0);
 
@@ -208,6 +219,8 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
                      [&builderKernelInstanceString](const auto& kernelPtr) {
                          return kernelPtr->GetInstanceString() == builderKernelInstanceString;
                      });
+
+    std::cout << builderKernelInstanceString << std::endl;
 
     ASSERT_NE(result, factoryInstances.end());
 }

@@ -194,7 +194,7 @@ TEST(CK_Builder, CreateExistingInstance_Xdl_V3)
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
-    auto builderKernelInstance       = Builder::Instance();
+    auto builderKernelInstance       = Builder::Instance{};
     auto builderKernelInstanceString = builderKernelInstance.GetInstanceString();
 
     // These are the instances that MIOpen currently gets from CK's static library
