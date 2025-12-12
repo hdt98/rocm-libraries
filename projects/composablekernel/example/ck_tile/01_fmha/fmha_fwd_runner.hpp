@@ -1881,6 +1881,32 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         s_host_ref, p_host_ref, p_compute_element_func);
                 }
             }
+            if(lse)
+            {
+                ck_tile::HostTensor<SMPLComputeDataType> lse_host_result({nhead, real_seqlen_q});
+                lse_host_result.ForEach([&](auto& self, auto idx) {
+                    self(idx) = lse_host(b_idx, idx[0], idx[1] + query_offset);
+                });
+
+                // Use smaller rtol/atol as LSE is computed and stored in fp32, so there is no
+                // precision loss due to conversion
+                bool cur_pass = ck_tile::check_err(lse_host_result,
+                                                   lse_host_ref,
+                                                   "LSE Error: Incorrect results!",
+                                                   1e-5,
+                                                   1e-5,
+                                                   /* allow_infinity_ref = */ true);
+
+                pass &= cur_pass;
+                if(!cur_pass)
+                {
+                    std::cerr << "LSE mismatch found at batch: " << wb << std::endl
+                              << "\tseqlen_q: " << real_seqlen_q << std::endl
+                              << "\tseqlen_k: " << real_seqlen_k << std::endl
+                              << "\tseqstart_q: " << seqstart_q_host << std::endl
+                              << "\tseqstart_k: " << seqstart_k_host << std::endl;
+                }
+            }
             if(p_drop > 0)
             {
                 ck_tile::HostTensor<RandValOutputDataType> randval_host_ref(
@@ -1907,10 +1933,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                    randval_host_ref,
                                                    "DROPOUT RANDVAL Error: Incorrect results!");
                 pass &= cur_pass;
-                if(!cur_pass)
-                {
-                    break;
-                }
             }
 
             if(qscale.type == quant_scale_enum::blockscale)
@@ -1969,35 +1991,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
                           << std::endl
                           << "\tquery_offset used: " << query_offset << std::endl
                           << "\tkey_offset used: " << key_offset << std::endl;
-
-                break;
             }
 
-            if(lse)
+            if(!pass)
             {
-                ck_tile::HostTensor<SMPLComputeDataType> lse_host_result({nhead, real_seqlen_q});
-                lse_host_result.ForEach([&](auto& self, auto idx) {
-                    self(idx) = lse_host(b_idx, idx[0], idx[1] + query_offset);
-                });
-
-                cur_pass = ck_tile::check_err(lse_host_result,
-                                              lse_host_ref,
-                                              "LSE Error: Incorrect results!",
-                                              rtol,
-                                              atol,
-                                              /* allow_infinity_ref = */ true);
-
-                pass &= cur_pass;
-                if(!cur_pass)
-                {
-                    std::cerr << "LSE mismatch found at batch: " << wb << std::endl
-                              << "\tseqlen_q: " << real_seqlen_q << std::endl
-                              << "\tseqlen_k: " << real_seqlen_k << std::endl
-                              << "\tseqstart_q: " << seqstart_q_host << std::endl
-                              << "\tseqstart_k: " << seqstart_k_host << std::endl;
-
-                    break;
-                }
+                break;
             }
         }
 
