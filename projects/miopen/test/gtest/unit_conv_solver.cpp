@@ -449,7 +449,8 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
         return tmp;
     }();
 
-    if(!(ctx.GetStream().GetDeviceName() == "gfx942") &&
+    auto device_name = ctx.GetStream().GetDeviceName();
+    if(!(miopen::StartsWith(device_name, "gfx942") || miopen::StartsWith(device_name, "gfx950")) &&
        conv_config.GetXDataType() == miopenFloat &&
        conv_config.GetConv().GetMathType() == miopenMathDefault)
     {

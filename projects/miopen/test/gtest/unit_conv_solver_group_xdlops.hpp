@@ -20,6 +20,7 @@ struct GroupXdlopsNumericData
     unsigned int group_count;
 
     bool deterministic = false;
+    bool tf32_compute  = false;
 };
 
 template <miopenDataType_t datatype>
@@ -33,7 +34,8 @@ ConvTestCase GetConvTestForGroupXdlops(miopenTensorLayout_t layout,
                                     std::move(conv_numeric_data.stride),
                                     std::move(conv_numeric_data.dilation),
                                     std::move(conv_numeric_data.group_count),
-                                    conv_numeric_data.deterministic}};
+                                    conv_numeric_data.deterministic,
+                                    conv_numeric_data.tf32_compute}};
 
     return conv_test_case;
 }

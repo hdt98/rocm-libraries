@@ -1027,7 +1027,7 @@ int ConvDriver<Tgpu, Tref>::AddCmdLineArgs()
                          "0",
                          "MIOpen tuning policy (Default=0, or no tuning policy set)",
                          "int");
-    // TODO:(LYM) change back to 0
+    // TODO:(LYM) change back to 0 when TF32 is fully supported
     inflags.AddInputFlag("math_type", 'M', "1", "math type of compute (Default=1)", "int");
 
     return 0;

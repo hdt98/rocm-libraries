@@ -818,8 +818,8 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
     Scalar beta_val(beta, GetScalarDataType(yDesc));
     const auto problem = conv::ProblemDescription{
         xDesc, wDesc, yDesc, *this, conv::Direction::Forward, 0, alpha_val, beta_val};
-    auto ctx = ExecutionContext{&handle};
     ValidateAlphaBeta(problem);
+    auto ctx = ExecutionContext{&handle};
     problem.SetupComputeType(ctx);
 
     ConvForwardCheckNumerics(handle, tensors, [&]() {
