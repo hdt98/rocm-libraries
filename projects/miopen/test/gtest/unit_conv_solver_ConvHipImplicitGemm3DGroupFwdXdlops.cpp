@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (c) 2025 Advanced Micro Devices, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright © Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier:  MIT
 
 #include "unit_conv_solver.hpp"
 
@@ -36,12 +13,14 @@ auto GetConvSmokeTestCases()
 {
     using TestCase                      = miopen::unit_tests::ConvTestCase;
     constexpr miopenDataType_t datatype = miopen::unit_tests::GetDataType(type);
+    const bool tf32_compute             = type == TestDataType::TF32;
 
     return std::vector{
         // clang-format off
         TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
                  {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                 datatype, {{0, 0, 0}, {1, 1, 1}, {1, 1, 1}}},
+                 datatype, 
+                 {{0, 0, 0}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}},
         // clang-format on
     };
 }
@@ -52,21 +31,26 @@ auto GetConvFullTestCases()
 {
     using TestCase                      = miopen::unit_tests::ConvTestCase;
     constexpr miopenDataType_t datatype = miopen::unit_tests::GetDataType(type);
+    const bool tf32_compute             = type == TestDataType::TF32;
 
     return std::vector{
         // clang-format off
         TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
                     {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                    datatype, {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}}}, // non-zero padding
+                    datatype, 
+                    {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}}, // non-zero padding
         TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
                     {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                    datatype, {{0, 0, 0}, {2, 2, 2}, {1, 1, 1}}}, // stride > 1
+                    datatype, 
+                    {{0, 0, 0}, {2, 2, 2}, {1, 1, 1}, 1, false, tf32_compute}}, // stride > 1
         TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
                     {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                    datatype, {{0, 0, 0}, {1, 1, 1}, {2, 2, 2}}}, // dilation > 1
+                    datatype, 
+                    {{0, 0, 0}, {1, 1, 1}, {2, 2, 2}, 1, false, tf32_compute}}, // dilation > 1
         TestCase{{datatype, miopenTensorNDHWC, {1, 64, 12, 24, 48}},
                     {datatype, miopenTensorNDHWC, {384, 64, 1, 1, 1}},
-                    datatype, {{0, 0, 0}, {1, 1, 1}, {1, 1, 1}}}, // some different NCHW and k parameters
+                    datatype, 
+                    {{0, 0, 0}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}}, // some different NCHW and k parameters
         // clang-format on
     };
 }
