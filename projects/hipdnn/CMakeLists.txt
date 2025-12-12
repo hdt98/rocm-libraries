@@ -237,7 +237,6 @@ if(HIPDNN_ENABLE_COVERAGE)
 
     add_custom_target(
         code_coverage
-        COMMAND mkdir -p coverage_report/profraw
         COMMAND find . -name \"*.profraw\" -print0 | xargs -0 ${LLVM_PROFDATA_BINARY} merge -sparse
                 -o ./coverage_report/hipdnn.profdata
         COMMAND
@@ -246,7 +245,7 @@ if(HIPDNN_ENABLE_COVERAGE)
             -ignore-filename-regex=\"${CODE_COVERAGE_IGNORE_REGEX}\"
         COMMAND
             ${LLVM_COV_BINARY} show -Xdemangler=${LLVM_CXXFILT_BINARY} ${CODE_COVERAGE_OBJECTS}
-            -instr-profile=./hipdnn.profdata
+            -instr-profile=./coverage_report/hipdnn.profdata
             -ignore-filename-regex=\"${CODE_COVERAGE_IGNORE_REGEX}\" --format=html
             --output-dir=coverage_report
         COMMAND

@@ -100,10 +100,13 @@ function(_append_test_to_check_target_internal TARGET WORKING_DIR TEST_TYPE STAT
     endif()
 
     if(HIPDNN_ENABLE_COVERAGE)
+        # Ensure coverage report directory exists
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/coverage_report/profraw")
+
         # For code coverage builds, we want each profraw file to have a unique name.  The %m in the
         # _FILE_FILE environment variable will auto generate a unique id.
         list(APPEND ENVIRONMENT_LIST
-             "LLVM_PROFILE_FILE=./${CMAKE_BINARY_DIR}/coverage_report/profraw/%m.profraw"
+             "LLVM_PROFILE_FILE=${CMAKE_BINARY_DIR}/coverage_report/profraw/%m.profraw"
         )
     endif()
 
