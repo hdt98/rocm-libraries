@@ -27,7 +27,7 @@ from rocisa.container import DSModifiers, vgpr, sgpr, SDWAModifiers, VOP3PModifi
 from rocisa.enum import SelectBit
 from rocisa.instruction import SMovB32, SWaitCnt, VOrB32, VPermB32, VLShiftLeftOrB32, \
                             VMovB32, VMovB64,VLShiftRightB32, VCvtPkFP8toF32, VCvtF32toF16, VCvtFP8toF32,VCvtScaleFP8toF16,VCvtScalePkFP8toF16, \
-                            VCvtPkF32toBF16, VCvtBF16toFP32, PVCvtBF16toFP32, VDot2CF32BF16, SNop, VSubF32, VSwapB32
+                            VCvtPkF32toBF16, VCvtBF16toFP32, PVCvtBF16toFP32, VDot2CF32BF16, SNop, VSubF32, VSwapB32, VAddPKF32
 
 from ..Component import LocalRead
 
@@ -373,7 +373,7 @@ class LocalReadMFMA(LocalRead):
                                     self.pack4HiBits(kernel, tc, 4, bufferIdx, baseValuiIdx, iui, writer, packCodeT, tmpvgprFP32)
                                 if valuiIdx % 4 == 0:
                                     tmpvgpr = []
-                                    tmp = writer.vgprPool.checkOut(1)
+                                    tmp = writer.vgprPool.checkOut(2)  # Need 2 VGPRs for PVCvtBF16toFP32
                                     tmpvgpr.append(tmp)
                                     # tmp vgprs need to be unique across A/B, so we store in writer state
                                     if not baseValuiIdx in writer.states.tmpvgpr:
@@ -393,17 +393,26 @@ class LocalReadMFMA(LocalRead):
                                             v1t = vgpr("Valu%s_T%u_I%u+%u+1"%(tc, bufferIdx, iui, valuiIdx // 2))
                                             v2t = vgpr("Valu%s_T%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx // 2))
                                             v3t = vgpr("Valu%s_T%u_I%u+%u+3"%(tc, bufferIdx, iui, valuiIdx // 2))
+                                            # For packed ops (regNum=2)
+                                            v01t_pk = vgpr("Valu%s_T%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx // 2), 2)
+                                            v23t_pk = vgpr("Valu%s_T%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx // 2), 2)
                                         else:
                                             tmpIdx = len(tmpvgprFP32) - 2
                                             v0t = vgpr(tmpvgprFP32[tmpIdx + 0])
                                             v1t = vgpr(tmpvgprFP32[tmpIdx] + 1)
                                             v2t = vgpr(tmpvgprFP32[tmpIdx + 1])
                                             v3t = vgpr(tmpvgprFP32[tmpIdx + 1] + 1)
+                                            # For packed ops (regNum=2)
+                                            v01t_pk = vgpr(tmpvgprFP32[tmpIdx + 0], 2)
+                                            v23t_pk = vgpr(tmpvgprFP32[tmpIdx + 1], 2)
                                     else:
                                         v0t = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx))
                                         v1t = vgpr("Valu%s_X%u_I%u+%u+1"%(tc, bufferIdx, iui, valuiIdx))
                                         v2t = vgpr("Valu%s_X%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx))
                                         v3t = vgpr("Valu%s_X%u_I%u+%u+3"%(tc, bufferIdx, iui, valuiIdx))
+                                        # For packed ops (regNum=2)
+                                        v01t_pk = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx), 2)
+                                        v23t_pk = vgpr("Valu%s_X%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx), 2)
                                     vHi0 = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, (valuiIdx-baseValuiIdx)/2 + baseValuiIdx))
                                     vHi1 = vgpr("Valu%s_X%u_I%u+%u+1"%(tc, bufferIdx, iui, (valuiIdx-baseValuiIdx)/2 + baseValuiIdx))
 
@@ -412,21 +421,20 @@ class LocalReadMFMA(LocalRead):
                                         packCodeT.add(VDot2CF32BF16(dst=v0t, src0=hex(0x8000bf80), src1=vHi0))
                                         packCodeT.add(VDot2CF32BF16(dst=v1t, src0=hex(0xbf800000), src1=vHi0))
                                     else:
-                                        packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, comment="begin"+str(valuiIdx)))
-                                        packCodeT.add(VSubF32(dst=v0t, src0=v0t, src1=vgpr(tmp)))
-                                        packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, vgprMask=None, vi=1))
-                                        packCodeT.add(VSubF32(dst=v1t, src0=v1t, src1=vgpr(tmp)))
+                                        packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, comment="begin "+str(valuiIdx)))
+                                        packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp+1), src=vHi0, vgprMask=None, vi=1))
+                                        packCodeT.add(VAddPKF32(dst=v01t_pk, src0=v01t_pk, \
+                                            src1=vgpr(tmp, 2), vop3=VOP3PModifiers(neg_lo=[0,1],neg_hi=[0,1]), comment="for v0t, v1t"))
 
                                     if kernel["UseDot2F32XEmulation"]:
                                         packCodeT.add(VDot2CF32BF16(dst=v2t, src0=hex(0x8000bf80), src1=vHi1))
                                     else:
                                         packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi1))
-                                        packCodeT.add(VSubF32(dst=v2t, src0=v2t, src1=vgpr(tmp)))
 
                                     # We use cvt+sub pair since dot2 requires adding 4 wait states.
-                                    packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi1, vgprMask=None, vi=1))
-                                    packCodeT.add(VSubF32(dst=v3t, src0=v3t, src1=vgpr(tmp), comment="end"))
-
+                                    packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp+1), src=vHi1, vgprMask=None, vi=1))
+                                    packCodeT.add(VAddPKF32(dst=v23t_pk, src0=v23t_pk, \
+                                            src1=vgpr(tmp, 2), vop3=VOP3PModifiers(neg_lo=[0,1],neg_hi=[0,1]), comment="for v2t, v3t"))
                                     if kernel["UseDot2F32XEmulation"]:
                                         packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
                                         packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))

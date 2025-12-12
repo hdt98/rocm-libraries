@@ -434,13 +434,18 @@ void init_containers(nb::module_ m)
         .def("__str__", &rocisa::DPPModifiers::toString);
 
     nb::class_<rocisa::VOP3PModifiers, rocisa::Container>(m_con, "VOP3PModifiers")
-        .def(nb::init<const std::vector<int>&, const std::vector<int>&, const std::vector<int>&>(),
+        .def(nb::init<const std::vector<int>&, const std::vector<int>&, const std::vector<int>&,
+                      const std::vector<int>&, const std::vector<int>&>(),
              nb::arg("op_sel")    = std::vector<int>{},
              nb::arg("op_sel_hi") = std::vector<int>{},
-             nb::arg("byte_sel")  = std::vector<int>{})
+             nb::arg("byte_sel")  = std::vector<int>{},
+             nb::arg("neg_lo")    = std::vector<int>{},
+             nb::arg("neg_hi")    = std::vector<int>{})
         .def_rw("op_sel", &rocisa::VOP3PModifiers::op_sel)
         .def_rw("op_sel_hi", &rocisa::VOP3PModifiers::op_sel_hi)
         .def_rw("byte_sel", &rocisa::VOP3PModifiers::byte_sel)
+        .def_rw("neg_lo", &rocisa::VOP3PModifiers::neg_lo)
+        .def_rw("neg_hi", &rocisa::VOP3PModifiers::neg_hi)
         .def("__str__", &rocisa::VOP3PModifiers::toString)
         .def("__deepcopy__",
              [](const rocisa::VOP3PModifiers& self, nb::dict&) {
@@ -448,12 +453,12 @@ void init_containers(nb::module_ m)
              })
         .def("__getstate__",
              [](const rocisa::VOP3PModifiers& self) {
-                 return std::make_tuple(self.op_sel, self.op_sel_hi, self.byte_sel);
+                 return std::make_tuple(self.op_sel, self.op_sel_hi, self.byte_sel, self.neg_lo, self.neg_hi);
              })
         .def("__setstate__",
              [](rocisa::VOP3PModifiers&                                          self,
-                std::tuple<std::vector<int>, std::vector<int>, std::vector<int>> t) {
-                 new(&self) rocisa::VOP3PModifiers(std::get<0>(t), std::get<1>(t), std::get<2>(t));
+                std::tuple<std::vector<int>, std::vector<int>, std::vector<int>, std::vector<int>, std::vector<int>> t) {
+                 new(&self) rocisa::VOP3PModifiers(std::get<0>(t), std::get<1>(t), std::get<2>(t), std::get<3>(t), std::get<4>(t));
              });
 
     nb::class_<rocisa::EXEC, rocisa::Container>(m_con, "EXEC")
