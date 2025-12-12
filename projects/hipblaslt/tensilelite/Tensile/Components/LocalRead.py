@@ -432,12 +432,15 @@ class LocalReadMFMA(LocalRead):
                                         packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi1))
 
                                     # We use cvt+sub pair since dot2 requires adding 4 wait states.
-                                    packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp+1), src=vHi1, vgprMask=None, vi=1))
-                                    packCodeT.add(VAddPKF32(dst=v23t_pk, src0=v23t_pk, \
-                                            src1=vgpr(tmp, 2), vop3=VOP3PModifiers(neg_lo=[0,1],neg_hi=[0,1]), comment="for v2t, v3t"))
                                     if kernel["UseDot2F32XEmulation"]:
+                                        packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi1, vgprMask=None, vi=1))
+                                        packCodeT.add(VSubF32(dst=v3t, src0=v3t, src1=vgpr(tmp), comment="end"))
                                         packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
                                         packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
+                                    else:
+                                        packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp+1), src=vHi1, vgprMask=None, vi=1))
+                                        packCodeT.add(VAddPKF32(dst=v23t_pk, src0=v23t_pk, \
+                                                src1=vgpr(tmp, 2), vop3=VOP3PModifiers(neg_lo=[0,1],neg_hi=[0,1]), comment="for v2t, v3t"))
 
                                     for val in tmpvgpr:
                                         writer.vgprPool.checkIn(val)
