@@ -910,10 +910,12 @@ void common_inst(nb::module_ m_common)
         .def(nb::init<const std::shared_ptr<rocisa::Container>&,
                       const InstructionInput&,
                       const InstructionInput&,
+                      std::optional<rocisa::VOP3PModifiers>,
                       const std::string&>(),
              nb::arg("dst"),
              nb::arg("src0"),
              nb::arg("src1"),
+             nb::arg("vop3") = std::nullopt,
              nb::arg("comment") = "")
         .def("__deepcopy__",
              [](const rocisa::VAddPKF32& self, nb::dict&) { return new rocisa::VAddPKF32(self); });

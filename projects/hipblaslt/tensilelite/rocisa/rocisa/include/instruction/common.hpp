@@ -2441,8 +2441,10 @@ namespace rocisa
         VAddPKF32(const std::shared_ptr<Container>& dst,
                   const InstructionInput&           src0,
                   const InstructionInput&           src1,
+                  std::optional<VOP3PModifiers>     vop3    = std::nullopt,
                   const std::string&                comment = "")
             : CompositeInstruction(InstType::INST_F32, dst, {src0, src1}, comment)
+            , vop3(vop3)
         {
             setInst("v_pk_add_f32");
         }
@@ -2452,7 +2454,7 @@ namespace rocisa
             std::vector<std::shared_ptr<Instruction>> instructions;
             if(getAsmCaps()["v_pk_add_f32"])
             {
-                instructions = {std::make_shared<_VAddPKF32>(dst, srcs, std::nullopt, comment)};
+                instructions = {std::make_shared<_VAddPKF32>(dst, srcs, vop3, comment)};
             }
             else
             {
@@ -2470,6 +2472,7 @@ namespace rocisa
 
         VAddPKF32(const VAddPKF32& other)
             : CompositeInstruction(other)
+            , vop3(other.vop3)
         {
         }
 
@@ -2477,6 +2480,8 @@ namespace rocisa
         {
             return std::make_shared<VAddPKF32>(*this);
         }
+
+        std::optional<VOP3PModifiers> vop3;
     };
 
     struct VAdd3U32 : public CommonInstruction

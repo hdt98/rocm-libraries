@@ -451,11 +451,15 @@ namespace rocisa
     {
         VOP3PModifiers(const std::vector<int>& op_sel    = {},
                        const std::vector<int>& op_sel_hi = {},
-                       const std::vector<int>& byte_sel  = {})
+                       const std::vector<int>& byte_sel  = {},
+                       const std::vector<int>& neg_lo    = {},
+                       const std::vector<int>& neg_hi    = {})
             : Container()
             , op_sel(op_sel)
             , op_sel_hi(op_sel_hi)
             , byte_sel(byte_sel)
+            , neg_lo(neg_lo)
+            , neg_hi(neg_hi)
         {
         }
 
@@ -464,6 +468,8 @@ namespace rocisa
             , op_sel(other.op_sel)
             , op_sel_hi(other.op_sel_hi)
             , byte_sel(other.byte_sel)
+            , neg_lo(other.neg_lo)
+            , neg_hi(other.neg_hi)
         {
         }
 
@@ -487,12 +493,22 @@ namespace rocisa
             {
                 kStr += " byte_sel:" + vectorToString(byte_sel);
             }
+            if(!neg_lo.empty())
+            {
+                kStr += " neg_lo:" + vectorToString(neg_lo);
+            }
+            if(!neg_hi.empty())
+            {
+                kStr += " neg_hi:" + vectorToString(neg_hi);
+            }
             return kStr;
         }
 
         std::vector<int> op_sel;
         std::vector<int> op_sel_hi;
         std::vector<int> byte_sel;
+        std::vector<int> neg_lo;
+        std::vector<int> neg_hi;
 
         std::string vectorToString(const std::vector<int>& vec) const
         {
