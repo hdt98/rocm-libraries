@@ -109,7 +109,7 @@ cmake -GNinja -DCMAKE_BUILD_TYPE=Debug ..
 
 ### Code Coverage Build
 ```bash
-cmake -GNinja -DCODE_COVERAGE=ON ..
+cmake -GNinja -DHIPDNN_ENABLE_COVERAGE=ON ..
 ninja code_coverage
 # Coverage reports will be generated in build/hipdnn_code_coverage/
 ```

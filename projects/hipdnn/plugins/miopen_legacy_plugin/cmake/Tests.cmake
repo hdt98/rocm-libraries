@@ -95,7 +95,7 @@ function(_append_test_to_check_target_internal TARGET WORKING_DIR TEST_TYPE STAT
         set(ENVIRONMENT_LIST ${TEST_ENVIRONMENT})
     endif()
 
-    if(CODE_COVERAGE)
+    if(HIPDNN_ENABLE_COVERAGE)
         # For code coverage builds, we want each profraw file to have a unique name.  The %m in the
         # LLVM_PROFILE_FILE environment variable will auto generate a unique id.
         list(APPEND ENVIRONMENT_LIST "LLVM_PROFILE_FILE=./${CMAKE_INSTALL_BINDIR}/%m.profraw")
