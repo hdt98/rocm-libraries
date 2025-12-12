@@ -610,19 +610,6 @@ rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
 {
     auto workSpaceRequired = workspaceRequired(gemm, prob);
 
-    if(workSpaceRequired > prob.workspaceSize)
-    {
-        if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
-        {
-            std::ostringstream msg;
-            msg << "Input workspace size " << prob.workspaceSize
-                << " is less than the required workspace size ";
-            msg << workSpaceRequired << std::endl;
-            log_info(__func__, msg.str());
-        }
-        return rocblaslt_status_invalid_value;
-    }
-
     auto commandArgs = createCommandArguments(gemm, prob, DEFAULT_WGM);
 
     // Add scratch space
@@ -633,11 +620,6 @@ rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
     }
 
     auto runtimeArgs = commandArgs.runtimeArguments();
-
-    if(!gemm->commandKernel->matchesPredicates(runtimeArgs, LogLevel::Error))
-    {
-        return rocblaslt_status_invalid_value;
-    }
 
     gemm->commandKernel->launchKernel(runtimeArgs, prob.stream);
     return rocblaslt_status_success;

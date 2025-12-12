@@ -48,6 +48,15 @@ using namespace std::literals; // For std::string literals of form "str"s
 
 struct perf_matmul : hipblaslt_test_valid
 {
+    void operator()(const Arguments& arg, hipblaslt_local_handle& handle)
+    {
+        if(strcmp(arg.function, "matmul"))
+            throw std::invalid_argument("Invalid combination --function "s + arg.function
+                                        + " --a_type "s + hip_datatype_to_string(arg.a_type));
+
+        testing_matmul(arg, handle);
+    }
+
     void operator()(const Arguments& arg)
     {
         if(strcmp(arg.function, "matmul"))
@@ -62,7 +71,8 @@ int run_bench_test(Arguments&         arg,
                    const std::string& filter,
                    bool               any_stride,
                    hipDeviceProp_t&   props,
-                   bool               yaml = false)
+                   bool               yaml,
+                   hipblaslt_local_handle& handle)
 {
     hipblaslt_cout << std::setiosflags(std::ios::fixed)
                    << std::setprecision(7); // Set precision to 7 digits
@@ -199,15 +209,20 @@ int run_bench_test(Arguments&         arg,
         }
     }
 
-    perf_matmul{}(arg);
+    perf_matmul{}(arg, handle);
     return 0;
 }
 
 int hipblaslt_bench_datafile(const std::string& filter, bool any_stride, hipDeviceProp_t& props)
 {
     int ret = 0;
-    for(Arguments arg : HipBlasLt_TestData())
-        ret |= run_bench_test(arg, filter, any_stride, props, true);
+
+    auto test_data = HipBlasLt_TestData();
+
+    hipblaslt_local_handle handle;
+
+    for(Arguments arg : test_data)
+        ret |= run_bench_test(arg, filter, any_stride, props, true, handle);
     test_cleanup::cleanup();
     return ret;
 }
@@ -1027,7 +1042,8 @@ try
     }
 
     arg.norm_check_assert = false;
-    int status            = run_bench_test(arg, filter, any_stride, props);
+    hipblaslt_local_handle handle{arg};
+    int status            = run_bench_test(arg, filter, any_stride, props, false, handle);
     freeEfficiencyMonitor();
     return status;
 }

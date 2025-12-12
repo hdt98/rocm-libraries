@@ -230,6 +230,42 @@ namespace
         EXPECT_FATAL_FAILURE(rocroller_predicate_testing{}(GetParam()), "NO solution found!");
     }
     INSTANTIATE_TEST_CATEGORIES(rocroller_predicate_test);
+
+
+    struct rocroller_cache_testing : hipblaslt_test_valid
+    {
+        void operator()(const Arguments& arg)
+        {
+            hipblaslt_local_handle handle;
+            testing_matmul(arg, handle);
+            testing_matmul(arg, handle);
+        }
+    };
+
+    struct rocroller_cache_test
+        : RocBlasLt_Test<rocroller_cache_test, rocroller_cache_testing>
+    {
+        static bool type_filter(const Arguments& arg)
+        {
+            return type_filter_functor{}(arg);
+        }
+
+        static bool function_filter(const Arguments& arg)
+        {
+            return !strcmp(arg.function, "rocroller-cache");
+        }
+
+        static std::string name_suffix(const Arguments& arg)
+        {
+            return matmul_test::name_suffix(arg);
+        }
+    };
+
+    TEST_P(rocroller_cache_test, multiple_matmuls)
+    {
+        RUN_TEST_ON_THREADS_STREAMS(rocroller_cache_testing{}(GetParam()));
+    }
+    INSTANTIATE_TEST_CATEGORIES(rocroller_cache_test);
 #endif
 
 } // namespace

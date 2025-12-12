@@ -32,11 +32,11 @@
 
 #include "argument_model.hpp"
 #include "hipblaslt_arguments.hpp"
+#include "utility.hpp"
 #include "test_cleanup.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <cstdio>
-#include <cstring>
 #include <functional>
 #include <future>
 #include <hipblaslt/hipblaslt.h>
@@ -425,6 +425,11 @@ struct hipblaslt_test_valid
 
     // Require derived class to define functor which takes (const Arguments &)
     virtual void operator()(const Arguments&) = 0;
+    virtual void operator()(const Arguments&, hipblaslt_local_handle&)
+    {
+        hipblaslt_cerr << "Handle argument not defined for test" << std::endl;
+        hipblaslt_abort();
+    }
 
     virtual ~hipblaslt_test_valid() = default;
 };

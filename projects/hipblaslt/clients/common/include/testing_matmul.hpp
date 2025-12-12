@@ -1202,9 +1202,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                               hipDataType      TciA,
                               hipDataType      TciB,
                               hipDataType      Tbias,
-                              hipDataType      Taux);
+                              hipDataType      Taux,
+                              hipblaslt_local_handle& handle);
 
-void testing_matmul(const Arguments& arg)
+void testing_matmul(const Arguments& arg, hipblaslt_local_handle& handle)
 {
     hipDataType tiA = arg.a_type;
     hipDataType tiB = arg.b_type;
@@ -1237,12 +1238,12 @@ void testing_matmul(const Arguments& arg)
             if(real_bias_type == HIP_R_16BF)
             {
                 return testing_matmul_with_bias(
-                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16BF, real_aux_type);
+                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16BF, real_aux_type, handle);
             }
             else
             {
                 return testing_matmul_with_bias(
-                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type);
+                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type, handle);
             }
         }
         else
@@ -1250,12 +1251,12 @@ void testing_matmul(const Arguments& arg)
             if(real_bias_type == HIP_R_16F)
             {
                 return testing_matmul_with_bias(
-                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16F, real_aux_type);
+                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16F, real_aux_type, handle);
             }
             else
             {
                 return testing_matmul_with_bias(
-                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type);
+                    arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type, handle);
             }
         }
     }
@@ -1264,12 +1265,12 @@ void testing_matmul(const Arguments& arg)
         if(real_bias_type == HIP_R_16F)
         {
             return testing_matmul_with_bias(
-                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16F, real_aux_type);
+                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16F, real_aux_type, handle);
         }
         else
         {
             return testing_matmul_with_bias(
-                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type);
+                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type, handle);
         }
     }
     else if(to == HIP_R_16BF)
@@ -1277,23 +1278,29 @@ void testing_matmul(const Arguments& arg)
         if(real_bias_type == HIP_R_16BF)
         {
             return testing_matmul_with_bias(
-                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16BF, real_aux_type);
+                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_16BF, real_aux_type, handle);
         }
         else
         {
             return testing_matmul_with_bias(
-                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type);
+                arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type, handle);
         }
     }
     else if(to == HIP_R_32F || to == HIP_R_32I || to == HIP_R_8I || to == HIP_R_64F)
     {
         //set Tbias to To
         return testing_matmul_with_bias(
-            arg_revised, tiA, tiB, to, tc, tciA, tciB, to, real_aux_type);
+            arg_revised, tiA, tiB, to, tc, tciA, tciB, to, real_aux_type, handle);
     }
     // shouldn't arrive here
     hipblaslt_test_invalid{}(arg);
     return;
+}
+
+void testing_matmul(const Arguments& arg)
+{
+    hipblaslt_local_handle handle{arg};
+    testing_matmul(arg, handle);
 }
 
 void testing_matmul_with_bias(const Arguments& arg,
@@ -1304,12 +1311,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                               hipDataType      TciA,
                               hipDataType      TciB,
                               hipDataType      Tbias,
-                              hipDataType      Taux)
+                              hipDataType      Taux,
+                              hipblaslt_local_handle& handle)
 {
     double gpu_time_used, cpu_time_used, gpu_mem_gbytes;
     gpu_time_used = cpu_time_used = gpu_mem_gbytes = 0.0;
     bool                   HMM                     = arg.HMM;
-    hipblaslt_local_handle handle{arg};
     hipStream_t            stream;
     CHECK_HIP_ERROR(hipStreamCreate(&stream));
 

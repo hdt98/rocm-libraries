@@ -29,7 +29,6 @@
 #include "datatype_interface.hpp"
 #include "hipblaslt_arguments.hpp"
 #include "hipblaslt_init.hpp"
-#include "hipblaslt_test.hpp"
 #include "singletons.hpp"
 #include <cinttypes>
 #include <hipblaslt/hipblaslt.h>

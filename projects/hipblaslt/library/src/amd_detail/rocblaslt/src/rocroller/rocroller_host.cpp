@@ -33,6 +33,7 @@
 #include "rocroller_host.hpp"
 #include "runtime_args_selection.hpp"
 #include "parameter_selection.hpp"
+#include "selection_cache.hpp"
 #include "solution_cache.hpp"
 #include "solution_selection.hpp"
 
@@ -51,6 +52,7 @@ using namespace rocRoller;
 struct RocRollerHandle
 {
     SolutionCache cache;
+    SelectionCache selectionCache;
 };
 
 /**
@@ -411,6 +413,17 @@ KernelType genKernelType(const RocblasltContractionProblem& prob)
     return kernelType;
 }
 
+ProblemSize genProblemSize(const RocblasltContractionProblem& prob)
+{
+    ProblemSize problemSize;
+
+    problemSize.m = prob.m;
+    problemSize.n = prob.n;
+    problemSize.k = prob.k;
+    problemSize.batchCount = prob.batch_count;
+
+    return problemSize;
+}
 
 /**
  * Generate a kernel from a given SolutionIndexParameters value.
@@ -437,6 +450,19 @@ rocblaslt_status
     }
 
     return rocblaslt_status_success;
+}
+
+bool isSolutionSupported(std::shared_ptr<GemmKernel> kernel, const RocblasltContractionProblem& prob, size_t* workspaceRequiredInBytes)
+{
+    *workspaceRequiredInBytes = workspaceRequired(kernel, prob);
+
+    if(*workspaceRequiredInBytes > prob.workspaceSize)
+        return false;
+
+    auto commandArgs = createCommandArguments(kernel, prob, DEFAULT_WGM);
+    auto runtimeArgs = commandArgs.runtimeArguments();
+
+    return kernel->commandKernel->matchesPredicates(runtimeArgs, LogLevel::Error);
 }
 
 /**
@@ -471,69 +497,83 @@ rocblaslt_status
 {
     RocRollerHandle* rocroller_handle = static_cast<RocRollerHandle*>(handle->rocroller_handle);
     auto             kernelType       = genKernelType(prob);
-    int              index;
+    auto             problemSize      = genProblemSize(prob);
 
-    if(prob.bias != nullptr)
+    auto existingSelections = rocroller_handle->selectionCache.getKernelSelections(kernelType, problemSize);
+    SelectedKernels selected;
+
+    if (!existingSelections)
     {
-        std::cerr << "rocRoller does not support bias" << std::endl;
-        return rocblaslt_status_invalid_value;
-    }
-
-    if(prob.batch_count != 1)
-    {
-        std::cerr << "rocRoller only supports 1 batch_count not " << prob.batch_count << std::endl;
-        return rocblaslt_status_invalid_value;
-    }
-
-    if(auto scale_type = hipDataType_to_rocRoller_type(prob.scale_type);
-       scale_type != rocRoller::DataType::None && scale_type != rocRoller::DataType::Float)
-    {
-        std::cerr << "rocRoller only supports F32 as scale type not " << scale_type << std::endl;
-        return rocblaslt_status_invalid_value;
-    }
-
-    if(kernelType.typeAcc != rocRoller::DataType::Float)
-    {
-        std::cerr << "rocRoller only supports F32 accumulation, not " << kernelType.typeAcc
-                  << std::endl;
-        return rocblaslt_status_invalid_value;
-    }
-
-    auto solutionIndexParameters
-        = chooseSolutionIndexParameters(kernelType, prob, requestedAlgoCount);
-
-    int i = 0;
-    for(auto const& solutionIndexParameter : solutionIndexParameters)
-    {
-        if(requestedAlgoCount != -1 && i >= requestedAlgoCount)
-            break;
-
-        index = parametersToIndex(solutionIndexParameter);
-        auto existingSolution = rocroller_handle->cache.getKernel(kernelType, solutionIndexParameter);
-        std::shared_ptr<GemmKernel> kernel;
-        // If kernel doesn't already exist, generate it
-        if(!existingSolution)
+        selected.numRequested = requestedAlgoCount;
+        if(prob.bias != nullptr)
         {
-            auto                        status = genKernelFromSolutionIndexParameters(
-                rocroller_handle, kernelType, solutionIndexParameter, index, kernel);
-            if(status != rocblaslt_status_success)
-                continue;
+            std::cerr << "rocRoller does not support bias" << std::endl;
+        }
+        else if(prob.batch_count != 1)
+        {
+            std::cerr << "rocRoller only supports 1 batch_count not " << prob.batch_count << std::endl;
+        }
+        else if(auto scale_type = hipDataType_to_rocRoller_type(prob.scale_type);
+        scale_type != rocRoller::DataType::None && scale_type != rocRoller::DataType::Float)
+        {
+            std::cerr << "rocRoller only supports F32 as scale type not " << scale_type << std::endl;
+        }
+        else if(kernelType.typeAcc != rocRoller::DataType::Float)
+        {
+            std::cerr << "rocRoller only supports F32 accumulation, not " << kernelType.typeAcc
+                    << std::endl;
         }
         else
         {
-            kernel = *existingSolution;
+            auto solutionIndexParameters
+                = chooseSolutionIndexParameters(kernelType, prob, requestedAlgoCount);
+
+            for(auto const& solutionIndexParameter : solutionIndexParameters)
+            {
+                if(requestedAlgoCount != -1 && selected.selectedKernels.size() >= requestedAlgoCount)
+                    break;
+
+                auto index = parametersToIndex(solutionIndexParameter);
+                auto existingSolution = rocroller_handle->cache.getKernel(kernelType, solutionIndexParameter);
+                std::shared_ptr<GemmKernel> kernel;
+                // If kernel doesn't already exist, generate it
+                if(!existingSolution)
+                {
+                    auto                        status = genKernelFromSolutionIndexParameters(
+                        rocroller_handle, kernelType, solutionIndexParameter, index, kernel);
+                    if(status != rocblaslt_status_success)
+                        continue;
+                }
+                else
+                {
+                    kernel = *existingSolution;
+                }
+
+                size_t workspaceRequiredInBytes;
+                if (isSolutionSupported(kernel, prob, &workspaceRequiredInBytes))
+                    selected.selectedKernels.push_back({index, workspaceRequiredInBytes});
+            }
         }
 
+        rocroller_handle->selectionCache.addKernelSelections(kernelType, problemSize, selected);
+    }
+    else
+    {
+        selected = *existingSelections;
+    }
+
+    int i = 0;
+    for (; i < selected.selectedKernels.size(); i++)
+    {
         // Fill out heuristicResultsArray
         // The most important thing to do is set the solutionIndex
         memset(heuristicResultsArray[i].algo.data, 0, sizeof(heuristicResultsArray[i].algo.data));
         int* solutionIndex = (int*)(heuristicResultsArray[i].algo.data);
-        *solutionIndex     = index;
+        *solutionIndex     = selected.selectedKernels[i].solutionIndex;
         heuristicResultsArray[i].algo.max_workspace_bytes = maxWorkSpaceBytes;
         heuristicResultsArray[i].algo.fallback            = false;
         heuristicResultsArray[i].state                    = rocblaslt_status_success;
-        heuristicResultsArray[i].workspaceSize            = workspaceRequired(kernel, prob);
-        i++;
+        heuristicResultsArray[i].workspaceSize            = selected.selectedKernels[i].workspaceRequired;
     }
 
     *returnAlgoCount = i;
@@ -631,15 +671,9 @@ rocblaslt_status isRocRollerSolutionSupported(rocblaslt_handle             handl
     if(status != rocblaslt_status_success)
         return status;
 
-    auto workSpaceRequired = workspaceRequired(kernel, prob);
+    auto supported = isSolutionSupported(kernel, prob, workspaceSizeInBytes);
 
-    if(workSpaceRequired > prob.workspaceSize)
-        return rocblaslt_status_invalid_value;
-
-    auto commandArgs = createCommandArguments(kernel, prob, DEFAULT_WGM);
-    auto runtimeArgs = commandArgs.runtimeArguments();
-
-    if(!kernel->commandKernel->matchesPredicates(runtimeArgs, LogLevel::Error))
+    if(!supported)
     {
         return rocblaslt_status_invalid_value;
     }

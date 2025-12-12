@@ -20,4 +20,23 @@ Tests:
   norm_check: 1
   gpu_arch: '950'
 
+- name: rocroller_solution_cache
+  category: pre_checkin
+  function:
+    rocroller-cache:
+    - { a_type: f8_r, b_type: f8_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r}
+    - { a_type: f8_r, b_type: f4_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r}
+    - { a_type: f4_r, b_type: f4_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r}
+    - { a_type: f6_r, b_type: f6_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r}
+  M: [128]
+  N: [128]
+  K: [256]
+  transA: T
+  transB: N
+  alpha: 1.0
+  beta: 0.0
+  initialization: trig_float
+  unit_check: 0
+  norm_check: 1
+  gpu_arch: '950'
 ...

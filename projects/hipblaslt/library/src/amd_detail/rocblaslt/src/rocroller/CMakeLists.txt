@@ -8,6 +8,7 @@ target_sources(hipblaslt-rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/parameter_selection.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/runtime_args_selection.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocroller_host.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/selection_cache.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/solution_cache.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/solution_selection.cpp"
 )
