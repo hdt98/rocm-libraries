@@ -25,6 +25,7 @@
  *******************************************************************************/
 
 // #include <random>
+#include <iomanip>
 #include <cmath>
 #include <limits>
 #include <numeric>
@@ -267,6 +268,59 @@ double compareHistogram(const std::vector<double>& data1,
         histogram2[current_bin]++;
     }
 
+    // Find max count for scaling the histogram display
+    uint64_t max_count = 0;
+    for(const auto& [bin, count] : histogram1)
+    {
+        max_count = std::max(max_count, count);
+    }
+    for(const auto& [bin, count] : histogram2)
+    {
+        max_count = std::max(max_count, count);
+    }
+
+    // Display histograms vertically
+    const uint64_t max_bar_width = 60;
+    const double   lower_bound   = mean - (std_dev * num_std_devs);
+    const double   upper_bound   = mean + (std_dev * num_std_devs);
+
+    std::cout << "\n=== Histogram 1 (Data) ===\n";
+    for(const auto& [bin, count] : histogram1)
+    {
+        if(bin >= lower_bound && bin + bin_width <= upper_bound)
+        {
+            // Skip bins where both histograms have zero entries
+            if(count == 0 && histogram2[bin] == 0)
+                continue;
+
+            uint64_t bar_length = (max_count > 0) 
+                ? static_cast<uint64_t>(static_cast<double>(count) / max_count * max_bar_width) 
+                : 0;
+            std::cout << std::setw(8) << std::fixed << std::setprecision(2) << bin << " | "
+                      << std::setw(max_bar_width) << std::left << std::string(bar_length, '*') 
+                      << std::right << " " << std::setw(6) << count << "\n";
+        }
+    }
+
+    std::cout << "\n=== Histogram 2 (Reference) ===\n";
+    for(const auto& [bin, count] : histogram2)
+    {
+        if(bin >= lower_bound && bin + bin_width <= upper_bound)
+        {
+            // Skip bins where both histograms have zero entries
+            if(count == 0 && histogram1[bin] == 0)
+                continue;
+
+            uint64_t bar_length = (max_count > 0) 
+                ? static_cast<uint64_t>(static_cast<double>(count) / max_count * max_bar_width) 
+                : 0;
+            std::cout << std::setw(8) << std::fixed << std::setprecision(2) << bin << " | "
+                      << std::setw(max_bar_width) << std::left << std::string(bar_length, '*') 
+                      << std::right << " " << std::setw(6) << count << "\n";
+        }
+    }
+    std::cout << "\n";
+
     // Calculate the average percent difference between the two histograms
     // within the given number of standard deviations
     double   sum_percent_diff  = 0.0;
@@ -274,8 +328,6 @@ double compareHistogram(const std::vector<double>& data1,
     for(auto const& [bin, val1] : histogram1)
     {
         // We only care about diffs within the given number of standard deviations
-        const double lower_bound = mean - (std_dev * num_std_devs);
-        const double upper_bound = mean + (std_dev * num_std_devs);
         if(bin >= lower_bound && bin + bin_width <= upper_bound)
         {
             const uint64_t val2 = histogram2[bin];
