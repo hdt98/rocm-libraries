@@ -10,6 +10,7 @@
 #include "ck/utility/env.hpp"
 #include "ck/utility/common_header.hpp"
 
+using ::ck::DeviceMem;
 using F8DataType = ck::f8_t;
 
 // Very specific M and K values for illustrative purposes

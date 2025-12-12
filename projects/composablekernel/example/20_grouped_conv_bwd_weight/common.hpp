@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -19,6 +19,11 @@
 #include "ck/library/utility/convolution_parameter.hpp"
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_bwd_weight.hpp"
+#include "ck/library/reference_tensor_operation/gpu/naive_conv_bwd_weight_gpu.hpp"
+
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
 
 using BF16 = ck::bhalf_t;
 using F16  = ck::half_t;
@@ -113,9 +118,9 @@ using OutputLayout = typename CommonLayoutSettingSelector<NDimSpatial>::OutputLa
 
 struct ExecutionConfig final
 {
-    bool do_verification = true;
-    int init_method      = 1;
-    bool time_kernel     = false;
+    int do_verification = 1; // 0=no, 1=CPU, 2=GPU
+    int init_method     = 1;
+    bool time_kernel    = false;
 };
 
 #define DefaultConvParam                                                                         \

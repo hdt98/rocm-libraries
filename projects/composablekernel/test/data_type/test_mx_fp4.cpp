@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "gtest/gtest.h"
 #include "ck/library/utility/device_memory.hpp"
@@ -8,6 +8,7 @@
 using ck::bhalf2_t;
 using ck::bhalf32_t;
 using ck::bhalf_t;
+using ::ck::DeviceMem;
 using ck::e8m0_bexp_t;
 using ck::float16_t;
 using ck::float2_t;

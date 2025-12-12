@@ -7,6 +7,7 @@
 
 using ck::bhalf8_t;
 using ck::bhalf_t;
+using ::ck::DeviceMem;
 using ck::f4_t;
 using ck::f4x8_t;
 using ck::float8_t;

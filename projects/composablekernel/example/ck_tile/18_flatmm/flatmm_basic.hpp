@@ -1,6 +1,5 @@
-
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -15,16 +14,18 @@
 template <typename PrecType, ck_tile::index_t M_Warp_Tile>
 constexpr ck_tile::index_t get_k_warp_tile()
 {
-    constexpr bool is_8bit_float =
-        std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
 #if CK_TILE_USE_WMMA
 #if defined(CK_USE_GFX1250)
+    constexpr bool is_8bit_float =
+        std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
     return is_8bit_float ? 64 : 32;
 #else
     return 16;
 #endif
 #else
 #if defined(CK_GFX950_SUPPORT)
+    constexpr bool is_8bit_float =
+        std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
     if constexpr(M_Warp_Tile == 32)
         return is_8bit_float ? 64 : 16;
     else
@@ -169,38 +170,6 @@ struct GemmBasicTypeConfig<ck_tile::bf8_t>
     using BDataType   = ck_tile::bf8_t;
     using AccDataType = float;
     using CDataType   = ck_tile::half_t;
-};
-
-template <typename T>
-struct DataTypeTraits;
-
-template <>
-struct DataTypeTraits<ck_tile::fp8_t>
-{
-    static constexpr const char* name = "fp8";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::bf8_t>
-{
-    static constexpr const char* name = "bf8";
-};
-template <>
-struct DataTypeTraits<float>
-{
-    static constexpr const char* name = "fp32";
-};
-
-template <>
-struct DataTypeTraits<double>
-{
-    static constexpr const char* name = "fp64";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::half_t>
-{
-    static constexpr const char* name = "fp16";
 };
 
 template <typename T>

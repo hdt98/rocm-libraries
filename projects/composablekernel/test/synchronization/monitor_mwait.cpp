@@ -9,6 +9,7 @@
 #include "ck/utility/type_convert.hpp"
 #include "ck/utility/env.hpp"
 
+using ::ck::DeviceMem;
 using F8DataType = ck::f8_t;
 
 #if defined(__gfx125__)
