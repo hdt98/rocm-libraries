@@ -194,6 +194,11 @@ TEST(CK_Builder, CreateExistingInstance_Xdl_V3)
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
+    auto description = ck_tile::reflect::describe<Builder::Instance>();
+    auto detailed = description.detailed();
+
+    std::cout << detailed << std::endl;
+
     auto builderKernelInstance       = Builder::Instance{};
     auto builderKernelInstanceString = builderKernelInstance.GetInstanceString();
 

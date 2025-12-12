@@ -24,12 +24,12 @@ struct DefaultAlgorithm
 
     struct ThreadBlock
     {
-        int block_size = 128;
+        int block_size = 64;
         struct TileSize
         {
-            int m = 32;
-            int n = 64;
-            int k = 64;
+            int m = 64;
+            int n = 16;
+            int k = 16;
         } tile_size;
     } thread_block;
 
@@ -37,11 +37,11 @@ struct DefaultAlgorithm
 
     struct GridwiseGemm
     {
-        int ak1            = 8;
-        int bk1            = 8;
-        int m_per_xdl      = 32;
-        int n_per_xdl      = 32;
-        int m_xdl_per_wave = 1;
+        int ak1            = 4;
+        int bk1            = 4;
+        int m_per_xdl      = 16;
+        int n_per_xdl      = 16;
+        int m_xdl_per_wave = 4;
         int n_xdl_per_wave = 1;
     } gridwise_gemm;
 
@@ -53,29 +53,41 @@ struct DefaultAlgorithm
         {
             struct BlockTransfer
             {
-                int k0  = 8;
+                int k0  = 4;
                 int m_n = 16;
                 int k1  = 1;
             } block_transfer;
             struct LdsTransfer
             {
-                int src_vector_dim            = 2;
+                int src_vector_dim            = 1;
                 int src_scalar_per_vector     = 4;
                 int lds_dst_scalar_per_vector = 4;
                 bool is_direct_load           = false;
-                bool lds_padding              = false;
+                bool lds_padding              = true;
             } lds_transfer;
             struct BlockTransferAccessOrder
             {
-                std::array<size_t, 3> order{1, 0, 2};
+                std::array<size_t, 3> order{0, 2, 1};
             } block_transfer_access_order;
             struct SrcAccessOrder
             {
-                std::array<size_t, 3> order{1, 0, 2};
+                std::array<size_t, 3> order{0, 2, 1};
             } src_access_order;
         };
         TransferAB a;
-        TransferAB b;
+        TransferAB b{
+            .block_transfer = {},
+            .lds_transfer = {
+                .src_vector_dim = 2,
+                .src_scalar_per_vector = 1
+            },
+            .block_transfer_access_order = {
+                .order = {1, 0, 2},
+            },
+            .src_access_order = {
+                .order = {1, 0, 2},
+            },
+        };
         struct TransferC
         {
             struct ThreadClusterDims
@@ -83,13 +95,13 @@ struct DefaultAlgorithm
                 int m_block        = 1;
                 int m_wave_per_xdl = 16;
                 int n_block        = 1;
-                int n_wave_per_xdl = 8;
+                int n_wave_per_xdl = 4;
             } thread_cluster_dims;
             struct Epilogue
             {
                 int m_xdl_per_wave_per_shuffle = 1;
                 int n_per_wave_per_shuffle     = 1;
-                int scalar_per_vector          = 8;
+                int scalar_per_vector          = 1;
             } epilogue;
         } c;
     } transfer;
@@ -97,14 +109,13 @@ struct DefaultAlgorithm
     // TODO: Fix CK Builder schema to not require these defaults.
     ConvSpecial fwd_specialization  = ConvSpecial::DEFAULT;
     GemmSpecial gemm_specialization = GemmSpecial::MNKPadding;
-    struct BlockGemm
-    {
-        PipeVers pipeline_version = PipeVers::V2;
-        PipeSched scheduler       = PipeSched::INTRAWAVE;
-    } block_gemm;
+    std::size_t num_gemm_k_prefetch_stages = 1;
+    std::size_t num_groups_to_merge = 8;
+    PipeSched loop_scheduler = PipeSched::DEFAULT;
 };
 
-// static_assert(ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
+static_assert(ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
+static_assert(!ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm>);
 
 struct Signature
 {
@@ -168,6 +179,21 @@ using DeviceOpGFwdDefaultPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdDefault<DataType>>;
 
+std::size_t FirstDifference(const std::string &a, const std::string &b) 
+{
+    for (auto i = 0; i < min(a.size(), b.size()); i++) {
+        if (a[i] != b[i]) {
+            return i;
+        }
+    }
+
+    if (a.size() == b.size()) {
+        return a.size();
+    }
+
+    return min(a.size(), b.size());
+}
+
 TEST(CK_Builder, CreateExistingInstance_Xdl)
 {
     // Verify that the signature structure conforms to the signature concept.
@@ -182,7 +208,7 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
     constexpr DefaultAlgorithm kAlgorithm{};
 
     // Create a ConvBuilder instance with the signature and algorithm
-    // This will instantiate the DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 kernel
+    // This will instantiate the DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle kernel
     using Builder = ckb::ConvBuilder<kSignature, kAlgorithm>;
 
     // Verify that Builder is a class type
@@ -194,6 +220,12 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
+    // Try getting the detailed tree
+    auto description = ck_tile::reflect::describe<Builder::Instance>();
+    auto detailed = description.detailed();
+
+    std::cout << detailed << std::endl;
+
     auto builderKernelInstance       = Builder::Instance{};
     auto builderKernelInstanceString = builderKernelInstance.GetInstanceString();
 
@@ -202,14 +234,31 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
     // These are the instances that MIOpen currently gets from CK's static library
     auto factoryInstances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
 
+    std::size_t m = 0;
+    std::string maxInstanceString;
+
     for (auto &&instance : factoryInstances) {
         auto str = instance->GetInstanceString();
         if (str.find("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3") != std::string::npos){
             continue;
         }
 
-        std::cout << str << std::endl;
+        auto comp = FirstDifference(str, builderKernelInstanceString);
+        if (comp > m) {
+            m = comp;
+            maxInstanceString = str;
+        }
+
+        // std::cout << str << std::endl;
     }
+
+    std::cout << builderKernelInstanceString << std::endl << maxInstanceString << std::endl;
+    std::cout << "First diff at char " << m << std::endl << std::endl;
+
+    for (auto i =0; i < m; i++){
+        std::cout << ' ';
+    }
+    std::cout << '^' << std::endl;
 
     ASSERT_GT(factoryInstances.size(), 0);
 
