@@ -84,6 +84,14 @@ auto get_elimit<FmhaFwdFp8Fp32>(std::string /*init_method*/)
     return ck_tile::make_tuple(rtol, atol);
 }
 
+template <>
+auto get_elimit<FmhaFwdMxFp8>(std::string /*init_method*/)
+{
+    double rtol = 1e-2;
+    double atol = 1.8e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
 int num_splits_heuristic(int batch_nhead_mblocks, int num_SMs, int max_splits)
 {
     // If we have enough to almost fill the SMs, then just use 1 split
@@ -230,6 +238,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
             return "fp8bf16";
         else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdFp8Fp32>)
             return "fp8fp32";
+        else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdMxFp8>)
+            return "mxfp8";
         else
             static_assert(false);
     }();
@@ -1456,7 +1466,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
         constexpr bool supports_qscale = std::is_same_v<DataTypeConfig, FmhaFwdFp8> ||
                                          std::is_same_v<DataTypeConfig, FmhaFwdFp8Bf16> ||
-                                         std::is_same_v<DataTypeConfig, FmhaFwdFp8Fp32>;
+                                         std::is_same_v<DataTypeConfig, FmhaFwdFp8Fp32> ||
+                                         std::is_same_v<DataTypeConfig, FmhaFwdMxFp8>;
 
         float scale_s_host = scale_s;
         float scale_p_host = 1.0f;

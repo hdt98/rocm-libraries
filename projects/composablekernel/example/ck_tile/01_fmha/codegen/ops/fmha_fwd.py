@@ -38,6 +38,7 @@ DTYPE_BITS = {
     "fp8bf16": 8,
     "fp8fp32": 8,
     "bf8": 8,
+    "mxfp8": 8,
 }
 
 K0_MAX_SUBMAX_MAP = {
@@ -836,7 +837,8 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
         def check_hdim_tile(
             problem_ctx: ProblemContext, kernel_ctx: KernelContext
         ) -> bool:
-            if problem_ctx.dtype != "fp32":
+            # FIX: too confusing that it has to know about mx types
+            if problem_ctx.dtype not in ("fp32", "mxfp8"):
                 # TODO: update if >=gfx11 archs get qr_async and qr_async_trload support
                 if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and (
                     (
@@ -966,8 +968,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
             return {
                 (128, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
             }  # fmt: skip
-        else:
-            raise ValueError(f"unsupported dtype={dtype}")
 
     # TODO: we don't support tuning yet, so pick up one value for vlayout/pipeline/pad
     #       support this in future
@@ -1035,9 +1035,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 else:
                     pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "f", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
                     pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
-        elif dtype in ["fp8", "fp8fp16", "bf8"]:
-            # TODO
-            pass
         return pipelines
 
 
@@ -1045,6 +1042,12 @@ class KernelComponentFactoryGfx950(
     KernelComponentFactoryGfx9, CompatibilityRuleFactoryGfx950
 ):
     arch = ArchTrait("gfx950")
+
+    _DT_MX_FP8 = ("mxfp8",)
+
+    @classmethod
+    def supported_dtypes(cls) -> Tuple[str]:
+        return KernelComponentFactoryGfx9.supported_dtypes() + cls._DT_MX_FP8
 
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
@@ -1054,6 +1057,12 @@ class KernelComponentFactoryGfx950(
             if (128, 128) in result.keys():
                 result[(128, 128)].append(
                     FmhaFwdTileSize(256, 32, 128, 128, 32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1))  # fmt: skip
+        elif dtype in cls._DT_MX_FP8:
+            return {
+                #                             bm0, bn0, bk0, bn1, bk1,
+                (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
+                (256, 256) : [FmhaFwdTileSize( 64, 128, 128, 256, 128, 256,  4, 1, 1,  4, 1, 1,  16, 16, 128,  16, 16, 128,  -1)],
+            }  # fmt: skip
         return result
 
     @classmethod
@@ -1091,6 +1100,17 @@ class KernelComponentFactoryGfx950(
                     pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
                         F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
 
+        elif dtype in cls._DT_MX_FP8:
+            # no need dropout kernels
+            lse = "t"
+            dropout = "f"
+            for logits, qscale, mask, bias in itertools.product(
+                ["f"],
+                ["pertensor"],  # TODO: temporary solution for development only
+                get_mask_map(mask_impl).keys(),
+                ["no"],
+            ):
+                pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f"))  # fmt: skip
         return pipelines
 
 

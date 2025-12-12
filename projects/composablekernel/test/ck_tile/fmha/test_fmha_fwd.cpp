@@ -65,6 +65,21 @@ struct TestConfigs<FmhaFwdFp8Bf16>
 };
 
 template <>
+struct TestConfigs<FmhaFwdMxFp8>
+{
+    static constexpr auto HDimValues         = std::array{std::tuple{128, -1}, std::tuple{256, -1}};
+    static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
+    static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
+    static constexpr auto ModeValues         = std::array{mode_enum::batch, mode_enum::group};
+    static constexpr auto IsVRowmajorValues  = std::array{true};
+    static constexpr auto qscale_str         = "pt";
+    static constexpr bool def_lse            = true;
+    static constexpr bool def_is_v_rowmajor  = true;
+    static constexpr auto init_method        = "3";
+    static int adjust_seqlen(int seqlen) { return seqlen; }
+};
+
+template <>
 struct TestConfigs<FmhaFwdFp32>
 {
     static constexpr auto HDimValues = std::array{

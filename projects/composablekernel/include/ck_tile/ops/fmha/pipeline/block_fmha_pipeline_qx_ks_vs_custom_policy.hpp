@@ -75,12 +75,11 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
             if constexpr(get_warp_size() == 64 &&
                          std::is_same_v<typename Problem::QDataType, fp8_t> &&
                          std::is_same_v<typename Problem::KDataType, fp8_t> &&
-                         std::is_same_v<typename Problem::SaccDataType, float>)
+                         std::is_same_v<typename Problem::SaccDataType, float> &&
+                         Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32 &&
+                         Problem::BlockFmhaShape::Gemm0WarpTile::at(number<1>{}) == 32 &&
+                         Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 32)
             {
-                static_assert(Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32);
-                static_assert(Problem::BlockFmhaShape::Gemm0WarpTile::at(number<1>{}) == 32);
-                static_assert(Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 32);
-
                 // TODO: hard coded here. Otherwise, it produces incorrect results
                 constexpr index_t swizzle_factor = 4;
                 return WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<
@@ -223,12 +222,11 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ false>
             if constexpr(get_warp_size() == 64 &&
                          std::is_same_v<typename Problem::QDataType, fp8_t> &&
                          std::is_same_v<typename Problem::KDataType, fp8_t> &&
-                         std::is_same_v<typename Problem::SaccDataType, float>)
+                         std::is_same_v<typename Problem::SaccDataType, float> &&
+                         Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32 &&
+                         Problem::BlockFmhaShape::Gemm0WarpTile::at(number<1>{}) == 32 &&
+                         Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 32)
             {
-                static_assert(Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32);
-                static_assert(Problem::BlockFmhaShape::Gemm0WarpTile::at(number<1>{}) == 32);
-                static_assert(Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 32);
-
                 // TODO: hard coded here. Otherwise, it produces incorrect results
                 constexpr index_t swizzle_factor = 4;
                 return WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<
@@ -984,23 +982,31 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             if constexpr(get_warp_size() == 64 &&
                          std::is_same_v<typename Problem::PDataType, fp8_t> &&
                          std::is_same_v<typename Problem::VDataType, fp8_t> &&
-                         std::is_same_v<typename Problem::OaccDataType, float>)
+                         std::is_same_v<typename Problem::OaccDataType, float> &&
+                         Problem::BlockFmhaShape::Gemm1WarpTile::at(number<0>{}) == 32 &&
+                         Problem::BlockFmhaShape::Gemm1WarpTile::at(number<1>{}) == 32 &&
+                         Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 32)
             {
-                static_assert(Problem::BlockFmhaShape::Gemm1WarpTile::at(number<0>{}) == 32);
-                static_assert(Problem::BlockFmhaShape::Gemm1WarpTile::at(number<1>{}) == 32);
-                static_assert(Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 32);
-
                 return WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<>{};
             }
             else
             {
+                constexpr auto AttrNumAccess =
+                    Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 128
+                        ? WGAttrNumAccessEnum::Octa // 16x16x128 fp8
+                    : Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 64
+                        ? WGAttrNumAccessEnum::Double // 32x32x64 fp8
+                        : WGAttrNumAccessEnum::Single;
                 return WarpGemmDispatcher<typename Problem::PDataType,
                                           typename Problem::VDataType,
                                           typename Problem::OaccDataType,
                                           Problem::BlockFmhaShape::Gemm1WarpTile::at(number<0>{}),
                                           Problem::BlockFmhaShape::Gemm1WarpTile::at(number<1>{}),
                                           Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}),
-                                          true>{};
+                                          true,  // TransposeC
+                                          false, // SwizzleA
+                                          false,
+                                          AttrNumAccess>{};
             }
         }();
 
