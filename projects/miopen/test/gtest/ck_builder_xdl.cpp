@@ -77,16 +77,15 @@ struct DefaultAlgorithm
         TransferAB a;
         TransferAB b{
             .block_transfer = {},
-            .lds_transfer = {
-                .src_vector_dim = 2,
-                .src_scalar_per_vector = 1
-            },
-            .block_transfer_access_order = {
-                .order = {1, 0, 2},
-            },
-            .src_access_order = {
-                .order = {1, 0, 2},
-            },
+            .lds_transfer   = {.src_vector_dim = 2, .src_scalar_per_vector = 1},
+            .block_transfer_access_order =
+                {
+                    .order = {1, 0, 2},
+                },
+            .src_access_order =
+                {
+                    .order = {1, 0, 2},
+                },
         };
         struct TransferC
         {
@@ -109,13 +108,14 @@ struct DefaultAlgorithm
     // TODO: Fix CK Builder schema to not require these defaults.
     ConvSpecial fwd_specialization  = ConvSpecial::DEFAULT;
     GemmSpecial gemm_specialization = GemmSpecial::MNKPadding;
+
     std::size_t num_gemm_k_prefetch_stages = 1;
-    std::size_t num_groups_to_merge = 8;
-    PipeSched loop_scheduler = PipeSched::DEFAULT;
+    std::size_t num_groups_to_merge        = 8;
+    PipeSched loop_scheduler               = PipeSched::DEFAULT;
 };
 
-static_assert(ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
-static_assert(!ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm>);
+static_assert(ckb::factory::IsXdlAlgorithm<DefaultAlgorithm> &&
+              !ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm>);
 
 struct Signature
 {
@@ -179,15 +179,18 @@ using DeviceOpGFwdDefaultPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdDefault<DataType>>;
 
-std::size_t FirstDifference(const std::string &a, const std::string &b) 
+std::size_t FirstDifference(const std::string& a, const std::string& b)
 {
-    for (auto i = 0; i < min(a.size(), b.size()); i++) {
-        if (a[i] != b[i]) {
+    for(auto i = 0; i < min(a.size(), b.size()); i++)
+    {
+        if(a[i] != b[i])
+        {
             return i;
         }
     }
 
-    if (a.size() == b.size()) {
+    if(a.size() == b.size())
+    {
         return a.size();
     }
 
@@ -220,47 +223,17 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
 
-    // Try getting the detailed tree
-    auto description = ck_tile::reflect::describe<Builder::Instance>();
-    auto detailed = description.detailed();
-
-    std::cout << detailed << std::endl;
-
     auto builderKernelInstance       = Builder::Instance{};
     auto builderKernelInstanceString = builderKernelInstance.GetInstanceString();
 
-    EXPECT_TRUE(builderKernelInstanceString.find("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3") == std::string::npos);
+    ASSERT_TRUE(builderKernelInstanceString.find(
+                    "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3") == std::string::npos)
+        << " builder returned wrong kind of instance";
 
     // These are the instances that MIOpen currently gets from CK's static library
     auto factoryInstances = DeviceOpGFwdDefaultPtrs<float>::GetInstances();
 
-    std::size_t m = 0;
-    std::string maxInstanceString;
-
-    for (auto &&instance : factoryInstances) {
-        auto str = instance->GetInstanceString();
-        if (str.find("DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3") != std::string::npos){
-            continue;
-        }
-
-        auto comp = FirstDifference(str, builderKernelInstanceString);
-        if (comp > m) {
-            m = comp;
-            maxInstanceString = str;
-        }
-
-        // std::cout << str << std::endl;
-    }
-
-    std::cout << builderKernelInstanceString << std::endl << maxInstanceString << std::endl;
-    std::cout << "First diff at char " << m << std::endl << std::endl;
-
-    for (auto i =0; i < m; i++){
-        std::cout << ' ';
-    }
-    std::cout << '^' << std::endl;
-
-    ASSERT_GT(factoryInstances.size(), 0);
+    ASSERT_GT(factoryInstances.size(), 0) << "Factory returned no instances";
 
     auto result =
         std::find_if(factoryInstances.begin(),
@@ -269,7 +242,7 @@ TEST(CK_Builder, CreateExistingInstance_Xdl)
                          return kernelPtr->GetInstanceString() == builderKernelInstanceString;
                      });
 
-    std::cout << builderKernelInstanceString << std::endl;
-
-    ASSERT_NE(result, factoryInstances.end());
+    ASSERT_TRUE(result != factoryInstances.end())
+        << "Instance string " << builderKernelInstanceString
+        << " not found in list of instances returned by factory.";
 }

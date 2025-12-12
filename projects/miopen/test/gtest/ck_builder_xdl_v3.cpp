@@ -104,7 +104,8 @@ struct DefaultAlgorithm
     } block_gemm;
 };
 
-static_assert(ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm>);
+static_assert(ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm> &&
+              !ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
 
 struct Signature
 {
@@ -193,11 +194,6 @@ TEST(CK_Builder, CreateExistingInstance_Xdl_V3)
                   "Builder::Instance should be a class type");
 
     static_assert(ck_tile::reflect::HasInstanceTraits<typename Builder::Instance>);
-
-    auto description = ck_tile::reflect::describe<Builder::Instance>();
-    auto detailed = description.detailed();
-
-    std::cout << detailed << std::endl;
 
     auto builderKernelInstance       = Builder::Instance{};
     auto builderKernelInstanceString = builderKernelInstance.GetInstanceString();
