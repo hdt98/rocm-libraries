@@ -42,6 +42,7 @@ struct TestConfigs
     static constexpr auto qscale_str        = "n";
     static constexpr bool def_lse           = true;
     static constexpr bool def_is_v_rowmajor = true;
+    static constexpr auto init_method       = "uf";
     static int adjust_seqlen(int seqlen) { return seqlen; }
 };
 
@@ -57,6 +58,7 @@ struct TestConfigs<FmhaFwdFp8Bf16>
     static constexpr auto qscale_str         = "pt";
     static constexpr bool def_lse            = false;
     static constexpr bool def_is_v_rowmajor  = true;
+    static constexpr auto init_method        = "3";
     // When there are no fp8 instances with padding, pad seqlen to avoid skipping most of the tests:
     // return ck_tile::integer_least_multiple(seqlen, 128);
     static int adjust_seqlen(int seqlen) { return seqlen; }
@@ -81,6 +83,7 @@ struct TestConfigs<FmhaFwdFp32>
     static constexpr auto qscale_str         = "n";
     static constexpr bool def_lse            = true;
     static constexpr bool def_is_v_rowmajor  = true;
+    static constexpr auto init_method        = "uf";
     static int adjust_seqlen(int seqlen) { return seqlen; }
 };
 
@@ -92,8 +95,8 @@ static auto IsVRowmajorValues    = ValuesIn(TestConfigs<DataTypeConfig>::IsVRowm
 constexpr static auto qscale_str = TestConfigs<DataTypeConfig>::qscale_str;
 constexpr bool def_lse           = TestConfigs<DataTypeConfig>::def_lse;
 constexpr bool def_is_v_rowmajor = TestConfigs<DataTypeConfig>::def_is_v_rowmajor;
+constexpr auto init_method       = TestConfigs<DataTypeConfig>::init_method;
 int adjust_seqlen(int seqlen) { return TestConfigs<DataTypeConfig>::adjust_seqlen(seqlen); }
-constexpr auto init_method = "uf";
 
 // Random seed used for initializing input tensors. 0 for non-deterministic seed
 CK_TILE_DECLARE_ENV_VAR(CK_TILE_TEST_SEED, uint64_t, 123456)
