@@ -3,6 +3,10 @@
 
 #pragma once
 
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 static example_gemm_xdl_v3_benchmark_instances op_ptrs;
 
 template <typename ProblemType>

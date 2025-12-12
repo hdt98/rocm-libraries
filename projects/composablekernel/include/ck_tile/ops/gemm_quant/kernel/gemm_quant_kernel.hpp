@@ -1177,8 +1177,9 @@ struct QuantGemmKernel
      * @param a_ptr input A pointer
      * @param b_ptr input B pointer
      * @param aq_ptr input AQ pointer
+     * @param bq_ptr input BQ pointer
      * @param c_ptr output C pointer
-     * @param smem_ptr_0 The start memory pointer of the shared memory block.
+     * @param smem_ptr The start memory pointer of the shared memory block.
      * @param kargs GEMM kernel arguments
      * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k batch.
      * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.

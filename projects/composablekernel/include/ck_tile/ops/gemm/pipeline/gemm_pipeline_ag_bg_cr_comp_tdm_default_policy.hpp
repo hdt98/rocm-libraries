@@ -150,7 +150,8 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         return make_tuple(number<pad_amount>{}, number<pad_interval>{});
     }
 
-    template <typename Problem>
+    template <typename Problem,
+              typename OverrideADataType = remove_cvref_t<typename Problem::ADataType>>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
@@ -167,7 +168,7 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
         else
         {
-            using ADataType = remove_cvref_t<typename Problem::ADataType>;
+            using ADataType = OverrideADataType;
 
             constexpr auto DataTypeSize  = sizeof(ADataType);
             constexpr index_t AVectorLen = VecByteSize / DataTypeSize;
@@ -210,7 +211,8 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
     }
 
-    template <typename Problem>
+    template <typename Problem,
+              typename OverrideBDataType = remove_cvref_t<typename Problem::BDataType>>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
@@ -227,7 +229,7 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
         else
         {
-            using BDataType = remove_cvref_t<typename Problem::BDataType>;
+            using BDataType = OverrideBDataType;
 
             constexpr auto DataTypeSize  = sizeof(BDataType);
             constexpr index_t BVectorLen = VecByteSize / DataTypeSize;
