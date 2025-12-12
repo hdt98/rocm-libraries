@@ -122,11 +122,11 @@ void gecon_initData(const rocblas_handle handle,
         rocblas_init<T>(hA, true);
 
         // make matrix non-singular by adding to diagonal if needed
-        if(!singular)
-        {
-            for(I i = 0; i < n; i++)
-                hA[0][i + i * lda] += 400;
-        }
+        // if(!singular)
+        // {
+        //     for(I i = 0; i < n; i++)
+        //         hA[0][i + i * lda] += 400;
+        // }
 
         // copy original matrix for factorization
         // for(I i = 0; i < n; i++)
