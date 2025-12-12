@@ -1167,7 +1167,9 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
     assert opt1.numMfma == len(mfmaCode)
 
 
-    for _, indexList in opt1.optSchedule.items():
+    for key, indexList in opt1.optSchedule.items():
+        if (len(indexList) > opt1.numCodePaths):
+            print(f"NOPE, {key}")
         assert len(indexList) <= opt1.numCodePaths
 
     if len(opt1.mfmaReorder) > 0:
@@ -1409,6 +1411,78 @@ class CMSRegistry:
         return func(*args, **kwargs)
 
 cmsRegistry = CMSRegistry()
+
+def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+    optSchedule = dict()
+    syncCode = []
+    syncCodeTail = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    #import pdb;pdb.set_trace()
+    if isTN(kernel) and useLDSTr and TLDS==1:
+        syncTable = [
+                    -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    4, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment=""),
+                    17, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+
+                    35, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    35, SBarrier(comment=""),
+
+                    53, SWaitCnt(dscnt=0, vlcnt=10, vscnt=-1, comment=""),
+                    53, SBarrier(comment="")]
+
+        syncCode = syncTable[1::2]
+
+        tailTable = [
+                     -1, SNop(0),
+                     0, SNop(0),
+                     1, SNop(0),
+                     2, SNop(0),
+                     3, SNop(0),
+                     17, SNop(0),
+                     18, SNop(0),
+                     19, SNop(0),
+                     20, SNop(0),
+                     21, SNop(0),
+                     35, SWaitCnt(dscnt=0),
+                     ]
+        syncCodeTail = tailTable[1::2]
+
+        optSchedule = {
+            'SYNC'  : [syncTable[::2]],
+            'GRIncA': [[0,0,0,1,1,1,2,2,2]],
+            'GRIncB': [[3,3,3,4,4,4,5,5,5]],
+            # LDS reads into first 4 vgprs of Valu!_X!_I!+offset, then next four into Valu!_T!_I!+offset
+            #  in order to avoid copies in the cvt code
+            'LRA0': [[0,1,2,3,4,5]],
+            'LRB0': [[6,7,8,9]],
+            # Pack code contains cvt ops for converting fp32 to bf16. A and B cvt ops are identical.
+            # There are 24 ops per block of 3 mfmas.
+            # This example puts all cvt ops for one mfma in a single block, but they should be split up
+            'PackA3' : [[-1]*4 + [0]*20 + [1]*4 + [2]*20 + [3]*24],
+            'PackB3' : [[-1]*4 + [0]*20 + [1]*4 + [2]*20 ],
+            'GRB': [[35,35]*4],
+            'GRA': [[35,35]*6],
+            'LRSA': [[16]],
+            'LRSB': [[16]],
+            'LWSA': [[52]],
+            'LWSB': [[52]],
+            'LCC': [[71, 71]],
+            'LRA3': [[54,55,58,59,60,61]],
+            'LRB3': [[56,57,62,63]],
+            'PackA0' : [[17]*4 + [18]*20 + [19]*4 + [20]*20 + [21]*24],
+            'PackB0' : [[17]*4 + [18]*20 + [19]*4 + [20]*20],
+            'SYNC_TAIL'   : [tailTable[::2]],
+        }
+
+        nglshift = nllshift = 10 # vmcnt shift for ngl and nll
+        nglshift = nllshift = 10 # vmcnt shift for ngl and nll
+    else:
+        return False, None
+
+    numMfma = 72
+    opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift, mfmaReorder=[], syncCodeTail=syncCodeTail)
+    return True, opt1
 
 def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
 
@@ -3116,6 +3190,7 @@ def hasCustomSchedule(kernel):
     is320x192x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [320, 192, 64, 2, 1, True, 0, 0]
     is128x224x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [128, 224, 64, 2, 1, True, 0, 0]
     is192x256x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [192, 256, 32, 2, 0, True, 0, 0]
+    is192x128x32DTL  = [MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB] == [192, 128, 32, 2, 0, True, 0, 0]
 
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS)
@@ -3151,4 +3226,8 @@ def hasCustomSchedule(kernel):
         return _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS)
     elif is192x256x32DTL and isTF32 and not isMixed and ([GRVWA, GRVWB, LRVW] == [4,4,4]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS)
+    elif is192x128x32DTL and isTF32 and not isMixed and ([GRVWA, GRVWB, LRVW] == [4,4,4]) and MI == [16,16,32,1] and MIWG == [2,2]:
+        #import pdb;pdb.set_trace()
+        return _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS)
+    #import pdb;pdb.set_trace()
     return False, None
