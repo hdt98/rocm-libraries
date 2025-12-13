@@ -1771,12 +1771,17 @@ class KernelWriterAssembly(KernelWriter):
           moduleRegInit.add(SMovB32(dst=sgpr("WorkGroup0+%u"%i), src=sgpr(preloadSgprStartIdx+self.states.numSgprPreload+i), \
                       comment="restore workgroup id"))
 
-      # StaggerU params hold leftmost 16 bits, if SK then rightmost 16 bits are used there for determining fixup reduction method
+      # StaggerU params hold rightmost 16 bits in sgprStaggerU, if SK then leftmost 16 bits in sgprStaggerU are used for determining fixup reduction method
       moduleRegInit.add(SAndB32(dst=sgpr("StaggerU"), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF0000), comment="Restore StaggerU related vars"))
+      moduleRegInit.add(SLShiftRightB32(dst=sgpr("StaggerU"), shiftHex=hex(16), src=sgpr("StaggerU")))
       if kernel["GlobalSplitU"] != 0:
         moduleRegInit.add(SAndB32(dst=sgpr("GSU"), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF), comment="Restore GSUConfig and GSU"))
       elif kernel["StreamK"] > 0:
-        moduleRegInit.add(SAndB32(dst=sgpr("StaggerU"), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF), comment="Sharing StaggerU reg with SK reduction arg"))
+        # done with sgprPackedArgs after this, can use as tmp
+        moduleRegInit.add(SLShiftLeftB32(dst=sgpr(sgprPackedArgs), shiftHex=hex(16), src=sgpr(sgprPackedArgs)))
+        # TODO: is this AND necessary?
+        moduleRegInit.add(SAndB32(dst=sgpr(sgprPackedArgs), src0=sgpr(sgprPackedArgs), src1=hex(0xFFFF0000), comment="Get SK bits"))
+        moduleRegInit.add(SOrB32(dst=sgpr("StaggerU"), src0=sgpr(sgprPackedArgs), src1=sgpr("StaggerU"), comment="Sharing StaggerU reg with SK reduction arg"))
 
       if kernel["ProblemType"]["SupportUserArgs"]:
         moduleRegInit.add(SMovB32(dst=sgpr("ArgType"),src=sgpr(sgprArgType)))
@@ -4463,11 +4468,11 @@ class KernelWriterAssembly(KernelWriter):
       staggerUMask = tmpSgpr + 1
       staggerUStrideShift = tmpSgpr + 2
       staggerUMapping = tmpSgpr + 3
-      module.add(SLShiftRightB32(dst=sgpr(currentStaggerU), shiftHex=hex(16), src=sgpr("StaggerU"), comment="Init StaggerU"))
+      module.add(SMovB32(dst=sgpr(currentStaggerU), src=sgpr("StaggerU")))
       module.add(SAndB32(dst=sgpr(staggerUStrideShift), src0=sgpr(currentStaggerU), src1=hex(0x1F00)))
       module.add(SLShiftRightB32(dst=sgpr(staggerUStrideShift), shiftHex=hex(8), src=sgpr(staggerUStrideShift)))
       module.add(SAndB32(dst=sgpr(staggerUMapping), src0=sgpr(currentStaggerU), src1=hex(0xE000)))
-      module.add(SAndB32(dst=sgpr(currentStaggerU), src0=sgpr(currentStaggerU), src1=hex(0x00FF)))
+      module.add(SAndB32(dst=sgpr(currentStaggerU), src0=sgpr(currentStaggerU), src1=hex(0xFF)))
       module.add(beginStaggerUIterLabel)
       module.add(SLShiftLeftB32(dst=sgpr(shiftedStaggerU), src=sgpr(currentStaggerU), \
               shiftHex=sgpr(staggerUStrideShift), comment="shift by StaggerUStride"))

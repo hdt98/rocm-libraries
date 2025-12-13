@@ -351,8 +351,9 @@ class StreamK(Component):
 
         tmpSgpr = writer.sgprPool.checkOut(2, "tmpSgpr")
         module.add(SMovB32(dst=sgpr(tmpSgpr), src=8))
-        module.add(SAndB32(dst=sgpr(tmpSgpr+1), src0=sgpr("StaggerU"), src1=hex(0xFFFF), comment="Sharing with StaggerU sgpr"))
-        module.add(SCmpLeU32(src0= sgpr(tmpSgpr), src1=sgpr(tmpSgpr+1)))
+        module.add(SAndB32(dst=sgpr(tmpSgpr+1), src0=sgpr("StaggerU"), src1=hex(0xFFFF0000), comment="Sharing with StaggerU sgpr"))
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr+1), shiftHex=hex(16), src=sgpr(tmpSgpr+1)))
+        module.add(SCmpLeU32(src0=sgpr(tmpSgpr), src1=sgpr(tmpSgpr+1)))
         module.add(SCBranchSCC1(labelName=skFixupTreeReductionLabel.getLabelName(), comment="Branch to tree reduction if enough workgroups"))
         writer.sgprPool.checkIn(tmpSgpr)
 

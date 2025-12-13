@@ -514,6 +514,30 @@ namespace TensileLite
         return packedIndices;
     }
 
+    uint32_t ContractionSolution::getSKMaxWG(ContractionSolution::Problem const& problem, dim3 const& numWorkGroups, StreamKSettings const& sk) const
+    {
+        auto tiles = problem.getNumTiles(sizeMapping, 1);
+        auto     itersPerTile = max(1, problem.getItersPerTile(sizeMapping));
+        auto     totalIters   = tiles * itersPerTile;
+        uint32_t skMaxWG = 0;
+        if(sizeMapping.streamK != 0)
+        {
+            auto tiles = problem.getNumTiles(sizeMapping, 1);
+
+            // Clamp minimum iters per tile to 1 to allow stream-k index calculation to work in case K==0
+            // In this case no actual iterations will be run, but workgroups will be mapped correctly for beta*C
+            auto     itersPerTile = max(1, problem.getItersPerTile(sizeMapping));
+            uint32_t skItersPerWG = 0;
+
+            if(sizeMapping.streamK == 1) // Basic SK
+                skItersPerWG = CeilDivide(totalIters, numWorkGroups.x);
+            else if(sizeMapping.streamK >= 2) // Two-tile SK
+                skItersPerWG = sk.grid * itersPerTile / sk.grid;
+            skMaxWG = itersPerTile / (skItersPerWG ? skItersPerWG : 1) + 1;
+        }
+        return skMaxWG;
+    }
+
     template <bool T_Debug, bool insertKernelArgs, typename KA>
     void ContractionSolution::singleCallArgs(ContractionSolution::Problem const& problem,
                                              ContractionInputs const&            inputs,
@@ -1326,6 +1350,11 @@ namespace TensileLite
                 std::cout << "AutoWGM: " << autoWGM << std::endl;
                 std::cout << "AutoWGMXCC: " << autoWGMXCC << std::endl;
             }
+
+            uint32_t SKmaxWG = 0;
+            if(sizeMapping.streamK != 0)
+                SKmaxWG = getSKMaxWG(problem, rv.numWorkGroups, sk);
+
             kernelArgs<T_Debug, false>(1,
                                        0,
                                        rv.args,
@@ -1334,7 +1363,8 @@ namespace TensileLite
                                        problem.getParams(),
                                        autoWGM,
                                        autoWGMXCC,
-                                       autoGsuVal);
+                                       autoGsuVal,
+                                       SKmaxWG);
         }
         singleCallArgs<T_Debug, true>(
             problem, inputs, 0, &hardware, problemNumGroupTiles, rv.numWorkGroups, rv.args, sk);

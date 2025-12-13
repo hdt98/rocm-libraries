@@ -373,6 +373,8 @@ namespace TensileLite
 
         virtual void relaseDeviceUserArgs(void* dUA, void* dUAHost);
 
+        uint32_t getSKMaxWG(ContractionSolution::Problem const& problem, dim3 const& numWorkGroups, StreamKSettings const& sk) const;
+
         template <bool T_Debug, bool insertKernelArgs, typename KA>
         void singleCallArgs(Problem const&           problem,
                             ContractionInputs const& inputs,
