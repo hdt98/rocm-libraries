@@ -504,6 +504,24 @@ pipeline {
                         }
                     }
                 }
+                stage('TF32 Hip Install All gfx942') {
+                    when {
+                        beforeAgent true
+                        expression { params.TARGET_GFX942 && params.DATATYPE_TF32 }
+                    }
+                    options {
+                        retry(2)
+                    }
+                    agent{ label rocmnode("gfx942") }
+                    steps{
+                        runBuildAndSingleGtestJob(Tf32_flags + gfx942_flags, Build_timeout_minutes)
+                    }
+                    post {
+                        always {
+                            cleanWs()
+                        }
+                    }
+                }
                 // GFX1101 Tests
                 stage('Fp16 Hip Install All gfx1101') {
                     when {
@@ -529,24 +547,6 @@ pipeline {
                     agent{ label rocmnode("navi32") }
                     steps{
                         runBuildAndSingleGtestJob(Full_test + gfx1101_flags, Build_timeout_minutes)
-                    }
-                }
-                stage('TF32 Hip All gfx942') {
-                    when {
-                        beforeAgent true
-                        expression { params.TARGET_GFX942 && params.DATATYPE_TF32 }
-                    }
-                    options {
-                        retry(2)
-                    }
-                    agent{ label rocmnode("gfx942") }
-                    steps{
-                        runBuildAndSingleGtestJob(Full_test + Tf32_flags + gfx942_flags, Build_timeout_minutes)
-                    }
-                    post {
-                        always {
-                            cleanWs()
-                        }
                     }
                 }
             }
