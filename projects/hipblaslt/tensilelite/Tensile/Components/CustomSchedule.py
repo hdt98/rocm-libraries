@@ -3066,9 +3066,7 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isTN(kernel)  and not useLDSTr and TLDS==1:
         kernel["UsePLRPack"] = True
-        snopTable = [
-          #  27, SNop(7),
-        ]
+ 
         # assume total number of pack instructions is 24 per block
         syncTable = [
             3, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for LRA0-0"),
@@ -3082,16 +3080,15 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             48, SWaitCnt(dscnt=-1, vlcnt=12-4, vscnt=-1, comment="wait for previous set of global reads"),
             48, SBarrier(comment=""),
            
-            63, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="wait for LRB3-0"),
+            56, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="wait for LRB3-0"),
+            56+8, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB3"),
 
             72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
             72, SBarrier(comment=""),
-            63+12, SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="wait for all LRB3"),
 
             79, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for LRA3-0"),
-            79+12, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRA3"),
+            79+8, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRA3"),
         ]
-       # syncTable = []
         optSchedule = {
             'SYNC': [syncTable[::2]],
           
@@ -3101,12 +3098,12 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'LRA0': [[-1, 0, 1, 2]],
             'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
             'PackA0': [create_range(3, 24, 23)],# input from LRA0, must be done before mfma#24
-            'PackB0': [create_range(23, 48, 47)],# input from LRB0, must be done before mfma#48
+            'PackB0': [create_range(23, 48, 50)],# input from LRB0, must be done before mfma#48
 
             'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
             'GRB': [[27, 27, 28, 28, 29, 29, 30, 30, 55, 55, 60, 60, 65, 65, 70, 70]],
-            'LRB3': [[48, 50, 52, 54, 56, 58, 60, 62]],
+            'LRB3': [[48, 49, 50, 51, 52, 53, 54, 55]],
             'LRA3': [[72, 74, 76, 78]],
 
             'LRSA': [[25]],
@@ -3114,21 +3111,18 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'LWSA': [[75]],
             'LWSB': [[76]],
 
-            'PackB3': [create_range(63, 48, 79)], # input from LRB3, after mfma#48
+            'PackB3': [create_range(56, 32, 79, 1, 3)], # input from LRB3, after mfma#48
             'PackA3': [create_range(79, 16, 95, 1, 3)], # input from LRA3, after mfma#48
-
-            'SNOP': [snopTable[::2]],
 
             'LCC' : [[95, 95]],
         }
         syncCode = syncTable[1::2]
-        snopCode = snopTable[1::2]
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
     else:
         return False, None
 
     numMfma = 96
-    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
 
 def hasCustomSchedule(kernel):
