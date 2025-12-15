@@ -167,13 +167,13 @@ namespace rocRoller
 
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
-            const auto multiplier = intraSPConflicts();
 
             InstructionStatus status;
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                const auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
+                const auto multiplier = intraSPConflicts();
+                const auto ldsInfo    = getLdsInfoFromOpcode(inst.getOpCode());
 
                 const auto [direction, dwords]   = ldsInfo.value();
                 const auto requiredDataSlots     = queueSlots(direction, dwords) * multiplier;
@@ -202,7 +202,9 @@ namespace rocRoller
                     = (LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 * multiplier) - 1;
             }
             const auto waitcnt = inst.getWaitCount().dscnt();
-            if(waitcnt >= 0)
+            if(waitcnt >= 0
+               && Settings::Get(Settings::DSObserverSetting)
+                      == DSObserverType::WeightlessDSMemObserver)
             {
                 AssertFatal(status.stallCycles == 0,
                             "No logic to handle both waitcnt stalls and instruction stalls yet");
@@ -253,9 +255,10 @@ namespace rocRoller
                 m_dataQueue.pop_front();
             }
 
-            for(unsigned int i = 0; i < intraSPConflicts(); ++i)
-                if(GPUInstructionInfo::isLDS(inst.getOpCode())
-                   && useWeightlessObserver(inst, m_context.lock()))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
+            {
+                for(unsigned int i = 0; i < intraSPConflicts(); ++i)
                 {
                     auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
 
@@ -311,6 +314,7 @@ namespace rocRoller
                                     dataCycles,
                                     cmdQueueStr));
                 }
+            }
         }
 
         int WeightlessDSMemObserver::getRemainingDataSlots() const
