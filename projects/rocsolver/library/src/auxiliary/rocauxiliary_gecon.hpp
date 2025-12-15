@@ -40,7 +40,6 @@
 #include "lapack/roclapack_getrs.hpp"
 #include <algorithm>
 #include <vector>
-#include <iostream>
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -225,7 +224,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
     // Sum absolute values
     S sum = 0;
     bool repeated = (rocblas_is_complex<T>) ? false : true;
-    // bool repeated = true;
     // we iterate over v, since v contains x from previous step (pointers swapped)
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
     {
@@ -400,14 +398,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     S val_new = rocblas_abs(x[local_max_idx]);
     S val_old = rocblas_abs(x[jlast]);
 
-    if (val_new == val_old || iters == iters_max){
+    if (val_new == val_old || iters >= iters_max){
         for(rocblas_int i = tid; i < n; i += GECON_BLOCKSIZE)
         {
             T sign = (i % 2 == 0) ? T(1) : T(-1);
             x[i] = T(sign * (S(1) + S(i) / S(n-1)));
         }
         if(tid == 0){
-            // TODO: increment iters???
             *kase = 1;
             *jump = 5; 
         }
@@ -491,31 +488,21 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
                  T** v, // same type as A, passed by reference so swap persists
                  T** x, // passed by reference so swap persists
                  I* isgn,
-                //  I* isave,       // just preserve elements as individual variables (on host?)
                  const I max_iters,
                  I* h_iters,
                  I* d_max_idx,
-                //  const I d_iters, // on host, just maintain iters as they will be incremented within the kernels // if kernel behaviour could change, then maintain device iters as well
                  S* d_est,          // real_t<T>
-                 const S* d_anorm,          // real_t<T>
-                //  S* d_estold,
-                //  I* d_jlast,
-                //  I* d_should_break,
-                //  I* d_is_equal,
+                 const S* d_anorm,  // real_t<T>
                  rocblas_int* d_jump,
                  rocblas_int* d_kase,
                  rocblas_int* h_jump,
                  rocblas_int* h_kase)
 {
-    // TODO: consider what return value should be, should we bother with returning success in each case, or just after switch statement?
-    // TODO: consider if synchronizations required between kernel laynches or memory transfers :)
     if (*h_kase == 0){
         // initialize x = (1/n, ..., 1/n)
         rocblas_int blocks = (n - 1) / GECON_BLOCKSIZE + 1;
         ROCSOLVER_LAUNCH_KERNEL((gecon_init_vector<T, I>), dim3(blocks), dim3(GECON_BLOCKSIZE), 0,
                                 stream, *x, n, T(1) / T(n));
-        // ROCSOLVER_LAUNCH_KERNEL((gecon_init_vector<T, I>), dim3(blocks), dim3(GECON_BLOCKSIZE), 0,
-        //                         stream, *v, n, T(1) / T(n));
         *h_kase = 1;
         *h_jump = 1;
         return rocblas_status_success;
@@ -543,9 +530,6 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
         case 2:
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump2<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0, stream, n, *x, d_max_idx);
 
-            // isave(2) = 3?????
-            // TODO: how to reflect this
-
             *h_kase = 1;
             *h_jump = 3;
 
@@ -554,39 +538,30 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             return rocblas_status_success;
             break;
         case 3:
-            // hipMemcpy(*v, *x, sizeof(T) * n, hipMemcpyDeviceToDevice);
             std::swap(*x, *v);
-            // hipStreamSynchronize(stream);
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump3<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
                                     stream, n, *x, *v, isgn, d_kase, d_jump, d_est);
 
             HIP_CHECK(hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
             HIP_CHECK(hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
-            // hipStreamSynchronize(stream);
 
             return rocblas_status_success;
             break;
         case 4:
-            // int jlast; 
-            // hipMemcpyAsync(jlast, d_max_idx, sizeof(I), hipMemcpyDeviceToHost, stream);
-            // hipStreamSynchronize(stream);
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump4<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
                                     stream, n, *x, isgn, d_kase, d_jump, d_max_idx, *h_iters, max_iters);
 
             HIP_CHECK(hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
             HIP_CHECK(hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
-            // hipStreamSynchronize(stream);
 
-            if (*h_jump == 5)
+            if (*h_jump == 3)
                 *h_iters = *h_iters+1;
 
             return rocblas_status_success;
             break;
         case 5:
-            // afterwards, d_est will contain condition number estimate
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump5<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
                                     stream, n, *x, d_est, d_anorm);
-            // copy x onto v
             std::swap(*x, *v);
             *h_kase = 0;
 
@@ -617,17 +592,16 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                                         T* work_v,
                                         T* work_x,
                                         I* work_isgn,
-                                        S* scalars_est,
-                                        I* scalars_max_idx,
-                                        rocblas_int* scalars_kase,
-                                        rocblas_int* scalars_jump,
+                                        S* scalar_est,
+                                        I* scalar_max_idx,
+                                        rocblas_int* scalar_kase,
+                                        rocblas_int* scalar_jump,
                                         void* work_getrs_1,
                                         void* work_getrs_2,
                                         void* work_getrs_3,
                                         void* work_getrs_4,
                                         const I max_iter)
 {
-    // TODO: does ROCSOLVER_ENTER need more function argss passed?
     ROCSOLVER_ENTER("gecon", "norm_type:", norm_type, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
 
@@ -650,14 +624,9 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         return rocblas_status_success;
     }
 
-    // return not implemented for Frobenius and max norms
-    if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
-        return rocblas_status_not_implemented;
-
     // iterate over each batch
     std::vector<S> h_anorm(batch_count);
     HIP_CHECK(hipMemcpyAsync(h_anorm.data(), anorm, sizeof(S) * batch_count, hipMemcpyDeviceToHost, stream));
-    // hipStreamSynchronize(stream);
     for(I batch = 0; batch < batch_count; batch++)
     {
         // if anorm is zero for this batch, rcond is zero
@@ -673,12 +642,11 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         T* v = work_v + batch * n;
         T* x = work_x + batch * n;
         I* isgn = work_isgn + batch * n;
-        S* d_est = rcond + batch;
+        S* d_est = scalar_est;  // reuse single scalar for all batches
         const S* d_anorm = anorm + batch;
-        I* d_max_idx = scalars_max_idx + batch;
-        rocblas_int* d_kase = scalars_kase + batch;
-        rocblas_int* d_jump = scalars_jump + batch;
-
+        I* d_max_idx = scalar_max_idx;  // reuse single scalar
+        rocblas_int* d_kase = scalar_kase;  // reuse single scalar
+        rocblas_int* d_jump = scalar_jump;  // reuse single scalar
 
         // initialize lacn2 state
         rocblas_int h_kase = 0;
@@ -717,9 +685,8 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                 work_getrs_2, work_getrs_3, work_getrs_4, true, true);
         } while(h_kase != 0);
 
-        // rcond is computed in jump5 and stored in d_est, which is already rcond[batch]
-        // note: d_est and rcond[batch] point to the same location
-        
+        // copy result from scalar buffer to rcond for this batch
+        HIP_CHECK(hipMemcpyAsync(rcond + batch, d_est, sizeof(S), hipMemcpyDeviceToDevice, stream));
     }
 
     return rocblas_status_success;
@@ -732,10 +699,10 @@ void rocsolver_gecon_getMemorySize(const I n,
                                    size_t* size_work_v,
                                    size_t* size_work_x,
                                    size_t* size_work_isgn,
-                                   size_t* size_scalars_est,
-                                   size_t* size_scalars_max_idx,
-                                   size_t* size_scalars_kase,
-                                   size_t* size_scalars_jump,
+                                   size_t* size_scalar_est,
+                                   size_t* size_scalar_max_idx,
+                                   size_t* size_scalar_kase,
+                                   size_t* size_scalar_jump,
                                    size_t* size_work_getrs_1,
                                    size_t* size_work_getrs_2,
                                    size_t* size_work_getrs_3,
@@ -747,10 +714,10 @@ void rocsolver_gecon_getMemorySize(const I n,
         *size_work_v = 0;
         *size_work_x = 0;
         *size_work_isgn = 0;
-        *size_scalars_est = 0;
-        *size_scalars_max_idx = 0;
-        *size_scalars_kase = 0;
-        *size_scalars_jump = 0;
+        *size_scalar_est = 0;
+        *size_scalar_max_idx = 0;
+        *size_scalar_kase = 0;
+        *size_scalar_jump = 0;
         *size_work_getrs_1 = 0;
         *size_work_getrs_2 = 0;
         *size_work_getrs_3 = 0;
@@ -764,22 +731,25 @@ void rocsolver_gecon_getMemorySize(const I n,
     // need n elements of type T per batch for x vector
     *size_work_x = sizeof(T) * n * batch_count;
 
-    // TODO: only needed by real, but how can we do that?
-    *size_work_isgn = sizeof(I) * n * batch_count;
+    // need n elements of type I per batch for isgn vector (only used by real types, not complex)
+    *size_work_isgn = rocblas_is_complex<T> ? 0 : sizeof(I) * n * batch_count;
 
-    // need S (real) scalar per batch for estimate
-    *size_scalars_est = sizeof(S) * batch_count;
+    // Scalars are reused across batches (not allocated per batch)
+    // need one S (real) scalar for estimate
+    *size_scalar_est = sizeof(S);
 
-    // need I scalar per batch for max index
-    *size_scalars_max_idx = sizeof(I) * batch_count;
+    // need one I scalar for max index
+    *size_scalar_max_idx = sizeof(I);
 
-    // need rocblas_int scalar per batch for kase state
-    *size_scalars_kase = sizeof(rocblas_int) * batch_count;
+    // need one rocblas_int scalar for kase state
+    *size_scalar_kase = sizeof(rocblas_int);
 
-    // need rocblas_int scalar per batch for jump state
-    *size_scalars_jump = sizeof(rocblas_int) * batch_count;
+    // need one rocblas_int scalar for jump state
+    *size_scalar_jump = sizeof(rocblas_int);
 
     // workspace for getrs
+    // optim_mem is an output parameter indicating if optimized memory layout is used
+    // by getrs internally; we don't need to act on it here, just provide it to the query
     bool optim_mem;
     rocsolver_getrs_getMemorySize<false, false, T, I>(rocblas_operation_none, n, 1, batch_count,
                                                       size_work_getrs_1, size_work_getrs_2,
@@ -802,6 +772,10 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
     // 1. invalid/non-supported values
     if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity
        && norm_type != rocsolver_norm_type_frobenius && norm_type != rocsolver_norm_type_max)
+        return rocblas_status_invalid_value;
+    
+    // Frobenius and max norms are not supported
+    if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
         return rocblas_status_invalid_value;
 
     // 2. invalid size
