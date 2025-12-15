@@ -3069,63 +3069,54 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
         snopTable = [
           #  27, SNop(7),
         ]
+        # assume total number of pack instructions is 24 per block
         syncTable = [
-            2, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
-            10, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="LRB0"),
-            12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
-            12, SBarrier(comment=""),
-            16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
-            16, SBarrier(comment=""),
+            3, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for LRA0-0"),
+            12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for all LRA0"),
+            12, SBarrier(comment="gra"),
+
+            23, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="LRB0-0"),
+            27, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB0"),
+            27, SBarrier(comment="grb"),
+
+            48, SWaitCnt(dscnt=-1, vlcnt=12-4, vscnt=-1, comment="wait for previous set of global reads"),
+            48, SBarrier(comment=""),
+           
+            63, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="wait for LRB3-0"),
+
             72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
             72, SBarrier(comment=""),
-            78, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for PackA0 and PackB0 to complete"),
-            80, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
-            80, SBarrier(comment=""),
-            92, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for PackA0 and PackB0 to complete"),
+            63+12, SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="wait for all LRB3"),
+
+            79, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for LRA3-0"),
+            79+12, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRA3"),
         ]
        # syncTable = []
         optSchedule = {
             'SYNC': [syncTable[::2]],
-            'PackA0': [[3, 3, 3, 3,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
-                    3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,  #l[0, 3] -> vgprValuA_X0[4:7] mfma#1
-                    5, 5, 5, 5, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
-                    6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
-            'PackB0': [[11, 11, 11, 11, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
-                    11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
-                    13, 13, 13, 13, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
-                    14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
-                    16, 16, 16, 16, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
-                    17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
-                    19, 19, 19, 19, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
-                    20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
-            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
-            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
+          
+            'GRIncA': [[0, 1, 2, 3, 4, 5, 6, 7, 8]],
+            'GRIncB': [[16, 17, 18, 19, 20, 21, 22, 23, 24]],
 
             'LRA0': [[-1, 0, 1, 2]],
             'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
+            'PackA0': [create_range(3, 24, 23)],# input from LRA0, output for mfma#24-47
+            'PackB0': [create_range(23, 48, 47)],# input from LRB0, output for mfma#48-71
+
             'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
-            'GRB': [[16, 16, 18, 18, 20, 20, 22, 22, 34, 34, 44, 44, 54, 54, 64, 64]],
+            'GRB': [[27, 27, 28, 28, 29, 29, 30, 30, 55, 55, 60, 60, 65, 65, 70, 70]],
+            'LRB3': [[48, 50, 52, 54, 56, 58, 60, 62]],
             'LRA3': [[72, 74, 76, 78]],
-            'LRB3': [[80, 82, 84, 86, 88, 90, 91, 92]],
 
-            'LRSA': [[22]],
-            'LRSB': [[22]],
-            'LWSA': [[70]],
-            'LWSB': [[70]],
+            'LRSA': [[25]],
+            'LRSB': [[26]],
+            'LWSA': [[75]],
+            'LWSB': [[76]],
 
-            'PackA3': [[79, 79, 80, 80, # vgprValuA_X0_I0[16:19] mfma#24
-                        80, 80, 81, 81, 81, 81, 81, 81, 82, 82, 82, 82, 83, 83, 83, 83, 83, 83, 83, 83,  # vgprValuA_X0_I0[20:23] mfma#25
-                        83, 83, 84, 84, # vgprValuA_X0_I0[24:27] mfma#27
-                        84, 84, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85]], # vgprValuA_X0_I0[28:31] mfma#28
-            'PackB3': [[93, 93, 93, 93, # vgprValuB_X0_I0[32:35] mfma#48
-                        94, 94, 94, 94, 94, 94, 94, 94, 94, 94 ,94, 94, 94, 94, 94, 94, 94, 94, 94, 94, # vgprValuB_X0_I0[36:39] mfma#50
-                        94, 94, 94, 94,  # vgprValuB_X0_I0[40:43] mfma#54
-                        95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, # vgprValuB_X0_I0[44:47] mfma#56
-                        95, 95, 95, 95, # vgprValuB_X0_I0[48:51] mfma#60
-                        95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
-                        95, 95, 95, 95, # vgprValuB_X0_I0[48:51] mfma#60
-                        95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95]],
+            'PackB3': [create_range(63, 48, 79)], # input from LRB3, output for mfma#72-95
+            'PackA3': [create_range(79, 24, 95)], # input from LRA3, output for mfma#0-23
+
             'SNOP': [snopTable[::2]],
 
             'LCC' : [[95, 95]],
