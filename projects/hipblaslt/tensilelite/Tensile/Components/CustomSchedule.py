@@ -3100,8 +3100,8 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
 
             'LRA0': [[-1, 0, 1, 2]],
             'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
-            'PackA0': [create_range(3, 24, 23)],# input from LRA0, output for mfma#24-47
-            'PackB0': [create_range(23, 48, 47)],# input from LRB0, output for mfma#48-71
+            'PackA0': [create_range(3, 24, 23)],# input from LRA0, must be done before mfma#24
+            'PackB0': [create_range(23, 48, 47)],# input from LRB0, must be done before mfma#48
 
             'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
@@ -3114,8 +3114,8 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'LWSA': [[75]],
             'LWSB': [[76]],
 
-            'PackB3': [create_range(63, 48, 79)], # input from LRB3, output for mfma#72-95
-            'PackA3': [create_range(79, 24, 95)], # input from LRA3, output for mfma#0-23
+            'PackB3': [create_range(63, 48, 79)], # input from LRB3, after mfma#48
+            'PackA3': [create_range(79, 16, 95, 1, 3)], # input from LRA3, after mfma#48
 
             'SNOP': [snopTable[::2]],
 
