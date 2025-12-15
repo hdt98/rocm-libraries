@@ -148,7 +148,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump2(const I n,
     __shared__ S sval[GECON_BLOCKSIZE / WarpSize];
     __shared__ S sval_indices[GECON_BLOCKSIZE / WarpSize];
 
-    // dot
+    // find index of maximum abosolute value in vector x
     S local_max = std::numeric_limits<S>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
@@ -220,7 +220,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
 
     __shared__ S sval[GECON_BLOCKSIZE / WarpSize];
     __shared__ bool sval_repeated[GECON_BLOCKSIZE / WarpSize];
-    __shared__ S sval_estold;  // Shared storage for estold so all threads can access it
+    __shared__ S sval_estold;  // for broadcasting est_old to all warps
 
     // Sum absolute values
     S sum = 0;
@@ -244,7 +244,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
         }
     }
 
-    // Reduce within Warp
+    // reduce within Warp
     sum += shift_left(sum, 1);
     repeated = repeated && __shfl_down(repeated, 1);
     sum += shift_left(sum, 2);
@@ -273,7 +273,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
             sum += sval[k];
             repeated = repeated && sval_repeated[k];
         }
-        sval_estold = *est;  // Save old estimate to shared memory before updating
+        sval_estold = *est;  // broadcast
         *est = sum;
         sval_repeated[0] = repeated;
     }
@@ -281,7 +281,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
     __syncthreads();
 
     repeated = sval_repeated[0];
-    S estold = sval_estold;  // All threads read the same synchronized value
+    S estold = sval_estold;  // read broadcast
 
     if (repeated || (*est <= estold)){
         for(I i = tid; i < n; i += GECON_BLOCKSIZE)
@@ -289,7 +289,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
             // we write over old x
             T sign = (i % 2 == 0) ? T(1) : T(-1);
             x[i] = T(sign * (S(1) + S(i) / S(n-1)));
-            // x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
             *kase = 1;
@@ -299,22 +298,19 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump3(const I n,
         return;
     }
 
+    // we iterate over v, since v contains old x (pointers swapped)
     if constexpr(rocblas_is_complex<T>)
     {
-        // we iterate over v, since v contains old x (pointers swapped)
         for(I i = tid; i < n; i += GECON_BLOCKSIZE)
         {
             S absxi = rocblas_abs(v[i]);
             if (absxi == 0){
                 x[i] = T(1);
-                // isgn[i] = T(1);
             } else{
                 x[i] = v[i] / absxi;
-                // isgn[i] = T(rocblas_real(x[i]) >= 0 ? 1 : -1);
             }
         }
     } else{
-        // we iterate over v, since v contains old x (pointers swapped)
         for(I i = tid; i < n; i += GECON_BLOCKSIZE)
         {
             if (v[i] >= 0)
@@ -356,7 +352,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     __shared__ S sval[GECON_BLOCKSIZE / WarpSize];
     __shared__ S sval_indices[GECON_BLOCKSIZE / WarpSize];
 
-    // dot
+    // find index of maximum abosolute value in vector x
     S local_max = std::numeric_limits<S>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
@@ -409,7 +405,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
         {
             T sign = (i % 2 == 0) ? T(1) : T(-1);
             x[i] = T(sign * (S(1) + S(i) / S(n-1)));
-            // x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
             // TODO: increment iters???
@@ -425,7 +420,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
         x[i] = T(0);
     }
 
-    // Synchronize to ensure all threads finish zeroing before thread 0 sets the max element
+    // ensure all threads done zeroing before writing to max element
     __syncthreads();
 
     if (tid == 0)
@@ -519,8 +514,8 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
         rocblas_int blocks = (n - 1) / GECON_BLOCKSIZE + 1;
         ROCSOLVER_LAUNCH_KERNEL((gecon_init_vector<T, I>), dim3(blocks), dim3(GECON_BLOCKSIZE), 0,
                                 stream, *x, n, T(1) / T(n));
-        ROCSOLVER_LAUNCH_KERNEL((gecon_init_vector<T, I>), dim3(blocks), dim3(GECON_BLOCKSIZE), 0,
-                                stream, *v, n, T(1) / T(n));
+        // ROCSOLVER_LAUNCH_KERNEL((gecon_init_vector<T, I>), dim3(blocks), dim3(GECON_BLOCKSIZE), 0,
+        //                         stream, *v, n, T(1) / T(n));
         *h_kase = 1;
         *h_jump = 1;
         return rocblas_status_success;
@@ -559,15 +554,15 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             return rocblas_status_success;
             break;
         case 3:
-            hipMemcpy(*v, *x, sizeof(T) * n, hipMemcpyDeviceToDevice);
+            // hipMemcpy(*v, *x, sizeof(T) * n, hipMemcpyDeviceToDevice);
             std::swap(*x, *v);
-            hipStreamSynchronize(stream);
+            // hipStreamSynchronize(stream);
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump3<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
                                     stream, n, *x, *v, isgn, d_kase, d_jump, d_est);
 
-            hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
-            hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
-            hipStreamSynchronize(stream);
+            HIP_CHECK(hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
+            HIP_CHECK(hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
+            // hipStreamSynchronize(stream);
 
             return rocblas_status_success;
             break;
@@ -578,9 +573,9 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump4<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
                                     stream, n, *x, isgn, d_kase, d_jump, d_max_idx, *h_iters, max_iters);
 
-            hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
-            hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
-            hipStreamSynchronize(stream);
+            HIP_CHECK(hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
+            HIP_CHECK(hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
+            // hipStreamSynchronize(stream);
 
             if (*h_jump == 5)
                 *h_iters = *h_iters+1;
@@ -598,6 +593,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             return rocblas_status_success;
             break;
         default:
+            return rocblas_status_invalid_value;
             break;
     }
 
@@ -660,8 +656,8 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
 
     // iterate over each batch
     std::vector<S> h_anorm(batch_count);
-    hipMemcpyAsync(h_anorm.data(), anorm, sizeof(S) * batch_count, hipMemcpyDeviceToHost, stream);
-    hipStreamSynchronize(stream);
+    HIP_CHECK(hipMemcpyAsync(h_anorm.data(), anorm, sizeof(S) * batch_count, hipMemcpyDeviceToHost, stream));
+    // hipStreamSynchronize(stream);
     for(I batch = 0; batch < batch_count; batch++)
     {
         // if anorm is zero for this batch, rcond is zero
@@ -669,7 +665,7 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         if(h_anorm[batch] == S(0))
         {
             S zero = S(0);
-            hipMemcpyAsync(rcond + batch, &zero, sizeof(S), hipMemcpyHostToDevice, stream);
+            HIP_CHECK(hipMemcpyAsync(rcond + batch, &zero, sizeof(S), hipMemcpyHostToDevice, stream));
             continue;
         }
 
