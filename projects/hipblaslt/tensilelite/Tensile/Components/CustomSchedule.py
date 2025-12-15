@@ -46,6 +46,25 @@ from copy import deepcopy
 from collections import Counter, defaultdict
 from typing import Callable, Dict, List, Tuple
 
+def create_range(min_val: int, num: int, max_val: int, step: int = 1, repeat: int = 2) -> list[int]:
+    """
+    Generate a list where each value in range(min_val, min_val+num, step) is repeated 'repeat' times.
+    Value is clamped to max_val
+    
+    Args:
+        min_val: Starting value (inclusive)
+        num: Number of values
+        step: Step between values
+        max_val: Maximum value (clamp)
+        repeat: Number of times to repeat each value
+    
+    Example:
+        create_range(100, 5,200, 1, 2) => [100, 100, 101, 101, 102, 102, 103, 103, 104, 104]
+        create_range(0, 5, 10, 2, 3) => [0, 0, 0, 2, 2, 2, 4, 4, 4, 6, 6, 6, 8, 8, 8]
+        create_range(0, 5, 6, 2, 3) => [0, 0, 0, 2, 2, 2, 4, 4, 4, 6, 6, 6, 6, 6, 6]
+    """
+    return [min(val, max_val) for val in range(min_val, min_val + num, step) for _ in range(repeat)]
+
 def get_most_recent_local_reads(
     vmfmas: List[int],
     counts: List[int],
@@ -3046,35 +3065,39 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isTN(kernel)  and not useLDSTr and TLDS==1:
+        kernel["UsePLRPack"] = True
         snopTable = [
           #  27, SNop(7),
         ]
         syncTable = [
-            -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+            2, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+            10, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="LRB0"),
             12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for LRA0 data ready"),
             12, SBarrier(comment=""),
             16, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRB0 data ready"),
             16, SBarrier(comment=""),
             72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
             72, SBarrier(comment=""),
+            78, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for PackA0 and PackB0 to complete"),
             80, SWaitCnt(dscnt=-1, vlcnt=12, vscnt=-1, comment="wait for previous set of global reads"),
             80, SBarrier(comment=""),
+            92, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for PackA0 and PackB0 to complete"),
         ]
        # syncTable = []
         optSchedule = {
             'SYNC': [syncTable[::2]],
-            'PackA3': [[-1, -1, -1, -1,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
-                    -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  #l[0, 3] -> vgprValuA_X0[4:7] mfma#1
-                    1, 1, 1, 1, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
-                    2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
-            'PackB3': [[-1, -1, -1, -1, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
-                    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
-                    3, 3, 4, 4, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
-                    4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
-                    7, 7, 8, 8, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
-                    8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
-                    13, 13, 13, 13, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
-                    14, 14, 14, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 18, 19,]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
+            'PackA0': [[3, 3, 3, 3,  # h[0, 3] -> vgprValuA_X0[0:3] mfma#0
+                    3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,  #l[0, 3] -> vgprValuA_X0[4:7] mfma#1
+                    5, 5, 5, 5, # h[4, 7] -> vgprValuA_X0[8:11] mfma#3
+                    6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]],# l[4, 7] -> vgprValuA_X0[12:15] mfma#4
+            'PackB0': [[11, 11, 11, 11, # h[0, 3] -> vgprValuB_X0[0:3] mfma#0
+                    11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, # l[0, 3] -> vgprValuB_X0[4:7] mfma#2
+                    13, 13, 13, 13, # h[4, 7] -> vgprValuB_X0[8:11] mfma#6
+                    14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, # l[4, 7] -> vgprValuB_X0[12:15] mfma#8
+                    16, 16, 16, 16, # h[8, 11] -> vgprValuB_X0[16:19] mfma#12
+                    17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, # l[8, 11] -> vgprValuB_X0[20:23] mfma#14
+                    19, 19, 19, 19, # h[12, 15] -> vgprValuB_X0[24:27] mfma#18
+                    20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,]],# l[12, 15] -> vgprValuB_X0[28:31] mfma#20
             'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
             'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
 
@@ -3091,18 +3114,18 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'LWSA': [[70]],
             'LWSB': [[70]],
 
-            'PackA0': [[19, 19, 20, 20, # vgprValuA_X0_I0[16:19] mfma#24
-                    20, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24,  # vgprValuA_X0_I0[20:23] mfma#25
-                    24, 24, 25, 25, # vgprValuA_X0_I0[24:27] mfma#27
-                    25, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]], # vgprValuA_X0_I0[28:31] mfma#28
-            'PackB0': [[27, 27, 28, 28, # vgprValuB_X0_I0[32:35] mfma#48
-                    29, 29, 30, 30, 30, 31, 31, 31, 32, 32, 32, 33, 33, 33, 34, 34, 34, 35, 35, 35, # vgprValuB_X0_I0[36:39] mfma#50
-                    36, 36, 36, 37, # vgprValuB_X0_I0[40:43] mfma#54
-                    37, 37, 38, 38, 38, 39, 39, 39, 40, 40, 40, 41, 41, 41, 42, 42, 42, 43, 43, 43, # vgprValuB_X0_I0[44:47] mfma#56
-                    44, 44, 44, 45, # vgprValuB_X0_I0[48:51] mfma#60
-                    45, 45, 46, 46, 46, 47, 47, 47, 48, 48, 48, 49, 49, 49, 50, 50, 50, 51, 51, 51, # vgprValuB_X0_I0[52:55] mfma#62
-                    52, 52, 52, 53, # vgprValuB_X0_I0[56:59] mfma#66
-                    53, 53, 54, 54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 58, 58, 58, 59, 59, 59]], # vgprValuB_X0_I0[60:63] mfma#68
+            'PackA3': [[79, 79, 80, 80, # vgprValuA_X0_I0[16:19] mfma#24
+                        80, 80, 81, 81, 81, 81, 81, 81, 82, 82, 82, 82, 83, 83, 83, 83, 83, 83, 83, 83,  # vgprValuA_X0_I0[20:23] mfma#25
+                        83, 83, 84, 84, # vgprValuA_X0_I0[24:27] mfma#27
+                        84, 84, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85, 85]], # vgprValuA_X0_I0[28:31] mfma#28
+            'PackB3': [[93, 93, 93, 93, # vgprValuB_X0_I0[32:35] mfma#48
+                        94, 94, 94, 94, 94, 94, 94, 94, 94, 94 ,94, 94, 94, 94, 94, 94, 94, 94, 94, 94, # vgprValuB_X0_I0[36:39] mfma#50
+                        94, 94, 94, 94,  # vgprValuB_X0_I0[40:43] mfma#54
+                        95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, # vgprValuB_X0_I0[44:47] mfma#56
+                        95, 95, 95, 95, # vgprValuB_X0_I0[48:51] mfma#60
+                        95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
+                        95, 95, 95, 95, # vgprValuB_X0_I0[48:51] mfma#60
+                        95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95]],
             'SNOP': [snopTable[::2]],
 
             'LCC' : [[95, 95]],
