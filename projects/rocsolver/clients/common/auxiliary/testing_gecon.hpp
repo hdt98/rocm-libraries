@@ -114,26 +114,12 @@ void gecon_initData(const rocblas_handle handle,
                     Thi& hipiv,
                     Tha& hanorm,
                     Thr& hrcond,
-                    std::vector<rocblas_int>& hinfo,
-                    const bool singular)
+                    std::vector<rocblas_int>& hinfo)
 {
     if(CPU)
     {
         rocblas_init<T>(hA, true);
 
-        // make matrix non-singular by adding to diagonal if needed
-        // if(!singular)
-        // {
-        //     for(I i = 0; i < n; i++)
-        //         hA[0][i + i * lda] += 400;
-        // }
-
-        // copy original matrix for factorization
-        // for(I i = 0; i < n; i++)
-        //     for(I j = 0; j < n; j++)
-        //         hA_factored[0][i + j * lda] = hA[0][i + j * lda];
-
-        // compute matrix norm before factorization
         std::vector<S> work(n);
         char norm = rocsolver2char_norm_type(norm_type);
         hanorm[0][0] = cpu_lange<T, S>(norm, n, n, hA[0], lda, work.data());
@@ -166,14 +152,13 @@ void gecon_getError(const rocblas_handle handle,
                     Tha& hanorm,
                     Thr& hrcond,
                     Thr& hrcond_res,
-                    double* max_err,
-                    const bool singular)
+                    double* max_err)
 {
     std::vector<rocblas_int> hinfo;
 
     // initialize data
     gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                        hA_factored, hipiv, hanorm, hrcond, hinfo, singular);
+                                        hA_factored, hipiv, hanorm, hrcond, hinfo);
 
     std::vector<I> hipiv_converted(n);
     for(I i = 0; i < n; i++)
@@ -192,38 +177,6 @@ void gecon_getError(const rocblas_handle handle,
     hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA[0], lda, hanorm[0][0], work.data(),
                                    rwork.data(), iwork.data());
 
-    // TEMPORARY: print estimates
-    std::cout << "CPU estimate: " << hrcond[0][0] << std::endl;
-    std::cout << "GPU estimate: " << hrcond_res[0][0] << std::endl;
-
-    // TEMPORARY: compute traditional condition number ||A|| * ||A^-1||
-    // invert A
-    // size_t size_A_inv = size_t(lda) * n;
-    // std::vector<rocblas_int> hinfo_inv(1);
-    // host_strided_batch_vector<T> hA_inv(size_A_inv, 1, size_A_inv, 1);
-    // for(size_t i = 0; i < size_A_inv; i++) hA_inv[0][i] = hA_factored[0][i];
-    
-    // need workspace for getri
-    // int lwork_query = -1;
-    // T work_query;
-    // cpu_getri(n, hA_inv[0], lda, hipiv[0], &work_query, lwork_query, hinfo_inv.data());
-    // int lwork = (int)std::real(work_query);
-    // if (lwork < n) lwork = n;
-    // std::vector<T> work_inv(lwork);
-
-    // cpu_getri(n, hA_inv[0], lda, hipiv[0], work_inv.data(), lwork, hinfo_inv.data());
-
-    // compute norm of inverse
-    // std::vector<S> work_inv_norm(n);
-    // S inv_norm = cpu_lange<T, S>(norm, n, n, hA_inv[0], lda, work_inv_norm.data());
-    
-    // condition number = 1 / (||A|| * ||A^-1||)  (reciprocal)
-    // S cond_num = S(1.0) / (hanorm[0][0] * inv_norm);
-    // std::cout << "Traditional condition number (reciprocal): " << cond_num << std::endl;
-    // END TEMPORARY
-
-    // error is ||hrcond - hrcond_res|| / ||hrcond||
-    // using absolute value since we only have a single scalar
     *max_err = std::abs(hrcond[0][0] - hrcond_res[0][0]) / std::abs(hrcond[0][0]);
 }
 
@@ -253,7 +206,7 @@ void gecon_getPerfData(const rocblas_handle handle,
     if(!perf)
     {
         gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo, false);
+                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
 
         // cpu-lapack performance (only if not in perf mode)
         char norm = rocsolver2char_norm_type(norm_type);
@@ -267,13 +220,13 @@ void gecon_getPerfData(const rocblas_handle handle,
     }
 
     gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                         hA_factored, hipiv, hanorm, hrcond, hinfo, false);
+                                         hA_factored, hipiv, hanorm, hrcond, hinfo);
 
     // cold calls
     for(int iter = 0; iter < 2; iter++)
     {
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo, false);
+                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
 
         // Use CPU factorization (same matrix for both CPU and GPU)
         std::vector<I> hipiv_converted(n);
@@ -304,7 +257,7 @@ void gecon_getPerfData(const rocblas_handle handle,
     for(int iter = 0; iter < hot_calls; iter++)
     {
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo, false);
+                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
 
         // Use CPU factorization (same matrix as CPU GECON)
         std::vector<I> hipiv_converted(n);
@@ -432,7 +385,7 @@ void testing_gecon(Arguments& argus)
     // check computations
     if(argus.unit_check || argus.norm_check)
         gecon_getError<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                hA_factored, hipiv, hanorm, hrcond, hrcond_res, &max_error, false);
+                                hA_factored, hipiv, hanorm, hrcond, hrcond_res, &max_error);
 
     // collect performance data
     if(argus.timing)
