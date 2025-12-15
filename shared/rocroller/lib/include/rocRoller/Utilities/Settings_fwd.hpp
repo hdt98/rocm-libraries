@@ -51,7 +51,15 @@ namespace rocRoller
         Count
     };
 
+    enum class DSObserverType
+    {
+        DSMEMObserver,
+        WeightlessDSMemObserver,
+        Count
+    };
+
     std::string toString(F8Mode);
+    std::string toString(DSObserverType);
 
     F8Mode getDefaultF8ModeForCurrentHipDevice();
 

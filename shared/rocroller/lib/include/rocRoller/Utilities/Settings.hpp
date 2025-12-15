@@ -245,6 +245,12 @@ namespace rocRoller
             getDefaultValueForKernelGraphDOTSerialization,
             -1};
 
+        static inline const SettingsOption<DSObserverType> DSObserverSetting{
+            "ROCROLLER_DS_OBSERVER",
+            "DS Memory Observer type: DSMEMObserver (default) or WeightlessDSMemObserver",
+            DSObserverType::DSMEMObserver,
+            -1};
+
         /**
          * @brief Creates a help dialog for the environment variables with
          * their names, default values and bit-offset (if it has one).

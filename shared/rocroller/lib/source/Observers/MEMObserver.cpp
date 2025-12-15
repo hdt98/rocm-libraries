@@ -35,6 +35,7 @@
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
 namespace rocRoller
@@ -73,9 +74,16 @@ namespace rocRoller
         bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
             AssertFatal(context != nullptr);
-            const auto target = context->targetArchitecture().target();
-            return inst.getAddresses().has_value()
-                   && getLdsInfoFromOpcode(inst.getOpCode()).has_value() && target.isCDNAGPU();
+
+            const DSObserverType observerType = Settings::Get(Settings::DSObserverSetting);
+
+            if(observerType == DSObserverType::WeightlessDSMemObserver)
+            {
+                return inst.getAddresses().has_value()
+                       && getLdsInfoFromOpcode(inst.getOpCode()).has_value();
+            }
+
+            return false;
         }
 
         VMEMObserver::VMEMObserver(ContextPtr ctx)

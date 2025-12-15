@@ -48,6 +48,7 @@
 #include <rocRoller/Operations/CommandArguments.hpp>
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -264,8 +265,11 @@ namespace MEMObserverTest
 
     TEST_CASE("WeightlessDSMemObserver simple test with totalCycles", "[observer]")
     {
+        Settings::getInstance()->set(Settings::DSObserverSetting,
+                                     DSObserverType::WeightlessDSMemObserver);
         SECTION("Waitcnt with instruction in-between")
         {
+
             auto context = TestContext::ForTestDevice();
             auto v       = context.createRegisters(Register::Type::Vector, DataType::UInt32, 4);
 
