@@ -301,12 +301,12 @@ void testing_gecon(Arguments& argus)
         return;
     }
 
-    // check for not_implemented for Frobenius and max norms
+    // check for invalid_value for Frobenius and max norms (not supported)
     if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
     {
         EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (I*)nullptr,
                                               (S*)nullptr, (S*)nullptr),
-                              rocblas_status_not_implemented);
+                              rocblas_status_invalid_value);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_args);
