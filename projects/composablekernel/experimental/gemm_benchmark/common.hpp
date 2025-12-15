@@ -87,6 +87,7 @@ struct ExecutionConfig final
     int cold_niters     = 50;
     int nrepeat         = 100;
     int rotating_count  = 4;
+    int use_gfx9_i4     = 1;
 };
 
 template <ck::index_t... Is>
@@ -314,6 +315,10 @@ bool parse_cmd_args<ProblemSizeSplitK>(int argc,
         {
             config.rotating_count = std::stoi(argv[14]);
         }
+        if(argc >= 16)
+        {
+            config.use_gfx9_i4 = std::stoi(argv[15]);
+        }
     }
     else
     {
@@ -442,4 +447,144 @@ float i4_to_f32_gfx9(uint8_t i4)
                                                    {0b111, +0.4375f}};
 
     return u[i4];
+}
+
+inline void permute_b_pk_i4(
+    Tensor<ck::pk_i4_t>& b_k_n_permute, int N, int K, Tensor<float>& b_k_n_f32, bool use_gfx9_i4)
+{
+    for(int n = 0; n < N; n++)
+    {
+        for(int k = 0; k < K; k++)
+        {
+            ck::pk_i4_t i4x2 = b_k_n_permute(k, n).data;
+            uint8_t i4       = 0;
+
+            if(k % 2 == 1)
+                i4 = (i4x2.data >> 0) & 0xf;
+            else
+                i4 = (i4x2.data >> 4) & 0xf;
+
+            float v_b       = use_gfx9_i4 ? i4_to_f32_gfx9(i4) : (((i4 & 0x0f) >> 0) - 8.f);
+            b_k_n_f32(k, n) = v_b;
+        }
+    }
+
+    // vector pk_i4x4 permute
+    for(int i = 0; i < N; i++)
+    {
+        for(int j = 0; j < K; j += 8)
+        {
+            int input[8];
+
+            for(int k = 0; k < 4; k++)
+            {
+                int i4x2         = b_k_n_permute(j + k * 2, i).data;
+                input[k * 2 + 0] = (i4x2 >> 4) & 0xf;
+                input[k * 2 + 1] = (i4x2 >> 0) & 0xf;
+            }
+
+            // permute 01234567->20643175
+            {
+                int hi   = input[2];
+                int lo   = input[0];
+                int i4x2 = (hi << 4) | lo;
+
+                b_k_n_permute(j + 0, i) = i4x2;
+            }
+
+            {
+                int hi   = input[6];
+                int lo   = input[4];
+                int i4x2 = (hi << 4) | lo;
+
+                b_k_n_permute(j + 2, i) = i4x2;
+            }
+
+            {
+                int hi   = input[3];
+                int lo   = input[1];
+                int i4x2 = (hi << 4) | lo;
+
+                b_k_n_permute(j + 4, i) = i4x2;
+            }
+
+            {
+                int hi   = input[7];
+                int lo   = input[5];
+                int i4x2 = (hi << 4) | lo;
+
+                b_k_n_permute(j + 6, i) = i4x2;
+            }
+        }
+    }
+}
+
+inline void permute_a_pk_i4(
+    Tensor<ck::pk_i4_t>& a_m_k_permute, int M, int K, Tensor<float>& a_m_k_f32, bool use_gfx9_i4)
+{
+    for(int m = 0; m < M; m++)
+    {
+        for(int k = 0; k < K; k++)
+        {
+            ck::pk_i4_t i4x2 = a_m_k_permute(m, k).data;
+            uint8_t i4       = 0;
+
+            if(k % 2 == 1)
+                i4 = (i4x2.data >> 0) & 0xf;
+            else
+                i4 = (i4x2.data >> 4) & 0xf;
+
+            float v_b       = use_gfx9_i4 ? i4_to_f32_gfx9(i4) : (((i4 & 0x0f) >> 0) - 8.f);
+            a_m_k_f32(m, k) = v_b;
+        }
+    }
+
+    // vector pk_i4x4 permute
+    for(int i = 0; i < M; i++)
+    {
+        for(int j = 0; j < K; j += 8)
+        {
+            int input[8];
+
+            for(int k = 0; k < 4; k++)
+            {
+                int i4x2         = a_m_k_permute(i, j + k * 2).data;
+                input[k * 2 + 0] = (i4x2 >> 4) & 0xf;
+                input[k * 2 + 1] = (i4x2 >> 0) & 0xf;
+            }
+
+            // permute 01234567->20643175
+            {
+                int hi   = input[2];
+                int lo   = input[0];
+                int i4x2 = (hi << 4) | lo;
+
+                a_m_k_permute(i, j + 0) = i4x2;
+            }
+
+            {
+                int hi   = input[6];
+                int lo   = input[4];
+                int i4x2 = (hi << 4) | lo;
+
+                a_m_k_permute(i, j + 2) = i4x2;
+            }
+
+            {
+                int hi   = input[3];
+                int lo   = input[1];
+                int i4x2 = (hi << 4) | lo;
+
+                a_m_k_permute(i, j + 4) = i4x2;
+            }
+
+            {
+                int hi   = input[7];
+                int lo   = input[5];
+                int i4x2 = (hi << 4) | lo;
+
+                a_m_k_permute(i, j + 6) = i4x2;
+            }
+        }
+    }
 }
