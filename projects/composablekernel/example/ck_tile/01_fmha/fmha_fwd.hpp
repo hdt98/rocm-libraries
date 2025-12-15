@@ -272,6 +272,9 @@ struct fmha_fwd_args
     ck_tile::index_t stride_bias; // if alibi, b*h need set this to h, 1*h need set this to 0
     ck_tile::index_t stride_randval;
     ck_tile::index_t stride_o;
+    ck_tile::index_t stride_q_descale;
+    ck_tile::index_t stride_k_descale;
+    ck_tile::index_t stride_v_descale;
     ck_tile::index_t nhead_stride_q;
     ck_tile::index_t nhead_stride_k;
     ck_tile::index_t nhead_stride_v;
@@ -667,6 +670,9 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
                                              args.stride_bias,
                                              args.stride_randval,
                                              args.stride_o,
+                                             args.stride_q_descale,
+                                             args.stride_k_descale,
+                                             args.stride_v_descale,
                                              args.nhead_stride_q,
                                              args.nhead_stride_k,
                                              args.nhead_stride_v,
@@ -717,6 +723,9 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
                                              args.stride_bias,
                                              args.stride_randval,
                                              args.stride_o,
+                                             args.stride_q_descale,
+                                             args.stride_k_descale,
+                                             args.stride_v_descale,
                                              args.nhead_stride_q,
                                              args.nhead_stride_k,
                                              args.nhead_stride_v,

@@ -191,6 +191,30 @@ struct FmhaFwdKernel
         const int32_t* block_scale_seqstart_k_ptr;
     };
 
+    struct FmhaFwdCommonMXKargs : FmhaFwdCommonQScaleKargs
+    {
+        ck_tile::index_t stride_q_descale;
+        ck_tile::index_t stride_k_descale;
+        ck_tile::index_t stride_v_descale;
+
+        ck_tile::index_t nhead_stride_q_descale;
+        ck_tile::index_t nhead_stride_k_descale;
+        ck_tile::index_t nhead_stride_v_descale;
+    };
+
+    struct FmhaFwdBatchModeMXKargs : FmhaFwdCommonMXKargs
+    {
+        ck_tile::index_t batch_stride_q_descale;
+        ck_tile::index_t batch_stride_k_descale;
+        ck_tile::index_t batch_stride_v_descale;
+    };
+
+    struct FmhaFwdGroupModeMXKargs : FmhaFwdCommonMXKargs
+    {
+        // TODO: seqstart for scales?
+        static_assert(false);
+    };
+
     struct FmhaFwdCommonLSEKargs
     {
         void* lse_ptr                     = nullptr;
@@ -271,7 +295,9 @@ struct FmhaFwdKernel
               FmhaFwdCommonQScaleKargs,
               std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
                                  FmhaFwdBatchBlockScaleKargs,
-                                 FmhaFwdEmptyKargs<3>>>,
+                                 std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
+                                                    FmhaFwdBatchModeMXKargs,
+                                                    FmhaFwdEmptyKargs<3>>>>,
           std::conditional_t<kHasDropout, FmhaFwdBatchModeDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>
     {
@@ -300,7 +326,9 @@ struct FmhaFwdKernel
               FmhaFwdCommonQScaleKargs,
               std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
                                  FmhaFwdGroupBlockScaleKargs,
-                                 FmhaFwdEmptyKargs<3>>>,
+                                 std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
+                                                    FmhaFwdGroupModeMXKargs,
+                                                    FmhaFwdEmptyKargs<3>>>>,
           std::conditional_t<kHasDropout, FmhaFwdCommonDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>,
           std::conditional_t<kSkipMinSeqlenQ, FmhaFwdSkipMinSeqlenQKargs, FmhaFwdEmptyKargs<6>>
@@ -350,6 +378,9 @@ struct FmhaFwdKernel
                   ck_tile::index_t stride_bias,
                   ck_tile::index_t stride_randval,
                   ck_tile::index_t stride_o,
+                  ck_tile::index_t stride_q_descale,
+                  ck_tile::index_t stride_k_descale,
+                  ck_tile::index_t stride_v_descale,
                   ck_tile::index_t nhead_stride_q,
                   ck_tile::index_t nhead_stride_k,
                   ck_tile::index_t nhead_stride_v,
@@ -450,7 +481,7 @@ struct FmhaFwdKernel
             kargs.k_descale_ptr = k_descale_ptr;
             kargs.v_descale_ptr = v_descale_ptr;
         }
-        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
+        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
         {
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
@@ -466,6 +497,24 @@ struct FmhaFwdKernel
 
             kargs.block_scale_size_q  = block_scale_size_q;
             kargs.block_scale_size_kv = block_scale_size_kv;
+        }
+        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+        {
+            kargs.q_descale_ptr = q_descale_ptr;
+            kargs.k_descale_ptr = k_descale_ptr;
+            kargs.v_descale_ptr = v_descale_ptr;
+
+            kargs.stride_q_descale = stride_q_descale;
+            kargs.stride_k_descale = stride_k_descale;
+            kargs.stride_v_descale = stride_v_descale;
+
+            kargs.nhead_stride_q_descale = nhead_stride_q_descale;
+            kargs.nhead_stride_k_descale = nhead_stride_k_descale;
+            kargs.nhead_stride_v_descale = nhead_stride_v_descale;
+
+            kargs.batch_stride_q_descale = batch_stride_q_descale;
+            kargs.batch_stride_k_descale = batch_stride_k_descale;
+            kargs.batch_stride_v_descale = batch_stride_v_descale;
         }
         if constexpr(kHasDropout)
         {
@@ -525,6 +574,9 @@ struct FmhaFwdKernel
               ck_tile::index_t stride_bias,
               ck_tile::index_t stride_randval,
               ck_tile::index_t stride_o,
+              ck_tile::index_t stride_q_descale,
+              ck_tile::index_t stride_k_descale,
+              ck_tile::index_t stride_v_descale,
               ck_tile::index_t nhead_stride_q,
               ck_tile::index_t nhead_stride_k,
               ck_tile::index_t nhead_stride_v,
@@ -583,6 +635,9 @@ struct FmhaFwdKernel
             stride_bias,
             stride_randval,
             stride_o,
+            stride_q_descale,
+            stride_k_descale,
+            stride_v_descale,
             nhead_stride_q,
             nhead_stride_k,
             nhead_stride_v,
@@ -644,6 +699,9 @@ struct FmhaFwdKernel
               ck_tile::index_t stride_bias,
               ck_tile::index_t stride_randval,
               ck_tile::index_t stride_o,
+              ck_tile::index_t stride_q_descale,
+              ck_tile::index_t stride_k_descale,
+              ck_tile::index_t stride_v_descale,
               ck_tile::index_t nhead_stride_q,
               ck_tile::index_t nhead_stride_k,
               ck_tile::index_t nhead_stride_v,
@@ -702,6 +760,9 @@ struct FmhaFwdKernel
             stride_bias,
             stride_randval,
             stride_o,
+            stride_q_descale,
+            stride_k_descale,
+            stride_v_descale,
             nhead_stride_q,
             nhead_stride_k,
             nhead_stride_v,
@@ -766,6 +827,9 @@ struct FmhaFwdKernel
                   ck_tile::index_t stride_bias,
                   ck_tile::index_t stride_randval,
                   ck_tile::index_t stride_o,
+                  ck_tile::index_t stride_q_descale,
+                  ck_tile::index_t stride_k_descale,
+                  ck_tile::index_t stride_v_descale,
                   ck_tile::index_t nhead_stride_q,
                   ck_tile::index_t nhead_stride_k,
                   ck_tile::index_t nhead_stride_v,
@@ -856,7 +920,7 @@ struct FmhaFwdKernel
             kargs.k_descale_ptr = k_descale_ptr;
             kargs.v_descale_ptr = v_descale_ptr;
         }
-        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
+        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
         {
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
@@ -873,6 +937,20 @@ struct FmhaFwdKernel
                 reinterpret_cast<const int32_t*>(block_scale_seqstart_q_ptr);
             kargs.block_scale_seqstart_k_ptr =
                 reinterpret_cast<const int32_t*>(block_scale_seqstart_k_ptr);
+        }
+        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+        {
+            kargs.q_descale_ptr = q_descale_ptr;
+            kargs.k_descale_ptr = k_descale_ptr;
+            kargs.v_descale_ptr = v_descale_ptr;
+
+            kargs.stride_q_descale = stride_q_descale;
+            kargs.stride_k_descale = stride_k_descale;
+            kargs.stride_v_descale = stride_v_descale;
+
+            kargs.nhead_stride_q_descale = nhead_stride_q_descale;
+            kargs.nhead_stride_k_descale = nhead_stride_k_descale;
+            kargs.nhead_stride_v_descale = nhead_stride_v_descale;
         }
         if constexpr(kHasDropout)
         {
@@ -939,6 +1017,9 @@ struct FmhaFwdKernel
               ck_tile::index_t stride_bias,
               ck_tile::index_t stride_randval,
               ck_tile::index_t stride_o,
+              ck_tile::index_t stride_q_descale,
+              ck_tile::index_t stride_k_descale,
+              ck_tile::index_t stride_v_descale,
               ck_tile::index_t nhead_stride_q,
               ck_tile::index_t nhead_stride_k,
               ck_tile::index_t nhead_stride_v,
@@ -992,6 +1073,9 @@ struct FmhaFwdKernel
             stride_bias,
             stride_randval,
             stride_o,
+            stride_q_descale,
+            stride_k_descale,
+            stride_v_descale,
             nhead_stride_q,
             nhead_stride_k,
             nhead_stride_v,
@@ -1048,6 +1132,9 @@ struct FmhaFwdKernel
               ck_tile::index_t stride_bias,
               ck_tile::index_t stride_randval,
               ck_tile::index_t stride_o,
+              ck_tile::index_t stride_q_descale,
+              ck_tile::index_t stride_k_descale,
+              ck_tile::index_t stride_v_descale,
               ck_tile::index_t nhead_stride_q,
               ck_tile::index_t nhead_stride_k,
               ck_tile::index_t nhead_stride_v,
@@ -1101,6 +1188,9 @@ struct FmhaFwdKernel
             stride_bias,
             stride_randval,
             stride_o,
+            stride_q_descale,
+            stride_k_descale,
+            stride_v_descale,
             nhead_stride_q,
             nhead_stride_k,
             nhead_stride_v,
@@ -1796,6 +1886,10 @@ struct FmhaFwdKernel
                         v_descale_ptr,
                         kargs.block_scale_size_kv,
                         sink_value);
+                }
+                else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    // TODO
                 }
                 else
                 {
