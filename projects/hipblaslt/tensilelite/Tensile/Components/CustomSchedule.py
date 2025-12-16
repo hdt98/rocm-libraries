@@ -3095,7 +3095,7 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for all LRA0"),
             12, SBarrier(comment="gra"),
 
-            23, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="LRB0-0"),
+            24, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="LRB0-0"),
             27, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB0"),
             27, SBarrier(comment="grb"),
 
@@ -3103,7 +3103,7 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             48, SBarrier(comment=""),
            
             56, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="wait for LRB3-0"),
-            56+8, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB3"),
+            56+4, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB3"),
 
             72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
             72, SBarrier(comment=""),
