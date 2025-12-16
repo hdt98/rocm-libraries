@@ -65,6 +65,31 @@ def create_range(min_val: int, num: int, max_val: int, step: int = 1, repeat: in
     """
     return [min(val, max_val) for val in range(min_val, min_val + num, step) for _ in range(repeat)]
 
+def merge_ranges(*range_params) -> list[int]:
+    """
+    Merge multiple create_range results together.
+    
+    Args:
+        *range_params: Variable number of tuples, each containing parameters for create_range.
+                      Each tuple should be (min_val, num, max_val) or 
+                      (min_val, num, max_val, step) or
+                      (min_val, num, max_val, step, repeat)
+    
+    Returns:
+        Combined list of all create_range results
+    
+    Example:
+        merge_ranges(
+            (3, 12, 24, 1, 2),     # create_range(3, 12, 24, 1, 2)
+            (79, 16, 95, 1, 3)     # create_range(79, 16, 95, 1, 3)
+        )
+        => [3, 3, 4, 4, ..., 14, 14, 79, 79, 79, 80, 80, 80, ..., 94, 94, 94]
+    """
+    result = []
+    for params in range_params:
+        result.extend(create_range(*params))
+    return result
+
 def get_most_recent_local_reads(
     vmfmas: List[int],
     counts: List[int],
@@ -3098,11 +3123,11 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'LRA0': [[-1, 0, 1, 2]],
             'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
             'PackA0': [create_range(3, 24, 23)],# input from LRA0, must be done before mfma#24
-            'PackB0': [create_range(23, 48, 50)],# input from LRB0, must be done before mfma#48
+            'PackB0': [create_range(23, 48, 47)],# input from LRB0, must be done before mfma#48
 
             'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
-            'GRB': [[27, 27, 28, 28, 29, 29, 30, 30, 55, 55, 60, 60, 65, 65, 70, 70]],
+            'GRB': [[27, 27, 28, 28, 29, 29, 30, 30, 51, 51, 57, 57, 63, 63, 69, 69]],
             'LRB3': [[48, 49, 50, 51, 52, 53, 54, 55]],
             'LRA3': [[72, 74, 76, 78]],
 
@@ -3111,13 +3136,14 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'LWSA': [[75]],
             'LWSB': [[76]],
 
-            'PackB3': [create_range(56, 32, 79, 1, 3)], # input from LRB3, after mfma#48
-            'PackA3': [create_range(79, 16, 95, 1, 3)], # input from LRA3, after mfma#48
+            'PackB3': [merge_ranges((56, 13, 68, 1, 6), # to hide GRB#51-69
+                                    (69, 9, 78))], # input from LRB3, after mfma#48
+            'PackA3': [create_range(79, 16, 94, 1, 3)], # input from LRA3, after mfma#48
 
             'LCC' : [[95, 95]],
         }
         syncCode = syncTable[1::2]
-        nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+        nglshift = nllshift = 12 # vmcnt shift for ngl and nll
     else:
         return False, None
 
