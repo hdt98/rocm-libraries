@@ -265,8 +265,7 @@ namespace MEMObserverTest
 
     TEST_CASE("WeightlessDSMemObserver simple test with totalCycles", "[observer]")
     {
-        Settings::getInstance()->set(Settings::DSObserverSetting,
-                                     DSObserverType::WeightlessDSMemObserver);
+        Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
         SECTION("Waitcnt with instruction in-between")
         {
 

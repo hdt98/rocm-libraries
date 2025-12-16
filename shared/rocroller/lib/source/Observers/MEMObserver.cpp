@@ -75,12 +75,14 @@ namespace rocRoller
         {
             AssertFatal(context != nullptr);
 
-            const DSObserverType observerType = Settings::Get(Settings::DSObserverSetting);
+            const DSObserverType observerType = Settings::Get(Settings::DSObserver);
 
             if(observerType == DSObserverType::WeightlessDSMemObserver)
             {
-                return inst.getAddresses().has_value()
-                       && getLdsInfoFromOpcode(inst.getOpCode()).has_value();
+                const auto addrs = inst.getAddresses();
+                return addrs.has_value() && (*addrs).size() % 64 == 0
+                       && getLdsInfoFromOpcode(inst.getOpCode()).has_value()
+                       && context->targetArchitecture().target().isGFX9GPU();
             }
 
             return false;
@@ -144,8 +146,6 @@ namespace rocRoller
             auto ctx = m_context.lock();
             AssertFatal(ctx != nullptr);
             const auto workgroupSize = product(ctx->kernel()->workgroupSize());
-            AssertFatal(workgroupSize >= 64 && workgroupSize <= 256 && workgroupSize % 64 == 0,
-                        ShowValue(workgroupSize));
             return workgroupSize / 64;
         }
 
@@ -203,8 +203,7 @@ namespace rocRoller
             }
             const auto waitcnt = inst.getWaitCount().dscnt();
             if(waitcnt >= 0
-               && Settings::Get(Settings::DSObserverSetting)
-                      == DSObserverType::WeightlessDSMemObserver)
+               && Settings::Get(Settings::DSObserver) == DSObserverType::WeightlessDSMemObserver)
             {
                 AssertFatal(status.stallCycles == 0,
                             "No logic to handle both waitcnt stalls and instruction stalls yet");
@@ -218,13 +217,6 @@ namespace rocRoller
                     const auto roundtripLatency    = 10; // exists after leaving queue
                     status.stallCycles = (waitCompletionCycle - m_programCycle) + roundtripLatency;
                 }
-                const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver {}: waitcnt dscnt {}, waiting for {} "
-                                "commands, stall {}",
-                                initialProgramCycle,
-                                waitcnt,
-                                commandsToWaitFor,
-                                status.stallCycles));
             }
             return status;
         }

@@ -181,9 +181,6 @@ namespace rocRoller::Scheduling::LDSBankModel
 
     uint getInstructionDataCycles(const RuntimeLDSInstruction& instr, GPUArchitectureGFX gfx)
     {
-        AssertFatal(rocRoller::toString(gfx).starts_with("gfx9"),
-                    "Unsupported GPU architecture: {}",
-                    rocRoller::toString(gfx));
         AssertFatal(instr.baseAddresses.size() == 64,
                     "Expected 64 for a wave, got ",
                     instr.baseAddresses.size());

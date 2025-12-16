@@ -154,7 +154,7 @@ namespace rocRoller
 
         constexpr bool isGFX9GPU() const
         {
-            return isCDNA1GPU() || isCDNA2GPU() || isCDNA3GPU();
+            return isCDNA1GPU() || isCDNA2GPU() || isCDNA3GPU() || isCDNA35GPU();
         }
 
         constexpr bool isGFX10GPU() const

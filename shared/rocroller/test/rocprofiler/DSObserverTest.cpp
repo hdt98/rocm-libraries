@@ -108,7 +108,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
 
-    Settings::getInstance()->set(Settings::DSObserverSetting,
+    Settings::getInstance()->set(Settings::DSObserver,
                                  DSObserverType::WeightlessDSMemObserver);
 
     constexpr auto workgroupSize = 64u;
@@ -295,7 +295,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
 
-    Settings::getInstance()->set(Settings::DSObserverSetting,
+    Settings::getInstance()->set(Settings::DSObserver,
                                  DSObserverType::WeightlessDSMemObserver);
 
     constexpr auto workgroupSize = 64u;
@@ -428,7 +428,7 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
 
-    Settings::getInstance()->set(Settings::DSObserverSetting,
+    Settings::getInstance()->set(Settings::DSObserver,
                                  DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = GENERATE(64u, 128u, 256u);

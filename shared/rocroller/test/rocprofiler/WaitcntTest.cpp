@@ -139,8 +139,7 @@ TEST_CASE("Weave multiple LDS and waitcnt", "[rocprofiler][scheduler][lds-model]
     s_waitcnt lgkmcnt(0), model 108, profiler 108, delta 0
     */
     using namespace Scheduling::LDSBankModel;
-    Settings::getInstance()->set(Settings::DSObserverSetting,
-                                 DSObserverType::WeightlessDSMemObserver);
+    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     constexpr auto workgroupSize = 64u;
 
@@ -300,8 +299,7 @@ TEST_CASE("Weave LDS and non-zero waitcnt", "[rocprofiler][scheduler][lds-model]
     ...
     */
     using namespace Scheduling::LDSBankModel;
-    Settings::getInstance()->set(Settings::DSObserverSetting,
-                                 DSObserverType::WeightlessDSMemObserver);
+    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     constexpr auto workgroupSize = 64u;
 
