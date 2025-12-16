@@ -2965,18 +2965,7 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     kernel["UsePLRPack"] = True
     if isNN(kernel) and useLDSTr and TLDS==1 and kernel["UsePLRPack"]:
-        syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
-                    SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
-                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
-                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
-                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
-                    SBarrier(comment=""),
-                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
-                    SWaitCnt(dscnt=-1, vlcnt=14, vscnt=-1, comment="Wait for LRB0 to complete"),
-                    SBarrier(comment=""),
-                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),]
         optSchedule = {
-            'SYNC'  : [[-1,5,34,36,71,71,72,107,107,107]],
             'GRIncA': [[1,1,1,2,2,2,3,3,3]],
             'GRIncB': [[4,4,4,5,5,5,6,6,6]],
             # LDS reads into first 4 vgprs of Valu!_X!_I!+offset, then next four into Valu!_T!_I!+offset
@@ -3016,7 +3005,25 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
                             136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136, 136,
                             139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139, 139,
                             ]],
+            'SYNC'  : [[-1,-1,5,34,35,36,36,71,71,71,72,72,107,107,107,107]],
         }
+        syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
+                    SNop(0),
+                    SWaitCnt(dscnt=12, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SNop(0),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SNop(0),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SBarrier(comment=""),
+                    SNop(0),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete"),
+                    SNop(0),
+                    SWaitCnt(dscnt=-1, vlcnt=14, vscnt=-1, comment="Wait for LRB0 to complete"),
+                    SBarrier(comment=""),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
+                    SNop(0),
+                    ]
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
     elif isNN(kernel) and useLDSTr and TLDS==1 and not kernel["UsePLRPack"]:
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete"),
