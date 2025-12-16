@@ -947,6 +947,13 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             }
 
             if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+            {
+                is_compatible &= (arg.a_g_n_c_wis_lengths_[1] == 1);
+                is_compatible &= (arg.e_g_n_k_wos_lengths_[1] == 1);
+            }
+
+            if constexpr(ConvForwardSpecialization ==
                          ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
             {
                 for(index_t i = 0; i < NDimSpatial; i++)
