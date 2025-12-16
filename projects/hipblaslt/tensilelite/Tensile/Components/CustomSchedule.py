@@ -3122,9 +3122,9 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
 
             'LRA0': [[-1, 0, 1, 2]],
             'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
-            'PackA0': [create_range(3, 24, 23)],# input from LRA0, must be done before mfma#24
-            'PackB0': [create_range(23, 48, 47)],# input from LRB0, must be done before mfma#48
-
+            'PackA0': [merge_ranges((3, 16, 15), # to hide GRA#15
+                                    (16, 8, 23))],# input from LRA0, must be done before mfma#24
+            'PackB0': [create_range(24, 48, 47)],# input from LRB0, must be done before mfma#48
             'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
 
             'GRB': [[27, 27, 28, 28, 29, 29, 30, 30, 51, 51, 57, 57, 63, 63, 69, 69]],
