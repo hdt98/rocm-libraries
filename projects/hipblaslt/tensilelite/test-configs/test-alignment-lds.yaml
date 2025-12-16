@@ -1,0 +1,179 @@
+# Test configuration for LDS Re-alignment optimization
+# Uses Local Data Share with multi-buffering to fix misalignment
+
+GlobalParameters:
+  MinimumRequiredVersion: 4.4.0
+  PrintLevel: 1
+  ForceRedoBenchmarkProblems: True
+  ForceRedoLibraryLogic: True
+  ForceRedoLibraryClient: True
+  CMakeBuildType: Release
+  EnqueuesPerSync: 1
+  SyncsPerBenchmark: 1
+  LibraryPrintDebug: False
+  NumElementsToValidate: 0
+  ValidationMaxToPrint: 0
+  ValidationPrintValids: False
+  ShortNames: False
+  MergeFiles: True
+  PlatformIdx: 0
+  DeviceIdx: 0
+  DataInitTypeBeta: 0
+
+BenchmarkProblems:
+  - # TN GEMM with LDS Re-alignment
+    - # ProblemType
+      OperationType: GEMM
+      DataType: b                # BFP16
+      DestDataType: b
+      ComputeDataType: s         # FP32 compute
+      HighPrecisionAccumulate: True
+      TransposeA: True           # A is transposed (K-major)
+      TransposeB: False          # B is not transposed (K-major)
+      UseBeta: True
+      Batched: False
+
+    - # BenchmarkProblemSizeGroup - LDS Alignment with 2 buffers
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - EdgeType: ["ShiftPtr"]
+        - LoopTail: [True]
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [True]
+        - PrefetchGlobalRead: [True]
+        - GlobalSplitU: [1]
+        
+        # LDS Alignment Parameters (2 buffers)
+        - EnableLDSAlignment: [True]
+        - LDSAlignmentBuffers: [2]               # Double buffering
+        - LDSAlignmentTarget: [128]              # Target 128-byte alignment
+        - LDSAlignmentKernelK: [64]              # Use MxNx64 instead of MxNx128
+        
+        # Disable other alignment techniques
+        - EnableAddressInterleave: [False]
+        - EnableRowReAlignment: [False]
+        
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 4, 1]
+          - [32, 32, 2, 1]
+        - ThreadTile:
+          - [4, 4]
+          - [4, 8]
+          - [8, 4]
+        - WorkGroup:
+          - [16, 16, 1]
+          - [32, 8, 1]
+        - DepthU: [16, 32]  # Note: Smaller DepthU may be needed with LDS alignment
+        - VectorWidthA: [1, 2]
+        - VectorWidthB: [1, 2]
+
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Range: [[2048], [3072], [1880, 1920, 2048]]
+          - Exact: [512, 512, 1880]
+          - Exact: [1024, 1024, 1880]
+
+    - # BenchmarkProblemSizeGroup - LDS Alignment with 3 buffers
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - EdgeType: ["ShiftPtr"]
+        - LoopTail: [True]
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [True]
+        - PrefetchGlobalRead: [True]
+        - GlobalSplitU: [1]
+        
+        # LDS Alignment Parameters (3 buffers)
+        - EnableLDSAlignment: [True]
+        - LDSAlignmentBuffers: [3]               # Triple buffering for better overlap
+        - LDSAlignmentTarget: [128]
+        - LDSAlignmentKernelK: [64]
+        
+        - EnableAddressInterleave: [False]
+        - EnableRowReAlignment: [False]
+        
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 4, 1]
+          - [32, 32, 2, 1]
+        - ThreadTile:
+          - [4, 4]
+          - [4, 8]
+        - WorkGroup:
+          - [16, 16, 1]
+          - [32, 8, 1]
+        - DepthU: [16, 32]
+        - VectorWidthA: [1, 2]
+        - VectorWidthB: [1, 2]
+
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Range: [[2048], [3072], [1880, 1920, 2048]]
+          - Exact: [512, 512, 1880]
+
+    - # BenchmarkProblemSizeGroup - Combined: LDS + Address Interleave
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - EdgeType: ["ShiftPtr"]
+        - LoopTail: [True]
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [True]
+        - PrefetchGlobalRead: [True]
+        - GlobalSplitU: [1]
+        
+        # Enable both techniques
+        - EnableLDSAlignment: [True]
+        - LDSAlignmentBuffers: [2]
+        - LDSAlignmentTarget: [128]
+        - LDSAlignmentKernelK: [64]
+        
+        - EnableAddressInterleave: [True]
+        - AddressInterleaveDirection: ["N"]
+        - AddressInterleaveAlignment: [256]
+        - AddressInterleaveTileSize: [16]
+        
+        - EnableRowReAlignment: [False]
+        
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 4, 1]
+          - [32, 32, 2, 1]
+        - ThreadTile:
+          - [4, 4]
+          - [4, 8]
+        - WorkGroup:
+          - [16, 16, 1]
+          - [32, 8, 1]
+        - DepthU: [16, 32]
+        - VectorWidthA: [1, 2]
+        - VectorWidthB: [1, 2]
+
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Range: [[2048], [3072], [1880]]  # Focus on worst case
+          - Exact: [1024, 1024, 1880]
+
+LibraryLogic:
+  ScheduleName: "vega20"
+  DeviceNames: ["Device 0000"]
+  ArchitectureName: "gfx942"
+
+# Expected Results:
+# - LDS alignment should handle any stride misalignment at the cost of:
+#   * Increased LDS usage (2x or 3x)
+#   * Some additional address calculation overhead
+# - Triple buffering (3 buffers) may provide better performance than double (2 buffers)
+#   due to better overlap of read/compute/write operations
+# - Combined approach (LDS + Address Interleave) might provide best results
+# - Target: 20-25% performance improvement for K=1880 case
+

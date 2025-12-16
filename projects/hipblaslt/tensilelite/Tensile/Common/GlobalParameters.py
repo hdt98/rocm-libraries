@@ -425,7 +425,18 @@ defaultBenchmarkCommonParameters = [
     {"MbskPrefetchMethod": [-1]},
     {"UseCustomMainLoopSchedule": [1]},
     {"SpaceFillingAlgo": [[]]},
-    {"SFCWGM": [[[1,1],[1,1]]]}
+    {"SFCWGM": [[[1,1],[1,1]]]},
+    # Memory Alignment Optimization Parameters
+    {"EnableAddressInterleave": [False]},          # Enable address interleaving optimization
+    {"AddressInterleaveDirection": ["N"]},         # 'M' or 'N' - which direction to interleave
+    {"AddressInterleaveAlignment": [256]},         # Target alignment in bytes (128 or 256)
+    {"AddressInterleaveTileSize": [16]},           # Number of kernels for interleaving
+    {"EnableLDSAlignment": [False]},               # Enable LDS re-alignment with multi-buffering
+    {"LDSAlignmentBuffers": [2]},                  # Number of LDS buffers (2 or 3)
+    {"LDSAlignmentTarget": [128]},                 # Target alignment: 128 or 256 bytes
+    {"LDSAlignmentKernelK": [64]},                 # Use smaller K for alignment (64 instead of 128)
+    {"EnableRowReAlignment": [False]},             # Enable row re-alignment within kernel
+    {"RowReAlignGroupSize": [16]}                  # Number of rows to group for re-alignment
 ]
 
 # dictionary of defaults comprised of default option for each parameter
