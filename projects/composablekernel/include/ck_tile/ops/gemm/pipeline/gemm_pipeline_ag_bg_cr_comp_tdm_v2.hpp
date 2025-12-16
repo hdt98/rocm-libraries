@@ -129,22 +129,25 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             TDMConfig tdm_config_b[2];
 
             // set tdm's lds padding config
-            constexpr auto padding_config = Policy::GetLdsPaddingConfig();
+            constexpr auto LdsPaddingConfigA =
+                Policy::template GetLdsPaddingConfig<Problem, true>();
+            constexpr auto APaddingEnabled  = LdsPaddingConfigA[I0{}];
+            constexpr auto APaddingAmount   = LdsPaddingConfigA[I1{}];
+            constexpr auto APaddingInterval = LdsPaddingConfigA[I2{}];
 
+            constexpr auto LdsPaddingConfigB =
+                Policy::template GetLdsPaddingConfig<Problem, false>();
+            constexpr auto BPaddingEnabled  = LdsPaddingConfigB[I0{}];
+            constexpr auto BPaddingAmount   = LdsPaddingConfigB[I1{}];
+            constexpr auto BPaddingInterval = LdsPaddingConfigB[I2{}];
             static_for<0, 2, 1>{}([&](auto i) {
-                if constexpr(!is_a_load_tr_v())
-                {
-                    tdm_config_a[i].pad_enable              = true;
-                    tdm_config_a[i].pad_config.pad_amount   = padding_config.at(number<0>{});
-                    tdm_config_a[i].pad_config.pad_interval = padding_config.at(number<1>{});
-                }
+                tdm_config_a[i].pad_enable              = APaddingEnabled;
+                tdm_config_a[i].pad_config.pad_amount   = APaddingAmount;
+                tdm_config_a[i].pad_config.pad_interval = APaddingInterval;
 
-                if constexpr(!is_b_load_tr_v())
-                {
-                    tdm_config_b[i].pad_enable              = true;
-                    tdm_config_b[i].pad_config.pad_amount   = padding_config.at(number<0>{});
-                    tdm_config_b[i].pad_config.pad_interval = padding_config.at(number<1>{});
-                }
+                tdm_config_b[i].pad_enable              = BPaddingEnabled;
+                tdm_config_b[i].pad_config.pad_amount   = BPaddingAmount;
+                tdm_config_b[i].pad_config.pad_interval = BPaddingInterval;
 
 #if BARRIER_ATOMIC_IN_TDM
                 // enable atomic_barrier in TDM to make sure data is visible in LDS before wave

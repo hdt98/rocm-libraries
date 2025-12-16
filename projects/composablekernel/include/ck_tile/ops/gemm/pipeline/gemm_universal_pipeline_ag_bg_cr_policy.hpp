@@ -871,6 +871,268 @@ struct UniversalGemmBasePolicy
 
         return smem_size_a + smem_size_b;
     }
+
+    // GetLdsPaddingConfig,  MakeALdsBlockDescriptorForTrLoad, MakeBLdsBlockDescriptorForTrLoad
+    // functions are used in gfx1250
+    template <typename Problem, bool IsA>
+    CK_TILE_HOST_DEVICE static constexpr auto GetLdsPaddingConfig()
+    {
+        auto constexpr_log2_floor = [](index_t x) constexpr {
+            index_t result = 0;
+            while(x > 1)
+            {
+                x >>= 1;
+                result++;
+            }
+            return result;
+        };
+        using DataType = remove_cvref_t<
+            std::conditional_t<IsA, typename Problem::ADataType, typename Problem::BDataType>>;
+        constexpr index_t MNPerBlock =
+            IsA ? Problem::BlockGemmShape::kM : Problem::BlockGemmShape::kN;
+
+        constexpr index_t BytesPerDword = sizeof(int32_t);
+        constexpr auto DataTypeSize     = sizeof(DataType);
+
+        constexpr auto is_tr_load = IsA ? is_a_load_tr<Problem> : is_b_load_tr<Problem>;
+        if constexpr(is_tr_load)
+        {
+            constexpr auto PackedSize = numeric_traits<DataType>::PackedSize;
+            constexpr index_t banks_per_mblk =
+                MNPerBlock * DataTypeSize / PackedSize / BytesPerDword;
+            // 8 * PackedSize means 8 * PackedSize columns which is in gfx1250 tr load instructions
+            // layout; this value is the column number that will access simultaneously in one cycle
+            if constexpr(banks_per_mblk * 8 * PackedSize <= get_n_lds_banks())
+            {
+                return make_tuple(number<false>{}, number<0>{}, number<0>{});
+            }
+            else
+            {
+                // check tr load instructions layout
+                constexpr index_t bank_of_vecs = 16 * sizeof(DataType) / PackedSize / BytesPerDword;
+                constexpr index_t pad_amount   = bank_of_vecs - 1;
+                constexpr index_t pad_interval = (banks_per_mblk < get_n_lds_banks())
+                                                     ? constexpr_log2_floor(get_n_lds_banks()) - 1
+                                                     : constexpr_log2_floor(banks_per_mblk) - 1;
+
+                return make_tuple(number<true>{}, number<pad_amount>{}, number<pad_interval>{});
+            }
+        }
+        else
+        {
+            // log2 minus 1 of the number of dwords to store into the destination before adding
+            // padding; one bank is 1 dword size
+            constexpr index_t pad_interval = constexpr_log2_floor(get_n_lds_banks()) - 1;
+            // always use b128 to ds_load; this value calculate the bank number per 128 bits
+            constexpr index_t banks_per_128b = get_n_words_per_128b();
+            // amount of padding to add in dwords 0 means 1 dword padding; 1 means 2 dwords
+            // padding
+            // ...
+            constexpr index_t pad_amount = banks_per_128b - 1;
+
+            return make_tuple(number<true>{}, number<pad_amount>{}, number<pad_interval>{});
+        }
+    }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeALdsBlockDescriptorForTrLoad()
+    {
+        static_assert(is_a_load_tr<Problem>,
+                      "MakeALdsBlockDescriptorForTrLoad function is only for A tr load case");
+        constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
+        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+
+        constexpr auto LdsPaddingConfigA = GetLdsPaddingConfig<Problem, true>();
+        constexpr auto IsPadding         = LdsPaddingConfigA[I0];
+        constexpr auto PaddingAmount     = LdsPaddingConfigA[I1];
+        constexpr auto PaddingInterval   = LdsPaddingConfigA[I2];
+        using ADataType                  = remove_cvref_t<typename Problem::ADataType>;
+        constexpr auto DataTypeSize      = sizeof(ADataType);
+        constexpr auto PackedSize        = numeric_traits<ADataType>::PackedSize;
+        if constexpr(!IsPadding)
+        {
+            constexpr index_t KPack = GetSmemPackA<Problem>();
+            constexpr auto a_lds_block_desc_0 =
+                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<MPerBlock>{}),
+                                             make_tuple(number<MPerBlock>{}, number<1>{}),
+                                             number<KPack>{},
+                                             number<1>{});
+            return a_lds_block_desc_0;
+        }
+        else
+        {
+            constexpr index_t BytesPerDword = sizeof(int32_t);
+            constexpr index_t KPack         = GetSmemPackA<Problem>();
+            constexpr index_t PaddingStride =
+                (1 << (PaddingInterval + 1)) * BytesPerDword / DataTypeSize * PackedSize;
+            constexpr index_t PaddingDataAmount =
+                (PaddingAmount + 1) * BytesPerDword / DataTypeSize * PackedSize;
+            // which means lds bank number > MPerBlock
+            if constexpr(PaddingStride > MPerBlock)
+            {
+                constexpr auto KLdsLayer = max(
+                    1UL, get_n_lds_banks() * BytesPerDword / MPerBlock / DataTypeSize * PackedSize);
+
+                constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
+                    make_tuple(number<KPerBlock / KLdsLayer>{},
+                               number<MPerBlock / KPack * KLdsLayer>{},
+                               number<KPack>{}),
+                    make_tuple(number<MPerBlock * KLdsLayer + PaddingDataAmount>{},
+                               number<KPack>{},
+                               number<1>{}),
+                    number<KPack>{},
+                    number<1>{});
+                constexpr auto a_lds_block_desc_1 = transform_tensor_descriptor(
+                    a_lds_block_desc_0,
+                    make_tuple(make_pass_through_transform(number<KPerBlock / KLdsLayer>{}),
+                               make_unmerge_transform(
+                                   make_tuple(number<KLdsLayer>{}, number<MPerBlock / KPack>{})),
+                               make_pass_through_transform(number<KPack>{})),
+                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+                    make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
+                constexpr auto a_lds_block_desc = transform_tensor_descriptor(
+                    a_lds_block_desc_1,
+                    make_tuple(make_merge_transform_v3_division_mod(make_tuple(
+                                   number<KPerBlock / KLdsLayer>{}, number<KLdsLayer>{})),
+                               make_merge_transform_v3_division_mod(
+                                   make_tuple(number<MPerBlock / KPack>{}, number<KPack>{}))),
+                    make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+                    make_tuple(sequence<0>{}, sequence<1>{}));
+                return a_lds_block_desc;
+            }
+            else
+            {
+                constexpr auto MLdsLayer          = MPerBlock / PaddingStride;
+                constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
+                    make_tuple(number<KPerBlock * MLdsLayer>{},
+                               number<MPerBlock / KPack / MLdsLayer>{},
+                               number<KPack>{}),
+                    make_tuple(number<MPerBlock / MLdsLayer + PaddingDataAmount>{},
+                               number<KPack>{},
+                               number<1>{}),
+                    number<KPack>{},
+                    number<1>{});
+                constexpr auto a_lds_block_desc_1 = transform_tensor_descriptor(
+                    a_lds_block_desc_0,
+                    make_tuple(make_unmerge_transform(
+                                   make_tuple(number<KPerBlock>{}, number<MLdsLayer>{})),
+                               make_pass_through_transform(number<MPerBlock / KPack / MLdsLayer>{}),
+                               make_pass_through_transform(number<KPack>{})),
+                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+                    make_tuple(sequence<0, 1>{}, sequence<2>{}, sequence<3>{}));
+                constexpr auto a_lds_block_desc = transform_tensor_descriptor(
+                    a_lds_block_desc_1,
+                    make_tuple(make_pass_through_transform(number<KPerBlock>{}),
+                               make_merge_transform_v3_division_mod(
+                                   make_tuple(number<MLdsLayer>{},
+                                              number<MPerBlock / KPack / MLdsLayer>{},
+                                              number<KPack>{}))),
+                    make_tuple(sequence<0>{}, sequence<1, 2, 3>{}),
+                    make_tuple(sequence<0>{}, sequence<1>{}));
+                return a_lds_block_desc;
+            }
+        }
+    }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeBLdsBlockDescriptorForTrLoad()
+    {
+        static_assert(is_b_load_tr<Problem>,
+                      "MakeBLdsBlockDescriptorForTrLoad function is only for B tr load case");
+        constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
+        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+
+        constexpr auto LdsPaddingConfigB = GetLdsPaddingConfig<Problem, false>();
+        constexpr auto IsPadding         = LdsPaddingConfigB[I0];
+        constexpr auto PaddingAmount     = LdsPaddingConfigB[I1];
+        constexpr auto PaddingInterval   = LdsPaddingConfigB[I2];
+        using BDataType                  = remove_cvref_t<typename Problem::BDataType>;
+        constexpr auto DataTypeSize      = sizeof(BDataType);
+        constexpr auto PackedSize        = numeric_traits<BDataType>::PackedSize;
+        if constexpr(!IsPadding)
+        {
+            constexpr index_t KPack = GetSmemPackB<Problem>();
+            constexpr auto b_lds_block_desc_0 =
+                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),
+                                             make_tuple(number<NPerBlock>{}, number<1>{}),
+                                             number<KPack>{},
+                                             number<1>{});
+            return b_lds_block_desc_0;
+        }
+        else
+        {
+            constexpr index_t BytesPerDword = sizeof(int32_t);
+            constexpr index_t KPack         = GetSmemPackB<Problem>();
+            constexpr index_t PaddingStride =
+                (1 << (PaddingInterval + 1)) * BytesPerDword / DataTypeSize * PackedSize;
+            constexpr index_t PaddingDataAmount =
+                (PaddingAmount + 1) * BytesPerDword / DataTypeSize * PackedSize;
+            // which means lds bank number > NPerBlock
+            if constexpr(PaddingStride > NPerBlock)
+            {
+                constexpr auto KLdsLayer = max(
+                    1UL, get_n_lds_banks() * BytesPerDword / NPerBlock / DataTypeSize * PackedSize);
+
+                constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
+                    make_tuple(number<KPerBlock / KLdsLayer>{},
+                               number<NPerBlock / KPack * KLdsLayer>{},
+                               number<KPack>{}),
+                    make_tuple(number<NPerBlock * KLdsLayer + PaddingDataAmount>{},
+                               number<KPack>{},
+                               number<1>{}),
+                    number<KPack>{},
+                    number<1>{});
+                constexpr auto b_lds_block_desc_1 = transform_tensor_descriptor(
+                    b_lds_block_desc_0,
+                    make_tuple(make_pass_through_transform(number<KPerBlock / KLdsLayer>{}),
+                               make_unmerge_transform(
+                                   make_tuple(number<KLdsLayer>{}, number<NPerBlock / KPack>{})),
+                               make_pass_through_transform(number<KPack>{})),
+                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+                    make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
+                constexpr auto b_lds_block_desc = transform_tensor_descriptor(
+                    b_lds_block_desc_1,
+                    make_tuple(make_merge_transform_v3_division_mod(make_tuple(
+                                   number<KPerBlock / KLdsLayer>{}, number<KLdsLayer>{})),
+                               make_merge_transform_v3_division_mod(
+                                   make_tuple(number<NPerBlock / KPack>{}, number<KPack>{}))),
+                    make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+                    make_tuple(sequence<0>{}, sequence<1>{}));
+                return b_lds_block_desc;
+            }
+            else
+            {
+                constexpr auto NLdsLayer          = NPerBlock / PaddingStride;
+                constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
+                    make_tuple(number<KPerBlock * NLdsLayer>{},
+                               number<NPerBlock / KPack / NLdsLayer>{},
+                               number<KPack>{}),
+                    make_tuple(number<NPerBlock / NLdsLayer + PaddingDataAmount>{},
+                               number<KPack>{},
+                               number<1>{}),
+                    number<KPack>{},
+                    number<1>{});
+                constexpr auto b_lds_block_desc_1 = transform_tensor_descriptor(
+                    b_lds_block_desc_0,
+                    make_tuple(make_unmerge_transform(
+                                   make_tuple(number<KPerBlock>{}, number<NLdsLayer>{})),
+                               make_pass_through_transform(number<NPerBlock / KPack / NLdsLayer>{}),
+                               make_pass_through_transform(number<KPack>{})),
+                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+                    make_tuple(sequence<0, 1>{}, sequence<2>{}, sequence<3>{}));
+                constexpr auto b_lds_block_desc = transform_tensor_descriptor(
+                    b_lds_block_desc_1,
+                    make_tuple(make_pass_through_transform(number<KPerBlock>{}),
+                               make_merge_transform_v3_division_mod(
+                                   make_tuple(number<NLdsLayer>{},
+                                              number<NPerBlock / KPack / NLdsLayer>{},
+                                              number<KPack>{}))),
+                    make_tuple(sequence<0>{}, sequence<1, 2, 3>{}),
+                    make_tuple(sequence<0>{}, sequence<1>{}));
+                return b_lds_block_desc;
+            }
+        }
+    }
 };
 
 // UniversalGemm Policy

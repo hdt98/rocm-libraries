@@ -551,20 +551,23 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             TDMConfig tdm_config_a;
             TDMConfig tdm_config_b;
             // set tdm's lds padding config
-            constexpr auto padding_config = Policy::GetLdsPaddingConfig();
-            if constexpr(!is_a_load_tr_v())
-            {
-                tdm_config_a.pad_enable              = true;
-                tdm_config_a.pad_config.pad_amount   = padding_config.at(number<0>{});
-                tdm_config_a.pad_config.pad_interval = padding_config.at(number<1>{});
-            }
+            constexpr auto LdsPaddingConfigA =
+                Policy::template GetLdsPaddingConfig<Problem, true>();
+            constexpr auto IsAPadding            = LdsPaddingConfigA[I0{}];
+            constexpr auto APaddingAmount        = LdsPaddingConfigA[I1{}];
+            constexpr auto APaddingInterval      = LdsPaddingConfigA[I2{}];
+            tdm_config_a.pad_enable              = IsAPadding;
+            tdm_config_a.pad_config.pad_amount   = APaddingAmount;
+            tdm_config_a.pad_config.pad_interval = APaddingInterval;
 
-            if constexpr(!is_b_load_tr_v())
-            {
-                tdm_config_b.pad_enable              = true;
-                tdm_config_b.pad_config.pad_amount   = padding_config.at(number<0>{});
-                tdm_config_b.pad_config.pad_interval = padding_config.at(number<1>{});
-            }
+            constexpr auto LdsPaddingConfigB =
+                Policy::template GetLdsPaddingConfig<Problem, false>();
+            constexpr auto IsBPadding            = LdsPaddingConfigB[I0{}];
+            constexpr auto BPaddingAmount        = LdsPaddingConfigB[I1{}];
+            constexpr auto BPaddingInterval      = LdsPaddingConfigB[I2{}];
+            tdm_config_b.pad_enable              = IsBPadding;
+            tdm_config_b.pad_config.pad_amount   = BPaddingAmount;
+            tdm_config_b.pad_config.pad_interval = BPaddingInterval;
 
             if constexpr(UseClusterLaunch)
             {
