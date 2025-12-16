@@ -32,8 +32,9 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool DirectLoad = false,
-          bool TransposeC = false>
+          bool DirectLoad           = false,
+          bool TransposeC           = false,
+          bool UseDataCachePrefetch = false>
 constexpr auto BlockGemmPipeline_Selector()
 {
     if constexpr(DirectLoad)
@@ -85,6 +86,39 @@ constexpr auto BlockGemmPipeline_Selector()
                                                              NRepeat,
                                                              KPack,
                                                              TransposeC>{};
+        }
+        else
+        {
+            std::cerr << "BlockGemmPipeline configuration is not available" << std::endl;
+        }
+    }
+    else if constexpr(UseDataCachePrefetch)
+    {
+        // currently only one implementation supports prefetch
+        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
+        {
+            return BlockwiseGemmXdlops_pipeline_v3<BlkGemmPipeSche,
+                                                   BlockSize,
+                                                   ADataType,
+                                                   BDataType,
+                                                   ComputeDataType,
+                                                   AccDataType,
+                                                   ATileDesc,
+                                                   BTileDesc,
+                                                   AMmaTileDesc,
+                                                   BMmaTileDesc,
+                                                   ABlockTransferSrcScalarPerVector,
+                                                   BBlockTransferSrcScalarPerVector,
+                                                   MPerBlock,
+                                                   NPerBlock,
+                                                   KPerBlock,
+                                                   MPerXDL,
+                                                   NPerXDL,
+                                                   MRepeat,
+                                                   NRepeat,
+                                                   KPack,
+                                                   TransposeC,
+                                                   UseDataCachePrefetch>{};
         }
         else
         {
