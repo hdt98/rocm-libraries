@@ -114,6 +114,7 @@ public:
     std::vector<std::vector<uint64_t>> GetValue2dVectorUint64(const std::string& long_name) const;
     void SetValue(const std::string& long_name, const std::string& new_value);
     void StoreOptionalFlagValue(char short_name, const std::string& input_value);
+    bool HasFlag(const std::string& long_name) const;
 
     virtual ~InputFlags() {}
 };

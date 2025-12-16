@@ -456,3 +456,13 @@ void InputFlags::SetValue(const std::string& long_name, const std::string& new_v
     char short_name                = FindShortName(long_name);
     MapInputs.at(short_name).value = new_value;
 }
+
+bool InputFlags::HasFlag(const std::string& long_name) const
+{
+    for(const auto& content : MapInputs)
+    {
+        if(content.second.long_name == long_name)
+            return true;
+    }
+    return false;
+}
