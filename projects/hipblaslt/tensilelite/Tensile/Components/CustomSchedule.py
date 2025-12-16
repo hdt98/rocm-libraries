@@ -1084,7 +1084,6 @@ class ScheduleInfo:
         nglshift,
         nllshift,
         mfmaReorder=[],
-        snopCode = [],
     ):
         self.numCodePaths = numCodePaths
         self.numMfma = numMfma
@@ -1093,7 +1092,6 @@ class ScheduleInfo:
         self.nglshift = nglshift  # vmcnt shift for noglobalload loop
         self.nllshift = nllshift  # vmcnt shift for nolocalload loop
         self.mfmaReorder = mfmaReorder
-        self.snopCode = snopCode
         self.__skipValidation__ = False
 
         # The set of validation rules to run inside `isValid`.
@@ -1239,7 +1237,6 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         idMap["PackB%u"%uIdx] = PackCodeB[uIdx]
 
     idMap['SYNC'] = opt1.syncCode
-    idMap['SNOP'] = opt1.snopCode
 
     status, message = opt1.isValid({'kernel' : kernel, "idMap": idMap})
     # create the case str (TN, NT, TT, or NN)
