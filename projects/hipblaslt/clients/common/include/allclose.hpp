@@ -48,8 +48,13 @@
 /*! \brief compare the allclose error of two matrices hCPU & hGPU */
 
 template <typename T>
-bool allclose(size_t* N, T* a, T* b, double atol, double rtol, bool equal_nan = false)
+bool allclose(size_t* N, T* a, T* b, double atol, double rtol, bool equal_nan = false, bool verbose = false)
 {
+    size_t error_count = 0;
+    double max_error = 0.0;
+    size_t first_error_idx = 0;
+    bool found_first_error = false;
+    
     for(size_t i = 0; i < *N; i++)
     {
         //Returning ture immediately if 2 elements are identical.
@@ -60,14 +65,49 @@ bool allclose(size_t* N, T* a, T* b, double atol, double rtol, bool equal_nan = 
         if(equal_nan && (std::isnan(a[i]) && std::isnan(b[i])))
             continue;
         if(equal_nan && (std::isnan(a[i]) ^ std::isnan(b[i])))
-            return false;
+        {
+            error_count++;
+            if(!found_first_error)
+            {
+                first_error_idx = i;
+                found_first_error = true;
+            }
+            if(!verbose)
+                return false;
+            continue;
+        }
 
         double error     = std::abs(a[i] - b[i]);
         double tolerance = atol + std::abs(rtol * b[i]);
         if(!(error <= tolerance))
-            return false;
+        {
+            error_count++;
+            if(error > max_error)
+                max_error = error;
+            if(!found_first_error)
+            {
+                first_error_idx = i;
+                found_first_error = true;
+            }
+            if(!verbose)
+                return false;
+        }
     }
-    return true;
+    
+    if(verbose && error_count > 0)
+    {
+        hipblaslt_cout << "=== allclose check failed ===" << std::endl;
+        hipblaslt_cout << "Total elements: " << *N << std::endl;
+        hipblaslt_cout << "Error elements: " << error_count << std::endl;
+        hipblaslt_cout << "Error ratio: " << (100.0 * error_count / *N) << "%" << std::endl;
+        hipblaslt_cout << "Max absolute error: " << max_error << std::endl;
+        hipblaslt_cout << "First error at index " << first_error_idx << ": "
+                       << "CPU=" << a[first_error_idx] << ", GPU=" << b[first_error_idx]
+                       << ", diff=" << std::abs(a[first_error_idx] - b[first_error_idx]) << std::endl;
+        hipblaslt_cout << "Tolerance: atol=" << atol << ", rtol=" << rtol << std::endl;
+    }
+    
+    return error_count == 0;
 }
 
 template <
@@ -107,7 +147,7 @@ bool allclose_check_general(char    allclose_type,
     {
         for(auto& rtol : rtols)
         {
-            if(allclose(&size, hCPU_double.data(), hGPU_double.data(), atol, rtol, false))
+            if(allclose(&size, hCPU_double.data(), hGPU_double.data(), atol, rtol, false, false))
             {
                 hipblaslt_atol = atol;
                 hipblaslt_rtol = rtol;
@@ -122,6 +162,54 @@ bool allclose_check_general(char    allclose_type,
 
     if(hipblaslt_atol == 1)
     {
+        // Failed all tolerance checks, print detailed error info with strictest tolerance
+        hipblaslt_cout << "Matrix dimensions: M=" << M << ", N=" << N << ", lda=" << lda << std::endl;
+        
+        // Find and print first error with matrix coordinates
+        size_t error_count = 0;
+        double max_error = 0.0;
+        size_t first_error_idx = 0;
+        bool found_first_error = false;
+        
+        for(size_t i = 0; i < size; i++)
+        {
+            if(hCPU_double[i] == hGPU_double[i])
+                continue;
+            
+            double error = std::abs(hCPU_double[i] - hGPU_double[i]);
+            double tolerance = 1e-6 + std::abs(1e-6 * hGPU_double[i]);
+            if(!(error <= tolerance))
+            {
+                error_count++;
+                if(error > max_error)
+                    max_error = error;
+                if(!found_first_error)
+                {
+                    first_error_idx = i;
+                    found_first_error = true;
+                }
+            }
+        }
+        
+        if(found_first_error)
+        {
+            // Convert linear index to matrix coordinates (column-major: index = row + col * lda)
+            int64_t col = first_error_idx / lda;
+            int64_t row = first_error_idx % lda;
+            
+            hipblaslt_cout << "=== allclose check failed ===" << std::endl;
+            hipblaslt_cout << "Total elements: " << size << std::endl;
+            hipblaslt_cout << "Error elements: " << error_count << std::endl;
+            hipblaslt_cout << "Error ratio: " << (100.0 * error_count / size) << "%" << std::endl;
+            hipblaslt_cout << "Max absolute error: " << max_error << std::endl;
+            hipblaslt_cout << "First error at index " << first_error_idx 
+                          << " (row=" << row << ", col=" << col << "): "
+                          << "CPU=" << hCPU_double[first_error_idx] 
+                          << ", GPU=" << hGPU_double[first_error_idx]
+                          << ", diff=" << std::abs(hCPU_double[first_error_idx] - hGPU_double[first_error_idx]) 
+                          << std::endl;
+        }
+        
         return false;
     }
 
@@ -163,7 +251,7 @@ bool allclose_check_general(char    allclose_type,
     {
         for(auto& rtol : rtols)
         {
-            if(allclose(&size, hCPU_double.data(), hGPU_double.data(), atol, rtol, false))
+            if(allclose(&size, hCPU_double.data(), hGPU_double.data(), atol, rtol, false, false))
             {
                 hipblaslt_atol = atol;
                 hipblaslt_rtol = rtol;
@@ -178,6 +266,54 @@ bool allclose_check_general(char    allclose_type,
 
     if(hipblaslt_atol == 1)
     {
+        // Failed all tolerance checks, print detailed error info with strictest tolerance
+        hipblaslt_cout << "Matrix dimensions: M=" << M << ", N=" << N << ", lda=" << lda << std::endl;
+        
+        // Find and print first error with matrix coordinates
+        size_t error_count = 0;
+        double max_error = 0.0;
+        size_t first_error_idx = 0;
+        bool found_first_error = false;
+        
+        for(size_t i = 0; i < size; i++)
+        {
+            if(hCPU_double[i] == hGPU_double[i])
+                continue;
+            
+            double error = std::abs(hCPU_double[i] - hGPU_double[i]);
+            double tolerance = 1e-6 + std::abs(1e-6 * hGPU_double[i]);
+            if(!(error <= tolerance))
+            {
+                error_count++;
+                if(error > max_error)
+                    max_error = error;
+                if(!found_first_error)
+                {
+                    first_error_idx = i;
+                    found_first_error = true;
+                }
+            }
+        }
+        
+        if(found_first_error)
+        {
+            // Convert linear index to matrix coordinates (column-major: index = row + col * lda)
+            int64_t col = first_error_idx / lda;
+            int64_t row = first_error_idx % lda;
+            
+            hipblaslt_cout << "=== allclose check failed ===" << std::endl;
+            hipblaslt_cout << "Total elements: " << size << std::endl;
+            hipblaslt_cout << "Error elements: " << error_count << std::endl;
+            hipblaslt_cout << "Error ratio: " << (100.0 * error_count / size) << "%" << std::endl;
+            hipblaslt_cout << "Max absolute error: " << max_error << std::endl;
+            hipblaslt_cout << "First error at index " << first_error_idx 
+                          << " (row=" << row << ", col=" << col << "): "
+                          << "CPU=" << hCPU_double[first_error_idx] 
+                          << ", GPU=" << hGPU_double[first_error_idx]
+                          << ", diff=" << std::abs(hCPU_double[first_error_idx] - hGPU_double[first_error_idx]) 
+                          << std::endl;
+        }
+        
         return false;
     }
 
@@ -218,7 +354,7 @@ bool allclose_check_general(char    allclose_type,
     {
         for(auto& rtol : rtols)
         {
-            if(allclose(&size, hCPU_double.data(), hGPU_double.data(), atol, rtol, false))
+            if(allclose(&size, hCPU_double.data(), hGPU_double.data(), atol, rtol, false, false))
             {
                 hipblaslt_atol = atol;
                 hipblaslt_rtol = rtol;
@@ -233,6 +369,54 @@ bool allclose_check_general(char    allclose_type,
 
     if(hipblaslt_atol == 1)
     {
+        // Failed all tolerance checks, print detailed error info with strictest tolerance
+        hipblaslt_cout << "Matrix dimensions: M=" << M << ", N=" << N << ", lda=" << lda << std::endl;
+        
+        // Find and print first error with matrix coordinates
+        size_t error_count = 0;
+        double max_error = 0.0;
+        size_t first_error_idx = 0;
+        bool found_first_error = false;
+        
+        for(size_t i = 0; i < size; i++)
+        {
+            if(hCPU_double[i] == hGPU_double[i])
+                continue;
+            
+            double error = std::abs(hCPU_double[i] - hGPU_double[i]);
+            double tolerance = 1e-6 + std::abs(1e-6 * hGPU_double[i]);
+            if(!(error <= tolerance))
+            {
+                error_count++;
+                if(error > max_error)
+                    max_error = error;
+                if(!found_first_error)
+                {
+                    first_error_idx = i;
+                    found_first_error = true;
+                }
+            }
+        }
+        
+        if(found_first_error)
+        {
+            // Convert linear index to matrix coordinates (column-major: index = row + col * lda)
+            int64_t col = first_error_idx / lda;
+            int64_t row = first_error_idx % lda;
+            
+            hipblaslt_cout << "=== allclose check failed ===" << std::endl;
+            hipblaslt_cout << "Total elements: " << size << std::endl;
+            hipblaslt_cout << "Error elements: " << error_count << std::endl;
+            hipblaslt_cout << "Error ratio: " << (100.0 * error_count / size) << "%" << std::endl;
+            hipblaslt_cout << "Max absolute error: " << max_error << std::endl;
+            hipblaslt_cout << "First error at index " << first_error_idx 
+                          << " (row=" << row << ", col=" << col << "): "
+                          << "CPU=" << hCPU_double[first_error_idx] 
+                          << ", GPU=" << hGPU_double[first_error_idx]
+                          << ", diff=" << std::abs(hCPU_double[first_error_idx] - hGPU_double[first_error_idx]) 
+                          << std::endl;
+        }
+        
         return false;
     }
 
