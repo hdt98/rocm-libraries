@@ -98,7 +98,7 @@
     ClusterLocalRead: 0
     CodeObjectVersion: '4'
     ConvertAfterDS: false
-    CustomKernelName: ''
+    CustomKernelName: 'Custom_Cijk_Alik_Bljk_BBS_BH_Bias_HA_S_SAV_UserArgs_unaligned_k_gfx950'
     DebugStreamK: 0
     DepthU: 128
     DirectToLds: 0
