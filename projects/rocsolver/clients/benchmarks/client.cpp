@@ -637,6 +637,13 @@ try
          value<char>()->default_value('U'),
             "U = upper, L = lower.\n"
             "                           Indicates where the data for a triangular or symmetric/hermitian matrix is stored.\n"
+            "                           ")
+
+        ("cholqr_algo",
+         value<char>()->default_value('D'),
+            "1 = CholeskyQR1, 2 = CholeskyQR2, 3 = CholeskyQR3 (computed shifts),\n"
+            "                           4 = CholeskyQR3 (user-provided shifts), D = default.\n"
+            "                           Specifies which Cholesky QR algorithm to use.\n"
             "                           ");
 
     // clang-format on
@@ -688,6 +695,7 @@ try
     argus.validate_esort("esort");
     argus.validate_itype("itype");
     argus.validate_rfinfo_mode("rfinfo_mode");
+    argus.validate_cholqr_algo("cholqr_algo");
 
     // prepare logging infrastructure and ignore environment variables
     rocsolver_log_begin();

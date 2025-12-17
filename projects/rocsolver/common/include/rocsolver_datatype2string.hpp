@@ -253,6 +253,19 @@ constexpr auto rocsolver2char_rfinfo_mode(rocsolver_rfinfo_mode value)
     return '\0';
 }
 
+constexpr auto rocsolver2char_cholqr_algo(rocsolver_cholqr_algo value)
+{
+    switch(value)
+    {
+    case rocsolver_cholqr_cholqr1: return '1';
+    case rocsolver_cholqr_cholqr2: return '2';
+    case rocsolver_cholqr_cholqr3_compute: return '3';
+    case rocsolver_cholqr_cholqr3_user: return '4';
+    case rocsolver_cholqr_default: return 'D';
+    }
+    return '\0';
+}
+
 /* ============================================================================================
  */
 /*  Convert lapack char constants to rocblas type. */
@@ -460,6 +473,19 @@ constexpr rocsolver_rfinfo_mode char2rocsolver_rfinfo_mode(char value)
     case '1': return rocsolver_rfinfo_mode_lu;
     case '2': return rocsolver_rfinfo_mode_cholesky;
     default: return static_cast<rocsolver_rfinfo_mode>(0);
+    }
+}
+
+constexpr rocsolver_cholqr_algo char2rocsolver_cholqr_algo(char value)
+{
+    switch(std::toupper(value))
+    {
+    case '1': return rocsolver_cholqr_cholqr1;
+    case '2': return rocsolver_cholqr_cholqr2;
+    case '3': return rocsolver_cholqr_cholqr3_compute;
+    case '4': return rocsolver_cholqr_cholqr3_user;
+    case 'D': return rocsolver_cholqr_default;
+    default: return static_cast<rocsolver_cholqr_algo>(0);
     }
 }
 

@@ -239,4 +239,14 @@ struct formatter<rocsolver_logvalue<rocblas_datatype>> : formatter<string_view>
     }
 };
 
+template <>
+struct formatter<rocsolver_logvalue<rocsolver_cholqr_algo>> : formatter<char>
+{
+    template <typename FormatCtx>
+    auto format(rocsolver_logvalue<rocsolver_cholqr_algo> wrapper, FormatCtx& ctx) ROCSOLVER_FMT_CONST
+    {
+        return formatter<char>::format(rocsolver::rocsolver2char_cholqr_algo(wrapper.value), ctx);
+    }
+};
+
 } // namespace
