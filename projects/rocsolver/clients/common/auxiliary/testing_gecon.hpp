@@ -34,6 +34,7 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
+#include "common/misc/rocsolver_timer.hpp"
 
 template <typename T, typename I, typename S>
 void gecon_checkBadArgs(const rocblas_handle handle,
@@ -147,6 +148,13 @@ void gecon_initData(const rocblas_handle handle,
         // copy data from CPU to device
         CHECK_HIP_ERROR(dA.transfer_from(hA));
         CHECK_HIP_ERROR(danorm.transfer_from(hanorm));
+
+        // convert and transfer pivot indices
+        std::vector<I> hipiv_converted(n);
+        for(I i = 0; i < n; i++)
+            hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
+        CHECK_HIP_ERROR(
+            hipMemcpy(dipiv.data(), hipiv_converted.data(), sizeof(I) * n, hipMemcpyHostToDevice));
     }
 }
 
@@ -172,12 +180,6 @@ void gecon_getError(const rocblas_handle handle,
     // initialize data
     gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
                                         hA_factored, hipiv, hanorm, hrcond, hinfo);
-
-    std::vector<I> hipiv_converted(n);
-    for(I i = 0; i < n; i++)
-        hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
-    CHECK_HIP_ERROR(
-        hipMemcpy(dipiv.data(), hipiv_converted.data(), sizeof(I) * n, hipMemcpyHostToDevice));
 
     CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
                                         danorm.data(), drcond.data()));
@@ -241,13 +243,6 @@ void gecon_getPerfData(const rocblas_handle handle,
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
                                              hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
 
-        // Use CPU factorization (same matrix for both CPU and GPU)
-        std::vector<I> hipiv_converted(n);
-        for(I i = 0; i < n; i++)
-            hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
-        CHECK_HIP_ERROR(
-            hipMemcpy(dipiv.data(), hipiv_converted.data(), sizeof(I) * n, hipMemcpyHostToDevice));
-
         CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
                                             danorm.data(), drcond.data()));
     }
@@ -255,7 +250,7 @@ void gecon_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    double start;
+    rocsolver_timer timer;
 
     if(profile > 0)
     {
@@ -272,19 +267,12 @@ void gecon_getPerfData(const rocblas_handle handle,
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
                                              hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
 
-        // Use CPU factorization (same matrix as CPU GECON)
-        std::vector<I> hipiv_converted(n);
-        for(I i = 0; i < n; i++)
-            hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
-        CHECK_HIP_ERROR(
-            hipMemcpy(dipiv.data(), hipiv_converted.data(), sizeof(I) * n, hipMemcpyHostToDevice));
-
-        start = get_time_us_sync(stream);
+        timer.start(stream);
         rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(), danorm.data(),
                         drcond.data());
-        *gpu_time_used += get_time_us_sync(stream) - start;
+        timer.end(stream);
     }
-    *gpu_time_used /= hot_calls;
+    *gpu_time_used = timer.get_combined();
 }
 
 template <typename T, typename I>
