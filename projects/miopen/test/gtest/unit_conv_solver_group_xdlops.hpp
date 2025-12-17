@@ -98,6 +98,8 @@ protected:
     }
 };
 
+} // namespace unit_tests
+} // namespace miopen
 
 // some short aliases
 template <miopenDataType_t datatype>
@@ -108,6 +110,3 @@ using UnitTestConvSolverGroupXDlopsBwd = miopen::unit_tests::UnitTestConvSolverG
 
 template <miopenDataType_t datatype>
 using UnitTestConvSolverGroupXDlopsWrw = miopen::unit_tests::UnitTestConvSolverGroupXDlops<miopen::conv::Direction::BackwardWeights, datatype>;
-
-} // namespace unit_tests
-} // namespace miopen
