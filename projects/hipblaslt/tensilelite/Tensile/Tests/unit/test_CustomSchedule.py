@@ -586,7 +586,7 @@ class TestCustomScheduleTF32:
             "DirectToLds": True,
             "GlobalReadVectorWidthA": 4, "GlobalReadVectorWidthB": 4, "LocalReadVectorWidth": 4,
             "MatrixInstruction": [16, 16, 32, 1], "MIWaveGroup": [2, 2],
-            "LDSTrInst": False, "TransposeLDS": 1, "MIWaveTileA": 6, "MIWaveTileB": 8,
+            "LDSTrInst": False, "TransposeLDS": 1, "MIWaveTileA": 4, "MIWaveTileB": 8,
         })
 
         has_schedule, schedule_info = hasCustomSchedule(kernel)
