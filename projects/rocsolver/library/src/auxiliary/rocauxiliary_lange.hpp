@@ -343,12 +343,12 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
 template <typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_max_kernel(const I m,
-                            const I n,
-                            const U A,
-                            const I lda,
-                            const rocblas_stride shiftA,
-                            const rocblas_stride strideA,
-                            S* block_maxs)
+                     const I n,
+                     const U A,
+                     const I lda,
+                     const rocblas_stride shiftA,
+                     const rocblas_stride strideA,
+                     S* block_maxs)
 {
     I bidz = blockIdx.z;
     I bid = blockIdx.x;
@@ -559,9 +559,9 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         // Launch max kernels with grid clamping to handle overflow
         I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
-        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>),
-                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM), 0,
-                                stream, m, n, A, lda, shiftA, strideA, work);
+        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>), dim3(grid_blocks, 1, batch_count),
+                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
+                                strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_max_final_kernel<T, I, S>), dim3(1, 1, batch_count),
                                 dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
                                 strideA, work, norms);
@@ -584,8 +584,8 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<T, I, S>),
-                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM), 0,
-                                stream, m, n, A, lda, shiftA, strideA, work);
+                                dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM),
+                                0, stream, m, n, A, lda, shiftA, strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_final_kernel<T, I, S>), dim3(1, 1, batch_count),
                                 dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
                                 strideA, work, norms);
