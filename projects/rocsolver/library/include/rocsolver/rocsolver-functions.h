@@ -29453,6 +29453,472 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zhegvdx_strided_batched(rocblas_handle
                                                                   const rocblas_int batch_count);
 //! @}
 
+/*! @{
+    \brief CHOLQR computes a QR factorization of a general m-by-n matrix A using
+    Cholesky QR factorization methods.
+
+    \details
+    The factorization has the form
+
+    \f[
+        A = Q  R
+    \f]
+
+    where R is upper triangular (upper trapezoidal if m < n), and Q is
+    a m-by-m orthogonal/unitary matrix. The factorization is computed using
+    one of several Cholesky QR algorithms selected by the algo parameter.
+
+    The algorithm choices are:
+    - rocsolver_cholqr_cholqr1: Basic CholeskyQR1 algorithm
+    - rocsolver_cholqr_cholqr2: CholeskyQR2 algorithm (default)
+    - rocsolver_cholqr_cholqr3_compute: Shifted CholeskyQR3 with computed shifts
+    - rocsolver_cholqr_cholqr3_user: Shifted CholeskyQR3 with user-provided shifts
+
+    @param[in]
+    handle      rocblas_handle.
+    @param[in]
+    m           rocblas_int. m >= 0.
+                The number of rows of the matrix A.
+    @param[in]
+    n           rocblas_int. n >= 0.
+                The number of columns of the matrix A.
+    @param[inout]
+    A           pointer to type. Array on the GPU of dimension lda*n.
+                On entry, the m-by-n matrix to be factored.
+                On exit, the orthogonal/unitary matrix Q (stored column-wise).
+    @param[in]
+    lda         rocblas_int. lda >= m.
+                Specifies the leading dimension of A.
+    @param[out]
+    R           pointer to type. Array on the GPU of dimension ldr*n.
+                The n-by-n upper triangular factor R.
+    @param[in]
+    ldr         rocblas_int. ldr >= n.
+                Specifies the leading dimension of R.
+    @param[inout]
+    sigma       pointer to real type. Array on the GPU of dimension batch_count.
+                For cholqr3_user: On entry, contains the user-provided shift values.
+                For cholqr3_compute: On exit, contains the computed shift values.
+                Not referenced for cholqr1 or cholqr2 algorithms.
+    @param[in]
+    algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
+    @param[out]
+    info        pointer to rocblas_int. Array of batch_count=1 integer on the GPU.
+                If info = 0, successful exit.
+                If info = i > 0, the Cholesky factorization failed.
+    ********************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_scholqr(rocblas_handle handle,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  float* A,
+                                                  const rocblas_int lda,
+                                                  float* R,
+                                                  const rocblas_int ldr,
+                                                  float* sigma,
+                                                  const rocsolver_cholqr_algo algo,
+                                                  rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dcholqr(rocblas_handle handle,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  double* A,
+                                                  const rocblas_int lda,
+                                                  double* R,
+                                                  const rocblas_int ldr,
+                                                  double* sigma,
+                                                  const rocsolver_cholqr_algo algo,
+                                                  rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ccholqr(rocblas_handle handle,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  rocblas_float_complex* A,
+                                                  const rocblas_int lda,
+                                                  rocblas_float_complex* R,
+                                                  const rocblas_int ldr,
+                                                  float* sigma,
+                                                  const rocsolver_cholqr_algo algo,
+                                                  rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr(rocblas_handle handle,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  rocblas_double_complex* A,
+                                                  const rocblas_int lda,
+                                                  rocblas_double_complex* R,
+                                                  const rocblas_int ldr,
+                                                  double* sigma,
+                                                  const rocsolver_cholqr_algo algo,
+                                                  rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_scholqr_64(rocblas_handle handle,
+                                                     const int64_t m,
+                                                     const int64_t n,
+                                                     float* A,
+                                                     const int64_t lda,
+                                                     float* R,
+                                                     const int64_t ldr,
+                                                     float* sigma,
+                                                     const rocsolver_cholqr_algo algo,
+                                                     int64_t* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dcholqr_64(rocblas_handle handle,
+                                                     const int64_t m,
+                                                     const int64_t n,
+                                                     double* A,
+                                                     const int64_t lda,
+                                                     double* R,
+                                                     const int64_t ldr,
+                                                     double* sigma,
+                                                     const rocsolver_cholqr_algo algo,
+                                                     int64_t* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ccholqr_64(rocblas_handle handle,
+                                                     const int64_t m,
+                                                     const int64_t n,
+                                                     rocblas_float_complex* A,
+                                                     const int64_t lda,
+                                                     rocblas_float_complex* R,
+                                                     const int64_t ldr,
+                                                     float* sigma,
+                                                     const rocsolver_cholqr_algo algo,
+                                                     int64_t* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_64(rocblas_handle handle,
+                                                     const int64_t m,
+                                                     const int64_t n,
+                                                     rocblas_double_complex* A,
+                                                     const int64_t lda,
+                                                     rocblas_double_complex* R,
+                                                     const int64_t ldr,
+                                                     double* sigma,
+                                                     const rocsolver_cholqr_algo algo,
+                                                     int64_t* info);
+//! @}
+
+/*! @{
+    \brief CHOLQR_BATCHED computes the QR factorization of a batch of general
+    m-by-n matrices using Cholesky QR factorization methods.
+
+    \details
+    The factorization of matrix \f$A_l\f$ in the batch has the form
+
+    \f[
+        A_l = Q_l  R_l
+    \f]
+
+    where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
+    a m-by-m orthogonal/unitary matrix. The factorization is computed using
+    one of several Cholesky QR algorithms selected by the algo parameter.
+
+    @param[in]
+    handle      rocblas_handle.
+    @param[in]
+    m           rocblas_int. m >= 0.
+                The number of rows of each matrix A_l in the batch.
+    @param[in]
+    n           rocblas_int. n >= 0.
+                The number of columns of each matrix A_l in the batch.
+    @param[inout]
+    A           array of pointers to type. Each pointer points to an array on the GPU of dimension lda*n.
+                On entry, the m-by-n matrices A_l to be factored.
+                On exit, the orthogonal/unitary matrices Q_l (stored column-wise).
+    @param[in]
+    lda         rocblas_int. lda >= m.
+                Specifies the leading dimension of matrices A_l.
+    @param[out]
+    R           array of pointers to type. Each pointer points to an array on the GPU of dimension ldr*n.
+                The n-by-n upper triangular factors R_l.
+    @param[in]
+    ldr         rocblas_int. ldr >= n.
+                Specifies the leading dimension of matrices R_l.
+    @param[inout]
+    sigma       pointer to real type. Array on the GPU of dimension batch_count.
+                For cholqr3_user: On entry, contains the user-provided shift values.
+                For cholqr3_compute: On exit, contains the computed shift values.
+                Not referenced for cholqr1 or cholqr2 algorithms.
+    @param[in]
+    algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
+    @param[out]
+    info        pointer to rocblas_int. Array of batch_count integers on the GPU.
+                If info[l] = 0, successful exit for factorization of A_l.
+                If info[l] = i > 0, the Cholesky factorization of A_l failed.
+    @param[in]
+    batch_count rocblas_int. batch_count >= 0.
+                Number of matrices in the batch.
+    ********************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_scholqr_batched(rocblas_handle handle,
+                                                          const rocblas_int m,
+                                                          const rocblas_int n,
+                                                          float* const A[],
+                                                          const rocblas_int lda,
+                                                          float* const R[],
+                                                          const rocblas_int ldr,
+                                                          float* sigma,
+                                                          const rocsolver_cholqr_algo algo,
+                                                          rocblas_int* info,
+                                                          const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dcholqr_batched(rocblas_handle handle,
+                                                          const rocblas_int m,
+                                                          const rocblas_int n,
+                                                          double* const A[],
+                                                          const rocblas_int lda,
+                                                          double* const R[],
+                                                          const rocblas_int ldr,
+                                                          double* sigma,
+                                                          const rocsolver_cholqr_algo algo,
+                                                          rocblas_int* info,
+                                                          const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ccholqr_batched(rocblas_handle handle,
+                                                          const rocblas_int m,
+                                                          const rocblas_int n,
+                                                          rocblas_float_complex* const A[],
+                                                          const rocblas_int lda,
+                                                          rocblas_float_complex* const R[],
+                                                          const rocblas_int ldr,
+                                                          float* sigma,
+                                                          const rocsolver_cholqr_algo algo,
+                                                          rocblas_int* info,
+                                                          const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_batched(rocblas_handle handle,
+                                                          const rocblas_int m,
+                                                          const rocblas_int n,
+                                                          rocblas_double_complex* const A[],
+                                                          const rocblas_int lda,
+                                                          rocblas_double_complex* const R[],
+                                                          const rocblas_int ldr,
+                                                          double* sigma,
+                                                          const rocsolver_cholqr_algo algo,
+                                                          rocblas_int* info,
+                                                          const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_scholqr_batched_64(rocblas_handle handle,
+                                                             const int64_t m,
+                                                             const int64_t n,
+                                                             float* const A[],
+                                                             const int64_t lda,
+                                                             float* const R[],
+                                                             const int64_t ldr,
+                                                             float* sigma,
+                                                             const rocsolver_cholqr_algo algo,
+                                                             int64_t* info,
+                                                             const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dcholqr_batched_64(rocblas_handle handle,
+                                                             const int64_t m,
+                                                             const int64_t n,
+                                                             double* const A[],
+                                                             const int64_t lda,
+                                                             double* const R[],
+                                                             const int64_t ldr,
+                                                             double* sigma,
+                                                             const rocsolver_cholqr_algo algo,
+                                                             int64_t* info,
+                                                             const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ccholqr_batched_64(rocblas_handle handle,
+                                                             const int64_t m,
+                                                             const int64_t n,
+                                                             rocblas_float_complex* const A[],
+                                                             const int64_t lda,
+                                                             rocblas_float_complex* const R[],
+                                                             const int64_t ldr,
+                                                             float* sigma,
+                                                             const rocsolver_cholqr_algo algo,
+                                                             int64_t* info,
+                                                             const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_batched_64(rocblas_handle handle,
+                                                             const int64_t m,
+                                                             const int64_t n,
+                                                             rocblas_double_complex* const A[],
+                                                             const int64_t lda,
+                                                             rocblas_double_complex* const R[],
+                                                             const int64_t ldr,
+                                                             double* sigma,
+                                                             const rocsolver_cholqr_algo algo,
+                                                             int64_t* info,
+                                                             const int64_t batch_count);
+//! @}
+
+/*! @{
+    \brief CHOLQR_STRIDED_BATCHED computes the QR factorization of a batch of general
+    m-by-n matrices using Cholesky QR factorization methods.
+
+    \details
+    The factorization of matrix \f$A_l\f$ in the batch has the form
+
+    \f[
+        A_l = Q_l  R_l
+    \f]
+
+    where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
+    a m-by-m orthogonal/unitary matrix. The factorization is computed using
+    one of several Cholesky QR algorithms selected by the algo parameter.
+
+    @param[in]
+    handle      rocblas_handle.
+    @param[in]
+    m           rocblas_int. m >= 0.
+                The number of rows of each matrix A_l in the batch.
+    @param[in]
+    n           rocblas_int. n >= 0.
+                The number of columns of each matrix A_l in the batch.
+    @param[inout]
+    A           pointer to type. Array on the GPU (the size depends on the value of strideA).
+                On entry, the m-by-n matrices A_l to be factored.
+                On exit, the orthogonal/unitary matrices Q_l (stored column-wise).
+    @param[in]
+    lda         rocblas_int. lda >= m.
+                Specifies the leading dimension of matrices A_l.
+    @param[in]
+    strideA     rocblas_stride.
+                Stride from the start of one matrix A_l to the next one A_(l+1).
+                There is no restriction for the value of strideA. Normal use case is strideA >= lda*n.
+    @param[out]
+    R           pointer to type. Array on the GPU (the size depends on the value of strideR).
+                The n-by-n upper triangular factors R_l.
+    @param[in]
+    ldr         rocblas_int. ldr >= n.
+                Specifies the leading dimension of matrices R_l.
+    @param[in]
+    strideR     rocblas_stride.
+                Stride from the start of one matrix R_l to the next one R_(l+1).
+                There is no restriction for the value of strideR. Normal use case is strideR >= ldr*n.
+    @param[inout]
+    sigma       pointer to real type. Array on the GPU of dimension batch_count.
+                For cholqr3_user: On entry, contains the user-provided shift values.
+                For cholqr3_compute: On exit, contains the computed shift values.
+                Not referenced for cholqr1 or cholqr2 algorithms.
+    @param[in]
+    algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
+    @param[out]
+    info        pointer to rocblas_int. Array of batch_count integers on the GPU.
+                If info[l] = 0, successful exit for factorization of A_l.
+                If info[l] = i > 0, the Cholesky factorization of A_l failed.
+    @param[in]
+    batch_count rocblas_int. batch_count >= 0.
+                Number of matrices in the batch.
+    ********************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_scholqr_strided_batched(rocblas_handle handle,
+                                                                  const rocblas_int m,
+                                                                  const rocblas_int n,
+                                                                  float* A,
+                                                                  const rocblas_int lda,
+                                                                  const rocblas_stride strideA,
+                                                                  float* R,
+                                                                  const rocblas_int ldr,
+                                                                  const rocblas_stride strideR,
+                                                                  float* sigma,
+                                                                  const rocsolver_cholqr_algo algo,
+                                                                  rocblas_int* info,
+                                                                  const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dcholqr_strided_batched(rocblas_handle handle,
+                                                                  const rocblas_int m,
+                                                                  const rocblas_int n,
+                                                                  double* A,
+                                                                  const rocblas_int lda,
+                                                                  const rocblas_stride strideA,
+                                                                  double* R,
+                                                                  const rocblas_int ldr,
+                                                                  const rocblas_stride strideR,
+                                                                  double* sigma,
+                                                                  const rocsolver_cholqr_algo algo,
+                                                                  rocblas_int* info,
+                                                                  const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ccholqr_strided_batched(rocblas_handle handle,
+                                                                  const rocblas_int m,
+                                                                  const rocblas_int n,
+                                                                  rocblas_float_complex* A,
+                                                                  const rocblas_int lda,
+                                                                  const rocblas_stride strideA,
+                                                                  rocblas_float_complex* R,
+                                                                  const rocblas_int ldr,
+                                                                  const rocblas_stride strideR,
+                                                                  float* sigma,
+                                                                  const rocsolver_cholqr_algo algo,
+                                                                  rocblas_int* info,
+                                                                  const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_strided_batched(rocblas_handle handle,
+                                                                  const rocblas_int m,
+                                                                  const rocblas_int n,
+                                                                  rocblas_double_complex* A,
+                                                                  const rocblas_int lda,
+                                                                  const rocblas_stride strideA,
+                                                                  rocblas_double_complex* R,
+                                                                  const rocblas_int ldr,
+                                                                  const rocblas_stride strideR,
+                                                                  double* sigma,
+                                                                  const rocsolver_cholqr_algo algo,
+                                                                  rocblas_int* info,
+                                                                  const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_scholqr_strided_batched_64(rocblas_handle handle,
+                                                                     const int64_t m,
+                                                                     const int64_t n,
+                                                                     float* A,
+                                                                     const int64_t lda,
+                                                                     const rocblas_stride strideA,
+                                                                     float* R,
+                                                                     const int64_t ldr,
+                                                                     const rocblas_stride strideR,
+                                                                     float* sigma,
+                                                                     const rocsolver_cholqr_algo algo,
+                                                                     int64_t* info,
+                                                                     const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dcholqr_strided_batched_64(rocblas_handle handle,
+                                                                     const int64_t m,
+                                                                     const int64_t n,
+                                                                     double* A,
+                                                                     const int64_t lda,
+                                                                     const rocblas_stride strideA,
+                                                                     double* R,
+                                                                     const int64_t ldr,
+                                                                     const rocblas_stride strideR,
+                                                                     double* sigma,
+                                                                     const rocsolver_cholqr_algo algo,
+                                                                     int64_t* info,
+                                                                     const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ccholqr_strided_batched_64(rocblas_handle handle,
+                                                                     const int64_t m,
+                                                                     const int64_t n,
+                                                                     rocblas_float_complex* A,
+                                                                     const int64_t lda,
+                                                                     const rocblas_stride strideA,
+                                                                     rocblas_float_complex* R,
+                                                                     const int64_t ldr,
+                                                                     const rocblas_stride strideR,
+                                                                     float* sigma,
+                                                                     const rocsolver_cholqr_algo algo,
+                                                                     int64_t* info,
+                                                                     const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_strided_batched_64(rocblas_handle handle,
+                                                                     const int64_t m,
+                                                                     const int64_t n,
+                                                                     rocblas_double_complex* A,
+                                                                     const int64_t lda,
+                                                                     const rocblas_stride strideA,
+                                                                     rocblas_double_complex* R,
+                                                                     const int64_t ldr,
+                                                                     const rocblas_stride strideR,
+                                                                     double* sigma,
+                                                                     const rocsolver_cholqr_algo algo,
+                                                                     int64_t* info,
+                                                                     const int64_t batch_count);
+//! @}
+
 #ifdef __cplusplus
 }
 #endif
