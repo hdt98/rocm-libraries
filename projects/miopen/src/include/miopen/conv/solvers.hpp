@@ -4498,6 +4498,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
     : PerfConfigBaseCK<PerformanceConfigHipImplicitGemm3DGroupFwdXdlops>
 {
     int index             = 0;
+    int split_k           = 0; // not used for this solver, but required for AI heuristics interface
     std::string kernel_id = "";
     std::vector<std::string> valid_kernels;
 
@@ -4512,7 +4513,8 @@ struct PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
         : PerformanceConfigHipImplicitGemm3DGroupFwdXdlops(0, "")
     {
     }
-    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const miopen::conv::ProblemDescription&);
+    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
+                                               const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
     bool IsValid(const ExecutionContext&, const miopen::conv::ProblemDescription& problem) const
@@ -4528,6 +4530,7 @@ private:
     void Init(const miopen::conv::ProblemDescription&);
     template <typename DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+    void InitValidKernels(const miopen::conv::ProblemDescription& problem);
 };
 
 struct ConvHipImplicitGemm3DGroupFwdXdlops final
@@ -4587,7 +4590,8 @@ struct PerformanceConfigHipImplicitGemm3DGroupWrwXdlops
         : PerformanceConfigHipImplicitGemm3DGroupWrwXdlops(0, "")
     {
     }
-    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const miopen::conv::ProblemDescription&);
+    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
+                                               const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
     bool IsValid(const ExecutionContext&, const miopen::conv::ProblemDescription& problem) const
@@ -4603,6 +4607,7 @@ private:
     void Init(const miopen::conv::ProblemDescription&);
     template <typename DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+    void InitValidKernels(const miopen::conv::ProblemDescription& problem);
 };
 
 struct ConvHipImplicitGemm3DGroupWrwXdlops final
@@ -4654,6 +4659,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
     : PerfConfigBaseCK<PerformanceConfigHipImplicitGemm3DGroupBwdXdlops>
 {
     int index;
+    int split_k = 0; // not used for this solver, but required for AI heuristics interface
     std::string kernel_id;
     std::vector<std::string> valid_kernels;
     PerformanceConfigHipImplicitGemm3DGroupBwdXdlops(int idx, std::string kernl_id)
@@ -4668,7 +4674,8 @@ struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
         : PerformanceConfigHipImplicitGemm3DGroupBwdXdlops(0, "")
     {
     }
-    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const miopen::conv::ProblemDescription&);
+    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
+                                               const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
     bool IsValid(const ExecutionContext&, const miopen::conv::ProblemDescription& problem) const
@@ -4684,6 +4691,7 @@ private:
     void Init(const miopen::conv::ProblemDescription&);
     template <typename DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+    void InitValidKernels(const miopen::conv::ProblemDescription& problem);
 };
 
 struct ConvHipImplicitGemm3DGroupBwdXdlops final
@@ -4919,6 +4927,15 @@ private:
 
     size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription& problem) const;
 };
+
+// Test helper functions for metadata validation
+// These functions return all CK kernel TypeStrings without problem-based filtering
+// Declared here but implemented in the respective solver .cpp files
+#if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+MIOPEN_INTERNALS_EXPORT std::vector<std::string> GetAllWrwKernelTypeStrings();
+MIOPEN_INTERNALS_EXPORT std::vector<std::string> GetAllFwdKernelTypeStrings();
+MIOPEN_INTERNALS_EXPORT std::vector<std::string> GetAllBwdKernelTypeStrings();
+#endif
 
 } // namespace conv
 } // namespace solver

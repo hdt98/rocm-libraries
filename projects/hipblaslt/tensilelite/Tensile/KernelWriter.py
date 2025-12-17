@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@ from rocisa.instruction import BufferLoadB128, BufferLoadB32, BufferLoadB64, \
   DSLoadB32, DSLoadB64, DSLoadB64TrB16, DSLoadInstruction, DSLoadU16, \
   DSLoadU8, DSStore2B32, DSStore2B64, DSStoreB128, DSStoreB16, DSStoreB256, \
   DSStoreB32, DSStoreB64, DSStoreB8, DSStoreInstruction, FlatLoadB128, FlatLoadB32, \
-  FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, \
+  FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, MacroInstruction, \
   MFMAInstruction, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpLeU32, \
   SMFMAInstruction, SNop, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
   SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32
@@ -52,6 +52,7 @@ from .Common import printWarning, roundUp, print2, DebugConfig, DataDirection, \
 from Tensile.SolutionStructs.Naming import getKernelNameMin
 from Tensile.Toolchain.Component import Assembler
 
+import math
 import abc
 import sys
 import collections
@@ -100,6 +101,9 @@ class ABMatrixInfo(MatrixInfo):
   numVgprLocalWriteSwapAddr: int  = -1
   startVgprLocalWriteSwapAddr: int= -1
   numSgprGlobalReadIncs: int     = -1
+
+  gNLCPermBlock: int             = -1
+  gNLCPerpStride: int            = -1
 
 # States
 @dataclass
@@ -177,7 +181,7 @@ class StateValues:
   lrvwUnrollMetadata: int                       = 0 # For Sparse Metadat
 
   numMfmaPerIter: int                    = 0
-
+  SubTileIdx: int                       = 0
   numReadsIterCoalescedA: int            = 0
   numReadsIterCoalescedB: int            = 0
   numReadsIterCoalescedMetadata: int     = 0
@@ -220,6 +224,7 @@ class StateValues:
   startVgprAddressDbg: int               = -1
   startVgprAlphaTmp: int                 = -1
   startVgprSerial: int                   = -1
+  startVgprCvt: int                      = -1
 
   numSgprSizesSum: int                   = 0
   numSgprSizesFree: int                  = 0
@@ -254,6 +259,7 @@ class StateValues:
   BiasType: int                          = 0
   BiasStride: int                        = 0
   FactorDim: int                         = 0
+  freeSgprVarPool: set                   = field(init=False)
 
   numReadsPerIterA: int                  = 0
   numReadsPerIterB: int                  = 0
@@ -281,10 +287,12 @@ class StateValues:
   numGlobalReadInsPerMfma: int           = 0
   numLocalWriteModPerMfma: int           = 0
   HHH_WMMA: bool                         = False
-
-  perIterLocalWriteCanSkip: List[int]    = field(init=False)
+  tmpvgpr: List[int]                     = field(init=False) # vgpr dict for localread
+  numPackCvt: int                        = 0
 
   lraTileProperties: Dict[int, LraTileProperties] = field(init=False)
+
+  WGMTransformLevels: int                = -1
 
   # Epilogue states
   preloadScaleA = False
@@ -311,6 +319,8 @@ class StateValues:
     self.nonPostLoopSgpr = []
 
     self.preloadGuard = []
+    self.tmpvgpr = {}
+    self.freeSgprVarPool = set()
 
 @dataclass
 class StateVgprs:
@@ -551,6 +561,25 @@ class KernelWriter(metaclass=abc.ABCMeta):
       globalReadIncBCode, isNGLL)
 
   ##############################################################################
+  # packItemsConditional: pack src items into dst items until numPack or searchString is found
+  # returns number of items packed
+  ##############################################################################
+  def _packItemsConditional(numPack, srcPackItems, dstPackItems, searchStrings):
+    numPacked = 0
+    if numPack == 0:
+      numPack = 999
+    for n in range(numPack):
+      if srcPackItems:
+        item = srcPackItems.pop(0)
+        dstPackItems.append(item)
+        numPacked += 1
+        itemStr = str(item.comment)
+        for string in searchStrings:
+          if string in itemStr:
+            return numPacked
+    return numPacked
+
+  ##############################################################################
   # Schedule work into the each unroll loop iteration
   # localReadCode is the local reads for this loop iteration
   #  (returned by localReadDo). The instructions in localReadCode
@@ -578,7 +607,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   #  localReadCode + otherCode
   ##############################################################################
   def _makeSubIterSchedule(self, kernel, tPA, tPB, localReadCode, iteration, pointerLWCode, pointerLRCode, waitCode, macIterCode, \
-      waitLWCode = Module(), syncCode = Module(), packCode = Module(), prevIterCode = Module(), NLLlast = False):
+      waitLWCode = Module(), syncCode = Module(), packCode = Module(), prevIterCode = Module(), NLLlast = False, tailloopInNll = False):
 
     iterCode = Module()
     globalReadCode       = deepcopy(self.codes.perIterGlobalRead[iteration])
@@ -586,8 +615,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     localWriteCode       = self.codes.perIterLocalWrite[iteration][1]
     isBarrier            = kernel["LoopIters"] - self.states.numItersPLR
     hasLocalRead = countLocalRead(localReadCode)
+    scheduleIterAlg = self.states.scheduleIterAlg
+    if (NLLlast and tailloopInNll):
+      # use scheduleIterAlg = 0 for NLLlast and tailloopInNll case
+      scheduleIterAlg = 0
     # Default schedule is other, local reads, then local writes:
-    if self.states.scheduleIterAlg==0:
+    if scheduleIterAlg == 0:
       # simple schedule, just add the modules in-order
       iterCode.add(globalReadCode)
       iterCode.add(waitLWCode)
@@ -599,7 +632,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       iterCode.add(waitCode)
       iterCode.add(packCode)
       iterCode.add(macIterCode)
-    elif self.states.scheduleIterAlg == 1:
+    elif scheduleIterAlg == 1:
       iterCode.add(waitLWCode)
       iterCode.add(syncCode)
       #import pdb
@@ -633,7 +666,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       iterCode.add(waitCode)
       iterCode.add(packCode)
       iterCode.add(macIterCode)
-    elif self.states.scheduleIterAlg == 2:
+    elif scheduleIterAlg == 2:
     # SIA2 use only 1 iteration and separate compute and fetch by raising compute priority
     # 2 workgroup interleave, while WG0/WG1 doing compute, WG1/WG0 doing fetch
     # EPS need to be 1, or valu instruction will break interleave
@@ -752,7 +785,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       iterCode.add(pointerLWCode)
       iterCode.add(pointerLRCode)
       iterCode.add(SSetPrior(prior=2, comment="Raise priority while processing macs"))
-    elif self.states.scheduleIterAlg == 3:
+    elif scheduleIterAlg == 3:
       iterCode.addComment0(" grEndMfmaIndex:%u, lwStartMfmaIndex:%u, lwEndMfmaIndex:%u "\
                           %(self.states.grEndMfmaIndex, self.states.lwStartMfmaIndex, self.states.lwEndMfmaIndex))
       iterCode.addComment0(" numMfmaForLR:%u, syncPlrMfmaIndex:%u "\
@@ -780,6 +813,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       numPackedA = 0
       numPackedB = 0
       numPackedM = 0
+      pointerLWCodeInserted = False
       #####
       # Prepare localReadCode
       ####
@@ -949,16 +983,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
         scheduleTF32Emu = kernel["UseF32XEmulation"]
         if scheduleTF32Emu:
-          # 26 is the instruction count for the TF32 emulation sequence in LocalRead.py
-          instPerPackA = 24 if kernel["UseDot2F32XEmulation"] else 26 #len(packAItems)
-          instPerPackB = 24 if kernel["UseDot2F32XEmulation"] else 26 #len(packBItems)
+          if kernel["UseDirect32XEmulation"]:
+            # none needed for direct
+            instPerPackA = 0
+            instPerPackB = 0
+          else:
+            instPerPackA = self.states.numPackCvt
+            instPerPackB = self.states.numPackCvt
           while packAItems or packBItems:
-            for n in range(instPerPackA):
-              if packAItems:
-                packItems.append(packAItems.pop(0))
-            for n in range(instPerPackB):
-              if packBItems:
-                packItems.append(packBItems.pop(0))
+            KernelWriter._packItemsConditional(instPerPackA, packAItems, packItems, ["__TF32_1", "__TF32_2"])
+            KernelWriter._packItemsConditional(instPerPackB, packBItems, packItems, ["__TF32_1", "__TF32_2"])
         else:
           while packAItems:
             if kernel["ConvertAfterDS"] and kernel["ProblemType"]["DataTypeA"].isAnyFloat8():
@@ -1099,7 +1133,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
         elif isinstance(inst, SMFMAInstruction):
           srcRegs = [inst.a, inst.b, inst.metadata]
         else:
-          srcRegs = inst.srcs
+          if hasattr(inst, 'srcs'):
+            srcRegs = inst.srcs
+          else:
+            srcRegs = []
 
         return any((lrDataReg & r) for r in srcRegs if isinstance(r, RegisterContainer))
 
@@ -1205,8 +1242,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # if start to schedule localwrite, but still have localreads not scheduled yet,
         # reject to use 1LDSB, since it will write and read same lds buffer at same time.
         if mfmaIndex > self.states.sync1LdsMfmaIndex and localReadItemsThisLoop and oneBufferScheduling:
-          #TODO: can we remove this restriction?
-          self.states.overflowedResources = 5
+          # If DTLA and DTLB we can ignore this, since the global reads will be scheduled following
+          # the local reads, and there is an lgkmcnt(0) to wait for the remaining local reads
+          if not ((iteration == isBarrier - 1) and (kernel["DirectToLdsA"] and kernel["DirectToLdsB"])):
+            self.states.overflowedResources = 5
         for j in range(readLeft):
           if localReadItemsThisLoop:
             item = localReadItemsThisLoop.pop(0)
@@ -1238,7 +1277,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             loadModule = globalReadCode.popFirstItem()
             iterCode.add(loadModule)
         # schedule remaining globalReadIncInst
-        if i == numMfmaPerIter - 1 and globalReadCode.itemsSize():
+        if (i == numMfmaPerIter - 1 and globalReadCode.itemsSize()) or \
+           (i == 0 and globalReadCode.itemsSize() and (iteration == 1 and kernel["ForceUnrollSubIter"])):
           loadModules = globalReadCode.popFirstNItems(globalReadCode.itemsSize())
           iterCode.addItems(loadModules)
 
@@ -1285,6 +1325,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 skipLocalWriteWaitcnt += countLocalWrite(writeItem) + countDSStoreB256(writeItem)
               if not localReadItemsThisLoop:
                 self.states.perIterLocalWriteCanSkip[iteration] += countLocalWrite(writeItem) + countDSStoreB256(writeItem)
+          if kernel["ForceUnrollSubIter"] and (writeItems and i == (numMfmaPerIter - 1)):
+            # if ForceUnrollSubIter, we need to schedule all localWrite in last mfma
+            while writeItems:
+              writeItem = writeItems.pop(0)
+              iterCode.add(writeItem)
         if mfmaIndex == self.states.lwEndMfmaIndex:
           while writeItems:
             localWriteCodeCounts.pop(0)
@@ -1299,8 +1344,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
         ####
         # scheduled pointer
         ####
-        if mfmaIndex == self.states.lwEndMfmaIndex:
+        # pointerLWCode with sgpr can break GlobalReadInc because s_xor_b32 changes SCC
+        # generate pointerLWCode after GlobalReadInc to avoid incorrect GlobalReadInc
+        LocalWriteUseSgpr = kernel["LocalWriteUseSgprA"] or kernel["LocalWriteUseSgprB"]
+        if ((not LocalWriteUseSgpr) and mfmaIndex == self.states.lwEndMfmaIndex) or \
+           (((mfmaIndex >= self.states.lwEndMfmaIndex and globalReadCode.itemsSize() == 0) or i == numMfmaPerIter - 1) and \
+            (not pointerLWCodeInserted)):
           iterCode.add(pointerLWCode)
+          pointerLWCodeInserted = True
         if i == numMfmaPerIter - 1:
           iterCode.add(pointerLRCode)
 
@@ -1422,20 +1473,32 @@ class KernelWriter(metaclass=abc.ABCMeta):
             iterCode.addComment0("pack scheduling: packAIdx:%u, packBIdx:%u" %(packAIdx,packBIdx))
 
           if not schedulePackConsiderMetadata:
-              # we put 2 pack in each mfma
-              for j in range(instPerPackA):
-                if packItems:
-                  iterCode.add(packItems.pop(0))
-                  curPackIdx += 1
+              if kernel["UseF32XEmulation"]:
+                tmp = []
+                curPackIdx += KernelWriter._packItemsConditional(instPerPackA, packItems, tmp, ["__TF32_1_A", "__TF32_2_A"])
+                for n in tmp:
+                  iterCode.add(n)
+              else:
+                # we put 2 pack in each mfma
+                for j in range(instPerPackA):
+                  if packItems:
+                    iterCode.add(packItems.pop(0))
+                    curPackIdx += 1
               if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
                 for j in range(ceil(instPerPackM)):
                   if packItems:
                     iterCode.add(packItems.pop(0))
                     curPackIdx += 1
-              for j in range(instPerPackB):
-                if packItems:
-                  iterCode.add(packItems.pop(0))
-                  curPackIdx += 1
+              if kernel["UseF32XEmulation"]:
+                tmp = []
+                curPackIdx += KernelWriter._packItemsConditional(instPerPackB, packItems, tmp, ["__TF32_1_B", "__TF32_2_B"])
+                for n in tmp:
+                  iterCode.add(n)
+              else:
+                for j in range(instPerPackB):
+                  if packItems:
+                    iterCode.add(packItems.pop(0))
+                    curPackIdx += 1
               # since packed register need to wait 2 quad cycle to finish packing
               # we insert pack instruction if we can, or s_nop
               while curPackIdx < numPack+2:
@@ -1448,7 +1511,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
                   break
               if kernel["UseF32XEmulation"]:
                 # HACK add dummy waits btween swap and mfmas. TODO: improve pack scheduling to avoid this
-                numDummy = 1 if kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 16 else 2
+                numDummy = 0 if kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 16 else 1
                 for numd in range(numDummy):
                   iterCode.add(SNop(waitState=0, comment="VALU packing writes to be consumed by matrix instruction"))
           else:
@@ -1711,7 +1774,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       while macIterItems:
         iterCode.add(macIterItems.pop(0))
     else:
-      assert 0, "Unsupported scheduleIterAlg=%u"%self.states.scheduleIterAlg
+      assert 0, "Unsupported scheduleIterAlg=%u"%scheduleIterAlg
 
     if isinstance(waitCode, SWaitCnt):
 
@@ -1742,8 +1805,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         localReadsB = 0 if kernel["DirectToVgprB"] else self.states.numReadsPerIterB * skipReadsIterB
         localReads += localReadsA + localReadsB
         # some of localReads is interleaved after waitcnt in SIA3
-        if kernel["ScheduleIterAlg"] == 3 and self.states.numItersPLR and\
-          (iteration < numReadsIterA or iteration < numReadsIterB or numPrefetchIter):
+        if scheduleIterAlg== 3 and self.states.numItersPLR and\
+          (iteration < numReadsIterA or iteration < numReadsIterB or numPrefetchIter) and\
+          not kernel["ForceUnrollSubIter"]:
           if ((iteration < numReadsIterA and not dataAtIterA < max(dataAtIterA,dataAtIterB)) or numPrefetchIter) and (not kernel["DirectToVgprA"]):
             localReads -= self.states.numReadsPerIterA
           if ((iteration < numReadsIterB and not dataAtIterB < max(dataAtIterA,dataAtIterB)) or numPrefetchIter) and (not kernel["DirectToVgprB"]):
@@ -1757,17 +1821,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
             localReadsNotWaited = self.states.numReadsPerIterB//kernel["InnerUnroll"] - self.states.numReadsPerUnrollB
             if localReadsNotWaited > 0:
               localReads += localReadsNotWaited
+        elif kernel["ForceUnrollSubIter"]:
+          localReads = 0
 
         dscnt += localReads
         iterCode.addComment0("numPrefetchIter=%u" % numPrefetchIter)
         iterCode.addComment0("dataAtIterA=%u numReadsIterA=%u skipReadsIterA=%u readsPerIterA=%u" % (dataAtIterA, numReadsIterA, skipReadsIterA, self.states.numReadsPerIterA))
         iterCode.addComment0("dataAtIterB=%u numReadsIterB=%u skipReadsIterB=%u readsPerIterB=%u" % (dataAtIterB, numReadsIterB, skipReadsIterB, self.states.numReadsPerIterB))
-        if kernel["ScheduleIterAlg"] == 0 or kernel["ScheduleIterAlg"] == 1:
+        if scheduleIterAlg == 0 or scheduleIterAlg == 1:
           for i in range (max(dataAtIterA,dataAtIterB),iteration+1):
             localWrites += countLocalWrite(self.codes.perIterLocalWrite[i][1])
             localWrites += countDSStoreB256(self.codes.perIterLocalWrite[i][1])
         # ScheduleIterAlg=2, localwrite is after waitCnt, no need to count it's current iteration.
-        if kernel["ScheduleIterAlg"] == 3:
+        if scheduleIterAlg == 3:
           for i in range (max(dataAtIterA,dataAtIterB)+1,iteration):
             localWrites += countLocalWrite(self.codes.perIterLocalWrite[i][1])
             localWrites += countDSStoreB256(self.codes.perIterLocalWrite[i][1])
@@ -1825,6 +1891,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if not forceNoTileCode:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
 
+
     self.dontAppendCode = forceNoTileCode
 
     tPM = tensorParametersA["tpsMetadata"]
@@ -1837,6 +1904,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["StreamK"] != 0:
       module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
       module.add(self.localWriteAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
+
+    module.add(self.removeGRSrdVariableSgprsFromPool(kernel))
 
     # tile assignments
     module.addComment1("global read addresses: tile offset assignment a")
@@ -1901,7 +1970,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       #     If this occurs we need to 'unshift' the C values (see shiftVectorComponents)
       #     BufferLoad does support this shifting, but if GuaranteeNoPartial=1 then
       #     it can be guaranteed that no shifting is required.
-      if not (kernel["BufferLoad"] and kernel["GuaranteeNoPartialA"]) and not forceNoTileCode:
+      if not (kernel["BufferLoad"] and kernel["GuaranteeNoPartialA"]) and not forceNoTileCode and not kernel["UseGeneralizedNLCOneA"]:
         module.addComment1("global read addresses: shift a")
         module.add(self.graShift(kernel, tensorParametersA))
         if tensorParametersA["is_sparse"] and kernel["DirectToVgprSparseMetadata"]:
@@ -1914,12 +1983,26 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # Using A's margin to instead Metadata's margin
         module.add(self.graShift(kernel, tPM, tPMRef["glvw"] if tPMRef["rtv"] else 1))
 
-      if not (kernel["BufferLoad"] and  kernel["GuaranteeNoPartialB"]) and not forceNoTileCode:
+      if not (kernel["BufferLoad"] and  kernel["GuaranteeNoPartialB"]) and not forceNoTileCode and not kernel["UseGeneralizedNLCOneB"]:
         module.addComment1("global read addresses: shift b")
         module.add(self.graShift(kernel, tensorParametersB))
         if tensorParametersB["is_sparse"] and kernel["DirectToVgprSparseMetadata"]:
           module.addComment1("global read addresses: shift metadata")
           module.add(self.graMetadataShift(kernel, tensorParametersB))
+
+    # addresses
+    if not forceNoTileCode:
+      module.addComment1("global read addresses: addresses a")
+      module.add(self.graAddresses(kernel, tensorParametersA))
+      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+        module.addComment1("global read addresses: addresses metadata")
+        module.add(self.graAddresses(kernel, tPM))
+      module.addComment1("global read addresses: addresses b")
+      module.add(self.graAddresses(kernel, tensorParametersB))
+
+    # workgoup SGPRs no longer needed
+
+    module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
 
     # final offsets
     module.addComment1("global read addresses: final offsets a")
@@ -1934,16 +2017,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(self.graFinalOffsets(kernel, tensorParametersB))
     self.dontAppendCode = False
     self.dontAppendCode = self.dontAppendCode or forceNoTileCode
-
-    # addresses
-    if not forceNoTileCode:
-      module.addComment1("global read addresses: addresses a")
-      module.add(self.graAddresses(kernel, tensorParametersA))
-      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-        module.addComment1("global read addresses: addresses metadata")
-        module.add(self.graAddresses(kernel, tPM))
-      module.addComment1("global read addresses: addresses b")
-      module.add(self.graAddresses(kernel, tensorParametersB))
 
     # Add increment code
     gsuComponent = Component.GSU.find(self)
@@ -1979,7 +2052,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.openLoop(kernel, tensorParametersA, tensorParametersB, i))
       module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx))
 
-    if not forceNoTileCode:
+    if not forceNoTileCode and self.states.staggerU:
       module.add(self.declareStaggerParms(kernel))
       module.add(self.calculateStagger(kernel, tensorParametersA))
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
@@ -2014,7 +2087,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st)
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters1st))
-      moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd, True)
+      skip2ndWaitForDtl = kernel["DirectToLds%s"%tensorParameters1st["tensorChar"]]
+      moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd, skip2ndWaitForDtl)
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters2nd))
       tPA = tensorParametersA
@@ -2032,21 +2106,31 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return module
 
   ##############################################################################
+  # get conditions to skip local read write wait
+  ##############################################################################
+  def getConditionToSkipLocalReadWriteWait( self, kernel, u ):
+    oneBufferScheduling = kernel["1LDSBuffer"] or kernel["DirectToLdsA"] or kernel["DirectToLdsB"]
+    condSkip = False
+    # skip wait for SIA=3 and oneLDSBuffer scheduling and PLR and PGR==2 and u > localWriteStartIter
+    # in this case, all local read is executed before 1LDSBuffer sync and no need to wait for local read
+    if (kernel["ScheduleIterAlg"] == 3 and oneBufferScheduling and kernel["PrefetchLocalRead"] and kernel["PrefetchGlobalRead"] == 2):
+      localWriteStartIter = self.states.lwStartMfmaIndex//self.states.numMfmaPerIter
+      if u > localWriteStartIter:
+        condSkip = True
+    return not condSkip
+
+  ##############################################################################
   # No Load Loop Body
   ##############################################################################
-  def noLoadLoopBody( self, kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=0, NLLnum=1):
+  def noLoadLoopBody( self, kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=0, NLLnum=1, useTailloopInNll=False):
     if kernel["UseCustomMainLoopSchedule"]:
       module = Module()
       if isNGLL:
-        module.add(SWaitCnt(dscnt=0, vlcnt=0, vscnt=-1, comment="Wait for all PGR to complete"))
-        module.add(SBarrier(comment=""))
         module.addComment0("Code-path 0, useGR=0, usePLR=1, useGRInc=1, useLoop = 0")
-        module.add(TextBlock("MAINLOOP 0 0 1 1 0\n"))
+        module.add(MacroInstruction(name="MAINLOOP", args=[0,0,1,1,0]))
       else:
-        module.add(SWaitCnt(dscnt=0, vlcnt=0, vscnt=-1, comment="Wait for all PGR to complete"))
-        module.add(SBarrier(comment=""))
         module.addComment0("Code-path 0, useGR=0, usePLR=0, useGRInc=0, useLoop = 0")
-        module.add(TextBlock("MAINLOOP 0 0 0 0 0\n"))
+        module.add(MacroInstruction(name="MAINLOOP", args=[0,0,0,0,0]))
       return module
     module = Module("noLoadLoopBody")
     expand = kernel["ExpandPointerSwap"]
@@ -2110,13 +2194,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.makeSchedule(kernel, tensorParametersA, tensorParametersB, localWriteEndIter, skipGlobalReadInc=False, lastLoop=NLLlast, isNGLL=isNGLL)
           module.add(self.codes.unrollLoopHeader)
 
+      if kernel["ForceUnrollSubIter"]:
+        self.states.lwStartMfmaIndex = (kernel["MIWaveTile"][1] + kernel["MIWaveTile"][0])//2 -1
+
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
-      isResetLroIter = (u == localWriteEndIter)
+      isResetLroIter = 1 if kernel["ForceUnrollSubIter"] else (u == localWriteEndIter)
       isSwapAndResetLwoIter = isResetLroIter
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
-          isSwapAndResetLwoIter = (u == self.states.lwEndMfmaIndex//(self.states.numMfmaPerIter))
+        isSwapAndResetLwoIter = (u == self.states.lwEndMfmaIndex//(self.states.numMfmaPerIter))
 
       extraComment = ""
       if isLastLoop:
@@ -2128,8 +2215,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
             extraComment += " (swap and reset local write pointers iteration) "
         if isSwapLroIter:
             extraComment += " (swap local read pointers iteration) "
-
-      module.addComment1("iter %u%s"%(u,extraComment))
+      if kernel["ForceUnrollSubIter"]:
+        module.addComment1("subiter %u"%(u))
+      else:
+        module.addComment1("iter %u%s"%(u,extraComment))
       plrIdx = (u+pflr) % self.states.numVgprBuffer
       plrIdxDTV = (u+pflr) % kernel["LoopIters"]
       localReads = Module()
@@ -2166,6 +2255,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
       doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
       doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+      if kernel["ForceUnrollSubIter"]:
+        doReadA = 1 if u == 0 else 0
+        doReadB = 1 if u == 0 else 0
+        doReadM = 1 if u == 0 else 0
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
@@ -2175,6 +2268,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadA = doReadA and iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]
         doReadB = doReadB and iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]
         doReadM = doReadM and iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]
+        if (doReadA or doReadB or doReadM) and kernel["ForceUnrollSubIter"]:
+          pack[1] = Module()
         if doReadA:
           localReads.addComment1("local read a")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadA
@@ -2185,12 +2280,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if needNextBufLR:
             localReads.add(localReadCodeA)
           pack[plrIdx*self.states.numIterPerCoalescedReadA].add(packCodeA)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeA)
         if doReadM:
           localReads.addComment1("local read metadata")
           localReadCodeM, packCodeM = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadMetadata, iui*self.states.numReadsIterCoalescedMetadata, 0, tPM)
           if needNextBufLR:
             localReads.add(localReadCodeM)
           pack[plrIdx*self.states.numIterPerCoalescedReadMetadata].add(packCodeM)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeM)
         if doReadB:
           localReads.addComment1("local read b")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadB
@@ -2198,6 +2297,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             # DTV + pack or input conversion case, offset bufferIdx for local read packing instructions
             bufferIdx = plrIdxDTV*self.states.numIterPerCoalescedReadB + vregSetIdxLR * kernel["LoopIters"]
           localReadCodeB, packCodeB = self.localReadDo(kernel, bufferIdx, iui*self.states.numReadsIterCoalescedB, 0, tensorParametersB)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeB)
           if needNextBufLR:
             localReads.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
@@ -2220,7 +2321,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
               waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "3wait for local write"))
             if (kernel["DirectToVgprA"] or kernel["DirectToVgprB"]) and (kernel["DirectToLdsA"] or kernel["DirectToLdsB"]):
               # DirectToVgpr + DirectToLds case, add waitcnt vmcnt before s_barrier
-              waitLWCode.add(self.getWaitcntCodeForDirectToVgpr(kernel, localWriteEndIter, u, isNLL=(not isNGLL), beforeBarrier=True))
+              waitLWCode.add(self.getWaitcntCodeForDirectToVgpr(kernel, tensorParametersA, tensorParametersB, localWriteEndIter, u, \
+                             isNLL=(not isNGLL), beforeBarrier=True))
             elif kernel["PrefetchGlobalRead"]==2 and (kernel["DirectToLdsA"] and kernel["DirectToLdsB"]):
               waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, 0, -1, -1, "wait for global reads with lds"))
             syncCode.add(self._syncThreads(kernel))
@@ -2236,11 +2338,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
             # Swap, reset, or increment the LRO:
             # force internalPointerSwap = False in NGLL case
             internalPointerSwap = expand and not isNGLL
-            pointerLRCode.addComment1("local read swap offsets a")
-            pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersA))
-            pointerLRCode.addComment1("local read swap offsets b")
-            pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersB))
-            if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+            if not kernel["ForceUnrollSubIter"] or (doReadA and (u<localWriteEndIter)):
+              pointerLRCode.addComment1("local read swap offsets a")
+              pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersA))
+            if not kernel["ForceUnrollSubIter"] or (doReadB and (u<localWriteEndIter)):
+              pointerLRCode.addComment1("local read swap offsets b")
+              pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersB))
+            if (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]) and\
+               (not kernel["ForceUnrollSubIter"] or (doReadM and (u<localWriteEndIter))):
               pointerLRCode.addComment1("local read swap offsets metadata")
               pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tPM))
 
@@ -2268,8 +2373,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.getWaitcntCodeForDirectToVgpr(kernel, tensorParametersA, tensorParametersB, localWriteEndIter, u, isNLL=(not isNGLL), NLLlast=NLLlast))
 
       luIdx = u % self.states.numVgprBuffer # local to use for MACs
+      if kernel["ForceUnrollSubIter"]:
+        luIdx = u # Pack[0] is for A0,B0 Pack[1] is for A1,B1. Pack[2] and Pack[3] are empty
       if kernel["EnableMatrixInstruction"]:
-        macIterCode.add(self.mfmaIter(kernel, tensorParametersA, tensorParametersB, u, kernel["InnerUnroll"], vregSetIdxMFMA, unrollIdx = u))
+        macIterCode.add(self.mfmaIter(kernel, tensorParametersA, tensorParametersB, u, kernel["InnerUnroll"], vregSetIdxMFMA, unrollIdx = u, tail = useTailloopInNll))
       else:
         macIterCode.add(self.macIter(kernel, tensorParametersA, tensorParametersB, luIdx, kernel["InnerUnroll"], True))
       if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
@@ -2277,9 +2384,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
         macIterCode.add(self.exclasses.biasSumUnroll.loopSum(self, kernel, tP, u, kernel["InnerUnroll"]))
 
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
-                      u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast)
+                      u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast, tailloopInNll=useTailloopInNll)
       module.add(subIterCode)
+      self.states.SubTileIdx = (self.states.SubTileIdx + 1) % kernel["numSubTiles"]
       pack[luIdx] = Module()
+
+      # tail loop in NoLoadLoop case, generate close loop code for TailLoop here (except for last loop iteration)
+      if useTailloopInNll:
+        finalLoop = (u == kernel["LoopIters"] - 1)
+        NLLindexLast = (NLLindex == NLLnum - 1)
+        module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -2, finalLoop, skipCondJumpCounter=u, NLLindexLast=NLLindexLast))
+
     return module
 
   ##############################################################################
@@ -2288,9 +2403,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
   #
   # isOptNLL : the NLL is to be optimized for the alpha=1 and non-edge case
   ##############################################################################
-  def noLoadLoop( self, kernel, tensorParametersA, tensorParametersB, isOptNLL, isNGLL, pack, NLLindex=0, NLLnum=1):
+  def noLoadLoop( self, kernel, tensorParametersA, tensorParametersB, isOptNLL, isNGLL, pack, NLLindex=0, NLLnum=1, useTailloopInNll=False):
     module = Module("noLoadLoop")
     LoopNameComment = "NoGlobalLoadLoop" if isNGLL else "NoLoadLoop"
+    if useTailloopInNll:
+      LoopNameComment = "TailLoop in " + LoopNameComment
     isOptNLLComment = "Opt" if isOptNLL else "Ord"
     startComment = "%s. %s - Begin " % (isOptNLLComment, LoopNameComment)
     if NLLnum > 1:
@@ -2331,7 +2448,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.codes.localWriteA = Module()
       self.codes.localWriteB = Module()
 
-    openSum = self.openSumAtLeastUnroll(kernel, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL, NLLindex=NLLindex, NLLnum=NLLnum)
+    # re-calculate loop counter for tailloopInNll
+    if useTailloopInNll:
+      module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1, tailloopInNll=True, NLLindex=NLLindex))
+
+    openSum = self.openSumAtLeastUnroll(kernel, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL, NLLindex=NLLindex, NLLnum=NLLnum, \
+                                        tailloopInNll=useTailloopInNll)
     module.add(openSum)
 
     if not self.states.numItersPLR and not kernel["UseCustomMainLoopSchedule"]:
@@ -2343,13 +2465,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self._syncThreads(kernel))
 
     # generate no Load Loop Body code
-    module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=NLLindex, NLLnum=NLLnum))
+    module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=NLLindex, \
+                                   NLLnum=NLLnum, useTailloopInNll=useTailloopInNll))
 
     if self.do["executeToLoopEnd"] and isOptNLL:
       module.add(self.functionEnd(kernel, addLabel=False))
 
     # Close code is necessary for both first and last (NGLL case(=NLLfirst) needs label)
-    module.add(self.closeSumAtLeastUnroll(kernel, tensorParametersA, tensorParametersB, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL, isNotLast=(NLLindex<(NLLnum-1))))
+    module.add(self.closeSumAtLeastUnroll(kernel, tensorParametersA, tensorParametersB, prefetch=False, isOptNLL=isOptNLL, isNGLL=isNGLL, \
+                                          isNotLast=(NLLindex<(NLLnum-1)), tailloopInNll=useTailloopInNll))
 
     if self.states.FactorDim == 3:
       self.updateBranchPlaceHolder(module, ["skipOptNLL_placeholder", "skipOptNLL_scc1_placeholder"] , ["OptNLL_End", "OptNLL_End"], ["SCBranchSCC0", "SCBranchSCC1"])
@@ -2392,7 +2516,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # unrolled loop: global read A, B
     # M0 update for directToLds, skip if using custom main loop schedule
     self.codes.dtlsM0UpdateA = self.directToLdsM0Update(kernel, 1, tensorParameters1st, kernel["UseCustomMainLoopSchedule"])
-    self.codes.dtlsM0UpdateB = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, True)
+    # skip wait for DTL if global load 1st is DTL
+    skip2ndWaitForDtl = kernel["DirectToLds%s"%tc1] or kernel["UseCustomMainLoopSchedule"]
+    self.codes.dtlsM0UpdateB = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, skip2ndWaitForDtl)
 
     g2lBufIdx1st = 0
     if grBA==True or (kernel["DirectToVgpr%s"%tc1] and isDTVGRSecondBuf):
@@ -2489,7 +2615,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     pflr     = self.states.numItersPLR  # how many pf already done above
 
-
     # Store instruction streams across all iterations
     MfmaCodeAllIters = Module()
     LRSwapAAllIters = Module()
@@ -2532,7 +2657,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
-      isResetLroIter = (u == localWriteEndIter)
+      if kernel["ForceUnrollSubIter"]:
+        self.states.lwStartMfmaIndex = (kernel["MIWaveTile"][1] + kernel["MIWaveTile"][0])//2 - 1
+
+      isResetLroIter = 1 if kernel["ForceUnrollSubIter"] else (u == localWriteEndIter)
       isSwapAndResetLwoIter = isResetLroIter
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
@@ -2545,7 +2673,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if isSwapLroIter:
         extraComment += " (swap local read pointers iteration) "
 
-      module.addComment1("iter %u%s"%(u,extraComment))
+      if kernel["ForceUnrollSubIter"]:
+        module.addComment1("subiter %u"%(u))
+      else:
+        module.addComment1("iter %u%s"%(u,extraComment))
+
       plrIdx = (u+pflr) % self.states.numVgprBuffer
       plrIdxDTV = (u+pflr) % kernel["LoopIters"]
 
@@ -2581,6 +2713,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
       doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
       doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+
+      if kernel["ForceUnrollSubIter"]:
+        doReadA = 1 if u == 0 else 0
+        doReadB = 1 if u == 0 else 0
+        doReadM = 1 if u == 0 else 0
+
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
@@ -2590,6 +2728,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadA = doReadA and iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]
         doReadB = doReadB and iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]
         doReadM = doReadM and iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]
+        if (doReadA or doReadB or doReadM) and kernel["ForceUnrollSubIter"]:
+          pack[1] = Module()
         if doReadA:
           localReads.addComment1("local read a")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadA
@@ -2603,12 +2743,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if kernel["UseCustomMainLoopSchedule"]:
             LRCodeAAllIters[uIdx].add(localReadCodeA)
             PackCodeAAllIters[uIdx].add(packCodeA)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeA)
         if doReadM:
           localReads.addComment1("local read metadata")
           localReadCodeM, packCodeM = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadMetadata, iui*self.states.numReadsIterCoalescedMetadata, 0, tPM)
           localReads.add(localReadCodeM)
           localReadsM.add(localReadCodeM)
           pack[plrIdx*self.states.numIterPerCoalescedReadMetadata].add(packCodeM)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeM)
         if doReadB:
           localReads.addComment1("local read b")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadB
@@ -2618,10 +2762,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReadCodeB, packCodeB = self.localReadDo(kernel, bufferIdx, iui*self.states.numReadsIterCoalescedB, 0, tensorParametersB)
           localReads.add(localReadCodeB)
           localReadsB.add(localReadCodeB)
+
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
           if kernel["UseCustomMainLoopSchedule"]:
             LRCodeBAllIters[uIdx].add(localReadCodeB)
             PackCodeBAllIters[uIdx].add(packCodeB)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeB)
+
         # Don't increment the LRO if we are going to reset them below:
         if not isResetLroIter or iui != kernel["InnerUnroll"]-1:
           if doReadA:
@@ -2670,16 +2818,21 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if kernel["ExpertSchedulingMode"] > 0:
             pointerLRCode.add(SWaitAlu(vm_vsrc=0, comment="wait for local read to vgpr complete"))
           # Swap, reset, or increment the LRO:
-          pointerLRCode.addComment1("local read swap offsets a")
-          pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tensorParametersA))
-          if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+          if not kernel["ForceUnrollSubIter"] or (doReadA and (u<localWriteEndIter)):
+            pointerLRCode.addComment1("local read swap offsets a")
+            pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tensorParametersA))
+            if kernel["UseCustomMainLoopSchedule"]:
+              LRSwapAAllIters.add(self.localReadSwapOffsets(kernel, expand, tensorParametersA))
+          if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"] and\
+             (not kernel["ForceUnrollSubIter"] or (doReadM and (u<localWriteEndIter))):
             pointerLRCode.addComment1("local read swap offsets metadata")
             pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tPM))
-          pointerLRCode.addComment1("local read swap offsets b")
-          pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tensorParametersB))
-          if kernel["UseCustomMainLoopSchedule"]:
-            LRSwapAAllIters.add(self.localReadSwapOffsets(kernel, expand, tensorParametersA))
-            LRSwapBAllIters.add(self.localReadSwapOffsets(kernel, expand, tensorParametersB))
+          if not kernel["ForceUnrollSubIter"] or (doReadB and (u<localWriteEndIter)):
+            pointerLRCode.addComment1("local read swap offsets b")
+            pointerLRCode.add(self.localReadSwapOffsets(kernel, expand, tensorParametersB))
+            if kernel["UseCustomMainLoopSchedule"]:
+              LRSwapBAllIters.add(self.localReadSwapOffsets(kernel, expand, tensorParametersB))
+
 
       if isResetLroIter: # ResetLroIter
         pointerLRCode.addComment1("local read init pointers a")
@@ -2690,9 +2843,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
         pointerLRCode.addComment1("local read init pointers b")
         pointerLRCode.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB))
 
-      waitCode = self._wait(kernel, tensorParametersA, tensorParametersB, \
-          -1, 0, 0, \
-          "wait for prior local read local write")
+      if self.getConditionToSkipLocalReadWriteWait(kernel, u):
+        waitCode = self._wait(kernel, tensorParametersA, tensorParametersB, \
+            -1, 0, 0, \
+            "wait for prior local read local write")
 
       luIdx = u % self.states.numVgprBuffer # local to use for MACs
       if kernel["EnableMatrixInstruction"]:
@@ -2726,9 +2880,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # after removing the global variable it is always false...
       # if self.states.numItersPLR:
       if not kernel["UseCustomMainLoopSchedule"]:
+        if kernel["ForceUnrollSubIter"]:
+          luIdx = u
         subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module)
         module.add(subIterCode) # add scheduled "other", local reads, local writes
+
+      self.states.SubTileIdx = (self.states.SubTileIdx + 1) % kernel["numSubTiles"]
       pack[luIdx] = Module()
 
 
@@ -2779,21 +2937,28 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.preLoop(self, kernel))
+
+
     # Open persistent loop
     loopComponent = Component.PersistentLoop.find(self)
-    module.add(loopComponent.openPersistentLoop(self, kernel))
 
+    module.add(loopComponent.openPersistentLoop(self, kernel))
     module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False))
 
     if self.do["executeToPrefetchEnd"]:
       module.add(self.functionEnd(kernel, addLabel=False))
-
-    pack = [ Module() for i in range (self.states.numVgprBuffer) ]
+    if kernel["ForceUnrollSubIter"]:
+      pack = [ Module() for i in range (4) ] # 4 buffers for ForceUnrollSubIter
+    else:
+      pack = [ Module() for i in range (self.states.numVgprBuffer) ]
     self.preLoopLocalWriteCode = None
 
     if kernel["PrefetchGlobalRead"]:
       if self.states.doShadowInit:
         module.add(self.openShadowInit())
+        # SrdD/SrdC are used starting now, remove from sgpr pool
+        self.removeSgprVarFromPool("SrdD")
+        self.removeSgprVarFromPool("SrdC")
         module.add(self.globalWriteWorkGroupInit(kernel))
         if self.states.doShadowInit == 2:
           module.add(self.initC(kernel)) # initC while waiting for global reads
@@ -2848,7 +3013,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if kernel["UnrollLoopSwapGlobalReadOrder"] == 1 or kernel["DirectToVgpr%s"%tc2]:
             # use second buffer
             g2lBufIdx2nd = 1
-          module.add(self.directToLdsM0Update(kernel, 1, tensorParameters2nd))
+          # skip wait for DTL if global load 1st is DTL
+          skip2ndWaitForDtl = kernel["DirectToLds%s"%tc1]
+          module.add(self.directToLdsM0Update(kernel, 1, tensorParameters2nd, skip2ndWaitForDtl))
           module.add(self.globalReadDo(kernel, 0, tensorParameters2nd, g2lBufIdx=g2lBufIdx2nd))
 
         # swap local ptrs again if DirectToLds is enabled
@@ -2860,6 +3027,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.localWriteSwapOffsets(kernel, expand, tensorParametersB))
 
         module.add(self.closePrefetchGlobalRead2())
+
+      self.states.subTileIdx = 0
+
+      if kernel["ForceUnrollSubIter"]:
+        kernel["LoopIters"] = kernel["numSubTiles"] * kernel["numSubTiles"]
+        self.states.numMfmaPerIter = self.states.numMfmaPerIter//kernel["LoopIters"]
+        self.states.numItersPLR = 1
 
       # prefetch-local
       if self.states.numItersPLR:
@@ -2889,19 +3063,22 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 localReadCodeB, packCodeB = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadB, iui*self.states.numReadsIterCoalescedB, espi, tensorParametersB)
                 module.add(localReadCodeB)
                 pack[plrIdx].add(packCodeB)
-              if iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]:
+              if not kernel["ForceUnrollSubIter"] and (iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]):
                 module.addComment1("local read inc a")
                 module.add(self.localReadInc(kernel, iui, tensorParametersA))
-              if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+              if not kernel["ForceUnrollSubIter"] and (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]):
                 if iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]: # no local read code if DirectToVgpr is enabled
                   module.addComment1("local read inc metadata")
                   module.add(self.localReadInc(kernel, iui, tPM))
-              if iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]:
+              if not kernel["ForceUnrollSubIter"] and (iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]):
                 module.addComment1("local read inc b")
                 module.add(self.localReadInc(kernel, iui, tensorParametersB))
-              if kernel["UsePLRPack"] and self.states.numItersPLR:
-                module.add(SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA and LRB to complete"))
-                module.add(pack[plrIdx])
+              if kernel["UseCustomMainLoopSchedule"]:
+                # Wait for all LR in pre-loop to complete before we start main loop
+                module.add(SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LR in pre-loop to complete"))
+                if kernel["UsePLRPack"] and self.states.numItersPLR:
+                  module.add(pack[plrIdx])
+        self.states.SubTileIdx = (self.states.SubTileIdx + 1) % kernel["numSubTiles"]
       elif self.states.numItersPLR == 0 and kernel["UseCustomMainLoopSchedule"]:
         # For numItersPLR=0 and CMS we prefetch only half the local reads
         localReadCodeA = Module()
@@ -2956,6 +3133,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # second GR buffer check for DTV
       isDTVGRSecondBuf = True if isDTV else False
       module.add(self._loopBody( kernel, tensorParametersA, tensorParametersB, pack, 0, loopCopies, False , dsWriteBA=dsWriteBA, isDTVGRSecondBuf=isDTVGRSecondBuf, skipClose=True))
+
       loopLabelToNoGRloopAfterABLoop = Label("NoGRloopAfterABLoop", "" )
       loopCounter = self.loopCounter(kernel, self.states.unrollIdx)
       module.add(SSubU32(dst=loopCounter, src0=loopCounter, \
@@ -3011,6 +3189,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # execute the NLL inside each unroll iteration not just once at the end.
     if kernel["PrefetchGlobalRead"]:
       if not kernel["SuppressNoLoadLoop"]:
+        if self.states.tailloopInNll:
+          # deepCopy packCode for tailloopInNll
+          backupPack = deepcopy(pack)
         NeedNLLOddEven  = isDTV # need odd+even NLL for 2 buffers (PGR1/2)
         NLLnum = 2 if NeedNLLOddEven else 1
         gsuComponent = Component.GSU.find(self)
@@ -3025,10 +3206,28 @@ class KernelWriter(metaclass=abc.ABCMeta):
           else:
             # deepCopy packCode for OptNLL noLoadLoop
             deepCopyPack = deepcopy(pack)
-          module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=deepCopyPack, NLLindex=NLLindex, NLLnum=NLLnum))
+          module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=deepCopyPack, NLLindex=NLLindex, NLLnum=NLLnum, \
+                                     useTailloopInNll=self.states.tailloopInNll))
           self.restoreLocalPointers(kernel, tensorParametersA, tensorParametersB)
 
-    if self.states.actualSummationLoops>1:
+        if self.states.tailloopInNll:
+          # tailloopInNll case, generate another set of NoLoadLoop for tailloopInNll not applicable case
+          # restore backup for pack code
+          pack = backupPack
+          for NLLindex in range(0, NLLnum):
+            self.saveLocalPointers(kernel, tensorParametersA, tensorParametersB)
+            # copy pack
+            if NLLindex == NLLnum - 1 or (self.states.packDTVA or self.states.packDTVB or self.states.convDTVA or self.states.convDTVB):
+              # last NLL or  pack DTV case, no deep copy for pack
+              # pack code for local prefetch is generated in noLoadLoopBody and used for DTV even
+              deepCopyPack = pack
+            else:
+              # deepCopy packCode for OptNLL noLoadLoop
+              deepCopyPack = deepcopy(pack)
+            module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=deepCopyPack, NLLindex=NLLindex, NLLnum=NLLnum))
+            self.restoreLocalPointers(kernel, tensorParametersA, tensorParametersB)
+
+    if self.states.actualSummationLoops>1 and self.states.staggerU:
       module.addComment1("remove stagger offsets")
       module.add(self.removeStagger(kernel, tensorParametersA))
       module.add(self.removeStagger(kernel, tensorParametersB))
@@ -3041,6 +3240,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr")
     module.addComment1("Tail: add address/G2L vgpr [%u...%u) to pool" % \
         (self.states.lastValuAB, self.states.lastVgprForReads))
+
+    self.removeSgprVarFromPool("SrdWS")
 
     if not kernel["NoTailLoop"]:
       ########################################
@@ -3086,7 +3287,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(moduleMacroDTLLWVgpr)
 
       module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1))
-      if self.states.actualSummationLoops==1:
+      if self.states.actualSummationLoops==1 and self.states.staggerU:
         module.addComment1("remove stagger offsets for tail loop")
         module.add(self.removeStagger(kernel, tensorParametersA))
         module.add(self.removeStagger(kernel, tensorParametersB))
@@ -3094,8 +3295,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # if swapGlobalRoad is true, swap the order of global read (B->A)
       tensorParameters1st = tensorParametersA
       tensorParameters2nd = tensorParametersB
-      tailLoopOpt1st = kernel["tailLoopOptA"]
-      tailLoopOpt2nd = kernel["tailLoopOptB"]
+      tailLoopOpt1st = kernel["tailLoopOptA"] and self.do["GlobalReadA"]
+      tailLoopOpt2nd = kernel["tailLoopOptB"] and self.do["GlobalReadB"]
 
       tc1 = 'A'
       tc2 = 'B'
@@ -3132,6 +3333,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         elif tc2 == 'B':
           globalReadMode2nd = 2
 
+      # Opt Mode 2
       module.addComment1("Update M0 for DTLDS")
       moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters1st)
       module.add(replaceHolder(moduleTmp, 0))
@@ -3141,7 +3343,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         module.add(self.globalReadDo(kernel, globalReadMode1st, tensorParameters1st))
       module.addComment1("Update M0 for DTLDS")
-      moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, True)
+      # skip wait for DTL if global load 1st is DTL
+      skip2ndWaitForDtl = kernel["DirectToLds%s"%tc1]
+      moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, skip2ndWaitForDtl)
       module.add(replaceHolder(moduleTmp, 0))
       module.addComment1("Tail global read %s"%tc2)
       if tailLoopOpt2nd and (globalReadMode2nd == 2):
@@ -3149,6 +3353,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         module.add(self.globalReadDo(kernel, globalReadMode2nd, tensorParameters2nd))
 
+      # Opt Mode 3
       doA = False
       doB = False
       if globalReadMode1st == 3:
@@ -3340,6 +3545,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
             self.states.b.numVgprLocalReadAddr, "LocalReadAddrB vgpr") # Add as available
           module.addComment1("Tail: add LocalReadAddrB Vgpr [%u...%u) to pool" % \
                             (self.states.b.startVgprLocalReadAddr, self.states.b.startVgprLocalReadAddr + self.states.b.numVgprLocalReadAddr))
+    elif self.states.tailloopInNll:
+      # always emit the skip-tail-loop label for NoTailLoop + tailloopInNll
+      module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -1, None, emitEndLabelOnly=True))
+
+    if self.states.tailloopInNll:
+      # generate wait code for early exit
+      module.add(self._wait(kernel, tensorParametersA, tensorParametersB, 0, -1, -1, " tailloopInNll: wait for global read"))
+      module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, " tailloopInNll: wait for local read"))
+      module.add(self._syncThreads(kernel))
 
     if self.do["executeToLoopEnd"]:
       module.add(self.functionEnd(kernel, addLabel=False))
@@ -3467,6 +3681,26 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.regCaps  = ti.getRegCaps()
 
     self.asmAssert = Assert(self.states.laneSGPRCount, kernel["WavefrontSize"], self.db["EnableAsserts"])
+
+    self.states.tailloopInNll = kernel["TailloopInNll"]
+    # remove staggerU code for tailloopInNll (cannot support staggerU)
+    self.states.staggerU = not self.states.tailloopInNll
+    self.states.tailloopInNllmaxUnit = 1
+    if self.states.tailloopInNll:
+      tluA = kernel["ProblemType"]["TLUA"]
+      tluB = kernel["ProblemType"]["TLUB"]
+      bpeGRA = kernel["ProblemType"]["DataTypeA"].numBytes()
+      bpeGRB = kernel["ProblemType"]["DataTypeB"].numBytes()
+      grvwa = kernel["GlobalReadVectorWidthA"]
+      grvwb = kernel["GlobalReadVectorWidthB"]
+      asem = kernel["AssertSummationElementMultiple"]
+      unitA = 1
+      unitB = 1
+      if ((not tluA) and (bpeGRA * asem < 4) and grvwa > 1):
+        unitA = 4 // (bpeGRA * asem)
+      if ((not tluB) and (bpeGRB * asem < 4) and grvwb > 1):
+        unitB = 4 // (bpeGRB * asem)
+      self.states.tailloopInNllmaxUnit = max(unitA, unitB)
 
     # Only assembly supports scheduling
     if kernel["KernelLanguage"] == "Assembly":
@@ -3601,13 +3835,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.numVgprBufferPackB = 1
 
     if kernel["UnrollMajorLDSA"]:
-      divider = 2 if (kernel["ProblemType"]["Sparse"] == 1) else 1
+      divider = 2 if (kernel["ProblemType"]["Sparse"] == 1) and (kernel["MIInputPerThread"] * kernel["ProblemType"]["DataType"].numBytes() <= 16) else 1
       self.states.lrvwUnrollA = kernel["LocalReadVectorWidth"] // divider
     else:
       self.states.lrvwUnrollA = 1
 
     if kernel["UnrollMajorLDSB"]:
-      divider = 2 if (kernel["ProblemType"]["Sparse"] == 2) else 1
+      divider = 2 if (kernel["ProblemType"]["Sparse"] == 2) and (kernel["MIInputPerThread"] * kernel["ProblemType"]["DataType"].numBytes() <= 16) else 1
       self.states.lrvwUnrollB = kernel["LocalReadVectorWidth"] // divider
     else:
       self.states.lrvwUnrollB = 1
@@ -4240,6 +4474,35 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         numVgprGlobalReadIncsMetadata = 0
 
+
+    def GNLCOInit(tc):
+      abmatrixinfo = self.states.a if tc == 'A' else self.states.b
+      if kernel["DirectToLds%s"%tc] and kernel["UseGeneralizedNLCOne%s"%tc]:
+        ntpl = kernel["NumTotalPackedLoads%s"%tc]
+        # TODOBS: Determine logic to calculate best permStride..
+        if kernel["ProblemType"]["TLU%s"%tc] == 1 and not kernel["enableLDSTr%s"%tc]:
+          usePerpPerm = False
+        elif kernel["ProblemType"]["TLU%s"%tc] == 1 and kernel["enableLDSTr%s"%tc]:
+          usePerpPerm = (ntpl & (ntpl-1)) == 0
+        else:
+          # Currently only VW=1,2 is supported due to how the local read offset
+          # is currently computed. Supporting VW=1,2 only required small modifications
+          # to the offset calc.
+          # TODO: Add support for VW=4,8, this will require more changes in LR offset
+          # calculations
+          usePerpPerm = False if kernel["VectorWidth%s"%tc] > 2 else True
+
+        permBlock = kernel["MatrixInstK"] if kernel["ProblemType"]["TLU%s"%tc] == 1 \
+          else kernel["VectorWidth%s"%tc] * kernel["MatrixInstM"]
+        abmatrixinfo.gNLCPermBlock  = permBlock
+        abmatrixinfo.gNLCPerpStride = min([8, 2**int(math.log(ntpl, 2)), permBlock]) if usePerpPerm else 1
+      else:
+        abmatrixinfo.gNLCPerpStride = 1
+        abmatrixinfo.gNLCPermBlock = 1
+
+    GNLCOInit('A')
+    GNLCOInit('B')
+
     numVgprAddressDbg = self.states.rpga if self.debugConfig.debugKernel else 0
 
     ####################################
@@ -4536,14 +4799,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.startVgprAddressDbg = vgprIdx
     vgprIdx += numVgprAddressDbg
 
-    # for zgemm + (SCIU or MIAV) case, allocate 4 vgpr for alpha calculation (cannot use tmp vgpr in unroll loop or write batch)
+    # for cgemm or zgemm + MIAV case, allocate 2 or 4 vgpr for alpha calculation (cannot use tmp vgpr in write batch)
     if kernel["ProblemType"]["DataType"].isComplex() \
-        and (kernel["StoreCInUnroll"] or kernel["MIArchVgpr"]) \
-        and (kernel["_GlobalAccumulation"] != 'MultipleBuffer'):
+      and kernel["MIArchVgpr"] \
+      and (kernel["_GlobalAccumulation"] == 'SingleBuffer' or kernel["_GlobalAccumulation"] == None):
+
       # need proper alignment
       vgprIdx = ((vgprIdx+2 - 1)//2)*2
       self.states.startVgprAlphaTmp = vgprIdx
-      vgprIdx += 4
+      vgprIdx += kernel["ProblemType"]["DataType"].numRegisters()
 
     # for swapping vgpr offsets of different lds buffers
     if self.states.a.numVgprLocalReadSwapAddr > 0:
@@ -4569,6 +4833,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # code doesn't have to deal with fragmentation
     self.states.startVgprSerial = vgprIdx
     vgprIdx += 1 # for vgpr serial id
+
+    if kernel["UseDirect32XEmulation"]:
+      numVgprsEmu = (self.states.a.numVgprValu + self.states.b.numVgprValu) // 2
+      if (vgprIdx >= (self.states.regCaps["MaxVgpr"] - numVgprsEmu)):
+        kernel["UseDirect32XEmulation"] = False
+        kernel["UseDot2F32XEmulation"] = True
+      else:
+        #align 64 bit
+        vgprIdx = ((vgprIdx+1)//2)*2
+        self.states.startVgprCvt = vgprIdx
+        vgprIdx += numVgprsEmu # for vgpr 32XEmulation
 
     self.states.totalVgprs = max(vgprIdx, self.states.c.numVgprValu)
     if self.states.totalVgprs < 0 or self.states.totalVgprs > self.states.regCaps["MaxVgpr"]:
@@ -4697,6 +4972,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("AddressDbg", self.states.numSgprAddressDbg)
       self.defineSgpr("DebugKernelItems", 1)
 
+    # the sgprs overlap with wg ids
     if self.states.doShadowInit and kernel["BufferStore"]:
       self.defineSgpr("SrdD", 4, 4)
       self.defineSgpr("SrdC", 4, 4)
@@ -4770,10 +5046,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
 
-    GSUAMBSK = 0
-    if (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
-      GSUAMBSK = 1
-
     self.defineSgpr("Alpha", numSgprAlpha, numSgprAlpha)
     self.states.numSgprAlpha = numSgprAlpha
     if kernel["ProblemType"]["UseBeta"]:
@@ -4807,8 +5079,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel["ProblemType"]["Sparse"] and kernel["LocalWriteUseSgprMetadata"]:
         self.defineSgpr("SwapMetadata", 1)
 
-
-    if GSUAMBSK:
+    if kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
       self.defineSgpr("AddressTD", numSgprAddressD, align=2)
       self.states.numSgprAddressGSUSync += numSgprAddressD
       self.defineSgpr("Synchronizer", 2, align=2)
@@ -4826,8 +5097,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("StreamKIterEnd", 1)
       self.defineSgpr("StreamKLocalStart", 1)
       self.defineSgpr("StreamKLocalEnd", 1)
+      if len(kernel["SpaceFillingAlgo"]):
+        self.defineSgpr("StreamKTileID", 1)
       if kernel["StreamKAtomic"] == 0:
         self.defineSgpr("SrdWS", 4, 4)
+
+    # These SGPRs aren't used right away, add them to spr pool temporarily
+    if self.states.doShadowInit and kernel["BufferStore"]:
+      self.addSgprVarToPool("SrdC")
+    if kernel["StreamK"] and kernel["StreamKAtomic"] == 0:
+      self.addSgprVarToPool("SrdWS")
 
     #------------------------
     # Registers defined below this point are not available in the post-loop
@@ -4898,7 +5177,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # reads Per Iteration
     ########################################
     if kernel["EnableMatrixInstruction"]:
-      if kernel["UnrollMajorLDSA"]:
+      if kernel["UnrollMajorLDSA"] or kernel["enableLDSTrA"]:
         self.states.numReadsPerUnrollA = ceil(tensorParametersA["bpe"] * kernel["MIInputPerThreadA"] / int(tensorParametersA["localReadInstruction"].blockWidth * 4))
       else:
         self.states.numReadsPerUnrollA = kernel["MIInputPerThreadA"]
@@ -4914,7 +5193,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         tileM = kernel["MIWaveTile"][1] if kernel["ProblemType"]["Sparse"] == 2 else kernel["MIWaveTile"][0]
         numM = kernel["InnerUnroll"]*(tileM * self.states.numReadsPerUnrollMetadata) // tensorParametersM["localReadInstruction"].numOffsets
 
-      if kernel["UnrollMajorLDSB"]:
+      if kernel["UnrollMajorLDSB"] or kernel["enableLDSTrB"]:
         self.states.numReadsPerUnrollB = ceil(tensorParametersB["bpe"] * kernel["MIInputPerThreadB"] / int(tensorParametersB["localReadInstruction"].blockWidth * 4))
       else:
         self.states.numReadsPerUnrollB = kernel["MIInputPerThreadB"]
@@ -4957,16 +5236,26 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.miLatency, miIssueLatency = getSMFMAIssueLatency(kernel["ProblemType"]["DataType"].toEnum(), kernel["MatrixInstM"], kernel["MatrixInstB"]) if kernel["ProblemType"]["Sparse"] else \
                                               getMFMAIssueLatency(kernel["ProblemType"]["DataType"].toEnum(), kernel["MatrixInstM"], kernel["MatrixInstB"])
 
+      # TODO: Avoid the logic which does not make sense.
+      # For gfx950, we can't issue any VALU or DS instruction in next 4 cycles.
+      # Changed the value based on this and also to mitigate some instruction scheduling issues.
+      # Invalidate this adjustment if ExtraMiLatencyLeft is >= 0
+      if not kernel["ProblemType"]["Sparse"] and kernel['ISA'] == IsaVersion(9,5,0) and kernel["ProblemType"]["DataType"].numBytes() == 2 and kernel["ExtraMiLatencyLeft"]== -1:
+        self.states.miLatency = kernel["MatrixInstM"] // 2
+        miIssueLatency = 2
+
       # give 1 quad-cycle buffer to prevend bubble from sync
       miLatencyBuffer = 1
       self.states.miLatencyLeft = max(self.states.miLatency - miLatencyBuffer - miIssueLatency,0)
+      # add extra miLatencyLeft from parameter
+      if kernel["ExtraMiLatencyLeft"] > 0:
+        self.states.miLatencyLeft += kernel["ExtraMiLatencyLeft"]
 
       # Special dependency cases
       if kernel["ProblemType"]["ComputeDataType"].isDouble():
         if kernel["MatrixInstruction"] == [4, 4, 4, 4]:
           if kernel['ISA'] == IsaVersion(9,0,10):
             self.states.miDependency = 4
-
 
     # shift vectors determined later
 
@@ -5117,6 +5406,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return ""
 
   ##############################################################################
+  # Allocate GR Address Resources
+  ##############################################################################
+  @abc.abstractmethod
+  def removeGRSrdVariableSgprsFromPool(self, kernel):
+    return ""
+
+  ##############################################################################
+  # Allocate GR Address Resources
+  ##############################################################################
+  @abc.abstractmethod
+  def removeGROffsetsVariableSgprsFromPool(self, kernel):
+    return ""
+
+  ##############################################################################
   # Check Resources
   ##############################################################################
   @abc.abstractmethod
@@ -5175,6 +5478,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tP["nru"] = itP[cM].numReadsUnroll                           # number of reads along unroll dimension
     tP["nrc"] = kernel["NumLoadsCoalesced%s"%cM]                 # number of reads along coalesced dimension
     tP["nrcv"] = itP[cM].numReadsCoalVecComp                     # number of vector components along coalesced dimension
+    tP["ntpl"] = kernel["NumTotalPackedLoads%s"%cM]
     tP["nrp"] = kernel["NumLoadsPerpendicular%s"%cM]             # number of reads along perpendicular dimension
     tP["nrpv"] = itP[cM].numReadsPerpVecComp                     # number of vector components along perpendicular dimension
     tP["nwcv"] = itP[cM].numWritesCoalVecComp                    # number of vector component writes along coalesced dimension
@@ -5353,7 +5657,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # Calculate Loop Num Iter
   ##############################################################################
   @abc.abstractmethod
-  def calculateLoopNumIter(self, kernel, tPA, tPB, loopIdx):
+  def calculateLoopNumIter(self, kernel, tPA, tPB, loopIdx, tailloopInNll=False, NLLindex=0):
     return ""
 
 
@@ -5400,7 +5704,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   @abc.abstractmethod
   def closeLoop(self, kernel, tPA, tPB, loopIdx, \
-                finalLoop, emitEndLabelOnly, oddLabel=False):
+                finalLoop, emitEndLabelOnly=False, oddLabel=False, \
+                skipCondJumpCounter=-1, NLLlast=False):
     return ""
 
   ##############################################################################
@@ -5414,7 +5719,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   # At Least 1 Unroll
   ##############################################################################
   @abc.abstractmethod
-  def openSumAtLeastUnroll(self, kernel, prefetch, isOptNLL, isNGLL=False, NLLindex=0, NLLnum=1):
+  def openSumAtLeastUnroll(self, kernel, prefetch, isOptNLL, isNGLL=False, NLLindex=0, NLLnum=1, NLLindexLast=False):
     return ""
 
   @abc.abstractmethod
@@ -5689,9 +5994,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return fileString
 
 
-  def setRocIsa(self, data):
+  def setRocIsa(self, data, outOptions):
     ti = rocIsa.getInstance()
     ti.setData(data)
+    ti.setOutputOptions(outOptions)
 
   def updateBranchPlaceHolder(self, module, placeholders, targets, operations):
     phs = [ ph for ph in placeholders ]

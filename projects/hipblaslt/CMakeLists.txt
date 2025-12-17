@@ -25,19 +25,14 @@ include(hipblaslt_python)
 include(hipblaslt_target_configure_sanitizers)
 include(tensilelite_supported_architectures)
 
-set(HIPBLASLT_PROJECT_VERSION "1.1.0" CACHE STRING "Semantic version string.")
+set(HIPBLASLT_PROJECT_VERSION "1.2.0" CACHE STRING "Semantic version string.")
 
 set(PROJECT_VERSION "${HIPBLASLT_PROJECT_VERSION}")
 string(REPLACE "." ";" VERSION_LIST ${PROJECT_VERSION})
 list(GET VERSION_LIST 0 PROJECT_VERSION_MAJOR)
 list(GET VERSION_LIST 1 PROJECT_VERSION_MINOR)
 list(GET VERSION_LIST 2 PROJECT_VERSION_PATCH)
-list(LENGTH VERSION_LIST list_size)
-if(list_size EQUAL 4)
-    list(GET VERSION_LIST 3 PROJECT_VERSION_TWEAK)
-else()
-    rocm_get_git_commit_tag(PROJECT_VERSION_TWEAK)
-endif()
+rocm_get_git_commit_tag(PROJECT_VERSION_TWEAK)
 
 set(hipblaslt_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(hipblaslt_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
@@ -121,6 +116,12 @@ if(HIPBLASLT_ENABLE_HOST)
     endif()
     if(HIPBLASLT_ENABLE_MARKER)
         find_library(rocTracer roctx64 REQUIRED)
+        get_filename_component(ROCTRACER_LIB_DIR ${rocTracer} DIRECTORY)
+        get_filename_component(ROCTRACER_ROOT_DIR ${ROCTRACER_LIB_DIR} DIRECTORY)
+        find_path(ROCTRACER_INCLUDE_DIR "roctracer/roctx.h"
+            HINTS ${ROCTRACER_ROOT_DIR}
+            PATH_SUFFIXES include
+            REQUIRED)
     else()
         set(rocTracer)
     endif()
@@ -218,7 +219,14 @@ if(HIPBLASLT_ENABLE_MSGPACK)
     endif()
 endif()
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../shared/origami" origami)
+if(NOT ROCM_LIBS_SUPERBUILD)
+    # TODO: This is a temporary solution to prevent the installation of the origami license files.
+    block(SCOPE_FOR VARIABLES)
+        set(ORIGAMI_ENABLE_INSTALL OFF)
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../shared/origami" origami)
+    endblock()
+endif()
+
 add_subdirectory(tensilelite)
 
 if(HIPBLASLT_ENABLE_HOST)
@@ -269,6 +277,7 @@ if(HIPBLASLT_ENABLE_HOST)
 
     if(HIPBLASLT_ENABLE_MARKER)
         target_compile_definitions(hipblaslt PRIVATE HIPBLASLT_ENABLE_MARKER)
+        target_include_directories(hipblaslt PRIVATE ${ROCTRACER_INCLUDE_DIR})
     endif()
 
     target_include_directories(hipblaslt
@@ -300,7 +309,7 @@ endif()
 
 if(HIPBLASLT_ENABLE_HOST)
     # work around code object stripping failure if using /usr/bin/strip
-    find_program(LLVM_STRIP 
+    find_program(LLVM_STRIP
         NAMES llvm-strip
         PATH_SUFFIXES lib/llvm/bin llvm/bin bin
     )
@@ -511,8 +520,7 @@ if(HIPBLASLT_ENABLE_CLIENT AND HIPBLASLT_ENABLE_SAMPLES)
         DESTINATION ${CMAKE_INSTALL_DATADIR}/hipblaslt/samples
         COMPONENT samples
         FILES_MATCHING
-        PATTERN "*.cpp"
-        PATTERN "*.h"
+        PATTERN "*.cpp|*.h"
         PATTERN "CMakeLists.txt" EXCLUDE
     )
     rocm_package_setup_client_component(samples)
@@ -535,17 +543,10 @@ endif()
 
 if(HIPBLASLT_ENABLE_COVERAGE)
     target_compile_options(hipblaslt PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(hipblaslt PRIVATE -fprofile-instr-generate)
+    target_link_options(hipblaslt PUBLIC -fprofile-instr-generate)
 
     target_compile_options(hipblaslt-clients-common PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(hipblaslt-clients-common PRIVATE -fprofile-instr-generate)
-
-    target_compile_options(hipblaslt-bench PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(hipblaslt-bench PRIVATE -fprofile-instr-generate)
-
-    target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
-    target_link_options(hipblaslt-test PRIVATE -fprofile-instr-generate)
-    target_compile_definitions(hipblaslt-test PRIVATE CODE_COVERAGE)
+    target_link_options(hipblaslt-clients-common PUBLIC -fprofile-instr-generate)
 
     set(coverage_dir "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
     add_custom_target(
@@ -557,24 +558,30 @@ if(HIPBLASLT_ENABLE_COVERAGE)
                                         GTEST_LISTENER=NO_PASS_LINE_IN_LOG
                                         $<TARGET_FILE:hipblaslt-test>
                                         --precompile=hipblaslt-test-precompile.db
+        COMMENT "Running hipblaslt testcases for coverage report"
       )
+
       find_program(
         LLVM_PROFDATA
         llvm-profdata
-        HINTS llvm/bin
         REQUIRED
+        HINTS ${ROCM_PATH}/llvm/bin
+        PATHS /opt/rocm/llvm/bin
       )
       find_program(
         LLVM_COV
         llvm-cov
         REQUIRED
-        HINTS llvm/bin
+        HINTS ${ROCM_PATH}/llvm/bin
+        PATHS /opt/rocm/llvm/bin
       )
       add_custom_target(
         coverage
         DEPENDS code_cov_tests
         COMMAND ${LLVM_PROFDATA} merge -sparse "${coverage_dir}/profraw/hipblaslt-coverage_*.profraw" -o "${coverage_dir}/hipblaslt.profdata"
-        COMMAND ${LLVM_COV} report -object $<TARGET_FILE:hipblaslt> -instr-profile="${coverage_dir}/hipblaslt.profdata"
-        COMMAND ${LLVM_COV} show -object $<TARGET_FILE:hipblaslt> -instr-profile="${coverage_dir}/hipblaslt.profdata" -format=html -output-dir="${coverage_dir}"
+        COMMAND ${LLVM_COV} report -object $<TARGET_FILE:hipblaslt> -instr-profile="${coverage_dir}/hipblaslt.profdata" --ignore-filename-regex=".*Tensile.*|.*origami.*"
+        COMMAND ${LLVM_COV} show -object $<TARGET_FILE:hipblaslt> -instr-profile="${coverage_dir}/hipblaslt.profdata" --ignore-filename-regex=".*Tensile.*|.*origami.*" -format=html -output-dir="${coverage_dir}"
+        COMMAND ${LLVM_COV} export -object $<TARGET_FILE:hipblaslt> -instr-profile="${coverage_dir}/hipblaslt.profdata" --ignore-filename-regex=".*Tensile.*|.*origami.*" -format=lcov > "${coverage_dir}/coverage.info"
+        COMMENT "Generating code coverage report"
       )
 endif()

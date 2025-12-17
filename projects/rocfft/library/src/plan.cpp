@@ -316,8 +316,9 @@ size_t rocfft_plan_t::AddMultiPlanItem(std::unique_ptr<MultiPlanItem>&& item,
                                        const std::vector<size_t>&       antecedents)
 {
     // ensure antecedents all exist
-    if(std::any_of(
-           antecedents.begin(), antecedents.end(), [=](size_t i) { return i >= multiPlan.size(); }))
+    if(std::any_of(antecedents.begin(), antecedents.end(), [=, this](size_t i) {
+           return i >= multiPlan.size();
+       }))
         throw std::runtime_error("antecedent does not exist");
 
     item->local_comm_rank = get_local_comm_rank();
@@ -1284,7 +1285,7 @@ static std::vector<BufferPtr> GatherUserBuffers(BufferPtrConstruct              
         }
     };
 
-    // In a multi-process enviroment, we've gathered the bricks on
+    // In a multi-process environment, we've gathered the bricks on
     // multiple ranks into the field.  Bricks from the same rank should
     // appear together in the field.  Assert that this is the case,
     // since the code below depends on it.
@@ -1734,9 +1735,9 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
                                                        int                   local_comm_rank,
                                                        rocfft_location_t     location,
                                                        rocfft_transform_type transformType,
-                                                       LoadOps&              loadOps,
-                                                       StoreOps&             storeOps,
-                                                       bool                  partOfMultiPlan)
+                                                       const std::optional<LoadOps>&  loadOps,
+                                                       const std::optional<StoreOps>& storeOps,
+                                                       bool partOfMultiPlan)
 {
     rocfft_scoped_device dev(location.device);
 
@@ -1747,21 +1748,43 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
         execPlan.deviceProp = rootPlanData.deviceProp;
         execPlan.rootPlan   = NodeFactory::CreateExplicitNode(rootPlanData, nullptr);
 
-        // TODO: some solutions require the problems to be unit_stride, otherwise the
-        //   scheme-tree may not be applicable. In this case, we can't apply the solutions.
-        //   Currently, it happens on Real3DEven with REAL_2D_SINGLE kernels. This needs to
-        //   be detected.
-
-        // If we are doing tuning initialzing now, we shouldn't apply any solution,
+        // If we are doing tuning initializing now, we shouldn't apply any solution,
         // since we are trying enumerating solutions now
         if(TuningBenchmarker::GetSingleton().IsInitializingTuning() == false)
         {
-            execPlan.rootScheme = ApplySolution(execPlan);
-            if(execPlan.rootScheme)
+            // Solutions do not consider strides.  Even-length real
+            // transforms need special consideration, since the
+            // even-length optimization is only valid for stride-1 on
+            // the fastest dimension.  So only apply a solution if
+            // we're not doing even-length real, or if fastest dim
+            // stride is 1.
+            const auto& realLength     = transformType == rocfft_transform_type_real_forward
+                                             ? execPlan.rootPlan->length
+                                             : execPlan.rootPlan->outputLength;
+            const bool  evenLengthReal = (transformType == rocfft_transform_type_real_forward
+                                         || transformType == rocfft_transform_type_real_inverse)
+                                        && realLength.front() % 2 == 0;
+            const bool stride1 = execPlan.rootPlan->inStride.front() == 1
+                                 && execPlan.rootPlan->outStride.front() == 1;
+            if(evenLengthReal && !stride1)
             {
-                execPlan.rootPlan = nullptr;
-                execPlan.rootPlan = NodeFactory::CreateExplicitNode(
-                    rootPlanData, nullptr, execPlan.rootScheme->curScheme);
+                if(LOG_TRACE_ENABLED())
+                {
+                    (*LogSingleton::GetInstance().GetTraceOS())
+                        << "transform is even-length real but not stride-1, not applying solution "
+                           "map"
+                        << std::endl;
+                }
+            }
+            else
+            {
+                execPlan.rootScheme = ApplySolution(execPlan);
+                if(execPlan.rootScheme)
+                {
+                    execPlan.rootPlan = nullptr;
+                    execPlan.rootPlan = NodeFactory::CreateExplicitNode(
+                        rootPlanData, nullptr, execPlan.rootScheme->curScheme);
+                }
             }
         }
 
@@ -1774,9 +1797,9 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
         execPlan.rootPlan->outStrideUnit = BufferIsUnitStride(execPlan, OB_USER_OUT);
 
         // set load/store ops on the root plan
-        if(loadOps.enabled())
+        if(loadOps)
             execPlan.rootPlan->loadOps = loadOps;
-        if(storeOps.enabled())
+        if(storeOps)
             execPlan.rootPlan->storeOps = storeOps;
 
         // only allocate kernels, twiddles, etc if plan will run on this rank
@@ -1836,14 +1859,16 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
 // new item will begin execution.
 //
 // NOTE: lengths and stride include batch dimension
-static size_t C2CBrickOneDimension(rocfft_plan_t&             plan,
-                                   size_t                     dimIdx,
-                                   rocfft_location_t          location,
-                                   const std::vector<size_t>& lengths,
-                                   const std::vector<size_t>& stride,
-                                   BufferPtr                  input,
-                                   BufferPtr                  output,
-                                   const std::vector<size_t>& antecedents)
+static size_t C2CBrickOneDimension(rocfft_plan_t&                 plan,
+                                   size_t                         dimIdx,
+                                   rocfft_location_t              location,
+                                   const std::vector<size_t>&     lengths,
+                                   const std::vector<size_t>&     stride,
+                                   BufferPtr                      input,
+                                   BufferPtr                      output,
+                                   const std::optional<LoadOps>&  loadOps,
+                                   const std::optional<StoreOps>& storeOps,
+                                   const std::vector<size_t>&     antecedents)
 {
     auto transformLengths = lengths;
     auto transformStride  = stride;
@@ -1879,8 +1904,8 @@ static size_t C2CBrickOneDimension(rocfft_plan_t&             plan,
                                             plan.get_local_comm_rank(),
                                             location,
                                             plan.transformType,
-                                            plan.desc.loadOps,
-                                            plan.desc.storeOps,
+                                            loadOps,
+                                            storeOps,
                                             true);
     singlePlan->mgpuPlan  = true;
     singlePlan->inputPtr  = input;
@@ -1888,12 +1913,14 @@ static size_t C2CBrickOneDimension(rocfft_plan_t&             plan,
     return plan.AddMultiPlanItem(std::move(singlePlan), antecedents);
 }
 
-void rocfft_plan_t::C2CField(const rocfft_field_t&      field,
-                             const std::vector<size_t>& fftDims,
-                             std::vector<BufferPtr>&    input,
-                             std::vector<BufferPtr>&    output,
-                             const std::vector<size_t>& inputAntecedents,
-                             std::vector<size_t>&       outputItems)
+void rocfft_plan_t::C2CField(const rocfft_field_t&          field,
+                             const std::vector<size_t>&     fftDims,
+                             std::vector<BufferPtr>&        input,
+                             std::vector<BufferPtr>&        output,
+                             const std::optional<LoadOps>&  loadOps,
+                             const std::optional<StoreOps>& storeOps,
+                             const std::vector<size_t>&     inputAntecedents,
+                             std::vector<size_t>&           outputItems)
 {
     outputItems.resize(field.bricks.size());
 
@@ -1911,6 +1938,12 @@ void rocfft_plan_t::C2CField(const rocfft_field_t&      field,
 
         for(auto dimIdx : fftDims)
         {
+            // apply load ops to first dimension we transform and store ops to the last
+            std::optional<LoadOps> appliedLoadOps
+                = dimIdx == fftDims.front() ? loadOps : std::nullopt;
+            std::optional<StoreOps> appliedStoreOps
+                = dimIdx == fftDims.back() ? storeOps : std::nullopt;
+
             auto transformItem              = C2CBrickOneDimension(*this,
                                                       dimIdx,
                                                       inBrick.location,
@@ -1918,6 +1951,8 @@ void rocfft_plan_t::C2CField(const rocfft_field_t&      field,
                                                       inBrick.stride,
                                                       fftInput,
                                                       output[i],
+                                                      appliedLoadOps,
+                                                      appliedStoreOps,
                                                       antecedents);
             multiPlan[transformItem]->group = "fft_dim_" + std::to_string(dimIdx);
             multiPlan[transformItem]->description
@@ -2681,13 +2716,19 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
 
     // plan FFTs along already contiguous dimensions
     std::vector<size_t> inputFFTItems;
-    C2CField(
-        desc.inFields.front(), contiguousInputDims, inputBufs, inputFFTBufs, {}, inputFFTItems);
+    // first FFT needs to apply user-specified load callback
+    C2CField(desc.inFields.front(),
+             contiguousInputDims,
+             inputBufs,
+             inputFFTBufs,
+             desc.loadOps,
+             std::nullopt,
+             {},
+             inputFFTItems);
 
     auto lengthsWithBatch = lengths;
     lengthsWithBatch.push_back(batch);
 
-#ifdef ROCFFT_MPI_ENABLE
     // track which dimensions have already been FFTed
     std::vector<int> fft_done(rank, 0);
     for(auto d : contiguousInputDims)
@@ -2730,6 +2771,11 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
     // using MPI sub-communicators for optimized pencil-to-pencil
     if(pencil_to_pencil)
     {
+        // This vector holds leases from an earlier iteration of the
+        // loop below, and is cleared when we are sure the leases can
+        // be reused.
+        std::vector<TempBufferLease> prevTempLeases;
+
         // plan global transposes and local FFTs
         for(size_t i = 0; i < transpose_sequence.size(); ++i)
         {
@@ -2750,6 +2796,10 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
                     split_sizes.push_back(grid[d]);
                 }
             }
+
+            // if this axis is already done, move to the next one
+            if(fft_done[pencil_axis])
+                continue;
 
             // create the next field by splitting using a heuristic approach
             rocfft_field_t nextField;
@@ -2803,24 +2853,29 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
             currentBufs        = tempBufs;
             currentAntecedents = transposeItems;
 
+            // leases allocated in this iteration need to live
+            // through next loop iteration, since they will be passed
+            // as input to the next GlobalTranspose.
+            prevTempLeases.swap(tempLeases);
+
             // once data is transposed, plan intermediate FFT
-            if(!fft_done[pencil_axis])
-            {
-                std::vector<size_t> fftItems;
-                C2CField(currentField,
-                         {static_cast<size_t>(pencil_axis)},
-                         writeToUserOutput ? outputBufs : currentBufs,
-                         writeToUserOutput ? outputBufs : currentBufs,
-                         currentAntecedents,
-                         fftItems);
-                fft_done[pencil_axis] = 1;
-                currentAntecedents    = fftItems;
-            }
+
+            // user output needs to apply store operations
+            std::vector<size_t> fftItems;
+            C2CField(currentField,
+                     {static_cast<size_t>(pencil_axis)},
+                     writeToUserOutput ? outputBufs : currentBufs,
+                     writeToUserOutput ? outputBufs : currentBufs,
+                     std::nullopt,
+                     writeToUserOutput ? std::optional<StoreOps>{desc.storeOps} : std::nullopt,
+                     currentAntecedents,
+                     fftItems);
+            fft_done[pencil_axis] = 1;
+            currentAntecedents    = fftItems;
         }
     }
     // default general decomposition without sub-communicators
     else
-#endif
     {
         // transpose non-contiguous dims to be contiguous and
         // transform them too
@@ -2858,10 +2913,16 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
 
             // now dimIdx dimension is contiguous on all bricks
             midFFTItems.clear();
+            // first transform needs to apply load operations
+            const std::optional<LoadOps> loadOps = dimIdx == nonContiguousDims.front()
+                                                       ? std::optional<LoadOps>{desc.loadOps}
+                                                       : std::nullopt;
             C2CField(transposedField,
                      {dimIdx},
                      transposeOutputBufs,
                      transposeOutputBufs,
+                     loadOps,
+                     std::nullopt,
                      transposeItems,
                      midFFTItems);
 
@@ -2885,10 +2946,13 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
                         midFFTItems,
                         finalTransposeItems,
                         transposeNumber++);
+        // apply store operations to last dimension
         C2CField(desc.outFields.front(),
                  contiguousOutputDims,
                  outputBufs,
                  outputBufs,
+                 std::nullopt,
+                 desc.storeOps,
                  finalTransposeItems,
                  finalFFTItems);
     }
@@ -2988,7 +3052,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
     static_assert(std::is_same_v<std::underlying_type<typeof(decltype(recvcount)::value_type)>,
                                  std::underlying_type<int>>);
 
-    // We must send and recieve the same type:
+    // We must send and receive the same type:
     static_assert(
         std::is_same_v<std::underlying_type<typeof(decltype(local_lowers)::value_type)>,
                        std::underlying_type<typeof(decltype(global_lowers)::value_type)>>);
@@ -3005,7 +3069,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
     }
 
-    // We must send and recieve the same type:
+    // We must send and receive the same type:
     static_assert(
         std::is_same_v<std::underlying_type<typeof(decltype(local_uppers)::value_type)>,
                        std::underlying_type<typeof(decltype(global_uppers)::value_type)>>);
@@ -3022,7 +3086,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
     }
 
-    // We must send and recieve the same type:
+    // We must send and receive the same type:
     static_assert(
         std::is_same_v<std::underlying_type<typeof(decltype(local_strides)::value_type)>,
                        std::underlying_type<typeof(decltype(global_strides)::value_type)>>);
@@ -3039,7 +3103,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
     }
 
-    // We must send and recieve the same type:
+    // We must send and receive the same type:
     static_assert(
         std::is_same_v<std::underlying_type<typeof(decltype(local_devices)::value_type)>,
                        std::underlying_type<typeof(decltype(global_devices)::value_type)>>);
@@ -3056,7 +3120,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
     }
 
-    // We must send and recieve the same type:
+    // We must send and receive the same type:
     static_assert(
         std::is_same_v<std::underlying_type<typeof(decltype(local_comm_ranks)::value_type)>,
                        std::underlying_type<typeof(decltype(global_comm_ranks)::value_type)>>);
@@ -3911,7 +3975,7 @@ void TreeNode::RecursiveBuildTree(SchemeTree* solution_scheme)
     SchemeTreeVec& child_scheme
         = (solution_scheme) ? solution_scheme->children : EmptySchemeTreeVec;
 
-    // overriden by each derived class
+    // overridden by each derived class
     BuildTree_internal(child_scheme);
 }
 
@@ -4028,7 +4092,7 @@ void TreeNode::ApplyFusion()
             this->RecursiveInsertNode(firstFusedNode, fused);
 
             // iterate from first to last to remove old nodes
-            fuse->ForEachNode([=](TreeNode* node) { this->RecursiveRemoveNode(node); });
+            fuse->ForEachNode([=, this](TreeNode* node) { this->RecursiveRemoveNode(node); });
         }
     }
 
@@ -4338,8 +4402,10 @@ void TreeNode::Print(rocfft_ostream& os, const int indent) const
 
     os << indentStr << "Direct_to_from_Reg: " << PrintDirectToFromRegMode(dir2regMode);
     os << "\n";
-    loadOps.print(os, indentStr);
-    storeOps.print(os, indentStr);
+    if(loadOps)
+        loadOps->print(os, indentStr);
+    if(storeOps)
+        storeOps->print(os, indentStr);
 
     os << indentStr << PrintOperatingBuffer(obIn) << " -> " << PrintOperatingBuffer(obOut) << "\n";
     os << indentStr << PrintOperatingBufferCode(obIn) << " -> " << PrintOperatingBufferCode(obOut)
@@ -4719,7 +4785,7 @@ std::unique_ptr<SchemeTree>
         size_t       kernel_option  = sol_node.solution_childnodes[0].child_option;
         bool         tunable_kernel = (kernel_token != solution_map::KERNEL_TOKEN_BUILTIN_KERNEL);
 
-        // When tuning, we're runing through each bench
+        // When tuning, we're running through each bench
         // so we use the elaborated token (_leafnode_id_phase_id)
         if(TuningBenchmarker::GetSingleton().IsProcessingTuning() && tunable_kernel)
         {
@@ -4760,7 +4826,7 @@ std::unique_ptr<SchemeTree>
         execPlan.solution_kernels.push_back(kernel_node.kernel_key);
         curScheme->numKernels = 1;
 
-        // Keep the references, and after buffer-assignment and colapse-batch-dim,
+        // Keep the references, and after buffer-assignment and collapse-batch-dim,
         // we can save some info back to the kernel-configurations
         if(TuningBenchmarker::GetSingleton().IsProcessingTuning())
         {
@@ -4881,7 +4947,7 @@ void ProcessNode(ExecPlan& execPlan)
     {
         // When SanityCheck fails,
         // if solution_kernels is empty or rootScheme is nullptr,
-        // means this is nothing to do with solution map. Throw to terminate
+        // means this has nothing to do with solution map. Throw to terminate
         if(execPlan.solution_kernels.empty() || rootScheme == nullptr)
             throw;
         else
@@ -4901,7 +4967,7 @@ void ProcessNode(ExecPlan& execPlan)
     size_t chirpSize        = 0;
     execPlan.rootPlan->DetermineBufferMemory(tmpBufSize, cmplxForRealSize, blueSize, chirpSize);
 
-    if(execPlan.rootPlan->loadOps.enabled())
+    if(execPlan.rootPlan->loadOps && execPlan.rootPlan->loadOps->enabled())
     {
         // Load ops happen on first node that reads input
         auto load_node = std::find_if(
@@ -4911,7 +4977,7 @@ void ProcessNode(ExecPlan& execPlan)
         (*load_node)->loadOps = execPlan.rootPlan->loadOps;
     }
 
-    if(execPlan.rootPlan->storeOps.enabled())
+    if(execPlan.rootPlan->storeOps && execPlan.rootPlan->storeOps->enabled())
     {
         // Store ops happen on last node of the plan that writes
         // output

@@ -3,7 +3,7 @@
 
 include(GoogleTest)
 
-if(HIP_DNN_SKIP_TESTS)
+if(HIPDNN_SKIP_TESTS)
     message(STATUS "Skipping HIP-DNN Frontend Unit tests")
     return()
 endif()
@@ -11,23 +11,34 @@ endif()
 find_package(hip REQUIRED)
 find_package(Threads REQUIRED)
 
-add_executable(hipdnn_frontend_tests 
+add_executable(
+    hipdnn_frontend_tests
     main.cpp
+    TestAttributes.cpp
     TestBackendLoggingHelpers.cpp
     TestBatchnormAttributes.cpp
     TestBatchnormBackwardAttributes.cpp
     TestBatchnormBackwardNode.cpp
     TestBatchnormInferenceAttributes.cpp
+    TestBatchnormInferenceAttributesVarianceExt.cpp
     TestBatchnormInferenceNode.cpp
+    TestBatchnormInferenceNodeVarianceExt.cpp
     TestBatchnormNode.cpp
     TestConvolutionDgradAttributes.cpp
     TestConvolutionFwdAttributes.cpp
     TestConvolutionDgradNode.cpp
     TestConvolutionNode.cpp
+    TestConvolutionWgradAttributes.cpp
+    TestConvolutionWgradNode.cpp
     TestError.cpp
     TestGraph.cpp
     TestGraphAttributes.cpp
     TestGraphGenerated.cpp
+    TestGraphSerialization.cpp
+    TestINode.cpp
+    TestMatmulAttributes.cpp
+    TestMatmulNode.cpp
+    TestNode.cpp
     TestPointwiseAttributes.cpp
     TestPointwiseNode.cpp
     TestScopedHipdnnBackendDescriptor.cpp
@@ -40,13 +51,8 @@ add_executable(hipdnn_frontend_tests
 
 target_compile_options(hipdnn_frontend_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
 
-target_link_libraries(hipdnn_frontend_tests 
-    GTest::gtest 
-    GTest::gmock
-    hip::host
-    Threads::Threads 
-    hipdnn_sdk 
-    hipdnn_frontend
+target_link_libraries(
+    hipdnn_frontend_tests GTest::gtest GTest::gmock hip::host Threads::Threads hipdnn_test_sdk
 )
 clang_tidy_check(hipdnn_frontend_tests)
 
