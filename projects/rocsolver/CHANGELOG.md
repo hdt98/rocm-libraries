@@ -28,6 +28,13 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 ### Optimized
 
 * Improved the performance of LARFB and downstream functions such as GEQRF and ORMTR.
+## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
+
+### Added
+
+* Compute the condition number of a matrix
+    * GECON
+    * GECON_64
 
 
 
