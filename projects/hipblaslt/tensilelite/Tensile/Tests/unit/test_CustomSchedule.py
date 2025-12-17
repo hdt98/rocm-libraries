@@ -573,6 +573,30 @@ class TestCustomScheduleTF32:
         valid, message = isValid(schedule_info, {"kernel": kernel})
         assert valid, message
 
+    def test_schedule_128x256x32_TF32(self):
+        """Tests the 128x256x32 TF32 TN schedule."""
+        kernel = create_base_kernel()
+        kernel["ProblemType"].update({
+            "TransposeA": True, "TransposeB": False
+        })
+        kernel.update({
+            "UseF32XEmulation": True,
+            "MacroTile0": 128, "MacroTile1": 256, "DepthU": 32,
+            "PrefetchGlobalRead": 2, "PrefetchLocalRead": 0,
+            "DirectToLds": True,
+            "GlobalReadVectorWidthA": 4, "GlobalReadVectorWidthB": 4, "LocalReadVectorWidth": 4,
+            "MatrixInstruction": [16, 16, 32, 1], "MIWaveGroup": [2, 2],
+            "LDSTrInst": False, "TransposeLDS": 1, "MIWaveTileA": 6, "MIWaveTileB": 8,
+        })
+
+        has_schedule, schedule_info = hasCustomSchedule(kernel)
+        assert has_schedule
+        assert isinstance(schedule_info, ScheduleInfo)
+        assert schedule_info.numCodePaths == 2
+        assert schedule_info.numMfma == 96
+        assert kernel["UsePLRPack"]
+        valid, message = isValid(schedule_info, {"kernel": kernel})
+        assert valid, message
 
 class TestCustomScheduleValidation:
     def test_schedule_validation_disable(self):
