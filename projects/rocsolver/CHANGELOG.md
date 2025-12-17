@@ -2,6 +2,16 @@
 
 Full documentation for rocSOLVER is available at the [rocSOLVER documentation](https://rocm.docs.amd.com/projects/rocSOLVER/en/latest/index.html).
 
+## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
+
+### Added
+
+* Compute the condition number of a matrix
+    * GECON
+    * GECON_64
+
+
+
 ## rocSOLVER 3.31.0 for ROCm 7.1.0
 
 ### Optimized
