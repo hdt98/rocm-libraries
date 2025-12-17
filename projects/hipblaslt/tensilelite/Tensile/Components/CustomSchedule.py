@@ -2299,3 +2299,78 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
 
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
+
+@RegisterSchedule(
+    tile_config=TileConfig(128, 256, 32, 2, 0, True, 0, 0),
+    dtype_predicate=isTF32,
+    vector_widths=[4, 4, 4],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    if isTN(kernel)  and not useLDSTr and TLDS==1:
+        kernel["UsePLRPack"] = True
+
+        # assume total number of pack instructions is 24 per block
+        syncTable = [
+            3, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for LRA0-0"),
+            12, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="wait for all LRA0"),
+            12, SBarrier(comment="gra"),
+
+            24, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="LRB0-0"),
+            27, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB0"),
+            27, SBarrier(comment="grb"),
+
+            48, SWaitCnt(dscnt=-1, vlcnt=12-4, vscnt=-1, comment="wait for previous set of global reads"),
+            48, SBarrier(comment=""),
+
+            56, SWaitCnt(dscnt=7, vlcnt=-1, vscnt=-1, comment="wait for LRB3-0"),
+            56+4, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRB3"),
+
+            72, SWaitCnt(dscnt=-1, vlcnt=12+8, vscnt=-1, comment="wait for previous set of global reads"),
+            72, SBarrier(comment=""),
+
+            79, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for LRA3-0"),
+            79+8, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for all LRA3"),
+        ]
+        optSchedule = {
+            'SYNC': [syncTable[::2]],
+
+            'GRIncA': [[0, 1, 2, 3, 4, 5, 6, 7, 8]],
+            'GRIncB': [[16, 17, 18, 19, 20, 21, 22, 23, 24]],
+
+            'LRA0': [[-1, 0, 1, 2]],
+            'LRB0': [[3, 4, 5, 6, 7, 8, 9, 10]],
+            'PackA0': [merge_ranges((3, 16, 15), # to hide GRA#15
+                                    (16, 8, 23))],# input from LRA0, must be done before mfma#24
+            'PackB0': [create_range(24, 48, 47)],# input from LRB0, must be done before mfma#48
+            'GRA': [[12, 12, 13, 13, 14, 14, 15, 15]],
+
+            'GRB': [[27, 27, 28, 28, 29, 29, 30, 30, 51, 51, 57, 57, 63, 63, 69, 69]],
+            'LRB3': [[48, 49, 50, 51, 52, 53, 54, 55]],
+            'LRA3': [[72, 74, 76, 78]],
+
+            'LRSA': [[25]],
+            'LRSB': [[26]],
+            'LWSA': [[75]],
+            'LWSB': [[76]],
+
+            'PackB3': [merge_ranges((56, 13, 68, 1, 6), # to hide GRB#51-69
+                                    (69, 9, 78))], # input from LRB3, after mfma#48
+            'PackA3': [create_range(79, 16, 94, 1, 3)], # input from LRA3, after mfma#48
+
+            'LCC' : [[95, 95]],
+        }
+        syncCode = syncTable[1::2]
+        nglshift = nllshift = 12 # vmcnt shift for ngl and nll
+    else:
+        return False, None
+
+    numMfma = 96
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    return True, opt1
