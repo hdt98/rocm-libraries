@@ -21,6 +21,14 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 ### Known issues
 ### Upcoming changes
 
+## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
+
+### Added
+
+* Compute the norm of a matrix for the following routines:
+    * LANGE
+    * LANGE_64
+
 
 
 ## rocSOLVER 3.32.0 for ROCm 7.2.0
