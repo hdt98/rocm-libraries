@@ -16,18 +16,22 @@ template <typename ADataType_,
           typename CDataType_,
           typename BlockGemmShape_,
           typename Traits_,
-          GemmPipelineScheduler Scheduler_ = GemmPipelineScheduler::Intrawave,
-          bool HasHotLoop_                 = true,
-          TailNumber TailNum_              = TailNumber::Full,
-          typename ComputeDataType_        = ADataType_>
+          GemmPipelineScheduler Scheduler_      = GemmPipelineScheduler::Intrawave,
+          bool HasHotLoop_                      = true,
+          TailNumber TailNum_                   = TailNumber::Full,
+          amd_buffer_coherence_enum BMemNTType_ = amd_buffer_coherence_enum::coherence_default,
+          bool BPreShufflePermute_              = false,
+          typename ComputeDataType_             = ADataType_>
 struct MXFlatmmPipelineProblem : FlatmmPipelineProblem<ADataType_,
-                                                       ADataType_,
+                                                       BDataType_,
                                                        CDataType_,
                                                        BlockGemmShape_,
                                                        Traits_,
                                                        Scheduler_,
                                                        HasHotLoop_,
                                                        TailNum_,
+                                                       BMemNTType_,
+                                                       BPreShufflePermute_,
                                                        ComputeDataType_>
 {
     using BlockGemmShape = BlockGemmShape_;
@@ -128,8 +132,8 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
     static constexpr index_t KXdlPack          = Problem::KXdlPack;
     static constexpr index_t ScaleGranularityK = Problem::ScaleGranularityK;
 
-    static constexpr index_t AK1 = Problem::VectorLoadSize / sizeof(ADataType);
-    static constexpr index_t BK1 = Problem::VectorLoadSize / sizeof(BDataType);
+    static constexpr index_t AK1 = 16 /*dwordx4*/ * APackedSize / sizeof(ADataType);
+    static constexpr index_t BK1 = 16 /*dwordx4*/ * BPackedSize / sizeof(BDataType);
 
     static constexpr index_t m_preload = (MIterPerWarp * KIterPerWarp >= DsReadPreload)
                                              ? DsReadPreload
@@ -466,11 +470,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
         // __builtin_amdgcn_sched_barrier(0);
     }
 
-    CK_TILE_HOST_DEVICE static constexpr auto GetADramTileDistribution()
-    {
-        return PipelinePolicy::template MakeADramTileDistribution<Problem>();
-    }
-
     template <typename... Args>
     CK_TILE_DEVICE auto operator()(Args&&... args) const
     {
@@ -680,7 +679,7 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
         statically_indexed_array<decltype(load_tile(a_warp_window_pong)), m_preload> a_warp_tensor;
 
         // preload A00,A10... from lds
-        s_waitcnt_barrier</*vmcnt*/ dswrite_num_perK>();
+        s_waitcnt_barrier</*vmcnt*/ Bload_num + ScaleAload_num + ScaleBload_num>();
         static_for<0, m_preload, 1>{}([&](auto loadIter) {
             constexpr auto mIter = loadIter % MXdlPack;
             constexpr auto kIter = loadIter / MXdlPack;
