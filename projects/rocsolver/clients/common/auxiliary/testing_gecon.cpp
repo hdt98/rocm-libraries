@@ -30,4 +30,3 @@
 #define TESTING_GECON(...) template void testing_gecon<__VA_ARGS__>(Arguments&);
 
 INSTANTIATE(TESTING_GECON, FOREACH_SCALAR_TYPE, FOREACH_INT_TYPE, APPLY_STAMP)
-

@@ -177,4 +177,3 @@ INSTANTIATE_TEST_SUITE_P(daily_lapack,
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
                          GECON_64,
                          Combine(ValuesIn(matrix_size_range_64), ValuesIn(norm_range)));
-

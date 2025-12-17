@@ -62,19 +62,16 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
     size_t size_work_v, size_work_x, size_work_isgn;
     size_t size_scalar_est, size_scalar_max_idx, size_scalar_kase, size_scalar_jump;
     size_t size_work_getrs_1, size_work_getrs_2, size_work_getrs_3, size_work_getrs_4;
-    rocsolver_gecon_getMemorySize<T, I, S>(n, lda, batch_count, &size_work_v, &size_work_x,
-                                           &size_work_isgn, &size_scalar_est,
-                                           &size_scalar_max_idx, &size_scalar_kase,
-                                           &size_scalar_jump, &size_work_getrs_1, &size_work_getrs_2,
-                                           &size_work_getrs_3, &size_work_getrs_4);
+    rocsolver_gecon_getMemorySize<T, I, S>(
+        n, lda, batch_count, &size_work_v, &size_work_x, &size_work_isgn, &size_scalar_est,
+        &size_scalar_max_idx, &size_scalar_kase, &size_scalar_jump, &size_work_getrs_1,
+        &size_work_getrs_2, &size_work_getrs_3, &size_work_getrs_4);
 
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_work_v, size_work_x,
-                                                      size_work_isgn, size_scalar_est,
-                                                      size_scalar_max_idx,
-                                                      size_scalar_kase, size_scalar_jump,
-                                                      size_work_getrs_1, size_work_getrs_2,
-                                                      size_work_getrs_3, size_work_getrs_4);
+        return rocblas_set_optimal_device_memory_size(
+            handle, size_work_v, size_work_x, size_work_isgn, size_scalar_est, size_scalar_max_idx,
+            size_scalar_kase, size_scalar_jump, size_work_getrs_1, size_work_getrs_2,
+            size_work_getrs_3, size_work_getrs_4);
 
     // memory workspace allocation
     void *work_v, *work_x, *work_isgn, *scalar_est, *scalar_max_idx;
@@ -102,10 +99,10 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
 
     // execution
     return rocsolver_gecon_template<false, false, T>(
-        handle, norm_type, n, A, shiftA, (I) 1, lda, strideA, ipiv, strideP, anorm, rcond,
+        handle, norm_type, n, A, shiftA, (I)1, lda, strideA, ipiv, strideP, anorm, rcond,
         batch_count, (T*)work_v, (T*)work_x, (I*)work_isgn, (S*)scalar_est, (I*)scalar_max_idx,
-        (rocblas_int*)scalar_kase, (rocblas_int*)scalar_jump, work_getrs_1,
-        work_getrs_2, work_getrs_3, work_getrs_4, max_iter);
+        (rocblas_int*)scalar_kase, (rocblas_int*)scalar_jump, work_getrs_1, work_getrs_2,
+        work_getrs_3, work_getrs_4, max_iter);
 }
 
 ROCSOLVER_END_NAMESPACE
