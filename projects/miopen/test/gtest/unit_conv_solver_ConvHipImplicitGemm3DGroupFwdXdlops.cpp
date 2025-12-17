@@ -1,7 +1,10 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include "unit_conv_solver.hpp"
+#include "unit_conv_solver_gruop_xdlops.hpp"
+
+// numeric part of test case
+using TestCase = miopen::unit_tests::GroupXdlopsNumericData;
 
 using TestDataType = miopen::unit_tests::TestDataType;
 
@@ -10,17 +13,13 @@ namespace {
 // Template version of GetConvSmokeTestCases
 template <TestDataType type>
 auto GetConvSmokeTestCases()
-{
-    using TestCase                      = miopen::unit_tests::ConvTestCase;
+{   
     constexpr miopenDataType_t datatype = miopen::unit_tests::GetDataType(type);
     const bool tf32_compute             = type == TestDataType::TF32;
 
     return std::vector{
         // clang-format off
-        TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
-                 {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                 datatype, 
-                 {{0, 0, 0}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}},
+        TestCase{{64, 32, 28, 28, 28}, {32, 32, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute},
         // clang-format on
     };
 }
@@ -29,30 +28,46 @@ auto GetConvSmokeTestCases()
 template <TestDataType type>
 auto GetConvFullTestCases()
 {
-    using TestCase                      = miopen::unit_tests::ConvTestCase;
     constexpr miopenDataType_t datatype = miopen::unit_tests::GetDataType(type);
     const bool tf32_compute             = type == TestDataType::TF32;
 
     return std::vector{
         // clang-format off
-        TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
-                    {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                    datatype, 
-                    {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}}, // non-zero padding
-        TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
-                    {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                    datatype, 
-                    {{0, 0, 0}, {2, 2, 2}, {1, 1, 1}, 1, false, tf32_compute}}, // stride > 1
-        TestCase{{datatype, miopenTensorNDHWC, {1, 64, 8, 8, 8}},
-                    {datatype, miopenTensorNDHWC, {96, 64, 1, 1, 1}},
-                    datatype, 
-                    {{0, 0, 0}, {1, 1, 1}, {2, 2, 2}, 1, false, tf32_compute}}, // dilation > 1
-        TestCase{{datatype, miopenTensorNDHWC, {1, 64, 12, 24, 48}},
-                    {datatype, miopenTensorNDHWC, {384, 64, 1, 1, 1}},
-                    datatype, 
-                    {{0, 0, 0}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}}, // some different NCHW and k parameters
+        TestCase{{6, 448, 3, 118, 182}, {896, 448, 1, 1, 1}, {0, 0, 0}, {1, 2, 2}, {1, 1, 1}, 
+                1, false, tf32_compute},
+        TestCase{{128, 3, 2, 14, 14}, {320, 3, 2, 14, 14}, {0, 0, 0}, {2, 14, 14}, {1, 1, 1}, 
+                1, false, tf32_compute},
+
+        // Group Count > 1  (2, 3, 5, 16)
+        TestCase{{128, 32, 28, 28, 28}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 
+                2, false, tf32_compute},
+        TestCase{{48, 48, 28, 28, 28}, {48, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 
+                3, false, tf32_compute},
+        TestCase{{120, 60, 28, 28, 28}, {60, 12, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 
+                5, false, tf32_compute},
+        TestCase{{64, 32, 28, 28, 28}, {32, 2, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {1, 1, 1}, 
+                16, false, tf32_compute}, 
         // clang-format on
     };
+}
+
+auto GetDevApplicabilityConvCase()
+{
+    // For device applicability checks
+    return GetConvTestForGroupXdlops<miopenHalf>(miopenTensorNDHWC,
+                                                 std::move(GetConvSmokeTestCases()[0]));
+}
+
+// Deterministic test case (for CPU deterministic applicability test)
+auto GetDeterministicConvCase()
+{
+    TestCase test_case = {
+        // clang-format off
+        TestCase{{64, 32, 28, 28, 28}, {32, 32, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, true}
+        // clang-format on
+    };
+
+    return GetConvTestForGroupXdlops<miopenHalf>(miopenTensorNDHWC, std::move(test_case));
 }
 
 // Template version of GetTestParams
@@ -83,11 +98,14 @@ const auto& GetTestParams()
 
 } // namespace
 
-using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP16  = GPU_UnitTestConvSolverFwd_FP16;
-using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_BFP16 = GPU_UnitTestConvSolverFwd_BFP16;
-using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP32  = GPU_UnitTestConvSolverFwd_FP32;
-using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_TF32  = GPU_UnitTestConvSolverFwd_TF32;
-using CPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlopsDevApplicability_NONE =
+using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP16  = UnitTestConvSolverGroupXDlopsFwd<miopenHalf>;
+using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_BFP16 = UnitTestConvSolverGroupXDlopsFwd<miopenBFloat16>;
+using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP32  = UnitTestConvSolverGroupXDlopsFwd<miopenFloat>;
+using GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_TF32  = UnitTestConvSolverGroupXDlopsFwd<miopenFloat>;
+
+using CPU_UnitTestConvSolverImplicitGemm3DGroupFwdXdlopsDevApplicability_FP16 =
+    CPU_UnitTestConvSolverDevApplicabilityFwd_NONE;
+using CPU_UnitTestConvSolverImplicitGemm3DGroupFwdXdlopsDeterministicApplicability_NONE =
     CPU_UnitTestConvSolverDevApplicabilityFwd_NONE;
 
 TEST_P(GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP16,
@@ -112,7 +130,14 @@ TEST_P(GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_TF32,
 {
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupFwdXdlops{});
 };
-TEST_P(CPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlopsDevApplicability_NONE,
+
+TEST_P(CPU_UnitTestConvSolverImplicitGemm3DGroupFwdXdlopsDevApplicability_FP16,
+       ConvHipImplicitGemm3DGroupFwdXdlops)
+{
+    this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupFwdXdlops{});
+};
+
+TEST_P(CPU_UnitTestConvSolverImplicitGemm3DGroupFwdXdlopsDeterministicApplicability_NONE,
        ConvHipImplicitGemm3DGroupFwdXdlops)
 {
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupFwdXdlops{});
@@ -123,28 +148,28 @@ INSTANTIATE_TEST_SUITE_P(
     Smoke,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP16,
     testing::Combine(testing::Values(GetTestParams<TestDataType::FP16>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvSmokeTestCases<TestDataType::FP16>())));
 
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_BFP16,
     testing::Combine(testing::Values(GetTestParams<TestDataType::BF16>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvSmokeTestCases<TestDataType::BF16>())));
 
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP32,
     testing::Combine(testing::Values(GetTestParams<TestDataType::FP32>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvSmokeTestCases<TestDataType::FP32>())));
 
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_TF32,
     testing::Combine(testing::Values(GetTestParams<TestDataType::TF32>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvSmokeTestCases<TestDataType::TF32>())));
 
 // Full tests
@@ -152,33 +177,37 @@ INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP16,
     testing::Combine(testing::Values(GetTestParams<TestDataType::FP16>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvFullTestCases<TestDataType::FP16>())));
 
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_BFP16,
     testing::Combine(testing::Values(GetTestParams<TestDataType::BF16>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvFullTestCases<TestDataType::BF16>())));
 
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_FP32,
     testing::Combine(testing::Values(GetTestParams<TestDataType::FP32>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvFullTestCases<TestDataType::FP32>())));
 
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlops_TF32,
     testing::Combine(testing::Values(GetTestParams<TestDataType::TF32>()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::Values(miopenTensorNDHWC, miopenTensorNCDHW),
                      testing::ValuesIn(GetConvFullTestCases<TestDataType::TF32>())));
 
-// Device applicability test
+// Device applicability tests
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         CPU_UnitTestConvSolverImplicitGemm3DGroupFwdXdlopsDevApplicability_FP16,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(GetDevApplicabilityConvCase())));
+
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
-    CPU_UnitTestConvSolverHipImplicitGemm3DGroupFwdXdlopsDevApplicability_NONE,
-    testing::Combine(testing::Values(GetTestParams<TestDataType::FP16>()),
-                     testing::Values(GetConvSmokeTestCases<TestDataType::FP16>()[0])));
+    CPU_UnitTestConvSolverImplicitGemm3DGroupFwdXdlopsDeterministicApplicability_NONE,
+    testing::Combine(testing::Values(Gpu::None), testing::Values(GetDeterministicConvCase())));

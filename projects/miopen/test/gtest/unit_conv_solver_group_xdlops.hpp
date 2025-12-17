@@ -21,6 +21,34 @@ struct GroupXdlopsNumericData
 
     bool deterministic = false;
     bool tf32_compute  = false;
+
+   friend std::ostream& operator<<(std::ostream& os, const GroupXdlopsNumericData& numeric_data)
+    {
+        os << "GroupXdlopsNumericData part: [";
+        LogVector(os, "x", numeric_data.x);
+        LogVector(os, "w", numeric_data.w);
+        LogVector(os, "pad", numeric_data.pad);
+        LogVector(os, "stride", numeric_data.stride);
+        LogVector(os, "dilation", numeric_data.dilation);
+        os << "group_count: " << numeric_data.group_count;
+        os << "deterministic: " << numeric_data.deterministic;
+        os << "]";
+        return os;
+    }
+
+private:
+    template <typename T>
+    static void LogVector(std::ostream& os, const std::string& vec_name, const std::vector<T>& vec)
+    {
+        os << vec_name << ": [";
+        for(size_t i = 0; i < vec.size(); ++i)
+        {
+            os << vec[i];
+            if(i < vec.size() - 1)
+                os << ",";
+        }
+        os << "] ";
+    }    
 };
 
 template <miopenDataType_t datatype>
@@ -69,6 +97,17 @@ protected:
         this->SetUpImpl(params);
     }
 };
+
+
+// some short aliases
+template <miopenDataType_t datatype>
+using UnitTestConvSolverGroupXDlopsFwd = miopen::unit_tests::UnitTestConvSolverGroupXDlops<miopen::conv::Direction::Forward, datatype>;
+
+template <miopenDataType_t datatype>
+using UnitTestConvSolverGroupXDlopsBwd = miopen::unit_tests::UnitTestConvSolverGroupXDlops<miopen::conv::Direction::BackwardData, datatype>;
+
+template <miopenDataType_t datatype>
+using UnitTestConvSolverGroupXDlopsWrw = miopen::unit_tests::UnitTestConvSolverGroupXDlops<miopen::conv::Direction::BackwardWeights, datatype>;
 
 } // namespace unit_tests
 } // namespace miopen
