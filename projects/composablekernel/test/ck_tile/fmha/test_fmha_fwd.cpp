@@ -71,10 +71,10 @@ struct TestConfigs<FmhaFwdMxFp8>
     static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
     static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
     static constexpr auto ModeValues         = std::array{mode_enum::batch, mode_enum::group};
-    static constexpr auto IsVRowmajorValues  = std::array{true};
-    static constexpr auto qscale_str         = "pt";
+    static constexpr auto IsVRowmajorValues  = std::array{false};
+    static constexpr auto qscale_str         = "mx";
     static constexpr bool def_lse            = true;
-    static constexpr bool def_is_v_rowmajor  = true;
+    static constexpr bool def_is_v_rowmajor  = false;
     static constexpr auto init_method        = "3";
     static int adjust_seqlen(int seqlen) { return seqlen; }
 };

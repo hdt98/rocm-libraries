@@ -1104,13 +1104,14 @@ class KernelComponentFactoryGfx950(
             # no need dropout kernels
             lse = "t"
             dropout = "f"
-            for logits, qscale, mask, bias in itertools.product(
+            for logits, qscale, mask, bias, sink in itertools.product(
                 ["f"],
-                ["pertensor"],  # TODO: temporary solution for development only
+                ["mx"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
+                ["f", "t"],
             ):
-                pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f"))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
         return pipelines
 
 

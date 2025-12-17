@@ -183,6 +183,14 @@ struct FmhaFwdTypeConfig<FmhaFwdMxFp8>
     using PDataType             = ck_tile::fp8_t; // data type for A matrix of second gemm
     using OaccDataType          = float;          // data type for second gemm accumulation
     using ODataType             = float;
+
+    using QScaleDataType = ck_tile::e8m0_t;
+    using KScaleDataType = ck_tile::e8m0_t;
+    using VScaleDataType = ck_tile::e8m0_t;
+    using PScaleDataType = ck_tile::e8m0_t;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = 32;
+    static constexpr ck_tile::index_t kVScaleGranularity  = 32;
 };
 
 struct FmhaMasks
