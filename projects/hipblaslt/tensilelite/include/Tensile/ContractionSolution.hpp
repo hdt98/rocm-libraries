@@ -383,7 +383,10 @@ namespace TensileLite
                             dim3 const&              problemNumGroupTiles,
                             dim3 const&              numWorkGroups,
                             KA&                      args,
-                            StreamKSettings const&   sk) const;
+                            StreamKSettings const&   sk,
+                            int32_t                  autoWGM,
+                            int32_t                  autoWGMXCC,
+                            uint32_t                 skMaxWG) const;
 
         // Common kernel related arguments (e.g. gemm_count, arg type, MT, GSU...)
         template <bool T_Debug, bool Legacy, typename KA>

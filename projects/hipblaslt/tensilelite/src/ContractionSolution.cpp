@@ -546,7 +546,10 @@ namespace TensileLite
                                              dim3 const&            problemNumGroupTiles,
                                              dim3 const&            numWorkGroups,
                                              KA&                    args,
-                                             StreamKSettings const& sk) const
+                                             StreamKSettings const& sk,
+                                             int32_t autoWGM,
+                                             int32_t autoWGMXCC,
+                                             uint32_t skMaxWG) const
     {
         if(debugKernel)
         {
@@ -562,7 +565,6 @@ namespace TensileLite
         TensorDescriptor const& compressed = problem.compressed();
         TensorDescriptor const& metadata   = problem.metadata();
 
-        auto [autoWGM, autoWGMXCC] = calculateAutoWGM(problem, hardware, sk.grid);
         uint32_t autoGsuVal        = calculateAutoGSU(problem, hardware);
         uint32_t gsu = problem.getParams().gsu() > 0 ? problem.getParams().gsu() : autoGsuVal;
 
@@ -709,7 +711,6 @@ namespace TensileLite
                 args.append("beta_2", inputs.beta, problem.betaType());
         }
 
-        uint32_t skMaxWG = 0;
         if(sizeMapping.streamK != 0)
         {
             // SK doesn't care gsu
@@ -747,7 +748,6 @@ namespace TensileLite
                     uint32_t skSplit
                         = sk.grid / tiles; // skTiles is skSplit in parallel reduction path
                     uint32_t skItersPerWG = itersPerTile / skSplit;
-                    skMaxWG = itersPerTile / (skItersPerWG ? skItersPerWG : 1) + 1;
 
                     args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
                     args.template append<uint32_t>("skGrid", sk.grid);
@@ -777,7 +777,6 @@ namespace TensileLite
                     }
 
                     uint32_t skItersPerWG = skTiles * itersPerTile / sk.grid;
-                    skMaxWG = itersPerTile / (skItersPerWG ? skItersPerWG : 1) + 1;
 
                     args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
                     args.template append<uint32_t>("skGrid", sk.grid);
@@ -1342,18 +1341,18 @@ namespace TensileLite
 
         rv.sharedMemBytes = 0;
 
+        auto [autoWGM, autoWGMXCC] = calculateAutoWGM(problem, &hardware, sk.grid);
+        uint32_t SKmaxWG = 0;
+        if(sizeMapping.streamK != 0)
+            SKmaxWG = getSKMaxWG(problem, rv.numWorkGroups, sk);
+
         if(internalArgsSupport.useUniversalArgs)
         {
-            auto [autoWGM, autoWGMXCC] = calculateAutoWGM(problem, &hardware, sk.grid);
             if(T_Debug)
             {
                 std::cout << "AutoWGM: " << autoWGM << std::endl;
                 std::cout << "AutoWGMXCC: " << autoWGMXCC << std::endl;
             }
-
-            uint32_t SKmaxWG = 0;
-            if(sizeMapping.streamK != 0)
-                SKmaxWG = getSKMaxWG(problem, rv.numWorkGroups, sk);
 
             kernelArgs<T_Debug, false>(1,
                                        0,
@@ -1367,7 +1366,7 @@ namespace TensileLite
                                        SKmaxWG);
         }
         singleCallArgs<T_Debug, true>(
-            problem, inputs, 0, &hardware, problemNumGroupTiles, rv.numWorkGroups, rv.args, sk);
+            problem, inputs, 0, &hardware, problemNumGroupTiles, rv.numWorkGroups, rv.args, sk, autoWGM, autoWGMXCC, SKmaxWG);
 
         if(sizeMapping.globalAccumulation == 3)
         {
@@ -1505,6 +1504,8 @@ namespace TensileLite
                 // But this code path is run to calculate to determine if solution is supported
                 // Set SK grid to 1 for now to avoid 0 division
                 sk.grid = 1;
+                auto [autoWGM, autoWGMXCC] = calculateAutoWGM(problem, &hardware, sk.grid);
+                constexpr uint32_t skMaxWG = 0; // SK not needed here
                 singleCallArgs<T_Debug, false>(problem,
                                                inputs.grouped[idx],
                                                workspaceOffsetInByte,
@@ -1512,7 +1513,10 @@ namespace TensileLite
                                                rv.numWorkGroups,
                                                rv.numWorkGroups,
                                                h_args,
-                                               sk);
+                                               sk,
+                                               autoWGM,
+                                               autoWGMXCC,
+                                               0);
 
                 if(sizeMapping.globalAccumulation == 3)
                 {
