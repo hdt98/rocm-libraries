@@ -2274,3 +2274,118 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
 
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
+
+
+@RegisterSchedule(
+    tile_config=TileConfig(160, 128, 32, 2, 0, True, 0, 0),
+    dtype_predicate=isTF32,
+    vector_widths=[4, 4, 4],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
+    numMfma = 60
+    kernel["MfmaInitCVgprs"] = True
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    if isTN(kernel) and useLDSTr and TLDS==1:
+        kernel["UsePLRPack"] = True
+        numPackInstr = 24 
+        numPackIndices = numPackInstr // 2 # We put 2 pack instructions per index
+
+        # Used the following constrains to create schedule
+        #  - LRA0 + PACKA0 needs to be done before 15
+        #  - LBR0 + PACKB0 needs to be done before 30
+        #  - LRB3 + PACKB3 needs to start after 30
+        #  - LRA3 + PACKA3 needs to start after 45
+        
+        # LRA0 + PACKA0
+        lra0 = [0,0,0,0,0]
+        waitLRA0 = 1
+        startPACKA0 = waitLRA0
+        packA0 = [
+            2,2,2,2,2, 2,2,2,2,2,
+            2,2,2,2,2, 2,2,2,2,2,
+            2,2,2,2,2, 2,2,2,2,2,
+            2,2,2,2,2, 2,2,2,2,2,
+            2,2,2,2,2, 2,2,2,2,2,
+            2,2,2,2,2, 2,2,2,2,2
+        ]
+        # LBR0 + PACKB0
+        lrb0 = [3,3,3,3]
+        waitLRB0 = 4
+        packB0 = [
+            5,5,5,5,5, 5,5,5,5,5, 
+            5,5,5,5,5, 5,5,5,5,5,
+            5,5,5,5,5, 5,5,5,5,5,
+            5,5,5,5,5, 5,5,5,5,5,
+            5,5,5,5,5, 5,5,5
+        ]
+        
+        # LBR3 + PACKB3  
+        halfMFMA = numMfma//2
+        startLRB3 = halfMFMA
+        lrb3 = create_range(startLRB3,2,numMfma-1)
+        lrb3 += create_range(max(lrb3)+6,2,numMfma-1)
+        waitLRB3 = startLRB3 + 6
+        packB3 = create_range(waitLRB3,4*numPackIndices,numMfma-1)
+        
+        # LRA3 + PACKA3
+        startLRA3 = (3*numMfma)//4 #can't start before 3/4 MFMAs
+        lra3 = create_range(startLRA3,3,numMfma-1)
+        waitLRA3 = startLRA3 + 5
+        packA3 = create_range(waitLRA3,3*numPackIndices,numMfma-1)
+        
+        # Return number of inflight loads in the list at given index
+        def inflight(lst, index):
+            return sum(val < (index) for val in lst)
+
+        syncTable = [                    
+            waitLRA0, SWaitCnt(dscnt=inflight(lra0,waitLRA0)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRA0 to complete"),
+            waitLRA0+numPackIndices, SWaitCnt(dscnt=inflight(lrb0, waitLRA0+numPackIndices), vlcnt=-1, vscnt=-1, comment="Wait for all LRA0 to complete"),
+            waitLRB0, SWaitCnt(dscnt=inflight(lrb0,waitLRB0)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRB0 to complete"),
+            waitLRB0+numPackIndices, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB0 to complete"),
+            waitLRB0+numPackIndices, SBarrier(comment="Barrier before GRA&GRB"),
+
+            startLRB3-1,SWaitCnt(dscnt=-1, vlcnt=6, vscnt=-1, comment="Wait for previous GRA&B"),
+            startLRB3-1,SBarrier(comment=""),
+            
+            waitLRB3,SWaitCnt(dscnt=inflight(lrb3, waitLRB3)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRB3 to complete"),
+            waitLRB3+numPackIndices,SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB3 to complete"),
+            
+            waitLRA3, SWaitCnt(dscnt=inflight(lra3,waitLRA3)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRA3 to complete"),
+            waitLRA3+numPackIndices, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRA3 to complete")
+        ]
+
+        syncCode = syncTable[1::2]
+        optSchedule = {
+
+            'SYNC': [syncTable[::2]],
+
+            'GRIncA': [[0,2,2,2,3,3,3,4,16]],
+            'GRIncB': [[17,18,19,20,21,22,23,24,25]],
+            'LRA0': [lra0],
+            'LRB0': [lrb0],
+            'PackA0' : [packA0],
+            'PackB0' : [packB0],
+            
+            'GRA': [[38,38, 40,40, 42,42, 44,44, 46,46]],
+            'GRB': [[72,72, 74,74, 76,76, 100,100]],
+            'LRSA': [[35]],
+            'LRSB': [[35]],
+            'LWSA': [[107]],
+            'LWSB': [[107]],
+            'LCC': [[59, 59]],
+            'LRA3': [lra3],
+            'LRB3': [lrb3],
+            'PackB3' : [packB3],
+            'PackA3' : [packA3],
+
+        }
+        nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+    else:
+        return False, None
+
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    return True, opt1
