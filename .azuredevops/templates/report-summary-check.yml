@@ -38,6 +38,7 @@ jobs:
       APP_ID: $(APP_ID)
       APP_INSTALLATION_ID: $(APP_INSTALLATION_ID)
       APP_PRIVATE_KEY: $(APP_PRIVATE_KEY)
+      PR_HEAD_SHA_VAR: $(prHeadSha)
     inputs:
       targetType: 'inline'
       script: |
@@ -66,8 +67,8 @@ jobs:
         
         # Use the HEAD SHA passed from the dispatcher to avoid race conditions
         # when new commits are pushed while the build is running
-        if [[ -n "$(prHeadSha)" && "$(prHeadSha)" != "\$(prHeadSha)" ]]; then
-          PR_HEAD_SHA="$(prHeadSha)"
+        if [[ -n "$PR_HEAD_SHA_VAR" && "$PR_HEAD_SHA_VAR" != "\$(prHeadSha)" ]]; then
+          PR_HEAD_SHA="$PR_HEAD_SHA_VAR"
           echo "Using HEAD SHA from pipeline variable: $PR_HEAD_SHA"
         else
           # Fallback for non-dispatcher triggered builds (e.g., direct PR triggers)
