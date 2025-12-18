@@ -120,14 +120,7 @@ struct UniversalGemmBasePolicy
 
         if constexpr(is_a_load_tr<Problem>)
         {
-            // TODO: better lds descriptor for performance
-            constexpr index_t KPack = GetSmemPackA<Problem>();
-            constexpr auto a_lds_block_desc_0 =
-                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<MPerBlock>{}),
-                                             make_tuple(number<MPerBlock>{}, number<1>{}),
-                                             number<KPack>{},
-                                             number<1>{});
-            return a_lds_block_desc_0;
+            return MakeALdsBlockDescriptorForTrLoad<Problem>();
         }
         else
         {
@@ -322,14 +315,7 @@ struct UniversalGemmBasePolicy
 
         if constexpr(is_b_load_tr<Problem>)
         {
-            // TODO: better lds descriptor for performance
-            constexpr index_t KPack = GetSmemPackB<Problem>();
-            constexpr auto b_lds_block_desc_0 =
-                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),
-                                             make_tuple(number<NPerBlock>{}, number<1>{}),
-                                             number<KPack>{},
-                                             number<1>{});
-            return b_lds_block_desc_0;
+            return MakeBLdsBlockDescriptorForTrLoad<Problem>();
         }
         else
         {
