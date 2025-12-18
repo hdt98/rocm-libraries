@@ -256,6 +256,11 @@ jobs:
                       "refName": "refs/pull/${{ github.event.pull_request.number }}/merge"
                     }
                   }
+                },
+                "variables": {
+                  "prHeadSha": {
+                    "value": "${{ github.event.pull_request.head.sha }}"
+                  }
                 }
               }')
 

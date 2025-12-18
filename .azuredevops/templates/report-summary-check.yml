@@ -63,7 +63,17 @@ jobs:
           "https://api.github.com/app/installations/$APP_INSTALLATION_ID/access_tokens" | jq -r .token)
 
         PR_NUMBER=$(echo "$(Build.SourceBranch)" | sed 's|refs/pull/\([0-9]*\)/.*|\1|')
-        PR_HEAD_SHA=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/pulls/$PR_NUMBER" | jq -r '.head.sha')
+        
+        # Use the HEAD SHA passed from the dispatcher to avoid race conditions
+        # when new commits are pushed while the build is running
+        if [[ -n "$(prHeadSha)" && "$(prHeadSha)" != "\$(prHeadSha)" ]]; then
+          PR_HEAD_SHA="$(prHeadSha)"
+          echo "Using HEAD SHA from pipeline variable: $PR_HEAD_SHA"
+        else
+          # Fallback for non-dispatcher triggered builds (e.g., direct PR triggers)
+          PR_HEAD_SHA=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/pulls/$PR_NUMBER" | jq -r '.head.sha')
+          echo "Using HEAD SHA from GitHub API (fallback): $PR_HEAD_SHA"
+        fi
         CHECK=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/commits/$PR_HEAD_SHA/check-runs" | jq -r '.check_runs[] | select(.name == "Azure CI Summary")')
         CHECK_ID=$(echo "$CHECK" | jq -r '.id')
         CHECK_SUMMARY=$(echo "$CHECK" | jq -r '.output.summary')
