@@ -293,7 +293,6 @@ VALID_LIBLOGIC_FILE_CONTENT = """
     StoreVectorWidth: 1
     StreamK: 3
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 8
     SubGroup0: 8
     SubGroup1: 32

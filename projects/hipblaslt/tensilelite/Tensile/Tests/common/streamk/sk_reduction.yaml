@@ -67,7 +67,6 @@ BenchmarkProblems:
         # - StoreRemapVectorWidth: [0, 1, 2, 4, 8]
         - StoreVectorWidth: [-1]
         - StreamK: [3]
-        - StreamKFixupTreeReduction: [0, 1]
         # - StreamKXCCMapping: [8]
         - TransposeLDS: [-1]
         # - UnrollLoopSwapGlobalReadOrder: [0, 1]
@@ -200,7 +199,6 @@ BenchmarkProblems:
         # - StoreRemapVectorWidth: [0, 1, 2, 4, 8]
         - StoreVectorWidth: [-1]
         - StreamK: [3]
-        - StreamKFixupTreeReduction: [0, 1]
         # - StreamKXCCMapping: [8]
         - TransposeLDS: [-1]
         # - UnrollLoopSwapGlobalReadOrder: [0, 1]
@@ -263,8 +261,7 @@ BenchmarkProblems:
         # - StorePriorityOpt: [False, True]
         # - StoreRemapVectorWidth: [0, 1, 2, 4, 8]
         - StoreVectorWidth: [-1]
-        - StreamK: [3]
-        - StreamKFixupTreeReduction: [0] # TODO also test Tree=1 when bug fix is merged
+        - StreamK: [3] # TODO also test Tree=1 when bug fix is merged
         # - StreamKXCCMapping: [8]
         - TransposeLDS: [-1]
         # - UnrollLoopSwapGlobalReadOrder: [0, 1]

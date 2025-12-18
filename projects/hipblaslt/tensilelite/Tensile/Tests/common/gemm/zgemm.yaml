@@ -66,7 +66,6 @@ BenchmarkProblems:
         # - StreamK: [3]
         # - StreamKAtomic: [1]
         # - StreamKXCCMapping: [0, 2]
-        # - StreamKFixupTreeReduction: [0, 1]
         - PrefetchLocalRead: [0, 1]
         - PrefetchGlobalRead: [0, 2]
         # - 1LDSBuffer: [-1,0,1]
