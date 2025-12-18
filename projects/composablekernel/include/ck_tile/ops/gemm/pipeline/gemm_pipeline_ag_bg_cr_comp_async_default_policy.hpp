@@ -22,6 +22,10 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
               typename OverrideADataType = remove_cvref_t<typename Problem::ADataType>>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
+#if defined(__gfx125__)
+        return UniversalGemmBasePolicy<GemmPipelineAgBgCrCompAsyncDefaultPolicy>::
+            MakeALdsBlockDescriptor<Problem, OverrideADataType>();
+#else
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
         if constexpr(is_a_load_tr<Problem>)
@@ -54,11 +58,16 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
                 make_tuple(sequence<1>{}, sequence<0, 2>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
         }
+#endif
     }
 
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
+#if defined(__gfx125__)
+        return UniversalGemmBasePolicy<
+            GemmPipelineAgBgCrCompAsyncDefaultPolicy>::MakeBLdsBlockDescriptor<Problem>();
+#else
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
         if constexpr(is_b_load_tr<Problem>)
@@ -91,6 +100,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
                 make_tuple(sequence<1>{}, sequence<0, 2>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
         }
+#endif
     }
 
     template <typename Problem>
