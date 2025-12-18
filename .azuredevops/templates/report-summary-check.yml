@@ -38,7 +38,6 @@ jobs:
       APP_ID: $(APP_ID)
       APP_INSTALLATION_ID: $(APP_INSTALLATION_ID)
       APP_PRIVATE_KEY: $(APP_PRIVATE_KEY)
-      PR_HEAD_SHA_VAR: $(prHeadSha)
     inputs:
       targetType: 'inline'
       script: |
@@ -63,27 +62,35 @@ jobs:
           -H "Accept: application/vnd.github+json" \
           "https://api.github.com/app/installations/$APP_INSTALLATION_ID/access_tokens" | jq -r .token)
 
+        # Get PR number and build ID
         PR_NUMBER=$(echo "$(Build.SourceBranch)" | sed 's|refs/pull/\([0-9]*\)/.*|\1|')
+        BUILD_ID="$(Build.BuildId)"
+        echo "PR Number: $PR_NUMBER, Build ID: $BUILD_ID"
         
-        # Use the HEAD SHA passed from the dispatcher to avoid race conditions
-        # when new commits are pushed while the build is running
-        if [[ -n "$PR_HEAD_SHA_VAR" && "$PR_HEAD_SHA_VAR" != "\$(prHeadSha)" ]]; then
-          PR_HEAD_SHA="$PR_HEAD_SHA_VAR"
-          echo "Using HEAD SHA from pipeline variable: $PR_HEAD_SHA"
-        else
-          # Fallback for non-dispatcher triggered builds (e.g., direct PR triggers)
-          PR_HEAD_SHA=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/pulls/$PR_NUMBER" | jq -r '.head.sha')
-          echo "Using HEAD SHA from GitHub API (fallback): $PR_HEAD_SHA"
-        fi
-        CHECK=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/commits/$PR_HEAD_SHA/check-runs" | jq -r '.check_runs[] | select(.name == "Azure CI Summary")')
+        # Get the current HEAD SHA
+        PR_HEAD_SHA=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/pulls/$PR_NUMBER" | jq -r '.head.sha')
+        echo "Current HEAD SHA: $PR_HEAD_SHA"
+        
+        # Find the Azure CI Summary check-run on current HEAD
+        CHECK=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/commits/$PR_HEAD_SHA/check-runs" \
+          | jq -r '.check_runs[] | select(.name == "Azure CI Summary")')
         CHECK_ID=$(echo "$CHECK" | jq -r '.id')
         CHECK_SUMMARY=$(echo "$CHECK" | jq -r '.output.summary')
         CHECK_TEXT=$(echo "$CHECK" | jq -r '.output.text')
-
-        if [[ -z "$CHECK_ID" ]]; then
+        
+        # Verify this check-run contains our build ID (prevents updating wrong check-run)
+        if [[ -z "$CHECK_ID" || "$CHECK_ID" == "null" ]]; then
           echo "No Azure CI Summary check found for commit $PR_HEAD_SHA"
           exit 0
         fi
+        
+        if [[ "$CHECK_TEXT" != *"$BUILD_ID="* ]]; then
+          echo "Check-run does not contain this build ID ($BUILD_ID)."
+          echo "This build was likely superseded by a newer commit. Exiting gracefully."
+          exit 0
+        fi
+        
+        echo "Found check-run ID $CHECK_ID with our build ID"
         if [[ "$CHECK_SUMMARY" == *"$(Build.BuildId)"* ]]; then
           CHECK_SUMMARY=$(echo "$CHECK_SUMMARY" | sed "s/buildId=$(Build.BuildId)[^|]*|[^|]*|/buildId=$(Build.BuildId)) | ${{ parameters.checkConclusion }} |/")
         fi
