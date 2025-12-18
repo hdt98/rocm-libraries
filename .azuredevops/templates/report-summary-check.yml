@@ -71,9 +71,26 @@ jobs:
         PR_HEAD_SHA=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/pulls/$PR_NUMBER" | jq -r '.head.sha')
         echo "Current HEAD SHA: $PR_HEAD_SHA"
         
-        # Find the Azure CI Summary check-run on current HEAD
-        CHECK=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/commits/$PR_HEAD_SHA/check-runs" \
-          | jq -r '.check_runs[] | select(.name == "Azure CI Summary")')
+        # Find the Azure CI Summary check-run on current HEAD (paginate to handle many check-runs)
+        PAGE=1
+        CHECK=""
+        while true; do
+          RESPONSE=$(curl -s "https://api.github.com/repos/ROCm/rocm-libraries/commits/$PR_HEAD_SHA/check-runs?per_page=100&page=$PAGE")
+          CHECK=$(echo "$RESPONSE" | jq -r '.check_runs[] | select(.name == "Azure CI Summary")')
+          
+          # Found it or no more results
+          if [[ -n "$CHECK" ]] || [[ $(echo "$RESPONSE" | jq '.check_runs | length') -eq 0 ]]; then
+            break
+          fi
+          
+          PAGE=$((PAGE + 1))
+          # Safety limit to prevent infinite loops
+          if [[ $PAGE -gt 10 ]]; then
+            echo "Warning: Reached page limit (1000 check-runs) without finding Azure CI Summary"
+            break
+          fi
+        done
+        
         CHECK_ID=$(echo "$CHECK" | jq -r '.id')
         CHECK_SUMMARY=$(echo "$CHECK" | jq -r '.output.summary')
         CHECK_TEXT=$(echo "$CHECK" | jq -r '.output.text')
