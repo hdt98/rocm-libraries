@@ -1,5 +1,8 @@
 {
   "version": 3,
+  "include": [
+    "CMakeCIPresets.json"
+  ],
   "configurePresets": [
     {
       "name": "default:release",
@@ -70,6 +73,5 @@
         "ROCROLLER_ENABLE_TEST_DISCOVERY": "OFF"
       }
     }
-
-]
+  ]
 }

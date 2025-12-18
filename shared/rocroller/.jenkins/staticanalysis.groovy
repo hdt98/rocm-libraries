@@ -48,10 +48,11 @@ def runCI =
     {
         platform, project->
         commonGroovy = load "${project.paths.project_src_prefix}/.jenkins/common.groovy"
-        commonGroovy.runCompileCommand(platform, project, jobName, false, false, '', true, true)
+        commonGroovy.runCompileCommand(platform, project, jobName)
     }
 
     // change first null to compileCommand once pytest-cmake is available
+    // this will also require creating a new preset for static analysis
     buildProject(prj, formatCheck, nodes.dockerArray, null, null, null, staticAnalysis)
 }
 

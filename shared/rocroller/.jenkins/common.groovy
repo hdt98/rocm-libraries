@@ -7,6 +7,21 @@ def getPrComments(pullRequest) {
   return comments
 }
 
+def addOrUpdatePrComment(pullRequest, commentTitle, commentBody)
+{
+    boolean commentExists = false
+    for (prComment in getPrComments(pullRequest)) {
+        if (prComment.body.contains(commentTitle))
+        {
+            commentExists = true
+            prComment.body = commentTitle + "\n\n" + commentBody
+        }
+    }
+    if (!commentExists) {
+        def comment = pullRequest.comment(commentBody)
+    }
+}
+
 def withSSH(platform, pipeline) {
     withCredentials(
         [
@@ -33,13 +48,9 @@ def withSSH(platform, pipeline) {
     }
 }
 
-def runCompileCommand(platform, project, jobName, boolean codeCoverage=false, boolean enableTimers=false, String target='', boolean useYamlCpp=true, boolean staticAnalysis=false)
+def runCompileCommand(platform, project, jobName)
 {
     project.paths.construct_build_prefix()
-    String codeCovFlag = codeCoverage ? '-DROCROLLER_ENABLE_COVERAGE=ON -DROCROLLER_BUILD_SHARED_LIBS=OFF' : ''
-    String timerFlag = enableTimers ? '-DROCROLLER_ENABLE_TIMERS=ON' : ''
-    String yamlBackendFlag = useYamlCpp ? '' : '-DROCROLLER_ENABLE_YAML_CPP=OFF'
-    String useCppCheck = staticAnalysis ? '-DROCROLLER_ENABLE_CPPCHECK=ON' : ''
 
     withSSH(platform) {
         sshBlock ->
@@ -49,22 +60,33 @@ def runCompileCommand(platform, project, jobName, boolean codeCoverage=false, bo
 
                 ${sshBlock}
 
-                mkdir -p build
-                cd build
                 # Check that all tests are included.
-                ../scripts/check_included_tests.py
-                cmake ../ \\
-                    ${codeCovFlag} ${timerFlag} ${yamlBackendFlag} ${useCppCheck}\\
-                    -DCMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ \\
-                    -DCMAKE_BUILD_TYPE=Release \\
-                    -DROCROLLER_ENABLE_FETCH=ON \\
-                    -DCMAKE_PREFIX_PATH="/opt/rocm;/opt/rocm/llvm"
+                ./scripts/check_included_tests.py
+                cmake --preset ci:${project.name.toLowerCase()}
                 ccache --print-stats
-                make -j ${target}
+                cmake --build --preset ci:${project.name.toLowerCase()} -j
                 ccache --print-stats
                 """
 
         platform.runCommand(this, command)
+    }
+
+    if (project.name == "Documentation") {
+        publishHTML([allowMissing: false,
+            alwaysLinkToLastBuild: false,
+            keepAll: false,
+            reportDir: "${project.paths.project_build_prefix}/docs/build/sphinx/html/",
+            reportFiles: "index.html",
+            reportName: "Generated Docs",
+            reportTitles: "Docs"])
+
+        if (env.CHANGE_ID)
+        {
+            def commentTitle = "# Generated Documentation"
+            def commentBody = "* [Link to view Generated Docs.](${JOB_URL}/Generated_20Docs) \n\n"
+
+            addOrUpdatePrComment(pullRequest, commentTitle, commentBody)
+        }
     }
 }
 
@@ -78,11 +100,10 @@ def runTestCommand (platform, project)
                 set -ex
                 cd ${project.paths.project_build_prefix}
 
-                pushd build
                 echo Using ${numThreads} out of `nproc` threads for testing.
-                OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2 ctest -j ${numThreads} --output-on-failure ${testExclude}
-                export ROCROLLER_BUILD_DIR="\$(pwd)"
-                popd
+                ctest --preset ci:${project.name.toLowerCase()}
+
+                export ROCROLLER_BUILD_DIR="\$(pwd)/build"
                 scripts/rrperf generate --suite generate_gfx950 --arch gfx950
             """
 
@@ -130,80 +151,33 @@ def runCodeCovTestCommand(platform, project)
 
     if (env.CHANGE_ID)
     {
-        def commentString = "# Code Coverage Report for ${platform.gpu}\n\n"
         def results = readFile("${project.paths.project_src_prefix}/build/code_cov_${platform.gpu}.formatted")
         def new_uncovered_lines = readFile("${project.paths.project_src_prefix}/build/new_uncovered_lines.txt").trim()
-        commentString += "## Summary\n\n"
-        commentString += "${results}\n\n"
-        if ("${new_uncovered_lines}" != "0")
-        {
-            commentString += "**This PR adds/edits _${new_uncovered_lines}_ newly uncovered lines.**\n\n"
-        }
-        commentString += "## Artifacts\n\n"
-        commentString += "* [HTML Coverage Report and Diff](${JOB_URL}/Code_20coverage_20${platform.gpu}_20report) \n"
-        commentString += "* [File Coverage Summary](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/build/code_cov_${platform.gpu}.report/*view*/) \n"
-        commentString += "* [Diff Text File](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/build/code_cov_${platform.gpu}.diff/*view*/) \n"
-        commentString += "* [Full Text Coverage Report](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/build/code_cov_${platform.gpu}.zip) \n"
-        commentString += "* [Python Coverage Report](${JOB_URL}/Python_20Code_20coverage_20${platform.gpu}_20report) \n"
-        commentString += "\n"
-        commentString += "## Commit Hashes\n\n"
-        for(parentHash in project.gitParentHashes) {
-            commentString += "* ${parentHash} \n"
-        }
-        boolean commentExists = false
-        for (prComment in getPrComments(pullRequest)) {
-            if (prComment.body.contains("# Code Coverage Report for ${platform.gpu}"))
-            {
-                commentExists = true
-                prComment.body = commentString
-            }
-        }
-        if (!commentExists) {
-            def comment = pullRequest.comment(commentString)
-        }
-    }
-}
 
-def runBuildDocsCommand(platform, project)
-{
-    project.paths.construct_build_prefix()
-    withSSH(platform) {
-        sshBlock ->
-        def command = """#!/usr/bin/env bash
-                    set -ex
-                    cd ${project.paths.project_build_prefix}
-                    ${sshBlock}
-                    cmake --preset docs -B build -S .
-                    cmake --build build --target docs
-                    """
-        platform.runCommand(this, command)
-    }
+        def new_lines_string = """
+        |**This PR adds/edits _${new_uncovered_lines}_ newly uncovered lines.
+        |"""
 
-    publishHTML([allowMissing: false,
-                alwaysLinkToLastBuild: false,
-                keepAll: false,
-                reportDir: "${project.paths.project_build_prefix}/docs/build/sphinx/html/",
-                reportFiles: "index.html",
-                reportName: "Generated Docs",
-                reportTitles: "Docs"])
+        def commentTitle = "# Code Coverage Report for ${platform.gpu}"
+        def commentBody = """\
+        |## Summary
+        |
+        |${results}
+        |${new_uncovered_lines != "0" ? new_lines_string : ""}
+        |## Artifacts
+        |
+        |* [HTML Coverage Report and Diff](${JOB_URL}/Code_20coverage_20${platform.gpu}_20report)
+        |* [File Coverage Summary](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/build/code_cov_${platform.gpu}.report/*view*/)
+        |* [Diff Text File](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/build/code_cov_${platform.gpu}.diff/*view*/)
+        |* [Full Text Coverage Report](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/build/code_cov_${platform.gpu}.zip)
+        |* [Python Coverage Report](${JOB_URL}/Python_20Code_20coverage_20${platform.gpu}_20report)
+        |
+        |## Commit Hashes
+        |
+        |* ${project.gitParentHashes.join("\n|* ")}
+        """.stripMargin()
 
-    if (env.CHANGE_ID)
-    {
-        def commentTitle = "# Generated Documentation"
-        def commentString = "${commentTitle}\n\n"
-        commentString += "* [Link to view Generated Docs.](${JOB_URL}/Generated_20Docs) \n\n"
-
-        boolean commentExists = false
-        for (prComment in getPrComments(pullRequest)) {
-            if (prComment.body.contains(commentTitle))
-            {
-                commentExists = true
-                prComment.body = commentString
-            }
-        }
-        if (!commentExists) {
-            def comment = pullRequest.comment(commentString)
-        }
+        addOrUpdatePrComment(pullRequest, commentTitle, commentBody)
     }
 }
 
@@ -244,7 +218,7 @@ def runPerformanceCommand (platform, project)
                     ./scripts/rrperf compare \\
                         \$(ls -trd ./performance_build_${platform.gpu}/performance_${platform.gpu}/*) \\
                             > performance_comparison_${platform.gpu}.md
-                    
+
                     ./scripts/rrperf compare --format resource_md \\
                         \$(ls -trd ./performance_build_${platform.gpu}/performance_${platform.gpu}/*) \\
                             > resource_comparison_${platform.gpu}.md
@@ -289,7 +263,7 @@ def runPerformanceCommand (platform, project)
                             ./performance_${platform.gpu}_master/performance_${platform.gpu}/* \\
                             ./performance_build_${platform.gpu}/performance_${platform.gpu}/* \\
                             > performance_comparison_${platform.gpu}.md
-                        
+
                         ./scripts/rrperf compare --format resource_md \\
                             ./performance_${platform.gpu}_master/performance_${platform.gpu}/* \\
                             ./performance_build_${platform.gpu}/performance_${platform.gpu}/* \\
@@ -334,61 +308,56 @@ def runPerformanceCommand (platform, project)
                         reportName: "Performance Report for ${platform.gpu}",
                         reportTitles: "Report"])
 
-            def perfCommentTitle = "# Performance Report for ${platform.gpu}"
-            def perfCommentString = "${perfCommentTitle}\n\n"
-            def perfResults = readFile("${project.paths.project_build_prefix}/performance_comparison_${platform.gpu}.md").trim()
-            def estimateString = masterCompare ? "" : " (estimated due to skipped ${env.CHANGE_TARGET} build)"
-            perfCommentString += "## Results${estimateString}\n\n"
-            perfCommentString += "<details open>\n\n${perfResults}\n</details>\n"
-            perfCommentString += "<details><summary>Links</summary>\n\n"
-            perfCommentString += "* [HTML Report](${JOB_URL}/Performance_20Report_20for_20${platform.gpu}) \n"
-            perfCommentString += "* [Job Link](${env.BUILD_URL}) \n"
-            perfCommentString += "* [Result Archive](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/performance_${platform.gpu}_archive.zip) \n"
-            perfCommentString += "</details>\n\n"
+            def estimateString = masterCompare ? "" : "(estimated due to skipped ${env.CHANGE_TARGET} build)"
 
-            boolean perfCommentExists = false
-            for (prComment in getPrComments(pullRequest)) {
-                if (prComment.body.contains(perfCommentTitle))
-                {
-                    perfCommentExists = true
-                    prComment.body = perfCommentString
-                }
-            }
-            if (!perfCommentExists) {
-                def comment = pullRequest.comment(perfCommentString)
-            }
-            
+            // Performance Report
+            def perfCommentTitle = "# Performance Report for ${platform.gpu}"
+            def perfResults = readFile("${project.paths.project_build_prefix}/performance_comparison_${platform.gpu}.md").trim()
+            def perfCommentBody = """\
+            |## Results ${estimateString}
+            |
+            |<details open>
+            |
+            |${perfResults}
+            |</details>
+            |<details><summary>Links</summary>
+            |
+            |* [HTML Report](${JOB_URL}/Performance_20Report_20for_20${platform.gpu})
+            |* [Job Link](${env.BUILD_URL})
+            |* [Result Archive](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/performance_${platform.gpu}_archive.zip)
+            |</details>
+            |
+            |""".stripMargin()
+            addOrUpdatePrComment(pullRequest, perfCommentTitle, perfCommentBody)
+
+            // Resource Report
             def resCommentTitle = "# Resource Report for ${platform.gpu}"
-            def resCommentString = "${resCommentTitle}\n\n"
             def resResults = readFile("${project.paths.project_build_prefix}/resource_comparison_${platform.gpu}.md").trim()
-            
+            def resCommentString = "${resCommentTitle}\n\n"
+
             def maxResultsLength = 60000
             def truncatedMessage = "\n```\n\n**Results truncated, see full report in workspace**"
-            
             if (resResults.length() > maxResultsLength) {
                 def truncateIndex = resResults.lastIndexOf('\n', maxResultsLength)
                 resResults = resResults.substring(0, truncateIndex) + truncatedMessage
             }
-            
-            resCommentString += "## Results${estimateString}\n\n"
-            resCommentString += "<details open>\n\n${resResults}\n</details>\n"
-            resCommentString += "<details><summary>Links</summary>\n\n"
-            resCommentString += "* [HTML Report](${JOB_URL}/Performance_20Report_20for_20${platform.gpu}) \n"
-            resCommentString += "* [Job Link](${env.BUILD_URL}) \n"
-            resCommentString += "* [Result Archive](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/performance_${platform.gpu}_archive.zip) \n"
-            resCommentString += "</details>\n\n"
 
-            boolean resCommentExists = false
-            for (prComment in getPrComments(pullRequest)) {
-                if (prComment.body.contains(resCommentTitle))
-                {
-                    resCommentExists = true
-                    prComment.body = resCommentString
-                }
-            }
-            if (!resCommentExists) {
-                def comment = pullRequest.comment(resCommentString)
-            }
+            def resCommentBody = """\
+            |## Results ${estimateString}
+            |
+            |<details open>
+            |
+            |${resResults}
+            |</details>
+            |<details><summary>Links</summary>
+            |
+            |* [HTML Report](${JOB_URL}/Performance_20Report_20for_20${platform.gpu})
+            |* [Job Link](${env.BUILD_URL})
+            |* [Result Archive](${JOB_URL}/lastSuccessfulBuild/artifact/${project.paths.src_prefix}/rocroller/shared/rocroller/performance_${platform.gpu}_archive.zip)
+            |</details>
+            |
+            |""".stripMargin()
+            addOrUpdatePrComment(pullRequest, resCommentTitle, resCommentBody)
         }
         else
         {
@@ -555,23 +524,15 @@ def runCodeQLTestCommand (platform, project)
     if (env.CHANGE_ID)
     {
         def commentTitle = "# CodeQL report"
-        def commentString = "${commentTitle}\n\n"
-        commentString += readFile("${project.paths.project_src_prefix}/codeql/build/types_count.md").trim() + "\n\n"
-        commentString += "## Links\n"
-        commentString += "* [HTML](${JOB_URL}CodeQL/codeql/build/codeql.html) \n"
-        commentString += "* [Sarif](${JOB_URL}CodeQL/codeql/build/codeql.sarif) (for download and usage in conjunction with SARIF viewers)\n\n"
+        def commentBody = """\
+        |${readFile("${project.paths.project_src_prefix}/codeql/build/types_count.md").trim()}
+        |
+        |## Links
+        |* [HTML](${JOB_URL}CodeQL/codeql/build/codeql.html)
+        |* [Sarif](${JOB_URL}CodeQL/codeql/build/codeql.sarif) (for download and usage in conjunction with SARIF viewers)
+        |""".stripMargin()
 
-        boolean commentExists = false
-        for (prComment in getPrComments(pullRequest)) {
-            if (prComment.body.contains(commentTitle))
-            {
-                commentExists = true
-                prComment.body = commentString
-            }
-        }
-        if (!commentExists) {
-            def comment = pullRequest.comment(commentString)
-        }
+        addOrUpdatePrComment(pullRequest, commentTitle, commentBody)
     }
 
     def html_contents = readFile("${project.paths.project_src_prefix}/codeql/build/codeql.html")

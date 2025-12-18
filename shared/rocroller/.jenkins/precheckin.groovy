@@ -48,7 +48,7 @@ def runCI =
 
         commonGroovy = load "${project.paths.project_src_prefix}/.jenkins/common.groovy"
         def useYAMLCPP = !platform.jenkinsLabel.contains('clang')
-        commonGroovy.runCompileCommand(platform, project, jobName, false, false, '', useYAMLCPP)
+        commonGroovy.runCompileCommand(platform, project, jobName)
     }
 
     def testCommand =

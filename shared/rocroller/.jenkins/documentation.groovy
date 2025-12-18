@@ -41,15 +41,15 @@ def runCI =
 
     boolean formatCheck = false
 
-    def buildDocsCommand =
+    def compileCommand =
     {
         platform, project->
 
         commonGroovy = load "${project.paths.project_src_prefix}/.jenkins/common.groovy"
-        commonGroovy.runBuildDocsCommand(platform, project)
+        commonGroovy.runCompileCommand(platform, project, jobName)
     }
 
-    buildProject(prj, formatCheck, nodes.dockerArray, buildDocsCommand, null, null)
+    buildProject(prj, formatCheck, nodes.dockerArray, compileCommand, null, null)
 }
 
 def rocRollerGetBaseParameters() {

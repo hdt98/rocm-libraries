@@ -1,0 +1,114 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "ci:base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build",
+            "generator": "Unix Makefiles",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "/opt/rocm/bin/amdclang++",
+                "CMAKE_PREFIX_PATH": "/opt/rocm;/opt/rocm/llvm",
+                "CMAKE_BUILD_TYPE": "Release",
+                "ROCROLLER_ENABLE_FETCH": "ON"
+            }
+        },
+        {
+            "name": "ci:precheckin",
+            "displayName": "CI precheckin",
+            "description": "The configuration used by the precheckin build on CI",
+            "inherits": "ci:base",
+            "cacheVariables": {
+                "ROCROLLER_ENABLE_YAML_CPP": "OFF"
+            }
+        },
+        {
+            "name": "ci:performance",
+            "displayName": "CI performance",
+            "description": "The configuration used by the performance build on CI",
+            "inherits": "ci:base",
+            "cacheVariables": {
+                "ROCROLLER_ENABLE_TIMERS": "ON"
+            }
+        },
+        {
+            "name": "ci:codecoverage",
+            "displayName": "CI code coverage",
+            "description": "The configuration used by the code coverage build on CI",
+            "inherits": "ci:base",
+            "cacheVariables": {
+                "ROCROLLER_ENABLE_COVERAGE": "ON",
+                "ROCROLLER_BUILD_SHARED_LIBS": "OFF"
+            }
+        },
+        {
+            "name": "ci:documentation",
+            "displayName": "CI documentation",
+            "description": "The configuration used by the documentation build on CI",
+            "inherits": "ci:base",
+            "cacheVariables": {
+                "ROCROLLER_ENABLE_DOCS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "ci:precheckin",
+            "displayName": "CI precheckin",
+            "description": "The configuration used by the precheckin build on CI",
+            "configurePreset": "ci:precheckin"
+        },
+        {
+            "name": "ci:performance",
+            "displayName": "CI performance",
+            "description": "The configuration used by the performance build on CI",
+            "configurePreset": "ci:performance",
+            "targets": [
+                "all_clients"
+            ]
+        },
+        {
+            "name": "ci:codecoverage",
+            "displayName": "CI code-coverage",
+            "description": "The configuration used by the code-coverage build on CI",
+            "configurePreset": "ci:code-coverage"
+        },
+        {
+            "name": "ci:documentation",
+            "displayName": "CI documentation",
+            "description": "The configuration used by the documentation build on CI",
+            "configurePreset": "ci:documentation",
+            "targets": [
+                "docs"
+            ]
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "ci:base",
+            "hidden": true,
+            "environment": {
+                "OPENBLAS_NUM_THREADS": "1",
+                "OMP_NUM_THREADS": "2"
+            },
+            "output": {
+                "outputOnFailure": true
+            },
+            "configurePreset": "ci:base"
+        },
+        {
+            "name": "ci:precheckin",
+            "displayName": "CI precheckin",
+            "description": "The configuration used by the precheckin build on CI",
+            "configurePreset": "ci:precheckin",
+            "inherits": "ci:base"
+        },
+        {
+            "name": "ci:performance",
+            "displayName": "CI performance",
+            "description": "The configuration used by the performance build on CI",
+            "configurePreset": "ci:performance",
+            "inherits": "ci:base"
+        }
+    ]
+}
