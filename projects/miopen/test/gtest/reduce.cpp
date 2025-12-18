@@ -886,6 +886,21 @@ struct ReduceCommon : public testing::TestWithParam<TestCase>
         std::tie(inLengths, toReduceDims, reduceOp, nanOpt, indicesOpt, scales) = GetParam();
     }
 
+    void TearDown() override
+    {
+        // Ensure all GPU operations complete before the next test
+        auto&& handle = get_handle();
+        handle.Finish();
+        
+        // Clear any pending HIP errors to prevent state leakage between tests
+        hipError_t err = hipGetLastError();
+        if(err != hipSuccess)
+        {
+            std::cerr << "Warning: Clearing HIP error in ReduceCommon TearDown: " 
+                      << hipGetErrorString(err) << std::endl;
+        }
+    }
+
     void Run()
     {
         using reduce::convert_type;

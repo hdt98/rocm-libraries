@@ -151,6 +151,28 @@ protected:
             workspace_dev = nullptr;
         }
     }
+
+    void TearDown() override
+    {
+        // Explicitly reset device pointers to trigger cleanup
+        workspace_dev.reset();
+        output_dev.reset();
+        target_dev.reset();
+        input_dev.reset();
+        
+        // Ensure all GPU operations complete before the next test
+        auto&& handle = get_handle();
+        handle.Finish();
+        
+        // Clear any pending HIP errors to prevent state leakage between tests
+        hipError_t err = hipGetLastError();
+        if(err != hipSuccess)
+        {
+            std::cerr << "Warning: Clearing HIP error in SoftMarginLossForwardTest TearDown: " 
+                      << hipGetErrorString(err) << std::endl;
+        }
+    }
+
     void RunTest()
     {
         auto&& handle = get_handle();
@@ -237,6 +259,28 @@ protected:
         ref_dI = tensor<T>{in_dims, in_strides};
         std::fill(ref_dI.begin(), ref_dI.end(), 0);
     }
+
+    void TearDown() override
+    {
+        // Explicitly reset device pointers to trigger cleanup
+        dI_dev.reset();
+        dO_dev.reset();
+        target_dev.reset();
+        input_dev.reset();
+        
+        // Ensure all GPU operations complete before the next test
+        auto&& handle = get_handle();
+        handle.Finish();
+        
+        // Clear any pending HIP errors to prevent state leakage between tests
+        hipError_t err = hipGetLastError();
+        if(err != hipSuccess)
+        {
+            std::cerr << "Warning: Clearing HIP error in SoftMarginLossBackwardTest TearDown: " 
+                      << hipGetErrorString(err) << std::endl;
+        }
+    }
+
     void RunTest()
     {
         auto&& handle = get_handle();
