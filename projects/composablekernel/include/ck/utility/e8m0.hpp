@@ -1,10 +1,11 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #ifndef CK_CODE_GEN_RTC
 #include "ck/utility/type.hpp"
+#include "ck/utility/scale_utils.hpp"
 
 namespace ck {
 
@@ -70,9 +71,6 @@ struct e8m0_bexp_t
 };
 
 namespace utils {
-
-template <typename T>
-__host__ __device__ inline constexpr int32_t get_exponent_value(T x);
 
 template <>
 __host__ __device__ inline constexpr int32_t get_exponent_value<e8m0_bexp_t>(e8m0_bexp_t x)

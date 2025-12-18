@@ -555,6 +555,38 @@ struct NumericLimits<e8m0_bexp_t>
         return e8m0_bexp_t(binary_142);
     }
 };
+
+template <>
+struct NumericLimits<e4m3_scale_t>
+{
+    static constexpr e4m3_scale_t binary_min  = e4m3_scale_t(0x01); // 0b00000001
+    static constexpr e4m3_scale_t binary_max  = e4m3_scale_t(0x7E); // 0b01111110
+    static constexpr e4m3_scale_t binary_qnan = e4m3_scale_t(0x7F); // 0b01111111
+    static constexpr e4m3_scale_t binary_1    = e4m3_scale_t(0x38); // 0b00111000
+    static constexpr e4m3_scale_t binary_2    = e4m3_scale_t(0x40); // 0b1000000
+
+    __host__ __device__ static constexpr e4m3_scale_t Min() { return binary_min; }
+    __host__ __device__ static constexpr e4m3_scale_t Max() { return binary_max; }
+    __host__ __device__ static constexpr e4m3_scale_t QuietNaN() { return binary_qnan; }
+    __host__ __device__ static constexpr e4m3_scale_t Binary_1() { return binary_1; }
+    __host__ __device__ static constexpr e4m3_scale_t Binary_2() { return binary_2; }
+};
+
+template <>
+struct NumericLimits<e5m3_scale_t>
+{
+    static constexpr e5m3_scale_t binary_min  = e5m3_scale_t(0x01); // 0b00000001
+    static constexpr e5m3_scale_t binary_max  = e5m3_scale_t(0xFE); // 0b11111110
+    static constexpr e5m3_scale_t binary_qnan = e5m3_scale_t(0xFF); // 0b11111111
+    static constexpr e5m3_scale_t binary_1    = e5m3_scale_t(0x78); // 0b01111000
+    static constexpr e5m3_scale_t binary_2    = e5m3_scale_t(0x80); // 0b10000000
+
+    __host__ __device__ static constexpr e5m3_scale_t Min() { return binary_min; }
+    __host__ __device__ static constexpr e5m3_scale_t Max() { return binary_max; }
+    __host__ __device__ static constexpr e5m3_scale_t QuietNaN() { return binary_qnan; }
+    __host__ __device__ static constexpr e5m3_scale_t Binary_1() { return binary_1; }
+    __host__ __device__ static constexpr e5m3_scale_t Binary_2() { return binary_2; }
+};
 #endif
 
 } // namespace ck

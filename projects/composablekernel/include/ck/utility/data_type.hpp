@@ -4,6 +4,8 @@
 #pragma once
 #include <stdint.h>
 #include "ck/utility/amd_ck_fp8.hpp"
+#include "ck/utility/e4m3.hpp"
+#include "ck/utility/e5m3.hpp"
 #include "ck/utility/e8m0.hpp"
 #include "ck/utility/statically_indexed_array.hpp"
 
@@ -332,6 +334,20 @@ struct scalar_type<e8m0_bexp_t>
     using type                           = e8m0_bexp_t::type;
     static constexpr index_t vector_size = 1;
 };
+
+template <>
+struct scalar_type<e4m3_scale_t>
+{
+    using type                           = e4m3_scale_t::type;
+    static constexpr index_t vector_size = 1;
+};
+
+template <>
+struct scalar_type<e5m3_scale_t>
+{
+    using type                           = e5m3_scale_t::type;
+    static constexpr index_t vector_size = 1;
+};
 #endif
 
 template <>
@@ -488,6 +504,10 @@ inline const char* get_type_name()
 #ifndef CK_CODE_GEN_RTC
     else if constexpr(is_same_v<T, e8m0_bexp_t>)
         return "e8m0";
+    else if constexpr(is_same_v<T, e4m3_scale_t>)
+        return "e4m3";
+    else if constexpr(is_same_v<T, e5m3_scale_t>)
+        return "e5m3";
 #endif
     else if constexpr(is_same_v<T, float>)
         return "fp32";
