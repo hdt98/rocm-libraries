@@ -71,7 +71,8 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
 
     static const ck_tile::index_t M_Warp_Tile = 16;
     static const ck_tile::index_t N_Warp_Tile = 16;
-    static const ck_tile::index_t K_Warp_Tile = get_k_warp_tile_flatmm<BDataType, M_Warp_Tile>();
+    static const ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<BDataType, M_Warp_Tile, true>();
 
     static constexpr bool DoubleSmemBuffer = true;  // preshuffle v2 uses ping-pong smem
     static constexpr bool TransposeC       = false; // transpose c is not supported
@@ -344,6 +345,14 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
         }
     }
 
+    struct BShuffleGemmConfig
+    {
+        static constexpr ck_tile::index_t N_Warp_Tile =
+            TestCkTileGroupedGemmPreshuffle::N_Warp_Tile;
+        static constexpr ck_tile::index_t K_Warp_Tile =
+            TestCkTileGroupedGemmPreshuffle::K_Warp_Tile;
+    };
+
     public:
     void Run(const std::vector<int>& Ms,
              const std::vector<int>& Ns,
@@ -428,7 +437,7 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
             ck_tile::FillUniformDistribution<BDataType>{-1.f, 1.f}(b_k_n_tensors[i]);
 
             // Host-side preshuffle of B
-            auto b_shuffle_host = shuffle_b(b_k_n_tensors[i]);
+            auto b_shuffle_host = ck_tile::shuffle_b<BShuffleGemmConfig>(b_k_n_tensors[i]);
 
             a_m_k_dev_buf.push_back(std::make_unique<ck_tile::DeviceMem>(
                 a_m_k_tensors[i].get_element_space_size_in_bytes()));
