@@ -239,7 +239,6 @@
     StoreVectorWidth: 1
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 8
     SubGroup1: 8

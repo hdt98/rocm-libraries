@@ -257,7 +257,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 8
     SubGroup1: 32
@@ -502,7 +501,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -747,7 +745,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -992,7 +989,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -1237,7 +1233,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 8
     SubGroup1: 32
@@ -1482,7 +1477,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 8
     SubGroup1: 32
@@ -1727,7 +1721,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -1972,7 +1965,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -2217,7 +2209,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -2462,7 +2453,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -2707,7 +2697,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 8
     SubGroup1: 32
@@ -2952,7 +2941,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -3197,7 +3185,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
@@ -3442,7 +3429,6 @@
     StoreVectorWidth: 4
     StreamK: 0
     StreamKAtomic: 0
-    StreamKFixupTreeReduction: 0
     StreamKXCCMapping: 0
     SubGroup0: 16
     SubGroup1: 16
