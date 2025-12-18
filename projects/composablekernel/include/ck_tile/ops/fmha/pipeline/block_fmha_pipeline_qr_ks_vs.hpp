@@ -28,6 +28,9 @@ struct BlockFmhaPipelineQRKSVS
     using PDataType             = remove_cvref_t<typename Problem::PDataType>;
     using OaccDataType          = remove_cvref_t<typename Problem::OaccDataType>;
     using ODataType             = remove_cvref_t<typename Problem::ODataType>;
+    using QScaleDataType        = remove_cvref_t<typename Problem::QScaleDataType>;
+    using KScaleDataType        = remove_cvref_t<typename Problem::KScaleDataType>;
+    using VScaleDataType        = remove_cvref_t<typename Problem::VScaleDataType>;
     using AttentionVariant      = remove_cvref_t<typename Problem::AttentionVariant>;
     using FmhaMask              = remove_cvref_t<typename Problem::FmhaMask>;
 
@@ -59,6 +62,12 @@ struct BlockFmhaPipelineQRKSVS
     static constexpr bool kHasDropout       = Problem::kHasDropout;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
     static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr auto QScaleEnum        = Problem::QScaleEnum;
+
+    static constexpr bool kIsMxType = QScaleEnum == BlockAttentionQuantScaleEnum::MX;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = Problem::kQKScaleGranularity;
+    static constexpr ck_tile::index_t kVScaleGranularity  = Problem::kVScaleGranularity;
 
     // For BLOCKSCALE: shift value for exp2(x + shift) to scale P to [0, 2^shift]
     static constexpr float OCP_FP8_SHIFT  = 8.0f;
@@ -148,7 +157,10 @@ struct BlockFmhaPipelineQRKSVS
               typename OAccElementFunction,
               typename PositionEncoding,
               typename AttentionVariantParams,
-              typename BlockIndices>
+              typename BlockIndices,
+              typename QScaleDramBlockWindowTmp,
+              typename KScaleDramBlockWindowTmp,
+              typename VScaleDramBlockWindowTmp>
     CK_TILE_HOST_DEVICE auto
     operator()(const QDramBlockWindowTmp& q_dram_block_window_tmp, // M0*K0 tile
                const QElementFunction& q_element_func,
@@ -175,6 +187,12 @@ struct BlockFmhaPipelineQRKSVS
                const float* k_descale_ptr,
                const float* v_descale_ptr,
                const index_t block_scale_size_kv,
+               const QScaleDramBlockWindowTmp&
+                   q_scale_dram_block_window_tmp, // M0*(K0/kQKScaleGranularity) tile
+               const KScaleDramBlockWindowTmp&
+                   k_scale_dram_block_window_tmp, // N0*(K0/kQKScaleGranularity) tile
+               const VScaleDramBlockWindowTmp&
+                   v_scale_dram_block_window_tmp // N1*(K1/kVScaleGranularity) tile
                const float sink_v) const
     {
         static_assert(
@@ -191,6 +209,30 @@ struct BlockFmhaPipelineQRKSVS
                           kM0 == BiasDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
                           kN0 == BiasDramBlockWindowTmp{}.get_window_lengths()[number<1>{}],
                       "wrong!");
+
+        if constexpr(kIsMxType)
+        {
+            static_assert(std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::ColumnMajor>);
+
+            static_assert(
+                std::is_same_v<QScaleDataType,
+                               remove_cvref_t<typename QScaleDramBlockWindowTmp::DataType>> &&
+                std::is_same_v<KScaleDataType,
+                               remove_cvref_t<typename KScaleDramBlockWindowTmp::DataType>> &&
+                std::is_same_v<VScaleDataType,
+                               remove_cvref_t<typename VScaleDramBlockWindowTmp::DataType>>);
+            static_assert(kM0 == QScaleDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
+                          kN0 == KScaleDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
+                          kK0 == KScaleDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] *
+                                     kQKScaleGranularity &&
+                          kN1 == VScaleDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
+                          kK1 == VScaleDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] *
+                                     kVScaleGranularity);
+
+            ignore = q_scale_dram_block_window_tmp;
+            ignore = k_scale_dram_block_window_tmp;
+            ignore = v_scale_dram_block_window_tmp;
+        }
 
         // K tile in LDS
         KDataType* k_lds_ptr = static_cast<KDataType*>(static_cast<void*>(

@@ -60,6 +60,13 @@ struct FmhaFwdKernel
     static constexpr bool kSkipMinSeqlenQ   = FmhaPipeline::Problem::kSkipMinSeqlenQ;
     static constexpr bool kHasSink          = FmhaPipeline::kHasSink;
 
+    using QScaleDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::QScaleDataType>;
+    using KScaleDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::KScaleDataType>;
+    using VScaleDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::VScaleDataType>;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = FmhaPipeline::kQKScaleGranularity;
+    static constexpr ck_tile::index_t kVScaleGranularity  = FmhaPipeline::kVScaleGranularity;
+
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
     using FmhaMask         = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
     static constexpr bool kHasMask = FmhaMask::IsMasking;
@@ -1385,7 +1392,8 @@ struct FmhaFwdKernel
                 {
                     batch_offset_randval = query_start * kargs.stride_randval;
                 }
-                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
+                             QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
                     const long_index_t bquery_start = kargs.block_scale_seqstart_q_ptr[i_batch];
                     const long_index_t bkey_start   = kargs.block_scale_seqstart_k_ptr[i_batch];
@@ -1460,7 +1468,8 @@ struct FmhaFwdKernel
                     batch_offset_randval =
                         static_cast<long_index_t>(i_batch) * kargs.batch_stride_randval;
                 }
-                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
+                             QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
                     batch_offset_q_descale =
                         static_cast<long_index_t>(i_batch) * kargs.batch_stride_q_descale;
@@ -1889,7 +1898,143 @@ struct FmhaFwdKernel
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
-                    // TODO
+                    const QScaleDataType* q_descale_ptr =
+                        reinterpret_cast<const QScaleDataType*>(kargs.q_descale_ptr) +
+                        static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q_descale +
+                        batch_offset_q_descale;
+                    const KScaleDataType* k_descale_ptr =
+                        reinterpret_cast<const KScaleDataType*>(kargs.k_descale_ptr) +
+                        static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) *
+                            kargs.nhead_stride_k_descale +
+                        batch_offset_k_descale;
+                    const VScaleDataType* v_descale_ptr =
+                        reinterpret_cast<const VScaleDataType*>(kargs.v_descale_ptr) +
+                        static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) *
+                            kargs.nhead_stride_v_descale +
+                        batch_offset_v_descale;
+
+                    const ck_tile::index_t hdim_q_scale =
+                        ck_tile::integer_divide_ceil(kargs.hdim_q, kQKScaleGranularity);
+                    const ck_tile::index_t seqlen_v_scale =
+                        ck_tile::integer_divide_ceil(kargs.seqlen_k, kVScaleGranularity);
+
+                    const auto q_scale_dram = [&]() {
+                        const auto q_scale_dram_naive =
+                            make_naive_tensor_view<address_space_enum::global>(
+                                q_descale_ptr,
+                                make_tuple(kargs.seqlen_q, hdim_q_scale),
+                                make_tuple(kargs.stride_q_descale, 1),
+                                number<FmhaPipeline::kAlignmentQ>{}, // FIX
+                                number<1>{});
+                        if constexpr(FmhaPipeline::kQLoadOnce)
+                        {
+                            static_assert(FmhaPipeline::kSubQKHeaddim % kQKScaleGranularity == 0);
+                            return pad_tensor_view(
+                                q_scale_dram_naive,
+                                make_tuple(
+                                    number<FmhaPipeline::kM0>{},
+                                    number<FmhaPipeline::kSubQKHeaddim / kQKScaleGranularity>{}),
+                                sequence<kPadSeqLenQ, kPadHeadDimQ>{});
+                        }
+                        else
+                        {
+                            static_assert(false);
+                            static_assert(FmhaPipeline::kK0 % kQKScaleGranularity == 0);
+                            return pad_tensor_view(
+                                q_scale_dram_naive,
+                                make_tuple(number<FmhaPipeline::kM0>{},
+                                           number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
+                                sequence<kPadSeqLenQ, kPadHeadDimQ>{});
+                        }
+                    }();
+                    const auto k_scale_dram = [&]() {
+                        const auto k_scale_dram_naive =
+                            make_naive_tensor_view<address_space_enum::global>(
+                                k_descale_ptr,
+                                make_tuple(kargs.seqlen_k, hdim_q_scale),
+                                make_tuple(kargs.stride_k_descale, 1),
+                                number<FmhaPipeline::kAlignmentK>{}, // FIX
+                                number<1>{});
+                        static_assert(FmhaPipeline::kK0 % kQKScaleGranularity == 0);
+                        constexpr bool kPadSeqLenK_ = kUseAsyncCopy ? kPadSeqLenK : false;
+                        return pad_tensor_view(
+                            k_scale_dram_naive,
+                            make_tuple(number<FmhaPipeline::kN0>{},
+                                       number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
+                            sequence<kPadSeqLenK_, kPadHeadDimQ>{});
+                    }();
+                    const auto v_scale_dram = [&]() {
+                        static_assert(
+                            std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::ColumnMajor>);
+                        const auto v_scale_dram_naive =
+                            make_naive_tensor_view<address_space_enum::global>(
+                                v_descale_ptr,
+                                make_tuple(kargs.hdim_v, seqlen_v_scale),
+                                make_tuple(kargs.stride_v_descale, 1),
+                                number<FmhaPipeline::kAlignmentV>{}, // FIX
+                                number<1>{});
+                        static_assert(FmhaPipeline::kK1 % kVScaleGranularity == 0);
+                        constexpr bool kPadHeadDimV_ = kUseAsyncCopy ? kPadHeadDimV : false;
+                        return pad_tensor_view(
+                            v_scale_dram_naive,
+                            make_tuple(number<FmhaPipeline::kN1>{},
+                                       number<FmhaPipeline::kK1 / kVScaleGranularity>{}),
+                            sequence<kPadHeadDimV_, kPadSeqLenK>{});
+                    }();
+
+                    auto q_scale_dram_window = make_tile_window(
+                        q_scale_dram,
+                        [&]() {
+                            if constexpr(FmhaPipeline::kQLoadOnce)
+                                return make_tuple(
+                                    number<FmhaPipeline::kM0>{},
+                                    number<FmhaPipeline::kSubQKHeaddim / kQKScaleGranularity>{});
+                            else
+                                return make_tuple(
+                                    number<FmhaPipeline::kM0>{},
+                                    number<FmhaPipeline::kK0 / kQKScaleGranularity>{});
+                        }(),
+                        {i_m0, 0});
+                    auto k_scale_dram_window = make_tile_window(
+                        k_scale_dram,
+                        make_tuple(number<FmhaPipeline::kN0>{},
+                                   number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
+                        {0, 0});
+                    auto v_scale_dram_window = make_tile_window(
+                        v_scale_dram,
+                        make_tuple(number<FmhaPipeline::kN1>{},
+                                   number<FmhaPipeline::kK1 / kVScaleGranularity>{}),
+                        {i_n1, 0});
+
+                    return FmhaPipeline{}(q_dram_window,
+                                          identity{}, // q_element_func
+                                          k_dram_window,
+                                          identity{}, // k_element_func
+                                          v_dram_window,
+                                          identity{}, // v_element_func
+                                          bias_dram_window,
+                                          identity{}, // bias_element_func
+                                          randval_dram_window,
+                                          lse_dram_window,
+                                          identity{}, // lse_element_func
+                                          identity{}, // s_acc_element_func
+                                          identity{}, // p_compute_element_func
+                                          identity{}, // o_acc_element_func
+                                          mask,
+                                          position_encoding,
+                                          kargs.scale_s,
+                                          variant,
+                                          variant_params,
+                                          block_indices,
+                                          smem_ptr,
+                                          dropout,
+                                          nullptr,
+                                          nullptr,
+                                          1,
+                                          q_scale_dram_window,
+                                          k_scale_dram_window,
+                                          v_scale_dram_window,
+                                          sink_value);
                 }
                 else
                 {
