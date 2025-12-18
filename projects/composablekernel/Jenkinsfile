@@ -687,7 +687,7 @@ def cmake_build(Map conf=[:]){
 
         //run tests except when NO_CK_BUILD or BUILD_LEGACY_OS are set
         //don't run tests for gfx1250
-        if(!setup_args.contains("NO_CK_BUILD") && !params.BUILD_LEGACY_OS  && !setup_args.contains("gfx1250"){
+        if(!setup_args.contains("NO_CK_BUILD") && !params.BUILD_LEGACY_OS  && !setup_args.contains("gfx1250")){
             sh "python3 ../script/ninja_json_converter.py .ninja_log --legacy-format --output ck_build_trace_${check_arch_name()}.json"
             archiveArtifacts "ck_build_trace_${check_arch_name()}.json"
             sh "python3 ../script/parse_ninja_trace.py ck_build_trace_${check_arch_name()}.json"
