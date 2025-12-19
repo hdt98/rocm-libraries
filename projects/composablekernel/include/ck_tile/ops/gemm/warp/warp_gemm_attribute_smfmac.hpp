@@ -73,14 +73,13 @@ struct WarpGemmAttributeSmfmac
         sequence<0, 2>>;
 
     // c_vec += a_vec * b_vec[idx]
-    template <bool post_nop_ = false>
+    template <typename... Params>
     CK_TILE_DEVICE void operator()(CVecType& c_vec,
                                    const AVecType& a_vec,
                                    const BVecType& b_vec,
-                                   const int32_t& idx,
-                                   bool_constant<post_nop_> = {}) const
+                                   const int32_t& idx) const
     {
-        Impl{}(c_vec, a_vec, b_vec, idx, bool_constant<post_nop_>{});
+        Impl{}.template operator()<Params...>(c_vec, a_vec, b_vec, idx);
     }
 };
 } // namespace ck_tile

@@ -6,6 +6,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/device_prop.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_attribute_wmma_impl.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_params.hpp"
 
 namespace ck_tile {
 
@@ -110,32 +111,31 @@ struct WarpGemmAttributeWmma
                            typename CWarpDstrEncodingTrait<Impl>::type>;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         if constexpr(kTransC)
         {
-            TransposedImpl{}(c_vec, b_vec, a_vec, bool_constant<post_nop_>{});
+            TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(c_vec, b_vec, a_vec);
         }
         else
         {
-            Impl{}(c_vec, a_vec, b_vec, bool_constant<post_nop_>{});
+            Impl{}.template operator()<Params...>(c_vec, a_vec, b_vec);
         }
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         if constexpr(kTransC)
         {
-            return TransposedImpl{}(b_vec, a_vec);
+            return TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(b_vec, a_vec);
         }
         else
         {
-            return Impl{}(a_vec, b_vec);
+            return Impl{}.template operator()<Params...>(a_vec, b_vec);
         }
     }
 };

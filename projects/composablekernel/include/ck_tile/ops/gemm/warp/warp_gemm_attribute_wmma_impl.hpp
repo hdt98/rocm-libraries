@@ -67,21 +67,19 @@ struct WarpGemmAttributeWmmaImpl
     using kCTYs2RHsMinor  = typename Traits::kCTYs2RHsMinor;
 
     // c_vec += a_vec * b_vec
-    template <bool clamp = false, bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
-        c_vec = Traits::template wmma_intrinsic<clamp>(a_vec, b_vec, c_vec);
+        c_vec = Traits::template wmma_intrinsic<Params...>(a_vec, b_vec, c_vec);
     }
 
     // c_vec = a_vec * b_vec
-    template <bool clamp = false>
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         return bit_cast<CVecType>(
-            Traits::template wmma_intrinsic<clamp>(a_vec, b_vec, CVecType{0.f}));
+            Traits::template wmma_intrinsic<Params...>(a_vec, b_vec, CVecType{0.f}));
     }
 };
 
