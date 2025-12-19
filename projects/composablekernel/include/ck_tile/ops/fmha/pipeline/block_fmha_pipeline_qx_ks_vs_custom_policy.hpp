@@ -69,6 +69,15 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
     }
 
     template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeKScaleRegTileDistribution()
+    {
+        using BlockGemm = remove_cvref_t<decltype(GetQKBlockGemm<Problem>())>;
+
+        return BlockGemm::template MakeBScaleBlockTileDistribution<Problem::BlockFmhaShape::kN0,
+                                                                   Problem::BlockFmhaShape::kK0>();
+    }
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetQKBlockGemm()
     {
         using GemmProblem =

@@ -847,7 +847,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             }
         };
         gen_scales(q_descale_host, -3, +1);
-        gen_scales(k_descale_host, 0, 0);
+        gen_scales(k_descale_host, -3, +1);
         gen_scales(v_descale_host, 0, 0);
     }
 

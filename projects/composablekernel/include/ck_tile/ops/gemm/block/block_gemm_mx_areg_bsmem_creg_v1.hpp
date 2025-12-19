@@ -27,11 +27,13 @@ struct BlockGemmMxARegBSmemCRegV1
     template <typename CBlockTensor,
               typename ABlockTensorTmp,
               typename AScaleBlockTensorTmp,
-              typename BBlockWindowTmp>
+              typename BBlockWindowTmp,
+              typename BScaleBlockTensorTmp>
     CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
                                    const ABlockTensorTmp& a_block_tensor_tmp,
                                    const AScaleBlockTensorTmp& a_scale_block_tensor_tmp,
-                                   const BBlockWindowTmp& b_block_window_tmp) const
+                                   const BBlockWindowTmp& b_block_window_tmp,
+                                   const BScaleBlockTensorTmp& b_scale_block_tensor_tmp) const
     {
         static_assert(std::is_same_v<ADataType, remove_cv_t<typename ABlockTensorTmp::DataType>> &&
                       std::is_same_v<BDataType, remove_cv_t<typename BBlockWindowTmp::DataType>> &&
@@ -81,6 +83,11 @@ struct BlockGemmMxARegBSmemCRegV1
                 MakeAScaleBlockTileDistribution());
         a_scale_block_tensor.get_thread_buffer() = a_scale_block_tensor_tmp.get_thread_buffer();
 
+        auto b_scale_block_tensor =
+            make_static_distributed_tensor<remove_cv_t<typename BScaleBlockTensorTmp::DataType>>(
+                MakeBScaleBlockTileDistribution());
+        b_scale_block_tensor.get_thread_buffer() = b_scale_block_tensor_tmp.get_thread_buffer();
+
         // construct B-warp-window
         auto b_warp_window_tmp = make_tile_window(
             b_block_window_tmp.get_bottom_tensor_view(),
@@ -120,6 +127,12 @@ struct BlockGemmMxARegBSmemCRegV1
             static_distributed_tensor<remove_cv_t<typename AScaleBlockTensorTmp::DataType>,
                                       AScaleWarpDstr>;
 
+        using BScaleWarpDstr = remove_cvref_t<decltype(make_static_tile_distribution(
+            MakeBScaleWarpDstrEncoding<WG>()))>;
+        using BScaleWarpTensor =
+            static_distributed_tensor<remove_cv_t<typename BScaleBlockTensorTmp::DataType>,
+                                      BScaleWarpDstr>;
+
         constexpr auto a_warp_y_lengths =
             to_sequence(AWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
         constexpr auto c_warp_y_lengths =
@@ -133,11 +146,23 @@ struct BlockGemmMxARegBSmemCRegV1
         constexpr auto a_scale_warp_y_index_zeros =
             uniform_sequence_gen_t<AScaleWarpDstr::NDimY, 0>{};
 
+        constexpr auto b_scale_warp_y_lengths =
+            to_sequence(BScaleWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
+        constexpr auto b_scale_warp_y_index_zeros =
+            uniform_sequence_gen_t<BScaleWarpDstr::NDimY, 0>{};
+
         // hot loop:
         static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
             static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
                 // read B warp tensor from B Block window
                 const auto b_warp_tensor = load_tile(b_warp_windows(nIter)(kIter));
+
+                BScaleWarpTensor b_scale_warp_tensor;
+
+                b_scale_warp_tensor.get_thread_buffer() =
+                    b_scale_block_tensor.get_y_sliced_thread_data(
+                        merge_sequences(sequence<nIter, kIter>{}, b_scale_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1>{}, b_scale_warp_y_lengths));
 
                 static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
                     // read A warp tensor from A block tensor
@@ -167,7 +192,7 @@ struct BlockGemmMxARegBSmemCRegV1
                         a_warp_tensor,
                         b_warp_tensor,
                         int32_t(a_scale_warp_tensor.get_thread_buffer()[0]),
-                        int32_t(0x7f));
+                        int32_t(b_scale_warp_tensor.get_thread_buffer()[0]));
 
                     // write C warp tensor into C block tensor
                     c_block_tensor.set_y_sliced_thread_data(
@@ -234,6 +259,36 @@ struct BlockGemmMxARegBSmemCRegV1
         }
     }
 
+    // TODO: Temporary solution
+    template <typename WG>
+    CK_TILE_DEVICE static constexpr auto MakeBScaleWarpDstrEncoding()
+    {
+        constexpr index_t ScaleGranularity = 32;
+
+        // TODO: same as MakeAScaleWarpDstrEncoding
+
+        if constexpr(WG::kM == 32 && WG::kN == 32)
+        {
+            return ck_tile::tile_distribution_encoding<
+                ck_tile::sequence<>,
+                ck_tile::tuple<ck_tile::sequence<32>, ck_tile::sequence<2, 32 / ScaleGranularity>>,
+                ck_tile::tuple<ck_tile::sequence<2, 1>>,
+                ck_tile::tuple<ck_tile::sequence<0, 0>>,
+                ck_tile::sequence<2>,
+                ck_tile::sequence<1>>{};
+        }
+        else
+        {
+            return ck_tile::tile_distribution_encoding<
+                ck_tile::sequence<>,
+                ck_tile::tuple<ck_tile::sequence<16>, ck_tile::sequence<4, 32 / ScaleGranularity>>,
+                ck_tile::tuple<ck_tile::sequence<2, 1>>,
+                ck_tile::tuple<ck_tile::sequence<0, 0>>,
+                ck_tile::sequence<2>,
+                ck_tile::sequence<1>>{};
+        }
+    }
+
     template <index_t MPerBlock = BlockGemmShape::kM, index_t KPerBlock = BlockGemmShape::kK>
     CK_TILE_DEVICE static constexpr auto MakeAScaleBlockTileDistribution()
     {
@@ -263,6 +318,35 @@ struct BlockGemmMxARegBSmemCRegV1
         return make_static_tile_distribution(a_scale_block_dstr_encode);
     }
 
+    template <index_t NPerBlock = BlockGemmShape::kN, index_t KPerBlock = BlockGemmShape::kK>
+    CK_TILE_DEVICE static constexpr auto MakeBScaleBlockTileDistribution()
+    {
+        constexpr auto config = Policy::template GetWarpGemmMWarpNWarp<Problem>();
+
+        using WG = remove_cvref_t<decltype(config.template at<0>())>;
+
+        constexpr index_t MWarp = config.template at<1>();
+        constexpr index_t NWarp = config.template at<2>();
+
+        constexpr index_t NIterPerWarp = NPerBlock / (NWarp * WG::kN);
+        constexpr index_t KIterPerWarp = KPerBlock / WG::kK;
+
+        constexpr auto b_scale_block_outer_dstr_encoding =
+            tile_distribution_encoding<sequence<MWarp>,
+                                       tuple<sequence<NIterPerWarp, NWarp>, sequence<KIterPerWarp>>,
+                                       tuple<sequence<0, 1>>,
+                                       tuple<sequence<0, 1>>,
+                                       sequence<1, 2>,
+                                       sequence<0, 0>>{};
+
+        // TODO: Temporary solution, add BScaleWarpDstrEncoding to WG?
+        constexpr auto b_scale_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
+            b_scale_block_outer_dstr_encoding,
+            MakeBScaleWarpDstrEncoding<WG>() /*typename WG::BScaleWarpDstrEncoding{}*/);
+
+        return make_static_tile_distribution(b_scale_block_dstr_encode);
+    }
+
     CK_TILE_DEVICE static constexpr auto MakeCBlockTile()
     {
         constexpr index_t MPerBlock = BlockGemmShape::kM;
@@ -277,7 +361,6 @@ struct BlockGemmMxARegBSmemCRegV1
 
         constexpr index_t MIterPerWarp = MPerBlock / (MWarp * WG::kM);
         constexpr index_t NIterPerWarp = NPerBlock / (NWarp * WG::kN);
-        // constexpr index_t KIterPerWarp = KPerBlock / WG::kK;
 
         constexpr auto c_block_outer_dstr_encoding = tile_distribution_encoding<
             sequence<>,
@@ -295,14 +378,21 @@ struct BlockGemmMxARegBSmemCRegV1
     }
 
     // C = A * B
-    template <typename ABlockTensorTmp, typename AScaleBlockTensorTmp, typename BBlockWindowTmp>
+    template <typename ABlockTensorTmp,
+              typename AScaleBlockTensorTmp,
+              typename BBlockWindowTmp,
+              typename BScaleBlockTensorTmp>
     CK_TILE_DEVICE auto operator()(const ABlockTensorTmp& a_block_tensor_tmp,
                                    const AScaleBlockTensorTmp& a_scale_block_tensor_tmp,
-                                   const BBlockWindowTmp& b_block_window_tmp) const
+                                   const BBlockWindowTmp& b_block_window_tmp,
+                                   const BScaleBlockTensorTmp& b_scale_block_tensor_tmp) const
     {
         auto c_block_tensor = MakeCBlockTile();
-        operator()(
-            c_block_tensor, a_block_tensor_tmp, a_scale_block_tensor_tmp, b_block_window_tmp);
+        operator()(c_block_tensor,
+                   a_block_tensor_tmp,
+                   a_scale_block_tensor_tmp,
+                   b_block_window_tmp,
+                   b_scale_block_tensor_tmp);
         return c_block_tensor;
     }
 };
