@@ -129,3 +129,4 @@ python3 -m sphinx -T -E -b html -d docs/_build/doctrees -D language=en docs docs
 ```
 
 You can then open `docs/_build/html/index.html` in your browser to view the documentation.
+

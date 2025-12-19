@@ -46,3 +46,4 @@ python3 ./rmake.py --install
 hipBLAS-common generates the following targets for consumption in internal and external projects.
 
 * `roc::hipblas-common`
+

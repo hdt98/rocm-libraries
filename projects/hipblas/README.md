@@ -109,3 +109,4 @@ hipblasSgemmStridedBatched( hipblasHandle_t handle,
 
 hipBLAS assumes matrix A and vectors x, y are allocated in GPU memory space filled with data. You
 are responsible for copying data to and from the host and device memory.
+

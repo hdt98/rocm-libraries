@@ -104,3 +104,4 @@ You can report bugs and feature requests through the rocm-libraries GitHub
 ## Contribute
 
 If you want to contribute to rocFFT, you must follow the [contribution guidelines](https://github.com/ROCm/rocm-libraries/blob/develop/projects/rocfft/.github/CONTRIBUTING.md).
+

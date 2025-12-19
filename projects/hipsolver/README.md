@@ -95,3 +95,4 @@ hipsolverSgeqrf(hipsolverHandle_t handle,
 ## Supported Functionality
 
 For a complete listing of all supported functions, see the [hipSOLVER user guide](https://rocm.docs.amd.com/projects/hipSOLVER/en/latest/howto/usage.html) and/or [API documentation](https://rocm.docs.amd.com/projects/hipSOLVER/en/latest/reference/index.html).
+

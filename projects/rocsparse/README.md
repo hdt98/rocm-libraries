@@ -139,3 +139,4 @@ To submit an issue, a bug, or a feature request, use the rocm-libraries GitHub
 
 The [license file](https://github.com/ROCm/rocm-libraries/blob/develop/projects/rocsparse/LICENSE.md) is located in the main
 repository.
+

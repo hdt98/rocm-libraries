@@ -245,3 +245,4 @@ script/uninstall_precommit.sh
 
 If you need to temporarily disable pre-commit hooks, you can add the `--no-verify` option to the
 `git commit` command.
+

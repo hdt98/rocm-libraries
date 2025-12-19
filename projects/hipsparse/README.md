@@ -87,3 +87,4 @@ hipsparseScsrmv(hipsparseHandle_t handle,
 
 hipSPARSE assumes matrix A and vectors x, y are allocated in GPU memory space filled with data. Users
 are responsible for copying data to and from the host and device memory.
+

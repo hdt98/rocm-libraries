@@ -294,3 +294,4 @@ cd build/release
 # Run benchmark, e.g.
 ./clients/staging/hipsparselt-bench -f spmm -i 200 -m 256 -n 256 -k 256
 ```
+

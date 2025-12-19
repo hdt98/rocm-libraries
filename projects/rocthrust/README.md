@@ -401,3 +401,4 @@ or follow [this link](https://github.com/ROCm/rocm-libraries/issues?q=is%3Aissue
 ## License
 
 rocThrust is distributed under the [Apache 2.0 LICENSE](./LICENSE).
+
