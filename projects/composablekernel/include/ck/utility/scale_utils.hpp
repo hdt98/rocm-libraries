@@ -5,9 +5,6 @@
 
 #ifndef CK_CODE_GEN_RTC
 
-#include <cstdint>
-#include <math.h>
-
 #include "ck/utility/type.hpp"
 
 namespace ck {
@@ -195,18 +192,18 @@ struct ScaleFormat
         int32_t exp_field  = static_cast<int32_t>((bits >> MantissaBits) & exponent_mask);
         int32_t mant_field = static_cast<int32_t>(bits & mantissa_mask);
 
-        float ulp = std::powf(2.0f, -static_cast<float>(mantissa_bits));
+        float ulp = powf(2.0f, -static_cast<float>(mantissa_bits));
 
         // Handle denormal
         if(exp_field == 0)
         {
             int32_t exp_value = 1;
-            return std::powf(2.0f, static_cast<float>(exp_value - bias)) *
+            return powf(2.0f, static_cast<float>(exp_value - bias)) *
                    static_cast<float>(mant_field) * ulp;
         }
         else
         {
-            return std::powf(2.0f, static_cast<float>(exp_field - bias)) *
+            return powf(2.0f, static_cast<float>(exp_field - bias)) *
                    (1.0f + static_cast<float>(mant_field) * ulp);
         }
     }
