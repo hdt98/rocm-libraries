@@ -9,6 +9,7 @@
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle_v3.hpp"
 
 #include "ck/library/tensor_operation_instance/add_device_operation_instance.hpp"
+#include "ck/host_utility/device_prop.hpp"
 
 namespace ck {
 namespace tensor_operation {
@@ -54,8 +55,11 @@ void add_device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_prefetch_instances
         DeviceGemmV2<Row, Col, Row, BF16, BF16, BF16, PassThrough, PassThrough, PassThrough>>>&
         instances)
 {
-    add_device_operation_instances(
-        instances, device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_instances<true>{});
+    if(ck::is_gfx125_supported())
+    {
+        add_device_operation_instances(
+            instances, device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_instances<true>{});
+    }
 }
 
 void add_device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_no_prefetch_instances(
@@ -63,8 +67,11 @@ void add_device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_no_prefetch_instan
         DeviceGemmV2<Row, Col, Row, BF16, BF16, BF16, PassThrough, PassThrough, PassThrough>>>&
         instances)
 {
-    add_device_operation_instances(
-        instances, device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_instances<false>{});
+    if(ck::is_gfx125_supported())
+    {
+        add_device_operation_instances(
+            instances, device_gemm_xdl_universal_bf16_bf16_bf16_mk_nk_mn_v3_instances<false>{});
+    }
 }
 
 } // namespace instance
