@@ -172,9 +172,17 @@ bool allclose_check_general(char    allclose_type,
         size_t first_error_idx = 0;
         bool found_first_error = false;
         std::set<int64_t> error_cols;
+        std::set<int64_t> non_zero_cols;  // Columns with non-zero elements
         
         for(size_t i = 0; i < size; i++)
         {
+            // Check if column has non-zero elements
+            int64_t col = i / lda;
+            if(std::abs(hCPU_double[i]) > 1e-10 || std::abs(hGPU_double[i]) > 1e-10)
+            {
+                non_zero_cols.insert(col);
+            }
+            
             if(hCPU_double[i] == hGPU_double[i])
                 continue;
             
@@ -191,7 +199,6 @@ bool allclose_check_general(char    allclose_type,
                     found_first_error = true;
                 }
                 // Collect column number (column-major: index = row + col * lda)
-                int64_t col = i / lda;
                 error_cols.insert(col);
             }
         }
@@ -256,6 +263,46 @@ bool allclose_check_general(char    allclose_type,
                     {
                         hipblaslt_cout << error_cols_vec[i];
                         if(i < error_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+            
+            // Print columns with non-zero elements
+            if(!non_zero_cols.empty())
+            {
+                std::vector<int64_t> non_zero_cols_vec(non_zero_cols.begin(), non_zero_cols.end());
+                hipblaslt_cout << "Non-zero columns: ";
+                bool first = true;
+                
+                if(non_zero_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t col : non_zero_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << non_zero_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (non_zero_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = non_zero_cols_vec.size() - 32; i < non_zero_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << non_zero_cols_vec[i];
+                        if(i < non_zero_cols_vec.size() - 1)
                             hipblaslt_cout << ", ";
                     }
                 }
@@ -376,9 +423,17 @@ bool allclose_check_general(char    allclose_type,
         size_t first_error_idx = 0;
         bool found_first_error = false;
         std::set<int64_t> error_cols;
+        std::set<int64_t> non_zero_cols;  // Columns with non-zero elements
         
         for(size_t i = 0; i < size; i++)
         {
+            // Check if column has non-zero elements
+            int64_t col = i / lda;
+            if(std::abs(hCPU_double[i]) > 1e-10 || std::abs(hGPU_double[i]) > 1e-10)
+            {
+                non_zero_cols.insert(col);
+            }
+            
             if(hCPU_double[i] == hGPU_double[i])
                 continue;
             
@@ -395,7 +450,6 @@ bool allclose_check_general(char    allclose_type,
                     found_first_error = true;
                 }
                 // Collect column number (column-major: index = row + col * lda)
-                int64_t col = i / lda;
                 error_cols.insert(col);
             }
         }
@@ -460,6 +514,46 @@ bool allclose_check_general(char    allclose_type,
                     {
                         hipblaslt_cout << error_cols_vec[i];
                         if(i < error_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+            
+            // Print columns with non-zero elements
+            if(!non_zero_cols.empty())
+            {
+                std::vector<int64_t> non_zero_cols_vec(non_zero_cols.begin(), non_zero_cols.end());
+                hipblaslt_cout << "Non-zero columns: ";
+                bool first = true;
+                
+                if(non_zero_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t col : non_zero_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << non_zero_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (non_zero_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = non_zero_cols_vec.size() - 32; i < non_zero_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << non_zero_cols_vec[i];
+                        if(i < non_zero_cols_vec.size() - 1)
                             hipblaslt_cout << ", ";
                     }
                 }
@@ -579,9 +673,17 @@ bool allclose_check_general(char    allclose_type,
         size_t first_error_idx = 0;
         bool found_first_error = false;
         std::set<int64_t> error_cols;
+        std::set<int64_t> non_zero_cols;  // Columns with non-zero elements
         
         for(size_t i = 0; i < size; i++)
         {
+            // Check if column has non-zero elements
+            int64_t col = i / lda;
+            if(std::abs(hCPU_double[i]) > 1e-10 || std::abs(hGPU_double[i]) > 1e-10)
+            {
+                non_zero_cols.insert(col);
+            }
+            
             if(hCPU_double[i] == hGPU_double[i])
                 continue;
             
@@ -598,7 +700,6 @@ bool allclose_check_general(char    allclose_type,
                     found_first_error = true;
                 }
                 // Collect column number (column-major: index = row + col * lda)
-                int64_t col = i / lda;
                 error_cols.insert(col);
             }
         }
@@ -663,6 +764,46 @@ bool allclose_check_general(char    allclose_type,
                     {
                         hipblaslt_cout << error_cols_vec[i];
                         if(i < error_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+            
+            // Print columns with non-zero elements
+            if(!non_zero_cols.empty())
+            {
+                std::vector<int64_t> non_zero_cols_vec(non_zero_cols.begin(), non_zero_cols.end());
+                hipblaslt_cout << "Non-zero columns: ";
+                bool first = true;
+                
+                if(non_zero_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t col : non_zero_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << non_zero_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (non_zero_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = non_zero_cols_vec.size() - 32; i < non_zero_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << non_zero_cols_vec[i];
+                        if(i < non_zero_cols_vec.size() - 1)
                             hipblaslt_cout << ", ";
                     }
                 }
