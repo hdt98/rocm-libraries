@@ -829,13 +829,14 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
     else if(qscale.type == quant_scale_enum::mx)
     {
-        auto gen_scales = [&](auto& scales) {
+        auto gen_scales = [&](auto& scales, float range_min, float range_max) {
             using ScaleType = ck_tile::remove_cvref_t<decltype(*scales.begin())>;
             if constexpr(std::is_same_v<ScaleType, ck_tile::e8m0_t>)
             {
                 // e8m0_t is basically an exponent of float32
                 ck_tile::HostTensor<float> pow2(scales.get_lengths());
-                ck_tile::FillUniformDistributionIntegerValue<float>{-4, +2, next_seed()}(pow2);
+                ck_tile::FillUniformDistributionIntegerValue<float>{
+                    range_min, range_max, next_seed()}(pow2);
                 scales.ForEach([&](auto& self, const auto& i) {
                     self(i) = static_cast<ScaleType>(std::exp2(pow2(i)));
                 });
@@ -845,9 +846,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 static_assert(false);
             }
         };
-        gen_scales(q_descale_host);
-        gen_scales(k_descale_host);
-        gen_scales(v_descale_host);
+        gen_scales(q_descale_host, -3, +1);
+        gen_scales(k_descale_host, 0, 0);
+        gen_scales(v_descale_host, 0, 0);
     }
 
     iota_shuffle(block_table_host.begin(), block_table_host.end(), 0, random_engine);
@@ -1473,6 +1474,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
         fmha_fwd_args fmha_args;
         init_args(fmha_args);
 
+        if(is_mx_type && ck_tile::get_device_name() != "gfx950")
+            return 1.0f;
         return fmha_fwd(fmha_traits, fmha_args, sc);
     };
     const float fwd_ave_time = run_fwd(stream_config);

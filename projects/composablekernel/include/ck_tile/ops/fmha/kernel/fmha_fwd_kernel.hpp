@@ -1924,7 +1924,7 @@ struct FmhaFwdKernel
                                 q_descale_ptr,
                                 make_tuple(kargs.seqlen_q, hdim_q_scale),
                                 make_tuple(kargs.stride_q_descale, 1),
-                                number<FmhaPipeline::kAlignmentQ>{}, // FIX
+                                number<1>{}, // FIX
                                 number<1>{});
                         if constexpr(FmhaPipeline::kQLoadOnce)
                         {
@@ -1953,7 +1953,7 @@ struct FmhaFwdKernel
                                 k_descale_ptr,
                                 make_tuple(kargs.seqlen_k, hdim_q_scale),
                                 make_tuple(kargs.stride_k_descale, 1),
-                                number<FmhaPipeline::kAlignmentK>{}, // FIX
+                                number<1>{}, // FIX
                                 number<1>{});
                         static_assert(FmhaPipeline::kK0 % kQKScaleGranularity == 0);
                         constexpr bool kPadSeqLenK_ = kUseAsyncCopy ? kPadSeqLenK : false;
@@ -1971,7 +1971,7 @@ struct FmhaFwdKernel
                                 v_descale_ptr,
                                 make_tuple(kargs.hdim_v, seqlen_v_scale),
                                 make_tuple(kargs.stride_v_descale, 1),
-                                number<FmhaPipeline::kAlignmentV>{}, // FIX
+                                number<1>{}, // FIX
                                 number<1>{});
                         static_assert(FmhaPipeline::kK1 % kVScaleGranularity == 0);
                         constexpr bool kPadHeadDimV_ = kUseAsyncCopy ? kPadHeadDimV : false;

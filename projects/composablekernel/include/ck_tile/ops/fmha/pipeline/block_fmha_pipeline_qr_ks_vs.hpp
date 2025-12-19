@@ -229,7 +229,6 @@ struct BlockFmhaPipelineQRKSVS
                           kK1 == VScaleDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] *
                                      kVScaleGranularity);
 
-            ignore = q_scale_dram_block_window_tmp;
             ignore = k_scale_dram_block_window_tmp;
             ignore = v_scale_dram_block_window_tmp;
         }
@@ -259,6 +258,23 @@ struct BlockFmhaPipelineQRKSVS
                                               Policy::template MakeQRegTileDistribution<Problem>());
 
         auto q = load_tile(q_dram_window);
+
+        auto q_scale = [&]() {
+            if constexpr(kIsMxType)
+            {
+                auto q_scale_dram_window =
+                    make_tile_window(q_scale_dram_block_window_tmp.get_bottom_tensor_view(),
+                                     q_scale_dram_block_window_tmp.get_window_lengths(),
+                                     q_scale_dram_block_window_tmp.get_window_origin(),
+                                     Policy::template MakeQScaleRegTileDistribution<Problem>());
+
+                return load_tile(q_scale_dram_window);
+            }
+            else
+            {
+                return 0;
+            }
+        }();
 
         using SaccBlockTileType = decltype(gemm_0.MakeCBlockTile());
         auto s_acc              = SaccBlockTileType{};
@@ -443,16 +459,29 @@ struct BlockFmhaPipelineQRKSVS
                     0); // prevent from messing up the order of global loads
             }
 
+            auto run_gemm0 = [&](auto i_k0) {
+                auto q_slice = get_slice_tile(
+                    q_tile, sequence<0, i_k0 * kK0>{}, sequence<kM0, (i_k0 + 1) * kK0>{});
+                if constexpr(kIsMxType)
+                {
+                    auto q_scale_slice =
+                        get_slice_tile(q_scale,
+                                       sequence<0, i_k0*(kK0 / kQKScaleGranularity)>{},
+                                       sequence<kM0, (i_k0 + 1) * (kK0 / kQKScaleGranularity)>{});
+                    gemm_0(s_acc, q_slice, q_scale_slice, k_lds_window);
+                }
+                else
+                {
+                    gemm_0(s_acc, q_slice, k_lds_window);
+                    schedule_gemm0();
+                }
+            };
+
             if constexpr(k0_loops > 2)
             {
                 static_for<0, k0_loops - 2, 1>{}([&](auto i_k0) {
                     block_sync_lds();
-                    gemm_0(s_acc,
-                           get_slice_tile(q_tile,
-                                          sequence<0, i_k0 * kK0>{},
-                                          sequence<kM0, (i_k0 + 1) * kK0>{}),
-                           k_lds_window);
-                    schedule_gemm0();
+                    run_gemm0(number<i_k0>{});
                     block_sync_lds();
                     move_tile_window(k_dram_window, {0, kK0});
 
@@ -466,23 +495,13 @@ struct BlockFmhaPipelineQRKSVS
             const auto v_prefetch = load_tile(v_dram_window); // prefetch load v tile
             {                                                 // tail
                 block_sync_lds();
-                gemm_0(s_acc,
-                       get_slice_tile(q_tile,
-                                      sequence<0, (k0_loops - 2) * kK0>{},
-                                      sequence<kM0, (k0_loops - 1) * kK0>{}),
-                       k_lds_window);
-                schedule_gemm0();
+                run_gemm0(number<k0_loops - 2>{});
                 block_sync_lds();
 
                 store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
                 block_sync_lds();
 
-                gemm_0(s_acc,
-                       get_slice_tile(q_tile,
-                                      sequence<0, (k0_loops - 1) * kK0>{},
-                                      sequence<kM0, k0_loops * kK0>{}),
-                       k_lds_window);
-                schedule_gemm0();
+                run_gemm0(number<k0_loops - 1>{});
             }
             // dequant
             auto s_acc_element_func_ = [&s_acc_element_func, k_descale]() {

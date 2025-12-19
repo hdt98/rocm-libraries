@@ -16,6 +16,7 @@
 #include "ck_tile/ops/gemm/block/block_gemm_areg_bsmem_creg_v2_custom_policy.hpp"
 #include "ck_tile/ops/gemm/block/block_gemm_areg_bsmem_creg_v2.hpp"
 #include "ck_tile/ops/gemm/block/block_gemm_areg_bsmem_creg_one_warp_v1.hpp"
+#include "ck_tile/ops/gemm/block/block_gemm_mx_areg_bsmem_creg_v1.hpp"
 
 namespace ck_tile {
 
@@ -58,6 +59,16 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
     }
 
     template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeQScaleRegTileDistribution()
+    {
+        using BlockGemm = remove_cvref_t<decltype(GetQKBlockGemm<Problem>())>;
+
+        return BlockGemm::template MakeAScaleBlockTileDistribution<
+            Problem::BlockFmhaShape::kM0,
+            Problem::BlockFmhaShape::kSubQKHeaddim>();
+    }
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetQKBlockGemm()
     {
         using GemmProblem =
@@ -87,8 +98,17 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
             }
             else
             {
+                // TODO: add swizzling? It is required for the second 32x32x64 GEMM!
                 constexpr bool SwizzleA =
-                    Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32;
+                    Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32 &&
+                    Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) != 64;
+                // TODO: For fp8 only, support fp4
+                constexpr auto AttrNumAccess =
+                    Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 128
+                        ? WGAttrNumAccessEnum::Double // 16x16x128 fp8
+                    : Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 64
+                        ? WGAttrNumAccessEnum::Double // 32x32x64 fp8
+                        : WGAttrNumAccessEnum::Single;
                 return WarpGemmDispatcher<typename Problem::QDataType,
                                           typename Problem::KDataType,
                                           typename Problem::SaccDataType,
@@ -96,7 +116,9 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                                           Problem::BlockFmhaShape::Gemm0WarpTile::at(number<1>{}),
                                           Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}),
                                           true, // TransposeC
-                                          SwizzleA>{};
+                                          SwizzleA,
+                                          false,
+                                          AttrNumAccess>{};
             }
         }();
 
@@ -107,10 +129,17 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                                                  typename Problem::BlockFmhaShape::Gemm0BlockWarps,
                                                  decltype(warp_gemm)>;
 
-        if constexpr(1 < Problem::kNumGemm0Warps)
-            return BlockGemmARegBSmemCRegV2<GemmProblem, BlockGemmPolicy>{};
+        if constexpr(Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+        {
+            return BlockGemmMxARegBSmemCRegV1<GemmProblem, BlockGemmPolicy>{};
+        }
         else
-            return BlockGemmARegBSmemCRegOneWarpV1<GemmProblem, BlockGemmPolicy>{};
+        {
+            if constexpr(1 < Problem::kNumGemm0Warps)
+                return BlockGemmARegBSmemCRegV2<GemmProblem, BlockGemmPolicy>{};
+            else
+                return BlockGemmARegBSmemCRegOneWarpV1<GemmProblem, BlockGemmPolicy>{};
+        }
     }
 };
 
