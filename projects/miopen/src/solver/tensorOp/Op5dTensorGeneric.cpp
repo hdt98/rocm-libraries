@@ -278,42 +278,42 @@ Op5dTensorGeneric::GetSolution([[maybe_unused]] const ExecutionContext& context,
                     if(use_i32)
                     {
                         // 32-bit path: len_t = unsigned int
-                        kernel(params.ATensor,                                   // Input Tensor A
-                               params.BTensor,                                   // Operand Tensor B
-                               params.CTensor,                                   // Output Tensor C
-                               uint64_t(params.Aoffset),                         // A-offset (always 64-bit)
-                               uint64_t(params.Boffset),                         // B-offset (always 64-bit)
-                               uint64_t(params.Coffset),                         // C-offset (always 64-bit)
-                               static_cast<unsigned int>(blens[0]),              // b_n
-                               static_cast<unsigned int>(blens[1]),              // b_c
-                               static_cast<unsigned int>(blens[2]),              // b_d
-                               static_cast<unsigned int>(blens[3]),              // b_h
-                               static_cast<unsigned int>(blens[4]),              // b_w
-                               static_cast<unsigned int>(clens[0]),              // c_n
-                               static_cast<unsigned int>(clens[1]),              // c_c
-                               static_cast<unsigned int>(clens[2]),              // c_d
-                               static_cast<unsigned int>(clens[3]),              // c_h
-                               static_cast<unsigned int>(clens[4]),              // c_w
-                               static_cast<unsigned int>(astrides_fix[0]),       // a_n fixed stride
-                               static_cast<unsigned int>(astrides_fix[1]),       // a_c fixed stride
-                               static_cast<unsigned int>(astrides_fix[2]),       // a_d fixed stride
-                               static_cast<unsigned int>(astrides_fix[3]),       // a_h fixed stride
-                               static_cast<unsigned int>(astrides_fix[4]),       // a_w fixed stride
-                               static_cast<unsigned int>(bstrides_fix[0]),       // b_n fixed stride
-                               static_cast<unsigned int>(bstrides_fix[1]),       // b_c fixed stride
-                               static_cast<unsigned int>(bstrides_fix[2]),       // b_d fixed stride
-                               static_cast<unsigned int>(bstrides_fix[3]),       // b_h fixed stride
-                               static_cast<unsigned int>(bstrides_fix[4]),       // b_w fixed stride
-                               static_cast<unsigned int>(cstrides[0]),           // c_n strides
-                               static_cast<unsigned int>(cstrides[1]),           // c_c strides
-                               static_cast<unsigned int>(cstrides[2]),           // c_d strides
-                               static_cast<unsigned int>(cstrides[3]),           // c_h strides
-                               static_cast<unsigned int>(cstrides[4]),           // c_w strides
-                               alpha0,                                           // a_0 coeff - scalar
-                               alpha1,                                           // a_1 coeff - scalar
-                               beta,                                             // beta-factor
-                               static_cast<unsigned int>(total_work),            // total_work (32-bit)
-                               !float_equal(beta, 0.0f));                        // use beta
+                        kernel(params.ATensor,                      // Input Tensor A
+                               params.BTensor,                      // Operand Tensor B
+                               params.CTensor,                      // Output Tensor C
+                               uint64_t(params.Aoffset),            // A-offset (always 64-bit)
+                               uint64_t(params.Boffset),            // B-offset (always 64-bit)
+                               uint64_t(params.Coffset),            // C-offset (always 64-bit)
+                               static_cast<unsigned int>(blens[0]), // b_n
+                               static_cast<unsigned int>(blens[1]), // b_c
+                               static_cast<unsigned int>(blens[2]), // b_d
+                               static_cast<unsigned int>(blens[3]), // b_h
+                               static_cast<unsigned int>(blens[4]), // b_w
+                               static_cast<unsigned int>(clens[0]), // c_n
+                               static_cast<unsigned int>(clens[1]), // c_c
+                               static_cast<unsigned int>(clens[2]), // c_d
+                               static_cast<unsigned int>(clens[3]), // c_h
+                               static_cast<unsigned int>(clens[4]), // c_w
+                               static_cast<unsigned int>(astrides_fix[0]), // a_n fixed stride
+                               static_cast<unsigned int>(astrides_fix[1]), // a_c fixed stride
+                               static_cast<unsigned int>(astrides_fix[2]), // a_d fixed stride
+                               static_cast<unsigned int>(astrides_fix[3]), // a_h fixed stride
+                               static_cast<unsigned int>(astrides_fix[4]), // a_w fixed stride
+                               static_cast<unsigned int>(bstrides_fix[0]), // b_n fixed stride
+                               static_cast<unsigned int>(bstrides_fix[1]), // b_c fixed stride
+                               static_cast<unsigned int>(bstrides_fix[2]), // b_d fixed stride
+                               static_cast<unsigned int>(bstrides_fix[3]), // b_h fixed stride
+                               static_cast<unsigned int>(bstrides_fix[4]), // b_w fixed stride
+                               static_cast<unsigned int>(cstrides[0]),     // c_n strides
+                               static_cast<unsigned int>(cstrides[1]),     // c_c strides
+                               static_cast<unsigned int>(cstrides[2]),     // c_d strides
+                               static_cast<unsigned int>(cstrides[3]),     // c_h strides
+                               static_cast<unsigned int>(cstrides[4]),     // c_w strides
+                               alpha0,                                     // a_0 coeff - scalar
+                               alpha1,                                     // a_1 coeff - scalar
+                               beta,                                       // beta-factor
+                               static_cast<unsigned int>(total_work),      // total_work (32-bit)
+                               !float_equal(beta, 0.0f));                  // use beta
                     }
                     else
                     {
@@ -349,11 +349,11 @@ Op5dTensorGeneric::GetSolution([[maybe_unused]] const ExecutionContext& context,
                                static_cast<unsigned long long>(cstrides[2]),     // c_d strides
                                static_cast<unsigned long long>(cstrides[3]),     // c_h strides
                                static_cast<unsigned long long>(cstrides[4]),     // c_w strides
-                               alpha0,                                           // a_0 coeff - scalar
-                               alpha1,                                           // a_1 coeff - scalar
-                               beta,                                             // beta-factor
-                               static_cast<unsigned long long>(total_work),      // total_work (64-bit)
-                               !float_equal(beta, 0.0f));                        // use beta
+                               alpha0,                                      // a_0 coeff - scalar
+                               alpha1,                                      // a_1 coeff - scalar
+                               beta,                                        // beta-factor
+                               static_cast<unsigned long long>(total_work), // total_work (64-bit)
+                               !float_equal(beta, 0.0f));                   // use beta
                     }
                 });
             };
