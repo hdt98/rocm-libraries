@@ -480,7 +480,7 @@ find_program(MIOPEN_AMDGCN_ASSEMBLER
 message(STATUS "AMDGCN assembler: ${MIOPEN_AMDGCN_ASSEMBLER}")
 
 if(MIOPEN_USE_COMGR)
-    find_package(amd_comgr REQUIRED CONFIG)
+    find_package(amd_comgr 3 REQUIRED CONFIG)
     message(STATUS "Build with amd_comgr ${amd_comgr_VERSION} ${amd_comgr_DIR}")
     set(MIOPEN_PACKAGE_REQS "${MIOPEN_PACKAGE_REQS}, comgr")
 endif()

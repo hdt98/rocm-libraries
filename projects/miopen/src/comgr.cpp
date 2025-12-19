@@ -93,8 +93,8 @@ MIOPEN_DECLARE_ENV_VAR_STR(ROCM_PATH)
     ((MIOPEN_AMD_COMGR_VERSION_MAJOR * 1000 + MIOPEN_AMD_COMGR_VERSION_MINOR) * 1000 + \
      MIOPEN_AMD_COMGR_VERSION_PATCH)
 
-#if COMGR_VERSION < 1007000
-#error "AMD COMgr older than 1.7.0 is not supported"
+#if COMGR_VERSION < 3000000
+#error "AMD COMgr older than 3.0.0 is not supported"
 #endif
 
 #define EC_BASE(comgrcall, info, action)                                  \
