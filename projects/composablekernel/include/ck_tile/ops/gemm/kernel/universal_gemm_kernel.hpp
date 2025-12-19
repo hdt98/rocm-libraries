@@ -1216,7 +1216,6 @@ struct UniversalGemmKernel
                        EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
                        is_any_of<EDataType, fp16_t, bf16_t>::value))
         {
-<<<<<<< HEAD
             constexpr auto scheduler_type =
                 GemmPipeline::DoubleSmemBuffer || (GemmPipeline::NumWaveGroups == 1);
             RunGemm<scheduler_type>(as_ptr,
@@ -1228,42 +1227,6 @@ struct UniversalGemmKernel
                                     splitk_batch_offset,
                                     i_m,
                                     i_n);
-=======
-            __shared__ char smem_ptr_1[GemmPipeline::GetSmemSize()];
-            if constexpr(!(EpiloguePipeline::MemoryOperation == memory_operation_enum::atomic_add &&
-                           EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
-                           is_any_of<EDataType, fp16_t, bf16_t>::value))
-            {
-                RunGemm2LDS(as_ptr,
-                            bs_ptr,
-                            kargs.ds_ptr,
-                            e_ptr,
-                            smem_ptr_0,
-                            smem_ptr_1,
-                            kargs,
-                            splitk_batch_offset,
-                            i_m,
-                            i_n);
-            }
-        }
-        else
-        {
-            if constexpr(!(EpiloguePipeline::MemoryOperation == memory_operation_enum::atomic_add &&
-                           EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
-                           is_any_of<EDataType, fp16_t, bf16_t>::value))
-            {
-                constexpr auto scheduler_type = (GemmPipeline::NumWaveGroups == 1);
-                RunGemm<scheduler_type>(as_ptr,
-                                        bs_ptr,
-                                        kargs.ds_ptr,
-                                        e_ptr,
-                                        smem_ptr_0,
-                                        kargs,
-                                        splitk_batch_offset,
-                                        i_m,
-                                        i_n);
-            }
->>>>>>> develop
         }
     }
 
@@ -1312,12 +1275,10 @@ struct UniversalGemmKernel
             // allocate LDS
             __shared__ char smem_ptr[GetSmemSize()];
             // Run the GEMM
-
             if constexpr(!(EpiloguePipeline::MemoryOperation == memory_operation_enum::atomic_add &&
                            EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
                            is_any_of<EDataType, fp16_t, bf16_t>::value))
             {
-<<<<<<< HEAD
                 RunGemm(as_ptr,
                         bs_ptr,
                         kargs.ds_ptr,
@@ -1327,43 +1288,6 @@ struct UniversalGemmKernel
                         splitk_batch_offset,
                         i_m,
                         i_n);
-=======
-                __shared__ char smem_ptr_1[GemmPipeline::GetSmemSize()];
-                if constexpr(!(EpiloguePipeline::MemoryOperation ==
-                                   memory_operation_enum::atomic_add &&
-                               EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
-                               is_any_of<EDataType, fp16_t, bf16_t>::value))
-                {
-                    RunGemm2LDS(as_ptr,
-                                bs_ptr,
-                                kargs.ds_ptr,
-                                e_ptr,
-                                smem_ptr_0,
-                                smem_ptr_1,
-                                kargs,
-                                splitk_batch_offset,
-                                i_m,
-                                i_n);
-                }
-            }
-            else
-            {
-                if constexpr(!(EpiloguePipeline::MemoryOperation ==
-                                   memory_operation_enum::atomic_add &&
-                               EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
-                               is_any_of<EDataType, fp16_t, bf16_t>::value))
-                {
-                    RunGemm(as_ptr,
-                            bs_ptr,
-                            kargs.ds_ptr,
-                            e_ptr,
-                            smem_ptr_0,
-                            kargs,
-                            splitk_batch_offset,
-                            i_m,
-                            i_n);
-                }
->>>>>>> develop
             }
 
             // Advance to the next work item

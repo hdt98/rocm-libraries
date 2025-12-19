@@ -48,7 +48,6 @@ struct TileGemmShape
     }
 };
 
-<<<<<<< HEAD
 template <typename ClusterTile_,
           typename BlockTile_,
           typename BlockWarps_,
@@ -93,12 +92,19 @@ struct is_cluster_tile_gemm_shape<
     : std::true_type
 {
 };
-=======
+
 template <typename PrecType, index_t M_Warp_Tile, bool IsFlatMM = false>
 constexpr index_t get_k_warp_tile()
 {
 #if CK_TILE_USE_WMMA
+#if defined(CK_USE_GFX1250)
+    constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
+                             std::is_same_v<PrecType, ck_tile::bf8_t> ||
+                             std::is_same_v<PrecType, ck_tile::int8_t>;
+    return is_8bit ? 64 : 32;
+#else
     return 16;
+#endif
 #else
 #if defined(CK_GFX950_SUPPORT)
     constexpr bool is_8bit_float =
@@ -115,6 +121,5 @@ constexpr index_t get_k_warp_tile()
 #endif
 #endif
 }
->>>>>>> develop
 
 } // namespace ck_tile

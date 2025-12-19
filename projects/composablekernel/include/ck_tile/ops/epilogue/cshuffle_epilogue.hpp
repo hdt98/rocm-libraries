@@ -35,13 +35,9 @@ template <typename AsDataType_,
           bool FixedVectorSize_        = false,
           index_t VectorSizeC_         = 1,
           bool TiledMMAPermuteN_       = false,
-<<<<<<< HEAD
-          index_t BlockedXDLN_PerWarp_ = 1,
-          typename ComputeDataType_    = void> // The number of continuous xdl_output per warp
-=======
           index_t BlockedXDLN_PerWarp_ = 1, // The number of continuous xdl_output per warp
-          bool DoubleSmemBuffer_       = false>
->>>>>>> develop
+          bool DoubleSmemBuffer_       = false,
+          typename ComputeDataType_    = void>
 struct CShuffleEpilogueProblem
 {
     using AsDataType                                       = remove_cvref_t<AsDataType_>;
@@ -101,29 +97,23 @@ struct CShuffleEpilogue
     using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
 
-<<<<<<< HEAD
-    using ATypeToUse = std::conditional_t<
-        std::is_same_v<ComputeDataType, void>,
-        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>,
-        ComputeDataType>;
+    using ATypeToUse =
+        std::conditional_t<std::is_same_v<ComputeDataType, void>,
+                           std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||
+                                                  std::is_same_v<ADataType, pk_fp4_t>,
+                                              BDataType,
+                                              ADataType>,
+                           ComputeDataType>;
     // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
-    using BTypeToUse = std::conditional_t<
-        std::is_same_v<ComputeDataType, void>,
-        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>,
-        ComputeDataType>;
-=======
-    using ATypeToUse = std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||
-                                              std::is_same_v<ADataType, pk_fp4_t>,
-                                          BDataType,
-                                          ADataType>;
-    // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
-    using BTypeToUse = std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
-                                              std::is_same_v<BDataType, pk_fp4_t> ||
-                                              std::is_same_v<BDataType, pk_fp4_raw_t>,
-                                          ADataType,
-                                          BDataType>;
+    using BTypeToUse =
+        std::conditional_t<std::is_same_v<ComputeDataType, void>,
+                           std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
+                                                  std::is_same_v<BDataType, pk_fp4_t> ||
+                                                  std::is_same_v<BDataType, pk_fp4_raw_t>,
+                                              ADataType,
+                                              BDataType>,
+                           ComputeDataType>;
 
->>>>>>> develop
     using ELayout       = remove_cvref_t<typename Problem::ELayout>;
     using CDElementwise = remove_cvref_t<typename Problem::CDElementwise>;
     static constexpr memory_operation_enum MemoryOperation = Problem::MemoryOperation;

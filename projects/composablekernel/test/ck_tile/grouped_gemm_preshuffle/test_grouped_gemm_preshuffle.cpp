@@ -51,18 +51,6 @@ struct KernelConfig
 using KernelTypes = ::testing::Types<
     //               ALayout, BLayout, CLayout, ADataType, BDataType, AccDataType, CDataType, Persistent ,M_Tile, N_Tile, K_Tile, BlockPerCu
 #if !CK_TILE_USE_WMMA || CK_TILE_USE_OCP_FP8
-<<<<<<< HEAD
-    KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,         False,   16,     64,    256,         1>,
-    KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,         False,   128,    128,   128,         2>,
-    KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,         True,    16,     64,    256,         1>,
-    KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,         True,    128,    128,   128,         2>,
-#endif      
-    KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,         False,   16,     64,    256,         1>,
-    KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,         False,   128,    128,   128,         2>,
-    KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,         True,    16,     64,    256,         1>,
-    KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,         True,    128,    128,   128,         2>,
-    
-=======
     KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,   False,    16,     64,    256,         1>,
     KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,   False,   128,    128,    128,         2>,
     KernelConfig<    Row,     Col,     Row,       F8,        F8,          F32,       F16,   True,    16,     64,    256,         1>,
@@ -72,7 +60,6 @@ using KernelTypes = ::testing::Types<
     KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,   False,  128,    128,    128,         2>,
     KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,   True,    16,     64,    256,         1>,
     KernelConfig<    Row,     Col,     Row,       F16,       F16,         F32,       F16,   True,  128,    128,    128,         2>,
->>>>>>> develop
     KernelConfig<    Row,     Col,     Row,       BF16,      BF16,         F32,       BF16,   False,    16,     64,    256,         1>,
     KernelConfig<    Row,     Col,     Row,       BF16,      BF16,         F32,       BF16,   False,    16,     64,    256,         1>,
     KernelConfig<    Row,     Col,     Row,       BF16,      BF16,         F32,       BF16,   False,  128,    128,    128,         2>,

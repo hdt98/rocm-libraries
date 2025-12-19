@@ -101,18 +101,11 @@ struct GroupedConvolutionBackwardWeightInvoker
                           GroupedConvTraitsType::VectorSizeC>>;
 
             using Kernel = ck_tile::GroupedConvolutionBackwardWeightKernel<GroupedConvTraitsType,
-<<<<<<< HEAD
                                                                                      TilePartitioner,
                                                                                      GemmPipeline,
                                                                                      ConvEpilogue>;
-            auto kargs   = Kernel::MakeKernelArgs(args);
-=======
-                                                                           TilePartitioner,
-                                                                           GemmPipeline,
-                                                                           ConvEpilogue>;
-            const auto kargs = Kernel::MakeKernelArgs(args);
->>>>>>> develop
 
+            const auto kargs  = Kernel::MakeKernelArgs(args);
             const dim3 grids  = Kernel::GridSize(kargs);
             const dim3 blocks = Kernel::BlockSize();
 

@@ -86,58 +86,33 @@ struct UniversalInvoker
         const auto Run = [&](const auto memory_operation_) {
             constexpr auto memory_operation = memory_operation_.value;
 
-<<<<<<< HEAD
             using GemmEpilogue = typename EpilogueTypeTraits<
                 GemmConfig::Pipeline,
-                ck_tile::CShuffleEpilogueProblem<ADataType,
-                                                 BDataType,
-                                                 DsDataType,
-                                                 AccDataType,
-                                                 CDataType,
-                                                 DsLayout,
-                                                 ELayout,
-                                                 CDEElementWise,
-                                                 TilePartitioner::MPerBlock,
-                                                 TilePartitioner::NPerBlock,
-                                                 GemmConfig::M_Warp,
-                                                 GemmConfig::N_Warp,
-                                                 GemmConfig::M_Warp_Tile,
-                                                 GemmConfig::N_Warp_Tile,
-                                                 GemmConfig::K_Warp_Tile,
-                                                 UniversalGemmProblem::TransposeC,
-                                                 memory_operation,
-                                                 GemmConfig::NumWaveGroups,
-                                                 false,
-                                                 1,
-                                                 false,
-                                                 GemmConfig::BlockedXDLN_PerWarp,
-                                                 ComputeDataType>>::Epilogue;
-=======
-            using GemmEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
-                ADataType,
-                BDataType,
-                DsDataType,
-                AccDataType,
-                CDataType,
-                DsLayout,
-                ELayout,
-                CDEElementWise,
-                TilePartitioner::MPerBlock,
-                TilePartitioner::NPerBlock,
-                GemmConfig::M_Warp,
-                GemmConfig::N_Warp,
-                GemmConfig::M_Warp_Tile,
-                GemmConfig::N_Warp_Tile,
-                GemmConfig::K_Warp_Tile,
-                UniversalGemmProblem::TransposeC,
-                memory_operation,
-                GemmConfig::NumWaveGroups,
-                false, /*FixedVectorSize_*/
-                1,     /*VectorSizeC_*/
-                false, /*TiledMMAPermuteN_*/
-                1,     /*BlockedXDLN_PerWarp_*/
-                GemmConfig::DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
->>>>>>> develop
+                ck_tile::CShuffleEpilogueProblem<
+                    ADataType,
+                    BDataType,
+                    DsDataType,
+                    AccDataType,
+                    CDataType,
+                    DsLayout,
+                    ELayout,
+                    CDEElementWise,
+                    TilePartitioner::MPerBlock,
+                    TilePartitioner::NPerBlock,
+                    GemmConfig::M_Warp,
+                    GemmConfig::N_Warp,
+                    GemmConfig::M_Warp_Tile,
+                    GemmConfig::N_Warp_Tile,
+                    GemmConfig::K_Warp_Tile,
+                    UniversalGemmProblem::TransposeC,
+                    memory_operation,
+                    GemmConfig::NumWaveGroups,
+                    false,                           /*FixedVectorSize_*/
+                    1,                               /*VectorSizeC_*/
+                    false,                           /*TiledMMAPermuteN_*/
+                    GemmConfig::BlockedXDLN_PerWarp, /*BlockedXDLN_PerWarp_*/
+                    GemmConfig::DoubleSmemBuffer,    /*DoubleSmemBuffer*/
+                    ComputeDataType>>::Epilogue;
 
             using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
             auto kargs   = Kernel::MakeKernelArgs(args);

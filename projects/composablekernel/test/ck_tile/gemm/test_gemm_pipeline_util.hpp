@@ -309,17 +309,13 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                                  N_Warp_Tile,
                                                  K_Warp_Tile,
                                                  UniversalGemmProblem::TransposeC,
-<<<<<<< HEAD
-                                                 memory_operation>>::epilogue;
-=======
                                                  memory_operation,
                                                  1,     /*kNumWaveGroups_*/
                                                  false, /*FixedVectorSize_*/
                                                  1,     /*VectorSizeC_*/
                                                  false, /*TiledMMAPermuteN_*/
                                                  1,     /*BlockedXDLN_PerWarp_*/
-                                                 DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
->>>>>>> develop
+                                                 DoubleSmemBuffer /*DoubleSmemBuffer*/>>::epilogue;
 
             using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
             auto kargs   = Kernel::MakeKernelArgs(args);

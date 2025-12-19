@@ -852,19 +852,13 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     CK_TILE_DEVICE static constexpr index_t GetSmemSizeB()
     {
-<<<<<<< HEAD
-        using BDataType                 = remove_cvref_t<typename Problem::BDataType>;
-        constexpr auto b_lds_block_desc = Derived::template MakeBLdsBlockDescriptor<Problem>();
-        constexpr index_t smem_size_b   = integer_least_multiple(
-            b_lds_block_desc.get_element_space_size() * sizeof(BDataType), 16);
-=======
         using BDataType =
             std::conditional_t<std::is_same_v<typename Problem::BDataType, pk_fp4_raw_t>,
                                typename Problem::ADataType,
                                typename Problem::BDataType>;
-        constexpr index_t smem_size_b = integer_least_multiple(
-            sizeof(BDataType) * Problem::BlockGemmShape::kN * Problem::BlockGemmShape::kK, 16);
->>>>>>> develop
+        constexpr auto b_lds_block_desc = Derived::template MakeBLdsBlockDescriptor<Problem>();
+        constexpr index_t smem_size_b   = integer_least_multiple(
+            b_lds_block_desc.get_element_space_size() * sizeof(BDataType), 16);
         return smem_size_b;
     }
 

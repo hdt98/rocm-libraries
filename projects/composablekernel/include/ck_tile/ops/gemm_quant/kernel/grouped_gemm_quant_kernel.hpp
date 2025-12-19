@@ -324,11 +324,6 @@ struct QuantGroupedGemmKernel
         if constexpr(GemmPipeline::DoubleSmemBuffer == true &&
                      kQuantType == QuantType::BQuantGrouped)
         {
-<<<<<<< HEAD
-=======
-
-            __shared__ char smem_ptr_1[GemmPipeline::GetSmemSize()];
->>>>>>> develop
             RunGemmWithPipelineSelection2LDS(a_ptr,
                                              b_ptr,
                                              aq_ptr,
@@ -342,19 +337,6 @@ struct QuantGroupedGemmKernel
         }
         else
         {
-
-<<<<<<< HEAD
-            RunGemmWithPipelineSelection(a_ptr,
-                                         b_ptr,
-                                         aq_ptr,
-                                         bq_ptr,
-                                         c_ptr,
-                                         smem_ptr,
-                                         kargs,
-                                         splitk_batch_offset,
-                                         i_m,
-                                         i_n);
-=======
             if constexpr(UsePersistentKernel)
             {
                 RunGemmWithPipelineSelection(a_ptr,
@@ -362,7 +344,7 @@ struct QuantGroupedGemmKernel
                                              aq_ptr,
                                              bq_ptr,
                                              c_ptr,
-                                             smem_ptr_0,
+                                             smem_ptr,
                                              kargs,
                                              splitk_batch_offset,
                                              i_m,
@@ -375,13 +357,12 @@ struct QuantGroupedGemmKernel
                               aq_ptr,
                               bq_ptr,
                               c_ptr,
-                              smem_ptr_0,
+                              smem_ptr,
                               kargs,
                               splitk_batch_offset,
                               i_m,
                               i_n);
             }
->>>>>>> develop
         }
     }
 
