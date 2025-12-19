@@ -808,8 +808,31 @@ extern "C" __global__ void OpTensorFwdBiasGeneric(MIOPEN_TYPE* a,
 
 static_assert(PACK_T >= 1 && PACK_T <= 16, "PACK_T must be in [1..16]");
 
-// Adaptive selection between the narrow (32-bit) and wide (64-bit) index types.
-// len_t / idx_t use 32-bit when the address range allows that for faster arithmetic.
+// When c_w is a power of 2, integer division and modulo can be replaced with
+// bitwise operations:
+//   x % c_w  ->  x & (c_w - 1)
+//   x / c_w  ->  x >> log2(c_w)
+//
+// The solver detects power-of-2 at JIT compile time and used then:
+//   CW_IS_POW2 = 1       - indicates c_w is power of 2
+//   CW_LOG2    = log2(c_w) - shift amount for division
+//
+// These macros provide a hybrid approach:
+// When CW_IS_POW2 is defined: use compile-time optimized bit operations
+// Otherwise: fall back to runtime division/modulo
+
+#ifdef CW_IS_POW2
+// Power-of-2 optimized: use bit operations (compile-time constant shift)
+#define CW_MOD(x, cw) ((x) & ((cw)-1))
+#define CW_DIV(x, cw) ((x) >> CW_LOG2)
+#else
+// General case: use standard division/modulo (runtime)
+#define CW_MOD(x, cw) ((x) % (cw))
+#define CW_DIV(x, cw) ((x) / (cw))
+#endif
+
+// Adaptive selection between the narrow (32-bit) and wide (64-bit) index/offset types.
+// 32-bit for faster arithmetic when the address range allows that.
 // Offsets remain 64-bit to safely handle very large tensors or base offsets.
 #ifdef USE_INDEX32
 using offset_t = uint64_t;
@@ -823,42 +846,42 @@ using idx_t    = uint64_t;
 
 // below - __restrict__ is used to allow compiler to aggressively optimize load/read operations
 // on tensors since we guarantee that there is no overlap between a, b, c pointers
-extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
-                                             const MIOPEN_TYPE* __restrict__ b,
-                                             MIOPEN_TYPE* __restrict__ c,
-                                             const offset_t Aoffset,
-                                             const offset_t Boffset,
-                                             const offset_t Coffset,
-                                             const len_t b_n,
-                                             const len_t b_c,
-                                             const len_t b_d,
-                                             const len_t b_h,
-                                             const len_t b_w,
-                                             const len_t c_n,
-                                             const len_t c_c,
-                                             const len_t c_d,
-                                             const len_t c_h,
-                                             const len_t c_w,
-                                             const len_t a_nstride,
-                                             const len_t a_cstride,
-                                             const len_t a_dstride,
-                                             const len_t a_hstride,
-                                             const len_t a_wstride,
-                                             const len_t b_nstride,
-                                             const len_t b_cstride,
-                                             const len_t b_dstride,
-                                             const len_t b_hstride,
-                                             const len_t b_wstride,
-                                             const len_t c_nstride,
-                                             const len_t c_cstride,
-                                             const len_t c_dstride,
-                                             const len_t c_hstride,
-                                             const len_t c_wstride,
-                                             const MIOPEN_TYPE alpha0,
-                                             const MIOPEN_TYPE alpha1,
-                                             const MIOPEN_TYPE beta,
-                                             const len_t total_work,
-                                             const bool use_beta)
+extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a, // Input Tensor A
+                                             const MIOPEN_TYPE* __restrict__ b, // Operand Tensor B
+                                             MIOPEN_TYPE* __restrict__ c,       // Output Tensor C
+                                             const offset_t Aoffset,            // A-offset
+                                             const offset_t Boffset,            // B-offset
+                                             const offset_t Coffset,            // C-offset
+                                             const len_t b_n,                   // b_n
+                                             const len_t b_c,                   // b_c
+                                             const len_t b_d,                   // b_d
+                                             const len_t b_h,                   // b_h
+                                             const len_t b_w,                   // b_w
+                                             const len_t c_n,                   // c_n
+                                             const len_t c_c,                   // c_c
+                                             const len_t c_d,                   // c_d
+                                             const len_t c_h,                   // c_h
+                                             const len_t c_w,                   // c_w
+                                             const len_t a_nstride,             // a_n fixed stride
+                                             const len_t a_cstride,             // a_c fixed stride
+                                             const len_t a_dstride,             // a_d fixed stride
+                                             const len_t a_hstride,             // a_h fixed stride
+                                             const len_t a_wstride,             // a_w fixed stride
+                                             const len_t b_nstride,             // b_n fixed stride
+                                             const len_t b_cstride,             // b_c fixed stride
+                                             const len_t b_dstride,             // b_d fixed stride
+                                             const len_t b_hstride,             // b_h fixed stride
+                                             const len_t b_wstride,             // b_w fixed stride
+                                             const len_t c_nstride,             // c_n strides
+                                             const len_t c_cstride,             // c_c strides
+                                             const len_t c_dstride,             // c_d strides
+                                             const len_t c_hstride,             // c_h strides
+                                             const len_t c_wstride,             // c_w strides
+                                             const MIOPEN_TYPE alpha0, // a_0 coeff - scalar
+                                             const MIOPEN_TYPE alpha1, // a_1 coeff - scalar
+                                             const MIOPEN_TYPE beta,   // beta-factor
+                                             const len_t total_work,   // total number of operations
+                                             const bool use_beta)      // use beta
 {
     const MIOPEN_TYPE* a_base = a + static_cast<size_t>(Aoffset);
     const MIOPEN_TYPE* b_base = b + static_cast<size_t>(Boffset);
@@ -885,7 +908,6 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
         i += static_cast<wide_t>(tcount))
     {
 
-        // additional guard to avoid internal overflow when using 32-bit idx_t
         const wide_t base = i * static_cast<wide_t>(PACK_T);
 
         // Decompose indices for C ( == A) per one block of PACK_T elements
@@ -896,8 +918,9 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
 
         wide_t tmp_w = base;
 
-        const idx_t w0 = static_cast<idx_t>(tmp_w % cw);
-        tmp_w /= cw;
+        // Use optimized bit operations for W dimension when c_w is power of 2
+        const idx_t w0 = static_cast<idx_t>(CW_MOD(tmp_w, cw));
+        tmp_w          = CW_DIV(tmp_w, cw);
         const idx_t h0 = static_cast<idx_t>(tmp_w % ch);
         tmp_w /= ch;
         const idx_t d0 = static_cast<idx_t>(tmp_w % cd);
@@ -916,8 +939,9 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
         // Check W for possible broadcasting for A and B When true,
         // the same element reused for all W positions for A only case with stride == 0
         // for B: stride == 0 or size == 1
-        const bool aw0 = (a_wstride == 0);
-        const bool bw0 = (b_w == 1) || (b_wstride == 0);
+        const bool aw0  = (a_wstride == 0);
+        const idx_t bw0 = (b_w == 1) ? 0 : ((b_w == c_w) ? w0 : (w0 % static_cast<idx_t>(b_w)));
+        const bool should_cache_bw = (b_w == 1);
 
         // Base offsets for A, B, C tensors
         wide_t a_off = static_cast<wide_t>(n0) * a_nstride + static_cast<wide_t>(c0) * a_cstride +
@@ -926,7 +950,7 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
 
         wide_t b_off = static_cast<wide_t>(bn0) * b_nstride + static_cast<wide_t>(bc0) * b_cstride +
                        static_cast<wide_t>(bd0) * b_dstride + static_cast<wide_t>(bh0) * b_hstride +
-                       (bw0 ? static_cast<wide_t>(0) : static_cast<wide_t>(w0) * b_wstride);
+                       static_cast<wide_t>(bw0) * b_wstride;
 
         wide_t c_off = static_cast<wide_t>(n0) * c_nstride + static_cast<wide_t>(c0) * c_cstride +
                        static_cast<wide_t>(d0) * c_dstride + static_cast<wide_t>(h0) * c_hstride +
@@ -934,7 +958,7 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
 
         // Increments for A, B, C ptrs
         const wide_t a_inc_w = aw0 ? static_cast<wide_t>(0) : static_cast<wide_t>(a_wstride);
-        const wide_t b_inc_w = bw0 ? static_cast<wide_t>(0) : static_cast<wide_t>(b_wstride);
+        const wide_t b_inc_w = should_cache_bw ? 0 : static_cast<wide_t>(b_wstride);
         const wide_t c_inc_w = static_cast<wide_t>(c_wstride);
 
         // Remaining elements in current C-row by W. Compute via wide_t then narrow.
@@ -942,13 +966,13 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
         const idx_t w_run    = static_cast<idx_t>(
             w_rem_w < static_cast<wide_t>(PACK_T) ? w_rem_w : static_cast<wide_t>(PACK_T));
 
-        // for broadcasted A or B, cache the reused value - save redundant loads
+        // Cache broadcast values to avoid redundant loads
         MIOPEN_TYPE av_cached = MIOPEN_TYPE(0);
         if(aw0)
             av_cached = a_base[static_cast<size_t>(a_off)];
 
         MIOPEN_TYPE bv_cached = MIOPEN_TYPE(0);
-        if(bw0)
+        if(should_cache_bw)
             bv_cached = b_base[static_cast<size_t>(b_off)];
 
 // "unroll" below - to unwind small simple loops for better
@@ -961,8 +985,9 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
         {
             if(k < w_run)
             {
-                const MIOPEN_TYPE av  = aw0 ? av_cached : a_base[static_cast<size_t>(a_off)];
-                const MIOPEN_TYPE bv  = bw0 ? bv_cached : b_base[static_cast<size_t>(b_off)];
+                const MIOPEN_TYPE av = aw0 ? av_cached : a_base[static_cast<size_t>(a_off)];
+                const MIOPEN_TYPE bv =
+                    should_cache_bw ? bv_cached : b_base[static_cast<size_t>(b_off)];
                 const MIOPEN_TYPE res = MIOPEN_TENSOR_OP(av * alpha0, bv * alpha1);
 
                 if(!use_beta)
@@ -982,55 +1007,160 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
         }
 
         // process remaining elements (tail) if any are present
-        for(idx_t k = w_run; k < static_cast<idx_t>(PACK_T); ++k)
+        // two paths: optimized incremental (when c_w >= PACK_T) or fallback full decomposition
+        if(w_run < static_cast<idx_t>(PACK_T))
         {
-            const wide_t idx_w = base + static_cast<wide_t>(k);
-            if(idx_w >= static_cast<wide_t>(total_work))
-                break;
-
-            // decompose linear index using cw/ch/cd/ccw defined above
-            const idx_t w  = static_cast<idx_t>(idx_w % cw);
-            const idx_t h  = static_cast<idx_t>((idx_w / cw) % ch);
-            const idx_t d  = static_cast<idx_t>((idx_w / (cw * ch)) % cd);
-            const idx_t c1 = static_cast<idx_t>((idx_w / (cw * ch * cd)) % ccw);
-            const idx_t n  = static_cast<idx_t>(idx_w / (cw * ch * cd * ccw));
-
-            // B broadcast mapping
-            const idx_t bn = (b_n == 1) ? 0 : ((b_n == c_n) ? n : (n % static_cast<idx_t>(b_n)));
-            const idx_t bc = (b_c == 1) ? 0 : ((b_c == c_c) ? c1 : (c1 % static_cast<idx_t>(b_c)));
-            const idx_t bd = (b_d == 1) ? 0 : ((b_d == c_d) ? d : (d % static_cast<idx_t>(b_d)));
-            const idx_t bh = (b_h == 1) ? 0 : ((b_h == c_h) ? h : (h % static_cast<idx_t>(b_h)));
-            const idx_t bw = (b_w == 1) ? 0 : ((b_w == c_w) ? w : (w % static_cast<idx_t>(b_w)));
-
-            // offsets
-            const wide_t a_off_tail =
-                static_cast<wide_t>(n) * a_nstride + static_cast<wide_t>(c1) * a_cstride +
-                static_cast<wide_t>(d) * a_dstride + static_cast<wide_t>(h) * a_hstride +
-                static_cast<wide_t>(w) * a_wstride;
-
-            const wide_t b_off_tail =
-                static_cast<wide_t>(bn) * b_nstride + static_cast<wide_t>(bc) * b_cstride +
-                static_cast<wide_t>(bd) * b_dstride + static_cast<wide_t>(bh) * b_hstride +
-                static_cast<wide_t>(bw) * b_wstride;
-
-            const wide_t c_off_tail =
-                static_cast<wide_t>(n) * c_nstride + static_cast<wide_t>(c1) * c_cstride +
-                static_cast<wide_t>(d) * c_dstride + static_cast<wide_t>(h) * c_hstride +
-                static_cast<wide_t>(w) * c_wstride;
-
-            // execute tensor op for the tail part
-            const MIOPEN_TYPE av      = a_base[static_cast<size_t>(a_off_tail)];
-            const MIOPEN_TYPE bv_tail = bw0 ? bv_cached : b_base[static_cast<size_t>(b_off_tail)];
-            const MIOPEN_TYPE tmp     = MIOPEN_TENSOR_OP(av * alpha0, bv_tail * alpha1);
-
-            if(!use_beta)
+            // guard: incremental tail only safe when tail can't span multiple W-rows
+            // when c_w >= PACK_T, tail elements (at most PACK_T - 1) fit in single row
+            if(cw >= static_cast<wide_t>(PACK_T))
             {
-                c_base[static_cast<size_t>(c_off_tail)] = tmp;
+                // Guard: skip if no tail elements (avoids OOB in pre-load below)
+                const wide_t first_tail_idx = base + static_cast<wide_t>(w_run);
+                if(first_tail_idx >= static_cast<wide_t>(total_work)) {}
+                else
+                {
+                    // optimized path: continue from main loop state with carry propagation
+                    idx_t h_t = h0 + 1;
+                    idx_t d_t = d0;
+                    idx_t c_t = c0;
+                    idx_t n_t = n0;
+
+                    // handle carry propagation for row wrap
+                    if(h_t >= static_cast<idx_t>(c_h))
+                    {
+                        h_t = 0;
+                        d_t++;
+                        if(d_t >= static_cast<idx_t>(c_d))
+                        {
+                            d_t = 0;
+                            c_t++;
+                            if(c_t >= static_cast<idx_t>(c_c))
+                            {
+                                c_t = 0;
+                                n_t++;
+                            }
+                        }
+                    }
+
+                    // B broadcast indices for new row position
+                    const idx_t bn_t =
+                        (b_n == 1) ? 0 : ((b_n == c_n) ? n_t : (n_t % static_cast<idx_t>(b_n)));
+                    const idx_t bc_t =
+                        (b_c == 1) ? 0 : ((b_c == c_c) ? c_t : (c_t % static_cast<idx_t>(b_c)));
+                    const idx_t bd_t =
+                        (b_d == 1) ? 0 : ((b_d == c_d) ? d_t : (d_t % static_cast<idx_t>(b_d)));
+                    const idx_t bh_t =
+                        (b_h == 1) ? 0 : ((b_h == c_h) ? h_t : (h_t % static_cast<idx_t>(b_h)));
+
+                    // base offsets for tail starting position (w = 0)
+                    wide_t a_off_t = static_cast<wide_t>(n_t) * a_nstride +
+                                     static_cast<wide_t>(c_t) * a_cstride +
+                                     static_cast<wide_t>(d_t) * a_dstride +
+                                     static_cast<wide_t>(h_t) * a_hstride;
+                    wide_t b_off_t = static_cast<wide_t>(bn_t) * b_nstride +
+                                     static_cast<wide_t>(bc_t) * b_cstride +
+                                     static_cast<wide_t>(bd_t) * b_dstride +
+                                     static_cast<wide_t>(bh_t) * b_hstride;
+                    wide_t c_off_t = static_cast<wide_t>(n_t) * c_nstride +
+                                     static_cast<wide_t>(c_t) * c_cstride +
+                                     static_cast<wide_t>(d_t) * c_dstride +
+                                     static_cast<wide_t>(h_t) * c_hstride;
+
+                    // cache B value for tail row if W-broadcast
+                    MIOPEN_TYPE bv_tail_cached = MIOPEN_TYPE(0);
+                    if(should_cache_bw)
+                        bv_tail_cached = b_base[static_cast<size_t>(b_off_t)];
+
+                    // process tail elements with incremental W-stride updates
+                    for(idx_t k = w_run; k < static_cast<idx_t>(PACK_T); ++k)
+                    {
+                        const wide_t idx_w = base + static_cast<wide_t>(k);
+                        if(idx_w >= static_cast<wide_t>(total_work))
+                            break;
+
+                        const MIOPEN_TYPE av = a_base[static_cast<size_t>(a_off_t)];
+                        const MIOPEN_TYPE bv =
+                            should_cache_bw ? bv_tail_cached : b_base[static_cast<size_t>(b_off_t)];
+                        const MIOPEN_TYPE res = MIOPEN_TENSOR_OP(av * alpha0, bv * alpha1);
+
+                        if(!use_beta)
+                        {
+                            c_base[static_cast<size_t>(c_off_t)] = res;
+                        }
+                        else
+                        {
+                            const MIOPEN_TYPE cv = c_base[static_cast<size_t>(c_off_t)];
+                            c_base[static_cast<size_t>(c_off_t)] = res + cv * beta;
+                        }
+
+                        a_off_t += a_inc_w;
+                        b_off_t += b_inc_w;
+                        c_off_t += c_inc_w;
+                    }
+                } // end else (valid tail elements exist)
             }
             else
             {
-                const MIOPEN_TYPE cv                    = c_base[static_cast<size_t>(c_off_tail)];
-                c_base[static_cast<size_t>(c_off_tail)] = tmp + cv * beta;
+                // fallback path: full decomposition for each tail element
+                // used when c_w < PACK_T (tail may span multiple rows)
+                for(idx_t k = w_run; k < static_cast<idx_t>(PACK_T); ++k)
+                {
+                    const wide_t idx_w = base + static_cast<wide_t>(k);
+                    if(idx_w >= static_cast<wide_t>(total_work))
+                        break;
+
+                    // decompose linear index (use optimized W operations when power of 2)
+                    const idx_t w      = static_cast<idx_t>(CW_MOD(idx_w, cw));
+                    const wide_t tmp_h = CW_DIV(idx_w, cw);
+                    const idx_t h      = static_cast<idx_t>(tmp_h % ch);
+                    const idx_t d      = static_cast<idx_t>((tmp_h / ch) % cd);
+                    const idx_t c1     = static_cast<idx_t>((tmp_h / (ch * cd)) % ccw);
+                    const idx_t n      = static_cast<idx_t>(tmp_h / (ch * cd * ccw));
+
+                    // B broadcast mapping
+                    const idx_t bn =
+                        (b_n == 1) ? 0 : ((b_n == c_n) ? n : (n % static_cast<idx_t>(b_n)));
+                    const idx_t bc =
+                        (b_c == 1) ? 0 : ((b_c == c_c) ? c1 : (c1 % static_cast<idx_t>(b_c)));
+                    const idx_t bd =
+                        (b_d == 1) ? 0 : ((b_d == c_d) ? d : (d % static_cast<idx_t>(b_d)));
+                    const idx_t bh =
+                        (b_h == 1) ? 0 : ((b_h == c_h) ? h : (h % static_cast<idx_t>(b_h)));
+                    const idx_t bw =
+                        (b_w == 1) ? 0 : ((b_w == c_w) ? w : (w % static_cast<idx_t>(b_w)));
+
+                    // offsets
+                    const wide_t a_off_tail =
+                        static_cast<wide_t>(n) * a_nstride + static_cast<wide_t>(c1) * a_cstride +
+                        static_cast<wide_t>(d) * a_dstride + static_cast<wide_t>(h) * a_hstride +
+                        static_cast<wide_t>(w) * a_wstride;
+
+                    const wide_t b_off_tail =
+                        static_cast<wide_t>(bn) * b_nstride + static_cast<wide_t>(bc) * b_cstride +
+                        static_cast<wide_t>(bd) * b_dstride + static_cast<wide_t>(bh) * b_hstride +
+                        static_cast<wide_t>(bw) * b_wstride;
+
+                    const wide_t c_off_tail =
+                        static_cast<wide_t>(n) * c_nstride + static_cast<wide_t>(c1) * c_cstride +
+                        static_cast<wide_t>(d) * c_dstride + static_cast<wide_t>(h) * c_hstride +
+                        static_cast<wide_t>(w) * c_wstride;
+
+                    // execute tensor op for the tail part
+                    const MIOPEN_TYPE av = a_base[static_cast<size_t>(a_off_tail)];
+                    const MIOPEN_TYPE bv_tail =
+                        should_cache_bw ? bv_cached : b_base[static_cast<size_t>(b_off_tail)];
+                    const MIOPEN_TYPE tmp = MIOPEN_TENSOR_OP(av * alpha0, bv_tail * alpha1);
+
+                    if(!use_beta)
+                    {
+                        c_base[static_cast<size_t>(c_off_tail)] = tmp;
+                    }
+                    else
+                    {
+                        const MIOPEN_TYPE cv = c_base[static_cast<size_t>(c_off_tail)];
+                        c_base[static_cast<size_t>(c_off_tail)] = tmp + cv * beta;
+                    }
+                }
             }
         }
     }
@@ -1048,21 +1178,22 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
         const wide_t cd  = static_cast<wide_t>(c_d);
         const wide_t ccw = static_cast<wide_t>(c_c);
 
-        // decompose linear index
-        const idx_t w  = static_cast<idx_t>(i % cw);
-        const idx_t h  = static_cast<idx_t>((i / cw) % ch);
-        const idx_t d  = static_cast<idx_t>((i / (cw * ch)) % cd);
-        const idx_t c1 = static_cast<idx_t>((i / (cw * ch * cd)) % ccw);
-        const idx_t n  = static_cast<idx_t>(i / (cw * ch * cd * ccw));
+        // decompose linear index (use optimized W operations when power of 2)
+        const idx_t w      = static_cast<idx_t>(CW_MOD(i, cw));
+        const wide_t tmp_h = CW_DIV(i, cw);
+        const idx_t h      = static_cast<idx_t>(tmp_h % ch);
+        const idx_t d      = static_cast<idx_t>((tmp_h / ch) % cd);
+        const idx_t c1     = static_cast<idx_t>((tmp_h / (ch * cd)) % ccw);
+        const idx_t n      = static_cast<idx_t>(tmp_h / (ch * cd * ccw));
 
-        // B broadcast mapping (len_t -> idx_t)
+        // B broadcast mapping
         const idx_t bn = (b_n == 1) ? 0 : ((b_n == c_n) ? n : (n % static_cast<idx_t>(b_n)));
         const idx_t bc = (b_c == 1) ? 0 : ((b_c == c_c) ? c1 : (c1 % static_cast<idx_t>(b_c)));
         const idx_t bd = (b_d == 1) ? 0 : ((b_d == c_d) ? d : (d % static_cast<idx_t>(b_d)));
         const idx_t bh = (b_h == 1) ? 0 : ((b_h == c_h) ? h : (h % static_cast<idx_t>(b_h)));
         const idx_t bw = (b_w == 1) ? 0 : ((b_w == c_w) ? w : (w % static_cast<idx_t>(b_w)));
 
-        // offsets в idx_t
+        // offsets
         const wide_t a_off =
             static_cast<wide_t>(n) * a_nstride + static_cast<wide_t>(c1) * a_cstride +
             static_cast<wide_t>(d) * a_dstride + static_cast<wide_t>(h) * a_hstride +
@@ -1085,19 +1216,20 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a,
 
         if(!use_beta)
         {
-            c_base[static_cast<size_t>(c_off)] = tmp;
+               c_base[static_cast<size_t>(c_off)] = tmp;
         }
         else
         {
-            const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
-            c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
+               const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
+               c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
         }
     }
-#endif
+#endif // USE_PACKED_INNER
 }
-#endif
+#endif // USE_5D_TENSOR_GENERIC
 
 #ifdef USE_5D_TENSOR_GENERIC_CONTIGUOUS
+
 // register-level packet processing to improve parallelism and reduce div/mod overhead.
 // PACK_T = how many consecutive elements each thread handles per inner iteration.
 // If the solver didn't define it at JIT time, fall back to 8 for standalone builds.
@@ -1120,29 +1252,34 @@ using len_t    = unsigned long long;
 using idx_t    = uint64_t;
 #endif
 
+// NOTE: Contiguous fast path assumes B and C have identical shapes (blens == clens).
+// We keep b_* and c_* parameters for interface compatibility with the generic kernel,
+// only (b_w, c_w) are currently used, the rest are intentionally unused.
+
 // below - __restrict__ is used to allow compiler to aggressively optimize load/read operations
 // on tensors since we guarantee that there is no overlap between a, b, c pointers
-extern "C" __global__ void Op5dTensorGenericContiguous(const MIOPEN_TYPE* __restrict__ a,
-                                                       const MIOPEN_TYPE* __restrict__ b,
-                                                       MIOPEN_TYPE* __restrict__ c,
-                                                       const offset_t Aoffset,
-                                                       const offset_t Boffset,
-                                                       const offset_t Coffset,
-                                                       [[maybe_unused]] const len_t b_n,
-                                                       [[maybe_unused]] const len_t b_c,
-                                                       [[maybe_unused]] const len_t b_d,
-                                                       [[maybe_unused]] const len_t b_h,
-                                                       const len_t b_w,
-                                                       [[maybe_unused]] const len_t c_n,
-                                                       [[maybe_unused]] const len_t c_c,
-                                                       [[maybe_unused]] const len_t c_d,
-                                                       [[maybe_unused]] const len_t c_h,
-                                                       const len_t c_w,
-                                                       const MIOPEN_TYPE alpha0,
-                                                       const MIOPEN_TYPE alpha1,
-                                                       const MIOPEN_TYPE beta,
-                                                       const len_t total_work,
-                                                       const bool use_beta)
+extern "C" __global__ void
+Op5dTensorGenericContiguous(const MIOPEN_TYPE* __restrict__ a, // Input Tensor A
+                            const MIOPEN_TYPE* __restrict__ b, // Operand Tensor B
+                            MIOPEN_TYPE* __restrict__ c,       // Output Tensor C
+                            const offset_t Aoffset,            // A-offset
+                            const offset_t Boffset,            // B-offset
+                            const offset_t Coffset,            // C-offset
+                            [[maybe_unused]] const len_t b_n,  // b_n = c_n
+                            [[maybe_unused]] const len_t b_c,  // b_c = c_c
+                            [[maybe_unused]] const len_t b_d,  // b_d = c_d
+                            [[maybe_unused]] const len_t b_h,  // b_h = c_h
+                            const len_t b_w,                   // b_w = c_w
+                            [[maybe_unused]] const len_t c_n,  // c_n
+                            [[maybe_unused]] const len_t c_c,  // c_c
+                            [[maybe_unused]] const len_t c_d,  // c_d
+                            [[maybe_unused]] const len_t c_h,  // c_h
+                            const len_t c_w,                   // c_w
+                            const MIOPEN_TYPE alpha0,          // a_0 coeff - scalar
+                            const MIOPEN_TYPE alpha1,          // a_1 coeff - scalar
+                            const MIOPEN_TYPE beta,            // beta-factor
+                            const len_t total_work,            // total number of operations
+                            const bool use_beta)               // use beta
 {
     const MIOPEN_TYPE* a_base = a + static_cast<size_t>(Aoffset);
     const MIOPEN_TYPE* b_base = b + static_cast<size_t>(Boffset);
