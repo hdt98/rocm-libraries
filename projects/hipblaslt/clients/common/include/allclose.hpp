@@ -34,6 +34,7 @@
 #include <cstdio>
 #include <hipblaslt/hipblaslt.h>
 #include <limits>
+#include <set>
 #include <memory>
 
 /* =====================================================================
@@ -165,11 +166,12 @@ bool allclose_check_general(char    allclose_type,
         // Failed all tolerance checks, print detailed error info with strictest tolerance
         hipblaslt_cout << "Matrix dimensions: M=" << M << ", N=" << N << ", lda=" << lda << std::endl;
         
-        // Find and print first error with matrix coordinates
+        // Find and print first error with matrix coordinates, and collect all error columns
         size_t error_count = 0;
         double max_error = 0.0;
         size_t first_error_idx = 0;
         bool found_first_error = false;
+        std::set<int64_t> error_cols;
         
         for(size_t i = 0; i < size; i++)
         {
@@ -188,6 +190,9 @@ bool allclose_check_general(char    allclose_type,
                     first_error_idx = i;
                     found_first_error = true;
                 }
+                // Collect column number (column-major: index = row + col * lda)
+                int64_t col = i / lda;
+                error_cols.insert(col);
             }
         }
         
@@ -208,6 +213,102 @@ bool allclose_check_general(char    allclose_type,
                           << ", GPU=" << hGPU_double[first_error_idx]
                           << ", diff=" << std::abs(hCPU_double[first_error_idx] - hGPU_double[first_error_idx]) 
                           << std::endl;
+            
+            // Print column statistics
+            size_t total_cols = N;
+            size_t error_col_count = error_cols.size();
+            size_t correct_col_count = total_cols - error_col_count;
+            hipblaslt_cout << "Column statistics: Total=" << total_cols 
+                          << ", Error=" << error_col_count 
+                          << ", Correct=" << correct_col_count << std::endl;
+            
+            // Print error columns (first 32 and last 32 if more than 64, otherwise all)
+            if(!error_cols.empty())
+            {
+                std::vector<int64_t> error_cols_vec(error_cols.begin(), error_cols.end());
+                hipblaslt_cout << "Error columns: ";
+                bool first = true;
+                
+                if(error_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t err_col : error_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << err_col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << error_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (error_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = error_cols_vec.size() - 32; i < error_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << error_cols_vec[i];
+                        if(i < error_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+            
+            // Print correct columns (first 32 and last 32 if more than 64, otherwise all)
+            if(correct_col_count > 0)
+            {
+                std::vector<int64_t> correct_cols_vec;
+                for(int64_t col = 0; col < static_cast<int64_t>(total_cols); col++)
+                {
+                    if(error_cols.find(col) == error_cols.end())
+                    {
+                        correct_cols_vec.push_back(col);
+                    }
+                }
+                
+                hipblaslt_cout << "Correct columns: ";
+                bool first = true;
+                
+                if(correct_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t corr_col : correct_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << corr_col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << correct_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (correct_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = correct_cols_vec.size() - 32; i < correct_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << correct_cols_vec[i];
+                        if(i < correct_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
         }
         
         return false;
@@ -269,11 +370,12 @@ bool allclose_check_general(char    allclose_type,
         // Failed all tolerance checks, print detailed error info with strictest tolerance
         hipblaslt_cout << "Matrix dimensions: M=" << M << ", N=" << N << ", lda=" << lda << std::endl;
         
-        // Find and print first error with matrix coordinates
+        // Find and print first error with matrix coordinates, and collect all error columns
         size_t error_count = 0;
         double max_error = 0.0;
         size_t first_error_idx = 0;
         bool found_first_error = false;
+        std::set<int64_t> error_cols;
         
         for(size_t i = 0; i < size; i++)
         {
@@ -292,6 +394,9 @@ bool allclose_check_general(char    allclose_type,
                     first_error_idx = i;
                     found_first_error = true;
                 }
+                // Collect column number (column-major: index = row + col * lda)
+                int64_t col = i / lda;
+                error_cols.insert(col);
             }
         }
         
@@ -312,6 +417,102 @@ bool allclose_check_general(char    allclose_type,
                           << ", GPU=" << hGPU_double[first_error_idx]
                           << ", diff=" << std::abs(hCPU_double[first_error_idx] - hGPU_double[first_error_idx]) 
                           << std::endl;
+            
+            // Print column statistics
+            size_t total_cols = N;
+            size_t error_col_count = error_cols.size();
+            size_t correct_col_count = total_cols - error_col_count;
+            hipblaslt_cout << "Column statistics: Total=" << total_cols 
+                          << ", Error=" << error_col_count 
+                          << ", Correct=" << correct_col_count << std::endl;
+            
+            // Print error columns (first 32 and last 32 if more than 64, otherwise all)
+            if(!error_cols.empty())
+            {
+                std::vector<int64_t> error_cols_vec(error_cols.begin(), error_cols.end());
+                hipblaslt_cout << "Error columns: ";
+                bool first = true;
+                
+                if(error_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t err_col : error_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << err_col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << error_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (error_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = error_cols_vec.size() - 32; i < error_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << error_cols_vec[i];
+                        if(i < error_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+            
+            // Print correct columns (first 32 and last 32 if more than 64, otherwise all)
+            if(correct_col_count > 0)
+            {
+                std::vector<int64_t> correct_cols_vec;
+                for(int64_t col = 0; col < static_cast<int64_t>(total_cols); col++)
+                {
+                    if(error_cols.find(col) == error_cols.end())
+                    {
+                        correct_cols_vec.push_back(col);
+                    }
+                }
+                
+                hipblaslt_cout << "Correct columns: ";
+                bool first = true;
+                
+                if(correct_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t corr_col : correct_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << corr_col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << correct_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (correct_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = correct_cols_vec.size() - 32; i < correct_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << correct_cols_vec[i];
+                        if(i < correct_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
         }
         
         return false;
@@ -372,11 +573,12 @@ bool allclose_check_general(char    allclose_type,
         // Failed all tolerance checks, print detailed error info with strictest tolerance
         hipblaslt_cout << "Matrix dimensions: M=" << M << ", N=" << N << ", lda=" << lda << std::endl;
         
-        // Find and print first error with matrix coordinates
+        // Find and print first error with matrix coordinates, and collect all error columns
         size_t error_count = 0;
         double max_error = 0.0;
         size_t first_error_idx = 0;
         bool found_first_error = false;
+        std::set<int64_t> error_cols;
         
         for(size_t i = 0; i < size; i++)
         {
@@ -395,6 +597,9 @@ bool allclose_check_general(char    allclose_type,
                     first_error_idx = i;
                     found_first_error = true;
                 }
+                // Collect column number (column-major: index = row + col * lda)
+                int64_t col = i / lda;
+                error_cols.insert(col);
             }
         }
         
@@ -415,6 +620,102 @@ bool allclose_check_general(char    allclose_type,
                           << ", GPU=" << hGPU_double[first_error_idx]
                           << ", diff=" << std::abs(hCPU_double[first_error_idx] - hGPU_double[first_error_idx]) 
                           << std::endl;
+            
+            // Print column statistics
+            size_t total_cols = N;
+            size_t error_col_count = error_cols.size();
+            size_t correct_col_count = total_cols - error_col_count;
+            hipblaslt_cout << "Column statistics: Total=" << total_cols 
+                          << ", Error=" << error_col_count 
+                          << ", Correct=" << correct_col_count << std::endl;
+            
+            // Print error columns (first 32 and last 32 if more than 64, otherwise all)
+            if(!error_cols.empty())
+            {
+                std::vector<int64_t> error_cols_vec(error_cols.begin(), error_cols.end());
+                hipblaslt_cout << "Error columns: ";
+                bool first = true;
+                
+                if(error_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t err_col : error_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << err_col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << error_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (error_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = error_cols_vec.size() - 32; i < error_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << error_cols_vec[i];
+                        if(i < error_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+            
+            // Print correct columns (first 32 and last 32 if more than 64, otherwise all)
+            if(correct_col_count > 0)
+            {
+                std::vector<int64_t> correct_cols_vec;
+                for(int64_t col = 0; col < static_cast<int64_t>(total_cols); col++)
+                {
+                    if(error_cols.find(col) == error_cols.end())
+                    {
+                        correct_cols_vec.push_back(col);
+                    }
+                }
+                
+                hipblaslt_cout << "Correct columns: ";
+                bool first = true;
+                
+                if(correct_cols_vec.size() <= 64)
+                {
+                    // Print all if <= 64
+                    for(int64_t corr_col : correct_cols_vec)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << corr_col;
+                        first = false;
+                    }
+                }
+                else
+                {
+                    // Print first 32
+                    for(size_t i = 0; i < 32; i++)
+                    {
+                        if(!first)
+                            hipblaslt_cout << ", ";
+                        hipblaslt_cout << correct_cols_vec[i];
+                        first = false;
+                    }
+                    hipblaslt_cout << ", ... (" << (correct_cols_vec.size() - 64) << " omitted), ";
+                    // Print last 32
+                    for(size_t i = correct_cols_vec.size() - 32; i < correct_cols_vec.size(); i++)
+                    {
+                        hipblaslt_cout << correct_cols_vec[i];
+                        if(i < correct_cols_vec.size() - 1)
+                            hipblaslt_cout << ", ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
         }
         
         return false;
