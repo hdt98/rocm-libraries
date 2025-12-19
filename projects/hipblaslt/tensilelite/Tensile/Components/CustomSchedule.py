@@ -2268,7 +2268,121 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
             'PackA3' : [packA3],
 
         }
+        for k,v in optSchedule.items():
+            print(f"{k}: {v}")
+        for i,s in zip(syncTable[::2], syncCode):
+            print(f"{i}: code: {s}")
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
+    else:
+        return False, None
+
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    return True, opt1
+
+@RegisterSchedule(
+    tile_config=TileConfig(128, 128, 32, 2, 0, True, 0, 0),
+    dtype_predicate=isTF32,
+    vector_widths=[4, 4, 4],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_128x128x32_TF32(kernel, useLDSTr, TLDS):
+    numMfma = 4 * 4 * 3    # 128 MT0 / 2 WT0 / 16 mfma dim  * 128/2/16 * 3 bf16 MFMAs per tf32 mfma
+    kernel["MfmaInitCVgprs"] = True
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    if isTN(kernel) and not useLDSTr and TLDS==1:
+        print("\nAAAAAAAAAAAAAAAAAAAAAAAAA")
+        kernel["UsePLRPack"] = True
+        numPackInstr = 16 
+        numPackIndices = numPackInstr // 2 # We put 2 pack instructions per index
+
+        # Used the following constrains to create schedule
+        #  - LRA0 + PACKA0 needs to be done before 1/4 MFMAs
+        #  - LBR0 + PACKB0 needs to be done before 2/4 MFMAs
+        #  - LRB3 + PACKB3 needs to start after 2/4 MFMAs
+        #  - LRA3 + PACKA3 needs to start after 3/4 MFMAs
+        
+        # LRA0 + PACKA0
+        lra0 = [0,0, 1,1]
+        waitLRA0 = max(lra0)+2
+        startPACKA0 = waitLRA0
+        # pack 3-11
+        packA0 = create_range(startPACKA0,3*numPackIndices,numMfma//4-1)
+        # LBR0 + PACKB0
+        lrb0 = [4,4,9,9]
+        waitLRB0 = max(lrb0)+2
+        startPACKB0 = max(waitLRB0,max(packA0)) # Starts after waitLRB0 and packA0
+        packB0 = create_range(startPACKB0,3*numPackIndices,numMfma//2-1)
+        
+        # LBR3 + PACKB3  
+        halfMFMA = numMfma//2
+        startLRB3 = halfMFMA
+        lrb3 = create_range(startLRB3,2,numMfma-1)
+        # lrb3 += create_range(max(lrb3)+4,2,numMfma-1)
+        waitLRB3 = startLRB3 + 4
+        packB3 = create_range(waitLRB3,3*numPackIndices,numMfma-1)
+        
+        # LRA3 + PACKA3
+        startLRA3 = (3*numMfma)//4 #can't start before 3/4 MFMAs
+        lra3 = create_range(startLRA3,2,numMfma-1)
+        waitLRA3 = startLRA3 + 3
+        packA3 = create_range(waitLRA3,3*numPackIndices,numMfma-1)
+        
+        # Return number of inflight loads in the list at given index
+        def inflight(lst, index):
+            return sum(val < (index) for val in lst)
+
+        syncTable = [                    
+                    waitLRA0, SWaitCnt(dscnt=inflight(lra0,waitLRA0)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRA0 to complete"),
+                    waitLRA0+numPackIndices, SWaitCnt(dscnt=inflight(lrb0, waitLRA0+numPackIndices), vlcnt=-1, vscnt=-1, comment="Wait for all LRA0 to complete"),
+                    waitLRB0, SWaitCnt(dscnt=inflight(lrb0,waitLRB0)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRB0 to complete"),
+                    waitLRB0+numPackIndices, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB0 to complete"),
+                    waitLRB0+numPackIndices, SBarrier(comment="Barrier before GRA&GRB"),
+
+                    startLRB3-1,SWaitCnt(dscnt=-1, vlcnt=2, vscnt=-1, comment="Wait for previous GRA&B"),
+                    startLRB3-1,SBarrier(comment=""),
+                    
+                    waitLRB3,SWaitCnt(dscnt=inflight(lrb3, waitLRB3)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRB3 to complete"),
+                    waitLRB3+numPackIndices,SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB3 to complete"),
+                    
+                    waitLRA3, SWaitCnt(dscnt=inflight(lra3,waitLRA3)-2, vlcnt=-1, vscnt=-1, comment="Wait for 1st 2 LRA3 to complete"),
+                    waitLRA3+numPackIndices, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRA3 to complete")
+                    ]
+
+        syncCode = syncTable[1::2]
+        gra = [20,20, 22,22, 24,24, 26,26]
+        grb = [32,32, 34,34, 36,36, 38,38]
+        optSchedule = {
+
+            'SYNC': [syncTable[::2]],
+
+            'GRIncA': [[0,2,2, 2,3,3, 3,4,5]],
+            'GRIncB': [[7,8,9, 10,11,12, 13,14,15]],
+            'LRA0': [lra0],
+            'LRB0': [lrb0],
+            'PackA0' : [packA0],
+            'PackB0' : [packB0],
+            
+            'GRA': [gra],#, [i+1 for i in gra]],
+            'GRB': [grb],# [i+1 for i in grb]],
+            'LRSA': [[waitLRB0+numPackIndices+1]],
+            'LRSB': [[waitLRB0+numPackIndices+1]],
+            'LWSA': [[45]],
+            'LWSB': [[45]],
+            'LCC': [[numMfma-1, numMfma-1]],
+            'LRA3': [lra3],
+            'LRB3': [lrb3],
+            'PackB3' : [packB3],
+            'PackA3' : [packA3],
+
+        }
+        for k,v in optSchedule.items():
+            print(f"{k}: {v}")
+        for i,s in zip(syncTable[::2], syncCode):
+            print(f"{i}: code: {s}")
+        nglshift = nllshift = 8 # vmcnt shift for ngl and nll
     else:
         return False, None
 
