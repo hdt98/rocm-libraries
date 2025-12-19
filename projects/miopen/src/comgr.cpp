@@ -269,10 +269,9 @@ static std::string to_string(const amd_comgr_action_kind_t val)
     std::ostringstream oss;
     MIOPEN_LOG_ENUM(oss,
                     val,
-                    AMD_COMGR_ACTION_CODEGEN_BC_TO_RELOCATABLE,
                     AMD_COMGR_ACTION_LINK_RELOCATABLE_TO_EXECUTABLE,
                     AMD_COMGR_ACTION_ASSEMBLE_SOURCE_TO_RELOCATABLE,
-                    AMD_COMGR_ACTION_COMPILE_SOURCE_WITH_DEVICE_LIBS_TO_BC);
+                    AMD_COMGR_ACTION_COMPILE_SOURCE_TO_EXECUTABLE);
     return oss.str();
 }
 
@@ -592,16 +591,8 @@ void BuildOcl(const std::string& name,
         compiler::lc::ocl::AddCompilerOptions(optCompile);
         action.SetOptionList(optCompile);
 
-        const Dataset linkedBc;
-        action.Do(AMD_COMGR_ACTION_COMPILE_SOURCE_WITH_DEVICE_LIBS_TO_BC, inputs, linkedBc);
-
-        action.SetOptionList(optCompile);
-        const Dataset relocatable;
-        action.Do(AMD_COMGR_ACTION_CODEGEN_BC_TO_RELOCATABLE, linkedBc, relocatable);
-
-        action.SetOptionList(OptionList());
         const Dataset exe;
-        action.Do(AMD_COMGR_ACTION_LINK_RELOCATABLE_TO_EXECUTABLE, relocatable, exe);
+        action.Do(AMD_COMGR_ACTION_COMPILE_SOURCE_TO_EXECUTABLE, inputs, exe);
 
         if(exe.GetDataCount(AMD_COMGR_DATA_KIND_EXECUTABLE) < 1)
             throw ComgrError{AMD_COMGR_STATUS_ERROR, true, "Executable binary not found"};
