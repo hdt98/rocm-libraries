@@ -601,6 +601,7 @@ namespace rocRoller
                     auto bufferReg = tagger->getRegister(
                         buffer, Register::Type::Scalar, {DataType::None, PointerType::Buffer}, 1);
                     bufferReg->setName(concatenate("Buffer", buffer));
+                    bufferReg->allocateNow();
                     if(bufferReg->allocationState() == Register::AllocationState::Unallocated)
                     {
                         Register::ValuePtr basePointer;
@@ -613,20 +614,13 @@ namespace rocRoller
                                               simplify(basePointer->expression() + user->offset));
                             co_yield bufDesc.setBasePointer(tmpRegister);
                         }
-                        else
-                        {
-                            co_yield bufDesc.setBasePointer(basePointer);
-                        }
-
-                        co_yield bufDesc.setDefaultOpts();
-                        Register::ValuePtr limitValue;
-                        co_yield generate(limitValue, toBytes(user->size));
+                        bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, base, m_context);
+                        bufferExpr = BufferDescriptor::SetOptions(
+                            bufferExpr, BufferDescriptor::GetDefaultOptions(m_context));
                         // TODO: Handle sizes larger than 32 bits
-                        auto limit = (limitValue->regType() == Register::Type::Literal)
-                                         ? limitValue
-                                         : limitValue->subset({0});
-                        limit->setVariableType(DataType::UInt32);
-                        co_yield bufDesc.setSize(limit);
+                        bufferExpr
+                            = BufferDescriptor::SetSize(bufferExpr, toBytes(user->size), m_context);
+                        co_yield Expression::generate(bufferReg, bufferExpr, m_context);
                     }
                     scope->addRegister(buffer);
                 }

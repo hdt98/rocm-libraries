@@ -26,8 +26,8 @@ namespace rocRollerTest
         const size_t numFP4PerElement = 8;
 
         /*
-         * buffer_load into FP4x8 to GPU, buffer_store to CPU
-         */
+          * buffer_load into FP4x8 to GPU, buffer_store to CPU
+          */
         void genFP4x8BufferLoadAndStore(int num_fp4)
         {
             AssertFatal(num_fp4 % numFP4PerElement == 0,
@@ -67,8 +67,10 @@ namespace rocRollerTest
 
                 Expression::ExpressionPtr bufferExpr = Expression::literal(Buffer{0, 0, 0, 0});
                 bufferExpr = BufferDescriptor::SetDefaults(bufferExpr, m_context);
-                bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, s_a->expression());
-                bufferExpr = BufferDescriptor::SetSize(bufferExpr, Expression::literal(N));
+                bufferExpr
+                    = BufferDescriptor::SetBasePointer(bufferExpr, s_a->expression(), m_context);
+                bufferExpr
+                    = BufferDescriptor::SetSize(bufferExpr, Expression::literal(N), m_context);
                 bufferExpr = BufferDescriptor::SetOptions(bufferExpr,
                                                           Expression::literal(131072)); //0x00020000
 
@@ -79,10 +81,13 @@ namespace rocRollerTest
 
                 auto bufInstOpts = rocRoller::BufferInstructionOptions();
 
-                co_yield m_context->mem()->loadBuffer(v_a, vgprSerial, 0, bufDesc, bufInstOpts, N);
-                co_yield bufDesc->setBasePointer(s_result);
-                co_yield bufDesc->setSize(Register::Value::Literal(N));
-                co_yield m_context->mem()->storeBuffer(v_a, vgprSerial, 0, bufDesc, bufInstOpts, N);
+                co_yield m_context->mem()->loadBuffer(
+                    v_a, vgprSerial, 0, bufferRegs, bufInstOpts, N);
+                bufferExpr = BufferDescriptor::SetBasePointer(
+                    bufferExpr, s_result->expression(), m_context);
+                co_yield Expression::generate(bufferRegs, bufferExpr, m_context);
+                co_yield m_context->mem()->storeBuffer(
+                    v_a, vgprSerial, 0, bufferRegs, bufInstOpts, N);
             };
 
             m_context->schedule(kb());
@@ -91,8 +96,8 @@ namespace rocRollerTest
         }
 
         /*
-         * global_load into FP4x8 to GPU, global_store to CPU
-         */
+          * global_load into FP4x8 to GPU, global_store to CPU
+          */
         void genFP4x8GlobalLoadAndStore(int num_fp4)
         {
             AssertFatal(num_fp4 % numFP4PerElement == 0,
@@ -229,11 +234,11 @@ namespace rocRollerTest
             auto dataType = DataType::FP4;
 
             auto tagTensorA = command->addOperation(
-                rocRoller::Operations::Tensor(2, dataType, {}, {0, 1})); // Load A
+                rocRoller::Operations::Tensor(2, dataType, {0, 1})); // Load A
             auto tagLoadA = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorA));
 
             auto tagTensorB = command->addOperation(
-                rocRoller::Operations::Tensor(2, dataType, {}, {0, 1})); // Store B
+                rocRoller::Operations::Tensor(2, dataType, {0, 1})); // Store B
             command->addOperation(rocRoller::Operations::T_Store_Tiled(tagLoadA, tagTensorB));
 
             auto commandArgs = command->createArguments();
