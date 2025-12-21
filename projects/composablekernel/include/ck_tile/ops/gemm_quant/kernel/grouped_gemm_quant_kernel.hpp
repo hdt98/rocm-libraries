@@ -466,12 +466,12 @@ struct QuantGroupedGemmKernel
                                                                           num_loop,
                                                                           has_hot_loop,
                                                                           tail_num,
-                                                                          smem_ptr_0);
+                                                                          smem_ptr);
 
             auto& c_block_window = gemm_tile_windows.at(Base::I4);
 
             // Run Epilogue Pipeline
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr_0);
+            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
         }
         else if constexpr(kQuantType == QuantType::BQuantGrouped)
         {

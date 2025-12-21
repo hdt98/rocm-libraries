@@ -313,7 +313,11 @@ struct CShuffleEpilogue
         constexpr index_t VectorLen = GetVectorSizeC();
 
         // calculate how many elements to pad to avoid bank conflict
-        constexpr auto PaddingAmount   = VectorLen;
+#if defined(__gfx950__) || defined(__gfx125__)
+        constexpr auto PaddingAmount = VectorLen;
+#else
+        constexpr auto PaddingAmount = 0;
+#endif
         constexpr index_t BytesPerBank = 4;
         // N is contiguous dimension
         if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)

@@ -1236,7 +1236,7 @@ struct QuantGemmKernel
                                                           aq_block_window,
                                                           bq_block_window,
                                                           num_loop,
-                                                          smem_ptr_0,
+                                                          smem_ptr,
                                                           m,
                                                           n);
             }

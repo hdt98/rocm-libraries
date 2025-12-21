@@ -11,30 +11,6 @@
 #include "ck_tile/ops/gemm/kernel/grouped_gemm_kernel.hpp"
 #include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 
-template <typename PrecType, ck_tile::index_t M_Warp_Tile>
-constexpr ck_tile::index_t get_k_warp_tile_flatmm()
-{
-#if CK_TILE_USE_WMMA
-#if defined(CK_USE_GFX1250)
-    return sizeof(PrecType) == 2 ? 32 : 64;
-#else
-    return 16;
-#endif
-#else
-#if defined(CK_GFX950_SUPPORT)
-    if constexpr(M_Warp_Tile == 32)
-        return sizeof(PrecType) == 2 ? 16 : 64;
-    else
-        return sizeof(PrecType) == 2 ? 32 : 128;
-#else
-    if constexpr(M_Warp_Tile == 32)
-        return sizeof(PrecType) == 2 ? 16 : 32;
-    else
-        return sizeof(PrecType) == 2 ? 32 : 64;
-#endif
-#endif
-}
-
 template <typename Tuple>
 class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
 {
