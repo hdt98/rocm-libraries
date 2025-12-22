@@ -61,12 +61,12 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
-    const auto a_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx));
-    const auto b_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx));
-    const auto e_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx));
+    const long_index_t a_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+    const long_index_t b_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+    const long_index_t e_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
@@ -156,12 +156,12 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
-    const long_index_t a_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx));
-    const long_index_t b_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx));
-    const long_index_t e_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx));
+    const long_index_t a_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+    const long_index_t b_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+    const long_index_t e_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
@@ -1030,7 +1030,7 @@ struct GridwiseGemmMultipleD_Wmma
                     a_grid_desc,
                 #if defined(__gfx13__)
                     make_multi_index(0,
-                                     m_block_data_idx_on_grid/(MWaves * MPerWmma * MRepeat),
+                                     m_block_data_idx_on_grid/(MWaves * MPerWmma),
                                      /*MRepeat*/0,
                                      /*MWaves*/(get_thread_local_1d_id() / 32) / NWaves,
                                      /*A_K0PerWmma*/0,
@@ -1122,7 +1122,7 @@ struct GridwiseGemmMultipleD_Wmma
                     b_grid_desc,
                 #if defined(__gfx13__)
                     make_multi_index(0,
-                                     n_block_data_idx_on_grid/(NWaves * NPerWmma * NRepeat),
+                                     n_block_data_idx_on_grid/(NWaves * NPerWmma),
                                      0,
                                      (get_thread_local_1d_id() / 32) % NWaves,
                                      0,

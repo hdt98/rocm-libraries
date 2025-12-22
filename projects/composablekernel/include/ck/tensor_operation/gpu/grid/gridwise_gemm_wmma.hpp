@@ -224,7 +224,7 @@ struct GridwiseGemm_Wmma
                 constexpr auto B_KRow        = I2;
                 constexpr auto KWmmaPerblock = KPerBlock / WmmaK;
                 constexpr auto K0PerWmma     = WmmaK / B_KRow / K1;
-                // KWmma->BlockId->NRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
+                // KWmma->NRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
                 return make_naive_tensor_descriptor(
                     make_tuple(Number<KWmmaPerblock>{},
                                Number<NRepeat>{},
@@ -314,9 +314,7 @@ struct GridwiseGemm_Wmma
             }
             else
             {
-                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 ->
-                // K0_MRepeat_Mwaves_MPerWmma_K1
-                // KWmma->BlockId->NRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
+                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
                 constexpr auto KWmma     = ABlockDesc_{}.GetLength(I0);
                 constexpr auto K0PerWmma = ABlockDesc_{}.GetLength(I3);
                 constexpr auto A_KRow    = ABlockDesc_{}.GetLength(I4);
@@ -643,8 +641,8 @@ struct GridwiseGemm_Wmma
             {
                 constexpr auto K0PerBlock = KPerBlock/ K1;
                 auto a_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                    static_cast<ADataType*>(p_shared),
-                    SharedMemTrait::a_block_space_size_aligned);
+                    static_cast<ADataType*>(p_shared), 
+                    SharedMemTrait::a_block_space_size_aligned);        
 
                 auto a_blockwise_copy =
                     ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
@@ -686,7 +684,7 @@ struct GridwiseGemm_Wmma
                 constexpr auto K0PerWmma     = WmmaK/2/K1Value;
                 auto a_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, ADataType>(
                     a_block_desc.GetElementSpaceSize());
-
+                
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 auto a_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<ADataType,
@@ -708,7 +706,7 @@ struct GridwiseGemm_Wmma
                     a_grid_desc,
                 #if defined(__gfx13__)
                     make_multi_index(0,
-                                     m_block_data_idx_on_grid/(MWaves * MPerWmma * MRepeat),
+                                     m_block_data_idx_on_grid/(MWaves * MPerWmma),
                                      /*MRepeat*/0,
                                      /*MWaves*/(get_thread_local_1d_id() / 32) / NWaves,
                                      /*A_K0PerWmma*/0,
@@ -767,7 +765,7 @@ struct GridwiseGemm_Wmma
                     b_block_desc,
                     make_multi_index(0, 0, 0),
                     ck::tensor_operation::element_wise::PassThrough{});
-
+                
                 return make_tuple(b_block_buf, b_blockwise_copy);
             }
             else
@@ -778,7 +776,7 @@ struct GridwiseGemm_Wmma
                 constexpr auto K0PerWmma     = WmmaK/2/K1Value;
                 auto b_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, BDataType>(
                     b_block_desc.GetElementSpaceSize());
-
+                
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 auto b_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<BDataType,
@@ -800,7 +798,7 @@ struct GridwiseGemm_Wmma
                     b_grid_desc,
                 #if defined(__gfx13__)
                     make_multi_index(0,
-                                     n_block_data_idx_on_grid/(NWaves * NPerWmma * NRepeat),
+                                     n_block_data_idx_on_grid/(NWaves * NPerWmma),
                                      0,
                                      (get_thread_local_1d_id() / 32) % NWaves,
                                      0,
@@ -1084,7 +1082,7 @@ struct GridwiseGemm_Wmma
         // write out to C, implement shuffle
         {
             // C mapping in single thread.
-            constexpr auto c_thread_desc_mrepeat_mwave_msubgroup_nrepeat_nwave_nthreadpersubgroup_maccvgprs =
+            constexpr auto c_thread_desc_mrepeat_mwave_msubgroup_nrepeat_nwave_nthreadpersubgroup_maccvgprs =  
             blockwise_gemm.GetCThreadDescriptor_MRepeat_MWave_MSubGroup_NRepeat_NWave_NThreadPerSubGroup_MAccVgprs();
 
             // C mapping in single block
@@ -1102,7 +1100,7 @@ struct GridwiseGemm_Wmma
                 GetCShuffleBlockDescriptor_MShRepeat_MPerShRepeat_NShRepeat_NPerShRepeat();
 
             auto c_shuffle_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<CShuffleDataType*>(p_shared) + SharedMemTrait::c_shuffle_block_space_offset,
+                static_cast<CShuffleDataType*>(p_shared) + SharedMemTrait::c_shuffle_block_space_offset, 
                 SharedMemTrait::c_shuffle_block_space_size);
 
             constexpr auto c_block_desc_mrepeat_mwave_msubgroup_nrepeat_nwave_nthreadpersubgroup_maccvgprs = transform_tensor_descriptor(
@@ -1140,10 +1138,10 @@ struct GridwiseGemm_Wmma
                 make_tuple(make_merge_transform(make_tuple(NRepeat, NWave, NThreadPerSubGroup))),
                 make_tuple(Sequence<0, 1, 2>{}),
                 make_tuple(Sequence<0>{}));
-
+            
             const auto m_thread_data_on_block_idx = m_thread_data_on_block_to_mrepeat_mwave_msubgroup_maccvgprs_adaptor.CalculateBottomIndex(
                 make_multi_index(m_thread_data_on_block));
-
+            
             const auto n_thread_data_on_block_idx = n_thread_data_on_block_to_nrepeat_nwave_nthreadpersubgroup_adaptor.CalculateBottomIndex(
                 make_multi_index(n_thread_data_on_block));
 

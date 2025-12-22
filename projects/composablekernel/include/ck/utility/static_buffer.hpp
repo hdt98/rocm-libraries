@@ -12,12 +12,11 @@ namespace ck {
 template <AddressSpaceEnum AddressSpace,
           typename T,
           index_t N,
-          bool InvalidElementUseNumericalZeroValue, // TODO remove this bool, no longer needed
-          typename StaticBufferBaseArray = StaticallyIndexedArray<T, N>>
-struct StaticBuffer : public StaticBufferBaseArray
+          bool InvalidElementUseNumericalZeroValue> // TODO remove this bool, no longer needed
+struct StaticBuffer : public StaticallyIndexedArray<T, N>
 {
     using type = T;
-    using base = StaticBufferBaseArray;
+    using base = StaticallyIndexedArray<T, N>;
 
     __host__ __device__ constexpr StaticBuffer() : base{} {}
 
@@ -73,12 +72,12 @@ template <AddressSpaceEnum AddressSpace,
           index_t NumOfVector,
           index_t ScalarPerVector,
           bool InvalidElementUseNumericalZeroValue, // TODO remove this bool, no longer needed,
-          typename BaseArray = StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>,
           typename enable_if<is_scalar_type<S>::value, bool>::type = false>
-struct StaticBufferTupleOfVector : public BaseArray
+struct StaticBufferTupleOfVector
+    : public StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>
 {
     using V    = typename vector_type<S, ScalarPerVector>::type;
-    using base = BaseArray;
+    using base = StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>;
 
     static constexpr auto s_per_v   = Number<ScalarPerVector>{};
     static constexpr auto num_of_v_ = Number<NumOfVector>{};

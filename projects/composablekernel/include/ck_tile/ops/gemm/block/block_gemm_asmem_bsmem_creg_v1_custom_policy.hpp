@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -13,9 +13,7 @@ template <typename AType_,
           typename BType_,
           typename CType_,
           typename BlockWarps_,
-          typename WarpGemm_,
-          bool TransLdA = false,
-          bool TransLdB = false>
+          typename WarpGemm_>
 struct BlockGemmASmemBSmemCRegV1CustomPolicy
 {
     using AType = remove_cvref_t<AType_>;
@@ -27,9 +25,6 @@ struct BlockGemmASmemBSmemCRegV1CustomPolicy
     static constexpr index_t kMWarps = BlockWarps::at(number<0>{});
     static constexpr index_t kNWarps = BlockWarps::at(number<1>{});
     static constexpr index_t kKWarps = BlockWarps::at(number<2>{});
-
-    static constexpr bool kTransLdA = TransLdA;
-    static constexpr bool kTransLdB = TransLdB;
 
     using WarpGemm = remove_cvref_t<WarpGemm_>;
 

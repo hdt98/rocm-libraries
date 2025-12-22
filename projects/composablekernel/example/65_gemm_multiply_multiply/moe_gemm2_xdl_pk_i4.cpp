@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -20,6 +20,10 @@
 #include "ck/library/utility/check_err.hpp"
 
 #include "ck/utility/blkgemmpipe_scheduler.hpp"
+
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
 
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
@@ -145,7 +149,7 @@ static constexpr bool MulRoutedWeight      = true;
 using DeviceOpInstance                     = ck::tensor_operation::device::DeviceMoeGemm
     // clang-format off
         <      Row, Col, DsLayout, ELayout, A0DataType, B0DataType, DsDataType, EDataType, AccDataType, CShuffleDataType,
-               AElementOp,  BElementOp, CDEElementOp,       GemmSpec,
+               AElementOp,  BElementOp, CDEElementOp,       GemmSpec,   
                BLOCKSIZE,   MPerBlock,   NPerBlock,    KPerBlock,
                AK1,   BK1,
                MNPerXDL,   MNPerXDL,

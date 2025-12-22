@@ -231,11 +231,6 @@ bool profile_softmax_impl(int do_verification,
         std::cout << "reduce_instance (" << instance_index << "/" << num_kernel << "): Passed"
                   << std::endl;
     }
-    if(instance_index != -1)
-    {
-        std::cout << "reduce_instance (" << instance_index << "/" << num_kernel << "): Passed"
-                  << std::endl;
-    }
     return std::all_of(
         std::begin(instance_pass), std::end(instance_pass), [](bool p) { return p; });
 }

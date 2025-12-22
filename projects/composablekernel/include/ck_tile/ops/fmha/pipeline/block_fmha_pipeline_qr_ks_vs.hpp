@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -83,6 +83,8 @@ struct BlockFmhaPipelineQRKSVS
         kPadHeadDimV ? 1 : Policy::template GetAlignmentO<Problem>();
     static constexpr index_t kAlignmentBias =
         kPadSeqLenK ? 1 : Policy::template GetAlignmentBias<Problem>();
+    static constexpr index_t kAlignmentRandVal =
+        kPadSeqLenK ? 1 : Policy::template GetAlignmentRandVal<Problem>();
 
     static constexpr index_t kBlockPerCu = []() {
         if constexpr(Problem::kBlockPerCu != -1)
@@ -478,11 +480,7 @@ struct BlockFmhaPipelineQRKSVS
                 sequence<1>{},
                 f_max,
                 -numeric<SMPLComputeDataType>::infinity()); // m_local = rowmax(S{j})
-#if(defined(__gfx13__))
-            block_tile_reduce_xor_sync(m_local, f_max);
-#else
             block_tile_reduce_sync(m_local, f_max, bool_constant<false>{});
-#endif
 
             const auto m_old = m; // m{j-1}
             tile_elementwise_inout(
@@ -540,11 +538,8 @@ struct BlockFmhaPipelineQRKSVS
 
             auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
                 p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
-#if(defined(__gfx13__))
-            block_tile_reduce_xor_sync(rowsum_p, f_sum);
-#else
+
             block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
-#endif
             // l{j}, Oacc{j}
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {

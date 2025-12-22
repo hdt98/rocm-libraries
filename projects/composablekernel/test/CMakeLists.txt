@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 include_directories(BEFORE
     ${PROJECT_SOURCE_DIR}/
     ${PROJECT_SOURCE_DIR}/profiler/include
@@ -46,7 +49,7 @@ set(REGRESSION_TESTS
     test_ck_tile_fmha_fwd_bf16
     test_ck_tile_fmha_fwd_fp16
     test_ck_tile_fmha_fwd_fp8
-    test_ck_tile_streamk_reboot_extended
+    test_ck_tile_streamk_extended
 )
 
 function(add_test_executable TEST_NAME)
@@ -60,6 +63,9 @@ function(add_test_executable TEST_NAME)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp32|_f32") AND NOT "fp32" IN_LIST DTYPES)
+                set(test 1)
+            endif()
+            if((source_name MATCHES "_tf32|_tf32") AND NOT "tf32" IN_LIST DTYPES)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp64|_f64") AND NOT "fp64" IN_LIST DTYPES)
@@ -123,9 +129,9 @@ function(add_test_executable TEST_NAME)
         elseif(source_name_list MATCHES "_wmma")
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         elseif(source_name_list MATCHES "_smfmac")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1310 gfx1370 gfx130F)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1310 gfx1370 gfx130F)
         elseif(source_name_list MATCHES "wcnn") #only build wcnn example for gfx13
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx940 gfx941 gfx942 gfx1030 gfx950 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx940 gfx941 gfx942 gfx1030 gfx950 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
         endif()
         set_source_files_properties(${ARGN} PROPERTIES LANGUAGE HIP)
         add_executable(${TEST_NAME} ${ARGN})
@@ -159,6 +165,9 @@ function(add_gtest_executable TEST_NAME)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp32|_f32") AND NOT "fp32" IN_LIST DTYPES)
+                set(test 1)
+            endif()
+            if((source_name MATCHES "_tf32|_tf32") AND NOT "tf32" IN_LIST DTYPES)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp64|_f64") AND NOT "fp64" IN_LIST DTYPES)
@@ -224,11 +233,11 @@ function(add_gtest_executable TEST_NAME)
         elseif(source_name_list MATCHES "_wmma")
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         elseif(source_name_list MATCHES "_smfmac")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1310 gfx1370 gfx130F)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1310 gfx1370 gfx130F)
         elseif(source_name_list MATCHES "_mx") #only build mx example for gfx950
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1310 gfx1370 gfx130F)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1310 gfx1370 gfx130F)
         elseif(source_name_list MATCHES "wcnn") #only build wcnn example for gfx13
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
         endif()
         set_source_files_properties(${ARGN} PROPERTIES LANGUAGE HIP)
         add_executable(${TEST_NAME} ${ARGN})
@@ -316,6 +325,9 @@ endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx950")
     add_subdirectory(mx_mfma_op)
     add_subdirectory(gemm_mx)
+endif()
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx12")
+    add_subdirectory(s_prefetch_op)
 endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_subdirectory(wcnn_op)

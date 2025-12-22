@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -2027,15 +2027,15 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             << "BlkGemmPipelineVersion: "
             << BlkGemmPipelineVersionToString[BlkGemmPipelineVer] << ", "
             << NumGroupsToMerge;
-
-        if constexpr(is_NGCHW_NGKHW<InLayout, WeiLayout, OutLayout>() ||
+            
+        if constexpr(is_NGCHW_NGKHW<InLayout, WeiLayout, OutLayout>() || 
                         is_NGCDHW_NGKDHW<InLayout, WeiLayout, OutLayout>()) {
                 str << ", TransposeTransferSrcScalarPerVector: "
                 << TransposeTransferSrcScalarPerVector <<", "
                 << "TransposeTransferDstScalarPerVector: " << TransposeTransferDstScalarPerVector;
             }
 
-
+            
             str << ">";
         // clang-format on
 

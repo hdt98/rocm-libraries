@@ -1,135 +1,7 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "gemm_utils.hpp"
-
-template <typename GemmConfig,
-          typename ADataType,
-          typename BDataType,
-          typename DsDataType,
-          typename AccDataType,
-          typename CDataType,
-          typename ALayout,
-          typename BLayout,
-          typename DsLayout,
-          typename CLayout,
-          bool Persistent,
-          typename CDEElementWise>
-float gemm(const ck_tile::GemmHostArgs</*NumDTensor = 0*/>& args, const ck_tile::stream_config& s)
-
-{
-    if constexpr(Persistent)
-        std::cout << "WARNING: Ignoring persistent kernel option for basic gemm." << std::endl;
-    // The kPadM, kPadN, kPadK & kBlockPerCu should also come from the Codegen part.
-    constexpr bool kPadM = false;
-    constexpr bool kPadN = false;
-    constexpr bool kPadK = false;
-
-    constexpr int kBlockPerCu = 1;
-
-    // This part comes from the Codegen
-    constexpr ck_tile::index_t M_Tile = 256;
-    constexpr ck_tile::index_t N_Tile = 256;
-    constexpr ck_tile::index_t K_Tile = 64;
-
-    constexpr ck_tile::index_t M_Warp = 2;
-    constexpr ck_tile::index_t N_Warp = 2;
-    constexpr ck_tile::index_t K_Warp = 1;
-#ifdef CK_TILE_USE_XDL
-    constexpr ck_tile::index_t M_Warp_Tile = 32;
-    constexpr ck_tile::index_t N_Warp_Tile = 32;
-    constexpr ck_tile::index_t K_Warp_Tile = 16;
-#elif CK_TILE_USE_WMMA
-    constexpr ck_tile::index_t M_Warp_Tile = 16;
-    constexpr ck_tile::index_t N_Warp_Tile = 16;
-    constexpr ck_tile::index_t K_Warp_Tile = 16;
-#endif
-    using CodegenGemmShape =
-        ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
-                               ck_tile::sequence<M_Warp, N_Warp, K_Warp>,
-                               ck_tile::sequence<M_Warp_Tile, N_Warp_Tile, K_Warp_Tile>>;
-
-    using TilePartitioner = ck_tile::GemmTile1DPartitioner<CodegenGemmShape>;
-
-    using CodegenGemmTraits =
-        ck_tile::TileGemmTraits<kPadM, kPadN, kPadK, ALayout, BLayout, CLayout>;
-
-    using CodegenPipelineProblem = ck_tile::
-        GemmPipelineProblem<ADataType, BDataType, AccDataType, CodegenGemmShape, CodegenGemmTraits>;
-
-#ifdef CK_TILE_USE_XDL
-    using CodegenGemmPipelinePolicy = ck_tile::GemmPipelineAGmemBGmemCRegV1DefaultPolicy;
-#elif CK_TILE_USE_WMMA
-    using CodegenGemmPipelinePolicy = ck_tile::GemmPipelineWmmaDefaultPolicy;
-#endif
-    using CodegenGemmPipeline =
-        ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem, CodegenGemmPipelinePolicy>;
-
-    const auto Run = [&](const auto memory_operation_) {
-        constexpr auto memory_operation = memory_operation_.value;
-
-        using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<ADataType,
-                                             BDataType,
-                                             ck_tile::tuple<>,
-                                             AccDataType,
-                                             CDataType,
-                                             ck_tile::tuple<>,
-                                             CLayout,
-                                             ck_tile::element_wise::PassThrough,
-                                             CodegenPipelineProblem::kBlockSize,
-                                             TilePartitioner::MPerBlock,
-                                             TilePartitioner::NPerBlock,
-                                             M_Warp,
-                                             N_Warp,
-                                             M_Warp_Tile,
-                                             N_Warp_Tile,
-                                             K_Warp_Tile,
-                                             CodegenPipelineProblem::TransposeC,
-                                             memory_operation>>;
-
-        // ToDo: Will add the codegen part to test different pipeline policies in GEMM.
-        // Now we only use the BlockGemmASmemBSmemCRegV1DefaultPolicy.
-        using Kernel = ck_tile::GemmKernel<TilePartitioner, CodegenGemmPipeline, GemmEpilogue>;
-        auto kargs   = Kernel::MakeKernelArgs(args);
-
-        const dim3 grids      = Kernel::GridSize(args.M, args.N, args.k_batch);
-        constexpr dim3 blocks = Kernel::BlockSize();
-
-        if(!Kernel::IsSupportedArgument(kargs))
-        {
-            throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!\n");
-        }
-
-        if(s.log_level_ > 0)
-        {
-            std::cout << "Launching kernel with args: " << Kernel::GetName() << '\n'
-                      << "shape: " << CodegenGemmShape::GetName() << '\n'
-                      << "problem: " << CodegenPipelineProblem::GetName() << '\n'
-                      << "pipeline: " << CodegenGemmPipeline::GetName() << '\n'
-                      << "grid: {" << grids.x << ", " << grids.y << ", " << grids.z << "}"
-                      << ", blocks: {" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}"
-                      << std::endl;
-        }
-
-        float ave_time = ck_tile::launch_kernel(
-            s, ck_tile::make_kernel<blocks.x, kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
-
-        return ave_time;
-    };
-
-    if(args.k_batch == 1)
-    {
-        return Run(ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                              ck_tile::memory_operation_enum::set>{});
-    }
-    else
-    {
-        return Run(ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                              ck_tile::memory_operation_enum::atomic_add>{});
-    }
-}
-
 #include "run_gemm_example.inc"
 #include "run_gemm_example_common.hpp"
 #include "gemm_basic_invoker.hpp"
@@ -193,8 +65,6 @@ int run_gemm_example(ck_tile::ArgParser& arg_parser)
                                           ck_tile::int8_t,
                                           int32_t>(a_layout, b_layout, arg_parser);
     }
-
-#ifndef CK_TILE_USE_WMMA
     else if(data_type == "pk_int4_t")
     {
         // TODO: Add support for bhalf_t ADataType
@@ -211,7 +81,6 @@ int run_gemm_example(ck_tile::ArgParser& arg_parser)
             throw std::runtime_error("Unsupported data type for this operation !!!");
         }
     }
-#endif
     else
     {
         throw std::runtime_error("Unsupported data type for this operation !!!");

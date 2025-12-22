@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -24,7 +24,6 @@ struct TileImageToColumnShape
 
     static constexpr index_t kMWarpPerBlock = kMPerBlock / kMPerWarp;
     static constexpr index_t kKWarpPerBlock = kKPerBlock / kKPerWarp;
-    static constexpr index_t kWarpSize      = get_warp_size();
 
     static constexpr index_t kBlockSize = get_warp_size() * kMWarpPerBlock * kKWarpPerBlock;
 };

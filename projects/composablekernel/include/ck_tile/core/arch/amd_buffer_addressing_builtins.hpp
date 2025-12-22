@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -2770,6 +2770,7 @@ __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
 #undef __LDS_ADDR
 }
 #endif
+
 } // namespace ck_tile
 
 #endif // CK_TILE_USE_BUFFER_ADDRESSING_BUILTIN

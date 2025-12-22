@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -93,7 +93,7 @@ struct MoeSmoothquant
         return dim3(hargs.topk, integer_divide_ceil(hargs.tokens, Block_M), 1);
     }
 
-    CK_TILE_HOST static auto BlockSize()
+    CK_TILE_HOST static constexpr auto BlockSize()
     {
         return is_wave32() ? Problem::BlockShape::template GetBlockSize<true>()
                            : Problem::BlockShape::template GetBlockSize<false>();
