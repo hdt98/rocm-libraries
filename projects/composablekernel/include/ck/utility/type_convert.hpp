@@ -2719,6 +2719,42 @@ inline __host__ __device__ float16_t type_convert<float16_t, bf6x16_pk_t>(bf6x16
     return type_convert<float16_t>(static_cast<bf6x16_t>(x));
 }
 
+template <>
+inline __host__ __device__ float type_convert<float, e8m0_bexp_t>(e8m0_bexp_t x)
+{
+    return float(x);
+}
+
+template <>
+inline __host__ __device__ e8m0_bexp_t type_convert<e8m0_bexp_t, float>(float x)
+{
+    return e8m0_bexp_t(x);
+}
+
+template <>
+inline __host__ __device__ float type_convert<float, e4m3_scale_t>(e4m3_scale_t x)
+{
+    return float(x);
+}
+
+template <>
+inline __host__ __device__ e4m3_scale_t type_convert<e4m3_scale_t, float>(float x)
+{
+    return e4m3_scale_t(x);
+}
+
+template <>
+inline __host__ __device__ float type_convert<float, e5m3_scale_t>(e5m3_scale_t x)
+{
+    return float(x);
+}
+
+template <>
+inline __host__ __device__ e5m3_scale_t type_convert<e5m3_scale_t, float>(float x)
+{
+    return e5m3_scale_t(x);
+}
+
 #endif
 #if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
 template <typename Y, typename X, size_t NumElems>

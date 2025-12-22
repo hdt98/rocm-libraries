@@ -1037,9 +1037,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 {
     template <class FloatC>
     __device__ static void Run(const f8x64_t& reg_a,
-                               const int32_t& scale_a,
+                               const e8m0x4_bexp_t& scale_a,
                                const f8x64_t& reg_b,
-                               const int32_t& scale_b,
+                               const e8m0x4_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1054,13 +1054,13 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                 ScaleOpselA, // SCALE_OPSEL[0]
                 0,           // SCALE_OPSEL_HI[0]
                 // M=laneId % 16 [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24] K=96..127
-                scale_a,
+                bit_cast<int32_t>(scale_a),
                 ScaleOpselB, // SCALE_OPSEL[1]
                 0,           // SCALE_OPSEL_HI[1]
                 // N=laneId % 16 [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24] K=96..127
-                scale_b,
-                0,  // NEG
-                0); // NEG_HI
+                bit_cast<int32_t>(scale_b),
+                0,  // NEG: 0-E8M0
+                0); // NEG_HI: 0-E8M0
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1072,9 +1072,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 
     template <class FloatC>
     __device__ static void Run(const bf8x64_t& reg_a,
-                               const int32_t& scale_a,
+                               const e8m0x4_bexp_t& scale_a,
                                const bf8x64_t& reg_b,
-                               const int32_t& scale_b,
+                               const e8m0x4_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1086,16 +1086,16 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int32_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int32_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1107,9 +1107,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 
     template <class FloatC>
     __device__ static void Run(const f6x64_t& reg_a,
-                               const int32_t& scale_a,
+                               const e8m0x4_bexp_t& scale_a,
                                const f6x64_t& reg_b,
-                               const int32_t& scale_b,
+                               const e8m0x4_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1157,16 +1157,16 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int32_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int32_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1178,9 +1178,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 
     template <class FloatC>
     __device__ static void Run(const bf6x64_t& reg_a,
-                               const int32_t& scale_a,
+                               const e8m0x4_bexp_t& scale_a,
                                const bf6x64_t& reg_b,
-                               const int32_t& scale_b,
+                               const e8m0x4_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1228,16 +1228,16 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int32_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int32_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1249,9 +1249,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 
     template <class FloatC>
     __device__ static void Run(const f4x64_t& reg_a,
-                               const int32_t scale_a,
+                               const e8m0x4_bexp_t scale_a,
                                const f4x64_t& reg_b,
-                               const int32_t scale_b,
+                               const e8m0x4_bexp_t scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1297,11 +1297,275 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
-                0,
-                scale_a,
+                0x0, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_a),
                 ScaleOpselB,
+                0x0, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_b),
                 0,
-                scale_b,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e4m3x4_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e4m3x4_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_a),
+                ScaleOpselB,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e5m3x4_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e5m3x4_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_a),
+                ScaleOpselB,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e4m3x4_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e5m3x4_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_a),
+                ScaleOpselB,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e5m3x4_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e4m3x4_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_a),
+                ScaleOpselB,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_b),
                 0,
                 0);
 #else
@@ -1315,9 +1579,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 
     template <class FloatC>
     __device__ static void Run(const f8x64_t& reg_a,
-                               const int32_t scale_a,
+                               const e8m0x4_bexp_t& scale_a,
                                const f4x64_t& reg_b,
-                               const int32_t scale_b,
+                               const e8m0x4_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1347,11 +1611,11 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
-                0,
-                scale_a,
+                0x0,
+                bit_cast<int32_t>(scale_a),
                 ScaleOpselB,
-                0,
-                scale_b,
+                0x0, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int32_t>(scale_b),
                 0,
                 0);
 #else
@@ -1372,9 +1636,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
 {
     template <class FloatC>
     __device__ static void Run(const f8x64_t& reg_a,
-                               const int64_t& scale_a,
+                               const e8m0x8_bexp_t& scale_a,
                                const f8x64_t& reg_b,
-                               const int64_t& scale_b,
+                               const e8m0x8_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1386,16 +1650,16 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1407,9 +1671,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
 
     template <class FloatC>
     __device__ static void Run(const bf8x64_t& reg_a,
-                               const int64_t& scale_a,
+                               const e8m0x8_bexp_t& scale_a,
                                const bf8x64_t& reg_b,
-                               const int64_t& scale_b,
+                               const e8m0x8_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1421,16 +1685,16 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1442,9 +1706,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
 
     template <class FloatC>
     __device__ static void Run(const f6x64_t& reg_a,
-                               const int64_t& scale_a,
+                               const e8m0x8_bexp_t& scale_a,
                                const f6x64_t& reg_b,
-                               const int64_t& scale_b,
+                               const e8m0x8_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1492,16 +1756,16 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1513,9 +1777,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
 
     template <class FloatC>
     __device__ static void Run(const bf6x64_t& reg_a,
-                               const int64_t& scale_a,
+                               const e8m0x8_bexp_t& scale_a,
                                const bf6x64_t& reg_b,
-                               const int64_t& scale_b,
+                               const e8m0x8_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1563,16 +1827,16 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA, // SCALE_OPSEL[0]
-                0,           // SCALE_OPSEL_HI[0]
-                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                ScaleOpselB, // SCALE_OPSEL[1]
-                0,           // SCALE_OPSEL_HI[1]
-                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
-                             // K=96..127
-                0,           // NEG
-                0);          // NEG_HI
+                ScaleOpselA,                // SCALE_OPSEL[0]
+                0,                          // SCALE_OPSEL_HI[0]
+                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                ScaleOpselB,                // SCALE_OPSEL[1]
+                0,                          // SCALE_OPSEL_HI[1]
+                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
+                                            // K=64..95; [31:24] K=96..127
+                0,                          // NEG
+                0);                         // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1584,9 +1848,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
 
     template <class FloatC>
     __device__ static void Run(const f4x64_t& reg_a,
-                               const int64_t scale_a,
+                               const e8m0x8_bexp_t& scale_a,
                                const f4x64_t& reg_b,
-                               const int64_t scale_b,
+                               const e8m0x8_bexp_t& scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1633,10 +1897,274 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
                 0,
-                scale_a,
+                bit_cast<int64_t>(scale_a),
                 ScaleOpselB,
                 0,
-                scale_b,
+                bit_cast<int64_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e4m3x8_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e4m3x8_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e5m3x8_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e5m3x8_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e4m3x8_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e5m3x8_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    template <class FloatC>
+    __device__ static void Run(const f4x64_t& reg_a,
+                               const e5m3x8_scale_t& scale_a,
+                               const f4x64_t& reg_b,
+                               const e4m3x8_scale_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
+        int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
+        using arg_type  = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
+                0x4, // 0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{arg_a[0],
+                         arg_a[1],
+                         arg_a[2],
+                         arg_a[3],
+                         arg_a[4],
+                         arg_a[5],
+                         arg_a[6],
+                         arg_a[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0x4,
+                arg_type{arg_b[0],
+                         arg_b[1],
+                         arg_b[2],
+                         arg_b[3],
+                         arg_b[4],
+                         arg_b[5],
+                         arg_b[6],
+                         arg_b[7],
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA,
+                0x1, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,
+                0x2, // 0-E8M0, 1-E5M3, 2-E4M3
+                bit_cast<int64_t>(scale_b),
                 0,
                 0);
 #else
@@ -1650,9 +2178,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
 
     template <class FloatC>
     __device__ static void Run(const f8x64_t& reg_a,
-                               const int64_t scale_a,
+                               const e8m0x8_bexp_t scale_a,
                                const f4x64_t& reg_b,
-                               const int64_t scale_b,
+                               const e8m0x8_bexp_t scale_b,
                                FloatC& reg_c)
     {
 #if defined(__gfx125__)
@@ -1683,10 +2211,10 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
                 0,
-                scale_a,
+                bit_cast<int64_t>(scale_a),
                 ScaleOpselB,
                 0,
-                scale_b,
+                bit_cast<int64_t>(scale_b),
                 0,
                 0);
 #else

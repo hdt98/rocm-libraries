@@ -1434,7 +1434,7 @@ struct mfma_type<MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125>
     {
 
         intrin_wmma_scale_f32_16x16x128_f8f6f4<MPerWmma, NPerWmma, ScaleOpselA, ScaleOpselB>::Run(
-            a, bit_cast<int32_t>(scale_a), b, bit_cast<int32_t>(scale_b), reg_c);
+            a, scale_a, b, scale_b, reg_c);
     }
 };
 
@@ -1460,7 +1460,7 @@ struct mfma_type<MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125>
                         FloatC& reg_c) const
     {
         intrin_wmma_scale16_f32_16x16x128_f8f6f4<MPerWmma, NPerWmma, ScaleOpselA, ScaleOpselB>::Run(
-            a, bit_cast<int64_t>(scale_a), b, bit_cast<int64_t>(scale_b), reg_c);
+            a, scale_a, b, scale_b, reg_c);
     }
 };
 
