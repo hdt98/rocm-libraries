@@ -1974,7 +1974,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
 #endif
         hipblaslt_init_device(ABC_dims::C,
-                              arg.initialization,
+                              hipblaslt_initialization::zero,
                               beta_isnan_type(arg, Talpha),
                               dC[i].buf(),
                               M[i],

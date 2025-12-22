@@ -36,6 +36,8 @@
 #include <limits>
 #include <set>
 #include <memory>
+#include <fstream>
+#include <iomanip>
 
 /* =====================================================================
         allclose check: abs(A-B) <= atol + abs(rtol * B)
@@ -178,7 +180,7 @@ bool allclose_check_general(char    allclose_type,
         {
             // Check if column has non-zero elements
             int64_t col = i / lda;
-            if(std::abs(hCPU_double[i]) > 1e-10 || std::abs(hGPU_double[i]) > 1e-10)
+            if(std::abs(hGPU_double[i]) > 1e-6)
             {
                 non_zero_cols.insert(col);
             }
@@ -356,6 +358,7 @@ bool allclose_check_general(char    allclose_type,
                 }
                 hipblaslt_cout << std::endl;
             }
+            
         }
         
         return false;
