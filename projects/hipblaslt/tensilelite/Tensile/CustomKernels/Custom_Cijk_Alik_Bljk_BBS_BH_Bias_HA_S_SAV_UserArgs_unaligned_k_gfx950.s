@@ -513,6 +513,8 @@ s_cbranch_scc0 label_Preload_HBMArgs
 s_add_u32 s[sgprKernArgAddress], s[sgprKernArgAddress], 0x10 // Shift common args
 s_addc_u32 s[sgprKernArgAddress+1], s[sgprKernArgAddress+1], 0
 
+.set DBG, 0
+
 /* Load Kernel Args */
 s_load_dword s27, s[sgprKernArgAddress:sgprKernArgAddress+1], 28 // 28
 s_load_dwordx16 s[28:43], s[sgprKernArgAddress:sgprKernArgAddress+1], 32 // 32
@@ -537,6 +539,11 @@ s_lshr_b32 s[sgprStaggerU], s[sgprStaggerU], 0x10
 s_mov_b32 s[sgprArgType], s17
 s_mov_b32 m0, 0x15a00                              // LDS clamp at 88576 bytes
 v_mov_b32 v[vgprSerial], v0                        // thread serial id
+.if DBG
+s_cmp_eq_u32 s13, 1
+s_cbranch_scc0 label_KernelEnd
+s_branch label_skip_WGMXCC
+.endif
 
 /* remap workgroup to XCCs */
 s_lshr_b32 s58, s[sgprWGM], 0x10                   // Get WGMXCC
@@ -1179,7 +1186,9 @@ v_add_co_u32 v35, vcc, 16, v34                     // groA0I_5 += LSPA
 v_add_co_u32 v36, vcc, 16, v35                     // groA0I_6 += LSPA
 v_add_co_u32 v37, vcc, 16, v36                     // groA0I_7 += LSPA
 
+// label_jzhou:
 /* global read addresses: tile offsets b */
+.if 0 //original
 v_mov_b32 v38, v26                                 // groB1J_0
 v_add_co_u32 v39, vcc, 16, v38                     // groB1J_1 += LSPB
 v_add_co_u32 v40, vcc, 16, v39                     // groB1J_2 += LSPB
@@ -1192,6 +1201,20 @@ v_add_co_u32 v46, vcc, 16, v45                     // groB1J_8 += LSPB
 v_add_co_u32 v47, vcc, 16, v46                     // groB1J_9 += LSPB
 v_add_co_u32 v48, vcc, 16, v47                     // groB1J_10 += LSPB
 v_add_co_u32 v49, vcc, 16, v48                     // groB1J_11 += LSPB
+.else 
+v_lshlrev_b32 v38, 4, v26                           // groB1J_0 = v26 * 16
+v_add_co_u32 v39, vcc, 256, v38                    // groB1J_1 = base + 256
+v_add_co_u32 v40, vcc, 256, v39                    // groB1J_2 = base + 512
+v_add_co_u32 v41, vcc, 256, v40                    // groB1J_3 = base + 768
+v_add_co_u32 v42, vcc, 256, v41                    // groB1J_4 = base + 1024
+v_add_co_u32 v43, vcc, 256, v42                    // groB1J_5 = base + 1280
+v_add_co_u32 v44, vcc, 256, v43                    // groB1J_6 = base + 1536
+v_add_co_u32 v45, vcc, 256, v44                    // groB1J_7 = base + 1792
+v_add_co_u32 v46, vcc, 256, v45                    // groB1J_8 = base + 2048
+v_add_co_u32 v47, vcc, 256, v46                    // groB1J_9 = base + 2304
+v_add_co_u32 v48, vcc, 256, v47                    // groB1J_10 = base + 2560
+v_add_co_u32 v49, vcc, 256, v48                    // groB1J_11 = base + 2816
+.endif
 
 /* global read addresses: unroll offsets a */
 v_mov_b32 v50, v25                                 // groAL_0
@@ -1239,8 +1262,12 @@ s_mov_b32 s[sgprSrdA+3], Srd127_96                 // Set bits 127_96 in SRD
 
 /* global read addresses: addresses b */
 /* max read offset = size[n] * stride[n-1] */
-s_mul_hi_u32 s15, s[sgprWorkGroup1], 192           // WorkGroup[01] * MT
-s_mul_i32 s14, s[sgprWorkGroup1], 192              // WorkGroup[01] * MT
+// label_jzhou:
+//s_mul_hi_u32 s15, s[sgprWorkGroup1], 192           // WorkGroup[01] * MT
+//s_mul_i32 s14, s[sgprWorkGroup1], 192              // WorkGroup[01] * MT
+s_mul_hi_u32 s15, s[sgprWorkGroup1], 1           // WorkGroup[01] * 1
+s_mul_i32 s14, s[sgprWorkGroup1], 1              // WorkGroup[01] * 1
+
 s_mul_hi_u32 s15, s14, s[sgprStrideB1J]            // tlu=0, scaled tile-offset by stride
 s_mul_i32 s14, s14, s[sgprStrideB1J]               // tlu=0, scaled tile-offset by stride
 s_mul_i32 s12, s[sgprStreamKLocalStart], DepthU    // StreamK tile start offset
@@ -1474,8 +1501,9 @@ s_cbranch_scc1 label_BPEDone                       // If split == 1, use reguler
 s_mov_b32 s60, 1
 s_mov_b32 s61, 2
 label_BPEDone:
-
-s_mul_i32 s84, MT1, s[sgprWorkGroup1]              // <- wg1*MT1
+// label_jzhou:
+//s_mul_i32 s84, MT1, s[sgprWorkGroup1]              // <- wg1*MT1
+s_mul_i32 s84, 1, s[sgprWorkGroup1]              // <- wg1*1
 s_mul_hi_u32 s83, s84, s[sgprStrideC1J]            // ScaleC s84 by Stride
 s_mul_i32 s82, s84, s[sgprStrideC1J]               // ScaleC s84 by Stride
 s_lshl_b64 s[82:83], s[82:83], s60                 // scale by bpe
@@ -4538,7 +4566,11 @@ v_lshrrev_b32 v1, 4, v1                            // 1 = 1 / 16
 v_lshlrev_b32 v1, 2, v1                            // thread0 * continuous_output
 v_add_lshl_u32 v1, v5, v1, 0                       // coordination 1 = vwB *(wave_id1 + tid1)
 v_mul_lo_u32 v2, v1, s[sgprStrideC1J]              //  offset 1
-v_mul_lo_u32 v3, v1, s[sgprStrideD1J]              //  offset 1
+// label_jzhou:
+v_lshrrev_b32 v3, 4, v[vgprSerial]                 // 1 = thread_id / 16     # 0 到 16
+v_lshlrev_b32 v3, 6, v3                            // thread0 * 64 (改为乘以64)
+v_mul_lo_u32 v3, v3, s[sgprStrideD1J]              //  offset 1
+
 v_and_b32 v0, 0, v4                                // v0 = v4 % 1
 v_mul_lo_u32 v0, 0x10, v0                          // wave coordination offset 0
 v_and_b32 v5, 15, v[vgprSerial]                    // v5 = v[vgprSerial] % 16
@@ -5228,6 +5260,40 @@ v_pk_mul_f32 v[vgprValuC+82:vgprValuC+82+1], s[sgprAlpha:sgprAlpha+1], v[vgprVal
 v_pk_mul_f32 v[vgprValuC+84:vgprValuC+84+1], s[sgprAlpha:sgprAlpha+1], v[vgprValuC+84:vgprValuC+84+1] op_sel_hi:[0,1,1] // *= alpha (pk)
 v_pk_mul_f32 v[vgprValuC+86:vgprValuC+86+1], s[sgprAlpha:sgprAlpha+1], v[vgprValuC+86:vgprValuC+86+1] op_sel_hi:[0,1,1] // *= alpha (pk)
 
+// label_jzhou:
+/******************************************/
+/* Macro: Increment SRD to Next Row(s)   */
+/******************************************/
+/* Parameters:
+ *   numRows  - number of rows to skip (1, 16, 61, 1024, etc.)
+ *   tmpSgpr  - temporary scalar register to use (e.g., s8)
+ *   srdBase  - base of SRD register (e.g., sgprSrdD)
+ *   stride   - stride register (e.g., sgprStrideD1J)
+ */
+
+.macro incToNextRow numRows, tmpSgpr=s8, srdBase=sgprSrdD, stride=sgprStrideD1J
+  .if \numRows == 1
+    // Jump 1 row: stride * 2 (BPE)
+    s_lshl_b32 \tmpSgpr, s[\stride], 1
+  .elseif \numRows == 16
+    // Jump 16 rows: stride * 32 (16 * 2 BPE)
+    s_lshl_b32 \tmpSgpr, s[\stride], 5
+  .elseif \numRows == 61
+    // Jump 61 rows: stride * 122 (61 * 2 BPE)
+    s_mul_i32 \tmpSgpr, s[\stride], 122
+  .elseif \numRows == 1024
+    // Jump 1024 rows: stride * 2048 (1024 * 2 BPE)
+    s_mul_i32 \tmpSgpr, s[\stride], 2048
+  .else
+    // General case: stride * (numRows * 2)
+    .set _offset, \numRows * 2
+    s_mul_i32 \tmpSgpr, s[\stride], _offset
+  .endif
+  // Add offset to SRD base address (64-bit)
+//  s_add_u32 s[\srdBase+0], s[\srdBase+0], \tmpSgpr
+ // s_addc_u32 s[\srdBase+1], s[\srdBase+1], 0
+.endm
+
 /* apply mask, calc new C and issue writes */
 v_mov_b32 v14, 0xffff0000                          // mask for pack two bfloat16 element to 32bit
 v_mov_b32 v15, 0x7fff0000                          // fp32 Nan
@@ -5259,7 +5325,7 @@ v_cvt_pk_bf16_f32 v32, v[vgprValuC+32], v[vgprValuC+33] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v33, v[vgprValuC+34], v[vgprValuC+35] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v34, v[vgprValuC+36], v[vgprValuC+37] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v35, v[vgprValuC+38], v[vgprValuC+39] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[32:35], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5275,7 +5341,7 @@ v_cvt_pk_bf16_f32 v40, v[vgprValuC+40], v[vgprValuC+41] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v41, v[vgprValuC+42], v[vgprValuC+43] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v42, v[vgprValuC+44], v[vgprValuC+45] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v43, v[vgprValuC+46], v[vgprValuC+47] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[40:43], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5291,7 +5357,7 @@ v_cvt_pk_bf16_f32 v48, v[vgprValuC+48], v[vgprValuC+49] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v49, v[vgprValuC+50], v[vgprValuC+51] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v50, v[vgprValuC+52], v[vgprValuC+53] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v51, v[vgprValuC+54], v[vgprValuC+55] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[48:51], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5307,7 +5373,7 @@ v_cvt_pk_bf16_f32 v56, v[vgprValuC+56], v[vgprValuC+57] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v57, v[vgprValuC+58], v[vgprValuC+59] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v58, v[vgprValuC+60], v[vgprValuC+61] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v59, v[vgprValuC+62], v[vgprValuC+63] // convert C to bf16 and Pack with neighbor
-s_mul_i32 s8, s[sgprStrideD1J], 122                // scale StrideD *= numRows(61) * bpe
+incToNextRow 976
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[56:59], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5323,7 +5389,7 @@ v_cvt_pk_bf16_f32 v64, v[vgprValuC+64], v[vgprValuC+65] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v65, v[vgprValuC+66], v[vgprValuC+67] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v66, v[vgprValuC+68], v[vgprValuC+69] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v67, v[vgprValuC+70], v[vgprValuC+71] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[64:67], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5339,7 +5405,7 @@ v_cvt_pk_bf16_f32 v72, v[vgprValuC+72], v[vgprValuC+73] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v73, v[vgprValuC+74], v[vgprValuC+75] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v74, v[vgprValuC+76], v[vgprValuC+77] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v75, v[vgprValuC+78], v[vgprValuC+79] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[72:75], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5355,7 +5421,7 @@ v_cvt_pk_bf16_f32 v80, v[vgprValuC+80], v[vgprValuC+81] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v81, v[vgprValuC+82], v[vgprValuC+83] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v82, v[vgprValuC+84], v[vgprValuC+85] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v83, v[vgprValuC+86], v[vgprValuC+87] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[80:83], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5445,7 +5511,7 @@ v_cvt_pk_bf16_f32 v24, v[vgprValuC+24], v[vgprValuC+25] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v25, v[vgprValuC+26], v[vgprValuC+27] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v26, v[vgprValuC+28], v[vgprValuC+29] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v27, v[vgprValuC+30], v[vgprValuC+31] // convert C to bf16 and Pack with neighbor
-s_mul_i32 s8, s[sgprStrideD1J], 122                // scale StrideD *= numRows(61) * bpe
+incToNextRow 976
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[24:27], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5461,7 +5527,7 @@ v_cvt_pk_bf16_f32 v32, v[vgprValuC+32], v[vgprValuC+33] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v33, v[vgprValuC+34], v[vgprValuC+35] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v34, v[vgprValuC+36], v[vgprValuC+37] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v35, v[vgprValuC+38], v[vgprValuC+39] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[32:35], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5477,7 +5543,7 @@ v_cvt_pk_bf16_f32 v40, v[vgprValuC+40], v[vgprValuC+41] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v41, v[vgprValuC+42], v[vgprValuC+43] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v42, v[vgprValuC+44], v[vgprValuC+45] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v43, v[vgprValuC+46], v[vgprValuC+47] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[40:43], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
@@ -5493,7 +5559,7 @@ v_cvt_pk_bf16_f32 v48, v[vgprValuC+48], v[vgprValuC+49] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v49, v[vgprValuC+50], v[vgprValuC+51] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v50, v[vgprValuC+52], v[vgprValuC+53] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v51, v[vgprValuC+54], v[vgprValuC+55] // convert C to bf16 and Pack with neighbor
-s_lshl_b32 s8, s[sgprStrideD1J], 1                 // incToNextRow: Scale by BPE
+incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
 buffer_store_dwordx4 v[48:51], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
