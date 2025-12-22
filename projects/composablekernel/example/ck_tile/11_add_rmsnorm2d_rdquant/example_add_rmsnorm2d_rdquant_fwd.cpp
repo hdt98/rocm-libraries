@@ -1,3 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
 #include "ck_tile/host.hpp"
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
@@ -99,10 +102,6 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     constexpr bool kThreePass = true;
 
-    using BlockWarps     = ck_tile::sequence<4, 1>;
-    using BlockTile      = ck_tile::sequence<4, 128>;
-    using WarpTile       = ck_tile::sequence<1, ck_tile::get_warp_size()>;
-    using Vector         = ck_tile::sequence<1, 1>;
     using BlockTile      = ck_tile::sequence<4, 128>;
     using Vector         = ck_tile::sequence<1, 1>;
     using ThreadPerBlock = ck_tile::sequence<4, 64>;

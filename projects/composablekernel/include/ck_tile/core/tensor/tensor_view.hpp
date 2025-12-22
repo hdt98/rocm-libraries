@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -111,44 +111,6 @@ struct tensor_view
     // "coord" is coordinate of DataType, not X. "coord" should be aligned to X
     template <typename X,
               bool oob_conditional_check = true,
-              typename std::enable_if<
-                  std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
-                                 typename vector_traits<remove_cvref_t<DataType>>::scalar_type>,
-                  bool>::type = false>
-    CK_TILE_HOST_DEVICE constexpr remove_cvref_t<X>
-    get_tr_vectorized_elements(const TensorCoord& coord,
-                               index_t linear_offset,
-                               bool_constant<oob_conditional_check> = {}) const
-    {
-        return buf_.template tr_get<X>(
-            coord.get_offset(),
-            linear_offset,
-            coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
-            bool_constant<oob_conditional_check>{});
-    }
-
-    template <typename X,
-              bool oob_conditional_check = true,
-              typename std::enable_if<
-                  std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
-                                 typename vector_traits<remove_cvref_t<DataType>>::scalar_type>,
-                  bool>::type = false>
-    CK_TILE_HOST_DEVICE constexpr remove_cvref_t<X>
-    get_tr_vectorized_elements(const TensorCoord& coord,
-                               index_t linear_offset,
-                               bool is_valid_element, // flag
-                               bool_constant<oob_conditional_check> = {}) const
-    {
-        return buf_.template tr_get<X>(coord.get_offset(),
-                                       linear_offset,
-                                       is_valid_element,
-                                       bool_constant<oob_conditional_check>{});
-    }
-
-    // X is vector of DataType.
-    // "coord" is coordinate of DataType, not X. "coord" should be aligned to X
-    template <typename X,
-              bool oob_conditional_check = true,
               bool pre_nop               = false,
               typename std::enable_if<
                   std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -204,8 +166,8 @@ struct tensor_view
     {
         return buf_.template async_get<X>(
             smem,
-            coord.get_offset() / PackedSize,
-            linear_offset / PackedSize,
+            coord.get_offset() / PackedSize + linear_offset / PackedSize,
+            0, // linear_offset need to be imm and is not supported currently
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
             bool_constant<oob_conditional_check>{});
     }

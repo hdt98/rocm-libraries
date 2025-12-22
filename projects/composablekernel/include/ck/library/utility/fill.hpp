@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -152,7 +152,7 @@ template <typename T>
 struct TransformIntoStructuralSparsity
 {
     // clang-format off
-    static constexpr uint8_t valid_sequences[] = {
+    static constexpr T valid_sequences[] = {
         0, 0, 1, 1,
         0, 1, 0, 1,
         0, 1, 1, 0,
@@ -168,9 +168,7 @@ struct TransformIntoStructuralSparsity
         std::for_each(first, last, [=, *this, idx = 0](T& elem) mutable {
             auto tmp_idx = idx;
             idx += 1;
-            elem =
-                valid_sequences[tmp_idx % (sizeof(valid_sequences) / sizeof(uint8_t))] ? elem : T{};
-            return elem;
+            return elem *= valid_sequences[tmp_idx % (sizeof(valid_sequences) / sizeof(T))];
         });
     }
 

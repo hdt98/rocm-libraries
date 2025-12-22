@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -72,7 +72,7 @@ namespace ck_tile {
 //
 // * Note on token_id_per_expert/sorted_token_ids_ptr data:
 // currently we do not have topk information from the data of token_id_per_expert/sorted_token_ids_ptr.
-// In some cases(like smooth-quant), we need topk information to indexing into tokens quant from
+// In some cases(like smooth-quant), we need topk information to indexing into tokens quant from 
 // different expert smooth quant. So we modify the number stored inside token_id_per_expert/sorted_token_ids_ptr
 //
 //       32bit    0........23 24.....31 bit
@@ -96,11 +96,11 @@ namespace ck_tile {
 // sorted_token_ids_ptr   : [0, 6, 6, 6, 2, 3, 4, 6, 1, 3, 6, 6, 0, 1, 2, 3, 4, 6, 6, 6, 6, 6, 6, 6, 0, 1, 2, 5]
 //                          |-  exp-0  -|-  exp-1  -|-  exp-2  -|-      exp-3          -|-  exp-4 -|-  exp-5  -|
 // sorted_weight_ptr      : [a, *, *, *, g, j, m, *, d, k, *, *, b, e, h, l, n, *, *, *, *, *, *, *, c, f, i, o]
-//
+//                          
 //
 // sorted_expert_ids_ptr  : [0, 1, 2, 3, 3, 5]
 // num_tokens_post_padded_ptr : [24]
-//
+// 
 // * local_expert_mask : indicate local expert mask used on current GPU (used for EP case)
 //   and modify the output expert-ID, because we will only have enbaled expert on specific GPU.
 //   we call expert input to this kernel as "global expert id", output as "local expert id"
@@ -218,7 +218,7 @@ struct MoeSortingHostArgs
 #else
     long_index_t moe_buf_bytes;  // byte size of p_moe_buf
 #endif
-
+    
 };
 
 template <typename Problem_>
@@ -391,7 +391,7 @@ struct MoeSortingKernel
                                                                         bound_ctrl))); // row_shr:4
         }
         if constexpr(wave_size == 8) {
-
+            
             // wave-size=8 need one extra shift
             thread_data =
                 reduce_op(thread_data,
@@ -401,13 +401,13 @@ struct MoeSortingKernel
                                                                         bank_mask,
                                                                         bound_ctrl))); // row_shr:8
 #if CK_TILE_HAS_ROW_NEWBCAST
-            data_t xxx =__builtin_bit_cast(data_t,
+            data_t xxx =__builtin_bit_cast(data_t, 
                             __builtin_amdgcn_mov_dpp(__builtin_bit_cast(int, thread_data),
                                                         0x157,
                                                         row_mask,
                                                         bank_mask,
                                                         bound_ctrl)); // row_newbcast:7
-
+            
             data_t yyy = (__lane_id() / 8) % 2 == 0 ? 0 : xxx;
             thread_data = thread_data - yyy;
 #else
@@ -416,13 +416,13 @@ struct MoeSortingKernel
             int broadcast_src_lane = (__lane_id() & ~15) + 7;  // Lane 7 of the 16-lane group
             int broadcast_addr = broadcast_src_lane << 2;      // Convert to byte address
             int bcast7 = __builtin_amdgcn_ds_bpermute(broadcast_addr, __builtin_bit_cast(int, thread_data));
-
+            
             // Apply subtraction only to odd 8-lane groups (lanes 8-15 of each 16-lane unit)
             if ((__lane_id() / 8) % 2 != 0) {  // Note: != 0, not == 0
                 thread_data = thread_data - __builtin_bit_cast(data_t, bcast7);
             }
 #endif
-
+            
         }
         if constexpr(wave_size > 8)
         {
@@ -773,7 +773,7 @@ struct MoeSortingKernel
                                    const mdiv topk_mdiv,
                                    const mdiv expert_mdiv,
                                    const index_t smem_rows,
-                                   void* smem_ptr) const
+                                   void* smem) const
     {
         const index_t tid            = static_cast<index_t>(threadIdx.x);
         const index_t wid            = amd_wave_read_first_lane(tid / get_warp_size());
@@ -785,9 +785,9 @@ struct MoeSortingKernel
 
         const index_t smem_cols = num_experts + 1;
 
-        simple_smem_indexer smem_cumsum{reinterpret_cast<index_t*>(smem_ptr) + 0};
-        simple_smem_indexer smem_cumdup{reinterpret_cast<index_t*>(smem_ptr) + smem_cols};
-        simple_smem_indexer smem_tokens{reinterpret_cast<index_t*>(smem_ptr) + 2 * smem_cols,
+        simple_smem_indexer smem_cumsum{reinterpret_cast<index_t*>(smem) + 0};
+        simple_smem_indexer smem_cumdup{reinterpret_cast<index_t*>(smem) + smem_cols};
+        simple_smem_indexer smem_tokens{reinterpret_cast<index_t*>(smem) + 2 * smem_cols,
                                         smem_cols};
 
         // #pragma unroll 8

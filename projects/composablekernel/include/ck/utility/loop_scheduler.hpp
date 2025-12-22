@@ -8,6 +8,7 @@
 #endif
 
 #include "ck/utility/common_header.hpp"
+#include "ck/utility/scheduler_enum.hpp"
 
 namespace ck {
 

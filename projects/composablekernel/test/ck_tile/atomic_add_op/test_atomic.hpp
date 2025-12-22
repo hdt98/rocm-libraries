@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -61,7 +61,7 @@ struct AtomicKernel
     using XDataType = typename Problem::XDataType;
 
     static constexpr index_t kBlockSize = Problem::BlockShape::BlockSize;
-    CK_TILE_HOST static auto BlockSize()
+    CK_TILE_HOST static constexpr auto BlockSize()
     {
         return ck_tile::is_wave32() ? kBlockSize / 2 : kBlockSize;
     }

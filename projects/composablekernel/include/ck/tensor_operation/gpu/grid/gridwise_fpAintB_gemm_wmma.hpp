@@ -185,23 +185,20 @@ struct GridwiseFpAintBGemm_Wmma
             }
             else
             {
-                constexpr auto A_KRow        = I2;
                 constexpr auto KWmmaPerblock = KPerBlock / WmmaK;
-                constexpr auto K0PerWmma     = WmmaK / A_KRow / K1;
+                constexpr auto K0PerWmma     = WmmaK / 2 / K1;
                 // KWmma->MRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
                 return make_naive_tensor_descriptor(
                     make_tuple(Number<KWmmaPerblock>{},
-                               I1,
                                Number<MRepeat>{},
                                I1,
                                Number<K0PerWmma>{},
                                I1,
                                I1,
                                K1),
-                    make_tuple(Number<K0PerWmma>{} * K1,
-                               K1,
-                               Number<KWmmaPerblock>{} * Number<K0PerWmma>{} * K1,
-                               K1,
+                    make_tuple(Number<MRepeat>{} * Number<K0PerWmma>{} * K1,
+                               Number<K0PerWmma>{} * K1,
+                               Number<K0PerWmma>{} * K1,
                                K1,
                                K1,
                                K1,
@@ -235,23 +232,20 @@ struct GridwiseFpAintBGemm_Wmma
             }
             else
             {
-                constexpr auto B_KRow        = I2;
                 constexpr auto KWmmaPerblock = KPerBlock / WmmaK;
-                constexpr auto K0PerWmma     = WmmaK / B_KRow / K1;
-                // KWmma->BlockId->NRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
+                constexpr auto K0PerWmma     = WmmaK / 2 / K1;
+                // KWmma->NRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
                 return make_naive_tensor_descriptor(
                     make_tuple(Number<KWmmaPerblock>{},
-                               I1,
                                Number<NRepeat>{},
                                I1,
                                Number<K0PerWmma>{},
                                I1,
                                I1,
                                K1),
-                    make_tuple(Number<K0PerWmma>{} * K1,
-                               K1,
-                               Number<KWmmaPerblock>{} * Number<K0PerWmma>{} * K1,
-                               K1,
+                    make_tuple(Number<NRepeat>{} * Number<K0PerWmma>{} * K1,
+                               Number<K0PerWmma>{} * K1,
+                               Number<K0PerWmma>{} * K1,
                                K1,
                                K1,
                                K1,
@@ -275,7 +269,7 @@ struct GridwiseFpAintBGemm_Wmma
             {
                 constexpr auto KWmmaPerBlock = KPerBlock / WmmaK;
 
-                return make_multi_index(KWmmaPerBlock, 0, 0, 0, 0, 0, 0, 0);
+                return make_multi_index(KWmmaPerBlock, 0, 0, 0, 0, 0, 0);
             }
         }();
 
@@ -295,7 +289,7 @@ struct GridwiseFpAintBGemm_Wmma
             {
                 constexpr auto KWmmaPerBlock = KPerBlock / WmmaK;
 
-                return make_multi_index(KWmmaPerBlock, 0, 0, 0, 0, 0, 0, 0);
+                return make_multi_index(KWmmaPerBlock, 0, 0, 0, 0, 0, 0);
             }
         }();
 
@@ -326,17 +320,15 @@ struct GridwiseFpAintBGemm_Wmma
                                    Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{})),
                                make_pass_through_transform(Number<A_K1>{})),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<1, 3>{}, Sequence<0, 2, 4>{}, Sequence<5>{}));
+                    make_tuple(Sequence<0, 3>{}, Sequence<1, 2, 4>{}, Sequence<5>{}));
             }
             else
             {
-                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 ->
-                // K0_MRepeat_Mwaves_MPerWmma_K1
-                // KWmma->BlockId->NRepeat->MWave->K0PerWmma->KRow->MPerWmma->K1 Per Thread
+                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
                 constexpr auto KWmma     = ABlockDesc_{}.GetLength(I0);
-                constexpr auto K0PerWmma = ABlockDesc_{}.GetLength(I4);
-                constexpr auto A_KRow    = ABlockDesc_{}.GetLength(I5);
-                constexpr auto A_K1      = ABlockDesc_{}.GetLength(I7);
+                constexpr auto K0PerWmma = ABlockDesc_{}.GetLength(I3);
+                constexpr auto A_KRow    = ABlockDesc_{}.GetLength(I4);
+                constexpr auto A_K1      = ABlockDesc_{}.GetLength(I6);
 
                 // Err: merge transform cause non-constexpr issue
 
@@ -357,8 +349,8 @@ struct GridwiseFpAintBGemm_Wmma
                 //         Sequence<4>{}));
 
                 // Workaround, Freeze transform
-                return make_naive_tensor_descriptor_packed(make_tuple(Number<MRepeat>{},
-                                                                      Number<KWmma * K0PerWmma>{},
+                return make_naive_tensor_descriptor_packed(make_tuple(Number<KWmma * K0PerWmma>{},
+                                                                      Number<MRepeat>{},
                                                                       I1,
                                                                       Number<A_KRow>{},
                                                                       I1,
@@ -390,20 +382,19 @@ struct GridwiseFpAintBGemm_Wmma
                                    Number<NRepeat>{}, Number<NWaves>{}, Number<NPerWmma>{})),
                                make_pass_through_transform(Number<B_K1>{})),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<1, 3>{}, Sequence<0, 2, 4>{}, Sequence<5>{}));
+                    make_tuple(Sequence<0, 3>{}, Sequence<1, 2, 4>{}, Sequence<5>{}));
             }
             else
             {
-                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 ->
-                // K0_MRepeat_Mwaves_MPerWmma_K1
+                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
                 constexpr auto KWmma     = BBlockDesc_{}.GetLength(I0);
-                constexpr auto K0PerWmma = BBlockDesc_{}.GetLength(I4);
-                constexpr auto B_KRow    = BBlockDesc_{}.GetLength(I5);
-                constexpr auto B_K1      = BBlockDesc_{}.GetLength(I7);
+                constexpr auto K0PerWmma = BBlockDesc_{}.GetLength(I3);
+                constexpr auto B_KRow    = BBlockDesc_{}.GetLength(I4);
+                constexpr auto B_K1      = BBlockDesc_{}.GetLength(I6);
 
                 // Workaround, Freeze transform
-                return make_naive_tensor_descriptor_packed(make_tuple(Number<NRepeat>{},
-                                                                      Number<KWmma * K0PerWmma>{},
+                return make_naive_tensor_descriptor_packed(make_tuple(Number<KWmma * K0PerWmma>{},
+                                                                      Number<NRepeat>{},
                                                                       I1,
                                                                       Number<B_KRow>{},
                                                                       I1,
@@ -449,11 +440,11 @@ struct GridwiseFpAintBGemm_Wmma
                                   a_grid_desc.GetLength(I0) * a_grid_desc.GetLength(I2));
             }
             else
-            { // ERROR
+            {
                 return make_tuple(a_grid_desc.GetLength(I1) * a_grid_desc.GetLength(I2) *
-                                      a_grid_desc.GetLength(I3) * a_grid_desc.GetLength(I6),
-                                  a_grid_desc.GetLength(I0) * a_grid_desc.GetLength(I4) *
-                                      a_grid_desc.GetLength(I5) * a_grid_desc.GetLength(I7));
+                                      a_grid_desc.GetLength(I5),
+                                  a_grid_desc.GetLength(I0) * a_grid_desc.GetLength(I3) *
+                                      a_grid_desc.GetLength(I4) * a_grid_desc.GetLength(I6));
             }
         };
 
@@ -464,11 +455,11 @@ struct GridwiseFpAintBGemm_Wmma
                                   b_grid_desc.GetLength(I0) * b_grid_desc.GetLength(I2));
             }
             else
-            { // ERROR
+            {
                 return make_tuple(b_grid_desc.GetLength(I1) * b_grid_desc.GetLength(I2) *
-                                      b_grid_desc.GetLength(I3) * b_grid_desc.GetLength(I6),
-                                  b_grid_desc.GetLength(I0) * b_grid_desc.GetLength(I4) *
-                                      b_grid_desc.GetLength(I5) * b_grid_desc.GetLength(I7));
+                                      b_grid_desc.GetLength(I5),
+                                  b_grid_desc.GetLength(I0) * b_grid_desc.GetLength(I3) *
+                                      b_grid_desc.GetLength(I4) * b_grid_desc.GetLength(I6));
             }
         };
 
@@ -656,22 +647,22 @@ struct GridwiseFpAintBGemm_Wmma
                 return a_grid_desc.GetLength(I0) * a_grid_desc.GetLength(I2);
             }
             else{
-                return a_grid_desc.GetLength(I0) * a_grid_desc.GetLength(I4)
-                        * a_grid_desc.GetLength(I5) * a_grid_desc.GetLength(I7);
+                return a_grid_desc.GetLength(I0) * a_grid_desc.GetLength(I3) 
+                        * a_grid_desc.GetLength(I4) * a_grid_desc.GetLength(I6);
             }
         }();
 
         constexpr auto a_block_desc = MakeABlockDescriptor();
         constexpr auto b_block_desc = MakeBBlockDescriptor();
-
+        
         auto a_block_trait = [&](){
             // A matrix blockwise copy
             if constexpr(AEnableLds)
             {
                 constexpr auto K0PerBlock = KPerBlock/ K1;
                 auto a_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                    static_cast<ADataType*>(p_shared),
-                    SharedMemTrait::a_block_space_size_aligned);
+                    static_cast<ADataType*>(p_shared), 
+                    SharedMemTrait::a_block_space_size_aligned);        
 
                 auto a_blockwise_copy =
                     ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
@@ -713,7 +704,7 @@ struct GridwiseFpAintBGemm_Wmma
                 constexpr auto K0PerWmma     = WmmaK/2/K1Value;
                 auto a_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, ADataType>(
                     a_block_desc.GetElementSpaceSize());
-
+                
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 auto a_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<ADataType,
@@ -721,22 +712,21 @@ struct GridwiseFpAintBGemm_Wmma
                                                      decltype(a_grid_desc),
                                                      decltype(a_block_desc),
                                                      Sequence<Number<KWmmaPerBlock>{},
-                                                              I1,
                                                               Number<MRepeat>{},
                                                               I1,
                                                               Number<K0PerWmma>{},
                                                               I1,
                                                               I1,
                                                               Number<K1Value>{}>,
-                                                     Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                     7,
+                                                     Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                                     6,
                                                      ABlockTransferSrcScalarPerVector,
                                                      AThreadTransferSrcResetCoordinateAfterRun,
                                                      true>(
                     a_grid_desc,
                 #if defined(__gfx13__)
                     make_multi_index(0,
-                                     m_block_data_idx_on_grid/(MWaves * MPerWmma * MRepeat),
+                                     m_block_data_idx_on_grid/(MWaves * MPerWmma),
                                      /*MRepeat*/0,
                                      /*MWaves*/(get_thread_local_1d_id() / 32) / NWaves,
                                      /*A_K0PerWmma*/0,
@@ -744,12 +734,11 @@ struct GridwiseFpAintBGemm_Wmma
                                      /*MPerWmma*/(get_thread_local_1d_id() % 32) / 2,
                                     /*K1Row*/ 0)
                 #else
-                    make_multi_index(0,
-                                     m_block_data_idx_on_grid/(MWaves * MPerWmma * MRepeat),
+                    make_multi_index(0, 
+                                     m_block_data_idx_on_grid/(MWaves * MPerWmma), 
+                                     get_thread_local_1d_id() / 32,
                                      0,
-                                     (get_thread_local_1d_id() / 32) / NWaves,
-                                     0,
-                                     (get_thread_local_1d_id() % 32 )/ 16,
+                                     (get_thread_local_1d_id() % 32 )/ 16, 
                                      get_thread_local_1d_id() % 16,
                                      0)
                 #endif
@@ -793,7 +782,7 @@ struct GridwiseFpAintBGemm_Wmma
 /* index_t SrcScalarStrideInVector,               */    1,
 /* index_t ScaleScalarStrideInVector,             */    1,
 /* index_t DstScalarStrideInVector,               */    1,
-/* bool ThreadTransferSrcResetCoordinateAfterRun, */    BThreadTransferSrcResetCoordinateAfterRun,
+/* bool ThreadTransferSrcResetCoordinateAfterRun, */    BThreadTransferSrcResetCoordinateAfterRun,    
 /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
                                                         NumGemmKPrefetchStage>(
                     b_grid_desc,
@@ -816,7 +805,7 @@ struct GridwiseFpAintBGemm_Wmma
                 constexpr auto K0PerWmma     = WmmaK/2/K1Value;
                 auto b_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, BDataType>(
                     b_block_desc.GetElementSpaceSize());
-
+                
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 auto b_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<BDataType,
@@ -824,22 +813,21 @@ struct GridwiseFpAintBGemm_Wmma
                                                      decltype(b_grid_desc),
                                                      decltype(b_block_desc),
                                                      Sequence<Number<KWmmaPerBlock>{},
-                                                              I1,
                                                               Number<NRepeat>{},
                                                               I1,
                                                               Number<K0PerWmma>{},
                                                               I1,
                                                               I1,
                                                               Number<K1Value>{}>,
-                                                     Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                     7,
+                                                     Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                                     6,
                                                      BBlockTransferSrcScalarPerVector,
                                                      BThreadTransferSrcResetCoordinateAfterRun,
                                                      true>(
                     b_grid_desc,
                 #if defined(__gfx13__)
                     make_multi_index(0,
-                                     n_block_data_idx_on_grid/(NWaves * NPerWmma * NRepeat),
+                                     n_block_data_idx_on_grid/(NWaves * NPerWmma),
                                      0,
                                      (get_thread_local_1d_id() / 32) % NWaves,
                                      0,
@@ -847,12 +835,11 @@ struct GridwiseFpAintBGemm_Wmma
                                      (get_thread_local_1d_id() % 32) / 2,
                                      0)
                 #else
-                    make_multi_index(0,
-                                     n_block_data_idx_on_grid/(NWaves * NPerWmma * NRepeat),
+                    make_multi_index(0, 
+                                     n_block_data_idx_on_grid/(NWaves * NPerWmma), 
+                                     get_thread_local_1d_id() / 32,
                                      0,
-                                     (get_thread_local_1d_id() / 32) % NWaves,
-                                     0,
-                                     (get_thread_local_1d_id() % 32 )/ 16,
+                                     (get_thread_local_1d_id() % 32 )/ 16, 
                                      get_thread_local_1d_id() % 16,
                                      0)
                 #endif
@@ -1144,7 +1131,7 @@ struct GridwiseFpAintBGemm_Wmma
                 GetCShuffleBlockDescriptor_MShRepeat_MPerShRepeat_NShRepeat_NPerShRepeat();
 
             auto c_shuffle_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<CShuffleDataType*>(p_shared) + SharedMemTrait::c_shuffle_block_space_offset,
+                static_cast<CShuffleDataType*>(p_shared) + SharedMemTrait::c_shuffle_block_space_offset, 
                 SharedMemTrait::c_shuffle_block_space_size);
 
             constexpr auto c_block_desc_mrepeat_mwave_msubgroup_nrepeat_nwave_nthreadpersubgroup_maccvgprs = transform_tensor_descriptor(
@@ -1182,10 +1169,10 @@ struct GridwiseFpAintBGemm_Wmma
                 make_tuple(make_merge_transform(make_tuple(NRepeat, NWave, NThreadPerSubGroup))),
                 make_tuple(Sequence<0, 1, 2>{}),
                 make_tuple(Sequence<0>{}));
-
+            
             const auto m_thread_data_on_block_idx = m_thread_data_on_block_to_mrepeat_mwave_msubgroup_maccvgprs_adaptor.CalculateBottomIndex(
                 make_multi_index(m_thread_data_on_block));
-
+            
             const auto n_thread_data_on_block_idx = n_thread_data_on_block_to_nrepeat_nwave_nthreadpersubgroup_adaptor.CalculateBottomIndex(
                 make_multi_index(n_thread_data_on_block));
 

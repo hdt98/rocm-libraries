@@ -145,9 +145,6 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
                 // skip test if instance_index is specified
                 return;
             }
-            // re-init output to zero before profiling next kernel
-            in_device_buf.SetZero();
-
             std::string op_name = op_ptr->GetTypeString();
 
             auto invoker_ptr = op_ptr->MakeInvokerPointer();

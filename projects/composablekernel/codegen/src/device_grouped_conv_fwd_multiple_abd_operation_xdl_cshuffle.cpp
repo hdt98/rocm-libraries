@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "ck/host/device_grouped_conv_fwd_multiple_d/conv_fwd_op.hpp"
 #include <iostream>
@@ -60,7 +60,8 @@ std::vector<Operation_Conv_Fwd_Xdl_Cshuffle> Operation_Conv_Fwd_Xdl_Cshuffle::Cr
   {   256,   128,   128,    32,   8,   8,   16,   16,    4,    4,        1},
   {   64,     64,   64,     32,   8,   8,   16,   16,    4,    4,        1},
   {   256,   256,   128,    32,   8,   8,   16,   16,    8,    4,        1},
-  {   128,   128,   128,    32,   8,   8,   16,   16,    8,    4,        1} // clang-format on
+  {   128,   128,   128,    32,   8,   8,   16,   16,    8,    4,        1}
+        // clang-format on
     };
 
     std::vector<operation::BlockTransferDesc> a_block_descriptions = {
@@ -74,7 +75,8 @@ std::vector<Operation_Conv_Fwd_Xdl_Cshuffle> Operation_Conv_Fwd_Xdl_Cshuffle::Cr
   {    S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              1,              8,         1},
   {    S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              1,              8,         1},
   {    S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,         1},
-  {    S<4, 32, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,         1} // clang-format on
+  {    S<4, 32, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,         1}
+        // clang-format on
     };
 
     std::vector<operation::BlockTransferDesc> b_block_descriptions = {
@@ -88,7 +90,8 @@ std::vector<Operation_Conv_Fwd_Xdl_Cshuffle> Operation_Conv_Fwd_Xdl_Cshuffle::Cr
   {    S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              1,              8,         1},
   {    S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              1,              8,         1},
   {    S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8,         1},
-  {    S<4, 32, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8,         1} // clang-format on
+  {    S<4, 32, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8,         1}
+        // clang-format on
     };
 
     std::vector<operation::CShuffleDesc> cshuffle_descriptions = {
@@ -102,7 +105,8 @@ std::vector<Operation_Conv_Fwd_Xdl_Cshuffle> Operation_Conv_Fwd_Xdl_Cshuffle::Cr
   {          1,           1},
   {          1,           1},
   {          1,           1},
-  {          1,           1} // clang-format on
+  {          1,           1}
+        // clang-format on
     };
 
     std::vector<operation::CBlockTransferDesc> c_block_descriptions = {
@@ -116,7 +120,8 @@ std::vector<Operation_Conv_Fwd_Xdl_Cshuffle> Operation_Conv_Fwd_Xdl_Cshuffle::Cr
   {              S<1, 32, 1, 8>,               4},
   {              S<1, 16, 1, 4>,               1},
   {              S<1, 32, 1, 8>,               4},
-  {              S<1, 16, 1, 8>,               4} // clang-format on
+  {              S<1, 16, 1, 8>,               4}
+        // clang-format on
     };
 
     assert(tile_descriptions.size() == a_block_descriptions.size());

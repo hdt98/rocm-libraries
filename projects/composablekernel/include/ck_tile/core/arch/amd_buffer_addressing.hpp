@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -110,19 +110,19 @@ CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void* ptr,
 namespace impl {
 // below type indicate the data type used for buffer load inline asm
 // clang-format off
-    template<index_t N, typename T> struct buffer_load_trait;
+template<index_t N, typename T> struct buffer_load_trait;
 
-    template<typename T> struct buffer_load_trait<16, T> { using payload_t = fp32x4_t; };
-    template<typename T> struct buffer_load_trait<8 , T> { using payload_t = fp32x2_t; };
-    template<typename T> struct buffer_load_trait<4 , T> { using payload_t = float; };
-    template<typename T> struct buffer_load_trait<2 , T> { using payload_t = float; };
-    template<typename T> struct buffer_load_trait<1 , T> { using payload_t = float; };
+template<typename T> struct buffer_load_trait<16, T> { using payload_t = fp32x4_t; };
+template<typename T> struct buffer_load_trait<8 , T> { using payload_t = fp32x2_t; };
+template<typename T> struct buffer_load_trait<4 , T> { using payload_t = float; };
+template<typename T> struct buffer_load_trait<2 , T> { using payload_t = float; };
+template<typename T> struct buffer_load_trait<1 , T> { using payload_t = float; };
 
-    #if CK_TILE_BUFFER_LOAD_RAW_BF16_WA
-    template<> struct buffer_load_trait<16, thread_buffer<bf16_t, 8>> { using payload_t = bf16x8_t; };
-    template<> struct buffer_load_trait<8 , thread_buffer<bf16_t, 4>> { using payload_t = bf16x4_t; };
-    template<> struct buffer_load_trait<4 , thread_buffer<bf16_t, 2>> { using payload_t = bf16x2_t; };
-    #endif
+#if CK_TILE_BUFFER_LOAD_RAW_BF16_WA
+template<> struct buffer_load_trait<16, thread_buffer<bf16_t, 8>> { using payload_t = bf16x8_t; };
+template<> struct buffer_load_trait<8 , thread_buffer<bf16_t, 4>> { using payload_t = bf16x4_t; };
+template<> struct buffer_load_trait<4 , thread_buffer<bf16_t, 2>> { using payload_t = bf16x2_t; };
+#endif
 // clang-format on
 } // namespace impl
 
@@ -932,7 +932,7 @@ struct buffer_store_if
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(saved_exec)
+                       "s"(save_exec)
                      : "memory");
 #endif
         }
@@ -976,7 +976,7 @@ struct buffer_store_if
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(saved_exec)
+                       "s"(save_exec)
                      : "memory");
 #endif
         }
@@ -1019,7 +1019,7 @@ struct buffer_store_if
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(saved_exec)
+                       "s"(save_exec)
                      : "memory");
 #endif
         }
@@ -1062,7 +1062,7 @@ struct buffer_store_if
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(saved_exec)
+                       "s"(save_exec)
                      : "memory");
 #endif
         }
@@ -1105,7 +1105,7 @@ struct buffer_store_if
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(saved_exec)
+                       "s"(save_exec)
                      : "memory");
 #endif
         }
@@ -1141,8 +1141,8 @@ struct buffer_atomic_add_if<bf16_t, 2, pre_nop>
                                    index_t flag = 1)
     {
         static_assert(sizeof(T) == 4);
-        auto saved_exec = __builtin_amdgcn_read_exec();
-        using mbuf_t    = float;
+        auto save_exec = __builtin_amdgcn_read_exec();
+        using mbuf_t   = float;
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
                      "global_atomic_pk_add_bf16 %0, %1, %2 offset:%3\n"
                      "s_mov_b64 exec %5"
@@ -1152,7 +1152,7 @@ struct buffer_atomic_add_if<bf16_t, 2, pre_nop>
                        "s"(res.xy),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(saved_exec)
+                       "s"(save_exec)
                      : "memory");
     }
 };
@@ -1183,13 +1183,13 @@ struct buffer_atomic_add<bf16_t, 2, pre_nop>
 namespace impl {
 // below type indicate the data type used for buffer load inline asm
 // clang-format off
-    template<index_t N, typename T> struct smem_load_trait;
+template<index_t N, typename T> struct smem_load_trait;
 
-    template<typename T> struct smem_load_trait<16, T> { using payload_t = fp32x4_t; };
-    template<typename T> struct smem_load_trait<8 , T> { using payload_t = fp32x2_t; };
-    template<typename T> struct smem_load_trait<4 , T> { using payload_t = float; };
-    template<typename T> struct smem_load_trait<2 , T> { using payload_t = float; };
-    template<typename T> struct smem_load_trait<1 , T> { using payload_t = float; };
+template<typename T> struct smem_load_trait<16, T> { using payload_t = fp32x4_t; };
+template<typename T> struct smem_load_trait<8 , T> { using payload_t = fp32x2_t; };
+template<typename T> struct smem_load_trait<4 , T> { using payload_t = float; };
+template<typename T> struct smem_load_trait<2 , T> { using payload_t = float; };
+template<typename T> struct smem_load_trait<1 , T> { using payload_t = float; };
 
 // clang-format on
 } // namespace impl
@@ -1274,88 +1274,88 @@ struct smem_load<1>
 };
 
 // clang-format off
-    namespace impl{
+namespace impl{
 
-    // can't use "+v" since there could be potential extra move(read/write)
-    // use "v" can help remove such duplicated moves
-    // besides, fake this as "memory" operation to force later valu after this fence
-    // TODO: may have scratch (because this is memory?)
-    //       need to reduce extra move inside compiler
-    template<index_t N>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword(array<float, N>& b)
-    {
-        constexpr auto kSize = remove_cvref_t<decltype(b)>::size();
-        static_for<0, kSize, 1>{}([&](auto i){
-            asm volatile(" " : : "v"(b.get(number<i>{})) : "memory");
-        });
-    }
-    #if 1
-    // below specialization just merge size() of dwords into single section
-    template<>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword<2>(array<float, 2>& b)
-    {
-        asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})) : "memory");
-    }
+// can't use "+v" since there could be potential extra move(read/write)
+// use "v" can help remove such duplicated moves
+// besides, fake this as "memory" operation to force later valu after this fence
+// TODO: may have scratch (because this is memory?)
+//       need to reduce extra move inside compiler
+template<index_t N>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword(array<float, N>& b)
+{
+    constexpr auto kSize = remove_cvref_t<decltype(b)>::size(); 
+    static_for<0, kSize, 1>{}([&](auto i){
+        asm volatile(" " : : "v"(b.get(number<i>{})) : "memory");
+    });
+}
+#if 1
+// below specialization just merge size() of dwords into single section
+template<>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword<2>(array<float, 2>& b)
+{
+    asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})) : "memory");
+}
 
-    template<>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword<3>(array<float, 3>& b)
-    {
-        asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})) : "memory");
-    }
+template<>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword<3>(array<float, 3>& b)
+{
+    asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})) : "memory");
+}
 
-    template<>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword<4>(array<float, 4>& b)
-    {
-        asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})) : "memory");
-    }
+template<>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword<4>(array<float, 4>& b)
+{
+    asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})) : "memory");
+}
 
-    template<>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword<8>(array<float, 8>& b)
-    {
-        asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})),
-                            "v"(b.get(number<4>{})), "v"(b.get(number<5>{})), "v"(b.get(number<6>{})), "v"(b.get(number<7>{})) : "memory");
-    }
+template<>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword<8>(array<float, 8>& b)
+{
+    asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})),
+                         "v"(b.get(number<4>{})), "v"(b.get(number<5>{})), "v"(b.get(number<6>{})), "v"(b.get(number<7>{})) : "memory");
+}
 
-    template<>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword<16>(array<float, 16>& b)
-    {
-        asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})),
-                            "v"(b.get(number<4>{})), "v"(b.get(number<5>{})), "v"(b.get(number<6>{})), "v"(b.get(number<7>{})),
-                            "v"(b.get(number<8>{})), "v"(b.get(number<9>{})), "v"(b.get(number<10>{})), "v"(b.get(number<11>{})),
-                            "v"(b.get(number<12>{})), "v"(b.get(number<13>{})), "v"(b.get(number<14>{})), "v"(b.get(number<15>{})) : "memory");
-    }
+template<>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword<16>(array<float, 16>& b)
+{
+    asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})),
+                         "v"(b.get(number<4>{})), "v"(b.get(number<5>{})), "v"(b.get(number<6>{})), "v"(b.get(number<7>{})),
+                         "v"(b.get(number<8>{})), "v"(b.get(number<9>{})), "v"(b.get(number<10>{})), "v"(b.get(number<11>{})),
+                         "v"(b.get(number<12>{})), "v"(b.get(number<13>{})), "v"(b.get(number<14>{})), "v"(b.get(number<15>{})) : "memory");
+}
 
-    template<>
-    CK_TILE_DEVICE void insert_dummy_dep_per_dword<32>(array<float, 32>& b)
-    {
-        asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})),
-                            "v"(b.get(number<4>{})), "v"(b.get(number<5>{})), "v"(b.get(number<6>{})), "v"(b.get(number<7>{})),
-                            "v"(b.get(number<8>{})), "v"(b.get(number<9>{})), "v"(b.get(number<10>{})), "v"(b.get(number<11>{})),
-                            "v"(b.get(number<12>{})), "v"(b.get(number<13>{})), "v"(b.get(number<14>{})), "v"(b.get(number<15>{})),
-                            "v"(b.get(number<16>{})), "v"(b.get(number<17>{})), "v"(b.get(number<18>{})), "v"(b.get(number<19>{})),
-                            "v"(b.get(number<20>{})), "v"(b.get(number<21>{})), "v"(b.get(number<22>{})), "v"(b.get(number<23>{})),
-                            "v"(b.get(number<24>{})), "v"(b.get(number<25>{})), "v"(b.get(number<26>{})), "v"(b.get(number<27>{})),
-                            "v"(b.get(number<28>{})), "v"(b.get(number<29>{})), "v"(b.get(number<30>{})), "v"(b.get(number<31>{})) : "memory");
-    }
-    #endif
-    CK_TILE_DEVICE void insert_dummy_dep() {}
+template<>
+CK_TILE_DEVICE void insert_dummy_dep_per_dword<32>(array<float, 32>& b)
+{
+    asm volatile(" " : : "v"(b.get(number<0>{})), "v"(b.get(number<1>{})), "v"(b.get(number<2>{})), "v"(b.get(number<3>{})),
+                         "v"(b.get(number<4>{})), "v"(b.get(number<5>{})), "v"(b.get(number<6>{})), "v"(b.get(number<7>{})),
+                         "v"(b.get(number<8>{})), "v"(b.get(number<9>{})), "v"(b.get(number<10>{})), "v"(b.get(number<11>{})),
+                         "v"(b.get(number<12>{})), "v"(b.get(number<13>{})), "v"(b.get(number<14>{})), "v"(b.get(number<15>{})),
+                         "v"(b.get(number<16>{})), "v"(b.get(number<17>{})), "v"(b.get(number<18>{})), "v"(b.get(number<19>{})),
+                         "v"(b.get(number<20>{})), "v"(b.get(number<21>{})), "v"(b.get(number<22>{})), "v"(b.get(number<23>{})),
+                         "v"(b.get(number<24>{})), "v"(b.get(number<25>{})), "v"(b.get(number<26>{})), "v"(b.get(number<27>{})),
+                         "v"(b.get(number<28>{})), "v"(b.get(number<29>{})), "v"(b.get(number<30>{})), "v"(b.get(number<31>{})) : "memory");
+}
+#endif
+CK_TILE_DEVICE void insert_dummy_dep() {}
 
-    template<typename T>
-    CK_TILE_DEVICE void insert_dummy_dep(T & buffer)
-    {
-        // TODO: indeed we expect T to be multiple of dword. subdword is always buggy
-        using da_type = array<float, (sizeof(T) + 3) / 4>;
-        auto & dummy = reinterpret_cast<da_type&>(buffer);
-        insert_dummy_dep_per_dword(dummy);
-    }
+template<typename T>
+CK_TILE_DEVICE void insert_dummy_dep(T & buffer)
+{
+    // TODO: indeed we expect T to be multiple of dword. subdword is always buggy
+    using da_type = array<float, (sizeof(T) + 3) / 4>;
+    auto & dummy = reinterpret_cast<da_type&>(buffer);
+    insert_dummy_dep_per_dword(dummy);
+}
 
-    template<typename Tx, typename... Ty>
-    CK_TILE_DEVICE void insert_dummy_dep(Tx& bx, Ty&... by)
-    {
-        insert_dummy_dep(bx);
-        insert_dummy_dep(by...);
-    }
-    }
+template<typename Tx, typename... Ty>
+CK_TILE_DEVICE void insert_dummy_dep(Tx& bx, Ty&... by)
+{
+    insert_dummy_dep(bx);
+    insert_dummy_dep(by...);
+}
+}
 // clang-format on
 template <typename... T>
 CK_TILE_DEVICE void buffer_load_fence(index_t cnt = 0, T&... o)
@@ -1704,7 +1704,7 @@ CK_TILE_DEVICE void async_buffer_load_dwordxn_v(void* smem,
 
 CK_TILE_DEVICE void async_buffer_load_fence(index_t cnt = 0)
 {
-    asm volatile("s_wait_loadcnt %0" : : "n"(cnt) : "memory");
+    asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
 }
 
 // memory coherency bit for buffer store/load instruction
@@ -2426,19 +2426,19 @@ CK_TILE_DEVICE void amd_buffer_store_impl(const thread_buffer<T, N> src_thread_d
         else if constexpr(N == 8)
         {
 #if 0
-                thread_buffer<fp16_t, 8> tmp{src_thread_data};
+            thread_buffer<fp16_t, 8> tmp{src_thread_data};
 
-                llvm_amdgcn_raw_buffer_store_fp16x4(tmp.template get_as<fp16x4_t>()[number<0>{}],
-                                                    dst_wave_buffer_resource,
-                                                    dst_thread_addr_offset,
-                                                    dst_wave_addr_offset,
-                                                    static_cast<index_t>(coherence));
+            llvm_amdgcn_raw_buffer_store_fp16x4(tmp.template get_as<fp16x4_t>()[number<0>{}],
+                                                dst_wave_buffer_resource,
+                                                dst_thread_addr_offset,
+                                                dst_wave_addr_offset,
+                                                static_cast<index_t>(coherence));
 
-                llvm_amdgcn_raw_buffer_store_fp16x4(tmp.template get_as<fp16x4_t>()[number<1>{}],
-                                                    dst_wave_buffer_resource,
-                                                    dst_thread_addr_offset,
-                                                    dst_wave_addr_offset + 4 * sizeof(fp16_t),
-                                                    static_cast<index_t>(coherence));
+            llvm_amdgcn_raw_buffer_store_fp16x4(tmp.template get_as<fp16x4_t>()[number<1>{}],
+                                                dst_wave_buffer_resource,
+                                                dst_thread_addr_offset,
+                                                dst_wave_addr_offset + 4 * sizeof(fp16_t),
+                                                static_cast<index_t>(coherence));
 #else
             llvm_amdgcn_raw_buffer_store_fp32x4(bit_cast<fp32x4_t>(src_thread_data),
                                                 dst_wave_buffer_resource,

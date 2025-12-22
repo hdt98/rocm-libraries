@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <cstdlib>
@@ -16,6 +16,10 @@
 #include "ck/library/utility/device_memory.hpp"
 #include "ck/library/utility/host_tensor.hpp"
 #include "ck/library/utility/host_tensor_generator.hpp"
+
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
 
 using F16 = ck::half_t;
 using F32 = float;
@@ -66,36 +70,6 @@ int main(int argc, char* argv[])
 
     std::vector<std::size_t> nchw = {16, 8, 32, 64};
     std::vector<std::size_t> nhwc = {16, 32, 64, 8};
-
-    if(argc == 1)
-    {
-        // use default case
-    }
-    else if(argc == 3)
-    {
-        do_verification = std::stoi(argv[1]);
-        time_kernel     = std::stoi(argv[2]);
-    }
-    else if(argc == 7)
-    {
-        do_verification = std::stoi(argv[1]);
-        time_kernel     = std::stoi(argv[2]);
-        nchw[0]         = std::stoi(argv[3]);
-        nchw[1]         = std::stoi(argv[4]);
-        nchw[2]         = std::stoi(argv[5]);
-        nchw[3]         = std::stoi(argv[6]);
-        nhwc[0]         = nchw[0];
-        nhwc[1]         = nchw[2];
-        nhwc[2]         = nchw[3];
-        nhwc[3]         = nchw[1];
-    }
-    else
-    {
-        std::cerr << "arg1 to 6: do_verification, time_kernel, N, C, H, W" << std::endl;
-
-        return 1;
-    }
-
     std::array<ck::index_t, 4> ab_lengths;
     std::array<ck::index_t, 4> a_strides = {1,
                                             static_cast<int>(nchw[0]),

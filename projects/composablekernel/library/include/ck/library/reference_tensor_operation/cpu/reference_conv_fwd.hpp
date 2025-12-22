@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -81,9 +81,7 @@ struct ReferenceConvFwd : public device::BaseOperator
             OutElementwiseOperation out_element_op,
             const std::array<Tensor<InDataType>, NumAElementwiseTensor>& elementwise_a_tensors,
             const std::array<Tensor<WeiDataType>, NumBElementwiseTensor>& elementwise_b_tensors,
-            const std::array<Tensor<OutDataType>, NumDElementwiseTensor>& elementwise_d_tensors,
-            size_t acc_convert_interval,
-            bool disable_bhalf_rne)
+            const std::array<Tensor<OutDataType>, NumDElementwiseTensor>& elementwise_d_tensors)
             : input_{input},
               weight_{weight},
               output_{output},
@@ -97,9 +95,7 @@ struct ReferenceConvFwd : public device::BaseOperator
               in_element_op_{in_element_op},
               wei_element_op_{wei_element_op},
               out_element_op_{out_element_op},
-              device_name_{ck::get_device_name()},
-              acc_convert_interval_(acc_convert_interval),
-              disable_bhalf_rne_(disable_bhalf_rne)
+              device_name_{ck::get_device_name()}
         {
         }
 
@@ -120,8 +116,6 @@ struct ReferenceConvFwd : public device::BaseOperator
         WeiElementwiseOperation wei_element_op_;
         OutElementwiseOperation out_element_op_;
         ::std::string device_name_; // the device which this conv is compared with
-        size_t acc_convert_interval_;
-        bool disable_bhalf_rne_;
     };
 
     struct Invoker : public device::BaseInvoker
@@ -186,26 +180,6 @@ struct ReferenceConvFwd : public device::BaseOperator
                                     v_acc += ck::type_convert<float>(v_in) *
                                              ck::type_convert<float>(v_wei);
                                 }
-                            }
-                        }
-                        if(arg.acc_convert_interval_ > 0 &&
-                           (c % arg.acc_convert_interval_ == (arg.acc_convert_interval_ - 1)))
-                        {
-                            if(arg.disable_bhalf_rne_ &&
-                               std::is_same<OutDataType, ck::bhalf_t>::value)
-                            {
-                                union
-                                {
-                                    float fp32;
-                                    uint32_t int32;
-                                } u     = {v_acc};
-                                u.int32 = (u.int32 >> 16) << 16;
-                                v_acc   = u.fp32;
-                            }
-                            else
-                            {
-                                OutDataType v_acc_converted = ck::type_convert<OutDataType>(v_acc);
-                                v_acc = ck::type_convert<float>(v_acc_converted);
                             }
                         }
                     }
@@ -321,26 +295,6 @@ struct ReferenceConvFwd : public device::BaseOperator
                                                  ck::type_convert<float>(v_wei);
                                     }
                                 }
-                            }
-                        }
-                        if(arg.acc_convert_interval_ > 0 &&
-                           (c % arg.acc_convert_interval_ == (arg.acc_convert_interval_ - 1)))
-                        {
-                            if(arg.disable_bhalf_rne_ &&
-                               std::is_same<OutDataType, ck::bhalf_t>::value)
-                            {
-                                union
-                                {
-                                    float fp32;
-                                    uint32_t int32;
-                                } u     = {v_acc};
-                                u.int32 = (u.int32 >> 16) << 16;
-                                v_acc   = u.fp32;
-                            }
-                            else
-                            {
-                                OutDataType v_acc_converted = ck::type_convert<OutDataType>(v_acc);
-                                v_acc = ck::type_convert<float>(v_acc_converted);
                             }
                         }
                     }
@@ -474,26 +428,6 @@ struct ReferenceConvFwd : public device::BaseOperator
                                 }
                             }
                         }
-                        if(arg.acc_convert_interval_ > 0 &&
-                           (c % arg.acc_convert_interval_ == (arg.acc_convert_interval_ - 1)))
-                        {
-                            if(arg.disable_bhalf_rne_ &&
-                               std::is_same<OutDataType, ck::bhalf_t>::value)
-                            {
-                                union
-                                {
-                                    float fp32;
-                                    uint32_t int32;
-                                } u     = {v_acc};
-                                u.int32 = (u.int32 >> 16) << 16;
-                                v_acc   = u.fp32;
-                            }
-                            else
-                            {
-                                OutDataType v_acc_converted = ck::type_convert<OutDataType>(v_acc);
-                                v_acc = ck::type_convert<float>(v_acc_converted);
-                            }
-                        }
                     }
                     OutDataType v_acc_converted = ck::type_convert<OutDataType>(v_acc);
                     OutDataType& v_out          = arg.output_(g, n, k, d_o, ho, wo);
@@ -593,9 +527,7 @@ struct ReferenceConvFwd : public device::BaseOperator
         OutElementwiseOperation out_element_op,
         const std::array<Tensor<InDataType>, NumAElementwiseTensor>& elementwise_a_tensors  = {},
         const std::array<Tensor<WeiDataType>, NumBElementwiseTensor>& elementwise_b_tensors = {},
-        const std::array<Tensor<OutDataType>, NumDElementwiseTensor>& elementwise_d_tensors = {},
-        size_t acc_convert_interval                                                         = 0,
-        bool disable_bhalf_rne                                                              = false)
+        const std::array<Tensor<OutDataType>, NumDElementwiseTensor>& elementwise_d_tensors = {})
     {
         return Argument{input,
                         weight,
@@ -609,9 +541,7 @@ struct ReferenceConvFwd : public device::BaseOperator
                         out_element_op,
                         elementwise_a_tensors,
                         elementwise_b_tensors,
-                        elementwise_d_tensors,
-                        acc_convert_interval,
-                        disable_bhalf_rne};
+                        elementwise_d_tensors};
     }
 
     static auto MakeInvoker() { return Invoker{}; }

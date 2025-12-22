@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 #include "ck_tile/core/arch/arch.hpp"
@@ -313,20 +313,12 @@ struct tile_window_linear
     template <index_t i_access = -1, bool oob_conditional_check = true>
     CK_TILE_DEVICE auto load(number<i_access> = {}, bool_constant<oob_conditional_check> = {}) const
     {
-        constexpr auto tile_dstr = typename Base::TileDstr{};
-        auto dst_tensor = make_static_distributed_tensor<typename Base::DataType>(tile_dstr);
-        return load(dst_tensor, number<i_access>{}, bool_constant<oob_conditional_check>{});
-    }
-
-    template <typename DstTile, index_t i_access = -1, bool oob_conditional_check = true>
-    CK_TILE_DEVICE auto load(DstTile& dst_tensor,
-                             number<i_access>                     = {},
-                             bool_constant<oob_conditional_check> = {}) const
-    {
         using vector_t = typename Base::Traits::vector_t;
         using SFC_Ys   = typename Base::Traits::SFC_Ys;
 
         constexpr auto tile_dstr = typename Base::TileDstr{};
+
+        auto dst_tensor = make_static_distributed_tensor<typename Base::DataType>(tile_dstr);
 
         auto issue = [&](auto i_access_) {
             constexpr auto IAccess = number<i_access_>{};
@@ -370,19 +362,10 @@ struct tile_window_linear
         return dst_tensor;
     }
 
-    template <index_t i_access = -1, bool oob_conditional_check = true>
-    CK_TILE_DEVICE auto tr_load(number<i_access>                     = {},
-                                bool_constant<oob_conditional_check> = {}) const
-    {
-        constexpr auto tile_dstr = typename Base::TileDstr{};
-        auto dst_tensor = make_static_distributed_tensor<typename Base::DataType>(tile_dstr);
-        return tr_load(dst_tensor, number<i_access>{}, bool_constant<oob_conditional_check>{});
-    }
-
     template <typename DstTile, index_t i_access = -1, bool oob_conditional_check = true>
-    CK_TILE_DEVICE auto tr_load(DstTile& dst_tensor,
-                                number<i_access>                     = {},
-                                bool_constant<oob_conditional_check> = {}) const
+    CK_TILE_DEVICE auto load(DstTile& dst_tensor,
+                             number<i_access>                     = {},
+                             bool_constant<oob_conditional_check> = {}) const
     {
         using vector_t = typename Base::Traits::vector_t;
         using SFC_Ys   = typename Base::Traits::SFC_Ys;
@@ -402,7 +385,7 @@ struct tile_window_linear
 
             // read from bottom tensor
             const vector_t vec_value =
-                this->get_bottom_tensor_view().template get_tr_vectorized_elements<vector_t>(
+                this->get_bottom_tensor_view().template get_vectorized_elements<vector_t>(
                     bottom_tensor_thread_coord,
                     linear_offset,
                     bottom_tensor_flag,
@@ -534,7 +517,8 @@ struct tile_window_linear
             size_per_buf;
 
         const index_t m0_init_value = size_per_buf + size_per_wave * get_warp_id();
-        m0_set_with_memory(m0_init_value); // This should be wave independent
+        m0_set_with_memory(
+            amd_wave_read_first_lane(m0_init_value)); // This should be wave independent
 
         using vector_t = typename Base::Traits::vector_t;
 

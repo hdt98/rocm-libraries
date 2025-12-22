@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -148,7 +148,7 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ false>
         return min(ElemPerThread, MaxVectorSize);
     }
 
-    template <typename Problem, typename BlockGemm>
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeQDramTileDistribution()
     {
         using QDataType = remove_cvref_t<typename Problem::QDataType>;
@@ -188,22 +188,7 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ false>
         constexpr index_t kMPerBlock = Problem::BlockFmhaShape::kM0;
         constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
         constexpr index_t kKPack     = 16 / sizeof(QDataType);
-#if(defined(__gfx13__))
-        constexpr auto q_lds_block_desc_0 = make_naive_tensor_descriptor(
-            make_tuple(number<kMPerBlock>{}, number<kKPerBlock / kKPack>{}, number<kKPack>{}),
-            make_tuple(number<kKPerBlock>{}, number<kKPack>{}, number<1>{}),
-            number<kKPack>{},
-            number<1>{});
 
-        constexpr auto q_lds_block_desc = transform_tensor_descriptor(
-            q_lds_block_desc_0,
-            make_tuple(make_pass_through_transform(kMPerBlock),
-                       make_merge_transform(make_tuple(kKPerBlock / kKPack, kKPack))),
-            make_tuple(sequence<0>{}, sequence<1, 2>{}),
-            make_tuple(sequence<0>{}, sequence<1>{}));
-
-        return q_lds_block_desc;
-#else
         constexpr auto q_lds_block_desc_0 = make_naive_tensor_descriptor(
             make_tuple(number<kKPerBlock / kKPack>{}, number<kMPerBlock>{}, number<kKPack>{}),
             make_tuple(number<(kMPerBlock + 1) * kKPack>{}, number<kKPack>{}, number<1>{}),
@@ -218,7 +203,6 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ false>
             make_tuple(sequence<0>{}, sequence<1>{}));
 
         return q_lds_block_desc;
-#endif
     }
 
     template <typename Problem>
@@ -439,6 +423,19 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
     }
 
     template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetAlignmentRandVal()
+    {
+        using BlockGemm = remove_cvref_t<decltype(QXPolicy::template GetQKBlockGemm<Problem>())>;
+        constexpr auto config = BlockGemm::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+        using WG              = remove_cvref_t<decltype(config.template at<0>())>;
+        using CWarpDstr       = typename WG::CWarpDstr;
+
+        constexpr auto c_warp_y_lengths = CWarpDstr{}.get_ys_to_d_descriptor().get_lengths();
+        constexpr index_t MaxVectorSize = 16 / sizeof(typename Problem::RandValOutputDataType);
+        return min(MaxVectorSize, c_warp_y_lengths.get(number<CWarpDstr::NDimY - 1>{}));
+    }
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetAlignmentO()
     {
         using BlockGemm       = remove_cvref_t<decltype(GetKVBlockGemm<Problem>())>;
@@ -461,10 +458,6 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             else
             {
                 constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
-#if(defined(__gfx13__))
-                constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
-                return kNPerBlock * kKPerBlock;
-#else
                 constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
                 constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
                 constexpr index_t WarpSize   = ck_tile::get_warp_size();
@@ -480,7 +473,6 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
                 constexpr index_t NumIssues  = kNPerBlock / (LaneGroups * NumWarps);
 
                 return NumIssues * NumWarps * (WarpSize * KVector + kPad);
-#endif
             }
         }();
 
@@ -509,24 +501,7 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
         constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
         constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
         constexpr index_t kKPack     = GetSmemKPackK<Problem>();
-#if(defined(__gfx13__))
-        // TODO need to consider lds bank conflict
-        constexpr auto k_lds_block_desc_0 = make_naive_tensor_descriptor(
-            make_tuple(number<kNPerBlock>{}, number<kKPerBlock / kKPack>{}, number<kKPack>{}),
-            make_tuple(number<kKPerBlock>{}, number<kKPack>{}, number<1>{}),
-            number<kKPack>{},
-            number<1>{});
 
-        constexpr auto k_lds_block_desc = transform_tensor_descriptor(
-            k_lds_block_desc_0,
-            make_tuple(
-                make_pass_through_transform(number<kNPerBlock>{}),
-                make_merge_transform(make_tuple(number<kKPerBlock / kKPack>{}, number<kKPack>{}))),
-            make_tuple(sequence<0>{}, sequence<1, 2>{}),
-            make_tuple(sequence<0>{}, sequence<1>{}));
-
-        return k_lds_block_desc;
-#else
         constexpr auto k_lds_block_desc_0 = make_naive_tensor_descriptor(
             make_tuple(number<kKPerBlock / kKPack>{}, number<kNPerBlock>{}, number<kKPack>{}),
             make_tuple(number<(kNPerBlock + 1) * kKPack>{}, number<kKPack>{}, number<1>{}),
@@ -542,35 +517,12 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             make_tuple(sequence<0>{}, sequence<1>{}));
 
         return k_lds_block_desc;
-#endif
     }
 
     template <typename Problem, index_t IBuf = 0>
     CK_TILE_HOST_DEVICE static constexpr auto
     MakeKLdsStoreBlockDescriptor(number<IBuf> = number<0>{})
     {
-#if(defined(__gfx13__))
-        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
-        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
-        constexpr index_t kKPack     = GetSmemKPackK<Problem>();
-
-        constexpr auto k_lds_block_desc_0 = make_naive_tensor_descriptor_with_offset(
-            make_tuple(number<kNPerBlock>{}, number<kKPerBlock / kKPack>{}, number<kKPack>{}),
-            make_tuple(number<kKPerBlock>{}, number<kKPack>{}, number<1>{}),
-            number<IBuf * GetSingleSmemElementSpaceSize<Problem>()>{},
-            number<kKPack>{},
-            number<1>{});
-
-        constexpr auto k_lds_block_desc = transform_tensor_descriptor(
-            k_lds_block_desc_0,
-            make_tuple(
-                make_pass_through_transform(number<kNPerBlock>{}),
-                make_merge_transform(make_tuple(number<kKPerBlock / kKPack>{}, number<kKPack>{}))),
-            make_tuple(sequence<0>{}, sequence<1, 2>{}),
-            make_tuple(sequence<0>{}, sequence<1>{}));
-
-        return k_lds_block_desc;
-#else
         // K is always k-major, we use async-copy to load into LDS
         constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
         constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
@@ -580,8 +532,8 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
 
         constexpr index_t KPack   = GetSmemKPackK<Problem>(); // this is for lds
         constexpr index_t KVector = GetAlignmentK<Problem>(); // this is for global load
-        constexpr index_t kPad    = KPack; // for async-copy, this pad is between warps. Optimize
-                                           // this for lds_read speed
+        constexpr index_t kPad =
+            KPack; // for async-copy, this pad is between warps. Optimize this for lds_read speed
 
         static_assert(WarpSize * KVector >= kKPerBlock && WarpSize * KVector % kKPerBlock == 0);
         constexpr index_t LanesPerK =
@@ -619,37 +571,11 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}));
 
         return k_lds_block_desc_issues_warps_lanes;
-#endif
     }
 
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeKLdsLoadBlockDescriptor()
     {
-#if(defined(__gfx13__))
-        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
-        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
-        constexpr index_t kKPack     = GetSmemKPackK<Problem>();
-        constexpr index_t BufferSize = GetSingleSmemElementSpaceSize<Problem>();
-        // TODO need to consider lds bank conflict
-        constexpr auto k_lds_block_desc_0 = make_naive_tensor_descriptor(
-            make_tuple(number<NumPrefetchK>{},
-                       number<kNPerBlock>{},
-                       number<kKPerBlock / kKPack>{},
-                       number<kKPack>{}),
-            make_tuple(number<BufferSize>{}, number<kKPerBlock>{}, number<kKPack>{}, number<1>{}),
-            number<kKPack>{},
-            number<1>{});
-
-        constexpr auto k_lds_block_desc = transform_tensor_descriptor(
-            k_lds_block_desc_0,
-            make_tuple(
-                make_merge_transform(make_tuple(number<NumPrefetchK>{}, number<kNPerBlock>{})),
-                make_merge_transform(make_tuple(number<kKPerBlock / kKPack>{}, number<kKPack>{}))),
-            make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-            make_tuple(sequence<0>{}, sequence<1>{}));
-
-        return k_lds_block_desc;
-#else
         // K is always k-major, we use async-copy to load into LDS
         constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
         constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
@@ -700,7 +626,6 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             make_tuple(sequence<0>{}, sequence<1>{}));
 
         return k_lds_block_desc;
-#endif
     }
 
     // 3d + padding
@@ -783,11 +708,8 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             constexpr index_t MWarp     = config.template at<1>();
             constexpr index_t kMPerStep = MWarp * WG::kM;
             constexpr index_t kNPerStep = WG::kN;
-#if defined(__gfx13__)
-            return kMPerStep * kNPerStep * sizeof(uint8_t);
-#else
+
             return (kMPerStep + 1) * kNPerStep * sizeof(uint8_t);
-#endif
         }
         else
         {
@@ -832,27 +754,6 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
         }
         else
         {
-#if(defined(__gfx13__))
-            using KDataType = remove_cvref_t<typename Problem::KDataType>;
-
-            constexpr index_t kBlockSize = Problem::kBlockSize;
-            constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
-            constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
-
-            constexpr index_t K1 = 16 / sizeof(KDataType);
-            constexpr index_t K0 = kKPerBlock / K1;
-            constexpr index_t N2 = get_warp_size() / K0;
-            constexpr index_t N1 = kBlockSize / get_warp_size();
-            constexpr index_t N0 = kNPerBlock / (N2 * N1);
-
-            return make_static_tile_distribution(
-                tile_distribution_encoding<sequence<1>,
-                                           tuple<sequence<N0, N1, N2>, sequence<K0, K1>>,
-                                           tuple<sequence<1>, sequence<1, 2>>,
-                                           tuple<sequence<1>, sequence<2, 0>>,
-                                           sequence<1, 2>,
-                                           sequence<0, 1>>{});
-#else
             constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
             constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
             constexpr index_t kBlockSize = Problem::kBlockSize;
@@ -880,7 +781,6 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
                                            tuple<sequence<2>, sequence<1, 0>>,
                                            sequence<1, 2>,
                                            sequence<0, 1>>{});
-#endif
         }
     }
 

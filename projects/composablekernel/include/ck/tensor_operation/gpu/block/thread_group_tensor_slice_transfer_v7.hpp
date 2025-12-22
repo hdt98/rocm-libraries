@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -96,7 +96,7 @@ struct ThreadGroupTensorSliceTransfer_v7
            ThreadGroup::GetThreadId() < thread_cluster_desc_.GetElementSize())
         {
             const auto thread_cluster_idx = thread_cluster_desc_.CalculateBottomIndex(
-                make_multi_index(ThreadGroup::GetThreadId()));
+                make_multi_index(get_thread_local_1d_id()));
 
             const auto thread_data_idx_begin = thread_cluster_idx * thread_slice_lengths;
 

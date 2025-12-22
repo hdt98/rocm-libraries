@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -79,8 +79,7 @@ __host__ __device__ Y run_cast_to_f8(X x, uint32_t rng)
     // exponent and mantissa again3
 
     // For IEEE bias mode, the bias is 2^(k-1)-1 where k is the width of exponent bits
-    constexpr int out_bias = (1 << (out_exp - 1)) - 1 + (negative_zero_nan ? 1 : 0);
-    static_assert(out_bias == NumericUtils<Y>::bias);
+    const int out_bias                  = (1 << (out_exp - 1)) - 1 + (negative_zero_nan ? 1 : 0);
     const int out_denormal_act_exponent = 1 - out_bias; // actual exponent of f8 denormal
     // act_exponent is the actual exponent of fp32/fp16 (after subtracting bias)
     // out_exponent is the converted f8 exponent with bias encoding
@@ -219,9 +218,8 @@ __host__ __device__ Y run_cast_from_f8(X x)
     uint32_t mantissa = static_cast<uint8_t>(x) & ((1 << in_mant) - 1);
     int exponent      = (static_cast<uint8_t>(x) & 0x7F) >> in_mant;
 
-    constexpr int in_bias = (1 << (in_exp - 1)) - 1 + (negative_zero_nan ? 1 : 0);
-    static_assert(in_bias == NumericUtils<X>::bias);
-    constexpr int exp_low_cutoff = (1 << (out_exp - 1)) - in_bias;
+    constexpr int exp_low_cutoff =
+        (1 << (out_exp - 1)) - (1 << (in_exp - 1)) + 1 - (negative_zero_nan ? 1 : 0);
     T_bitwise retval;
 
     if constexpr(negative_zero_nan)
