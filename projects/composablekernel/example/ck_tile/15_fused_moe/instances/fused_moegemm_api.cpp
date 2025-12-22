@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <ck_tile/core.hpp>
 #include "fused_moegemm.hpp"
@@ -21,11 +21,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 0;
         constexpr ck_tile::index_t go_  = 1;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA
-        using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "bf16" && t.prec_w == "bf16" && t.prec_o == "bf16" && t.prec_st == "fp32" &&
@@ -33,11 +29,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 0;
         constexpr ck_tile::index_t go_  = 0;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA
-        using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "fp16" && t.prec_w == "fp16" && t.prec_o == "fp16" && t.prec_st == "fp32" &&
@@ -45,11 +37,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 0;
         constexpr ck_tile::index_t go_  = 1;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA
-        using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "fp16" && t.prec_w == "fp16" && t.prec_o == "fp16" && t.prec_st == "fp32" &&
@@ -57,11 +45,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 0;
         constexpr ck_tile::index_t go_  = 0;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA
-        using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "bf16" && t.prec_w == "bf16" && t.prec_o == "bf16" && t.prec_st == "fp32" &&
@@ -69,11 +53,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 1;
         constexpr ck_tile::index_t go_  = 1;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA
-        using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "bf16" && t.prec_w == "bf16" && t.prec_o == "bf16" && t.prec_st == "fp32" &&
@@ -81,11 +61,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 1;
         constexpr ck_tile::index_t go_  = 0;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA
-        using t_ = fmoe_<ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "fp16" && t.prec_w == "fp16" && t.prec_o == "fp16" && t.prec_st == "fp32" &&
@@ -93,11 +69,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 1;
         constexpr ck_tile::index_t go_  = 1;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA     
-        using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     else if(t.prec_i == "fp16" && t.prec_w == "fp16" && t.prec_o == "fp16" && t.prec_st == "fp32" &&
@@ -105,11 +77,7 @@ float fused_moegemm(fused_moegemm_traits t, fused_moegemm_args a, const ck_tile:
     {
         constexpr ck_tile::index_t act_ = 1;
         constexpr ck_tile::index_t go_  = 0;
-#ifdef CK_TILE_USE_XDL
         using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 32>, act_, go_, 0>;
-#elif CK_TILE_USE_WMMA    
-        using t_ = fmoe_<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float, S<32, 512, 128, 128>, S<1, 4, 1>, S<16, 16, 16>, act_, go_, 0>;
-#endif
         r = fused_moegemm_<t_>(s, a);
     }
     // clang-format on

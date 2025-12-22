@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ck/utility/dtype_vector.hpp"
+#include "ck/utility/data_type.hpp"
 #include "ck/utility/f8_utils.hpp"
 #include "ck/utility/get_id.hpp"
 #include "ck/utility/mxf4_utils.hpp"
@@ -63,12 +63,10 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(fl
 #if defined(__gfx950__)
     return static_cast_float_to_bf16(x);
 #else
-    uint16_t ret = 0;
     // Nan check
     if(x != x)
     {
-        ret = 0x7FC0;
-        return bit_cast<bhalf_t>(ret);
+        return uint16_t(0x7FC0);
     }
 
     union
@@ -80,8 +78,7 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(fl
     const uint32_t first_bf16_mantisa_bit = ((u.int32 >> 16) & 1);
     constexpr uint32_t rounding_bias      = uint32_t((1 << 15) - 1);
 
-    ret = uint16_t((u.int32 + first_bf16_mantisa_bit + rounding_bias) >> 16);
-    return bit_cast<bhalf_t>(ret);
+    return uint16_t((u.int32 + first_bf16_mantisa_bit + rounding_bias) >> 16);
 #endif
 }
 
@@ -126,7 +123,7 @@ inline __host__ __device__ constexpr float type_convert<float, bhalf_t>(bhalf_t 
     {
         uint32_t int32;
         float fp32;
-    } u = {uint32_t(bit_cast<uint16_t>(x)) << 16};
+    } u = {uint32_t(x) << 16};
 
     return u.fp32;
 }
@@ -138,13 +135,7 @@ inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, float>(float 
 #if CK_USE_RNE_BF16_CONVERSION
     return bf16_convert_rtn<bhalf_t>(x);
 #else
-    union
-    {
-        uint32_t int32;
-        float fp32;
-    } u;
-    u.fp32 = x;
-    return bit_cast<bhalf_t>(uint16_t(static_cast<uint32_t>(u.int32) >> 16));
+    return uint16_t(static_cast<uint32_t>(x) >> 16);
 #endif
 }
 

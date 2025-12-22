@@ -716,7 +716,7 @@ struct AddFastGelu
     }
 };
 
-// E = FastGelu(C * D)
+// E = MultiplyFastGelu(C + D)
 struct MultiplyFastGelu
 {
     static constexpr const char* name = "MultiplyFastGelu";

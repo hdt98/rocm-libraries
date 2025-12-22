@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -19,10 +19,10 @@
 namespace ck_tile {
 // Per-lane read-offset tweaks allow swizzling patterns not representable by tile_distribution.
 template <typename TileWindow_,
-          index_t i_access = -1,
-          typename offset_t,
+          index_t i_access           = -1,
           bool oob_conditional_check = true,
-          typename                   = std::enable_if_t<std::is_class_v<TileWindow_>>>
+          typename offset_t,
+          typename = std::enable_if_t<std::is_class_v<TileWindow_>>>
 CK_TILE_DEVICE auto load_tile_with_offset(const TileWindow_& tile_window,
                                           offset_t offset,
                                           number<i_access>                     = {},
@@ -73,7 +73,7 @@ template <typename DistributedTensor_,
                                       std::is_class_v<TileWindow_>>>
 CK_TILE_DEVICE auto load_tile_with_offset(DistributedTensor_& dst_tile,
                                           const TileWindow_& tile_window,
-                                          index_t offset,
+                                          offset_t offset,
                                           number<i_access>                     = {},
                                           bool_constant<oob_conditional_check> = {})
 {

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -184,9 +184,6 @@ struct GeneratorTensor_2
     template <typename... Is>
     T operator()(Is...)
     {
-        // static thread_local std::mt19937 generator(std::random_device{}());
-        // std::uniform_int_distribution<int> distribution(min_value, max_value - 1);
-        // return static_cast<T>(distribution(generator));
         return static_cast<T>((std::rand() % (max_value - min_value)) + min_value);
     }
 };

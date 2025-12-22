@@ -241,8 +241,6 @@ if (SUPPORTED_GPU_TARGETS MATCHES "gfx9|gfx11|gfx12|gfx13" AND NOT FORCE_DISABLE
     message(STATUS "Enabling XDL instances")
     add_definitions(-DCK_USE_XDL)
     set(CK_USE_XDL "ON")
-    add_definitions(-DCK_TILE_USE_XDL)
-    set(CK_TILE_USE_XDL "ON")
 endif()
 if ((SUPPORTED_GPU_TARGETS MATCHES "gfx94" OR SUPPORTED_GPU_TARGETS MATCHES "gfx95") AND NOT FORCE_DISABLE_XDL)
     message(STATUS "Enabling XDL FP8 gemms on native architectures")

@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 include_guard(GLOBAL)
 include(FetchContent)
 
@@ -72,8 +75,7 @@ if(WIN32)
             -Wno-suggest-destructor-override
             -Wno-suggest-override
             -Wno-nonportable-system-include-path
-            -Wno-language-extension-token
-            -DGTEST_HAS_SEH=0)
+            -Wno-language-extension-token)
 endif()
 
 target_compile_options(gtest PRIVATE ${GTEST_CXX_FLAGS})

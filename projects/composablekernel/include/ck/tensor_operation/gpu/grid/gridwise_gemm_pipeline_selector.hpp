@@ -8,6 +8,8 @@
 #include <ostream>
 #endif
 
+#include "ck/utility/pipeline_enum.hpp"
+#include "ck/utility/loop_scheduler.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v1.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v2.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v4_direct_load.hpp"

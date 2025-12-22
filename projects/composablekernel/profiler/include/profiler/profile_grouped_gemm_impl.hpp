@@ -407,6 +407,7 @@ bool profile_grouped_gemm_impl(int do_verification,
         std::cout << "grouped_gemm_instance (" << instance_index << "/" << num_kernel << "): Passed"
                   << std::endl;
     }
+
     return pass;
 }
 

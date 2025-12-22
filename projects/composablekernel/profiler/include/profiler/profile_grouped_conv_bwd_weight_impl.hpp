@@ -191,7 +191,6 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
     index_t num_kernel = 0;
     for(auto& op_ptr : op_ptrs)
     {
-        bool supported = false;
         for(std::size_t split_k_id = 0; split_k_id < split_k_list.size(); split_k_id++)
         {
             auto argument_ptr = op_ptr->MakeArgumentPointer(
@@ -229,14 +228,12 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
 
             if(op_ptr->IsSupportedArgument(argument_ptr.get()))
             {
-                supported = true;
-                if((instance_index != -1) && (instance_index != num_kernel))
+                num_kernel++;
+                if((instance_index != -1) && (instance_index + 1 != num_kernel))
                 {
                     // skip test if instance_index is specified
                     continue;
                 }
-                // using atomic add, so need to reset input
-                wei_device_buf.SetZero();
 
                 std::string op_name = op_ptr->GetTypeString();
 
@@ -330,10 +327,6 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
                 std::cout << op_ptr->GetTypeString() << " does not support this problem"
                           << std::endl;
             }
-        }
-        if(supported)
-        {
-            num_kernel++;
         }
     }
 

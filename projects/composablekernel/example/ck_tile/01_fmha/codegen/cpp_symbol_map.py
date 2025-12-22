@@ -1,8 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 # generate kernel instances to speed up compilation
-from enum import Enum
-
 FWD_DTYPE_MAP = {
     "fp32": "FmhaFwdFp32",
     "fp16": "FmhaFwdFp16",
@@ -32,18 +30,22 @@ _MASK_MAP = {
 }
 
 
-class GEMM_MODE(Enum):
-    XDL = 0
-    WMMA = 1
-
-def get_mask_map(mask : str):
-    if mask == "generic":
+def get_mask_map(mask_impl: str):
+    if mask_impl == "generic":
         return _MASK_MAP
-    elif mask == "simplified":
+    elif mask_impl == "simplified":
         return _MASK_SIMPLIFIED_MAP
     else:
         assert False
         return None
+
+
+def get_mask_impl(mask: str) -> str:
+    return "simplified" if mask.startswith("s_") else "generic"
+
+
+def get_mask_cpp_type(mask: str) -> str:
+    return get_mask_map(get_mask_impl(mask))[mask]
 
 
 _MASK_CHECK_MAP = {
@@ -68,20 +70,24 @@ def get_mask_check_map(mask: str):
         return None
 
 
+def get_mask_cpp_check_expr(mask: str) -> str:
+    return get_mask_check_map(get_mask_impl(mask))[mask]
+
+
+QSCALE_MAP = {
+    "no": "ck_tile::BlockAttentionQuantScaleEnum::NO_SCALE",
+    "pertensor": "ck_tile::BlockAttentionQuantScaleEnum::PERTENSOR",
+}
+
+QSCALE_CHECK_MAP = {
+    "no": "quant_scale_enum::no_scale",
+    "pertensor": "quant_scale_enum::pertensor",
+}
+
 BIAS_MAP = {
     "no": "ck_tile::BlockAttentionBiasEnum::NO_BIAS",
     "bias": "ck_tile::BlockAttentionBiasEnum::ELEMENTWISE_BIAS",
     "alibi": "ck_tile::BlockAttentionBiasEnum::ALIBI",
-}
-
-GEMMMODE_MAP = {
-    "CK_TILE_USE_WMMA" : "wmma",
-    "CK_TILE_USE_XDL"  : "xdl"
-}
-
-GEMMMODE_MAP = {
-    "CK_TILE_USE_WMMA" : "wmma",
-    "CK_TILE_USE_XDL"  : "xdl"
 }
 
 # TODO: this is ugly
@@ -128,6 +134,7 @@ PIPELINE_MAP = {
     "qr_async": "ck_tile::BlockFmhaPipelineQRKSVSAsync",
     "qs": "ck_tile::BlockFmhaPipelineQSKSVS",
     "qr_async_trload": "ck_tile::BlockFmhaPipelineQRKSVSAsyncTrload",
+    "qr_async_trload_v3": "ck_tile::BlockFmhaFwdV3Pipeline",
 }
 
 PIPELINE_ENUM_MAP = {
@@ -137,6 +144,7 @@ PIPELINE_ENUM_MAP = {
     "qs": "ck_tile::BlockFmhaPipelineEnum::QSKSVS",
     "qr_pagedkv": "ck_tile::BlockFmhaPipelineEnum::QRKSVS",
     "qr_async_trload": "ck_tile::BlockFmhaPipelineEnum::QRKSVS_ASYNC_TRLOAD",
+    "qr_async_trload_v3": "ck_tile::BlockFmhaPipelineEnum::QRKSVS_ASYNC_TRLOAD_V3",
 }
 
 BOOL_MAP = {

@@ -1,4 +1,4 @@
-// Copyright © Advanced Micro Devices, Inc. or its affiliates.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
 #pragma once
@@ -38,4 +38,5 @@ using WarpGemmWmma_f32_16x16x16_f8_bf8 =
 template <bool kTransC = false>
 using WarpGemmWmma_f32_16x16x16_bf8_f8 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x16_bf8_f8, kTransC>>;
+
 } // namespace ck_tile

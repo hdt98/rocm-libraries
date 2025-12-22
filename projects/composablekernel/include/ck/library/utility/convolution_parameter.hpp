@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -29,8 +29,7 @@ struct ConvParam
               const std::vector<ck::index_t>& strides,
               const std::vector<ck::index_t>& dilations,
               const std::vector<ck::index_t>& left_pads,
-              const std::vector<ck::index_t>& right_pads,
-              bool transposed = false);
+              const std::vector<ck::index_t>& right_pads);
 
     ConvParam(ck::long_index_t n_dim,
               ck::long_index_t group_count,
@@ -42,8 +41,7 @@ struct ConvParam
               const std::vector<ck::long_index_t>& strides,
               const std::vector<ck::long_index_t>& dilations,
               const std::vector<ck::long_index_t>& left_pads,
-              const std::vector<ck::long_index_t>& right_pads,
-              bool transposed = false);
+              const std::vector<ck::long_index_t>& right_pads);
 
     ck::long_index_t num_dim_spatial_;
     ck::long_index_t G_;

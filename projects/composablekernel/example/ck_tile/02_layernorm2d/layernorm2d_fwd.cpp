@@ -1,3 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
 #include "ck_tile/host.hpp"
 #include "layernorm2d_fwd.hpp"
 #include "ck_tile/utility/json_dump.hpp"
@@ -303,11 +306,10 @@ bool run(const ck_tile::ArgParser& arg_parser)
                     absmax       = a > absmax ? a : absmax;
                 }
                 // printf("cpu:absmax:%f\n", absmax);
-                ComputeDataType kMaxY   = std::is_same_v<YDataType, ck_tile::fp8_t>
-                                              ? ck_tile::type_convert<ComputeDataType>(
-                                                  ck_tile::numeric<ck_tile::fp8_t>::max())
-                                          : std::is_same_v<YDataType, ck_tile::int8_t> ? 127.0
-                                                                                       : 0.0;
+                constexpr ComputeDataType kMaxY =
+                    std::is_same<YDataType, ck_tile::fp8_t>::value    ? 240.0
+                    : std::is_same<YDataType, ck_tile::int8_t>::value ? 127.0
+                                                                      : 0.0;
                 ComputeDataType y_scale = absmax / kMaxY;
                 y_scale_host_ref(m_)    = ck_tile::type_convert<YScaleDataType>(y_scale);
                 for(int n_ = 0; n_ < N_; n_++)

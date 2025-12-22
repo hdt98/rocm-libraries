@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -11,12 +11,6 @@
 #include "ck_tile/ops/epilogue.hpp"
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/utility/json_dump.hpp"
-
-#define CK_TILE_PIPELINE_COMPUTE_V3 1
-#define CK_TILE_PIPELINE_MEMORY 2
-#define CK_TILE_PIPELINE_COMPUTE_V4 3
-#define CK_TILE_PIPELINE_COMPUTE_V5 4
-#define CK_TILE_PIPELINE_COMPUTE_WMMA 5
 
 template <typename PrecType, ck_tile::index_t M_Warp_Tile>
 constexpr ck_tile::index_t get_k_warp_tile()
@@ -226,7 +220,7 @@ struct GemmConfigComputeV4_1 : public GemmConfigBase
     static constexpr ck_tile::index_t M_Warp = 2;
     static constexpr ck_tile::index_t N_Warp = 2;
     static constexpr ck_tile::index_t K_Warp = 1;
-    // clang-format on
+
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
     static constexpr ck_tile::index_t N_Warp_Tile = 32;
     static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
@@ -248,7 +242,27 @@ struct GemmConfigComputeV5 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
     static constexpr ck_tile::index_t N_Warp_Tile = 32;
-    static constexpr ck_tile::index_t K_Warp_Tile = sizeof(PrecType) == 2 ? 16 : 64;
+    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+
+    static constexpr bool DoubleSmemBuffer          = false;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V5;
+    static constexpr ck_tile::index_t NumWaveGroups = 2;
+};
+
+template <typename PrecType>
+struct GemmConfigComputeV6 : public GemmConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 256;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 32;
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
 
     static constexpr bool DoubleSmemBuffer          = false;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V6;
@@ -387,63 +401,6 @@ struct GemmTypeConfig<ck_tile::int8_t, ck_tile::int8_t, int32_t>
     using CDataType   = int32_t;
 };
 
-template <typename T>
-struct DataTypeTraits;
-
-template <>
-struct DataTypeTraits<float>
-{
-    static constexpr const char* name = "fp32";
-};
-
-template <>
-struct DataTypeTraits<double>
-{
-    static constexpr const char* name = "fp64";
-};
-
-template <>
-struct DataTypeTraits<int32_t>
-{
-    static constexpr const char* name = "int32";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::half_t>
-{
-    static constexpr const char* name = "fp16";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::bf16_t>
-{
-    static constexpr const char* name = "bf16";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::fp8_t>
-{
-    static constexpr const char* name = "fp8";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::bf8_t>
-{
-    static constexpr const char* name = "bf8";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::pk_int4_t>
-{
-    static constexpr const char* name = "pk_int4_t";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::int8_t>
-{
-    static constexpr const char* name = "int8";
-};
-
 template <ck_tile::GemmPipeline PipelineId>
 struct PipelineTypeTraits;
 
@@ -500,16 +457,6 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::PRESHUFFLE_V2>
     template <typename PipelineProblem>
     using UniversalGemmPipeline =
         ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2<PipelineProblem>;
-};
-
-template <>
-struct PipelineTypeTraits<CK_TILE_PIPELINE_COMPUTE_WMMA>
-{
-    template <typename PipelineProblem>
-    using GemmPipeline =
-        ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem, ck_tile::GemmPipelineWmmaDefaultPolicy>;
-    template <typename PipelineProblem>
-    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<PipelineProblem>;
 };
 
 auto create_args()

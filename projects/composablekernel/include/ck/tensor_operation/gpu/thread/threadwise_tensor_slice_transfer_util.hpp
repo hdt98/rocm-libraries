@@ -1,7 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 #pragma once
-
 namespace ck {
 
 // Do following things to avoid "alloca" in LLVM-IR, which would cause scratch memory
@@ -75,4 +74,5 @@ struct lambda_wave_cluster_dimension
 };
 
 } // namespace detail
+
 } // namespace ck
