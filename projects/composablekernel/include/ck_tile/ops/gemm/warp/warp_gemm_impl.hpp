@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -43,9 +43,8 @@ struct WarpGemmImpl
         return WarpGemmAttribute_::get_num_of_access();
     }
 
-    template <typename CTensor, typename ATensor, typename BTensor, bool post_nop_ = false>
-    CK_TILE_DEVICE void
-    operator()(CTensor& c, const ATensor& a, const BTensor& b, bool_constant<post_nop_> = {}) const
+    template <typename... Params, typename CTensor, typename ATensor, typename BTensor>
+    CK_TILE_DEVICE void operator()(CTensor& c, const ATensor& a, const BTensor& b) const
     {
         static_assert(detail::is_similiar_distributed_tensor_v<CTensor, CWarpTensor> &&
                       detail::is_similiar_distributed_tensor_v<ATensor, AWarpTensor> &&
@@ -61,21 +60,18 @@ struct WarpGemmImpl
         auto c_vec       = c.get_thread_buffer().template get_as<CVec>()[I0];
 
         // c_vec += a_vec * b_vec
-        WarpGemmAttribute{}(c_vec, a_vec, b_vec, bool_constant<post_nop_>{});
+        WarpGemmAttribute{}.template operator()<Params...>(c_vec, a_vec, b_vec);
 
         c.get_thread_buffer().template set_as<CVec>(I0, c_vec);
     }
 
-    template <typename CTensor,
+    template <typename... Params,
+              typename CTensor,
               typename ATensor,
               typename BTensor,
-              index_t i_subk,
-              bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CTensor& c,
-                                   const ATensor& a,
-                                   const BTensor& b,
-                                   number<i_subk>,
-                                   bool_constant<post_nop_> = {}) const
+              index_t i_subk>
+    CK_TILE_DEVICE void
+    operator()(CTensor& c, const ATensor& a, const BTensor& b, number<i_subk>) const
     {
         using AVec = ext_vector_t<ADataType, ATensor::get_thread_buffer_size()>;
         using BVec = ext_vector_t<BDataType, BTensor::get_thread_buffer_size()>;
@@ -88,23 +84,17 @@ struct WarpGemmImpl
         auto c_vec       = c.get_thread_buffer().template get_as<CVec>()[I0];
 
         // c_vec += a_vec * b_vec
-        WarpGemmAttribute{}(c_vec, a_vec, b_vec, number<i_subk>{}, bool_constant<post_nop_>{});
+        WarpGemmAttribute{}.template operator()<Params...>(c_vec, a_vec, b_vec, number<i_subk>{});
 
         c.get_thread_buffer().template set_as<CVec>(I0, c_vec);
     }
 
-    template <index_t opselA,
-              index_t opselB,
-              typename CTensor,
-              typename ATensor,
-              typename BTensor,
-              bool post_nop_ = false>
+    template <typename... Params, typename CTensor, typename ATensor, typename BTensor>
     CK_TILE_DEVICE void operator()(CTensor& c,
                                    const ATensor& a,
                                    const BTensor& b,
                                    const int32_t& a_scale,
-                                   const int32_t& b_scale,
-                                   bool_constant<post_nop_> = {}) const
+                                   const int32_t& b_scale) const
     {
         static_assert(detail::is_similiar_distributed_tensor_v<CTensor, CWarpTensor> &&
                       detail::is_similiar_distributed_tensor_v<ATensor, AWarpTensor> &&
@@ -120,13 +110,12 @@ struct WarpGemmImpl
         auto c_vec       = c.get_thread_buffer().template get_as<CVec>()[I0];
 
         // c_vec += a_vec * b_vec
-        WarpGemmAttribute{}.template operator()<opselA, opselB>(
-            c_vec, a_vec, a_scale, b_vec, b_scale, bool_constant<post_nop_>{});
+        WarpGemmAttribute{}.template operator()<Params...>(c_vec, a_vec, a_scale, b_vec, b_scale);
 
         c.get_thread_buffer().template set_as<CVec>(I0, c_vec);
     }
 
-    template <typename ATensor, typename BTensor>
+    template <typename... Params, typename ATensor, typename BTensor>
     CK_TILE_DEVICE auto operator()(const ATensor& a, const BTensor& b) const
     {
         using CTensor = CWarpTensor;
@@ -144,14 +133,14 @@ struct WarpGemmImpl
         const auto b_vec = b.get_thread_buffer().template get_as<BVec>()[I0];
 
         // c_vec = a_vec * b_vec
-        auto c_vec = WarpGemmAttribute{}(a_vec, b_vec);
+        auto c_vec = WarpGemmAttribute{}.template operator()<Params...>(a_vec, b_vec);
 
         c.get_thread_buffer().template set_as<CVec>(I0, c_vec);
 
         return c;
     }
 
-    template <index_t opselA, index_t opselB, typename ATensor, typename BTensor>
+    template <typename... Params, typename ATensor, typename BTensor>
     CK_TILE_DEVICE auto operator()(const ATensor& a,
                                    const BTensor& b,
                                    const int32_t& a_scale,
@@ -173,7 +162,7 @@ struct WarpGemmImpl
 
         // c_vec = a_vec * b_vec
         auto c_vec =
-            WarpGemmAttribute{}.template operator()<opselA, opselB>(a_vec, a_scale, b_vec, b_scale);
+            WarpGemmAttribute{}.template operator()<Params...>(a_vec, a_scale, b_vec, b_scale);
 
         c.get_thread_buffer().template set_as<CVec>(I0, c_vec);
 

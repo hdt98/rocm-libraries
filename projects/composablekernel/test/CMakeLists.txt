@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 include_directories(BEFORE
     ${PROJECT_SOURCE_DIR}/
     ${PROJECT_SOURCE_DIR}/profiler/include
@@ -46,7 +49,7 @@ set(REGRESSION_TESTS
     test_ck_tile_fmha_fwd_bf16
     test_ck_tile_fmha_fwd_fp16
     test_ck_tile_fmha_fwd_fp8
-    test_ck_tile_streamk_reboot_extended
+    test_ck_tile_streamk_extended
 )
 
 function(add_test_executable TEST_NAME)
@@ -60,6 +63,9 @@ function(add_test_executable TEST_NAME)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp32|_f32") AND NOT "fp32" IN_LIST DTYPES)
+                set(test 1)
+            endif()
+            if((source_name MATCHES "_tf32|_tf32") AND NOT "tf32" IN_LIST DTYPES)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp64|_f64") AND NOT "fp64" IN_LIST DTYPES)
@@ -117,7 +123,7 @@ function(add_test_executable TEST_NAME)
         elseif(source_name_list MATCHES "_wmma")
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         elseif(source_name_list MATCHES "_smfmac")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1250 gfx1251)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1250 gfx1251)
         endif()
         set_source_files_properties(${ARGN} PROPERTIES LANGUAGE HIP)
         add_executable(${TEST_NAME} ${ARGN})
@@ -151,6 +157,9 @@ function(add_gtest_executable TEST_NAME)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp32|_f32") AND NOT "fp32" IN_LIST DTYPES)
+                set(test 1)
+            endif()
+            if((source_name MATCHES "_tf32|_tf32") AND NOT "tf32" IN_LIST DTYPES)
                 set(test 1)
             endif()
             if((source_name MATCHES "_fp64|_f64") AND NOT "fp64" IN_LIST DTYPES)
@@ -218,9 +227,9 @@ function(add_gtest_executable TEST_NAME)
         elseif(source_name_list MATCHES "monitor_mwait" OR source_name_list MATCHES "async_lds_load_store") #only build sync tests for gfx1250+
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
         elseif(source_name_list MATCHES "_smfmac")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1250 gfx1251)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx908 gfx90a gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic gfx1250 gfx1251)
         elseif(source_name_list MATCHES "_mx") #only build mx example for gfx950 and gfx125x
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
              if(ARGN MATCHES "_pk4scale") #only build pk4scale for gfx1250
                 list(REMOVE_ITEM TEST_TARGETS gfx950)
              endif()
@@ -311,6 +320,14 @@ endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx1250")
     add_subdirectory(mx_wmma_op)
 endif()
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx12")
+    add_subdirectory(s_prefetch_op)
+endif()
+
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx125")
+    add_subdirectory(prefetch_op)
+endif()
+
 add_subdirectory(position_embedding)
 add_subdirectory(scatter_gather)
 add_subdirectory(synchronization)

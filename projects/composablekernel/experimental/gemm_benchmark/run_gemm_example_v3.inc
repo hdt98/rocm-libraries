@@ -3,6 +3,10 @@
 
 #pragma once
 
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 static example_gemm_xdl_v3_benchmark_instances op_ptrs;
 
 template <typename ProblemType>
@@ -80,6 +84,19 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         break;
     }
 
+    Tensor<float> a_m_k_f32({M, K});
+    Tensor<float> b_k_n_f32({K, N});
+
+    if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t>)
+    {
+        permute_a_pk_i4(a_m_k, M, K, a_m_k_f32, config.use_gfx9_i4);
+    }
+
+    if constexpr(ck::is_same_v<BDataType, ck::pk_i4_t>)
+    {
+        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, config.use_gfx9_i4);
+    }
+
     Tensor<CDataType> c_m_n_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
     Tensor<CDataType> c_m_n_device_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
 
@@ -115,13 +132,38 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     bool pass = true;
     if((config.do_verification == 1) || (config.do_verification == 3))
     {
-        auto ref_gemm    = ReferenceGemmInstance{};
-        auto ref_invoker = ref_gemm.MakeInvoker();
+        if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t> && ck::is_same_v<BDataType, ck::pk_i4_t>)
+        {
+            using PkInt4ReferenceGemmInstance =
+                ck::tensor_operation::host::ReferenceGemm<float,
+                                                          float,
+                                                          CDataType,
+                                                          AccDataType,
+                                                          PassThrough,
+                                                          PassThrough,
+                                                          PassThrough>;
+            auto ref_gemm    = PkInt4ReferenceGemmInstance{};
+            auto ref_invoker = ref_gemm.MakeInvoker();
 
-        auto ref_argument = ref_gemm.MakeArgument(
-            a_m_k, b_k_n, c_m_n_host_result, PassThrough{}, PassThrough{}, PassThrough{});
+            auto ref_argument = ref_gemm.MakeArgument(a_m_k_f32,
+                                                      b_k_n_f32,
+                                                      c_m_n_host_result,
+                                                      PassThrough{},
+                                                      PassThrough{},
+                                                      PassThrough{});
 
-        ref_invoker.Run(ref_argument);
+            ref_invoker.Run(ref_argument);
+        }
+        else
+        {
+            auto ref_gemm    = ReferenceGemmInstance{};
+            auto ref_invoker = ref_gemm.MakeInvoker();
+
+            auto ref_argument = ref_gemm.MakeArgument(
+                a_m_k, b_k_n, c_m_n_host_result, PassThrough{}, PassThrough{}, PassThrough{});
+
+            ref_invoker.Run(ref_argument);
+        }
     }
     std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
     // do GEMM

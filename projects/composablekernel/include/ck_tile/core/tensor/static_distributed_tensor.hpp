@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -75,7 +75,7 @@ struct static_distributed_tensor
         constexpr auto sliced_thread_tensor_desc =
             make_naive_tensor_descriptor_packed(make_tuple(YSliceLengths...));
 
-        thread_buffer<DataType, sliced_thread_tensor_desc.get_element_space_size()>
+        thread_buffer<DataType, sliced_thread_tensor_desc.get_element_space_size() / PackedSize>
             sliced_thread_data;
 
         static_ford<sequence<YSliceLengths...>>{}([&](auto idx) {

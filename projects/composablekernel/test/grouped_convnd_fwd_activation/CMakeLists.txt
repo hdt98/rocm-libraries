@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 # device_grouped_conv2d_fwd_bias_bnorm_clamp_instance breaks compiler on gfx125 targets
 
 if(GPU_TARGETS MATCHES "gfx9|gfx120|gfx12-generic")

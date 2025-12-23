@@ -1,4 +1,4 @@
-// Copyright © Advanced Micro Devices, Inc. or its affiliates.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
 #pragma once
@@ -87,4 +87,27 @@ template <bool kTransC = false>
 using WarpGemmWmma_f16_16x16x64_bf8_f8 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f16_16x16x64_bf8_f8, kTransC>>;
 
+template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_f8_f8 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_f8, kTransC>>;
+
+template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_bf8_bf8 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_bf8_bf8, kTransC>>;
+
+template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_f8_bf8 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_bf8, kTransC>>;
+
+template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_bf8_f8 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_bf8_f8, kTransC>>;
+
+template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_f8_f4 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_f4, kTransC>>;
+
+template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_f4_f4 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f4_f4, kTransC>>;
 } // namespace ck_tile

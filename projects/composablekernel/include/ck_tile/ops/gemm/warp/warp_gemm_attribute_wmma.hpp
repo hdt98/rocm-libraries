@@ -1,11 +1,12 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/device_prop.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_attribute_wmma_impl.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_params.hpp"
 
 namespace ck_tile {
 
@@ -17,7 +18,7 @@ struct AWarpDstrEncodingTrait
     using type = tile_distribution_encoding<
         sequence<Impl::kRepeat>,
         tuple<sequence<Impl::kAMLane>,
-              sequence<Impl::kABK0PerLane, Impl::kABKLane, Impl::kABK1PerLane>>,
+              sequence<Impl::kAK0PerLane, Impl::kABKLane, Impl::kAK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
         tuple<typename Impl::kABPs2RHssMinor>,
         typename Impl::kABYs2RHsMajor,
@@ -30,7 +31,7 @@ struct BWarpDstrEncodingTrait
     using type = tile_distribution_encoding<
         sequence<Impl::kRepeat>,
         tuple<sequence<Impl::kBNLane>,
-              sequence<Impl::kABK0PerLane, Impl::kABKLane, Impl::kABK1PerLane>>,
+              sequence<Impl::kBK0PerLane, Impl::kABKLane, Impl::kBK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
         tuple<typename Impl::kABPs2RHssMinor>,
         typename Impl::kABYs2RHsMajor,
@@ -89,12 +90,14 @@ struct WarpGemmAttributeWmma
     using BVecType = typename Impl::BVecType;
     using CVecType = typename Impl::CVecType;
 
-    static constexpr index_t kM          = Impl::kM;
-    static constexpr index_t kN          = Impl::kN;
-    static constexpr index_t kK          = Impl::kK;
-    static constexpr index_t kCMLane     = Impl::kCMLane;
-    static constexpr index_t kKPerThread = Impl::kABK0PerLane * Impl::kABK1PerLane;
-    static constexpr index_t kKPack      = Impl::kABK1PerLane;
+    static constexpr index_t kM      = Impl::kM;
+    static constexpr index_t kN      = Impl::kN;
+    static constexpr index_t kK      = Impl::kK;
+    static constexpr index_t kCMLane = Impl::kCMLane;
+
+    static_assert(Impl::kAK0PerLane * Impl::kAK1PerLane == Impl::kBK0PerLane * Impl::kBK1PerLane);
+    static constexpr index_t kKPerThread = Impl::kAK0PerLane * Impl::kAK1PerLane;
+    static constexpr index_t kKPack      = Impl::kAK1PerLane;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return 1; }
 
@@ -110,32 +113,31 @@ struct WarpGemmAttributeWmma
                            typename CWarpDstrEncodingTrait<Impl>::type>;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         if constexpr(kTransC)
         {
-            TransposedImpl{}(c_vec, b_vec, a_vec, bool_constant<post_nop_>{});
+            TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(c_vec, b_vec, a_vec);
         }
         else
         {
-            Impl{}(c_vec, a_vec, b_vec, bool_constant<post_nop_>{});
+            Impl{}.template operator()<Params...>(c_vec, a_vec, b_vec);
         }
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         if constexpr(kTransC)
         {
-            return TransposedImpl{}(b_vec, a_vec);
+            return TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(b_vec, a_vec);
         }
         else
         {
-            return Impl{}(a_vec, b_vec);
+            return Impl{}.template operator()<Params...>(a_vec, b_vec);
         }
     }
 };

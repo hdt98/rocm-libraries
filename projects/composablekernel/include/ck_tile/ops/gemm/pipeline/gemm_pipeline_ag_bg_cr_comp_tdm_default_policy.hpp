@@ -127,62 +127,37 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
     }
 
-    CK_TILE_HOST_DEVICE static constexpr auto GetLdsPaddingConfig()
-    {
-        // always use b128 to ds_load; this value calculate the bank number per 128 bits
-        constexpr index_t bank_of_vecs = get_n_words_per_128b();
-        // amount of padding to add in dwords 0 means 1 dword padding; 1 means 2 dwords padding ...
-        constexpr index_t pad_amount = bank_of_vecs - 1;
-
-        auto constexpr_log2_floor = [](index_t x) constexpr {
-            index_t result = 0;
-            while(x > 1)
-            {
-                x >>= 1;
-                result++;
-            }
-            return result;
-        };
-        // log2 minus 1 of the number of dwords to store into the destination before adding padding;
-        // one bank is 1 dword size
-        constexpr index_t pad_interval = constexpr_log2_floor(get_n_lds_banks()) - 1;
-
-        return make_tuple(number<pad_amount>{}, number<pad_interval>{});
-    }
-
-    template <typename Problem>
+    template <typename Problem,
+              typename OverrideADataType = remove_cvref_t<typename Problem::ADataType>>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
-        constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
-        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
         if constexpr(Base::template is_a_load_tr<Problem>)
         {
-            constexpr index_t KPack = Base::template GetSmemPackA<Problem>();
-            constexpr auto a_lds_block_desc_0 =
-                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<MPerBlock>{}),
-                                             make_tuple(number<MPerBlock>{}, number<1>{}),
-                                             number<KPack>{},
-                                             number<1>{});
-            return a_lds_block_desc_0;
+            return Base::template MakeALdsBlockDescriptorForTrLoad<Problem>();
         }
         else
         {
-            using ADataType = remove_cvref_t<typename Problem::ADataType>;
+            constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
+            constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
 
+            constexpr auto LdsPaddingConfigA = Base::template GetLdsPaddingConfig<Problem, true>();
+            constexpr auto IsNeedPadding     = LdsPaddingConfigA[Base::I0];
+            // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
+            constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigA[Base::I1] : -1;
+            using ADataType              = OverrideADataType;
             constexpr auto DataTypeSize  = sizeof(ADataType);
             constexpr index_t AVectorLen = VecByteSize / DataTypeSize;
             constexpr auto MLdsLayer =
                 max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
             // calculate how many elements to pad to avoid bank conflict
-            constexpr index_t BytesPerDword = 4;
-            constexpr auto PaddingAmount =
-                (GetLdsPaddingConfig().at(number<0>{}) + 1) * BytesPerDword / DataTypeSize;
+            constexpr index_t BytesPerDword  = sizeof(int32_t);
+            constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
 
             constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MPerBlock / MLdsLayer>{},
                            number<KPerBlock / AVectorLen * MLdsLayer>{},
                            number<AVectorLen>{}),
-                make_tuple(number<KPerBlock * MLdsLayer + PaddingAmount>{},
+                make_tuple(number<KPerBlock * MLdsLayer + PaddingDataAmount>{},
                            number<AVectorLen>{},
                            number<1>{}),
                 number<AVectorLen>{},
@@ -210,39 +185,38 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
     }
 
-    template <typename Problem>
+    template <typename Problem,
+              typename OverrideBDataType = remove_cvref_t<typename Problem::BDataType>>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
-        constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
-        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
         if constexpr(Base::template is_b_load_tr<Problem>)
         {
-            constexpr index_t KPack = Base::template GetSmemPackB<Problem>();
-            constexpr auto b_lds_block_desc_0 =
-                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),
-                                             make_tuple(number<NPerBlock>{}, number<1>{}),
-                                             number<KPack>{},
-                                             number<1>{});
-            return b_lds_block_desc_0;
+            return Base::template MakeBLdsBlockDescriptorForTrLoad<Problem>();
         }
         else
         {
-            using BDataType = remove_cvref_t<typename Problem::BDataType>;
+            constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
+            constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
 
+            constexpr auto LdsPaddingConfigB = Base::template GetLdsPaddingConfig<Problem, false>();
+            constexpr auto IsNeedPadding     = LdsPaddingConfigB[Base::I0];
+            // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
+            constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigB[Base::I1] : -1;
+            using BDataType              = OverrideBDataType;
             constexpr auto DataTypeSize  = sizeof(BDataType);
+
             constexpr index_t BVectorLen = VecByteSize / DataTypeSize;
             constexpr auto NLdsLayer =
                 max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
             // calculate how many elements to pad to avoid bank conflict
-            constexpr index_t BytesPerDword = 4;
-            constexpr auto PaddingAmount =
-                (GetLdsPaddingConfig().at(number<0>{}) + 1) * BytesPerDword / DataTypeSize;
+            constexpr index_t BytesPerDword  = sizeof(int32_t);
+            constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
 
             constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<NPerBlock / NLdsLayer>{},
                            number<KPerBlock / BVectorLen * NLdsLayer>{},
                            number<BVectorLen>{}),
-                make_tuple(number<KPerBlock * NLdsLayer + PaddingAmount>{},
+                make_tuple(number<KPerBlock * NLdsLayer + PaddingDataAmount>{},
                            number<BVectorLen>{},
                            number<1>{}),
                 number<BVectorLen>{},
@@ -304,8 +278,8 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         };
 
         // Iterate over all possible (m, n) block coordinates in the cluster. If the current (m,
-        // n) block is a participant according to the multicast direction, set the corresponding bit
-        // in the mask. for matmul AxB, A broadcasts from M direction, B broadcasts from N
+        // n) block is a participant according to the multicast direction, set the corresponding
+        // bit in the mask. for matmul AxB, A broadcasts from M direction, B broadcasts from N
         // direction.
         uint16_t block_id_mask = 0;
         static_for<0, NCluster, 1>{}([&](auto n) {

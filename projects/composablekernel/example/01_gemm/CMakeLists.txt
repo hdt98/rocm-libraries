@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 add_custom_target(example_gemm_dl)
 
 add_example_executable(example_gemm_dl_fp32 gemm_dl_fp32.cpp)
@@ -149,3 +152,8 @@ add_example_executable(example_gemm_wmma_fp16_fp8_v3 gemm_wmma_fp16_fp8_v3.cpp)
 add_example_dependencies(example_gemm_wmma example_gemm_wmma_fp16_fp8_v3)
 add_example_executable(example_gemm_wmma_fp16_pk_i4_v3_b_scale gemm_wmma_fp16_pk_i4_v3_b_scale.cpp)
 add_example_dependencies(example_gemm_wmma example_gemm_wmma_fp16_pk_i4_v3_b_scale)
+
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx125")
+    add_example_executable(example_gemm_xdl_bf16_v3_prefetch gemm_xdl_bf16_v3_prefetch.cpp)
+    add_example_dependencies(example_gemm_xdl example_gemm_xdl_bf16_v3_prefetch)
+endif()

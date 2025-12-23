@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -784,6 +784,7 @@ inline __host__ __device__ f4x32_t scaled_type_convert<f4x32_t, bhalf32_t>(e8m0_
     return f4_convert_rne(x, type_convert<float>(scale));
 #endif
 }
+
 /**
  * @brief Converts a 6-bit floating-point value (f6_t) to a 32-bit float,
  *        applying the specified scaling factor.
@@ -795,24 +796,29 @@ inline __host__ __device__ f4x32_t scaled_type_convert<f4x32_t, bhalf32_t>(e8m0_
 template <>
 inline __host__ __device__ float scaled_type_convert<float, f6_t>(e8m0_bexp_t scale, f6_t x)
 {
-#if defined(__gfx950__)
-    union
-    {
-        f6x32_t f6_vector;
-        f6_t f6_array[32];
-    } in{x};
-
-    union
-    {
-        float32_t float_vector;
-        float float_array[32];
-    } out{};
-
-    out.float_vector = __builtin_amdgcn_cvt_scalef32_pk32_f32_fp6(
-        in.f6_vector.template AsType<f6x32_t::data_t>()[Number<0>{}], type_convert<float>(scale));
-    return out.float_array[0];
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<float>(x, type_convert<float>(scale));
 #else
-    return utils::to_float<f6_t>(scale, x);
+    return slowcast_from_f6<float>(x, scale);
+#endif
+}
+
+/**
+ * @brief Converts a vector of 16 6-bit floating-point values (f6x16_t) to a vector of 16 floats,
+ *        applying the specified scaling factor.
+ *
+ * @param scale The exponent scale factor (e8m0_bexp_t).
+ * @param x     The f6x16_t vector to be converted.
+ * @return      The converted float vector representation of the input.
+ */
+template <>
+inline __host__ __device__ float16_t scaled_type_convert<float16_t, f6x16_t>(e8m0_bexp_t scale,
+                                                                             f6x16_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<float16_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<float16_t>(x, scale);
 #endif
 }
 
@@ -828,26 +834,10 @@ template <>
 inline __host__ __device__ float32_t scaled_type_convert<float32_t, f6x32_t>(e8m0_bexp_t scale,
                                                                              f6x32_t x)
 {
-#if defined(__gfx950__)
-    return __builtin_amdgcn_cvt_scalef32_pk32_f32_fp6(
-        x.template AsType<f6x32_t::data_t>()[Number<0>{}], type_convert<float>(scale));
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<float32_t>(x, type_convert<float>(scale));
 #else
-    union
-    {
-        f6x32_t f6_vector;
-        f6_t f6_array[32];
-    } in{x};
-
-    union
-    {
-        float32_t float_vector;
-        float float_array[32];
-    } out{};
-
-    ck::static_for<0, 32, 1>{}(
-        [&](auto i) { out.float_array[i] = utils::to_float<f6_t>(scale, in.f6_array[i]); });
-
-    return out.float_vector;
+    return slowcast_from_f6<float32_t>(x, scale);
 #endif
 }
 
@@ -862,24 +852,29 @@ inline __host__ __device__ float32_t scaled_type_convert<float32_t, f6x32_t>(e8m
 template <>
 inline __host__ __device__ float scaled_type_convert<float, bf6_t>(e8m0_bexp_t scale, bf6_t x)
 {
-#if defined(__gfx950__)
-    union
-    {
-        bf6x32_t bf6_vector;
-        bf6_t bf6_array[32];
-    } in{x};
-
-    union
-    {
-        float32_t float_vector;
-        float float_array[32];
-    } out{};
-
-    out.float_vector = __builtin_amdgcn_cvt_scalef32_pk32_f32_bf6(
-        in.bf6_vector.template AsType<bf6x32_t::data_t>()[Number<0>{}], type_convert<float>(scale));
-    return out.float_array[0];
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<float>(x, type_convert<float>(scale));
 #else
-    return utils::to_float<bf6_t>(scale, x);
+    return slowcast_from_f6<float>(x, scale);
+#endif
+}
+
+/**
+ * @brief Converts a vector of 6-bit floating-point values (bf6x16_t) to a vector of 16 floats,
+ *        applying the specified scaling factor.
+ *
+ * @param scale The exponent scale factor (e8m0_bexp_t).
+ * @param x     The bf6x16_t vector to be converted.
+ * @return      The converted vector of 16 float representation of the input.
+ */
+template <>
+inline __host__ __device__ float16_t scaled_type_convert<float16_t, bf6x16_t>(e8m0_bexp_t scale,
+                                                                              bf6x16_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<float16_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<float16_t>(x, scale);
 #endif
 }
 
@@ -895,26 +890,10 @@ template <>
 inline __host__ __device__ float32_t scaled_type_convert<float32_t, bf6x32_t>(e8m0_bexp_t scale,
                                                                               bf6x32_t x)
 {
-#if defined(__gfx950__)
-    return __builtin_amdgcn_cvt_scalef32_pk32_f32_bf6(
-        x.template AsType<bf6x32_t::data_t>()[Number<0>{}], type_convert<float>(scale));
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<float32_t>(x, type_convert<float>(scale));
 #else
-    union
-    {
-        bf6x32_t bf6_vector;
-        bf6_t bf6_array[32];
-    } in{x};
-
-    union
-    {
-        float32_t float_vector;
-        float float_array[32];
-    } out{};
-
-    ck::static_for<0, 32, 1>{}(
-        [&](auto i) { out.float_array[i] = utils::to_float<bf6_t>(scale, in.bf6_array[i]); });
-
-    return out.float_vector;
+    return slowcast_from_f6<float32_t>(x, scale);
 #endif
 }
 
@@ -931,6 +910,28 @@ inline __host__ __device__ float32_t scaled_type_convert<float32_t, bf6x32_t>(e8
  */
 template <>
 inline __host__ __device__ f6_t scaled_type_convert<f6_t, float>(e8m0_bexp_t scale, float x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+/**
+ * @brief Converts a vector of 16 floats to a vector of 16 6-bit floating-point values (f6x16_t),
+ * applying the specified scale.
+ *
+ * Depending on whether CK_USE_SR_F6_CONVERSION is defined, it uses either stochastic rounding
+ * (f6_convert_sr) or round-to-nearest-even (f6_convert_rne).
+ *
+ * @param scale The exponent scale factor (e8m0_bexp_t).
+ * @param x     The float vector to convert.
+ * @return      The converted vector of 6-bit floating-point values (f6x16_t).
+ */
+template <>
+inline __host__ __device__ f6x16_t scaled_type_convert<f6x16_t, float16_t>(e8m0_bexp_t scale,
+                                                                           float16_t x)
 {
 #if CK_USE_SR_F6_CONVERSION
     return f6_convert_sr(x, type_convert<float>(scale));
@@ -983,6 +984,28 @@ inline __host__ __device__ bf6_t scaled_type_convert<bf6_t, float>(e8m0_bexp_t s
 }
 
 /**
+ * @brief Converts a vector of 16 floats to a vector of 16 6-bit floating-point values (bf6x16_t),
+ * applying the specified scale.
+ *
+ * Depending on whether CK_USE_SR_F6_CONVERSION is defined, it uses either stochastic rounding
+ * (bf6_convert_sr) or round-to-nearest-even (bf6_convert_rne).
+ *
+ * @param scale The exponent scale factor (e8m0_bexp_t).
+ * @param x     The float vector to convert.
+ * @return      The converted 6-bit floating-point vector (bf6x16_t).
+ */
+template <>
+inline __host__ __device__ bf6x16_t scaled_type_convert<bf6x16_t, float16_t>(e8m0_bexp_t scale,
+                                                                             float16_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+/**
  * @brief Converts a vector of 32 floats to a vector of 32 6-bit floating-point values (bf6x32_t),
  * applying the specified scale.
  *
@@ -996,6 +1019,274 @@ inline __host__ __device__ bf6_t scaled_type_convert<bf6_t, float>(e8m0_bexp_t s
 template <>
 inline __host__ __device__ bf6x32_t scaled_type_convert<bf6x32_t, float32_t>(e8m0_bexp_t scale,
                                                                              float32_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+/* float16(half_t) <-> bf6
+ * single value, vector 16, vector 32 conversion.*/
+template <>
+inline __host__ __device__ half_t scaled_type_convert<half_t, f6_t>(e8m0_bexp_t scale, f6_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<half_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<half_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ half16_t scaled_type_convert<half16_t, f6x16_t>(e8m0_bexp_t scale,
+                                                                           f6x16_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<half16_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<half16_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ half32_t scaled_type_convert<half32_t, f6x32_t>(e8m0_bexp_t scale,
+                                                                           f6x32_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<half32_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<half32_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ half_t scaled_type_convert<half_t, bf6_t>(e8m0_bexp_t scale, bf6_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<half_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<half_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ half16_t scaled_type_convert<half16_t, bf6x16_t>(e8m0_bexp_t scale,
+                                                                            bf6x16_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<half16_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<half16_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ half32_t scaled_type_convert<half32_t, bf6x32_t>(e8m0_bexp_t scale,
+                                                                            bf6x32_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<half32_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<half32_t>(x, scale);
+#endif
+}
+
+/* float16(half_t) -> fp6, bf6
+ * single value, vector 16, vector 32 conversion
+ * Uses stochastic rounding if CK_USE_SR_F6_CONVERSION is defined,
+ * otherwise uses round-to-nearest-even.*/
+template <>
+inline __host__ __device__ f6_t scaled_type_convert<f6_t, half_t>(e8m0_bexp_t scale, half_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f6x16_t scaled_type_convert<f6x16_t, half16_t>(e8m0_bexp_t scale,
+                                                                          half16_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f6x32_t scaled_type_convert<f6x32_t, half32_t>(e8m0_bexp_t scale,
+                                                                          half32_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ bf6_t scaled_type_convert<bf6_t, half_t>(e8m0_bexp_t scale, half_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ bf6x16_t scaled_type_convert<bf6x16_t, half16_t>(e8m0_bexp_t scale,
+                                                                            half16_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ bf6x32_t scaled_type_convert<bf6x32_t, half32_t>(e8m0_bexp_t scale,
+                                                                            half32_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+/* bfloat16(bhalf_t) <-> bf6
+ * single value, vector 16, vector 32 conversion.*/
+template <>
+inline __host__ __device__ bhalf_t scaled_type_convert<bhalf_t, f6_t>(e8m0_bexp_t scale, f6_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<bhalf_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<bhalf_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf16_t scaled_type_convert<bhalf16_t, f6x16_t>(e8m0_bexp_t scale,
+                                                                             f6x16_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<bhalf16_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<bhalf16_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf32_t scaled_type_convert<bhalf32_t, f6x32_t>(e8m0_bexp_t scale,
+                                                                             f6x32_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<bhalf32_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<bhalf32_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf_t scaled_type_convert<bhalf_t, bf6_t>(e8m0_bexp_t scale, bf6_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<bhalf_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<bhalf_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf16_t scaled_type_convert<bhalf16_t, bf6x16_t>(e8m0_bexp_t scale,
+                                                                              bf6x16_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<bhalf16_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<bhalf16_t>(x, scale);
+#endif
+}
+
+template <>
+inline __host__ __device__ bhalf32_t scaled_type_convert<bhalf32_t, bf6x32_t>(e8m0_bexp_t scale,
+                                                                              bf6x32_t x)
+{
+#if CK_MX_FP6_CVT_FAST_PATH
+    return cast_from_f6_scaled<bhalf32_t>(x, type_convert<float>(scale));
+#else
+    return slowcast_from_f6<bhalf32_t>(x, scale);
+#endif
+}
+
+/* float16(bhalf_t) -> fp6, bf6
+ * single value, vector 16, vector 32 conversion
+ * Uses stochastic rounding if CK_USE_SR_F6_CONVERSION is defined,
+ * otherwise uses round-to-nearest-even.*/
+template <>
+inline __host__ __device__ f6_t scaled_type_convert<f6_t, bhalf_t>(e8m0_bexp_t scale, bhalf_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f6x16_t scaled_type_convert<f6x16_t, bhalf16_t>(e8m0_bexp_t scale,
+                                                                           bhalf16_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ f6x32_t scaled_type_convert<f6x32_t, bhalf32_t>(e8m0_bexp_t scale,
+                                                                           bhalf32_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return f6_convert_sr(x, type_convert<float>(scale));
+#else
+    return f6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ bf6_t scaled_type_convert<bf6_t, bhalf_t>(e8m0_bexp_t scale, bhalf_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ bf6x16_t scaled_type_convert<bf6x16_t, bhalf16_t>(e8m0_bexp_t scale,
+                                                                             bhalf16_t x)
+{
+#if CK_USE_SR_F6_CONVERSION
+    return bf6_convert_sr(x, type_convert<float>(scale));
+#else
+    return bf6_convert_rne(x, type_convert<float>(scale));
+#endif
+}
+
+template <>
+inline __host__ __device__ bf6x32_t scaled_type_convert<bf6x32_t, bhalf32_t>(e8m0_bexp_t scale,
+                                                                             bhalf32_t x)
 {
 #if CK_USE_SR_F6_CONVERSION
     return bf6_convert_sr(x, type_convert<float>(scale));
@@ -1731,6 +2022,131 @@ struct pk4scaled_type_convert_impl<bhalf8_t, f4x8_t, Scale_sel>
     __device__ static bhalf8_t run(uint32_t scale, f4x8_t x)
     {
         return cast_from_f4_scaled<bhalf8_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+/* scale is packed 4 form [FP6]
+ * Scale_sel: select different scale set and apply to the tensor[16x32] represented by a wave,
+ *            th[0-15]: 16x16 and th[16-31]: 16x16
+ *      Block 32 :
+ *      0(000): src[th[0-15]]  * scale[th[0-15]][7:0]
+                src[th[16-31]] * scale[th[0-15]][15:8]
+ *      1(001): src[th[0-15]]  * scale[th[16-31]][7:0]
+                src[th[16-31]] * scale[th[16-31]][15:8]
+ *      2(010): src[th[0-15]]  * scale[th[0-15]][23:16]
+                src[th[16-31]] * scale[th[0-15]][31:24]
+ *      3(011): src[th[0-15]]  * scale[th[16-31]][23:16]
+                src[th[16-31]] * scale[th[16-31]][31:24]
+ *      Block 16 : Available for certain revision
+ *      4(100): src[th[0-15]]  * scale[th[0-15]][7:0]
+                src[th[16-31]] * scale[th[0-15]][23:16]
+ *      5(101): src[th[0-15]]  * scale[th[16-31]][7:0]
+                src[th[16-31]] * scale[th[16-31]][23:16]
+ *      6(110): src[th[0-15]]  * scale[th[0-15]][15:8]
+                src[th[16-31]] * scale[th[0-15]][31:24]
+ *      7(111): src[th[0-15]]  * scale[th[16-31]][15:8]
+                src[th[16-31]] * scale[th[16-31]][31:24]
+ */
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<float16_t, f6x16_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 16 6-bit floating-point(fp6) values to a vector of 16 float32,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp6) to convert.
+     * @return      The converted float32 vector.
+     */
+    __device__ static float16_t run(uint32_t scale, f6x16_t x)
+    {
+        return cast_from_f6_scaled<float16_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<float16_t, bf6x16_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 16 6-bit floating-point(bf6) values to a vector of 16 float32,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(bf6) to convert.
+     * @return      The converted float32 vector.
+     */
+    __device__ static float16_t run(uint32_t scale, bf6x16_t x)
+    {
+        return cast_from_f6_scaled<float16_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+// half_t
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<half16_t, f6x16_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 16 6-bit floating-point(fp6) values to a vector of 16 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp6) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static half16_t run(uint32_t scale, f6x16_t x)
+    {
+        return cast_from_f6_scaled<half16_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<half16_t, bf6x16_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 16 6-bit floating-point(bf6) values to a vector of 16 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(bf6) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static half16_t run(uint32_t scale, bf6x16_t x)
+    {
+        return cast_from_f6_scaled<half16_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+// bhalf_t
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<bhalf16_t, f6x16_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 16 6-bit floating-point(fp6) values to a vector of 16 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp6) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static bhalf16_t run(uint32_t scale, f6x16_t x)
+    {
+        return cast_from_f6_scaled<bhalf16_t, uint32_t, Scale_sel>(x, scale);
+    }
+};
+
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<bhalf16_t, bf6x16_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 16 6-bit floating-point(bf6) values to a vector of 16 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(bf6) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static bhalf16_t run(uint32_t scale, bf6x16_t x)
+    {
+        return cast_from_f6_scaled<bhalf16_t, uint32_t, Scale_sel>(x, scale);
     }
 };
 #endif // #if CK_MX_ARCH_1250

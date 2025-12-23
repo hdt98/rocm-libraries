@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -120,6 +120,7 @@ namespace device {
 ///                             in global memory. Currently not supported!
 /// @tparam PermuteB            Whether the B input tensor has gridwise-gemm friendly data layout
 ///                             in global memory (pre-shuffled).
+/// @tparam UseDataCachePrefetch Whether to use data cache prefetching feature of hardware.
 template <typename ALayout,
           typename BLayout,
           typename CLayout,
@@ -165,7 +166,9 @@ template <typename ALayout,
           typename ComputeTypeA                       = CDataType,
           typename ComputeTypeB                       = ComputeTypeA,
           bool PermuteA                               = false,
-          bool PermuteB                               = false>
+          bool PermuteB                               = false,
+          index_t MinimumOccupancy                    = 0,
+          bool UseDataCachePrefetch                   = false>
 struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
                                                        BLayout,
                                                        CLayout,
@@ -230,7 +233,10 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
         ComputeTypeA,
         ComputeTypeB,
         PermuteA,
-        PermuteB>;
+        PermuteB,
+        false,
+        MinimumOccupancy,
+        UseDataCachePrefetch>;
     using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
     using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
 
@@ -346,17 +352,24 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             };
 
             constexpr index_t minimum_occupancy = []() {
-                if constexpr(BlkGemmPipeSched == BlockGemmPipelineScheduler::Interwave)
+                if constexpr(MinimumOccupancy == 0)
                 {
-                    return 2;
-                }
-                else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
-                {
-                    return (MPerBlock * NPerBlock / BlockSize <= 128) ? 2 : 1;
+                    if constexpr(BlkGemmPipeSched == BlockGemmPipelineScheduler::Interwave)
+                    {
+                        return 2;
+                    }
+                    else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
+                    {
+                        return (MPerBlock * NPerBlock / BlockSize <= 128) ? 2 : 1;
+                    }
+                    else
+                    {
+                        return 1;
+                    }
                 }
                 else
                 {
-                    return 1;
+                    return MinimumOccupancy;
                 }
             }();
 

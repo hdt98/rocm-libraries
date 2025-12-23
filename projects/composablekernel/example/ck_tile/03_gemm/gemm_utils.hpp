@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -78,8 +78,9 @@ struct GemmConfigBase
     static constexpr bool Preshuffle                = false;
     static constexpr bool TiledMMAPermuteN          = false;
 
-    static constexpr ck_tile::index_t kClusterSizeM = 1;
-    static constexpr ck_tile::index_t kClusterSizeN = 1;
+    static constexpr ck_tile::index_t kClusterSizeM       = 1;
+    static constexpr ck_tile::index_t kClusterSizeN       = 1;
+    static constexpr ck_tile::index_t BlockedXDLN_PerWarp = 1;
 };
 
 template <typename PrecType>
@@ -182,7 +183,6 @@ struct GemmConfigComputeV3_2 : public GemmConfigBase
     static constexpr int kBlockPerCu = 2;
 };
 
-#if CK_TILE_USE_WMMA
 template <typename PrecType>
 struct GemmConfigComputeV3_WMMA : public GemmConfigBase
 {
@@ -203,7 +203,6 @@ struct GemmConfigComputeV3_WMMA : public GemmConfigBase
 
     static constexpr int kBlockPerCu = 2;
 };
-#endif
 
 template <typename PrecType>
 struct GemmConfigComputeV4 : public GemmConfigBase
@@ -417,63 +416,6 @@ struct GemmTypeConfig<ck_tile::int8_t, ck_tile::int8_t, int32_t>
     using CDataType   = int32_t;
 };
 
-template <typename T>
-struct DataTypeTraits;
-
-template <>
-struct DataTypeTraits<float>
-{
-    static constexpr const char* name = "fp32";
-};
-
-template <>
-struct DataTypeTraits<double>
-{
-    static constexpr const char* name = "fp64";
-};
-
-template <>
-struct DataTypeTraits<int32_t>
-{
-    static constexpr const char* name = "int32";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::half_t>
-{
-    static constexpr const char* name = "fp16";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::bf16_t>
-{
-    static constexpr const char* name = "bf16";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::fp8_t>
-{
-    static constexpr const char* name = "fp8";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::bf8_t>
-{
-    static constexpr const char* name = "bf8";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::pk_int4_t>
-{
-    static constexpr const char* name = "pk_int4_t";
-};
-
-template <>
-struct DataTypeTraits<ck_tile::int8_t>
-{
-    static constexpr const char* name = "int8";
-};
-
 template <ck_tile::GemmPipeline PipelineId>
 struct PipelineTypeTraits;
 
@@ -497,6 +439,15 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V1>
 
 template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V3>
 {
     template <typename PipelineProblem>
     using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;

@@ -1,9 +1,10 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "warp_gemm_params.hpp"
 
 namespace ck_tile {
 
@@ -23,7 +24,8 @@ enum class WGAttrCtlEnum
 };
 
 #define DISPATCH_MFMA_(mfma_, dmod_, amod_, bmod_, cmod_)       \
-    if constexpr(post_nop_)                                     \
+    using P = WarpGemmParamsParser<Params...>;                  \
+    if constexpr(P::post_nop)                                   \
     {                                                           \
         asm volatile(mfma_ " %0, %1, %2, %3 ; yyy\n"            \
                            "s_nop 3"                            \
@@ -93,11 +95,9 @@ struct WarpGemmAttributeMfmaImplF32F32F32M16N16K4
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_16x16x4f32", Ctrl)
         else
@@ -113,6 +113,7 @@ struct WarpGemmAttributeMfmaImplF32F32F32M16N16K4
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx9__)
@@ -157,11 +158,9 @@ struct WarpGemmAttributeMfmaImplF32F32F32M32N32K2
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_32x32x2f32", Ctrl)
         else
@@ -177,6 +176,7 @@ struct WarpGemmAttributeMfmaImplF32F32F32M32N32K2
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx9__)
@@ -221,11 +221,9 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M16N16K32
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_16x16x32_bf16", Ctrl)
         else
@@ -241,6 +239,7 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M16N16K32
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx950__)
@@ -284,11 +283,9 @@ struct WarpGemmAttributeMfmaImplF16F16F32M32N32K8
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_32x32x8f16", Ctrl)
         else
@@ -304,6 +301,7 @@ struct WarpGemmAttributeMfmaImplF16F16F32M32N32K8
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx9__)
@@ -347,11 +345,9 @@ struct WarpGemmAttributeMfmaImplF16F16F32M16N16K16
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_16x16x16f16", Ctrl)
         else
@@ -367,6 +363,7 @@ struct WarpGemmAttributeMfmaImplF16F16F32M16N16K16
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx9__)
@@ -410,11 +407,9 @@ struct WarpGemmAttributeMfmaImplF16F16F32M16N16K32
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_16x16x32f16", Ctrl)
         else
@@ -430,6 +425,7 @@ struct WarpGemmAttributeMfmaImplF16F16F32M16N16K32
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx950__)
@@ -474,11 +470,9 @@ struct WarpGemmAttributeMfmaImplF16F16F32M4N64K4
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_4x4x4f16", Ctrl)
         else
@@ -494,6 +488,7 @@ struct WarpGemmAttributeMfmaImplF16F16F32M4N64K4
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx9__)
@@ -538,11 +533,9 @@ struct WarpGemmAttributeMfmaImplF16F16F32M64N4K4
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_4x4x4f16", Ctrl)
         else
@@ -558,6 +551,7 @@ struct WarpGemmAttributeMfmaImplF16F16F32M64N4K4
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx9__)
@@ -602,11 +596,9 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M32N32K8
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_32x32x8bf16_1k", Ctrl)
         else
@@ -634,6 +626,7 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M32N32K8
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx90a__) || defined(__gfx94__)
@@ -691,11 +684,9 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M16N16K16
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_16x16x16bf16_1k", Ctrl)
         {
@@ -722,6 +713,7 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M16N16K16
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx90a__) || defined(__gfx94__)
@@ -780,11 +772,9 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M4N64K4
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_4x4x4bf16_1k", Ctrl)
         else
@@ -812,6 +802,7 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M4N64K4
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx90a__) || defined(__gfx94__)
@@ -870,11 +861,9 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M64N4K4
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_4x4x4bf16_1k", Ctrl)
         else
@@ -902,6 +891,7 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M64N4K4
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx90a__) || defined(__gfx94__)
@@ -960,11 +950,9 @@ struct WarpGemmAttributeMfmaImplF16F16F32M32N32K16
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_32x32x16_f16", Ctrl)
         else
@@ -1004,6 +992,7 @@ struct WarpGemmAttributeMfmaImplF16F16F32M32N32K16
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx950__)
@@ -1074,11 +1063,9 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M32N32K16
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_f32_32x32x16_bf16", Ctrl)
         else
@@ -1118,6 +1105,7 @@ struct WarpGemmAttributeMfmaImplBf16Bf16F32M32N32K16
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx950__)
@@ -1189,11 +1177,9 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x32_f8_base
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         if constexpr(Ctrl == WGAttrCtlEnum::Raw_vvv)
         {
@@ -1295,6 +1281,7 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x32_f8_base
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx94__) or defined(__gfx95__)
@@ -1348,11 +1335,9 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x16_f8_base
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         if constexpr(Ctrl == WGAttrCtlEnum::Raw_vvv)
         {
@@ -1465,6 +1450,7 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x16_f8_base
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx94__) or defined(__gfx95__)
@@ -1556,15 +1542,15 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x128_f8f6f4
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <index_t opselA, index_t opselB, bool post_nop_ = false>
+    template <typename... Params>
     CK_TILE_DEVICE void operator()(CVecType& c_vec,
                                    const AVecType& a_vec,
                                    const int32_t& a_scale,
                                    const BVecType& b_vec,
-                                   const int32_t& b_scale,
-                                   bool_constant<post_nop_> = {}) const
+                                   const int32_t& b_scale) const
     {
 #if defined(__gfx950__)
+        using P         = WarpGemmParamsParser<Params...>;
         auto dtype2conf = [](auto dtype) {
             if constexpr(std::is_same_v<decltype(dtype), fp8_t>)
                 return make_tuple(number<0>{}, int32x8_t{});
@@ -1594,8 +1580,15 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x128_f8f6f4
         auto arg_b         = bit_cast<decltype(dtype2vec(BDataType{}))>(b_vec);
         constexpr int cbsz = decltype(dtype2code(ADataType{}))::value;
         constexpr int blgp = decltype(dtype2code(BDataType{}))::value;
-        c_vec              = __builtin_amdgcn_mfma_scale_f32_16x16x128_f8f6f4(
-            arg256(arg_a), arg256(arg_b), c_vec, cbsz, blgp, opselA, a_scale, opselB, b_scale);
+        c_vec              = __builtin_amdgcn_mfma_scale_f32_16x16x128_f8f6f4(arg256(arg_a),
+                                                                 arg256(arg_b),
+                                                                 c_vec,
+                                                                 cbsz,
+                                                                 blgp,
+                                                                 P::op_sel_a,
+                                                                 a_scale,
+                                                                 P::op_sel_b,
+                                                                 b_scale);
 #else
         ck_tile::ignore = c_vec;
         ck_tile::ignore = a_vec;
@@ -1606,31 +1599,30 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x128_f8f6f4
     }
 
     // c_vec = a_vec * b_vec
-    template <index_t opselA, index_t opselB>
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec,
                                        const int32_t& a_scale,
                                        const BVecType& b_vec,
                                        const int32_t& b_scale) const
     {
         CVecType c_vec{0.f};
-        operator()<opselA, opselB>(c_vec, a_vec, a_scale, b_vec, b_scale);
+        operator()<Params...>(c_vec, a_vec, a_scale, b_vec, b_scale);
         return c_vec;
     }
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
-        operator()<0, 0>(c_vec, a_vec, 0, b_vec, 0);
+        operator()<Params...>(c_vec, a_vec, 0, b_vec, 0);
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
-        return operator()<0, 0>(a_vec, 0, b_vec, 0);
+        return operator()<Params...>(a_vec, 0, b_vec, 0);
     }
 };
 
@@ -1664,11 +1656,9 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8_bf8_base
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         //__builtin_amdgcn_mfma_scale_f32_32x32x64_f8f6f4(a, b, c, cbsz, blgp, opsel, scale_a,
         // opsel, scale_b)
@@ -1693,6 +1683,7 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8_bf8_base
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
 #if defined(__gfx950__)
@@ -1763,11 +1754,9 @@ struct WarpGemmAttributeMfmaImpl_i32_32x32x16_i8
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_i32_32x32x16_i8", Ctrl)
         else
@@ -1795,10 +1784,11 @@ struct WarpGemmAttributeMfmaImpl_i32_32x32x16_i8
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         CVecType c_vec{0};
-        operator()(c_vec, a_vec, b_vec);
+        operator()<Params...>(c_vec, a_vec, b_vec);
         return c_vec;
     }
 };
@@ -1833,11 +1823,9 @@ struct WarpGemmAttributeMfmaImpl_i32_16x16x32_i8
     static constexpr index_t kCM1PerLane = 4; // write to 4x AccVGPRs
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_i32_16x16x32_i8", Ctrl)
         else
@@ -1854,10 +1842,11 @@ struct WarpGemmAttributeMfmaImpl_i32_16x16x32_i8
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         CVecType c_vec{0};
-        operator()(c_vec, a_vec, b_vec);
+        operator()<Params...>(c_vec, a_vec, b_vec);
         return c_vec;
     }
 };
@@ -1892,11 +1881,9 @@ struct WarpGemmAttributeMfmaImpl_i32_16x16x64_i8
     static constexpr index_t kCM1PerLane = 4; // write to 4x AccVGPRs
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_i32_16x16x64_i8", Ctrl)
         else
@@ -1913,10 +1900,11 @@ struct WarpGemmAttributeMfmaImpl_i32_16x16x64_i8
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         CVecType c_vec{0};
-        operator()(c_vec, a_vec, b_vec);
+        operator()<Params...>(c_vec, a_vec, b_vec);
         return c_vec;
     }
 };
@@ -1951,11 +1939,9 @@ struct WarpGemmAttributeMfmaImpl_i32_32x32x32_i8
     static constexpr index_t kCM1PerLane = 4;
 
     // c_vec += a_vec * b_vec
-    template <bool post_nop_ = false>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec,
-                                   bool_constant<post_nop_> = {}) const
+    template <typename... Params>
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         DISPATCH_MFMA_CTRL_("v_mfma_i32_32x32x32_i8", Ctrl)
         else
@@ -1972,10 +1958,11 @@ struct WarpGemmAttributeMfmaImpl_i32_32x32x32_i8
     }
 
     // c_vec = a_vec * b_vec
+    template <typename... Params>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
         CVecType c_vec{0};
-        operator()(c_vec, a_vec, b_vec);
+        operator()<Params...>(c_vec, a_vec, b_vec);
         return c_vec;
     }
 };

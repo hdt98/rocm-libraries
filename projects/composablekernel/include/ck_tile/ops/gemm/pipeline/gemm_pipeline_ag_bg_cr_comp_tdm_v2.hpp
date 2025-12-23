@@ -28,9 +28,7 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
     using Base             = GemmPipelineAgBgCrCompTDMV1<Problem, Policy>;
     using PipelineImplBase = typename Base::PipelineImplBase;
 
-    static constexpr bool HasHotLoop = Base::HasHotLoop;
-    static constexpr auto TailNum    = Base::TailNum;
-    static constexpr auto Scheduler  = Base::Scheduler;
+    static constexpr auto Scheduler = Base::Scheduler;
 
     static constexpr index_t BlockSize = Problem::kBlockSize;
 
@@ -131,22 +129,25 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             TDMConfig tdm_config_b[2];
 
             // set tdm's lds padding config
-            constexpr auto padding_config = Policy::GetLdsPaddingConfig();
+            constexpr auto LdsPaddingConfigA =
+                Policy::template GetLdsPaddingConfig<Problem, true>();
+            constexpr auto APaddingEnabled  = LdsPaddingConfigA[I0{}];
+            constexpr auto APaddingAmount   = LdsPaddingConfigA[I1{}];
+            constexpr auto APaddingInterval = LdsPaddingConfigA[I2{}];
 
+            constexpr auto LdsPaddingConfigB =
+                Policy::template GetLdsPaddingConfig<Problem, false>();
+            constexpr auto BPaddingEnabled  = LdsPaddingConfigB[I0{}];
+            constexpr auto BPaddingAmount   = LdsPaddingConfigB[I1{}];
+            constexpr auto BPaddingInterval = LdsPaddingConfigB[I2{}];
             static_for<0, 2, 1>{}([&](auto i) {
-                if constexpr(!is_a_load_tr_v())
-                {
-                    tdm_config_a[i].pad_enable              = true;
-                    tdm_config_a[i].pad_config.pad_amount   = padding_config.at(number<0>{});
-                    tdm_config_a[i].pad_config.pad_interval = padding_config.at(number<1>{});
-                }
+                tdm_config_a[i].pad_enable              = APaddingEnabled;
+                tdm_config_a[i].pad_config.pad_amount   = APaddingAmount;
+                tdm_config_a[i].pad_config.pad_interval = APaddingInterval;
 
-                if constexpr(!is_b_load_tr_v())
-                {
-                    tdm_config_b[i].pad_enable              = true;
-                    tdm_config_b[i].pad_config.pad_amount   = padding_config.at(number<0>{});
-                    tdm_config_b[i].pad_config.pad_interval = padding_config.at(number<1>{});
-                }
+                tdm_config_b[i].pad_enable              = BPaddingEnabled;
+                tdm_config_b[i].pad_config.pad_amount   = BPaddingAmount;
+                tdm_config_b[i].pad_config.pad_interval = BPaddingInterval;
 
 #if BARRIER_ATOMIC_IN_TDM
                 // enable atomic_barrier in TDM to make sure data is visible in LDS before wave
@@ -643,13 +644,20 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                                    index_t num_loop,
                                    void* p_smem) const
     {
-        return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
-            a_dram_block_window_tmp,
-            a_element_func,
-            b_dram_block_window_tmp,
-            b_element_func,
-            num_loop,
-            p_smem);
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+
+        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                a_element_func,
+                b_dram_block_window_tmp,
+                b_element_func,
+                num_loop,
+                p_smem);
+        };
+
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
 
     template <typename ADramBlockWindowTmp, typename BDramBlockWindowTmp>
@@ -658,13 +666,18 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                                    const index_t num_loop,
                                    void* __restrict__ p_smem) const
     {
-        return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
-            a_dram_block_window_tmp,
-            [](const Base::ADataType& a) { return a; },
-            b_dram_block_window_tmp,
-            [](const Base::BDataType& b) { return b; },
-            num_loop,
-            p_smem);
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+        const auto RunPipeline  = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                [](const typename Base::ADataType& a) { return a; },
+                b_dram_block_window_tmp,
+                [](const typename Base::BDataType& b) { return b; },
+                num_loop,
+                p_smem);
+        };
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()

@@ -19,12 +19,12 @@ struct BaseGemmPipelineAgBgCrCompAsync
     static constexpr index_t PrefillStages   = 1;
     static constexpr index_t GlobalBufferNum = 1;
 
-    CK_TILE_HOST static constexpr bool BlockHasHotloop(index_t num_loop)
+    CK_TILE_HOST_DEVICE static constexpr bool BlockHasHotloop(index_t num_loop)
     {
         return num_loop > PrefetchStages;
     }
 
-    CK_TILE_HOST static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)
+    CK_TILE_HOST_DEVICE static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)
     {
         if(num_loop == 1)
         {
@@ -158,11 +158,7 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
 
     static constexpr bool DoubleSmemBuffer = Problem::DoubleSmemBuffer;
 
-    static_assert(DoubleSmemBuffer == true, "pipeline requires double smem buffer");
-
-    static constexpr bool HasHotLoop = Problem::HasHotLoop;
-    static constexpr auto TailNum    = Problem::TailNum;
-    static constexpr auto Scheduler  = Problem::Scheduler;
+    static constexpr auto Scheduler = Problem::Scheduler;
 
     static constexpr auto is_a_load_tr_v = bool_constant<PipelineImplBase::is_a_load_tr>{};
     static constexpr auto is_b_load_tr_v = bool_constant<PipelineImplBase::is_b_load_tr>{};
@@ -543,13 +539,20 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
                                    index_t num_loop,
                                    void* p_smem) const
     {
-        return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
-            a_dram_block_window_tmp,
-            a_element_func,
-            b_dram_block_window_tmp,
-            b_element_func,
-            num_loop,
-            p_smem);
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+
+        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                a_element_func,
+                b_dram_block_window_tmp,
+                b_element_func,
+                num_loop,
+                p_smem);
+        };
+
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
 
     public:
@@ -559,13 +562,20 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
                                    const index_t num_loop,
                                    void* __restrict__ p_smem) const
     {
-        return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
-            a_dram_block_window_tmp,
-            [](const ADataType& a) { return a; },
-            b_dram_block_window_tmp,
-            [](const BDataType& b) { return b; },
-            num_loop,
-            p_smem);
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+
+        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                [](const ADataType& a) { return a; },
+                b_dram_block_window_tmp,
+                [](const BDataType& b) { return b; },
+                num_loop,
+                p_smem);
+        };
+
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()

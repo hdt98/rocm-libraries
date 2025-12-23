@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -244,7 +244,16 @@ struct BlockGemmARegBRegCRegV1
                         merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
 
                     // warp GEMM
-                    WarpGemm{}(c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                    if constexpr(nIter != 0)
+                    {
+                        WarpGemm{}.template operator()<ReuseA<true>, ReuseB<false>>(
+                            c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                    }
+                    else
+                    {
+                        WarpGemm{}.template operator()<ReuseA<false>, ReuseB<false>>(
+                            c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                    }
 
                     // write C warp tensor into C block tensor
                     c_block_tensor.set_y_sliced_thread_data(

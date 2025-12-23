@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -70,6 +70,9 @@ CK_TILE_TYPE_CONVERT(int8_t, int8, float, float)
 
 CK_TILE_TYPE_CONVERT(fp16_t, fp16, fp8_t, fp8)
 CK_TILE_TYPE_CONVERT(fp16_t, fp16, bf8_t, bf8)
+
+CK_TILE_TYPE_CONVERT(fp16x2_t, fp16x2, fp32x2_t, fp32x2)
+CK_TILE_TYPE_CONVERT(bf16x2_t, bf16x2, fp32x2_t, fp32x2)
 #undef CK_TILE_TYPE_CONVERT
 
 } // namespace ck_tile
