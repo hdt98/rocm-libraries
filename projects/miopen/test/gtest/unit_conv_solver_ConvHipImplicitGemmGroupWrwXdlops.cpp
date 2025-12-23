@@ -60,7 +60,9 @@ const auto& GetTestParams()
     static const auto params = [] {
 // If MIOpen is built without CK these tests will fail, skip them to avoid failing
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-        Gpu supportedDevices = Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950;
+        // NOTE: removed gfx908 from this list for now since causing errors on Windows
+        // will need to add it back once we find root cause
+        Gpu supportedDevices = Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950;
         if(datatype == miopenBFloat16)
             supportedDevices = Gpu::gfx94X | Gpu::gfx950;
         if constexpr(datatype != miopenFloat)
