@@ -2765,6 +2765,7 @@ inline __host__ __device__ half32_t type_convert<half32_t, bf6x32_t>(bf6x32_t x)
 #endif
 }
 
+template <>
 inline __host__ __device__ half16_t type_convert<half16_t, bf6x16_t>(bf6x16_t x)
 {
 #if CK_MX_FP6_CVT_FAST_PATH
@@ -2863,7 +2864,7 @@ inline __host__ __device__ bhalf16_t type_convert<bhalf16_t, bf6x16_pk_t>(bf6x16
 {
     return type_convert<bhalf16_t>(static_cast<bf6x16_t>(x));
 }
-  
+
 template <>
 inline __host__ __device__ float type_convert<float, e8m0_bexp_t>(e8m0_bexp_t x)
 {
