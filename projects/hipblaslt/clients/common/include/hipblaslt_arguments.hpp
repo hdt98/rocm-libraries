@@ -58,6 +58,12 @@ struct Arguments
         Block  = 3
     };
 
+    enum class ApiMethod : int
+    {
+        C_API = 0,
+        MIX_API = 1,
+        CPP_API = 2
+    };
     /*************************************************************************
      *                    Beginning Of Arguments                             *
      *************************************************************************/
@@ -165,14 +171,14 @@ struct Arguments
     uint32_t scaleBBlockColSize;
 
     // API related
-    bool    use_ext;
-    bool    use_ext_setproblem;
-    int     algo_method; // 0 for getheuristic, 1 for get all algos, 2 for algo index
-    int     api_method; // 0 for c, 1 for mix, 2 for cpp
-    bool    use_user_args;
-    int32_t rotating;
-    bool    use_gpu_timer;
-    float   skip_slow_solution_ratio;
+    bool      use_ext;
+    bool      use_ext_setproblem;
+    int       algo_method; // 0 for getheuristic, 1 for get all algos, 2 for algo index
+    ApiMethod api_method;
+    bool      use_user_args;
+    int32_t   rotating;
+    bool      use_gpu_timer;
+    float     skip_slow_solution_ratio;
     // tuning
     int32_t gsu_vector[MAX_SUPPORTED_NUM_PROBLEMS]; // This is for client
     int32_t wgm_vector[MAX_SUPPORTED_NUM_PROBLEMS]; // This is for client

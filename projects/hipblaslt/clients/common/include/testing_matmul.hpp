@@ -1194,6 +1194,13 @@ std::tuple<hipDataType, hipDataType> derive_unset_compute_input_type(const Argum
     return {real_compute_input_typeA, real_compute_input_typeB};
 }
 
+// Derive `use_ext` and `use_ext_setproblem` from a validated api_method; branchless, no-throw.
+void set_ext_from_valid_api_method(const Arguments::ApiMethod& api_method, bool& use_ext, bool& use_ext_setproblem) noexcept
+{
+    use_ext            = (api_method != Arguments::ApiMethod::C_API);
+    use_ext_setproblem = (api_method == Arguments::ApiMethod::CPP_API);
+}
+
 void testing_matmul_with_bias(const Arguments& arg,
                               hipDataType      TiA,
                               hipDataType      TiB,
@@ -1363,8 +1370,15 @@ void testing_matmul_with_bias(const Arguments& arg,
 
     std::vector<void*> alpha_in(gemm_count);
 
-    bool do_swizzle_a = arg.swizzle_a && isSwizzleSupported(TiA);
+    bool do_swizzle_a = arg.swizzle_a && isSwizzleSupported(TiA); 
     bool do_swizzle_b = arg.swizzle_b && isSwizzleSupported(TiB);
+
+    // Set flags based on a validated api_method.
+    // 'use_ext' and 'use_ext_setproblem' are determined exclusively by the given api_method.
+    // The helper ensures the mapping follows the predefined rules for valid API modes.
+    bool use_ext = false;
+    bool use_ext_setproblem = false;
+    set_ext_from_valid_api_method(arg.api_method, use_ext, use_ext_setproblem);
 
     // Need to split into two for loop to calculate the rotating buffer
     int64_t totalRotatingSizeNeeded = 0;
@@ -2460,7 +2474,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
     std::vector<hipblaslt_ext::GemmEpilogue> extepilogue;
     hipblaslt_ext::GemmProblemType           extproblemtype;
-    if(arg.use_ext_setproblem)
+    if(use_ext_setproblem)
     {
         extinputs.resize(block_count, std::vector<hipblaslt_ext::GemmInputs>(gemm_count));
         extepilogue.resize(gemm_count);
@@ -2594,7 +2608,7 @@ void testing_matmul_with_bias(const Arguments& arg,
     remove_duplicate = std::set<uint32_t>(wgm_vector.begin(), wgm_vector.end());
     wgm_vector.assign(remove_duplicate.begin(), remove_duplicate.end());
     std::vector<hipblaslt_ext::GemmTuning> tuningVec;
-    if(arg.use_ext)
+    if(use_ext)
     {
         for(size_t wgm = 0; wgm < wgm_vector.size(); wgm++)
             for(size_t gsu = 0; gsu < gsu_vector.size(); gsu++)
@@ -2648,9 +2662,9 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             if(!do_grouped_gemm)
             {
-                if(arg.use_ext)
+                if(use_ext)
                 {
-                    if(arg.use_ext_setproblem)
+                    if(use_ext_setproblem)
                     {
                         for(int32_t b = 0; b < block_count; b++)
                             CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(M[0],
@@ -2743,7 +2757,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
             else
             {
-                if(arg.use_ext_setproblem)
+                if(use_ext_setproblem)
                 {
                     auto num_batches_64
                         = std::vector<int64_t>{num_batches.begin(), num_batches.end()};
@@ -2841,9 +2855,9 @@ void testing_matmul_with_bias(const Arguments& arg,
         int requestCount = 0;
         if(!do_grouped_gemm)
         {
-            if(arg.use_ext)
+            if(use_ext)
             {
-                if(arg.use_ext_setproblem)
+                if(use_ext_setproblem)
                 {
                     for(int32_t b = 0; b < block_count; b++)
                         CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(M[0],
@@ -2946,7 +2960,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
         else
         {
-            if(arg.use_ext_setproblem)
+            if(use_ext_setproblem)
             {
                 auto num_batches_64 = std::vector<int64_t>{num_batches.begin(), num_batches.end()};
                 for(int32_t b = 0; b < block_count; b++)
@@ -3023,9 +3037,9 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         if(!do_grouped_gemm)
         {
-            if(arg.use_ext)
+            if(use_ext)
             {
-                if(arg.use_ext_setproblem)
+                if(use_ext_setproblem)
                 {
                     for(int32_t b = 0; b < block_count; b++)
                         CHECK_HIPBLASLT_ERROR(gemmVec[b].setProblem(M[0],
@@ -3113,7 +3127,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
         else
         {
-            if(arg.use_ext_setproblem)
+            if(use_ext_setproblem)
             {
                 auto num_batches_64 = std::vector<int64_t>{num_batches.begin(), num_batches.end()};
                 for(int32_t b = 0; b < block_count; b++)
@@ -3509,7 +3523,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
             if(!do_grouped_gemm)
             {
-                if(arg.use_ext)
+                if(use_ext)
                 {
                     gemmVec[0].setMaxWorkspaceBytes(workspace_size);
                     CHECK_HIPBLASLT_ERROR(
@@ -3682,7 +3696,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             if(!do_grouped_gemm)
             {
                 EfficiencyMonitor& perf_monitor = getEfficiencyMonitor();
-                if(arg.use_ext)
+                if(use_ext)
                 {
                     for(int32_t b = 0; b < block_count; b++)
                     {
@@ -4063,7 +4077,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             {
                 if(arg.print_kernel_info)
                 {
-                    if(arg.use_ext)
+                    if(use_ext)
                     {
                         if(!do_grouped_gemm)
                         {

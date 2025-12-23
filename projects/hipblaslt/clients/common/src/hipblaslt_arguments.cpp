@@ -71,7 +71,7 @@ void Arguments::init()
     algo                   = 0;
     solution_index         = -1;
     requested_solution_num = 1;
-    api_method = 0;
+    api_method = Arguments::ApiMethod::C_API;
 
     a_type              = HIP_R_16F;
     b_type              = HIP_R_16F;
