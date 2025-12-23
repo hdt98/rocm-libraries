@@ -1029,10 +1029,10 @@ struct intrin_wmma_f64_16x16x4_f64<16, 16>
     }
 };
 
-#ifndef CK_CODE_GEN_RTC
 template <index_t MPerWave, index_t NPerWave, index_t ScaleOpselA, index_t ScaleOpselB>
 struct intrin_wmma_scale_f32_16x16x128_f8f6f4;
 
+#ifndef CK_CODE_GEN_RTC
 template <index_t ScaleOpselA, index_t ScaleOpselB>
 struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 {
