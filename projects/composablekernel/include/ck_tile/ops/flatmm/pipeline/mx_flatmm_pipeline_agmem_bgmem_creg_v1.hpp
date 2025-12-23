@@ -734,8 +734,8 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                 static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
                                     constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
                                     //  warp GEMM
-                                    WG{}.template
-                                    operator()<ikxdl * MXdlPack + imxdl, ikxdl * NXdlPack + inxdl>(
+                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
+                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
                                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                                         bit_cast<typename WG::AWarpTensor>(
                                             a_warp_tensor(number<AwarpIter>{})),
@@ -830,8 +830,8 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                 static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
                                     constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
                                     // warp GEMM
-                                    WG{}.template
-                                    operator()<ikxdl * MXdlPack + imxdl, ikxdl * NXdlPack + inxdl>(
+                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
+                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
                                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                                         bit_cast<typename WG::AWarpTensor>(
                                             a_warp_tensor(number<AwarpIter>{})),
@@ -931,8 +931,8 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                 static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
                                     constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
                                     // warp GEMM
-                                    WG{}.template
-                                    operator()<ikxdl * MXdlPack + imxdl, ikxdl * NXdlPack + inxdl>(
+                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
+                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
                                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                                         bit_cast<typename WG::AWarpTensor>(
                                             a_warp_tensor(number<AwarpIter>{})),
@@ -987,8 +987,8 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                 static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
                                     constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
                                     // warp GEMM
-                                    WG{}.template
-                                    operator()<ikxdl * MXdlPack + imxdl, ikxdl * NXdlPack + inxdl>(
+                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
+                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
                                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                                         bit_cast<typename WG::AWarpTensor>(
                                             a_warp_tensor(number<AwarpIter>{})),
@@ -1032,8 +1032,8 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                 static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
                                     constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
                                     // warp GEMM
-                                    WG{}.template
-                                    operator()<ikxdl * MXdlPack + imxdl, ikxdl * NXdlPack + inxdl>(
+                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
+                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
                                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                                         bit_cast<typename WG::AWarpTensor>(
                                             a_warp_tensor(number<AwarpIter>{})),

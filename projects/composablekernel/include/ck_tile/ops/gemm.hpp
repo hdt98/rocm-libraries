@@ -76,6 +76,7 @@
 #include "ck_tile/ops/gemm/warp/warp_gemm_attribute_wmma_impl_base_traits.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_impl.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_params.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_smfmac_impl.hpp"
 #include "ck_tile/ops/gemm/warp/warp_wmma_gemm.hpp"
 #include "ck_tile/ops/common/generic_2d_block_shape.hpp"
