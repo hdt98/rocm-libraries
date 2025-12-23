@@ -18,7 +18,7 @@ struct AWarpDstrEncodingTrait
     using type = tile_distribution_encoding<
         sequence<Impl::kRepeat>,
         tuple<sequence<Impl::kAMLane>,
-              sequence<Impl::kABK0PerLane, Impl::kABKLane, Impl::kABK1PerLane>>,
+              sequence<Impl::kAK0PerLane, Impl::kABKLane, Impl::kAK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
         tuple<typename Impl::kABPs2RHssMinor>,
         typename Impl::kABYs2RHsMajor,
@@ -31,7 +31,7 @@ struct BWarpDstrEncodingTrait
     using type = tile_distribution_encoding<
         sequence<Impl::kRepeat>,
         tuple<sequence<Impl::kBNLane>,
-              sequence<Impl::kABK0PerLane, Impl::kABKLane, Impl::kABK1PerLane>>,
+              sequence<Impl::kBK0PerLane, Impl::kABKLane, Impl::kBK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
         tuple<typename Impl::kABPs2RHssMinor>,
         typename Impl::kABYs2RHsMajor,
@@ -90,12 +90,14 @@ struct WarpGemmAttributeWmma
     using BVecType = typename Impl::BVecType;
     using CVecType = typename Impl::CVecType;
 
-    static constexpr index_t kM          = Impl::kM;
-    static constexpr index_t kN          = Impl::kN;
-    static constexpr index_t kK          = Impl::kK;
-    static constexpr index_t kCMLane     = Impl::kCMLane;
-    static constexpr index_t kKPerThread = Impl::kABK0PerLane * Impl::kABK1PerLane;
-    static constexpr index_t kKPack      = Impl::kABK1PerLane;
+    static constexpr index_t kM      = Impl::kM;
+    static constexpr index_t kN      = Impl::kN;
+    static constexpr index_t kK      = Impl::kK;
+    static constexpr index_t kCMLane = Impl::kCMLane;
+
+    static_assert(Impl::kAK0PerLane * Impl::kAK1PerLane == Impl::kBK0PerLane * Impl::kBK1PerLane);
+    static constexpr index_t kKPerThread = Impl::kAK0PerLane * Impl::kAK1PerLane;
+    static constexpr index_t kKPack      = Impl::kAK1PerLane;
 
     CK_TILE_HOST_DEVICE static constexpr auto get_num_of_access() { return 1; }
 

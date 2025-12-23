@@ -39,12 +39,14 @@ struct WarpGemmAttributeWmmaImpl
     static constexpr index_t kAMBlock = Traits::kAMBlock;
     static constexpr index_t kBNBlock = Traits::kBNBlock;
 
-    static constexpr index_t kRepeat      = Traits::kRepeat;
-    static constexpr index_t kAMLane      = Traits::kAMLane;
-    static constexpr index_t kBNLane      = Traits::kBNLane;
-    static constexpr index_t kABK0PerLane = Traits::kABK0PerLane;
-    static constexpr index_t kABKLane     = Traits::kABKLane;
-    static constexpr index_t kABK1PerLane = Traits::kABK1PerLane;
+    static constexpr index_t kRepeat     = Traits::kRepeat;
+    static constexpr index_t kAMLane     = Traits::kAMLane;
+    static constexpr index_t kBNLane     = Traits::kBNLane;
+    static constexpr index_t kAK0PerLane = Traits::kAK0PerLane;
+    static constexpr index_t kBK0PerLane = Traits::kBK0PerLane;
+    static constexpr index_t kAK1PerLane = Traits::kAK1PerLane;
+    static constexpr index_t kBK1PerLane = Traits::kBK1PerLane;
+    static constexpr index_t kABKLane    = Traits::kABKLane;
 
     static constexpr index_t kCMLane     = Traits::kCMLane;
     static constexpr index_t kCNLane     = Traits::kCNLane;
@@ -128,6 +130,24 @@ using WarpGemmAttributeWmmaImpl_f32_16x16x64_f8_bf8 =
 
 using WarpGemmAttributeWmmaImpl_f32_16x16x64_bf8_f8 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 64>>;
+
+using WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_f8 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, fp8_t, fp8_t, float, 16, 16, 128>>;
+
+using WarpGemmAttributeWmmaImpl_f32_16x16x128_bf8_bf8 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, bf8_t, bf8_t, float, 16, 16, 128>>;
+
+using WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_bf8 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, fp8_t, bf8_t, float, 16, 16, 128>>;
+
+using WarpGemmAttributeWmmaImpl_f32_16x16x128_bf8_f8 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 128>>;
+
+using WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_f4 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, fp8_t, pk_fp4_t, float, 16, 16, 128>>;
+
+using WarpGemmAttributeWmmaImpl_f32_16x16x128_f4_f4 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, pk_fp4_t, pk_fp4_t, float, 16, 16, 128>>;
 
 using WarpGemmAttributeWmmaImpl_f16_16x16x64_f8_f8 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, fp8_t, fp8_t, fp16_t, 16, 16, 64>>;
