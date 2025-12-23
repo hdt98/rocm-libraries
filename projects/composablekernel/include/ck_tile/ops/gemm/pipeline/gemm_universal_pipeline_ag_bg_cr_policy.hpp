@@ -511,14 +511,8 @@ struct UniversalGemmBasePolicy
             ck_tile::numeric_traits<remove_cvref_t<DataType>>::PackedSize;
 
         // Assume DataType is even!
-        if constexpr(XPerTile % (PackedSize * 32 / sizeof(DataType)) == 0 &&
-                     elements_per_thread % (PackedSize * 32 / sizeof(DataType)) == 0 &&
-                     PackedSize == 2)
-        {
-            return (PackedSize * 32 / sizeof(DataType));
-        }
-        else if constexpr(XPerTile % (PackedSize * 16 / sizeof(DataType)) == 0 &&
-                          elements_per_thread % (PackedSize * 16 / sizeof(DataType)) == 0)
+        if constexpr(XPerTile % (PackedSize * 16 / sizeof(DataType)) == 0 &&
+                     elements_per_thread % (PackedSize * 16 / sizeof(DataType)) == 0)
         {
             return (PackedSize * 16 / sizeof(DataType));
         }
