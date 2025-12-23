@@ -80,6 +80,25 @@ int run_bench_test(Arguments&         arg,
     // Enable information cout
     arg.print_solution_found = true;
 
+    switch(arg.api_method)
+    {
+    case 0:
+        arg.use_ext            = false;
+        arg.use_ext_setproblem = false;
+        break;
+    case 1:
+        arg.use_ext            = true;
+        arg.use_ext_setproblem = false;
+        break;
+    case 2:
+        arg.use_ext            = true;
+        arg.use_ext_setproblem = true;
+        break;
+    default:
+        throw std::invalid_argument("Invalid value for api_method: " + std::to_string(arg.api_method));
+        break;
+    }
+
     // Skip past any testing_ prefix in function
     static constexpr char prefix[] = "testing_";
     const char*           function = arg.function;
@@ -298,7 +317,6 @@ try
     bool        any_stride        = false;
     bool        dump_matrix       = false;
 
-    int         api_method      = 0;
     std::string api_method_str  = "";
     std::string algo_method_str = "";
 
@@ -657,15 +675,15 @@ try
 
     if(api_method_str.compare("c") == 0)
     {
-        api_method = 0;
+        arg.api_method = 0;
     }
     else if(api_method_str.compare("mix") == 0)
     {
-        api_method = 1;
+        arg.api_method = 1;
     }
     else if(api_method_str.compare("cpp") == 0)
     {
-        api_method = 2;
+        arg.api_method = 2;
     }
     else
     {
@@ -708,7 +726,7 @@ try
         arg.gsu_vector[i] = gsu_vector[i];
         max_gsu           = max(max_gsu, arg.gsu_vector[i]);
     }
-    if((max_gsu > 0) && ((api_method == 0) || arg.grouped_gemm))
+    if((max_gsu > 0) && ((arg.api_method == 0) || arg.grouped_gemm))
     {
         hipblaslt_cerr << "Currently split K only supports GEMM + api_method mix or cpp."
                        << std::endl;
@@ -731,7 +749,7 @@ try
         arg.wgm_vector[i] = wgm_vector[i];
         max_wgm           = max(max_wgm, arg.wgm_vector[i]);
     }
-    if((max_wgm > 0) && (api_method == 0))
+    if((max_wgm > 0) && (arg.api_method == 0))
     {
         hipblaslt_cerr << "Currently workgroup mapping only supports api_method mix or cpp."
                        << std::endl;
@@ -1005,25 +1023,6 @@ try
     {
         arg.norm_check     = 1;
         arg.allclose_check = 1;
-    }
-
-    switch(api_method)
-    {
-    case 0:
-        arg.use_ext            = false;
-        arg.use_ext_setproblem = false;
-        break;
-    case 1:
-        arg.use_ext            = true;
-        arg.use_ext_setproblem = false;
-        break;
-    case 2:
-        arg.use_ext            = true;
-        arg.use_ext_setproblem = true;
-        break;
-    default:
-        throw std::invalid_argument("Invalid value for api_method: " + std::to_string(api_method));
-        break;
     }
 
     arg.norm_check_assert = false;
