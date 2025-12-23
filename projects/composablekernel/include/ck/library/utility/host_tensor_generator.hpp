@@ -379,7 +379,7 @@ struct GeneratorTensor_2<ck::e4m3_scale_t>
     ck::e4m3_scale_t operator()(Is...)
     {
         float tmp = (std::rand() % (max_value - min_value)) + min_value;
-        return ck::e4m3_scale_t(tmp);
+        return ck::type_convert<ck::e4m3_scale_t>(tmp);
     }
 };
 
@@ -393,7 +393,7 @@ struct GeneratorTensor_2<ck::e5m3_scale_t>
     ck::e5m3_scale_t operator()(Is...)
     {
         float tmp = (std::rand() % (max_value - min_value)) + min_value;
-        return ck::e5m3_scale_t(tmp);
+        return ck::type_convert<ck::e5m3_scale_t>(tmp);
     }
 };
 
