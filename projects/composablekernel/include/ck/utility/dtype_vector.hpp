@@ -5225,13 +5225,13 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
 };
 
 template <typename T>
-struct is_mx_type_t : std::false_type
+struct is_mx_type_t : ck::false_type
 {
 };
 
 // Specialize the template for ck::MxType_t
 template <MTX_FMT MX_TYPE>
-struct is_mx_type_t<MxType_t<MX_TYPE>> : std::true_type
+struct is_mx_type_t<MxType_t<MX_TYPE>> : ck::true_type
 {
 };
 

@@ -173,13 +173,6 @@ struct GemmPipelineWmmaPolicy
         constexpr auto I1 = number<1>{};
         constexpr auto I2 = number<2>{};
 
-        using ALayout = remove_cvref_t<typename Problem::ALayout>;
-        using BLayout = remove_cvref_t<typename Problem::BLayout>;
-        constexpr bool TransLdA =
-            std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor> && TransLoadEn;
-        constexpr bool TransLdB =
-            std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor> && TransLoadEn;
-
         using BlockWarps      = typename Problem::BlockGemmShape::BlockWarps;
         using WmmaTile        = typename Problem::BlockGemmShape::WarpTile;
         using WarpGemm        = WarpGemmDispatcher<typename Problem::ADataType,
@@ -193,9 +186,7 @@ struct GemmPipelineWmmaPolicy
                                                                       typename Problem::BDataType,
                                                                       typename Problem::CDataType,
                                                                       BlockWarps,
-                                                                      WarpGemm,
-                                                                      TransLdA,
-                                                                      TransLdB>;
+                                                                      WarpGemm>;
 
         return BlockUniversalGemmAsBsCr<Problem, BlockGemmPolicy>{};
     }

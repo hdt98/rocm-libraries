@@ -404,11 +404,9 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                     make_tuple(Sequence<1>{}, Sequence<0>{}),
                     make_tuple(Sequence<1, 3, 5>{}, Sequence<0, 2, 4>{}));
 #else
-#if(defined(__gfx12__))
-                constexpr auto A_KRow = I2;
-#else
+
                 constexpr auto A_KRow = I1;
-#endif
+
                 return transform_tensor_descriptor(
                     ABlockDesc_{},
                     make_tuple(make_unmerge_transform(make_tuple(Number<A_K0>{}, A_KRow)),
@@ -515,7 +513,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
     {
         constexpr index_t A_L0 = A1BlockDesc_AL0_M_AL1{}.GetLength(I0);
         constexpr index_t A_L1 = A1BlockDesc_AL0_M_AL1{}.GetLength(I2);
-#if(defined(__gfx12__) || defined(__gfx13__))
+#if defined(__gfx13__)
         constexpr auto A_LRow = I2;
 #else
         constexpr auto A_LRow = I1;

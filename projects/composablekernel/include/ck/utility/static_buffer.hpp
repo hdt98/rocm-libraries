@@ -4,7 +4,6 @@
 #pragma once
 
 #include "statically_indexed_array.hpp"
-#include "ck/utility/dtype_vector.hpp"
 
 namespace ck {
 
@@ -12,11 +11,12 @@ namespace ck {
 template <AddressSpaceEnum AddressSpace,
           typename T,
           index_t N,
-          bool InvalidElementUseNumericalZeroValue> // TODO remove this bool, no longer needed
-struct StaticBuffer : public StaticallyIndexedArray<T, N>
+          bool InvalidElementUseNumericalZeroValue, // TODO remove this bool, no longer needed
+          typename StaticBufferBaseArray = StaticallyIndexedArray<T, N>>
+struct StaticBuffer : public StaticBufferBaseArray
 {
     using type = T;
-    using base = StaticallyIndexedArray<T, N>;
+    using base = StaticBufferBaseArray;
 
     __host__ __device__ constexpr StaticBuffer() : base{} {}
 
@@ -72,12 +72,12 @@ template <AddressSpaceEnum AddressSpace,
           index_t NumOfVector,
           index_t ScalarPerVector,
           bool InvalidElementUseNumericalZeroValue, // TODO remove this bool, no longer needed,
+          typename BaseArray = StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>,
           typename enable_if<is_scalar_type<S>::value, bool>::type = false>
-struct StaticBufferTupleOfVector
-    : public StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>
+struct StaticBufferTupleOfVector : public BaseArray
 {
     using V    = typename vector_type<S, ScalarPerVector>::type;
-    using base = StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>;
+    using base = BaseArray;
 
     static constexpr auto s_per_v   = Number<ScalarPerVector>{};
     static constexpr auto num_of_v_ = Number<NumOfVector>{};

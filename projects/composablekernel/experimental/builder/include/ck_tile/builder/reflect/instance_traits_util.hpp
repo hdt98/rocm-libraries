@@ -208,6 +208,7 @@ constexpr std::string_view pipeline_version_name(ck::PipelineVersion ver)
     case v1: return "v1";
     case v2: return "v2";
     case v4: return "v4";
+    case v5: return "v5";
     case weight_only: return "weight_only";
     }
 }

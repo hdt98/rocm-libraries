@@ -55,6 +55,8 @@ float matrix_core_swizzle(matrix_core_swizzle_traits t,
             constexpr int BLOCK_SIZE = ck_tile::get_warp_size() * 4;
             constexpr int NPerBlock  = 256;
             constexpr int KPerBlock  = 128;
+#if 0 // OOXX Todo for enable
+#if defined(CK_TILE_USE_WMMA)
             if(ck_tile::is_gfx13_supported())
             {
                 constexpr matrix_core_inst_enum Inst = matrix_core_inst_enum::WMMA_16x16x16_F16;
@@ -96,6 +98,8 @@ float matrix_core_swizzle(matrix_core_swizzle_traits t,
                 }
             }
             else
+#endif
+#endif
             {
                 constexpr matrix_core_inst_enum Inst = matrix_core_inst_enum::MFMA_16x16x16_F16;
                 if(t.permute.compare("0,1,4,2,5,3,6") == 0)

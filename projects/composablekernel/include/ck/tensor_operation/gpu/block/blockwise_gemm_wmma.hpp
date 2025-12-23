@@ -25,7 +25,9 @@ template <index_t BlockSize,
           index_t KPerBlock,
           index_t MPerWMMA,
           index_t NPerWMMA,
+#if defined(__gfx13__)
           index_t KPerWMMA,
+#endif
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
@@ -56,14 +58,17 @@ template <index_t BlockSize,
  */
 struct BlockwiseGemmWMMA
 {
-    static constexpr auto I0    = Number<0>{};
-    static constexpr auto I1    = Number<1>{};
-    static constexpr auto I2    = Number<2>{};
-    static constexpr auto I3    = Number<3>{};
-    static constexpr auto I4    = Number<4>{};
-    static constexpr auto I5    = Number<5>{};
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+    static constexpr auto I2 = Number<2>{};
+    static constexpr auto I3 = Number<3>{};
+    static constexpr auto I4 = Number<4>{};
+    static constexpr auto I5 = Number<5>{};
+#if defined(__gfx13__)
     static constexpr auto WmmaK = Number<KPerWMMA>{};
-
+#elif defined(__gfx12__)
+    static constexpr auto WmmaK = Number<16>{};
+#endif
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
     // Hardcode of WaveSize, since current HIP Runtime(5.4.0-10984) could not return correct one.

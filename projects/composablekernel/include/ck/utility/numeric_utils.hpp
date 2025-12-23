@@ -2,6 +2,7 @@
 // // Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 #pragma once
 #include "ck/utility/data_type.hpp"
+#include "ck/utility/dtype_vector.hpp"
 
 namespace ck {
 

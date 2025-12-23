@@ -107,7 +107,7 @@ struct ThreadwiseTensorSliceTransfer_v1r3
         static_for<0, num_access, 1>{}([&](auto idx_1d) {
             constexpr auto idx_md = SpaceFillingCurve::GetIndex(idx_1d);
 
-            if constexpr(ForceAlignToUint32 && std::is_same<SrcData, DstData>::value)
+            if constexpr(ForceAlignToUint32 && is_same<SrcData, DstData>::value)
             {
                 static_assert(sizeof(uint32_t) / sizeof(SrcData) > 0);
                 constexpr index_t SrcScalarPerUint32 = sizeof(uint32_t) / sizeof(SrcData);
@@ -391,7 +391,7 @@ struct ThreadwiseTensorSliceTransfer_v2
                 }
             }();
             // copy data from src_vector into dst_buf
-            if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value &&
+            if constexpr(InvalidElementAsNaN == false && is_same<SrcData, DstData>::value &&
                          go_fast_copy == true)
             {
                 if constexpr(ForceAlignToUint32)
@@ -2303,7 +2303,7 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic
                 constexpr auto idx_md = SpaceFillingCurve::GetIndex(idx_1d);
 
                 // copy data from src_buf into dst_vector
-                if constexpr(std::is_same<SrcData, DstData>::value)
+                if constexpr(is_same<SrcData, DstData>::value)
                 {
                     using src_vector_t =
                         typename vector_type_maker<SrcData, DstScalarPerVector>::type::type;

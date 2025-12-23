@@ -229,7 +229,7 @@ struct MultiplyAddImpl
     __host__ __device__ void operator()(E& e, const C& c, const D0& d0, const D1& d1) const
     {
         float tmp = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
-        if constexpr(Clamp && std::is_integral<E>::value && (is_same_v<E, bhalf_t> == false))
+        if constexpr(Clamp && is_integral<E>::value && (is_same_v<E, bhalf_t> == false))
         {
             float tmp_clamp = math::clamp(tmp,
                                           ck::type_convert<float>(NumericLimits<E>::Min()),

@@ -17,17 +17,6 @@
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_wavegroup_v1.hpp"
 
 namespace ck {
-
-enum struct PipelineVersion
-{
-    v1,
-    v2,
-    // v3 is only used in the Stream-K implementation.
-    v4,
-    v5, // this is added for gfx13 for asynchronous memory copy
-    weight_only,
-};
-
 template <PipelineVersion PipelineVer,
           index_t NumPrefetch          = 1,
           LoopScheduler LoopSched      = LoopScheduler::Default,
@@ -108,19 +97,3 @@ constexpr auto GridwiseGemmPipeline_Selector()
 }
 
 } // namespace ck
-
-#if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
-inline std::ostream& operator<<(std::ostream& os, const ck::PipelineVersion& p)
-{
-    switch(p)
-    {
-    case ck::PipelineVersion::v1: os << "PipelineVersion::v1"; break;
-    case ck::PipelineVersion::v2: os << "PipelineVersion::v2"; break;
-    case ck::PipelineVersion::v4: os << "PipelineVersion::v4"; break;
-    case ck::PipelineVersion::v5: os << "PipelineVersion::v5"; break;
-    case ck::PipelineVersion::weight_only: os << "PipelineVersion::weight_only"; break;
-    default: os << "";
-    }
-    return os;
-}
-#endif

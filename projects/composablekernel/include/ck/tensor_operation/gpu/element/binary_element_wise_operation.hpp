@@ -225,7 +225,7 @@ struct ScaleAddImpl
     __host__ __device__ constexpr void operator()(Y& y, const X0& x0, const X1& x1) const
     {
         float y_0 = scale_ * ck::type_convert<float>(x0) + ck::type_convert<float>(x1);
-        if constexpr(Clamp && std::is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
+        if constexpr(Clamp && is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
         {
             float y_1 = math::clamp(y_0,
                                     ck::type_convert<float>(NumericLimits<Y>::Min()),

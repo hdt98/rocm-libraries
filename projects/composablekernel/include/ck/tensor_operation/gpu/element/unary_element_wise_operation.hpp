@@ -692,7 +692,7 @@ struct ScaleImpl
     {
         float y_0 = type_convert<float>(x) * scale_;
         // TODO: replace bhalf with native type and remove the addtional check.
-        if constexpr(Clamp && std::is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
+        if constexpr(Clamp && ck::is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
         {
             float y_1 = math::clamp(y_0,
                                     ck::type_convert<float>(NumericLimits<Y>::Min()),
