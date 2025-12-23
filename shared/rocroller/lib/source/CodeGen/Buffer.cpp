@@ -54,7 +54,7 @@ namespace rocRoller
                         ShowValue(exprVarType));
 
             bufferExpr = BufferDescriptor::SetSize(
-                bufferExpr, Expression::literal(2147483548u, DataType::UInt32), ctx);
+                bufferExpr, Expression::literal(2147483548ull, DataType::UInt64), ctx);
             bufferExpr = BufferDescriptor::SetOptions(bufferExpr, GetDefaultOptions(ctx));
             return bufferExpr;
         }
@@ -85,7 +85,8 @@ namespace rocRoller
             return bfc(addressExpr, bufferExpr, 0, 0, 64);
         }
 
-        ExpressionPtr GetBasePointer(ExpressionPtr bufferExpr)
+        ExpressionPtr
+            GetBasePointer(ExpressionPtr bufferExpr, ExpressionPtr valueExpr, ContextPtr ctx)
         {
             AssertFatal(bufferExpr, "Buffer expression cannot be null.");
             auto exprVarType = resultVariableType(bufferExpr);
@@ -93,6 +94,13 @@ namespace rocRoller
                         "Buffer expression must be of buffer pointer type. ",
                         ShowValue(exprVarType));
 
+            if(ctx->targetArchitecture().HasCapability(
+                   GPUCapability::HasBufferFormatSpecInSOffsetField))
+            {
+                // s1[24:0] s0[31:0] 57-bit Base byte address.
+                auto basePointer = bfe(DataType::UInt64, bufferExpr, 0, 57);
+                return bfc(basePointer + valueExpr, bufferExpr, 0, 0, 57);
+            }
             return bfe(DataType::UInt64, bufferExpr, 0, 64);
         }
 
@@ -128,6 +136,11 @@ namespace rocRoller
             if(ctx->targetArchitecture().HasCapability(
                    GPUCapability::HasBufferFormatSpecInSOffsetField))
             {
+                // Ensure type is valid
+                auto sizeExprType = resultVariableType(sizeExpr);
+                if(DataTypeInfo::Get(sizeExprType).elementBits < 64)
+                    sizeExpr = Expression::convert(DataType::UInt64, sizeExpr);
+
                 // s3[5:0] s2[31:0] s1[31:25] 45-bit numRecords
                 return bfc(sizeExpr, bufferExpr, 0, 57, 45);
             }
