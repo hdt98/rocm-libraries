@@ -172,12 +172,6 @@ namespace
                     name << "_APIAlgoIndex";
                 else if(arg.algo_method == 1)
                     name << "_APIFindAllAlgo";
-                if(arg.api_method == Arguments::ApiMethod::MIX_API)
-                    name << "_MixAPI";
-                else if(arg.api_method == Arguments::ApiMethod::CPP_API)
-                    name << "_CppAPI";
-                else
-                    name << "_CAPI";
                 if(arg.use_user_args)
                     name << "_UserArgs";
                 if(arg.gsu_vector[0])
