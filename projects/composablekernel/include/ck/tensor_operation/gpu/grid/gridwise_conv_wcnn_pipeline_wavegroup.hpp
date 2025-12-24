@@ -148,6 +148,8 @@ struct GridwiseConvPipeline_v2
         semaDataLdsFree.init(0, 1, true);
         semaAccumReady.init();
         semaAccumFree.init(0, 1, true);
+        semFromNext.init();
+        semFromPrev.init();
 
         auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
 
@@ -669,6 +671,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
         semaDataFree.init(0, 1, true);
         semaAccumReady.init();
         semaAccumFree.init(0, 1, true);
+        semFromNext.init();
+        semFromPrev.init();
 
         auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
         // wait semaphore init
