@@ -1275,7 +1275,6 @@ struct UniversalGemmKernel
             // allocate LDS
             __shared__ char smem_ptr[GetSmemSize()];
             // Run the GEMM
-
             if constexpr(!(EpiloguePipeline::MemoryOperation == memory_operation_enum::atomic_add &&
                            EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
                            is_any_of<EDataType, fp16_t, bf16_t>::value))

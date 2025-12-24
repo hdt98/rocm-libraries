@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck/utility/common_header.hpp"
+#include "ck/host_utility/device_prop.hpp"
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -335,6 +336,29 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
             return false;
         }
 #endif
+
+#if defined(__gfx125__)
+        if constexpr(sizeof(AComputeDataType) == 1)
+        {
+            if constexpr(KPerBlock % 64)
+            {
+                return false;
+            }
+        }
+        else if constexpr(sizeof(AComputeDataType) == 2)
+        {
+            if constexpr(KPerBlock % 32)
+            {
+                return false;
+            }
+        }
+#endif
+
+        if constexpr(GetSharedMemoryNumberOfByte() > get_lds_size(get_device_arch()))
+        {
+            return false;
+        }
+
         return ck::tensor_operation::device::IsValidGemmCompilationParameter<
             BlockSize,
             MPerBlock,
@@ -417,6 +441,18 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         {
             return false;
         }
+
+#if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
+        if(!is_xdl_wmma_k_supported<AComputeDataType, KPerBlock>())
+        {
+            return false;
+        }
+
+        if(GetSharedMemoryNumberOfByte() > get_lds_size())
+        {
+            return false;
+        }
+#endif
 
         return true;
     }
