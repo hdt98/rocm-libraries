@@ -67,7 +67,7 @@ struct F16xMXF4FlatmmKernel : FlatmmKernel<TilePartitioner_, FlatmmPipeline_, Ep
             hipDeviceProp_t prop;
             int deviceId = 0; // default device
 
-            constexpr int block_size = F16xMXF4FlatmmKernel::BlockSize().x;
+            const int block_size     = F16xMXF4FlatmmKernel::BlockSize().x;
             int dync_smem_size       = 0;
             int maxActiveBlocksPerCU = 0;
 

@@ -298,7 +298,7 @@ struct FlatmmKernel
             hipDeviceProp_t prop;
             int deviceId = 0; // default device
 
-            constexpr int block_size = FlatmmKernel::BlockSize().x;
+            const int block_size     = FlatmmKernel::BlockSize().x;
             int dync_smem_size       = 0;
             int maxActiveBlocksPerCU = 0;
 
@@ -327,7 +327,17 @@ struct FlatmmKernel
         }
     }
 
-    CK_TILE_HOST static constexpr auto BlockSize() { return dim3(kBlockSize); }
+    CK_TILE_HOST static auto BlockSize()
+    {
+        if(ck_tile::is_wave32())
+        {
+            return dim3(kBlockSize / 2);
+        }
+        else
+        {
+            return dim3(kBlockSize);
+        }
+    }
 
     template <class ScaleM, class ScaleN>
     CK_TILE_HOST static constexpr FlatmmKernelArgs<ScaleM, ScaleN, DsDataType::size()>

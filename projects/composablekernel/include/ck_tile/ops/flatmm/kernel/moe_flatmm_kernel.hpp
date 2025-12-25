@@ -313,7 +313,17 @@ struct MoeFlatmmKernel
             '_', "moe_flatmm", gemm_prec_str<ADataType, BDataType>, FlatmmPipeline::GetName());
     }
 
-    static constexpr auto BlockSize() -> dim3 { return dim3(kBlockSize); }
+    static auto BlockSize() -> dim3
+    {
+        if(ck_tile::is_wave32())
+        {
+            return dim3(kBlockSize / 2);
+        }
+        else
+        {
+            return dim3(kBlockSize);
+        }
+    }
 
     static constexpr auto GridSize(index_t M, index_t N, index_t KBatch)
     {
