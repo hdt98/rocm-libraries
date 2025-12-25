@@ -393,6 +393,12 @@ label_ASM_Start:  /// Main body of the asm kernel
 .set BufferLimit, 0xffffffff
 .set BufferOOB, 0x80000000
 
+/* === Cacheline Alignment Constants === */
+.set CACHELINE_BYTES, 128
+.set CACHELINE_ELEMENTS, 64     // 128 bytes / 2 (bf16)
+.set SIZE_K, 1880               // K dimension size
+.set LDB_MOD_CACHELINE, 24      // 1880 % 64 = 24
+
 /******************************************/
 /* Bits 127:96 of SRD.                    */
 /* hex: 0x20000                           */
@@ -413,18 +419,20 @@ label_ASM_Start:  /// Main body of the asm kernel
 /******************************************/
 .set Srd127_96, 0x20000
 
-/* Global Offset A */
+/* Global Offset A - Original (for reference) */
 .macro GLOBAL_OFFSET_A vgprAddr:req, vgprOffsetL:req, vgprOffset0I:req, vgprTmp:req
     v_mul_lo_u32 v[\vgprTmp+0], s[sgprStrideA0I], v[\vgprOffset0I] // mul d1 lower
     v_add_co_u32 v[\vgprAddr+0], vcc, v[\vgprOffsetL], v[\vgprTmp+0] // accumulate K lower
+    v_add_u32 v[\vgprAddr+0], v[\vgprAddr+0], s[sgprWGOffset]
     v_add_u32 v[\vgprAddr+0], 0x8, v[\vgprAddr+0]      // add prepad for pointer shift
     v_lshlrev_b32 v[\vgprAddr+0], 1, v[\vgprAddr+0]    // offset *= bytes/element
 .endm
 
-/* Global Offset B */
+/* Global Offset B - Original (for reference) */
 .macro GLOBAL_OFFSET_B vgprAddr:req, vgprOffsetL:req, vgprOffset1J:req, vgprTmp:req
     v_mul_lo_u32 v[\vgprTmp+0], s[sgprStrideB1J], v[\vgprOffset1J] // mul d1 lower
     v_add_co_u32 v[\vgprAddr+0], vcc, v[\vgprOffsetL], v[\vgprTmp+0] // accumulate K lower
+    v_add_u32 v[\vgprAddr+0], v[\vgprAddr+0], s[sgprWGOffset]
     v_add_u32 v[\vgprAddr+0], 0x8, v[\vgprAddr+0]      // add prepad for pointer shift
     v_lshlrev_b32 v[\vgprAddr+0], 1, v[\vgprAddr+0]    // offset *= bytes/element
 .endm
@@ -1302,6 +1310,36 @@ s_add_u32 s[sgprSrdB+0], s[sgprAddressB+0], s14    // SRD base = Address+ tileSt
 s_addc_u32 s[sgprSrdB+1], s[sgprAddressB+1], s15   // SRD base = Address+ tileStart1
 s_mov_b32 s[sgprSrdB+3], Srd127_96                 // Set bits 127_96 in SRD
 
+/* === Compute WorkGroup Cacheline Offset === */
+/* Check if s[sgprStrideB1J] % CACHELINE_ELEMENTS == 0, if so set sgprWGOffset=0 and skip calculation */
+.set sgprWGOffset, 88  // Use unused sgpr register (s81 is used later)
+.set sgprSizeK_Const, 82  // Reuse for SIZE_K constant
+
+// Calculate s[sgprStrideB1J] % CACHELINE_ELEMENTS using bitwise AND (CACHELINE_ELEMENTS = 64 = 2^6)
+s_and_b32 s84, s[sgprStrideB1J], (CACHELINE_ELEMENTS-1)  // s84 = s[sgprStrideB1J] % 64 (using & 63)
+
+// Check if remainder == 0
+s_cmp_eq_u32 s84, 0                                // Compare remainder with 0
+s_cbranch_scc1 label_skip_WGO                      // If remainder == 0, skip WGOffset calculation
+
+/* B matrix J_start = WG1 * 1 (from line 1328-1329) */
+/* offset = (WG1 * ldb) % CACHELINE_ELEMENTS = (WG1 * 1880) % 64 */
+s_mul_i32 s83, s[sgprWorkGroup1], LDB_MOD_CACHELINE  // s83 = WG1 * 24
+s_and_b32 s[sgprWGOffset], s83, (CACHELINE_ELEMENTS-1)  // s88 = (WG1*24) % 64
+s_sub_u32 s[sgprWGOffset], 64, s[sgprWGOffset]
+s_cmp_eq_u32 s[sgprWGOffset], 64 
+s_cselect_b32 s[sgprWGOffset], 0, s[sgprWGOffset]
+s_mov_b32 s[sgprSizeK_Const], SIZE_K               // s82 = SIZE_K = 1880
+/* sgprWGOffset now contains the cacheline offset for this WorkGroup */
+s_branch label_after_WGO                           // Jump past skip label after calculation
+
+label_skip_WGO:
+// If s[sgprStrideB1J] % CACHELINE_ELEMENTS == 0, set sgprWGOffset=0
+s_mov_b32 s[sgprWGOffset], 0                       // Set to 0 when skipping calculation
+s_mov_b32 s[sgprSizeK_Const], SIZE_K               // s82 = SIZE_K = 1880 (also set this when skipping)
+
+label_after_WGO:
+label_jzhou:
 /* global read addresses: final offsets a */
 /* ============================================================= */
 GLOBAL_OFFSET_A vgprGlobalReadOffsetA+0, 50, 30, 52 // gROA_0_0_0_0
@@ -1343,6 +1381,7 @@ s_mov_b32 s[sgprLoopCounterL], 0                   // Skip iterations
 label_SKAlphaCheck2:
 s_and_b32 s13, 127, s[sgprSizesSum+0]              // s13 = s[sgprSizesSum+0] % 128
 s_cmp_eq_u32 s13, 0                                // numIterL == 0
+
 s_cselect_b32 s12, 0, 1                            // check if size uses tail loop
 s_cmp_eq_u32 s[sgprStreamKLocalEnd], s[sgprItersPerTile] // Check if WG processes final iteration of tile
 s_cselect_b32 s12, s12, 0                          // this WG runs tail loop
@@ -2941,6 +2980,7 @@ s_cmov_b32 s[sgprLoopCounterL], 0                  // This WG not completing til
 s_cmp_eq_u32 s[sgprLoopCounterL], 0                // numIterL == 0
 s_mov_b32 s[sgprOrigLoopCounter], 0                // repurpose to count each localRead increment
 s_cbranch_scc1 label_SkipTailLoopL                 // skip to end of tail loop b/c numIter==0
+//s_branch label_SkipTailLoopL
 
 /* remove stagger offsets for tail loop */
 s_sub_i32 s82, 3, s[sgprStaggerUIter]
@@ -2961,11 +3001,16 @@ label_MultiplyDone_DLSAQLEVYLOBCPNL:
 s_sub_u32 s82, s82, s[sgprWrapUA]                  // S - WrapU
 s_subb_u32 s83, s83, s[sgprWrapUA+1]               // S - WrapU
 s_add_u32 s[sgprSrdA+0], s[sgprSrdA+0], s82        // gra SRD += inc(lower)
+//s_sub_u32  s[sgprSrdA+0], s[sgprSrdA+0], 3760
+s_sub_u32 s[sgprSrdA+0], s[sgprSrdA+0], 3584    //14*128
+
 s_addc_u32 s[sgprSrdA+1], s[sgprSrdA+1], s83       // gra SRD += inc(upper)
 s_sub_u32 s[sgprShadowLimitA+0], s[sgprShadowLimitA+0], s82 // limit -= inc)
 s_subb_u32 s[sgprShadowLimitA+1], s[sgprShadowLimitA+1], s83 // limit -= inc)
 s_cmp_eq_u32 s[sgprShadowLimitA+1], 0              // are we within 2^32?
 s_cselect_b32 s[sgprSrdA+2], s[sgprShadowLimitA+0], BufferLimit // Move shadow to real if we are within 2^32
+s_add_u32 s[sgprSrdA+2], s[sgprSrdA+2], 3584    //14*128
+
 s_sub_i32 s82, 3, s[sgprStaggerUIter]
 s_cmp_ge_i32 s82, 0
 s_cbranch_scc0 label_Negative_LQI6BOBE0EY8XIP1
@@ -2984,11 +3029,96 @@ label_MultiplyDone_9N1QELR2XL4Z0HRB:
 s_sub_u32 s82, s82, s[sgprWrapUB]                  // S - WrapU
 s_subb_u32 s83, s83, s[sgprWrapUB+1]               // S - WrapU
 s_add_u32 s[sgprSrdB+0], s[sgprSrdB+0], s82        // gra SRD += inc(lower)
+s_sub_u32 s[sgprSrdB+0], s[sgprSrdB+0], 3584    //14*128
+
 s_addc_u32 s[sgprSrdB+1], s[sgprSrdB+1], s83       // gra SRD += inc(upper)
 s_sub_u32 s[sgprShadowLimitB+0], s[sgprShadowLimitB+0], s82 // limit -= inc)
 s_subb_u32 s[sgprShadowLimitB+1], s[sgprShadowLimitB+1], s83 // limit -= inc)
 s_cmp_eq_u32 s[sgprShadowLimitB+1], 0              // are we within 2^32?
 s_cselect_b32 s[sgprSrdB+2], s[sgprShadowLimitB+0], BufferLimit // Move shadow to real if we are within 2^32
+s_add_u32 s[sgprSrdB+2], s[sgprSrdB+2], 3584    //14*128
+
+// Macro: Check and conditionally modify GlobalReadOffsetA for circular buffer wraparound
+// Purpose: Implements circular buffer access by checking if offset needs wraparound adjustment
+// Condition: if (LoopCounterL * 2 < (GlobalReadOffsetA % 3760)), then set offset to special value
+// Parameters:
+//   offset_reg  - register offset for vgprGlobalReadOffsetA/B
+//   tmp_sgpr    - temporary scalar register
+//   tmp_vgpr    - temporary vector register (uses tmp_vgpr, tmp_vgpr+1, tmp_vgpr+2, tmp_vgpr+3)
+.macro CHECK_AND_SET_OFFSET_MOD offset_reg, tmp_sgpr, tmp_vgpr
+    // Step 1: Calculate n = sgprLoopCounterL / 8
+    s_lshr_b32 s[\tmp_sgpr], s[sgprLoopCounterL], 3                 // n = LoopCounterL >> 3 (divide by 8)
+    
+    // Step 2: Get lane index = vgprSerial % 16
+    v_and_b32 v[\tmp_vgpr], 0x0F, v[vgprSerial]                    // lane = Serial & 0x0F (mod 16)
+    
+    // Step 3: Identify first n lanes and set others to s[sgprSrdB+2]+1
+    v_mov_b32 v[\tmp_vgpr+1], s[\tmp_sgpr]                         // Move n to vector register
+    v_cmp_lt_u32 vcc, v[\tmp_vgpr], v[\tmp_vgpr+1]                 // vcc = (lane < n)
+    
+    // Set lanes beyond n to s[sgprSrdB+2]+1
+    s_add_u32 s[\tmp_sgpr+1], s[sgprSrdB+2], 1                     // Compute s[sgprSrdB+2]+1
+    v_mov_b32 v[\tmp_vgpr+2], s[\tmp_sgpr+1]                       // Move to vector register
+    v_cndmask_b32 v[\offset_reg], v[\tmp_vgpr+2], v[\offset_reg], vcc  // Keep first n lanes, set others
+    
+    // Step 4: In the first n lanes, select lanes [n-m, n) and subtract 3760
+    // Calculate m = sgprWGOffset / 8
+    s_lshr_b32 s[\tmp_sgpr+2], s[sgprWGOffset], 3                  // m = WGOffset >> 3 (divide by 8)
+    
+    // Calculate n - m (lower bound for selected lanes)
+    s_sub_u32 s[\tmp_sgpr+3], s[\tmp_sgpr], s[\tmp_sgpr+2]         // n - m
+    v_mov_b32 v[\tmp_vgpr+3], s[\tmp_sgpr+3]                       // Move (n - m) to vector register
+    
+    // Set vcc for lanes in range [n-m, n): lane_index >= (n-m) AND lane_index < n
+    v_cmp_ge_u32 vcc, v[\tmp_vgpr], v[\tmp_vgpr+3]                 // lane_index >= (n - m)
+    v_cmp_lt_u32 s[60:61], v[\tmp_vgpr], v[\tmp_vgpr+1]            // lane_index < n
+    s_and_b64 vcc, vcc, s[60:61]                                   // vcc = (lane >= n-m) AND (lane < n)
+    
+   // Load constant 3584 and calculate offset + 3584
+    s_mov_b32 s[\tmp_sgpr+4], 3584                                 // Load constant 3584
+    v_mov_b32 v[\tmp_vgpr+4], s[\tmp_sgpr+4]                       // Move to vector register
+    v_add_u32 v[\tmp_vgpr+5], v[\offset_reg], v[\tmp_vgpr+4]        // offset + 3584
+    // Apply subtraction of 3584 to selected lanes using vcc
+    v_cndmask_b32 v[\offset_reg],   v[\tmp_vgpr+5], v[\offset_reg],  vcc  // Subtract 3584 from lanes [n-m, n)
+
+    // Calculate (n - m ) * 16
+    s_lshl_b32 s[\tmp_sgpr+3], s[\tmp_sgpr+3], 4                  // (n - m ) * 16 (left shift by 4)
+    s_add_u32 s[\tmp_sgpr+3], s[\tmp_sgpr+3], s[sgprWGOffset]    //  2 x  s[sgprWGOffset] 
+    s_add_u32 s[\tmp_sgpr+3], s[\tmp_sgpr+3], s[sgprWGOffset]
+
+    v_mov_b32 v[\tmp_vgpr+4], s[\tmp_sgpr+3]                       // Move ((n - m + 1) * 16) to vector register
+    
+    // Calculate offset - ((n - m + 1) * 16)
+    v_sub_u32 v[\tmp_vgpr+5], v[\offset_reg], v[\tmp_vgpr+4]       // offset - ((n - m + 1) * 16) -  2 x  s[sgprWGOffset] 
+
+    // Apply subtraction to selected lanes using vcc: if vcc==1, use subtracted value
+    v_cndmask_b32 v[\offset_reg], v[\offset_reg],v[\tmp_vgpr+5],  vcc  // if vcc==1, v[offset_reg] - ((n - m + 1) * 16)
+.endm 
+
+
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 0, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 1, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 2, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 3, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 4, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 5, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 6, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetA + 7, 80, 38
+
+/* Check and set GlobalReadOffsetB */
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 0, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 1, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 2, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 3, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 4, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 5, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 6, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 7, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 8, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 9, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 10, 80, 38
+CHECK_AND_SET_OFFSET_MOD vgprGlobalReadOffsetB + 11, 80, 38
+
 
 /* Update M0 for DTLDS */
 
@@ -4280,6 +4410,7 @@ v_add_co_u32 v[vgprLocalReadAddrA+0], vcc, s74, v[vgprLocalReadAddrA+0] // lrA +
                                                    // inc (dup assign opt.)
 v_add_co_u32 v[vgprLocalReadAddrB+0], vcc, s74, v[vgprLocalReadAddrB+0] // lrB += 64 (bpeDS)
 s_waitcnt lgkmcnt(0)                               // 4wait for local read
+s_branch label_TailLoop_SkipZeroOutMask_DZOUDPYJU2HHRCOQ
 v_and_b32 v112, 63, v[vgprSerial]                  // v112 = v[vgprSerial] % 64
 v_lshrrev_b32 v112, 4, v112                        // 112 = 112 / 16
 v_lshlrev_b32 v112, 3, v112                        // v112 = v112 * 8
