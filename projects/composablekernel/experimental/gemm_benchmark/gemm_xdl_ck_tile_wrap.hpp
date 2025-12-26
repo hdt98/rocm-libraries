@@ -185,6 +185,7 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
         static constexpr bool DoubleSmemBuffer =
             Pipeline == ck_tile::GemmPipeline::COMPUTE_V4 ||
             Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC ||
+            Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC_V2 ||
             Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
             Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V2;
 
@@ -219,7 +220,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
         else if constexpr((PipelineVer == ck_tile::GemmPipeline::BASIC_V2) ||
                           (PipelineVer == ck_tile::GemmPipeline::COMPUTE_V3) ||
                           (PipelineVer == ck_tile::GemmPipeline::MEMORY) ||
-                          (PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC))
+                          (PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC) ||
+                          (PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC_V2))
         {
             return 2 * (AVgprSize + BVgprSize) + AccVgprSize;
         }
@@ -247,6 +249,7 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
             NPerBlock * KPerBlock * sizeof(ComputeDataType) / GetPackedSize<ComputeDataType>();
         if constexpr(PipelineVer == ck_tile::GemmPipeline::COMPUTE_V4 ||
                      PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC ||
+                     PipelineVer == ck_tile::GemmPipeline::COMPUTE_ASYNC_V2 ||
                      PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
                      PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V2)
         {
@@ -293,6 +296,7 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
         if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_V4 ||
                      GemmConfig::Pipeline == ck_tile::GemmPipeline::MEMORY ||
                      GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC ||
+                     GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC_V2 ||
                      GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V2 ||
                      GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V1)
         {
@@ -499,7 +503,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public DeviceGemmV2<ALayoutCk,
             {ck_tile::GemmPipeline::BASIC_V2, "BASIC_V2"},
             {ck_tile::GemmPipeline::PRESHUFFLE_V2, "PRESHUFFLE_V2"},
             {ck_tile::GemmPipeline::COMPUTE_TDM_V1, "COMPUTE_TDM_V1"},
-            {ck_tile::GemmPipeline::COMPUTE_TDM_V2, "COMPUTE_TDM_V2"}};
+            {ck_tile::GemmPipeline::COMPUTE_TDM_V2, "COMPUTE_TDM_V2"},
+            {ck_tile::GemmPipeline::COMPUTE_ASYNC_V2, "COMPUTE_ASYNC_V2"}};
 
         auto str = std::stringstream();
         // clang-format off

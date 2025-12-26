@@ -27,14 +27,14 @@ using DeviceGemmV2Instance = ck::tensor_operation::device::DeviceGemm_Xdl_CkTile
     ADataType, BDataType, CDataType, AccDataType, CShuffleDataType,
     AElementOp, BElementOp, CElementOp,
     GemmDefault,
-    64, 64, 64,                                      // M/N/K PerBlock
+    256, 256, 64,                                      // M/N/K PerBlock
     16, 16, get_k_warp_tile<ck_tile::fp16_t, 16>(),  // M/N/K PerXDL
     2, 2, 1, 1,                                        // M/N/K Warp
     ADataType,
     1,
     1,
     ck_tile::GemmPipelineScheduler::Intrawave,
-    ck_tile::GemmPipeline::COMPUTE_ASYNC>;
+    ck_tile::GemmPipeline::COMPUTE_ASYNC_V2>;
 // clang-format on
 
 using ReferenceGemmInstance = ck::tensor_operation::host::

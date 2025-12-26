@@ -26,6 +26,10 @@
 #include "ck/library/reference_tensor_operation/cpu/reference_gemm.hpp"
 #include "ck/library/reference_tensor_operation/gpu/reference_gemm.hpp"
 
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 struct ProblemSize final
 {
     ck::index_t M = 3840;
