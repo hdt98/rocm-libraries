@@ -36,7 +36,8 @@ auto calculate_rtol_atol(const ck_tile::index_t K,
 
 enum struct GemmPipelineType
 {
-    WeightPreshuffleV2
+    WeightPreshuffleV2,
+    WeightPreshuffleTDM
 };
 
 template <GemmPipelineType PT, typename Problem>
@@ -49,6 +50,15 @@ struct GemmPipelineTypeSelector<GemmPipelineType::WeightPreshuffleV2, Problem>
     using pipeline      = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegV2<Problem>;
 
     static constexpr auto GetName() { return "GemmPipelineAgBgCrWeightPreshuffleV2"; }
+};
+
+template <typename Problem>
+struct GemmPipelineTypeSelector<GemmPipelineType::WeightPreshuffleTDM, Problem>
+{
+    using base_pipeline = ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegTDM<Problem>;
+    using pipeline      = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegTDM<Problem>;
+
+    static constexpr auto GetName() { return "GemmPipelineAgBgCrWeightPreshuffleTDM"; }
 };
 
 template <typename Datatype>
@@ -113,8 +123,7 @@ class TestCkTileGemmPipeline : public ::testing::Test
         constexpr bool kPadK      = PadK;
         constexpr bool preshuffle = Preshuffle;
 
-        constexpr bool DoubleSmemBuffer =
-            (PipelineType == GemmPipelineType::WeightPreshuffleV2) ? true : false;
+        constexpr bool DoubleSmemBuffer = true;
 
         // TODO: For now - but this should also be a test parameter
         constexpr bool TransposeC = false;

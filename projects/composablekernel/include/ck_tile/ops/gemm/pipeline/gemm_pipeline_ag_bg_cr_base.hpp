@@ -79,12 +79,17 @@ struct GemmPipelineAgBgCrImplBase
 
     CK_TILE_HOST_DEVICE static constexpr auto TransposeC() { return Problem::TransposeC; }
 
-    template <typename DstBlockTile, typename SrcTileWindow, typename DramTileWindowStep>
+    template <typename SrcDataType = void,
+              typename DstDataType = void,
+              index_t UnaryOpSize  = 8,
+              typename DstBlockTile,
+              typename SrcTileWindow,
+              typename DramTileWindowStep>
     CK_TILE_DEVICE void GlobalPrefetch(DstBlockTile& dst_block_tile,
                                        SrcTileWindow& dram_tile_window,
                                        const DramTileWindowStep& dram_tile_window_step) const
     {
-        load_tile(dst_block_tile, dram_tile_window);
+        load_int4_tile<SrcDataType, DstDataType, UnaryOpSize>(dst_block_tile, dram_tile_window);
         move_tile_window(dram_tile_window, dram_tile_window_step);
     }
 

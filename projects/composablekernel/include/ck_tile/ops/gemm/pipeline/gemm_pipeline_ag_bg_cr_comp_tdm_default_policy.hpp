@@ -4,7 +4,6 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/gemm/pipeline/tile_gemm_shape.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
@@ -242,18 +241,6 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
 
             return b_lds_block_desc;
         }
-    }
-
-    template <typename Problem>
-    CK_TILE_HOST_DEVICE static constexpr bool isClusterLaunch()
-    {
-        constexpr index_t clusterM = Problem::BlockGemmShape::kclusterM;
-        constexpr index_t clusterN = Problem::BlockGemmShape::kclusterN;
-        constexpr index_t clusterK = Problem::BlockGemmShape::kclusterK;
-        // cluster launch is enabled only when TilePartitioner uses cluster tile gemm shape and
-        // cluster size > 1
-        return is_cluster_tile_gemm_shape<typename Problem::BlockGemmShape>::value &&
-               (clusterM * clusterN * clusterK > 1);
     }
 
     template <MultiCastDirection Direction, typename Problem>

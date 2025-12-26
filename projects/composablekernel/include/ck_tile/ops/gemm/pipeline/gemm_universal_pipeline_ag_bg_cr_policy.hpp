@@ -6,6 +6,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm/block/block_gemm_asmem_bsmem_creg_v1_custom_policy.hpp"
 #include "ck_tile/ops/gemm/block/block_universal_gemm_as_bs_cr.hpp"
+#include "ck_tile/ops/gemm/pipeline/tile_gemm_shape.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 
@@ -1125,6 +1126,18 @@ struct UniversalGemmBasePolicy
                 return b_lds_block_desc;
             }
         }
+    }
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr bool isClusterLaunch()
+    {
+        constexpr index_t clusterM = Problem::BlockGemmShape::kclusterM;
+        constexpr index_t clusterN = Problem::BlockGemmShape::kclusterN;
+        constexpr index_t clusterK = Problem::BlockGemmShape::kclusterK;
+        // cluster launch is enabled only when TilePartitioner uses cluster tile gemm shape and
+        // cluster size > 1
+        return is_cluster_tile_gemm_shape<typename Problem::BlockGemmShape>::value &&
+               (clusterM * clusterN * clusterK > 1);
     }
 };
 
