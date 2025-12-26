@@ -10,28 +10,24 @@
 #include "ck/utility/functional.hpp"
 #include "ck/utility/type.hpp"
 
-#ifdef CK_USE_FNUZ_FP8
-#define CK_USE_FNUZ_FP8 1
-#else
+#ifndef CK_USE_FNUZ_FP8
 #define CK_USE_FNUZ_FP8 0
 #endif
 
-#ifdef CK_USE_OCP_FP8
-#define CK_USE_OCP_FP8 1
-#else
+#ifndef CK_USE_OCP_FP8
 #define CK_USE_OCP_FP8 0
 #endif
 
-#if(defined(__gfx942__) || defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx950__) || \
-    defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__)) &&                      \
+#if(defined(__gfx942__) || defined(__gfx950__) || defined(__gfx12__) || defined(__gfx1310__) || \
+    defined(__gfx1370__) || defined(__gfx130F__)) &&                                            \
     __HIP_DEVICE_COMPILE__
 #define CK_FP8_CVT_FAST_PATH 1
 #else
 #define CK_FP8_CVT_FAST_PATH 0
 #endif
 
-#if(defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx950__) || defined(__gfx1310__) || \
-    defined(__gfx1370__) || defined(__gfx130F__)) &&                                               \
+#if(defined(__gfx950__) || defined(__gfx12__) || defined(__gfx1310__) || defined(__gfx1370__) || \
+    defined(__gfx130F__)) &&                                                                     \
     __HIP_DEVICE_COMPILE__
 #define CK_OCP_FP8_CVT_FAST_PATH 1
 #else
@@ -40,8 +36,34 @@
 
 namespace ck {
 
-using f8_fnuz_t  = _BitInt(8);
-using bf8_fnuz_t = unsigned _BitInt(8);
+struct f8_fnuz_t
+{
+    using data_type  = unsigned char;
+    data_type m_data = data_type{};
+    __host__ __device__ explicit constexpr f8_fnuz_t(data_type in_data) : m_data(in_data) {}
+    __host__ __device__ explicit constexpr f8_fnuz_t() = default;
+    __host__ __device__ bool constexpr operator==(f8_fnuz_t other) const
+    {
+        return m_data == other.m_data;
+    }
+    __host__ __device__ explicit constexpr operator data_type() const { return m_data; }
+};
+
+struct bf8_fnuz_t
+{
+    using data_type  = unsigned char;
+    data_type m_data = data_type{};
+    __host__ __device__ explicit constexpr bf8_fnuz_t(data_type in_data) : m_data(in_data) {}
+    __host__ __device__ explicit constexpr bf8_fnuz_t() = default;
+    __host__ __device__ bool constexpr operator==(bf8_fnuz_t other) const
+    {
+        return m_data == other.m_data;
+    }
+    __host__ __device__ explicit constexpr operator data_type() const { return m_data; }
+};
+
+static_assert(1 == sizeof(f8_fnuz_t));
+static_assert(1 == sizeof(bf8_fnuz_t));
 
 typedef unsigned char fp8_storage_t;
 
@@ -404,8 +426,8 @@ struct bf8_ocp_t
     __host__ explicit operator float() const
 #endif
     {
-#if defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1310__) || \
-    defined(__gfx1370__) || defined(__gfx130F__)
+#if defined(__gfx950__) || defined(__gfx12__) || defined(__gfx1310__) || defined(__gfx1370__) || \
+    defined(__gfx130F__)
         return fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data);
 #else
         return fp8_impl::cast_from_f8<float, wm, we, false>(
@@ -419,7 +441,7 @@ struct bf8_ocp_t
     __host__ explicit operator _Float16() const
 #endif
     {
-#if defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__)
+#if defined(__gfx950__) || defined(__gfx12__)
         return static_cast<_Float16>(fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data));
 #elif defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__)
         return fp8_impl::cast_to_f16_from_f8<default_interpret>(this->data);
@@ -471,7 +493,7 @@ __host__ __device__ inline constexpr bool fp8_is_inf(bf8_ocp_t a)
 namespace fp8_impl {
 
 // Assertions to check for supported conversion types
-#define __assert_ocp_support(interp)                                               \
+#define __fp8_impl_assert_ocp_support(interp)                                      \
     {                                                                              \
         if(interp != ck_fp8_interpretation_t::CK_E4M3_OCP &&                       \
            interp != ck_fp8_interpretation_t::CK_E5M2_OCP)                         \
@@ -479,7 +501,7 @@ namespace fp8_impl {
             __hip_assert(false && "type is unsupported by current target device"); \
         }                                                                          \
     }
-#define __assert_fnuz_support(interp)                                              \
+#define __fp8_impl_assert_fnuz_support(interp)                                     \
     {                                                                              \
         if(interp != ck_fp8_interpretation_t::CK_E4M3_FNUZ &&                      \
            interp != ck_fp8_interpretation_t::CK_E5M2_FNUZ)                        \
@@ -493,10 +515,10 @@ __is_interpret_supported([[maybe_unused]] ck_fp8_interpretation_t interp)
 {
 #if defined(__HIP_DEVICE_COMPILE__) && __HIP_DEVICE_COMPILE__
 #if CK_USE_OCP_FP8
-    __assert_ocp_support(interp);
+    __fp8_impl_assert_ocp_support(interp);
 #endif
 #if CK_USE_FNUZ_FP8
-    __assert_fnuz_support(interp);
+    __fp8_impl_assert_fnuz_support(interp);
 #endif
 #endif
 }
@@ -646,7 +668,7 @@ static __device__ fp8x2_storage_t cast_to_f8_from_f16(half2_t v, unsigned int rn
     } val;
 
     constexpr shortx2_t i16x2val = {0, 0};
-    val.half_vec = v;
+    val.half_vec                 = v;
 
     if constexpr(saturate)
     {
@@ -723,7 +745,7 @@ static __device__ fp8x2_storage_t cast_to_f8_from_f16(half2_t v, unsigned int rn
     } val;
 
     constexpr shortx2_t i16x2val = {0, 0};
-    val.half_vec = v;
+    val.half_vec                 = v;
 
     if constexpr(saturate)
     {
@@ -897,7 +919,7 @@ static __device__ fp8x2_storage_t cast_to_f8_from_bf16(ushortx2_t v, unsigned in
     } val;
 
     constexpr shortx2_t i16x2val = {0, 0};
-    val.bhalf_vec = v;
+    val.bhalf_vec                = v;
 
     if constexpr(saturate)
     {
@@ -1534,7 +1556,7 @@ __host__ static inline fp8_storage_t cvt_float_to_fp8(const float f)
 #else
         constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
-        rng                = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&f), f);
+        rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&f), f);
 #else
         rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&f), f);
 #endif // #ifndef CK_CODE_GEN_RTC
@@ -1835,7 +1857,7 @@ __host__ static inline fp8x2_storage_t cvt_bhalf_t_to_fp8(const bf16x2_t x)
  * \return fp8_storage_t
  */
 template <ck_fp8_interpretation_t interp,
-          ck_saturation_t sat = ck_saturation_t::CK_SATFINITE,
+          ck_saturation_t sat      = ck_saturation_t::CK_SATFINITE,
           bool stochastic_rounding = false>
 #if CK_FP8_CVT_FAST_PATH || CK_USE_OCP_FP8
 __host__ __device__ static inline fp8_storage_t cvt_bhalf_t_to_fp8(const ushort x)
@@ -1855,7 +1877,7 @@ __host__ static inline fp8_storage_t cvt_bhalf_t_to_fp8(const ushort x)
 #else
             constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
-            rng                = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x),
+            rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x),
                                                static_cast<float>(x));
 #else
             rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), static_cast<float>(x));
@@ -1884,7 +1906,7 @@ __host__ static inline fp8_storage_t cvt_bhalf_t_to_fp8(const ushort x)
  * \return fp8x2_storage_t
  */
 template <ck_fp8_interpretation_t interp,
-          ck_saturation_t sat = ck_saturation_t::CK_SATFINITE,
+          ck_saturation_t sat      = ck_saturation_t::CK_SATFINITE,
           bool stochastic_rounding = false>
 #if CK_FP8_CVT_FAST_PATH || CK_USE_OCP_FP8
 __host__ __device__ static inline fp8x2_storage_t cvt_bhalf_t_to_fp8(const ushortx2_t x)
@@ -1909,7 +1931,7 @@ __host__ static inline fp8x2_storage_t cvt_bhalf_t_to_fp8(const ushortx2_t x)
 #else
             constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
-            rng                = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x),
+            rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x),
                                                static_cast<float>(x[0]));
 #else
             rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x),
@@ -1939,7 +1961,7 @@ using bf8_t = bf8_ocp_t;
 #define CK_FP8_TYPE_FNUZ 0
 #define CK_FP8_TYPE_OCP 1
 #else
-using f8_t = f8_fnuz_t;
+using f8_t  = f8_fnuz_t;
 using bf8_t = bf8_fnuz_t;
 #define CK_FP8_TYPE_FNUZ 1
 #define CK_FP8_TYPE_OCP 0

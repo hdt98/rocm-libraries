@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -15,7 +15,7 @@ struct joinable_thread : std::thread
     {
     }
 
-    joinable_thread(joinable_thread&&) = default;
+    joinable_thread(joinable_thread&&)            = default;
     joinable_thread& operator=(joinable_thread&&) = default;
 
     ~joinable_thread()

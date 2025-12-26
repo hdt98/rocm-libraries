@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2022, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -18,6 +18,10 @@
 #include "ck/library/reference_tensor_operation/cpu/reference_gemm.hpp"
 #include "ck/library/utility/check_err.hpp"
 #include "ck/host_utility/device_prop.hpp"
+
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
 
 struct AlphaBetaAdd
 {
@@ -43,8 +47,9 @@ using S = ck::Sequence<Is...>;
 using I8  = std::int8_t;
 using I32 = std::int32_t;
 
-using Row = ck::tensor_layout::gemm::RowMajor;
-using Col = ck::tensor_layout::gemm::ColumnMajor;
+using Row    = ck::tensor_layout::gemm::RowMajor;
+using Col    = ck::tensor_layout::gemm::ColumnMajor;
+using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
 using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
@@ -86,7 +91,7 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMultipleD_Wmma_
     128, // MPerBlock
     64,  // NPerBlock
     64,  // KPerBlock
-    4,   // K1
+    8,   // K1
     16,  // MPerWmma
     16,  // NPerWmma
     4,   // M-Repeat // M-PerWmma / M-Repeat = M-Wave
@@ -95,15 +100,15 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMultipleD_Wmma_
     S<1, 0, 2>,
     S<1, 0, 2>,
     2,
-    4,
-    4,
+    8,
+    8,
     true,
     S<4, 32, 1>,
     S<1, 0, 2>,
     S<1, 0, 2>,
     2,
-    4,
-    4,
+    8,
+    8,
     true,
     1, // C shuffle (M Repeat) Per store
     1, // C shuffle (N Repeat) Per store
@@ -117,14 +122,14 @@ int main(int argc, char* argv[])
     bool time_kernel     = true;
 
     // GEMM shape
-    ck::index_t M = 256;
-    ck::index_t N = 256;
-    ck::index_t K = 256;
+    ck::index_t M = 3840;
+    ck::index_t N = 4096;
+    ck::index_t K = 4096;
 
-    ck::index_t StrideA = 256;
-    ck::index_t StrideB = 256;
-    ck::index_t StrideD = 256;
-    ck::index_t StrideE = 256;
+    ck::index_t StrideA = 4096;
+    ck::index_t StrideB = 4096;
+    ck::index_t StrideD = 4096;
+    ck::index_t StrideE = 4096;
 
     int alpha = 1;
     int beta  = 1;
@@ -176,8 +181,7 @@ int main(int argc, char* argv[])
         exit(0);
     }
 
-    bool is_supported =
-        ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported();
+    bool is_supported = ck::is_gfx11_supported();
     if(!is_supported)
     {
         std::cout << "WARNING: wmma example not supported on the platform " << ck::get_device_name()
@@ -191,11 +195,11 @@ int main(int argc, char* argv[])
 
             if(std::is_same<decltype(layout), ck::tensor_layout::gemm::RowMajor>::value)
             {
-                return HostTensorDescriptor({row, col}, {stride, 1_uz});
+                return HostTensorDescriptor({row, col}, {stride, 1_uz}, Bypass{});
             }
             else
             {
-                return HostTensorDescriptor({row, col}, {1_uz, stride});
+                return HostTensorDescriptor({row, col}, {1_uz, stride}, Bypass{});
             }
         };
 

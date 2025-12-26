@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <gtest/gtest.h>
@@ -58,16 +58,17 @@ class TestBatchedGemmMultiD : public ::testing::Test
                                                                             PassThrough,
                                                                             PassThrough,
                                                                             PassThrough>>(
-                true,
-                1,
-                false,
-                false,
+                true,  // do_verification
+                1,     // init_method
+                false, // do_log
+                1,     // time_kernel,
                 M,
                 N,
                 K,
-                K,
-                N,
-                N,
+                std::is_same_v<ALayout, Row> ? K : M, // strideA
+                std::is_same_v<BLayout, Row> ? N : K, // strideB
+                std::is_same_v<CLayout, Row> ? N : M, // strideC
+                // BatchStrideA BatchStrideB, BatchStrideC
                 M * K,
                 K * N,
                 M * N,

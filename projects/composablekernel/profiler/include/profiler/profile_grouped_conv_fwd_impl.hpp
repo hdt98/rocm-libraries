@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -164,9 +164,6 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
                 return;
             }
 
-            // re-init output to zero before profiling next kernel
-            out_device_buf.SetZero();
-
             std::string op_name = op_ptr->GetTypeString();
 
             auto invoker_ptr = op_ptr->MakeInvokerPointer();
@@ -261,9 +258,9 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
         run_impl(op_ptr, argument_ptr);
     }
 
-    std::cout << "Best configuration parameters:"
-              << "\nname: " << best_op_name << "\navg_time: " << best_avg_time
-              << "\ntflops: " << best_tflops << "\nGB/s: " << best_gb_per_sec << std::endl;
+    std::cout << "Best configuration parameters:" << "\nname: " << best_op_name
+              << "\navg_time: " << best_avg_time << "\ntflops: " << best_tflops
+              << "\nGB/s: " << best_gb_per_sec << std::endl;
     if(instance_index != -1)
     {
         std::cout << "grouped_conv_fwd_instance (" << instance_index << "/" << num_kernel

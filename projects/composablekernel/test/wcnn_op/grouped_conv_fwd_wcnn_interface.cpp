@@ -1197,10 +1197,10 @@ TEST_F(TestGroupedConv3DFwdWcnnFilter1, 3DFilter1)
     this->Init(param);
     this->in_g_n_c_wis_desc = in_size_mismatch;
     bool size_mismatch      = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
-                                            ck::half_t,
-                                            ck::half_t,
-                                            float,
-                                            PackedLayout<3>>();
+                                                 ck::half_t,
+                                                 ck::half_t,
+                                                 float,
+                                                 PackedLayout<3>>();
     EXPECT_FALSE(size_mismatch);
 }
 

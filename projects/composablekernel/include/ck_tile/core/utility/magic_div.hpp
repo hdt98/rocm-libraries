@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -38,8 +38,7 @@ struct magic_division32_bit_range
             shift_u32++;
         };
 
-        uint64_t tmp_u64 = static_cast<uint64_t>((1UL << shift_u32) - divisor) << 32;
-
+        uint64_t tmp_u64        = static_cast<uint64_t>((1UL << shift_u32) - divisor) << 32;
         uint32_t multiplier_u32 = tmp_u64 / divisor + 1;
 
         return make_tuple(multiplier_u32, shift_u32);

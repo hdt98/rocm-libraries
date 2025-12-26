@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <cstdlib>
@@ -16,12 +16,18 @@
 #include "ck/library/utility/host_tensor.hpp"
 #include "ck/library/utility/host_tensor_generator.hpp"
 
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 using F16 = ck::half_t;
 using F32 = float;
 
 using ADataType = F16;
 using BDataType = F16;
 
+using NchwLayout                       = ck::tensor_layout::convolution::NCHW;
+using NhwcLayout                       = ck::tensor_layout::convolution::NHWC;
 using PassThrough                      = ck::tensor_operation::element_wise::PassThrough;
 using DeviceElementwisePermuteInstance = ck::tensor_operation::device::DeviceElementwiseImpl<
     ck::Tuple<ADataType>, // InDataTypeTuple
@@ -42,37 +48,24 @@ int main(int argc, char* argv[])
     bool do_verification = true;
     bool time_kernel     = true;
 
-    std::vector<std::size_t> nchw = {16, 128, 32, 64};
-    std::vector<std::size_t> nhwc = {16, 32, 64, 128};
-
     if(argc == 1)
     {
-        // use default case
+        // use default
     }
     else if(argc == 3)
     {
         do_verification = std::stoi(argv[1]);
         time_kernel     = std::stoi(argv[2]);
     }
-    else if(argc == 7)
-    {
-        do_verification = std::stoi(argv[1]);
-        time_kernel     = std::stoi(argv[2]);
-        nchw[0]         = std::stoi(argv[3]);
-        nchw[1]         = std::stoi(argv[4]);
-        nchw[2]         = std::stoi(argv[5]);
-        nchw[3]         = std::stoi(argv[6]);
-        nhwc[0]         = nchw[0];
-        nhwc[1]         = nchw[2];
-        nhwc[2]         = nchw[3];
-        nhwc[3]         = nchw[1];
-    }
     else
     {
-        std::cerr << "arg1 to 6: do_verification, time_kernel, N, C, H, W" << std::endl;
-
-        return 1;
+        printf("arg1: verification (0=no, 1=yes)\n");
+        printf("arg2: time kernel (0=no, 1=yes)\n");
+        exit(0);
     }
+
+    std::vector<std::size_t> nchw = {16, 128, 32, 64};
+    std::vector<std::size_t> nhwc = {16, 32, 64, 128};
 
     std::array<ck::index_t, 4> ab_lengths;
     std::array<ck::index_t, 4> a_strides = {static_cast<int>(nchw[1] * nchw[2] * nchw[3]),
@@ -85,9 +78,9 @@ int main(int argc, char* argv[])
                                             static_cast<int>(nhwc[3])};
     ck::ranges::copy(nchw, ab_lengths.begin());
 
-    std::array<Tensor<ADataType>, 1> as = {Tensor<ADataType>(ab_lengths, a_strides)};
+    std::array<Tensor<ADataType>, 1> as = {Tensor<ADataType>(ab_lengths, a_strides, NchwLayout{})};
     Tensor<ADataType>& a                = as[0];
-    Tensor<BDataType> b(ab_lengths, b_strides);
+    Tensor<BDataType> b(ab_lengths, b_strides, NhwcLayout{});
 
     a.GenerateTensorValue(GeneratorTensor_3<ADataType>{0.0, 1.0});
 
@@ -130,7 +123,7 @@ int main(int argc, char* argv[])
 
     if(do_verification)
     {
-        Tensor<BDataType> host_b(ab_lengths, b_strides);
+        Tensor<BDataType> host_b(ab_lengths, b_strides, NhwcLayout{});
         using ReferenceElementwiseInstance =
             ck::tensor_operation::host::ReferenceElementwise<1, ADataType, BDataType, PassThrough>;
         auto ref_elementwise = ReferenceElementwiseInstance{};

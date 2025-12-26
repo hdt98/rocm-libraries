@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <algorithm>
 #include <cstring>
@@ -19,9 +19,7 @@ float image_to_column(const image_to_column_traits& traits,
         constexpr ck_tile::index_t VectorSize  = 8;
 
         using thread_tile = ck_tile::sequence<8, 8>;
-        using warp_tile   = std::conditional_t<ck_tile::get_warp_size() == 32,
-                                             ck_tile::sequence<32, 64>,
-                                             ck_tile::sequence<64, 64>>;
+        using warp_tile   = ck_tile::sequence<64, 64>;
         using block_tile  = ck_tile::sequence<128, 128>;
 
         using Shape = ck_tile::TileImageToColumnShape<thread_tile, warp_tile, block_tile>;
@@ -57,13 +55,12 @@ float image_to_column(const image_to_column_traits& traits,
             args.N * args.output_spatial_lengths[0] * args.output_spatial_lengths[1],
             args.filter_spatial_lengths[0] * args.filter_spatial_lengths[1] * args.C,
             args.G);
-        constexpr dim3 blocks = Kernel::BlockSize();
+        const dim3 blocks = Kernel::BlockSize();
 
         constexpr ck_tile::index_t kBlockPerCu = 2;
 
         float ave_time = ck_tile::launch_kernel(
-            stream_conf,
-            ck_tile::make_kernel<blocks.x, kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+            stream_conf, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
 
         return ave_time;
     }
@@ -112,6 +109,7 @@ int main(int argc, char* argv[])
     const auto in_desc =
         ck_tile::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<ImLayout>(conv_params);
     const auto out_desc = ck_tile::HostTensorDescriptor({G, NHoWo, CYX});
+
     // host verify
     ck_tile::HostTensor<InDataType> in(in_desc);
     ck_tile::HostTensor<OutDataType> out_device(out_desc);
@@ -150,9 +148,17 @@ int main(int argc, char* argv[])
     float ave_time =
         image_to_column(traits, args, ck_tile::stream_config{nullptr, config.time_kernel});
 
-    std::size_t num_btype = G * NHoWo * CYX * (sizeof(OutDataType) + sizeof(InDataType));
-    float gb_per_sec      = num_btype / 1.E6 / ave_time;
-    std::cout << "Perf: " << ave_time << " ms, " << gb_per_sec << " GB/s" << std::endl;
+    if(config.time_kernel)
+    {
+        std::size_t num_btype = G * NHoWo * CYX * (sizeof(OutDataType) + sizeof(InDataType));
+        float gb_per_sec      = num_btype / 1.E6 / ave_time;
+        std::cout << "Perf: " << ave_time << " ms, " << gb_per_sec << " GB/s" << std::endl;
+    }
+    else
+    {
+        std::cout << "image_to_column: pass, No Perf generated due to config.time_kernel=0"
+                  << std::endl;
+    }
 
     bool pass = true;
 

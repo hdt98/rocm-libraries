@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // // Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 #pragma once
+#include "ck/utility/data_type.hpp"
 #include "ck/utility/dtype_vector.hpp"
 
 namespace ck {
@@ -10,11 +11,46 @@ struct NumericUtils
 {
 };
 
+#ifndef CK_CODE_GEN_RTC
+template <>
+struct NumericUtils<e8m0_bexp_t>
+{
+    static constexpr int exp  = 8;
+    static constexpr int mant = 0;
+    static constexpr int bias = 127;
+
+    static constexpr int unbiased_exp_min = -127;
+    static constexpr int unbiased_exp_max = 127;
+    static constexpr int biased_exp_min   = 0;
+    static constexpr int biased_exp_max   = 254;
+
+    using bitwise_type = uint8_t;
+};
+#endif
+
 template <>
 struct NumericUtils<float>
 {
     static constexpr int exp            = 8;
     static constexpr int mant           = 23;
+    static constexpr int bias           = 127;
+    static constexpr uint32_t nan_mask  = 0x7F800000;
+    static constexpr uint32_t head_mask = 0xFF800000;
+    static constexpr uint32_t mant_mask = 0x7FFFFF;
+    static constexpr uint32_t exp_mask  = 0xFF;
+    static constexpr uint32_t Inf       = 0x7F800000;
+    static constexpr uint32_t NegInf    = 0xFF800000;
+    static constexpr uint32_t NaN       = 0x7F800001;
+    static constexpr uint32_t Neg0      = 0x80000000;
+    static constexpr bool has_inf       = true;
+    using bitwise_type                  = uint32_t;
+};
+
+template <>
+struct NumericUtils<ck::tf32_t>
+{
+    static constexpr int exp            = 8;
+    static constexpr int mant           = 10;
     static constexpr int bias           = 127;
     static constexpr uint32_t nan_mask  = 0x7F800000;
     static constexpr uint32_t head_mask = 0xFF800000;
@@ -178,21 +214,6 @@ struct NumericUtils<bf6_t>
     static constexpr bool has_inf  = false;
     static constexpr bool has_nan  = false;
     static constexpr bool has_zero = true;
-
-    using bitwise_type = uint8_t;
-};
-
-template <>
-struct NumericUtils<e8m0_bexp_t>
-{
-    static constexpr int exp  = 8;
-    static constexpr int mant = 0;
-    static constexpr int bias = 127;
-
-    static constexpr int unbiased_exp_min = -127;
-    static constexpr int unbiased_exp_max = 127;
-    static constexpr int biased_exp_min   = 0;
-    static constexpr int biased_exp_max   = 254;
 
     using bitwise_type = uint8_t;
 };

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -21,10 +21,6 @@ enum class rope_enum
     interleaved  = 1,
     half_rotated = 2,
 };
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 template <typename DataType>
 std::tuple<ck_tile::HostTensor<DataType>, ck_tile::HostTensor<DataType>>

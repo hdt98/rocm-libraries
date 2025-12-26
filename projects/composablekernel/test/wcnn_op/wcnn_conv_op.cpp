@@ -21,7 +21,7 @@ namespace ck {
 
 namespace conv_op_util {
 
-//#define LOAD_DATA_PER_TILE 0
+// #define LOAD_DATA_PER_TILE 0
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
@@ -84,10 +84,10 @@ __global__ void __launch_bounds__(64, 1)
     using WeiDataTileVec = typename decltype(wcnn_conv)::WeiDataTileVec::type;
     using AccDataVec     = typename decltype(wcnn_conv)::AccDataVec;
     using AccVec         = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                             AccDataType,
-                                             AccVectorCount,
-                                             wcnn_conv.GetNumAccumComponents(),
-                                             true>;
+                                                     AccDataType,
+                                                     AccVectorCount,
+                                                     wcnn_conv.GetNumAccumComponents(),
+                                                     true>;
 
     const int lIdx = threadIdx.x;
 #if !defined(LOAD_DATA_PER_TILE)
@@ -346,10 +346,10 @@ __global__ void __launch_bounds__(64, 1)
 
     using AccDataVec = typename decltype(wcnn_conv)::AccDataVec;
     using AccVec     = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                             AccDataType,
-                                             1,
-                                             wcnn_conv.GetNumAccumComponents(),
-                                             true>;
+                                                 AccDataType,
+                                                 1,
+                                                 wcnn_conv.GetNumAccumComponents(),
+                                                 true>;
     const int lIdx   = threadIdx.x;
 
     // Data layout: HWC, unit: InDataType
@@ -590,17 +590,17 @@ bool run_test()
     constexpr ck::index_t OutputChannels = DEFAULT_K;
 #else
     constexpr auto wcnn_conv     = ck::WcnnConv<WeiDataType,
-                                            InDataType,
-                                            GPUAccType,
-                                            HPerWcnn,
-                                            WPerWcnn,
-                                            FilterSize,
-                                            DilationSize,
-                                            DilationSize,
-                                            1,
-                                            false,
-                                            false,
-                                            UseF32I32>();
+                                                InDataType,
+                                                GPUAccType,
+                                                HPerWcnn,
+                                                WPerWcnn,
+                                                FilterSize,
+                                                DilationSize,
+                                                DilationSize,
+                                                1,
+                                                false,
+                                                false,
+                                                UseF32I32>();
     constexpr ck::index_t Width  = WPerWcnn * DEFAULT_W_REPEAT;
     constexpr ck::index_t Height = HPerWcnn * DEFAULT_H_REPEAT;
     constexpr ck::index_t InputChannels =

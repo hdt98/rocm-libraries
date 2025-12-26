@@ -32,19 +32,19 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_gemm_wmma_gfx13(const ADataType* __restrict__ p_a_grid,
-                               const BDataType* __restrict__ p_b_grid,
-                               CDataType* __restrict__ p_c_grid,
-                               const AGridDesc a_grid_desc,
-                               const BGridDesc b_grid_desc,
-                               const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                                   c_grid_desc_mblock_mperblock_nblock_nperblock,
-                               const AElementwiseOperation a_element_op,
-                               const BElementwiseOperation b_element_op,
-                               const CElementwiseOperation c_element_op,
-                               const Block2CTileMap block_2_ctile_map)
+    kernel_gemm_wmma_gfx13(const ADataType* __restrict__ p_a_grid,
+                           const BDataType* __restrict__ p_b_grid,
+                           CDataType* __restrict__ p_c_grid,
+                           const AGridDesc a_grid_desc,
+                           const BGridDesc b_grid_desc,
+                           const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                               c_grid_desc_mblock_mperblock_nblock_nperblock,
+                           const AElementwiseOperation a_element_op,
+                           const BElementwiseOperation b_element_op,
+                           const CElementwiseOperation c_element_op,
+                           const Block2CTileMap block_2_ctile_map)
 {
 #if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
@@ -151,23 +151,23 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_gemm_mx_wmma(const int32_t* __restrict__ p_a_grid,
-                            const int32_t* __restrict__ p_b_grid,
-                            const int32_t* __restrict__ p_a_scale,
-                            const int32_t* __restrict__ p_b_scale,
-                            const AScaleGridDesc a_scale_grid_desc,
-                            const BScaleGridDesc b_scale_grid_desc,
-                            CDataType* __restrict__ p_c_grid,
-                            const AGridDesc a_grid_desc,
-                            const BGridDesc b_grid_desc,
-                            const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                                c_grid_desc_mblock_mperblock_nblock_nperblock,
-                            const AElementwiseOperation a_element_op,
-                            const BElementwiseOperation b_element_op,
-                            const CElementwiseOperation c_element_op,
-                            const Block2CTileMap block_2_ctile_map)
+    kernel_gemm_mx_wmma(const int32_t* __restrict__ p_a_grid,
+                        const int32_t* __restrict__ p_b_grid,
+                        const int32_t* __restrict__ p_a_scale,
+                        const int32_t* __restrict__ p_b_scale,
+                        const AScaleGridDesc a_scale_grid_desc,
+                        const BScaleGridDesc b_scale_grid_desc,
+                        CDataType* __restrict__ p_c_grid,
+                        const AGridDesc a_grid_desc,
+                        const BGridDesc b_grid_desc,
+                        const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                            c_grid_desc_mblock_mperblock_nblock_nperblock,
+                        const AElementwiseOperation a_element_op,
+                        const BElementwiseOperation b_element_op,
+                        const CElementwiseOperation c_element_op,
+                        const Block2CTileMap block_2_ctile_map)
 {
 #if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
@@ -1666,22 +1666,22 @@ struct GridwiseGemm_Wmma_GFX13
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 auto a_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<int32_t,
-                                                     int32_t,
-                                                     decltype(a_grid_desc),
-                                                     decltype(a_block_desc),
-                                                     Sequence<Number<KWmmaPerBlock>{},
-                                                              I1,
-                                                              Number<MRepeat>{},
-                                                              I1,
-                                                              Number<K0PerWmma>{},
-                                                              I1,
-                                                              I1,
-                                                              Number<K1Value>{}>,
-                                                     Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                     7,
-                                                     1,
-                                                     AThreadTransferSrcResetCoordinateAfterRun,
-                                                     true>(
+                                                                    int32_t,
+                                                                    decltype(a_grid_desc),
+                                                                    decltype(a_block_desc),
+                                                                    Sequence<Number<KWmmaPerBlock>{},
+                                                                             I1,
+                                                                             Number<MRepeat>{},
+                                                                             I1,
+                                                                             Number<K0PerWmma>{},
+                                                                             I1,
+                                                                             I1,
+                                                                             Number<K1Value>{}>,
+                                                                    Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                                                                    7,
+                                                                    1,
+                                                                    AThreadTransferSrcResetCoordinateAfterRun,
+                                                                    true>(
                         a_grid_desc,
                         make_multi_index(0,
                                          m_block_data_idx_on_grid / (MWaves * MPerWmma * MRepeat),
@@ -1693,16 +1693,16 @@ struct GridwiseGemm_Wmma_GFX13
                                          /*MPerWmma*/ (ThisThreadBlockGrid::GetThreadId() % 32) / 2,
                                          /*K1Row*/ 0));
                 auto a_scale_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
-                    int32_t,
-                    int32_t,
-                    decltype(a_scale_grid_desc),  // K0, MRepeat, MWaves, MPerWmma, 2
-                    decltype(a_scale_block_desc), // K0, MRepeat, 1, 1, 1
-                    Sequence<Number<ScaleK0PerBlock>{}, Number<MRepeat>{}, I1, I1, I1>,
-                    Sequence<0, 1, 2, 3, 4>,
-                    4,
-                    1,
-                    AThreadTransferSrcResetCoordinateAfterRun,
-                    true>(a_scale_grid_desc,
+                                   int32_t,
+                                   int32_t,
+                                   decltype(a_scale_grid_desc),  // K0, MRepeat, MWaves, MPerWmma, 2
+                                   decltype(a_scale_block_desc), // K0, MRepeat, 1, 1, 1
+                                   Sequence<Number<ScaleK0PerBlock>{}, Number<MRepeat>{}, I1, I1, I1>,
+                                   Sequence<0, 1, 2, 3, 4>,
+                                   4,
+                                   1,
+                                   AThreadTransferSrcResetCoordinateAfterRun,
+                                   true>(a_scale_grid_desc,
                           make_multi_index(0,
                                            m_block_data_idx_on_grid / (MWaves * MPerWmma),
                                            (ThisThreadBlockGrid::GetThreadId() / 32) / NWaves,
@@ -2262,29 +2262,29 @@ struct GridwiseGemm_Wmma_GFX13
                     constexpr auto AddrCnt        = 32 / ThreadsPerTile;
                     // Limitation: NumDim of Src and Dst descriptor should be identical
                     auto a_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
-                        ADataType,
-                        ADataType,
-                        decltype(a_grid_desc),
-                        decltype(a_block_desc),
-                        Sequence<Number<KWmmaPerBlock>{},
-                                 I1,
-                                 Number<MRepeat>{},
-                                 I1,
-                                 Number<K0PerWmma>{},
-                                 I1,
-                                 I1,
-                                 Number<K1Value>{}>,
-                        Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                        7,
-                        ABlockTransferSrcScalarPerVector,
-                        1,
-                        AThreadTransferSrcResetCoordinateAfterRun,
-                        /*InvalidElementAsNaN       */ true,
-                        /*UseTrLoad                 */ false,
-                        /*ForceAlignToUint32        */ false,
-                        /*UseTileLoad               */ true,
-                        /*ThreadsPerTile            */ ThreadsPerTile,
-                        /*VgprsPerTile              */ VgprsPerTile>(
+                                      ADataType,
+                                      ADataType,
+                                      decltype(a_grid_desc),
+                                      decltype(a_block_desc),
+                                      Sequence<Number<KWmmaPerBlock>{},
+                                               I1,
+                                               Number<MRepeat>{},
+                                               I1,
+                                               Number<K0PerWmma>{},
+                                               I1,
+                                               I1,
+                                               Number<K1Value>{}>,
+                                      Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                                      7,
+                                      ABlockTransferSrcScalarPerVector,
+                                      1,
+                                      AThreadTransferSrcResetCoordinateAfterRun,
+                                      /*InvalidElementAsNaN       */ true,
+                                      /*UseTrLoad                 */ false,
+                                      /*ForceAlignToUint32        */ false,
+                                      /*UseTileLoad               */ true,
+                                      /*ThreadsPerTile            */ ThreadsPerTile,
+                                      /*VgprsPerTile              */ VgprsPerTile>(
                         a_grid_desc,
 
                         make_multi_index(
@@ -2323,30 +2323,30 @@ struct GridwiseGemm_Wmma_GFX13
                     constexpr auto K0PerWmma     = AKPerWmma / 2 / K1Value;
                     // Limitation: NumDim of Src and Dst descriptor should be identical
                     auto a_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
-                        ADataType,
-                        ADataType,
-                        decltype(a_grid_desc),
-                        decltype(a_block_desc),
-                        Sequence<Number<KWmmaPerBlock>{},
-                                 I1,
-                                 Number<MRepeat>{},
-                                 I1,
-                                 Number<K0PerWmma>{},
-                                 I1,
-                                 I1,
-                                 Number<K1Value>{}>,
-                        Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                        7,
-                        ABlockTransferSrcScalarPerVector,
-                        1,
-                        AThreadTransferSrcResetCoordinateAfterRun,
-                        /*InvalidElementAsNaN       */ true,
-                        /*UseTrLoad                 */ false,
-                        /*ForceAlignToUint32        */ false,
-                        /*UseTileLoad               */ false,
-                        /*ThreadsPerTile            */ 1,
-                        /*VgprsPerTile              */ 1,
-                        /*ClusterMulticastLoad      */ ALoadOption>(
+                                      ADataType,
+                                      ADataType,
+                                      decltype(a_grid_desc),
+                                      decltype(a_block_desc),
+                                      Sequence<Number<KWmmaPerBlock>{},
+                                               I1,
+                                               Number<MRepeat>{},
+                                               I1,
+                                               Number<K0PerWmma>{},
+                                               I1,
+                                               I1,
+                                               Number<K1Value>{}>,
+                                      Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                                      7,
+                                      ABlockTransferSrcScalarPerVector,
+                                      1,
+                                      AThreadTransferSrcResetCoordinateAfterRun,
+                                      /*InvalidElementAsNaN       */ true,
+                                      /*UseTrLoad                 */ false,
+                                      /*ForceAlignToUint32        */ false,
+                                      /*UseTileLoad               */ false,
+                                      /*ThreadsPerTile            */ 1,
+                                      /*VgprsPerTile              */ 1,
+                                      /*ClusterMulticastLoad      */ ALoadOption>(
                         a_grid_desc,
 
                         make_multi_index(
@@ -2386,23 +2386,23 @@ struct GridwiseGemm_Wmma_GFX13
                     // Limitation: NumDim of Src and Dst descriptor should be identical
                     auto a_blockwise_copy =
                         ThreadwiseTensorSliceTransfer_v2<ADataType,
-                                                         ADataType,
-                                                         decltype(a_grid_desc),
-                                                         decltype(a_block_desc),
-                                                         Sequence<Number<KWmmaPerBlock>{},
-                                                                  I1,
-                                                                  Number<MRepeat>{},
-                                                                  I1,
-                                                                  Number<K0PerWmma>{},
-                                                                  I1,
-                                                                  I1,
-                                                                  Number<K1Value>{}>,
-                                                         Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                         7,
-                                                         ABlockTransferSrcScalarPerVector,
-                                                         1,
-                                                         AThreadTransferSrcResetCoordinateAfterRun,
-                                                         true>(
+                                                                       ADataType,
+                                                                       decltype(a_grid_desc),
+                                                                       decltype(a_block_desc),
+                                                                       Sequence<Number<KWmmaPerBlock>{},
+                                                                                I1,
+                                                                                Number<MRepeat>{},
+                                                                                I1,
+                                                                                Number<K0PerWmma>{},
+                                                                                I1,
+                                                                                I1,
+                                                                                Number<K1Value>{}>,
+                                                                       Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                                                                       7,
+                                                                       ABlockTransferSrcScalarPerVector,
+                                                                       1,
+                                                                       AThreadTransferSrcResetCoordinateAfterRun,
+                                                                       true>(
                             a_grid_desc,
                             make_multi_index(
                                 0,
@@ -2763,7 +2763,8 @@ struct GridwiseGemm_Wmma_GFX13
         /*******************************************************************************/
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
-        auto blockwise_gemm  = BlockwiseGemmWMMA<ThisThreadBlockGrid,
+#if(defined(__gfx13__))
+        auto blockwise_gemm = BlockwiseGemmWMMA<BlockSize,
                                                 ADataType,
                                                 BDataType,
                                                 AccDataType,
@@ -2780,11 +2781,30 @@ struct GridwiseGemm_Wmma_GFX13
                                                 KPack,
                                                 AEnableLds,
                                                 BEnableLds,
+                                                false, // Transpose C
                                                 false, // APermute
                                                 false, // BPermute
-                                                false, // Transpose C
                                                 ALoadOption,
                                                 BLoadOption>{};
+#else
+        auto blockwise_gemm = BlockwiseGemmWMMA<BlockSize,
+                                                ADataType,
+                                                BDataType,
+                                                AccDataType,
+                                                decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
+                                                decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
+                                                MPerBlock,
+                                                NPerBlock,
+                                                KPerBlock,
+                                                MPerWmma,
+                                                NPerWmma,
+                                                MRepeat,
+                                                NRepeat,
+                                                KPack,
+                                                AEnableLds,
+                                                BEnableLds>{};
+#endif
+
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -342,8 +342,8 @@ struct sequence_reverse
 
     using seq_split = sequence_split<Seq, NSize / 2>;
     using type      = typename sequence_merge<
-        typename sequence_reverse<typename seq_split::right_type>::type,
-        typename sequence_reverse<typename seq_split::left_type>::type>::type;
+             typename sequence_reverse<typename seq_split::right_type>::type,
+             typename sequence_reverse<typename seq_split::left_type>::type>::type;
 };
 
 template <index_t I>

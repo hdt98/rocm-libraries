@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iomanip>
 #include <vector>
@@ -132,8 +132,6 @@ int main(int argc, char* argv[])
     {
         auto& op_ptr = op_ptrs[i];
 
-        std::string op_name = op_ptr->GetTypeString();
-
         auto argument_ptr = op_ptr->MakeArgumentPointer(a_device_buf.GetDeviceBuffer(),
                                                         b_device_buf.GetDeviceBuffer(),
                                                         c_device_buf.GetDeviceBuffer(),
@@ -148,6 +146,8 @@ int main(int argc, char* argv[])
                                                         c_element_op);
 
         auto invoker_ptr = op_ptr->MakeInvokerPointer();
+
+        std::string op_name = op_ptr->GetTypeString();
 
         if(op_ptr->IsSupportedArgument(argument_ptr.get()))
         {

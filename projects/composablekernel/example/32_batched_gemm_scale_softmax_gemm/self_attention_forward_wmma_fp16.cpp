@@ -29,6 +29,10 @@ Gemm + Softmax + Gemm fused operation. Computes C_g_m_n = Softmax(A_g_m_k * B0_g
 #include "ck/library/reference_tensor_operation/cpu/reference_softmax.hpp"
 #include "ck/host_utility/device_prop.hpp"
 
+using ::ck::DeviceMem;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
 
@@ -142,10 +146,10 @@ using DeviceMHAFactory =
             S<2, 2, 8>, S<0, 2, 1>, S<0, 2, 1>, 1, 8, 1, false,
             // CShuffleBlockTransfer MN
             1, 1, S<1, 16, 1, 2>, 8,             
-            MaskingSpec>
+            MaskingSpec>,
 #endif
 #ifdef CK_MHA_USE_WAVE_2
-         ,ck::tensor_operation::device::DeviceBatchedGemmSoftmaxGemmPermute_Wmma_CShuffle<
+         ck::tensor_operation::device::DeviceBatchedGemmSoftmaxGemmPermute_Wmma_CShuffle<
             NumDimG, NumDimM, NumDimN, NumDimK, NumDimO,
             ADataType, B0DataType, B1DataType, CDataType, Acc0BiasDataType, Acc0DataType, Acc1BiasDataType, Acc1DataType, CShuffleDataType,
             AElementOp, B0ElementOp, Acc0ElementOp, B1ElementOp, CElementOp,
@@ -210,10 +214,10 @@ using DeviceMHAFactory =
             S<2, 4, 8>, S<0, 2, 1>, S<0, 2, 1>, 1, 4, 1, false,
             // CShuffleBlockTransfer MN
             1, 1, S<1, 32, 1, 2>, 8,             
-            MaskingSpec>
+            MaskingSpec>,
 #endif
 #ifdef CK_MHA_USE_WAVE_4
-        ,ck::tensor_operation::device::DeviceBatchedGemmSoftmaxGemmPermute_Wmma_CShuffle<
+        ck::tensor_operation::device::DeviceBatchedGemmSoftmaxGemmPermute_Wmma_CShuffle<
             NumDimG, NumDimM, NumDimN, NumDimK, NumDimO,
             ADataType, B0DataType, B1DataType, CDataType, Acc0BiasDataType, Acc0DataType, Acc1BiasDataType, Acc1DataType, CShuffleDataType,
             AElementOp, B0ElementOp, Acc0ElementOp, B1ElementOp, CElementOp,

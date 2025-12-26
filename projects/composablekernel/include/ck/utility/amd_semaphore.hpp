@@ -6,7 +6,7 @@
 
 #include "amd_address_space.hpp"
 
-//#define CK_USE_AMD_SEMAPHORE_ASM 1
+// #define CK_USE_AMD_SEMAPHORE_ASM 1
 
 namespace ck {
 

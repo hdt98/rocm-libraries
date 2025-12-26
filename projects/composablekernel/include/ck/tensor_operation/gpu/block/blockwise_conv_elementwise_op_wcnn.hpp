@@ -167,12 +167,12 @@ struct BlockwiseElementSbaWcnn
     static constexpr index_t NumDTensor   = DsBlockDesc::Size();
     static constexpr bool EnableWaveGroup = ThisThreadBlock::InWaveGroup();
     static constexpr auto wcnn_sba        = WcnnSba<AccDataType,
-                                             HPerWcnn,
-                                             WPerWcnn,
-                                             BlockwiseElementOp::activeFunc,
-                                             BlockwiseElementOp::packed,
-                                             BlockwiseElementOp::uniform,
-                                             Aco>{};
+                                                    HPerWcnn,
+                                                    WPerWcnn,
+                                                    BlockwiseElementOp::activeFunc,
+                                                    BlockwiseElementOp::packed,
+                                                    BlockwiseElementOp::uniform,
+                                                    Aco>{};
     static constexpr auto NumBias         = wcnn_sba.GetNumBiasComponents();
     static constexpr auto NumScale        = wcnn_sba.GetNumScaleComponents();
 
@@ -1087,12 +1087,12 @@ struct BlockwiseElementFmaWcnn
                                              NumAccCompSubTile,
                                              NumAccCompPerTile / NumAccCompSubTile>;
         using ResidualDescLength  = Sequence<WPerWave / WPerWcnn,
-                                            KPerWave / CPerWcnn,
-                                            HPerWave / HPerWcnn,
-                                            NumSubTilePerImage,
-                                            1,
-                                            1,
-                                            NumDataCompPerTile>;
+                                             KPerWave / CPerWcnn,
+                                             HPerWave / HPerWcnn,
+                                             NumSubTilePerImage,
+                                             1,
+                                             1,
+                                             NumDataCompPerTile>;
         if constexpr(UniformScale)
         {
             return make_tuple(ResidualDescLength{});
@@ -1374,20 +1374,20 @@ struct BlockwiseElementSbaFmaWcnn
                                                   Aco,
                                                   typename BlockwiseElementOp::Sba>;
     using BlockwiseFma  = BlockwiseElementFmaWcnn<ThisThreadBlock,
-                                                 decltype(GetFmaDsDataType()),
-                                                 AccDataType,
-                                                 decltype(GetFmaDsBlockDesc()), // {Residual, Scale}
-                                                 HPerBlock,
-                                                 WPerBlock,
-                                                 KPerBlock,
-                                                 HPerWcnn,
-                                                 WPerWcnn,
-                                                 HRepeat,
-                                                 WRepeat,
-                                                 KRepeat,
-                                                 DsEnableLds,
-                                                 Aco,
-                                                 typename BlockwiseElementOp::Fma>;
+                                                  decltype(GetFmaDsDataType()),
+                                                  AccDataType,
+                                                  decltype(GetFmaDsBlockDesc()), // {Residual, Scale}
+                                                  HPerBlock,
+                                                  WPerBlock,
+                                                  KPerBlock,
+                                                  HPerWcnn,
+                                                  WPerWcnn,
+                                                  HRepeat,
+                                                  WRepeat,
+                                                  KRepeat,
+                                                  DsEnableLds,
+                                                  Aco,
+                                                  typename BlockwiseElementOp::Fma>;
 
     BlockwiseSuba blockwise_suba_;
     BlockwiseFma blockwise_fma_;

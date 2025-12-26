@@ -106,13 +106,18 @@ void add_device_gemm_wmma_f16_f16_f16_mk_nk_mn_instances(
         DeviceGemm<Row, Col, Row, F16, F16, F16, PassThrough, PassThrough, PassThrough>>>&
         instances)
 {
-    if(ck::is_gfx13_supported())
-    {
-        add_device_operation_instances(instances,
-                                       device_gemm_wmma_f16_f16_f16_mk_nk_mn_gfx13_instances{});
-    }
     add_device_operation_instances(instances, device_gemm_wmma_f16_f16_f16_mk_nk_mn_instances{});
 }
+
+void add_device_gemm_wmma_f16_f16_f16_mk_nk_mn_gfx13_instances(
+    std::vector<std::unique_ptr<
+        DeviceGemm<Row, Col, Row, F16, F16, F16, PassThrough, PassThrough, PassThrough>>>&
+        instances)
+{
+    add_device_operation_instances(instances,
+                                   device_gemm_wmma_f16_f16_f16_mk_nk_mn_gfx13_instances{});
+}
+
 } // namespace instance
 } // namespace device
 } // namespace tensor_operation

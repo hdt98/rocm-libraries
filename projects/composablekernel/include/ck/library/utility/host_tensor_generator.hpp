@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -184,9 +184,6 @@ struct GeneratorTensor_2
     template <typename... Is>
     T operator()(Is...)
     {
-        // static thread_local std::mt19937 generator(std::random_device{}());
-        // std::uniform_int_distribution<int> distribution(min_value, max_value - 1);
-        // return static_cast<T>(distribution(generator));
         return static_cast<T>((std::rand() % (max_value - min_value)) + min_value);
     }
 };
@@ -267,7 +264,7 @@ struct GeneratorTensor_2<ck::pk_i4_t>
     {
         int hi        = std::rand() % (max_value - min_value) + min_value + 8;
         int lo        = std::rand() % (max_value - min_value) + min_value + 8;
-        ck::pk_i4_t r = ((hi << 4) + lo) & 0xff;
+        ck::pk_i4_t r = (((hi & 0xf) << 4) + (lo & 0xf));
         return r;
     }
 };
@@ -436,6 +433,22 @@ struct GeneratorTensor_3<ck::f4x2_pk_t>
         float fp32_tmp1 = min_value + tmp1 * (max_value - min_value);
 
         return ck::f4x2_pk_t{ck::type_convert<ck::f4x2_t>(ck::float2_t{fp32_tmp0, fp32_tmp1})};
+    }
+};
+
+template <>
+struct GeneratorTensor_3<ck::pk_i4_t>
+{
+    int min_value = 0;
+    int max_value = 1;
+
+    template <typename... Is>
+    ck::pk_i4_t operator()(Is...)
+    {
+        int hi        = std::rand() % (max_value - min_value) + min_value + 8;
+        int lo        = std::rand() % (max_value - min_value) + min_value + 8;
+        ck::pk_i4_t r = (((hi & 0xf) << 4) + (lo & 0xf));
+        return r;
     }
 };
 

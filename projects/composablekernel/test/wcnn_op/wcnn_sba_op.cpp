@@ -2,9 +2,9 @@
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 #include "common_wcnn.hpp"
 
-//#define ENABLE_FULL_TEST 1
+// #define ENABLE_FULL_TEST 1
 //
-// #define USE_ABSOLUTE_SIZE 1
+//  #define USE_ABSOLUTE_SIZE 1
 #ifdef USE_ABSOLUTE_SIZE
 #define DEFAULT_K 16
 #define DEFAULT_C 32
@@ -90,10 +90,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     using WeiDataTileVec = typename decltype(wcnn_conv)::WeiDataTileVec::type;
     using AccDataVec     = typename decltype(wcnn_conv)::AccDataVec;
     using AccVec         = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                             AccDataType,
-                                             AccVectorCount,
-                                             wcnn_conv.GetNumAccumComponents(),
-                                             true>;
+                                                     AccDataType,
+                                                     AccVectorCount,
+                                                     wcnn_conv.GetNumAccumComponents(),
+                                                     true>;
 
     const int lIdx                                = threadIdx.x;
     InDataVec inData[HRepeat * WRepeat * CRepeat] = {};
@@ -348,10 +348,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     constexpr auto accSbaInstance =
         ck::WcnnSba<AccDataType, HPerWcnn, WPerWcnn, activateFunc, scaleBiasPacked, uniformScale>();
     using SbaOutVec         = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                                AccDataType,
-                                                AccVectorCount,
-                                                accSbaInstance.GetNumSbaOutComponents(),
-                                                true>;
+                                                        AccDataType,
+                                                        AccVectorCount,
+                                                        accSbaInstance.GetNumSbaOutComponents(),
+                                                        true>;
     SbaOutVec d_thread_buf_ = {};
     constexpr auto I0       = Number<0>{};
     constexpr auto I1       = Number<1>{};
@@ -676,10 +676,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     using AccDataVec = typename decltype(wcnn_conv)::AccDataVec;
     using AccVec     = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                             AccDataType,
-                                             1,
-                                             wcnn_conv.GetNumAccumComponents(),
-                                             true>;
+                                                 AccDataType,
+                                                 1,
+                                                 wcnn_conv.GetNumAccumComponents(),
+                                                 true>;
     const int lIdx   = threadIdx.x;
 
     // Data layout: HWC, unit: InDataType
@@ -935,10 +935,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         ck::WcnnSba<AccDataType, HPerWcnn, WPerWcnn, activateFunc, scaleBiasPacked, uniformScale>();
 
     using SbaOutVec         = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                                AccDataType,
-                                                1,
-                                                accSbaInstance.GetNumSbaOutComponents(),
-                                                true>;
+                                                        AccDataType,
+                                                        1,
+                                                        accSbaInstance.GetNumSbaOutComponents(),
+                                                        true>;
     SbaOutVec d_thread_buf_ = {};
 
     static_for<0, KRepeat, 1>{}([&](auto k) {
@@ -1026,13 +1026,13 @@ bool run_test()
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
     constexpr ck::index_t convertScale = 1;
     constexpr auto wcnn_conv           = ck::WcnnConv<WeiDataType,
-                                            InDataType,
-                                            GPUAccType,
-                                            HPerWcnn,
-                                            WPerWcnn,
-                                            FilterSize,
-                                            DilationSize,
-                                            DilationSize>();
+                                                      InDataType,
+                                                      GPUAccType,
+                                                      HPerWcnn,
+                                                      WPerWcnn,
+                                                      FilterSize,
+                                                      DilationSize,
+                                                      DilationSize>();
     constexpr bool IsInt4 =
         std::is_same<ck::int4_t, InDataType>::value || std::is_same<ck::uint4_t, InDataType>::value;
 #ifdef USE_ABSOLUTE_SIZE

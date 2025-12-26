@@ -159,8 +159,7 @@ struct ThreadGroupTensorSliceTransferAsync
                                                     ScalarPerVector>(
                     dst_buf, src_offset, dst_offset, is_src_valid, is_dst_valid);
             }
-            constexpr auto move_on_dim = [&]() constexpr
-            {
+            constexpr auto move_on_dim = [&]() constexpr {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
 
                 static_for<0, nDim, 1>{}([&](auto i) {
@@ -172,8 +171,7 @@ struct ThreadGroupTensorSliceTransferAsync
                 });
 
                 return move_on_dim_;
-            }
-            ();
+            }();
 
             // Decide whether to move forward or backward.
             constexpr auto forward_sweep = [&]() {

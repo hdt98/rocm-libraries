@@ -83,13 +83,13 @@ struct BlockwiseFasternet50Wcnn
 
     // Wave properties
     static constexpr index_t Iters  = GetFilterIters<WeiDataType,
-                                                    InDataType,
-                                                    AccDataType,
-                                                    CPerBlock,
-                                                    HPerWcnn,
-                                                    WPerWcnn,
-                                                    FilterSize,
-                                                    Transposed>();
+                                                     InDataType,
+                                                     AccDataType,
+                                                     CPerBlock,
+                                                     HPerWcnn,
+                                                     WPerWcnn,
+                                                     FilterSize,
+                                                     Transposed>();
     static constexpr auto wcnn_conv = WcnnConv<WeiDataType,
                                                InDataType,
                                                AccDataType,

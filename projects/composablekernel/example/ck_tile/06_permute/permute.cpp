@@ -1,8 +1,9 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "permute.hpp"
 #include "ck_tile/host.hpp"
+#include "ck_tile/utility/json_dump.hpp"
 
 #include <array>
 #include <cstring>
@@ -53,11 +54,11 @@ float permute(permute_traits t, permute_args a, const ck_tile::stream_config& s)
 
         auto kargs = Kernel::MakeKargs(a);
 
-        const dim3 grids      = Kernel::GridSize(a);
-        constexpr dim3 blocks = Kernel::BlockSize();
+        const dim3 grids  = Kernel::GridSize(a);
+        const dim3 blocks = Kernel::BlockSize();
 
-        float ave_time = ck_tile::launch_kernel(
-            s, ck_tile::make_kernel<blocks.x, 1>(Kernel{}, grids, blocks, 0, kargs));
+        float ave_time =
+            ck_tile::launch_kernel(s, ck_tile::make_kernel<1>(Kernel{}, grids, blocks, 0, kargs));
 
         return ave_time;
     }
@@ -69,11 +70,11 @@ float permute(permute_traits t, permute_args a, const ck_tile::stream_config& s)
 
         auto kargs = Kernel::MakeKargs(a);
 
-        const dim3 grids      = Kernel::GridSize(a);
-        constexpr dim3 blocks = Kernel::BlockSize();
+        const dim3 grids  = Kernel::GridSize(a);
+        const dim3 blocks = Kernel::BlockSize();
 
-        float ave_time = ck_tile::launch_kernel(
-            s, ck_tile::make_kernel<blocks.x, 1>(Kernel{}, grids, blocks, 0, kargs));
+        float ave_time =
+            ck_tile::launch_kernel(s, ck_tile::make_kernel<1>(Kernel{}, grids, blocks, 0, kargs));
 
         return ave_time;
     }
@@ -85,11 +86,11 @@ float permute(permute_traits t, permute_args a, const ck_tile::stream_config& s)
 
         auto kargs = Kernel::MakeKargs(a);
 
-        const dim3 grids      = Kernel::GridSize(a);
-        constexpr dim3 blocks = Kernel::BlockSize();
+        const dim3 grids  = Kernel::GridSize(a);
+        const dim3 blocks = Kernel::BlockSize();
 
-        float ave_time = ck_tile::launch_kernel(
-            s, ck_tile::make_kernel<blocks.x, 1>(Kernel{}, grids, blocks, 0, kargs));
+        float ave_time =
+            ck_tile::launch_kernel(s, ck_tile::make_kernel<1>(Kernel{}, grids, blocks, 0, kargs));
 
         return ave_time;
     }
@@ -127,7 +128,9 @@ auto create_args(int argc, char* argv[])
                 "random seed used for initializing input tensors. 0 for "
                 "non-deterministic seed")
         .insert("warmup", "5", "number of iterations before benchmark the kernel")
-        .insert("repeat", "20", "number of iterations to benchmark the kernel");
+        .insert("repeat", "20", "number of iterations to benchmark the kernel")
+        .insert("json", "0", "0: No Json, 1: Dump Results in Json format")
+        .insert("jsonfile", "permute.json", "json file name to dump results");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -256,6 +259,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
         return permute(t, a, stream_config);
     };
+#if !CK_TILE_USE_WMMA
 #ifdef PERMUTE_USE_ALTERNATIVE_IMPL
     // batch* n0*n1*n2*k0*k1*k2 -> batch* n0*k0*n1*k1*n2*k2
     if((arg_parser.get_str("perm") == std::string("0,1,4,2,5,3,6") ||
@@ -281,40 +285,23 @@ bool run(const ck_tile::ArgParser& arg_parser)
             auto kv = shape[5];
             a.n     = nr * nw;
             a.k     = kr * kw * kv;
-            if(ck_tile::is_gfx13_supported())
+            if(kv == 8 && kw == 4 && nw == 16 && nr % 4 == 0 && kr % 8 == 0)
             {
-                if(kv == 8 && kw == 2 && nw == 16 && nr % 4 == 0 && kr % 8 == 0)
-                {
-                    t.inst = "16x16x16";
-                    std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
+                t.inst = "16x16x16";
+                std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
 
-                    ave_time = matrix_core_swizzle(t, a, stream_config);
-                }
-                else
-                {
-                    ave_time = run_permute();
-                }
+                ave_time = matrix_core_swizzle(t, a, stream_config);
+            }
+            else if(kv == 8 && kw == 2 && nw == 32 && nr % 4 == 0 && kr % 8 == 0)
+            {
+                t.inst = "32x32x8";
+                std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
+
+                ave_time = matrix_core_swizzle(t, a, stream_config);
             }
             else
             {
-                if(kv == 8 && kw == 4 && nw == 16 && nr % 4 == 0 && kr % 8 == 0)
-                {
-                    t.inst = "16x16x16";
-                    std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
-
-                    ave_time = matrix_core_swizzle(t, a, stream_config);
-                }
-                else if(kv == 8 && kw == 2 && nw == 32 && nr % 4 == 0 && kr % 8 == 0)
-                {
-                    t.inst = "32x32x8";
-                    std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
-
-                    ave_time = matrix_core_swizzle(t, a, stream_config);
-                }
-                else
-                {
-                    ave_time = run_permute();
-                }
+                ave_time = run_permute();
             }
         }
         else
@@ -329,56 +316,39 @@ bool run(const ck_tile::ArgParser& arg_parser)
             a.batch = shape[0];
             a.n     = shape[1] * shape[2] * shape[3];
             a.k     = shape[4] * shape[5] * shape[6];
-            if(ck_tile::is_gfx13_supported())
+            if(shape[6] == 8 && shape[3] == 32 && shape[5] == 2 && shape[2] == 4 &&
+               shape[4] % 8 == 0 && shape[1] % 2 == 0)
             {
-                if(shape[6] == 8 && shape[3] == 16 && shape[5] == 2 && shape[2] == 4 &&
-                   shape[4] % 4 == 0 && shape[1] % 4 == 0)
-                {
-                    t.inst = "16x16x16";
-                    std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
+                // 32x32x8 inst
+                // perm=0,1,4,2,5,3,6
+                // y_shape=*,2x,8x,4,2,32,8 (3,6,16,4,2,32,8)
+                // shape = *,2x,4,32,8x,2,8 (3,6,4,32,16,2,8)
 
-                    ave_time = matrix_core_swizzle(t, a, stream_config);
-                }
-                else
-                {
-                    ave_time = run_permute();
-                }
+                t.inst = "32x32x8";
+                std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
+
+                ave_time = matrix_core_swizzle(t, a, stream_config);
+            }
+            else if(shape[6] == 8 && shape[3] == 16 && shape[5] == 4 && shape[2] == 4 &&
+                    shape[4] % 4 == 0 && shape[1] % 4 == 0)
+            {
+                // 16x16x16 inst
+                // perm=0,1,4,2,5,3,6
+                // y_shape=*,4x,4x,4,4,16,8
+                // shape = *,4x,4,16,4x,4,8 (3,8,4,16,16,4,8)
+                t.inst = "16x16x16";
+                std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
+
+                ave_time = matrix_core_swizzle(t, a, stream_config);
             }
             else
             {
-                if(shape[6] == 8 && shape[3] == 32 && shape[5] == 2 && shape[2] == 4 &&
-                   shape[4] % 8 == 0 && shape[1] % 2 == 0)
-                {
-                    // 32x32x8 inst
-                    // perm=0,1,4,2,5,3,6
-                    // y_shape=*,2x,8x,4,2,32,8 (3,6,16,4,2,32,8)
-                    // shape = *,2x,4,32,8x,2,8 (3,6,4,32,16,2,8)
-
-                    t.inst = "32x32x8";
-                    std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
-
-                    ave_time = matrix_core_swizzle(t, a, stream_config);
-                }
-                else if(shape[6] == 8 && shape[3] == 16 && shape[5] == 4 && shape[2] == 4 &&
-                        shape[4] % 4 == 0 && shape[1] % 4 == 0)
-                {
-                    // 16x16x16 inst
-                    // perm=0,1,4,2,5,3,6
-                    // y_shape=*,4x,4x,4,4,16,8
-                    // shape = *,4x,4,16,4x,4,8 (3,8,4,16,16,4,8)
-                    t.inst = "16x16x16";
-                    std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
-
-                    ave_time = matrix_core_swizzle(t, a, stream_config);
-                }
-                else
-                {
-                    ave_time = run_permute();
-                }
+                ave_time = run_permute();
             }
         }
     }
     else
+#endif
 #endif
     {
         ave_time = run_permute();
@@ -407,9 +377,19 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
         y_buf.FromDevice(y_dev.data());
 
-        pass =
-            ck_tile::check_err(y_dev, y, std::string("OUT Error: Incorrect results!"), 1e-2, 1e-2);
+        pass = std::equal(
+            y_dev.begin(), y_dev.end(), y.begin(), [&](const DataType& d, const DataType& h) {
+                using itype = to_integer_type<sizeof(DataType)>;
+                itype i_d   = ck_tile::bit_cast<itype>(d);
+                itype i_h   = ck_tile::bit_cast<itype>(h);
+                return i_d == i_h;
+            });
         std::cout << ", valid:" << (pass ? "y" : "n") << std::flush;
+    }
+
+    if(arg_parser.get_int("json") == 1)
+    {
+        dump_permute_json_results(arg_parser.get_str("jsonfile"), data_type, pass, ave_time, 0, 0);
     }
 
     std::cout << std::endl;

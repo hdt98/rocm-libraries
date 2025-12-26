@@ -1,37 +1,46 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 int run_groupnorm_fwd_example(int argc, char* argv[])
 {
-    ck::index_t N    = 32;
-    ck::index_t H    = 16;
-    ck::index_t W    = 16;
-    ck::index_t G    = 64;
-    ck::index_t C    = 128;
-    bool time_kernel = true;
+    ck::index_t N = 32;
+    ck::index_t H = 16;
+    ck::index_t W = 16;
+    ck::index_t G = 64;
+    ck::index_t C = 128;
+
+    bool do_verification = true;
+    bool time_kernel     = true;
+    bool log_kernel      = true;
 
     if(argc == 1)
     {
         // use default case
     }
-    else if(argc == 2)
+    else if(argc == 4)
     {
-        time_kernel = std::stoi(argv[1]);
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+        log_kernel      = std::stoi(argv[3]);
     }
-    else if(argc == 7)
+    else if(argc == 9)
     {
-        time_kernel = std::stoi(argv[1]);
-        N           = std::stoi(argv[2]);
-        H           = std::stoi(argv[3]);
-        W           = std::stoi(argv[4]);
-        G           = std::stoi(argv[5]);
-        C           = std::stoi(argv[6]);
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+        log_kernel      = std::stoi(argv[3]);
+        N               = std::stoi(argv[4]);
+        H               = std::stoi(argv[5]);
+        W               = std::stoi(argv[6]);
+        G               = std::stoi(argv[7]);
+        C               = std::stoi(argv[8]);
     }
     else
     {
-        std::cerr << "arg1 to 6: time_kernel, N, H, W, G, C" << std::endl;
+        std::cerr << "arg1 = verify(0=no, 1=yes), arg2 = time kernels(0=no, 1=yes), arg3 = log "
+                     "kernels(0=no, 1=yes), arg4 to 8: N, H, W, G, C"
+                  << std::endl;
 
         return 1;
     }
@@ -71,9 +80,9 @@ int run_groupnorm_fwd_example(int argc, char* argv[])
         {0, 0, 0, C, 1},
         std::vector<ck::index_t>{y.mDesc.GetStrides().begin(), y.mDesc.GetStrides().end()},
         std::vector<ck::index_t>{save_mean.mDesc.GetStrides().begin(),
-                                 save_mean.mDesc.GetStrides().end()},
+                                    save_mean.mDesc.GetStrides().end()},
         std::vector<ck::index_t>{save_mean.mDesc.GetStrides().begin(),
-                                 save_mean.mDesc.GetStrides().end()},
+                                    save_mean.mDesc.GetStrides().end()},
         {1, 2, 4}, // reduction dimension: [H, W, C]
         1e-6,
         x_dev.GetDeviceBuffer(),
@@ -100,7 +109,8 @@ int run_groupnorm_fwd_example(int argc, char* argv[])
     device_instance.SetWorkSpacePointer(argument_ptr.get(), workspace_dev.GetDeviceBuffer());
 
     auto invoker_ptr = device_instance.MakeInvokerPointer();
-    float ave_time = invoker_ptr->Run(argument_ptr.get(), StreamConfig{nullptr, time_kernel, true});
+    float ave_time =
+        invoker_ptr->Run(argument_ptr.get(), StreamConfig{nullptr, time_kernel, log_kernel});
 
     std::size_t num_btype = sizeof(XDataType) * N * H * W * G * C +
                             sizeof(YDataType) * N * H * W * G * C + sizeof(GammaDataType) * G * C +
@@ -112,6 +122,7 @@ int run_groupnorm_fwd_example(int argc, char* argv[])
               << device_instance.GetTypeString() << std::endl;
 
     bool pass = true;
+    if(do_verification)
     {
         Tensor<YDataType> host_y({N, H, W, G, C});
         Tensor<SaveMeanInvStdDataType> host_save_mean(HostTensorDescriptor{N, G});

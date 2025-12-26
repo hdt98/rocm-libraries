@@ -45,25 +45,23 @@ template <typename DeviceOp,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_grouped_query_attention_wmma(const ADataType* __restrict__ p_a_grid,
-                                            const B0DataType* __restrict__ p_b0_grid,
-                                            const B1DataType* __restrict__ p_b1_grid,
-                                            CDataType* __restrict__ p_c_grid,
-                                            index_t M,  // SequenceQ
-                                            index_t N,  // SequenceK
-                                            index_t K,  // HeadDim
-                                            index_t O,  // SequenceK
-                                            index_t G0, // Batch
-                                            index_t G1, // HeadNum
-                                            float alpha,
-                                            bool input_permute,
-                                            bool output_permute)
+    kernel_grouped_query_attention_wmma(const ADataType* __restrict__ p_a_grid,
+                                        const B0DataType* __restrict__ p_b0_grid,
+                                        const B1DataType* __restrict__ p_b1_grid,
+                                        CDataType* __restrict__ p_c_grid,
+                                        index_t M,  // SequenceQ
+                                        index_t N,  // SequenceK
+                                        index_t K,  // HeadDim
+                                        index_t O,  // SequenceK
+                                        index_t G0, // Batch
+                                        index_t G1, // HeadNum
+                                        float alpha,
+                                        bool input_permute,
+                                        bool output_permute)
 {
-    ignore = alpha;
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
-    defined(__gfx13__))
+#if(defined(__gfx11__) || defined(__gfx12__) || defined(__gfx13__))
 
     // clang-format off
 // ***************************************************
@@ -109,19 +107,19 @@ __global__ void
         DeviceOp::MakeB1GridDescriptor(b1_gs_os_ns_lengths, b1_gs_os_ns_strides);
     const auto c_grid_desc_m_n =
                   DeviceOp::Transform::MakeCGridDescriptor_M_N(c_gs_ms_os_lengths, c_gs_ms_os_strides);
-    const auto c_grid_desc_mblock_mperblock_nblock_nperblock = 
+    const auto c_grid_desc_mblock_mperblock_nblock_nperblock =
                   GridwiseOp::MakeCGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(c_grid_desc_m_n);
     const auto block_2_ctile_map = GridwiseOp::MakeDefaultBlock2CTileMap(c_grid_desc_m_n, 1, 1);
 
     const auto a_grid_desc_g_m_k =
                   DeviceOp::Transform::MakeAGridDescriptor_G_M_K(a_gs_ms_ks_lengths, a_gs_ms_ks_strides);
-    const auto b0_grid_desc_g_l_k = 
+    const auto b0_grid_desc_g_l_k =
                   DeviceOp::Transform::MakeB0GridDescriptor_G_N_K(b0_gs_ns_ks_lengths, b0_gs_ns_ks_strides);
-    const auto b1_grid_desc_g_n_l = 
+    const auto b1_grid_desc_g_n_l =
                   DeviceOp::Transform::MakeB1GridDescriptor_G_N_K(b1_gs_os_ns_lengths, b1_gs_os_ns_strides);
     const auto c_grid_desc_g_m_n =
                   DeviceOp::Transform::MakeCGridDescriptor_G_M_N(c_gs_ms_os_lengths, c_gs_ms_os_strides);
-    const auto compute_base_ptr_of_batch = 
+    const auto compute_base_ptr_of_batch =
                   typename DeviceOp::ComputeBasePtrOfStridedBatch{a_grid_desc_g_m_k, b0_grid_desc_g_l_k, b1_grid_desc_g_n_l, c_grid_desc_g_m_n};
     index_t batch_count = c_grid_desc_g_m_n.GetLength(Number<0>{});
     const auto c0_matrix_mask = typename DeviceOp::C0MatrixMask{b0_grid_desc_g_l_k.GetLength(Number<1>{})};

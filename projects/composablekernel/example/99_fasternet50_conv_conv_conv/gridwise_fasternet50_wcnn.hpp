@@ -40,24 +40,24 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_fasternet50_wcnn(const InDataType* __restrict__ p_in_grid,
-                                WeiPointer p_wei_grid,
-                                DsPointer p_ds_grid,
-                                EDataType* __restrict__ p_e_grid,
-                                const InElementwiseOperation in_element_op,
-                                const WeiElementwiseOperation wei_element_op,
-                                const AccElementwiseOperation acc_element_op,
-                                const index_t batch_count,
-                                const InGridDesc in_grid_desc,
-                                const WeiGridDesc wei_grid_desc,
-                                const DsGridDesc ds_grid_desc,
-                                const EGridDesc e_grid_desc,
-                                const Block2CTileMap block_2_ctile_map,
-                                const ComputePtrOffsetOfBatch0 compute_ptr_offset_of_batch_0,
-                                const ComputePtrOffsetOfBatch1 compute_ptr_offset_of_batch_1,
-                                const ComputePtrOffsetOfBatch2 compute_ptr_offset_of_batch_2)
+    kernel_fasternet50_wcnn(const InDataType* __restrict__ p_in_grid,
+                            WeiPointer p_wei_grid,
+                            DsPointer p_ds_grid,
+                            EDataType* __restrict__ p_e_grid,
+                            const InElementwiseOperation in_element_op,
+                            const WeiElementwiseOperation wei_element_op,
+                            const AccElementwiseOperation acc_element_op,
+                            const index_t batch_count,
+                            const InGridDesc in_grid_desc,
+                            const WeiGridDesc wei_grid_desc,
+                            const DsGridDesc ds_grid_desc,
+                            const EGridDesc e_grid_desc,
+                            const Block2CTileMap block_2_ctile_map,
+                            const ComputePtrOffsetOfBatch0 compute_ptr_offset_of_batch_0,
+                            const ComputePtrOffsetOfBatch1 compute_ptr_offset_of_batch_1,
+                            const ComputePtrOffsetOfBatch2 compute_ptr_offset_of_batch_2)
 {
 #if defined(__gfx13__)
     // offset base pointer for each work-group
@@ -1211,18 +1211,16 @@ struct GridwiseFasternet50_Wcnn_CShuffle
                 // tuple of reference to C/Ds tensor descriptors
                 const auto c_ds_desc_refs = concat_tuple_of_reference(
                     tie(out_tensor_block_desc),
-                    generate_tie(
-                        [&](auto i) -> const auto& // return type should be reference
-                        { return ds_grid_desc[Number<conv_phase>{}][i]; },
-                        Number<NumSingleDTensor>{}));
+                    generate_tie([&](auto i) -> const auto& // return type should be reference
+                                 { return ds_grid_desc[Number<conv_phase>{}][i]; },
+                                 Number<NumSingleDTensor>{}));
 
                 // tuple of reference to C/Ds tensor buffers
                 const auto c_ds_buf_refs = concat_tuple_of_reference(
                     tie(out_tensor_block_buf),
-                    generate_tie(
-                        [&](auto i) -> const auto& // return type should be reference
-                        { return ds_grid_buf[Number<conv_phase>{}][i]; },
-                        Number<NumSingleDTensor>{}));
+                    generate_tie([&](auto i) -> const auto& // return type should be reference
+                                 { return ds_grid_buf[Number<conv_phase>{}][i]; },
+                                 Number<NumSingleDTensor>{}));
 
                 // tuple of starting index of C/Ds blockwise copy
                 const auto idx_c_ds_block_begin =
@@ -2938,9 +2936,9 @@ struct GridwiseFasternet50_Wcnn_CShuffle
                         if constexpr(EnableWaveGroup)
                         {
                             return make_static_buffer_v5<
-                                AddressSpaceEnum::Vgpr,
-                                DDataType,
-                                laneSharedMemTrait.ds_0_block_space_offset[i] / sizeof(DDataType)>(
+                                    AddressSpaceEnum::Vgpr,
+                                    DDataType,
+                                    laneSharedMemTrait.ds_0_block_space_offset[i] / sizeof(DDataType)>(
                                 ds_wave_desc[Number<i>{}].GetElementSpaceSize(),
                                 static_cast<DDataType*>(p_lane_shared));
                         }
@@ -3016,9 +3014,9 @@ struct GridwiseFasternet50_Wcnn_CShuffle
                         if constexpr(EnableWaveGroup)
                         {
                             return make_static_buffer_v5<
-                                AddressSpaceEnum::Vgpr,
-                                DDataType,
-                                laneSharedMemTrait.ds_1_block_space_offset[i] / sizeof(DDataType)>(
+                                    AddressSpaceEnum::Vgpr,
+                                    DDataType,
+                                    laneSharedMemTrait.ds_1_block_space_offset[i] / sizeof(DDataType)>(
                                 ds_wave_desc[Number<i>{}].GetElementSpaceSize(),
                                 static_cast<DDataType*>(p_lane_shared));
                         }
@@ -3094,9 +3092,9 @@ struct GridwiseFasternet50_Wcnn_CShuffle
                         if constexpr(EnableWaveGroup)
                         {
                             return make_static_buffer_v5<
-                                AddressSpaceEnum::Vgpr,
-                                DDataType,
-                                laneSharedMemTrait.ds_2_block_space_offset[i] / sizeof(DDataType)>(
+                                    AddressSpaceEnum::Vgpr,
+                                    DDataType,
+                                    laneSharedMemTrait.ds_2_block_space_offset[i] / sizeof(DDataType)>(
                                 ds_wave_desc[Number<i>{}].GetElementSpaceSize(),
                                 static_cast<DDataType*>(p_lane_shared));
                         }
@@ -3381,20 +3379,20 @@ struct GridwiseFasternet50_Wcnn_CShuffle
 #endif
         }
 #else
-        ignore                           = p_in_grid;
-        ignore                           = p_wei_grid;
-        ignore                           = p_ds_grid;
-        ignore                           = p_e_grid;
-        ignore                           = p_shared;
-        ignore                           = p_lane_shared;
-        ignore                           = in_element_op;
-        ignore                           = wei_element_op;
-        ignore                           = acc_element_op;
-        ignore                           = in_grid_desc;
-        ignore                           = wei_grid_desc;
-        ignore                           = ds_grid_desc;
-        ignore                           = e_grid_desc;
-        ignore                           = block_2_ctile_map;
+        ignore = p_in_grid;
+        ignore = p_wei_grid;
+        ignore = p_ds_grid;
+        ignore = p_e_grid;
+        ignore = p_shared;
+        ignore = p_lane_shared;
+        ignore = in_element_op;
+        ignore = wei_element_op;
+        ignore = acc_element_op;
+        ignore = in_grid_desc;
+        ignore = wei_grid_desc;
+        ignore = ds_grid_desc;
+        ignore = e_grid_desc;
+        ignore = block_2_ctile_map;
 #endif
     }
 };

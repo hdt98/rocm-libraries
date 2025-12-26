@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -27,6 +27,10 @@ struct TileGemmShape
 
     static constexpr bool PermuteA = PermuteA_;
     static constexpr bool PermuteB = PermuteB_;
+
+    static constexpr index_t flatNPerWarp  = BlockWarps::at(number<1>{});
+    static constexpr index_t flatKPerWarp  = WarpTile::at(number<2>{}) * WarpTile::at(number<1>{});
+    static constexpr index_t flatKPerBlock = flatKPerWarp * kK / WarpTile::at(number<2>{});
 
     CK_TILE_HOST static std::string GetName()
     {

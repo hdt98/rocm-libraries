@@ -90,19 +90,19 @@ llvm_amdgcn_raw_buffer_load_i8x4(int32x4_t srsrc,
                                  index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.v4i8");
 
 // buffer load i16
-__device__ int16_t
+__device__ bhalf_t
 llvm_amdgcn_raw_buffer_load_i16(int32x4_t srsrc,
                                 index_t voffset,
                                 index_t soffset,
                                 index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.i16");
 
-__device__ int16x2_t
+__device__ bhalf2_t
 llvm_amdgcn_raw_buffer_load_i16x2(int32x4_t srsrc,
                                   index_t voffset,
                                   index_t soffset,
                                   index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.v2i16");
 
-__device__ int16x4_t
+__device__ bhalf4_t
 llvm_amdgcn_raw_buffer_load_i16x4(int32x4_t srsrc,
                                   index_t voffset,
                                   index_t soffset,
@@ -189,21 +189,21 @@ llvm_amdgcn_raw_buffer_store_i8x4(int8x4_t vdata,
 
 // buffer store i16
 __device__ void
-llvm_amdgcn_raw_buffer_store_i16(int16_t vdata,
+llvm_amdgcn_raw_buffer_store_i16(bhalf_t vdata,
                                  int32x4_t rsrc,
                                  index_t voffset,
                                  index_t soffset,
                                  index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.i16");
 
 __device__ void
-llvm_amdgcn_raw_buffer_store_i16x2(int16x2_t vdata,
+llvm_amdgcn_raw_buffer_store_i16x2(bhalf2_t vdata,
                                    int32x4_t rsrc,
                                    index_t voffset,
                                    index_t soffset,
                                    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v2i16");
 
 __device__ void
-llvm_amdgcn_raw_buffer_store_i16x4(int16x4_t vdata,
+llvm_amdgcn_raw_buffer_store_i16x4(bhalf4_t vdata,
                                    int32x4_t rsrc,
                                    index_t voffset,
                                    index_t soffset,
@@ -1363,33 +1363,6 @@ __device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
         ignore = global_offset;
 #endif
     }
-}
-
-template <typename T, index_t N, AddressSpaceEnum BufferAddressSpace>
-__device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
-{
-    using vector_t = typename vector_type_maker<T, N>::type::type;
-#if defined(__gfx13__)
-    if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t>)
-    {
-        if(is_src_valid)
-        {
-            typedef __attribute__((__vector_size__(8 * sizeof(__fp16)))) __fp16 llvm_fp16x8_t;
-            __attribute__((address_space(1))) llvm_fp16x8_t* global_ptr =
-                reinterpret_cast<__attribute__((address_space(1))) llvm_fp16x8_t*>(
-                    reinterpret_cast<uintptr_t>(in_ptr));
-            return bit_cast<vector_t>(__builtin_amdgcn_global_load_tr16_b128_v8f16(global_ptr));
-        }
-        else
-        {
-            return vector_t{0};
-        }
-    }
-#else
-    ignore = in_ptr;
-    ignore = is_src_valid;
-    return vector_t{0};
-#endif
 }
 
 template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>

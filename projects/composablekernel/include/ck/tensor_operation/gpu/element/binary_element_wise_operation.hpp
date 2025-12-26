@@ -12,6 +12,8 @@ namespace element_wise {
 
 struct Add
 {
+    static constexpr const char* name = "Add";
+
     template <typename Y, typename X0, typename X1>
     __host__ __device__ constexpr void operator()(Y& y, const X0& x0, const X1& x1) const;
 
@@ -47,7 +49,7 @@ struct Add
     __host__ __device__ constexpr void
     operator()<half_t>(half_t& y, const float& x0, const half_t& x1) const
     {
-        y = type_convert<half_t>(x0) + x1;
+        y = x0 + type_convert<float>(x1);
     };
 
     template <>
@@ -94,6 +96,8 @@ struct Add
 
 struct Max
 {
+    static constexpr const char* name = "Max";
+
     template <typename Y, typename X0, typename X1>
     __host__ __device__ void operator()(Y& y, const X0& x0, const X1& x1) const
     {
@@ -105,6 +109,8 @@ struct Max
 
 struct Min
 {
+    static constexpr const char* name = "Min";
+
     template <typename Y, typename X0, typename X1>
     __host__ __device__ void operator()(Y& y, const X0& x0, const X1& x1) const
     {
@@ -116,6 +122,8 @@ struct Min
 
 struct Multiply
 {
+    static constexpr const char* name = "Multiply";
+
     template <typename Y, typename X0, typename X1>
     __host__ __device__ constexpr void operator()(Y& y, const X0& x0, const X1& x1) const;
 
@@ -210,13 +218,14 @@ struct Multiply
 template <bool Clamp = false>
 struct ScaleAddImpl
 {
+    static constexpr const char* name = "ScaleAdd";
     __host__ __device__ ScaleAddImpl(float scale = 1.f) : scale_(scale) {}
 
     template <typename Y, typename X0, typename X1>
     __host__ __device__ constexpr void operator()(Y& y, const X0& x0, const X1& x1) const
     {
         float y_0 = scale_ * ck::type_convert<float>(x0) + ck::type_convert<float>(x1);
-        if constexpr(Clamp && std::is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
+        if constexpr(Clamp && is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
         {
             float y_1 = math::clamp(y_0,
                                     ck::type_convert<float>(NumericLimits<Y>::Min()),
@@ -308,6 +317,8 @@ struct ScaleAddRevRelu
 
 struct Subtract
 {
+    static constexpr const char* name = "Subtract";
+
     template <typename T>
     __host__ __device__ constexpr void operator()(T& y, const T& x0, const T& x1) const;
 
@@ -352,6 +363,8 @@ struct Subtract
 
 struct Bilinear
 {
+    static constexpr const char* name = "Bilinear";
+
     Bilinear(float alpha = 1.f, float beta = 1.f) : alpha_(alpha), beta_(beta){};
 
     template <typename Y, typename X0, typename X1>
@@ -426,6 +439,8 @@ struct Bilinear
 
 struct AddClamp
 {
+    static constexpr const char* name = "AddClamp";
+
     AddClamp(float floor = 0.f, float ceil = NumericLimits<float>::Max())
         : floor_(floor), ceil_(ceil){};
 
@@ -452,10 +467,10 @@ struct AddClamp
     __host__ __device__ constexpr void
     operator()<half_t, half_t, half_t>(half_t& y, const half_t& x0, const half_t& x1) const
     {
-        const half_t a = x0 + x1;
-        y              = a > type_convert<half_t>(floor_)
-                             ? (a < type_convert<half_t>(ceil_) ? a : type_convert<half_t>(ceil_))
-                             : type_convert<half_t>(floor_);
+        const half_t floor = type_convert<half_t>(floor_);
+        const half_t ceil  = type_convert<half_t>(ceil_);
+        const half_t a     = x0 + x1;
+        y                  = a > floor ? (a < ceil ? a : ceil) : floor;
     };
 
     template <>
@@ -515,6 +530,8 @@ struct AddClamp
 
 struct AddRelu
 {
+    static constexpr const char* name = "AddRelu";
+
     template <typename Y, typename X0, typename X1>
     __host__ __device__ constexpr void operator()(Y& y, const X0& x0, const X1& x1) const;
 
@@ -596,6 +613,8 @@ struct AddRelu
 
 struct AddHardswish
 {
+    static constexpr const char* name = "AddHardswish";
+
     template <typename T>
     __host__ __device__ constexpr void operator()(T& y, const T& x0, const T& x1) const;
 
@@ -633,6 +652,8 @@ struct AddHardswish
 // E = FastGelu(C + D)
 struct AddFastGelu
 {
+    static constexpr const char* name = "AddFastGelu";
+
     template <typename E, typename C, typename D>
     __host__ __device__ constexpr void operator()(E& e, const C& c, const D& d) const;
 
@@ -695,9 +716,11 @@ struct AddFastGelu
     }
 };
 
-// E = FastGelu(C * D)
+// E = MultiplyFastGelu(C + D)
 struct MultiplyFastGelu
 {
+    static constexpr const char* name = "MultiplyFastGelu";
+
     template <typename E, typename C, typename D>
     __host__ __device__ constexpr void operator()(E& e, const C& c, const D& d) const;
 
@@ -763,6 +786,8 @@ struct MultiplyFastGelu
 // E = Silu(C + D)
 struct AddSilu
 {
+    static constexpr const char* name = "AddSilu";
+
     template <typename E, typename C, typename D>
     __host__ __device__ constexpr void operator()(E& e, const C& c, const D& d) const;
 
@@ -813,6 +838,8 @@ struct AddSilu
 
 struct ConvScaleAdd
 {
+    static constexpr const char* name = "ConvScaleAdd";
+
     __host__ __device__ ConvScaleAdd(float scale_in  = 1.f,
                                      float scale_wei = 1.f,
                                      float scale_out = 1.f)

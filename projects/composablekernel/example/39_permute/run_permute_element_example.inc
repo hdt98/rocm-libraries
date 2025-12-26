@@ -1,9 +1,9 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
-bool run_permute_element(bool time_kernel, const Problem& problem)
+bool run_permute_element(const Problem& problem, bool time_kernel)
 {
     const auto& input_shape = problem.shape;
     const auto& input_axes  = problem.axes;
@@ -59,9 +59,9 @@ bool run_permute_element(bool time_kernel, const Problem& problem)
                                 1e-6);
 }
 
-bool run_permute_element_example(bool time_kernel,
-                                 const Problem::Shape& shape,
-                                 const Problem::Axes& axes)
+bool run_permute_element_example(const Problem::Shape& shape,
+                                 const Problem::Axes& axes,
+                                 bool time_kernel)
 {
-    return run_permute_element(time_kernel, Problem{shape, axes});
+    return run_permute_element(Problem{shape, axes}, time_kernel);
 }

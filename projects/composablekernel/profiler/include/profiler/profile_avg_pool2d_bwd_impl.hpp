@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -83,7 +83,9 @@ bool profile_avg_pool2d_bwd_impl(int do_verification,
         [](std::size_t N_, std::size_t C_, std::size_t H, std::size_t W) {
             using namespace ck::literals;
 
-            return HostTensorDescriptor({N_, C_, H, W}, {C_ * H * W, 1_uz, W * C_, C_});
+            return HostTensorDescriptor({N_, C_, H, W},
+                                        {C_ * H * W, 1_uz, W * C_, C_},
+                                        ck::tensor_layout::convolution::NCHW{});
         };
 
     Tensor<DOutDataType> out_n_c_ho_wo_host(f_host_tensor_descriptor(N, C, Ho, Wo));

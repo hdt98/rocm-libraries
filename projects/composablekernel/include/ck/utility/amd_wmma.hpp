@@ -1579,8 +1579,8 @@ struct intrin_wmma_i32_16x16x16_iu8_w32_gfx12;
 template <bool neg_a, bool neg_b, bool clamp>
 struct intrin_wmma_i32_16x16x16_iu8_w32_gfx12<16, 16, neg_a, neg_b, clamp>
 {
-    template <class FloatA, class FloatB, class FloatC>
-    __device__ static void Run(const FloatA& reg_a, const FloatB& reg_b, FloatC& reg_c)
+    template <class FloatC>
+    __device__ static void Run(const int8x8_t& reg_a, const int8x8_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx12__)
         reg_c.template AsType<int32x8_t>()(Number<0>{}) =

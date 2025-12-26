@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -203,8 +203,11 @@ make_input_host_tensor_descriptor_g_n_c_wis_packed(const ck::utils::conv::ConvPa
     }
 
     return transpose_host_tensor_descriptor_given_new2old(
-        HostTensorDescriptor(physical_lengths),
-        detail::get_layout_transpose_gnchw_to_old<InLayout>());
+        // TBD: specify explicit conv layout rather than base one
+        HostTensorDescriptor(physical_lengths,
+                             ck::tensor_layout::convolution::BaseConvolutionLayout{}),
+        detail::get_layout_transpose_gnchw_to_old<InLayout>(),
+        InLayout{});
 }
 
 // make tensor descriptor for packed weight tensor, and order the dimension in the order of GKCYX
@@ -296,57 +299,10 @@ make_weight_host_tensor_descriptor_g_k_c_xs_packed(const ck::utils::conv::ConvPa
     }
 
     return transpose_host_tensor_descriptor_given_new2old(
-        HostTensorDescriptor(physical_lengths),
-        detail::get_layout_transpose_gnchw_to_old<WeiLayout>());
-}
-
-template <typename DsLayout>
-HostTensorDescriptor
-make_scalebias_host_tensor_descriptor(const ck::utils::conv::ConvParam& conv_param,
-                                      ck::index_t ds_length)
-{
-    switch(conv_param.num_dim_spatial_)
-    {
-    case 1:
-        return HostTensorDescriptor(
-            {conv_param.G_, conv_param.N_, ds_length, conv_param.output_spatial_lengths_[0]},
-            {
-                ds_length, // g
-                0,         // k
-                1,         // c
-                0          // x
-            });
-    case 2:
-        return HostTensorDescriptor({conv_param.G_,
-                                     conv_param.N_,
-                                     ds_length,
-                                     conv_param.output_spatial_lengths_[0],
-                                     conv_param.output_spatial_lengths_[1]},
-                                    {
-                                        ds_length, // g
-                                        0,         // n
-                                        1,         // k
-                                        0,         // ho
-                                        0          // wo
-                                    });
-    case 3:
-        return HostTensorDescriptor({conv_param.G_,
-                                     conv_param.N_,
-                                     ds_length,
-                                     conv_param.output_spatial_lengths_[0],
-                                     conv_param.output_spatial_lengths_[1],
-                                     conv_param.output_spatial_lengths_[2]},
-                                    {
-                                        ds_length, // g
-                                        0,         // n
-                                        1,         // k
-                                        0,         // z
-                                        0,         // y
-                                        0          // x
-                                    });
-    }
-
-    throw std::runtime_error("unsuppored # dim spatial");
+        HostTensorDescriptor(physical_lengths,
+                             ck::tensor_layout::convolution::BaseConvolutionLayout{}),
+        detail::get_layout_transpose_gnchw_to_old<WeiLayout>(),
+        WeiLayout{});
 }
 
 // make tensor descriptor for packed output tensor, and order the dimension in the order of GNKHW
@@ -435,8 +391,10 @@ make_output_host_tensor_descriptor_g_n_k_wos_packed(const ck::utils::conv::ConvP
     }
 
     return transpose_host_tensor_descriptor_given_new2old(
-        HostTensorDescriptor(physical_lengths),
-        detail::get_layout_transpose_gnchw_to_old<OutLayout>());
+        HostTensorDescriptor(physical_lengths,
+                             ck::tensor_layout::convolution::BaseConvolutionLayout{}),
+        detail::get_layout_transpose_gnchw_to_old<OutLayout>(),
+        OutLayout{});
 }
 
 } // namespace conv

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -206,6 +206,28 @@ struct DeviceOperationInstanceFactory<
             {
                 add_device_gemm_wmma_f16_f16_f16_km_nk_mn_instances(op_ptrs);
             }
+#ifdef CK_USE_WCNN
+            if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
+                         is_same_v<CLayout, Row>)
+            {
+                add_device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances(op_ptrs);
+            }
+            else if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Col> &&
+                              is_same_v<CLayout, Row>)
+            {
+                add_device_gemm_wmma_f16_f16_f16_mk_nk_mn_gfx13_instances(op_ptrs);
+            }
+            else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Row> &&
+                              is_same_v<CLayout, Row>)
+            {
+                add_device_gemm_wmma_f16_f16_f16_km_kn_mn_gfx13_instances(op_ptrs);
+            }
+            else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Col> &&
+                              is_same_v<CLayout, Row>)
+            {
+                add_device_gemm_wmma_f16_f16_f16_km_nk_mn_gfx13_instances(op_ptrs);
+            }
+#endif
         }
 #endif
 #ifdef CK_ENABLE_BF16

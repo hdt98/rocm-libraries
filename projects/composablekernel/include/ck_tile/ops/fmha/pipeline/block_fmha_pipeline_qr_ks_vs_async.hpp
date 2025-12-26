@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -81,6 +81,8 @@ struct BlockFmhaPipelineQRKSVSAsync
     static constexpr index_t kAlignmentO = Policy::template GetAlignmentO<Problem>();
     static constexpr index_t kAlignmentBias =
         kPadSeqLenK ? 1 : Policy::template GetAlignmentBias<Problem>();
+    static constexpr index_t kAlignmentRandVal =
+        kPadSeqLenK ? 1 : Policy::template GetAlignmentRandVal<Problem>();
 
 #if CK_TILE_FMHA_FWD_FAST_EXP2
     static constexpr auto R_LOG2E = 1.0 / log2e_v<SaccDataType>;
@@ -205,18 +207,7 @@ struct BlockFmhaPipelineQRKSVSAsync
         constexpr auto LdsSeq = Policy::template GetLdsBufferSequence<Problem>();
 
         // K tile in LDS
-        auto k_lds_ptr = reinterpret_cast<KDataType*>(smem_ptr);
-#if(defined(__gfx13__))
-        auto k_lds_store = generate_tuple(
-            [&](auto i_buf) {
-                return make_tile_window(
-                    make_tensor_view<address_space_enum::lds>(
-                        k_lds_ptr, Policy::template MakeKLdsStoreBlockDescriptor<Problem>(i_buf)),
-                    Policy::template MakeKLdsStoreBlockDescriptor<Problem>(i_buf).get_lengths(),
-                    {0, 0}); // for gfx13 use 2D tile window; because of instruction difference
-            },
-            number<Policy::NumKVLdsBuffers>{});
-#else
+        auto k_lds_ptr   = reinterpret_cast<KDataType*>(smem_ptr);
         auto k_lds_store = generate_tuple(
             [&](auto i_buf) {
                 return make_tile_window(
@@ -226,7 +217,7 @@ struct BlockFmhaPipelineQRKSVSAsync
                     {0, 0, 0});
             },
             number<Policy::NumKVLdsBuffers>{});
-#endif
+
         auto k_lds_Load_view = make_tensor_view<address_space_enum::lds>(
             k_lds_ptr, Policy::template MakeKLdsLoadBlockDescriptor<Problem>());
 
@@ -250,9 +241,6 @@ struct BlockFmhaPipelineQRKSVSAsync
                                               q_dram_block_window_tmp.get_window_lengths(),
                                               q_dram_block_window_tmp.get_window_origin(),
                                               Policy::template MakeQRegTileDistribution<Problem>());
-#if(defined(__gfx13__))
-        auto q = load_tile(q_dram_window);
-#else
         q_dram_window.init_raw();
 
         // TODO: we use async Copy for K, which is inline asm
@@ -262,8 +250,8 @@ struct BlockFmhaPipelineQRKSVSAsync
         // however, q would be cleared in the constructor of static distributed tensor
         // set_tile(q, number<0>{}); // use per-dword clear to avoid scratch
         load_tile_raw(q, q_dram_window);
-#endif
         __builtin_amdgcn_sched_barrier(0);
+
         using SaccBlockTileType = decltype(gemm_0.MakeCBlockTile());
         auto s_acc              = SaccBlockTileType{};
 
@@ -356,20 +344,13 @@ struct BlockFmhaPipelineQRKSVSAsync
                              {0, seqlen_k_start}, // TODO: hdim split?
                              Policy::template MakeVDramTileDistribution<Problem>());
 
-// prefetch K tile
-#if(defined(__gfx13__))
-        ignore = k_pre_np; // not used
-        async_load_tile_to_lds(
-            k_lds_store(LdsSeq.at(number<0>{})), k_dram_window, number<-1>{}, k_oob_ck);
-#else
+        // prefetch K tile
         async_load_tile_raw(
             k_lds_store(LdsSeq.at(number<0>{})), k_dram_window, number<-1>{}, k_oob_ck, k_pre_np);
-#endif
         move_tile_window(k_dram_window, {0, kK0});
         __builtin_amdgcn_sched_barrier(0);
-#if(!defined(__gfx13__))
+
         buffer_load_fence(k_dram_window.get_num_of_access(), q.get_thread_buffer());
-#endif
         (void)q_element_func; // ??? rocm-6.x if use q element func will have scratch on hdim=64/32
         // auto q_tile = q;      // tile_elementwise_in(q_element_func, q);
 
@@ -387,25 +368,15 @@ struct BlockFmhaPipelineQRKSVSAsync
             if constexpr(k0_loops > 1)
             {
                 static_for<0, k0_loops - 1, 1>{}([&](auto i_k0) {
-#if(defined(__gfx13__))
-                    async_load_tile_to_lds(k_lds_store(number<LdsSeq.at(number<i_k0 + 1>{})>{}),
-                                           k_dram_window,
-                                           number<-1>{},
-                                           k_oob_ck);
-#else
                     async_load_tile_raw(k_lds_store(number<LdsSeq.at(number<i_k0 + 1>{})>{}),
                                         k_dram_window,
                                         number<-1>{},
                                         k_oob_ck,
                                         k_pre_np);
-#endif
                     if constexpr(i_k0 < k0_loops - 1)
                         move_tile_window(k_dram_window, {0, kK0});
-#if(defined(__gfx13__))
-                    block_async_lds(k_dram_window.get_num_of_access());
-#else
+
                     async_load_fence(k_dram_window.get_num_of_access());
-#endif
                     __builtin_amdgcn_s_barrier();
                     __builtin_amdgcn_sched_barrier(0);
                     gemm_0(s_acc,
@@ -421,11 +392,8 @@ struct BlockFmhaPipelineQRKSVSAsync
             // the following fence/barrier will be scheduled inside 1st loop
             if constexpr(k0_loops <= 2)
                 __builtin_amdgcn_sched_barrier(0);
-#if(defined(__gfx13__))
-            block_async_lds();
-#else
+
             async_load_fence();
-#endif
             __builtin_amdgcn_s_barrier();
 
             const auto bias_tile = load_tile(bias_dram_window); // load bias tile
@@ -541,11 +509,8 @@ struct BlockFmhaPipelineQRKSVSAsync
                 sequence<1>{},
                 f_max,
                 -numeric<SMPLComputeDataType>::infinity()); // m_local = rowmax(S{j})
-#if(defined(__gfx13__))
-            block_tile_reduce_xor_sync(m_local, f_max);
-#else
             block_tile_reduce_sync(m_local, f_max, bool_constant<false>{});
-#endif
+
             const auto m_old = m; // m{j-1}
             tile_elementwise_inout(
                 [](auto& e0, auto e1, auto e2) { e0 = max(e1, e2); }, m, m_old, m_local); // m{j}
@@ -640,11 +605,7 @@ struct BlockFmhaPipelineQRKSVSAsync
             auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
                 p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
 
-#if(defined(__gfx13__))
-            block_tile_reduce_xor_sync(rowsum_p, f_sum);
-#else
             block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
-#endif
             // l{j}, Oacc{j}
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
@@ -696,12 +657,12 @@ struct BlockFmhaPipelineQRKSVSAsync
             const auto p = [&]() {
 #if CK_TILE_FMHA_FLOAT_TO_FLOAT16_RTN
                 // For fp32 to fp16,
-                // impl::cast_tile_pk_fp16_fp32 would cause precision issue,
+                // impl::cast_tile_pkrtz_fp16_fp32 would cause precision issue,
                 // since it uses __builtin_amdgcn_cvt_pkrtz, which is round to zero.
                 return cast_tile<PDataType>(tile_elementwise_in(p_compute_element_func, p_compute));
 #else
                 if constexpr(std::is_same_v<PDataType, fp16_t>)
-                    return impl::cast_tile_pk_fp16_fp32<PDataType>(
+                    return impl::cast_tile_pkrtz_fp16_fp32<PDataType>(
                         tile_elementwise_in(p_compute_element_func, p_compute));
                 else
                     return cast_tile<PDataType>(
@@ -763,18 +724,11 @@ struct BlockFmhaPipelineQRKSVSAsync
                 if constexpr(k1_loops >= 2 &&
                              LdsSeq.at(number<0>{}) == LdsSeq.at(number<k0_loops + k1_loops - 2>{}))
                     __builtin_amdgcn_s_barrier();
-#if(defined(__gfx13__))
-                async_load_tile_to_lds(k_lds_store(number<LdsSeq.at(number<0>{})>{}),
-                                       k_dram_window,
-                                       number<-1>{},
-                                       k_oob_ck);
-#else
                 async_load_tile_raw(k_lds_store(LdsSeq.at(number<0>{})),
                                     k_dram_window,
                                     number<-1>{},
                                     k_oob_ck,
                                     k_pre_np);
-#endif
                 move_tile_window(k_dram_window, {0, kK0});
             }
             // tail
