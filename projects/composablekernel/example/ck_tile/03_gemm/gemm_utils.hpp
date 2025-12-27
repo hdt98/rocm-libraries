@@ -466,6 +466,15 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_ASYNC>
 };
 
 template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_ASYNC_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompAsyncV2<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompAsyncV2<PipelineProblem>;
+};
+
+template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V1>
 {
     template <typename PipelineProblem>
