@@ -37,6 +37,10 @@
 #include <algorithm>
 #include <cmath>
 
+#define ASSERT(x) \
+    {             \
+    }
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 /**
@@ -54,9 +58,9 @@ ROCSOLVER_BEGIN_NAMESPACE
 template <typename I>
 __device__ static I idx_upper(I i, I j, I n)
 {
-    assert((0 <= i) && (i <= (n - 1)));
-    assert((0 <= j) && (j <= (n - 1)));
-    assert(i <= j);
+    ASSERT((0 <= i) && (i <= (n - 1)));
+    ASSERT((0 <= j) && (j <= (n - 1)));
+    ASSERT(i <= j);
 
     return (i + (j * (j + 1)) / 2);
 }
@@ -76,9 +80,9 @@ __device__ static I idx_upper(I i, I j, I n)
 template <typename I>
 __device__ static I idx_lower(I i, I j, I n)
 {
-    assert((0 <= i) && (i <= (n - 1)));
-    assert((0 <= j) && (j <= (n - 1)));
-    assert(i >= j);
+    ASSERT((0 <= i) && (i <= (n - 1)));
+    ASSERT((0 <= j) && (j <= (n - 1)));
+    ASSERT(i >= j);
 
     return ((i - j) + (j * (2 * n + 1 - j)) / 2);
 }
@@ -90,7 +94,8 @@ __device__ static I idx_lower(I i, I j, I n)
  * ------------------------------------------------------
 **/
 template <typename T, typename I, typename INFO>
-__device__ static void potf2_simple(bool const is_upper, I const n, T* const A, INFO* const info)
+__device__ static void
+    potf2_simple(bool const is_upper, I const n, T* const A, INFO* const info, const I row_offset)
 {
     auto const lda = n;
     bool const is_lower = (!is_upper);
@@ -99,7 +104,7 @@ __device__ static void potf2_simple(bool const is_upper, I const n, T* const A, 
     auto const i_inc = hipBlockDim_x;
     auto const j_start = hipThreadIdx_y;
     auto const j_inc = hipBlockDim_y;
-    assert(hipBlockDim_z == 1);
+    ASSERT(hipBlockDim_z == 1);
 
     auto const tid = hipThreadIdx_x + hipThreadIdx_y * hipBlockDim_x
         + hipThreadIdx_z * (hipBlockDim_x * hipBlockDim_y);
@@ -137,7 +142,7 @@ __device__ static void potf2_simple(bool const is_upper, I const n, T* const A, 
                     A[kk] = akk;
                     // Fortran 1-based index
                     if(*info == 0)
-                        *info = kcol + 1;
+                        *info = kcol + 1 + row_offset;
                 }
                 break;
             }
@@ -282,7 +287,8 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
                                          const rocblas_stride shiftA,
                                          const I lda,
                                          const rocblas_stride strideA,
-                                         INFO* const info)
+                                         INFO* const info,
+                                         const I row_offset)
 {
     bool const is_lower = (!is_upper);
 
@@ -290,19 +296,19 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
     auto const i_inc = hipBlockDim_x;
     auto const j_start = hipThreadIdx_y;
     auto const j_inc = hipBlockDim_y;
-    assert(hipBlockDim_z == 1);
+    ASSERT(hipBlockDim_z == 1);
 
     // --------------------------------
     // note hipGridDim_z == batch_count
     // --------------------------------
     auto const bid = hipBlockIdx_z;
-    assert(AA != nullptr);
-    assert(info != nullptr);
+    ASSERT(AA != nullptr);
+    ASSERT(info != nullptr);
 
     T* const A = load_ptr_batch(AA, bid, shiftA, strideA);
     INFO* const info_bid = info + bid;
 
-    assert(A != nullptr);
+    ASSERT(A != nullptr);
 
     // -----------------------------------------
     // assume n by n matrix will fit in LDS cache
@@ -352,7 +358,7 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
     __syncthreads();
 
     bool const is_up = (use_compute_lower) ? false : is_upper;
-    potf2_simple<T>(is_up, n, Ash, info_bid);
+    potf2_simple<T>(is_up, n, Ash, info_bid, row_offset);
 
     __syncthreads();
 
@@ -403,7 +409,8 @@ rocblas_status potf2_run_small(rocblas_handle handle,
                                const I lda,
                                const rocblas_stride strideA,
                                INFO* info,
-                               const I batch_count)
+                               const I batch_count,
+                               const I row_offset)
 {
     ROCSOLVER_ENTER("potf2_kernel_small", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
@@ -416,7 +423,7 @@ rocblas_status potf2_run_small(rocblas_handle handle,
     bool const is_upper = (uplo == rocblas_fill_upper);
     ROCSOLVER_LAUNCH_KERNEL((potf2_kernel_small<T, I, INFO, U>), dim3(1, 1, batch_count),
                             dim3(BS2, BS2, 1), lmemsize, stream, is_upper, n, A, shiftA, lda,
-                            strideA, info);
+                            strideA, info, row_offset);
 
     return rocblas_status_success;
 }
@@ -425,9 +432,10 @@ rocblas_status potf2_run_small(rocblas_handle handle,
     Instantiation macros
 *************************************************************/
 
-#define INSTANTIATE_POTF2_SMALL(T, I, INFO, U)                                                       \
-    template rocblas_status potf2_run_small<T, I, INFO, U>(                                          \
-        rocblas_handle handle, const rocblas_fill uplo, const I n, U A, const rocblas_stride shiftA, \
-        const I lda, const rocblas_stride strideA, INFO* info, const I batch_count)
+#define INSTANTIATE_POTF2_SMALL(T, I, INFO, U)                                              \
+    template rocblas_status potf2_run_small<T, I, INFO, U>(                                 \
+        rocblas_handle handle, const rocblas_fill uplo, const I n, U A,                     \
+        const rocblas_stride shiftA, const I lda, const rocblas_stride strideA, INFO* info, \
+        const I batch_count, const I row_offset)
 
 ROCSOLVER_END_NAMESPACE

@@ -154,11 +154,12 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
                                         void* work4,
                                         T* pivots,
                                         INFO* iinfo,
-                                        bool optim_mem)
+                                        bool optim_mem,
+                                        const I row_offset_in = 0)
 {
     ROCSOLVER_ENTER("potrf", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
-
+    bool constexpr use_iinfo = false;
     // quick return
     if(batch_count == 0)
         return rocblas_status_success;
@@ -186,8 +187,11 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     // algorithm
     I nb = POTRF_BLOCKSIZE(T);
     if(n <= POTRF_POTF2_SWITCHSIZE(T))
+    {
+        I const row_offset = 0 + row_offset_in;
         return rocsolver_potf2_template<T>(handle, uplo, n, A, shiftA, lda, strideA, info,
-                                           batch_count, scalars, (T*)work1, pivots);
+                                           batch_count, scalars, (T*)work1, pivots, row_offset);
+    }
 
     // constants for rocblas functions calls
     T t_one = 1;
@@ -207,13 +211,24 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
         {
             // Factor diagonal and subdiagonal blocks
             jb = std::min(n - j, nb); // number of columns in the block
-            ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threads, 0, stream, iinfo, batch_count, 0);
-            rocsolver_potf2_template<T>(handle, uplo, jb, A, shiftA + idx2D(j, j, lda), lda,
-                                        strideA, iinfo, batch_count, scalars, (T*)work1, pivots);
+            if(use_iinfo)
+            {
+                ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threads, 0, stream, iinfo,
+                                        batch_count, 0);
+                rocsolver_potf2_template<T>(handle, uplo, jb, A, shiftA + idx2D(j, j, lda), lda,
+                                            strideA, iinfo, batch_count, scalars, (T*)work1, pivots);
 
-            // test for non-positive-definiteness.
-            ROCSOLVER_LAUNCH_KERNEL((chk_positive<I, INFO, U>), gridReset, threads, 0, stream,
-                                    iinfo, info, j, batch_count);
+                // test for non-positive-definiteness.
+                ROCSOLVER_LAUNCH_KERNEL((chk_positive<I, INFO, U>), gridReset, threads, 0, stream,
+                                        iinfo, info, j, batch_count);
+            }
+            else
+            {
+                I const row_offset = j + row_offset_in;
+                rocsolver_potf2_template<T>(handle, uplo, jb, A, shiftA + idx2D(j, j, lda), lda,
+                                            strideA, info, batch_count, scalars, (T*)work1, pivots,
+                                            row_offset);
+            }
 
             if(j + jb < n)
             {
@@ -239,13 +254,24 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
         {
             // Factor diagonal and subdiagonal blocks
             jb = std::min(n - j, nb); // number of columns in the block
-            ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threads, 0, stream, iinfo, batch_count, 0);
-            rocsolver_potf2_template<T>(handle, uplo, jb, A, shiftA + idx2D(j, j, lda), lda,
-                                        strideA, iinfo, batch_count, scalars, (T*)work1, pivots);
+            if(use_iinfo)
+            {
+                ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threads, 0, stream, iinfo,
+                                        batch_count, 0);
+                rocsolver_potf2_template<T>(handle, uplo, jb, A, shiftA + idx2D(j, j, lda), lda,
+                                            strideA, iinfo, batch_count, scalars, (T*)work1, pivots);
 
-            // test for non-positive-definiteness.
-            ROCSOLVER_LAUNCH_KERNEL((chk_positive<I, INFO, U>), gridReset, threads, 0, stream,
-                                    iinfo, info, j, batch_count);
+                // test for non-positive-definiteness.
+                ROCSOLVER_LAUNCH_KERNEL((chk_positive<I, INFO, U>), gridReset, threads, 0, stream,
+                                        iinfo, info, j, batch_count);
+            }
+            else
+            {
+                I const row_offset = j + row_offset_in;
+                rocsolver_potf2_template<T>(handle, uplo, jb, A, shiftA + idx2D(j, j, lda), lda,
+                                            strideA, info, batch_count, scalars, (T*)work1, pivots,
+                                            row_offset);
+            }
 
             if(j + jb < n)
             {
@@ -268,10 +294,20 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     // factor last block
     if(j < n)
     {
-        rocsolver_potf2_template<T>(handle, uplo, n - j, A, shiftA + idx2D(j, j, lda), lda, strideA,
-                                    iinfo, batch_count, scalars, (T*)work1, pivots);
-        ROCSOLVER_LAUNCH_KERNEL((chk_positive<I, INFO, U>), gridReset, threads, 0, stream, iinfo,
-                                info, j, batch_count);
+        if(use_iinfo)
+        {
+            rocsolver_potf2_template<T>(handle, uplo, n - j, A, shiftA + idx2D(j, j, lda), lda,
+                                        strideA, iinfo, batch_count, scalars, (T*)work1, pivots);
+            ROCSOLVER_LAUNCH_KERNEL((chk_positive<I, INFO, U>), gridReset, threads, 0, stream,
+                                    iinfo, info, j, batch_count);
+        }
+        else
+        {
+            I const row_offset = j + row_offset_in;
+            rocsolver_potf2_template<T>(handle, uplo, n - j, A, shiftA + idx2D(j, j, lda), lda,
+                                        strideA, info, batch_count, scalars, (T*)work1, pivots,
+                                        row_offset);
+        }
     }
 
     rocblas_set_pointer_mode(handle, old_mode);

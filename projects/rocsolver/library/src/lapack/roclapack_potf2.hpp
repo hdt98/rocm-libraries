@@ -46,7 +46,8 @@ ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
                                      const size_t loc,
                                      const I j,
                                      T* res,
-                                     INFO* info)
+                                     INFO* info,
+                                     const I row_offset)
 {
     I id = hipBlockIdx_x;
 
@@ -57,7 +58,7 @@ ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
     {
         // error for non-positive definiteness
         if(info[id] == 0)
-            info[id] = j + 1; // use fortran 1-based index
+            info[id] = j + 1 + row_offset; // use fortran 1-based index
         M[loc] = t;
         res[id] = 0;
     }
@@ -77,7 +78,8 @@ ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
                                      const size_t loc,
                                      const I j,
                                      T* res,
-                                     INFO* info)
+                                     INFO* info,
+                                     const I row_offset)
 {
     I id = hipBlockIdx_x;
 
@@ -88,7 +90,7 @@ ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
     {
         // error for non-positive definiteness
         if(info[id] == 0)
-            info[id] = j + 1; // use fortran 1-based index
+            info[id] = j + 1 + row_offset; // use fortran 1-based index
         M[loc] = t;
         res[id] = 0;
     }
@@ -178,7 +180,8 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
                                         const I batch_count,
                                         T* scalars,
                                         T* work,
-                                        T* pivots)
+                                        T* pivots,
+                                        const I row_offset = 0)
 {
     ROCSOLVER_ENTER("potf2", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
@@ -195,7 +198,10 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
     dim3 threads(BS1, 1, 1);
 
     // info=0 (starting with a positive definite matrix)
-    ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threads, 0, stream, info, batch_count, 0);
+    if(row_offset == 0)
+    {
+        ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threads, 0, stream, info, batch_count, 0);
+    }
 
     // quick return if no dimensions
     if(n == 0)
@@ -211,7 +217,7 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
         // ----------------------
         // use specialized kernel
         // ----------------------
-        potf2_run_small<T>(handle, uplo, n, A, shiftA, lda, strideA, info, batch_count);
+        potf2_run_small<T>(handle, uplo, n, A, shiftA, lda, strideA, info, batch_count, row_offset);
     }
     else
     {
@@ -229,8 +235,9 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
                                             shiftA + idx2D(0, j, lda), 1, strideA, batch_count,
                                             pivots, work);
 
-                ROCSOLVER_LAUNCH_KERNEL((sqrtDiagOnward<T, I>), dim3(batch_count), dim3(1), 0, stream,
-                                        A, shiftA, strideA, idx2D(j, j, lda), j, pivots, info);
+                ROCSOLVER_LAUNCH_KERNEL((sqrtDiagOnward<T, I>), dim3(batch_count), dim3(1), 0,
+                                        stream, A, shiftA, strideA, idx2D(j, j, lda), j, pivots,
+                                        info, row_offset);
 
                 // Compute elements J+1:N of row J
                 if(j < n - 1)
@@ -264,8 +271,9 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
                                             A, shiftA + idx2D(j, 0, lda), lda, strideA, batch_count,
                                             pivots, work);
 
-                ROCSOLVER_LAUNCH_KERNEL((sqrtDiagOnward<T, I>), dim3(batch_count), dim3(1), 0, stream,
-                                        A, shiftA, strideA, idx2D(j, j, lda), j, pivots, info);
+                ROCSOLVER_LAUNCH_KERNEL((sqrtDiagOnward<T, I>), dim3(batch_count), dim3(1), 0,
+                                        stream, A, shiftA, strideA, idx2D(j, j, lda), j, pivots,
+                                        info, row_offset);
 
                 // Compute elements J+1:N of column J
                 if(j < n - 1)
