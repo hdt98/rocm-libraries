@@ -1221,10 +1221,6 @@ pipeline {
             defaultValue: false,
             description: "Run the ck_tile FMHA tests (default: OFF)")
         booleanParam(
-            name: "RUN_TILE_ENGINE_BASIC_TESTS",
-            defaultValue: false,
-            description: "Run the tile_engine_basic tests (default: OFF)")
-        booleanParam(
             name: "RUN_TILE_ENGINE_GEMM_TESTS",
             defaultValue: false,
             description: "Run the tile_engine_gemm tests (default: OFF)")
@@ -1637,45 +1633,6 @@ pipeline {
                     environment{
                         setup_args = "NO_CK_BUILD"
                         execute_args = build_and_run_fmha("gfx1201")
-                    }
-                    steps{
-                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        cleanWs()
-                    }
-                }
-            }
-        }
-        stage("Run TILE_ENGINE_BASIC Tests")
-        {
-            when {
-                beforeAgent true
-                expression { env.SHOULD_RUN_CI.toBoolean() }
-            }
-            parallel
-            {
-                stage("Run TILE_ENGINE_BASIC Tests on gfx942")
-                {
-                    when {
-                        beforeAgent true
-                        expression { params.RUN_TILE_ENGINE_BASIC_TESTS.toBoolean() }
-                    }
-                    agent{ label rocmnode("gfx942") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-                                            -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-                                            -D CMAKE_BUILD_TYPE=Release \
-                                            -D GPU_TARGETS="gfx942" \
-                                            -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16" \
-                                            -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
-                                            -D GEMM_UNIVERSAL_CONFIG_FILE="default_ci_config.json" \
-                                            -D GEMM_MULTI_D_DATATYPE="fp16" \
-                                            -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
-                                            -D GEMM_MULTI_D_CONFIG_FILE="default_ci_config.json" \
-                                            -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
-                                            -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
-                                            -D GEMM_PRESHUFFLE_CONFIG_FILE="default_ci_config.json" .. && \
-                                           ninja -j${nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all """
                     }
                     steps{
                         buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
