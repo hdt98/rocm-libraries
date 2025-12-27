@@ -356,14 +356,11 @@ struct UniversalGemmKernel
 
     struct SplitKBatchOffset
     {
-<<<<<<< HEAD
-=======
         // This structure distributes work evenly among splitkk workgroups
         // It's based on a principle that if there is enough work to fill all workgroups,
         // then we can distribute the (K / K1) parts among k_batch workgroups in such a way
         // that each workgroup will be doing ceil((K / K1) / splitk) or ceil((K / K1) / splitk) - 1
         // and leave the potential tail for last(splitk - 1) indexed workgroup.
->>>>>>> develop
         __device__ SplitKBatchOffset(const KernelArgs& kargs, const index_t k_id = blockIdx.z)
         {
             constexpr auto K1     = TilePartitioner::BlockGemmShape::WarpTile::at(number<2>{});
@@ -411,11 +408,7 @@ struct UniversalGemmKernel
                 }
             });
 
-<<<<<<< HEAD
-            if(k_id < (kargs.k_batch - 1))
-=======
             if(k_id == kargs.k_batch - 1)
->>>>>>> develop
             {
                 splitted_k = kargs.K - std::min(k_id, num_full) * full_k_read -
                              std::max(k_id - num_full, 0) * partial_k_read;

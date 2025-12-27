@@ -721,46 +721,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
             });
 
             // GEMM 2i
-<<<<<<< HEAD
-            static_for<0, KPackIterPerWarp, 1>{}([&](auto kIter_pack) {
-                static_for<0, MPackIterPerWarp, 1>{}([&](auto mIter_pack) {
-                    static_for<0, NPackIterPerWarp, 1>{}([&](auto nIter_pack) {
-                        static_for<0, KXdlPack, 1>{}([&](auto ikxdl) {
-                            static_for<0, MXdlPack, 1>{}([&](auto imxdl) {
-                                constexpr auto AwarpIter = imxdl + ikxdl * MXdlPack;
-                                constexpr auto m_iter    = mIter_pack * MXdlPack + imxdl;
-                                constexpr auto k_iter    = kIter_pack * KXdlPack + ikxdl;
-                                static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
-                                    constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
-                                    //  warp GEMM
-                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
-                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
-                                        c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
-                                        bit_cast<typename WG::AWarpTensor>(
-                                            a_warp_tensor(number<AwarpIter>{})),
-                                        bit_cast<typename WG::BWarpTensor>(
-                                            b_warp_tensor_ping(number<n_iter>{})(number<k_iter>{})),
-                                        scale_a_tile_tensor_ping(mIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0],
-                                        scale_b_tile_tensor_ping(nIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0]);
-                                });
-                                // preload next A from lds
-                                constexpr auto addr =
-                                    m_iter % 2 + k_iter * 2 + m_iter / 2 * 4 + m_preload;
-                                if constexpr(addr < (KIterPerWarp * MIterPerWarp) &&
-                                             (nIter_pack == NPackIterPerWarp - 1))
-                                {
-                                    constexpr auto AmIter              = addr % 2 + addr / 4 * 2;
-                                    constexpr auto AkIter              = addr / 2 % 2;
-                                    a_warp_tensor(number<AwarpIter>{}) = load_tile_with_offset(
-                                        a_warp_window_ping,
-                                        tuple<number<AmIter * WG::kM>, number<AkIter * WG::kK>>{});
-                                }
-                            });
-                        });
-                    });
-=======
             static_for_product<number<KPackIterPerWarp>,
                                number<MPackIterPerWarp>,
                                number<NPackIterPerWarp>,
@@ -773,7 +733,7 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                     constexpr auto k_iter    = ikpack * KXdlPack + ikxdl;
                     constexpr auto APackIter = ikxdl * MXdlPack + imxdl; // idx inside a xdl pack
                     //  warp GEMM
-                    WG{}.template operator()<APackIter, ikxdl * NXdlPack + inxdl>(
+                    WG{}.template operator()<OpSelA<APackIter>, OpSelB<ikxdl * NXdlPack + inxdl>>(
                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                         bit_cast<typename WG::AWarpTensor>(a_warp_tensor(number<APackIter>{})),
                         bit_cast<typename WG::BWarpTensor>(
@@ -792,7 +752,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                             tuple<number<AmIter * WG::kM>,
                                   number<AkIter * WG::kK / APackedSize>>{});
                     }
->>>>>>> develop
                 });
             // barrier as ds_load A(2i) and buffer_load_lds A(2i + 1) finished
             s_waitcnt< // vmcnt
@@ -851,46 +810,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
             });
 
             // GEMM 2i+1
-<<<<<<< HEAD
-            static_for<0, KPackIterPerWarp, 1>{}([&](auto kIter_pack) {
-                static_for<0, MPackIterPerWarp, 1>{}([&](auto mIter_pack) {
-                    static_for<0, NPackIterPerWarp, 1>{}([&](auto nIter_pack) {
-                        static_for<0, KXdlPack, 1>{}([&](auto ikxdl) {
-                            static_for<0, MXdlPack, 1>{}([&](auto imxdl) {
-                                constexpr auto AwarpIter = imxdl + ikxdl * MXdlPack;
-                                constexpr auto m_iter    = mIter_pack * MXdlPack + imxdl;
-                                constexpr auto k_iter    = kIter_pack * KXdlPack + ikxdl;
-                                static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
-                                    constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
-                                    // warp GEMM
-                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
-                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
-                                        c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
-                                        bit_cast<typename WG::AWarpTensor>(
-                                            a_warp_tensor(number<AwarpIter>{})),
-                                        bit_cast<typename WG::BWarpTensor>(
-                                            b_warp_tensor_pong(number<n_iter>{})(number<k_iter>{})),
-                                        scale_a_tile_tensor_pong(mIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0], // scale A
-                                        scale_b_tile_tensor_pong(nIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0]); // scale B
-                                });
-                                // preload next A from lds
-                                constexpr auto addr =
-                                    m_iter % 2 + k_iter * 2 + m_iter / 2 * 4 + m_preload;
-                                if constexpr(addr < (KIterPerWarp * MIterPerWarp) &&
-                                             (nIter_pack == NPackIterPerWarp - 1))
-                                {
-                                    constexpr auto AmIter              = addr % 2 + addr / 4 * 2;
-                                    constexpr auto AkIter              = addr / 2 % 2;
-                                    a_warp_tensor(number<AwarpIter>{}) = load_tile_with_offset(
-                                        a_warp_window_pong,
-                                        tuple<number<AmIter * WG::kM>, number<AkIter * WG::kK>>{});
-                                }
-                            });
-                        });
-                    });
-=======
             static_for_product<number<KPackIterPerWarp>,
                                number<MPackIterPerWarp>,
                                number<NPackIterPerWarp>,
@@ -903,7 +822,7 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                     constexpr auto k_iter    = ikpack * KXdlPack + ikxdl;
                     constexpr auto APackIter = ikxdl * MXdlPack + imxdl; // idx inside a xdl pack
                     // warp GEMM
-                    WG{}.template operator()<APackIter, ikxdl * NXdlPack + inxdl>(
+                    WG{}.template operator()<OpSelA<APackIter>, OpSelB<ikxdl * NXdlPack + inxdl>>(
                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                         bit_cast<typename WG::AWarpTensor>(a_warp_tensor(number<APackIter>{})),
                         bit_cast<typename WG::BWarpTensor>(
@@ -922,7 +841,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                             tuple<number<AmIter * WG::kM>,
                                   number<AkIter * WG::kK / APackedSize>>{});
                     }
->>>>>>> develop
                 });
             // barrier as ds_load A(2i + 1) and buffer_load_lds A(2i + 2) finished
             s_waitcnt< // vmcnt
@@ -986,46 +904,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
             });
 
             // GEMM loopK-1
-<<<<<<< HEAD
-            static_for<0, KPackIterPerWarp, 1>{}([&](auto kIter_pack) {
-                static_for<0, MPackIterPerWarp, 1>{}([&](auto mIter_pack) {
-                    static_for<0, NPackIterPerWarp, 1>{}([&](auto nIter_pack) {
-                        static_for<0, KXdlPack, 1>{}([&](auto ikxdl) {
-                            static_for<0, MXdlPack, 1>{}([&](auto imxdl) {
-                                constexpr auto AwarpIter = imxdl + ikxdl * MXdlPack;
-                                constexpr auto m_iter    = mIter_pack * MXdlPack + imxdl;
-                                constexpr auto k_iter    = kIter_pack * KXdlPack + ikxdl;
-                                static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
-                                    constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
-                                    // warp GEMM
-                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
-                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
-                                        c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
-                                        bit_cast<typename WG::AWarpTensor>(
-                                            a_warp_tensor(number<AwarpIter>{})),
-                                        bit_cast<typename WG::BWarpTensor>(
-                                            b_warp_tensor_ping(number<n_iter>{})(number<k_iter>{})),
-                                        scale_a_tile_tensor_ping(mIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0], // scale A
-                                        scale_b_tile_tensor_ping(nIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0]); // scale B
-                                });
-                                // preload next A from lds
-                                constexpr auto addr =
-                                    m_iter % 2 + k_iter * 2 + m_iter / 2 * 4 + m_preload;
-                                if constexpr(addr < (KIterPerWarp * MIterPerWarp) &&
-                                             (nIter_pack == NPackIterPerWarp - 1))
-                                {
-                                    constexpr auto AmIter              = addr % 2 + addr / 4 * 2;
-                                    constexpr auto AkIter              = addr / 2 % 2;
-                                    a_warp_tensor(number<AwarpIter>{}) = load_tile_with_offset(
-                                        a_warp_window_ping,
-                                        tuple<number<AmIter * WG::kM>, number<AkIter * WG::kK>>{});
-                                }
-                            });
-                        });
-                    });
-=======
             static_for_product<number<KPackIterPerWarp>,
                                number<MPackIterPerWarp>,
                                number<NPackIterPerWarp>,
@@ -1038,7 +916,7 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                     constexpr auto k_iter    = ikpack * KXdlPack + ikxdl;
                     constexpr auto APackIter = ikxdl * MXdlPack + imxdl; // idx inside a xdl pack
                     // warp GEMM
-                    WG{}.template operator()<APackIter, ikxdl * NXdlPack + inxdl>(
+                    WG{}.template operator()<OpSelA<APackIter>, OpSelB<ikxdl * NXdlPack + inxdl>>(
                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                         bit_cast<typename WG::AWarpTensor>(a_warp_tensor(number<APackIter>{})),
                         bit_cast<typename WG::BWarpTensor>(
@@ -1057,7 +935,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                             tuple<number<AmIter * WG::kM>,
                                   number<AkIter * WG::kK / APackedSize>>{});
                     }
->>>>>>> develop
                 });
             // barrier as ds_load A(2i) and buffer_load_lds A(2i + 1) finished
             s_waitcnt< // vmcnt
@@ -1076,46 +953,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
             Last2ndHotLoopScheduler();
 
             // GEMM loopK
-<<<<<<< HEAD
-            static_for<0, KPackIterPerWarp, 1>{}([&](auto kIter_pack) {
-                static_for<0, MPackIterPerWarp, 1>{}([&](auto mIter_pack) {
-                    static_for<0, NPackIterPerWarp, 1>{}([&](auto nIter_pack) {
-                        static_for<0, KXdlPack, 1>{}([&](auto ikxdl) {
-                            static_for<0, MXdlPack, 1>{}([&](auto imxdl) {
-                                constexpr auto AwarpIter = imxdl + ikxdl * MXdlPack;
-                                constexpr auto m_iter    = mIter_pack * MXdlPack + imxdl;
-                                constexpr auto k_iter    = kIter_pack * KXdlPack + ikxdl;
-                                static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
-                                    constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
-                                    // warp GEMM
-                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
-                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
-                                        c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
-                                        bit_cast<typename WG::AWarpTensor>(
-                                            a_warp_tensor(number<AwarpIter>{})),
-                                        bit_cast<typename WG::BWarpTensor>(
-                                            b_warp_tensor_pong(number<n_iter>{})(number<k_iter>{})),
-                                        scale_a_tile_tensor_pong(mIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0], // scale A
-                                        scale_b_tile_tensor_pong(nIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0]); // scale B
-                                });
-                                // preload next A from lds
-                                constexpr auto addr =
-                                    m_iter % 2 + k_iter * 2 + m_iter / 2 * 4 + m_preload;
-                                if constexpr(addr < (KIterPerWarp * MIterPerWarp) &&
-                                             (nIter_pack == NPackIterPerWarp - 1))
-                                {
-                                    constexpr auto AmIter              = addr % 2 + addr / 4 * 2;
-                                    constexpr auto AkIter              = addr / 2 % 2;
-                                    a_warp_tensor(number<AwarpIter>{}) = load_tile_with_offset(
-                                        a_warp_window_pong,
-                                        tuple<number<AmIter * WG::kM>, number<AkIter * WG::kK>>{});
-                                }
-                            });
-                        });
-                    });
-=======
             static_for_product<number<KPackIterPerWarp>,
                                number<MPackIterPerWarp>,
                                number<NPackIterPerWarp>,
@@ -1128,7 +965,7 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                     constexpr auto k_iter    = ikpack * KXdlPack + ikxdl;
                     constexpr auto APackIter = ikxdl * MXdlPack + imxdl; // idx inside a xdl pack
                     // warp GEMM
-                    WG{}.template operator()<APackIter, ikxdl * NXdlPack + inxdl>(
+                    WG{}.template operator()<OpSelA<APackIter>, OpSelB<ikxdl * NXdlPack + inxdl>>(
                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                         bit_cast<typename WG::AWarpTensor>(a_warp_tensor(number<APackIter>{})),
                         bit_cast<typename WG::BWarpTensor>(
@@ -1147,53 +984,12 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                                   tuple<number<AmIter * WG::kM>,
                                                         number<AkIter * WG::kK / APackedSize>>{});
                     }
->>>>>>> develop
                 });
             LastHotLoopScheduler();
         }
         else if constexpr(TailNum == TailNumber::Odd)
         {
             // GEMM loopK
-<<<<<<< HEAD
-            static_for<0, KPackIterPerWarp, 1>{}([&](auto kIter_pack) {
-                static_for<0, MPackIterPerWarp, 1>{}([&](auto mIter_pack) {
-                    static_for<0, NPackIterPerWarp, 1>{}([&](auto nIter_pack) {
-                        static_for<0, KXdlPack, 1>{}([&](auto ikxdl) {
-                            static_for<0, MXdlPack, 1>{}([&](auto imxdl) {
-                                constexpr auto AwarpIter = imxdl + ikxdl * MXdlPack;
-                                constexpr auto m_iter    = mIter_pack * MXdlPack + imxdl;
-                                constexpr auto k_iter    = kIter_pack * KXdlPack + ikxdl;
-                                static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
-                                    constexpr auto n_iter = nIter_pack * NXdlPack + inxdl;
-                                    // warp GEMM
-                                    WG{}.template operator()<OpSelA<ikxdl * MXdlPack + imxdl>,
-                                                             OpSelB<ikxdl * NXdlPack + inxdl>>(
-                                        c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
-                                        bit_cast<typename WG::AWarpTensor>(
-                                            a_warp_tensor(number<AwarpIter>{})),
-                                        bit_cast<typename WG::BWarpTensor>(
-                                            b_warp_tensor_ping(number<n_iter>{})(number<k_iter>{})),
-                                        scale_a_tile_tensor_ping(mIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0], // scale A
-                                        scale_b_tile_tensor_ping(nIter_pack)(kIter_pack)
-                                            .get_thread_buffer()[0]); // scale B
-                                });
-                                // preload next A from lds
-                                constexpr auto addr =
-                                    m_iter % 2 + k_iter * 2 + m_iter / 2 * 4 + m_preload;
-                                if constexpr(addr < (KIterPerWarp * MIterPerWarp) &&
-                                             (nIter_pack == NPackIterPerWarp - 1))
-                                {
-                                    constexpr auto AmIter              = addr % 2 + addr / 4 * 2;
-                                    constexpr auto AkIter              = addr / 2 % 2;
-                                    a_warp_tensor(number<AwarpIter>{}) = load_tile_with_offset(
-                                        a_warp_window_ping,
-                                        tuple<number<AmIter * WG::kM>, number<AkIter * WG::kK>>{});
-                                }
-                            });
-                        });
-                    });
-=======
             static_for_product<number<KPackIterPerWarp>,
                                number<MPackIterPerWarp>,
                                number<NPackIterPerWarp>,
@@ -1206,7 +1002,7 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                     constexpr auto k_iter    = ikpack * KXdlPack + ikxdl;
                     constexpr auto APackIter = ikxdl * MXdlPack + imxdl; // idx inside a xdl pack
                     // warp GEMM
-                    WG{}.template operator()<APackIter, ikxdl * NXdlPack + inxdl>(
+                    WG{}.template operator()<OpSelA<APackIter>, OpSelB<ikxdl * NXdlPack + inxdl>>(
                         c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                         bit_cast<typename WG::AWarpTensor>(a_warp_tensor(number<APackIter>{})),
                         bit_cast<typename WG::BWarpTensor>(
@@ -1225,7 +1021,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
                                                   tuple<number<AmIter * WG::kM>,
                                                         number<AkIter * WG::kK / APackedSize>>{});
                     }
->>>>>>> develop
                 });
             LastHotLoopScheduler();
         }

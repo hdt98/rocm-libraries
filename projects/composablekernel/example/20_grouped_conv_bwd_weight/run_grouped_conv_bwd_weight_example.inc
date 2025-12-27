@@ -131,13 +131,6 @@ bool run_grouped_conv_bwd_weight(const ExecutionConfig& config,
 
         wei_device_buf.FromDevice(wei_device_result.mData.data());
 
-<<<<<<< HEAD
-        return ck::utils::check_err(wei_device_result.mData,
-                                    wei_host_result.mData,
-                                    "Error: Incorrect results!",
-                                    get_rtol<WeiDataType, float>(),
-                                    get_atol<WeiDataType, float>());
-=======
         float max_accumulated_value =
             *std::max_element(wei_host_result.mData.begin(), wei_host_result.mData.end());
 
@@ -153,7 +146,6 @@ bool run_grouped_conv_bwd_weight(const ExecutionConfig& config,
                                     "Error: Incorrect results!",
                                     rtol,
                                     atol);
->>>>>>> develop
     }
     else if(config.do_verification == 2)
     {
