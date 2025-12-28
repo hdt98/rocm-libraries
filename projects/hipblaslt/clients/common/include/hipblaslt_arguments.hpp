@@ -302,6 +302,9 @@ struct Arguments
     friend hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& str,
                                                   const Arguments&            arg);
 
+    friend hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& str,
+                                                  std::pair<char const *, Arguments::ApiMethod> m);
+
     // Google Tests uses this with std:ostream automatically to dump parameters
     friend std::ostream& operator<<(std::ostream& str, const Arguments& arg);
 

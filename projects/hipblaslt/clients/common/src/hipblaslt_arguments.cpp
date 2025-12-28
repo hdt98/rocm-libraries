@@ -170,6 +170,19 @@ hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os, const Arg
     return os << " }\n";
 }
 
+hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os, std::pair<char const *, Arguments::ApiMethod> m)
+{
+    const char* s;
+    switch(m.second)
+    {
+    case Arguments::ApiMethod::C_API:   s = "c";   break;
+    case Arguments::ApiMethod::MIX_API: s = "mix"; break;
+    case Arguments::ApiMethod::CPP_API: s = "cpp"; break;
+    default: s = "c"; break;
+    }
+    return os << m.first << ": " << s;
+}
+
 // Google Tests uses this automatically with std::ostream to dump parameters
 std::ostream& operator<<(std::ostream& os, const Arguments& arg)
 {
