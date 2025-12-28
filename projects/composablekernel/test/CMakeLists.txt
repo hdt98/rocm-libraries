@@ -33,6 +33,7 @@ set(REGRESSION_TESTS
     test_convnd_fwd
     test_convnd_bwd_data
     test_grouped_convnd_fwd
+    test_grouped_convnd_fwd_scaleadd_ab
     test_grouped_convnd_bwd_weight
     test_softmax_rank3
     test_softmax_rank4
@@ -332,4 +333,5 @@ endif()
 add_subdirectory(position_embedding)
 add_subdirectory(scatter_gather)
 add_subdirectory(synchronization)
+add_subdirectory(gpu_reference)
 add_subdirectory(util)
