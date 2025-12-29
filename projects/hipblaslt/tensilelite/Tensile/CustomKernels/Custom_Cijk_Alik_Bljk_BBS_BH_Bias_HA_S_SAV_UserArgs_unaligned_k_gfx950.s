@@ -1183,8 +1183,19 @@ v_add_co_u32 v[vgprLocalWriteAddrB], vcc, 0x8200, v[vgprLocalWriteAddrB] // lwFO
 
 /* global read addresses: other free assignments */
 /* s[sgprWorkGroup2] */
-
+.set ADDR_A, 1
 /* global read addresses: tile offsets a */
+.if ADDR_A
+// why 16 ? 16 = 2048 / 128
+v_lshlrev_b32 v30, 4, v24                          // groA0I_0 = v24 * 8
+v_add_co_u32 v31, vcc, 256, v30                     // groA0I_1 += LSPA
+v_add_co_u32 v32, vcc, 256, v31                     // groA0I_2 += LSPA
+v_add_co_u32 v33, vcc, 256, v32                     // groA0I_3 += LSPA
+v_add_co_u32 v34, vcc, 256, v33                     // groA0I_4 += LSPA
+v_add_co_u32 v35, vcc, 256, v34                     // groA0I_5 += LSPA
+v_add_co_u32 v36, vcc, 256, v35                     // groA0I_6 += LSPA
+v_add_co_u32 v37, vcc, 256, v36                     // groA0I_7 += LSPA
+.else
 v_mov_b32 v30, v24                                 // groA0I_0
 v_add_co_u32 v31, vcc, 16, v30                     // groA0I_1 += LSPA
 v_add_co_u32 v32, vcc, 16, v31                     // groA0I_2 += LSPA
@@ -1193,8 +1204,8 @@ v_add_co_u32 v34, vcc, 16, v33                     // groA0I_4 += LSPA
 v_add_co_u32 v35, vcc, 16, v34                     // groA0I_5 += LSPA
 v_add_co_u32 v36, vcc, 16, v35                     // groA0I_6 += LSPA
 v_add_co_u32 v37, vcc, 16, v36                     // groA0I_7 += LSPA
+.endif
 
-// label_jzhou:
 /* global read addresses: tile offsets b */
 .if 0 //original
 v_mov_b32 v38, v26                                 // groB1J_0
@@ -1223,6 +1234,7 @@ v_add_co_u32 v47, vcc, 256, v46                    // groB1J_9 = base + 2304
 v_add_co_u32 v48, vcc, 256, v47                    // groB1J_10 = base + 2560
 v_add_co_u32 v49, vcc, 256, v48                    // groB1J_11 = base + 2816
 .endif
+label_jzhou1:
 
 /* global read addresses: unroll offsets a */
 v_mov_b32 v50, v25                                 // groAL_0
@@ -1232,8 +1244,13 @@ v_mov_b32 v51, v27                                 // groBL_0
 
 /* global read addresses: addresses a */
 /* max read offset = size[n] * stride[n-1] */
+.if ADDR_A
+s_mul_hi_u32 s15, s[sgprWorkGroup0], 1           // WorkGroup[01] * MT
+s_mul_i32 s14, s[sgprWorkGroup0], 1              // WorkGroup[01] * MT
+.else
 s_mul_hi_u32 s15, s[sgprWorkGroup0], 128           // WorkGroup[01] * MT
 s_mul_i32 s14, s[sgprWorkGroup0], 128              // WorkGroup[01] * MT
+.endif
 s_mul_hi_u32 s15, s14, s[sgprStrideA0I]            // tlu=0, scaled tile-offset by stride
 s_mul_i32 s14, s14, s[sgprStrideA0I]               // tlu=0, scaled tile-offset by stride
 s_mul_i32 s12, s[sgprStreamKLocalStart], DepthU    // StreamK tile start offset
@@ -4710,6 +4727,10 @@ s_mul_i32 s8, 128, s[sgprWorkGroup0]               // wgp0 * MT0
 v_add_u32 v0, s8, v0                               // coord 0 = (tid0/MI_m)*4 + waveG0*MIB_m + MT0*SG0
 s_mul_i32 s8, 192, s[sgprWorkGroup1]               // wgp1 * MT1
 v_add_u32 v1, s8, v1                               // coord 1 = (tid0%MI_m) + waveG1*MIB_n + MT1*SG1
+// v2 = v5 * 128; v2 = v2 + s[sgprWorkGroup0]
+v_lshlrev_b32 v2, 7, v5                            // v4 = v5 << 7
+v_add_u32 v2, s[sgprWorkGroup0], v2                // v4 += workgroup0
+label_jzhou4:
 
 /* not-LocalSplitU: global write */
 
@@ -5291,7 +5312,7 @@ ds_read_b128 v[100:103], v19 offset:1040           // load scaleAlpha
 /* (d1,vc1,d0,vc0)=(1,1,0,0) */
 /* (d1,vc1,d0,vc0)=(1,2,0,0) */
 /* (d1,vc1,d0,vc0)=(1,3,0,0) */
-v_add_lshl_u32 v17, v3, v0, 0x1                    // optSingleColVgpr scaleToBpe: sharedAddrVgpr <- cinRowPtr + coord0, scaled by BPE. BSHERE:coord0=0, coord0Vgpr=0
+v_add_lshl_u32 v17, v3, v2, 0x1                    // optSingleColVgpr scaleToBpe: sharedAddrVgpr <- cinRowPtr + coord0, scaled by BPE. BSHERE:coord0=0, coord0Vgpr=0
 v_accvgpr_read_b32 v[vgprValuC+24], acc0           // copy acc to vreg[0]
 v_accvgpr_read_b32 v[vgprValuC+25], acc4           // copy acc to vreg[1]
 v_accvgpr_read_b32 v[vgprValuC+26], acc8           // copy acc to vreg[2]
@@ -5425,6 +5446,26 @@ v_pk_mul_f32 v[vgprValuC+86:vgprValuC+86+1], s[sgprAlpha:sgprAlpha+1], v[vgprVal
  // s_addc_u32 s[\srdBase+1], s[\srdBase+1], 0
 .endm
 
+// Store a packed bf16 (low 16b + high 16b) from one VGPR into two bf16 elements in D.
+// The hi-half is stored at (base + 32) bytes, matching the existing layout here.
+.macro STORE_PKBF16_TO_D vindex:req, vaddr:req, srd:req, base:req
+  .set _off_hi_\@, \base + 32
+  buffer_store_short v[\vindex], \vaddr, \srd, 0 offen offset:\base nt
+  buffer_store_short_d16_hi v[\vindex], \vaddr, \srd, 0 offen offset:_off_hi_\@ nt
+.endm
+
+// Store 4 consecutive packed bf16 VGPRs starting at v[\vbase] into D at base0+{0,64,128,192}.
+.macro STORE4_PKBF16_TO_D vbase:req, vaddr:req, srd:req, base0:req
+  .set _b0_\@, \base0
+  .set _b1_\@, \base0 + 64
+  .set _b2_\@, \base0 + 128
+  .set _b3_\@, \base0 + 192
+  STORE_PKBF16_TO_D \vbase+0, \vaddr, \srd, _b0_\@
+  STORE_PKBF16_TO_D \vbase+1, \vaddr, \srd, _b1_\@
+  STORE_PKBF16_TO_D \vbase+2, \vaddr, \srd, _b2_\@
+  STORE_PKBF16_TO_D \vbase+3, \vaddr, \srd, _b3_\@
+.endm
+
 /* apply mask, calc new C and issue writes */
 v_mov_b32 v14, 0xffff0000                          // mask for pack two bfloat16 element to 32bit
 v_mov_b32 v15, 0x7fff0000                          // fp32 Nan
@@ -5443,7 +5484,10 @@ v_cvt_pk_bf16_f32 v24, v[vgprValuC+24], v[vgprValuC+25] // convert C to bf16 and
 v_cvt_pk_bf16_f32 v25, v[vgprValuC+26], v[vgprValuC+27] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v26, v[vgprValuC+28], v[vgprValuC+29] // convert C to bf16 and Pack with neighbor
 v_cvt_pk_bf16_f32 v27, v[vgprValuC+30], v[vgprValuC+31] // convert C to bf16 and Pack with neighbor
-buffer_store_dwordx4 v[24:27], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+label_jzhou2:
+STORE4_PKBF16_TO_D 24, v17, s[sgprSrdD:sgprSrdD+3], 0
+
+//buffer_store_dwordx4 v[24:27], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
 v_pk_mul_f32 v[vgprValuC+32:vgprValuC+32+1], v[96:97], v[vgprValuC+32:vgprValuC+32+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+34:vgprValuC+34+1], v[98:99], v[vgprValuC+34:vgprValuC+34+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+36:vgprValuC+36+1], v[100:101], v[vgprValuC+36:vgprValuC+36+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5459,7 +5503,9 @@ v_cvt_pk_bf16_f32 v35, v[vgprValuC+38], v[vgprValuC+39] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[32:35], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[32:35], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 32, v17, s[sgprSrdD:sgprSrdD+3], 0
+
 v_pk_mul_f32 v[vgprValuC+40:vgprValuC+40+1], v[96:97], v[vgprValuC+40:vgprValuC+40+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+42:vgprValuC+42+1], v[98:99], v[vgprValuC+42:vgprValuC+42+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+44:vgprValuC+44+1], v[100:101], v[vgprValuC+44:vgprValuC+44+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5475,7 +5521,9 @@ v_cvt_pk_bf16_f32 v43, v[vgprValuC+46], v[vgprValuC+47] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[40:43], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[40:43], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 40, v17, s[sgprSrdD:sgprSrdD+3], 0
+
 v_pk_mul_f32 v[vgprValuC+48:vgprValuC+48+1], v[96:97], v[vgprValuC+48:vgprValuC+48+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+50:vgprValuC+50+1], v[98:99], v[vgprValuC+50:vgprValuC+50+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+52:vgprValuC+52+1], v[100:101], v[vgprValuC+52:vgprValuC+52+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5491,7 +5539,8 @@ v_cvt_pk_bf16_f32 v51, v[vgprValuC+54], v[vgprValuC+55] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[48:51], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[48:51], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 48, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+56:vgprValuC+56+1], v[96:97], v[vgprValuC+56:vgprValuC+56+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+58:vgprValuC+58+1], v[98:99], v[vgprValuC+58:vgprValuC+58+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+60:vgprValuC+60+1], v[100:101], v[vgprValuC+60:vgprValuC+60+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5507,7 +5556,8 @@ v_cvt_pk_bf16_f32 v59, v[vgprValuC+62], v[vgprValuC+63] // convert C to bf16 and
 incToNextRow 976
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[56:59], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[56:59], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 56, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+64:vgprValuC+64+1], v[96:97], v[vgprValuC+64:vgprValuC+64+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+66:vgprValuC+66+1], v[98:99], v[vgprValuC+66:vgprValuC+66+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+68:vgprValuC+68+1], v[100:101], v[vgprValuC+68:vgprValuC+68+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5523,7 +5573,8 @@ v_cvt_pk_bf16_f32 v67, v[vgprValuC+70], v[vgprValuC+71] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[64:67], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[64:67], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 64, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+72:vgprValuC+72+1], v[96:97], v[vgprValuC+72:vgprValuC+72+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+74:vgprValuC+74+1], v[98:99], v[vgprValuC+74:vgprValuC+74+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+76:vgprValuC+76+1], v[100:101], v[vgprValuC+76:vgprValuC+76+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5539,7 +5590,8 @@ v_cvt_pk_bf16_f32 v75, v[vgprValuC+78], v[vgprValuC+79] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[72:75], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[72:75], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 72, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+80:vgprValuC+80+1], v[96:97], v[vgprValuC+80:vgprValuC+80+1] // *= ScaleAlphaVecVMulPK(96)(0)
 v_pk_mul_f32 v[vgprValuC+82:vgprValuC+82+1], v[98:99], v[vgprValuC+82:vgprValuC+82+1] // *= ScaleAlphaVecVMulPK(96)(2)
 v_pk_mul_f32 v[vgprValuC+84:vgprValuC+84+1], v[100:101], v[vgprValuC+84:vgprValuC+84+1] // *= ScaleAlphaVecVMulPK(96)(4)
@@ -5555,7 +5607,8 @@ v_cvt_pk_bf16_f32 v83, v[vgprValuC+86], v[vgprValuC+87] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[80:83], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[80:83], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 80, v17, s[sgprSrdD:sgprSrdD+3], 0
 s_nop 0                                            // 1 wait state required when next inst writes vgprs held by previous dwordx4 store inst
 /* optSingleColVgpr=1 optSharedColVgpr=0 optSGPRUsage=BufferLoad_Mask optSrdIncForRow=1 factorDim=0 */
 
@@ -5645,7 +5698,8 @@ v_cvt_pk_bf16_f32 v27, v[vgprValuC+30], v[vgprValuC+31] // convert C to bf16 and
 incToNextRow 976
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[24:27], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[24:27], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 24, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+32:vgprValuC+32+1], v[64:65], v[vgprValuC+32:vgprValuC+32+1] // *= ScaleAlphaVecVMulPK(64)(0)
 v_pk_mul_f32 v[vgprValuC+34:vgprValuC+34+1], v[66:67], v[vgprValuC+34:vgprValuC+34+1] // *= ScaleAlphaVecVMulPK(64)(2)
 v_pk_mul_f32 v[vgprValuC+36:vgprValuC+36+1], v[68:69], v[vgprValuC+36:vgprValuC+36+1] // *= ScaleAlphaVecVMulPK(64)(4)
@@ -5661,7 +5715,8 @@ v_cvt_pk_bf16_f32 v35, v[vgprValuC+38], v[vgprValuC+39] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[32:35], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[32:35], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 32, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+40:vgprValuC+40+1], v[64:65], v[vgprValuC+40:vgprValuC+40+1] // *= ScaleAlphaVecVMulPK(64)(0)
 v_pk_mul_f32 v[vgprValuC+42:vgprValuC+42+1], v[66:67], v[vgprValuC+42:vgprValuC+42+1] // *= ScaleAlphaVecVMulPK(64)(2)
 v_pk_mul_f32 v[vgprValuC+44:vgprValuC+44+1], v[68:69], v[vgprValuC+44:vgprValuC+44+1] // *= ScaleAlphaVecVMulPK(64)(4)
@@ -5677,7 +5732,8 @@ v_cvt_pk_bf16_f32 v43, v[vgprValuC+46], v[vgprValuC+47] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[40:43], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[40:43], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 40, v17, s[sgprSrdD:sgprSrdD+3], 0
 v_pk_mul_f32 v[vgprValuC+48:vgprValuC+48+1], v[64:65], v[vgprValuC+48:vgprValuC+48+1] // *= ScaleAlphaVecVMulPK(64)(0)
 v_pk_mul_f32 v[vgprValuC+50:vgprValuC+50+1], v[66:67], v[vgprValuC+50:vgprValuC+50+1] // *= ScaleAlphaVecVMulPK(64)(2)
 v_pk_mul_f32 v[vgprValuC+52:vgprValuC+52+1], v[68:69], v[vgprValuC+52:vgprValuC+52+1] // *= ScaleAlphaVecVMulPK(64)(4)
@@ -5693,9 +5749,11 @@ v_cvt_pk_bf16_f32 v51, v[vgprValuC+54], v[vgprValuC+55] // convert C to bf16 and
 incToNextRow 16
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s8         // incToNextRow: gra SRD += inc(lower)
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], 0         // incToNextRow: gra SRD += inc(upper)
-buffer_store_dwordx4 v[48:51], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+//buffer_store_dwordx4 v[48:51], v17, s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 nt // store D
+STORE4_PKBF16_TO_D 48, v17, s[sgprSrdD:sgprSrdD+3], 0
 s_nop 0                                            // 1 wait state required when next inst writes vgprs held by previous dwordx4 store inst
 
+label_jzhou3:
 
 // jump to end
 s_getpc_b64 s[74:75]                               // addr of next instr

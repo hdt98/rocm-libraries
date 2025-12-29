@@ -36,6 +36,16 @@
                     "description": "Set non-stop mode off",
                     "text": "set non-stop off",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "ROCgdb autogen (.set → register map) + utilities (reg/lds/global/swcu)",
+                    "text": "source ${workspaceFolder}/utilities/rocgdb_utilities/src/rocgdb_autogen.gdb",
+                    "ignoreFailures": false
+                },
+                {
+                    "description": "ROCgdb utilities (reg/lds/global/swcu)",
+                    "text": "source ${workspaceFolder}/utilities/rocgdb_utilities/src/rocgdb_utilities.gdb",
+                    "ignoreFailures": false
                 }
             ]
         },
