@@ -155,12 +155,7 @@ else()
     set(MIOPEN_DEFAULT_BACKEND "OpenCL")
 endif()
 
-if(NOT WIN32 AND NOT MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM)
-    include(CheckCXXLinkerFlag)
-    check_cxx_linker_flag(-lstdc++fs HAS_LIB_STD_FILESYSTEM)
-endif()
-
-list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX}/hip /opt/rocm /opt/rocm/llvm /opt/rocm/hip)
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX}/hip)
 
 option(ENABLE_HIP_WORKAROUNDS Off)
 set(MIOPEN_INSTALL_CXX_HEADERS Off CACHE BOOL "Install MIOpen's C++ header interface")
@@ -490,8 +485,6 @@ if(MIOPEN_USE_HIPRTC)
     find_package(hiprtc REQUIRED)
     message(STATUS "Build with hiprtc ${hiprtc_VERSION} ${hiprtc_DIR}")
 endif()
-
-find_package(Boost REQUIRED COMPONENTS filesystem CONFIG)
 
 find_path(HALF_INCLUDE_DIR half/half.hpp)
 message(STATUS "HALF_INCLUDE_DIR: ${HALF_INCLUDE_DIR}")
