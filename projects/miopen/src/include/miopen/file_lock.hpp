@@ -10,8 +10,8 @@
 #include <thread>
 
 #ifdef _WIN32
-#include <windows.h>
-#include <io.h>
+#define NOMINMAX
+#include <Windows.h>
 #else
 #include <unistd.h>
 #include <errno.h>
@@ -171,8 +171,7 @@ private:
             flags |= LOCKFILE_FAIL_IMMEDIATELY;
 
         OVERLAPPED ov = {};
-        BOOL ok       = LockFileEx(handle, flags, 0, MAXDWORD, MAXDWORD, &ov);
-        return ok != 0;
+        return (LockFileEx(handle, flags, 0, MAXDWORD, MAXDWORD, &ov) != 0);
     }
 
     void swap(file_lock& rhs) noexcept { std::swap(handle, rhs.handle); }

@@ -32,7 +32,6 @@
 #include <string>
 #ifdef _WIN32
 #include <optional>
-#include <boost/algorithm/string/replace.hpp>
 #endif
 
 #ifdef __linux__

@@ -50,11 +50,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef MLO_INTERNAL_H_
 #define MLO_INTERNAL_H_
 
-// Header Files
-#ifndef NOMINMAX
-#define NOMINMAX // stupid windows.h confused with min() macros in std namespace
-#endif
-
 #include <miopen/config.hpp>
 
 #if MIOPEN_BACKEND_OPENCL
