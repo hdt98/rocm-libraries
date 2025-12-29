@@ -36,7 +36,9 @@ struct BasicInvoker
 
         constexpr ck_tile::index_t M_Warp_Tile = 16;
         constexpr ck_tile::index_t N_Warp_Tile = 16;
-        constexpr ck_tile::index_t K_Warp_Tile = 16;
+        constexpr ck_tile::index_t K_Warp_Tile =
+            ck_tile::get_k_warp_tile<ADataType, M_Warp_Tile, true>();
+        ;
 #else
         constexpr ck_tile::index_t M_Warp = 2;
         constexpr ck_tile::index_t N_Warp = 2;
