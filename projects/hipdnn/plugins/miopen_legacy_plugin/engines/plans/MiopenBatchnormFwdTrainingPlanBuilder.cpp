@@ -49,19 +49,6 @@ const hipdnn_data_sdk::data_objects::BatchnormAttributes&
 
     const auto& bnAttr = node.attributesAs<hipdnn_data_sdk::data_objects::BatchnormAttributes>();
 
-    // TODO: Remove when MIOpen supports separate input/output buffers for running statistics
-    if(bnAttr.prev_running_mean_tensor_uid().has_value()
-       || bnAttr.prev_running_variance_tensor_uid().has_value()
-       || bnAttr.momentum_tensor_uid().has_value()
-       || bnAttr.next_running_mean_tensor_uid().has_value()
-       || bnAttr.next_running_variance_tensor_uid().has_value())
-    {
-        throw hipdnn_plugin_sdk::HipdnnPluginException(
-            HIPDNN_PLUGIN_STATUS_BAD_PARAM,
-            "Batchnorm fwd training plan builder does not support running statistics - MIOpen API "
-            "update required");
-    }
-
     return bnAttr;
 }
 
@@ -92,12 +79,10 @@ const hipdnn_data_sdk::data_objects::PointwiseAttributes&
     return activAttr;
 }
 
-#if 0 // TODO: Enable when MIOpen API supports separate input/output buffers for running statistics \
-    // MIOpen currently requires single IN/OUT buffers for running statistics, but hipDNN graph     \
-    // API uses separate prev/next buffers. This validation will be needed when MIOpen is updated.
 void checkRunningStatisticsTensorVirtuality(
     const hipdnn_data_sdk::data_objects::BatchnormAttributes& bnAttr,
-    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>& tensorMap)
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        tensorMap)
 {
     // Optional running statistics tensors must be non-virtual if present
     if(bnAttr.prev_running_mean_tensor_uid().has_value())
@@ -148,7 +133,6 @@ void checkRunningStatisticsTensorVirtuality(
         }
     }
 }
-#endif
 
 void checkTensorVirtuality1Node(
     const hipdnn_data_sdk::data_objects::BatchnormAttributes& bnAttr,
@@ -195,9 +179,7 @@ void checkTensorVirtuality1Node(
         }
     }
 
-#if 0 // TODO: Enable when MIOpen API supports separate input/output buffers for running statistics
     checkRunningStatisticsTensorVirtuality(bnAttr, tensorMap);
-#endif
 }
 
 void checkTensorVirtuality2Node(
@@ -246,9 +228,7 @@ void checkTensorVirtuality2Node(
         }
     }
 
-#if 0 // TODO: Enable when MIOpen API supports separate input/output buffers for running statistics
     checkRunningStatisticsTensorVirtuality(bnAttr, tensorMap);
-#endif
 
     const auto& actTensorIn0
         = miopen_utils::findTensorAttributes(tensorMap, actAttr.in_0_tensor_uid());
