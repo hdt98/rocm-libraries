@@ -33,7 +33,7 @@
 static std::atomic<int> num_prod{};
 
 static const auto total_producers = std::thread::hardware_concurrency();
-const auto data_len               = 100;
+const auto data_len{100};
 
 template <typename T>
 using data_t = std::vector<T>;
@@ -67,15 +67,16 @@ TEST(CPU_UtilMultiThreadQueue_NONE, Basic)
     for(auto idx = 0; idx < data_len; ++idx)
     {
         auto res = comp_queue.pop();
-        std::cerr << res << std::endl;
+        // std::cout << res << std::endl;
         num_cons++;
     }
 
     for(auto& prod : producers)
         prod.join();
 
-    std::cout << "Stage 2" << std::endl;
-    for(const auto& tmp : common_data)
-        std::cout << tmp << std::endl;
+    /*  std::cout << "Stage 2" << std::endl;
+        for(const auto& tmp : common_data)
+            std::cout << tmp << std::endl;
+    */
     EXPECT_EQ(num_prod, num_cons);
 }

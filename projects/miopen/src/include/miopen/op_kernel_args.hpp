@@ -11,7 +11,6 @@
 
 struct OpKernelArg
 {
-
     OpKernelArg(char val, size_t sz) : buffer(sz) { std::fill(buffer.begin(), buffer.end(), val); }
 
     template <typename T>
