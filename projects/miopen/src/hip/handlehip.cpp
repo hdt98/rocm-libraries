@@ -611,7 +611,7 @@ Program Handle::LoadProgram(const fs::path& program_name,
 
         p.FreeCodeObjectFileStorage();
 #else
-        boost::filesystem::path cache_path;
+        fs::path cache_path;
 
         // If cache is disabled we don't need to dump binary and move it there
         if(!miopen::IsCacheDisabled())
@@ -631,7 +631,7 @@ Program Handle::LoadProgram(const fs::path& program_name,
             if(cache_path.empty())
                 p.AttachBinary(LoadFile(p.GetCodeObjectPathname()));
             else
-                p.AttachBinary(cache_path.string());
+                p.AttachBinary(cache_path);
         }
 
         p.FreeCodeObjectFileStorage();
