@@ -29,6 +29,7 @@
 
 #include <miopen/filesystem.hpp>
 #include <fstream>
+#include <vector>
 
 namespace miopen {
 

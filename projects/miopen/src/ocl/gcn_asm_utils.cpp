@@ -249,11 +249,12 @@ static void AmdgcnAssembleQuiet(std::string_view source, std::string_view params
 
 static bool GcnAssemblerHasBug34765Impl()
 {
-    auto path = miopen::fs::temp_directory_path();
-    miopen::WriteFile(miopen::GetKernelSrc("bugzilla_34765_detect.s"), path);
+    auto p = miopen::fs::temp_directory_path();
+    miopen::WriteFile(miopen::GetKernelSrc("bugzilla_34765_detect.s"), p);
+    const auto& src = p.string();
     try
     {
-        AmdgcnAssembleQuiet(path, "-mcpu=gfx900");
+        AmdgcnAssembleQuiet(src, "-mcpu=gfx900");
         return false;
     }
     catch(...)
@@ -271,11 +272,12 @@ static bool GcnAssemblerHasBug34765()
 
 static bool GcnAssemblerSupportsOption(const std::string& option)
 {
-    auto path = miopen::fs::temp_directory_path();
-    miopen::WriteFile(miopen::GetKernelSrc("dummy_kernel.s"), path);
+    auto p = miopen::fs::temp_directory_path();
+    miopen::WriteFile(miopen::GetKernelSrc("dummy_kernel.s"), p);
+    const auto& src = p.string();
     try
     {
-        AmdgcnAssembleQuiet(path, "-mcpu=gfx900 " + option);
+        AmdgcnAssembleQuiet(src, "-mcpu=gfx900 " + option);
         MIOPEN_LOG_NQI("Supported: '" << option << '\'');
         return true;
     }
