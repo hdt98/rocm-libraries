@@ -27,11 +27,6 @@
 #ifndef GUARD_MIOPEN_FILESYSTEM_HPP_
 #define GUARD_MIOPEN_FILESYSTEM_HPP_
 
-// See CMakeLists.txt in addkernels
-#if !defined(MIOPEN_HACK_DO_NOT_INCLUDE_CONFIG_H)
-#include <miopen/config.h>
-#endif
-
 #include <string>
 #include <string_view>
 

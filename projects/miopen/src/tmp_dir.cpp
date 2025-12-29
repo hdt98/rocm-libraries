@@ -42,10 +42,10 @@ TmpDir::TmpDir(std::string_view prefix) : path{fs::temp_directory_path()}
 {
     std::string p{prefix.empty() ? "" : (prefix[0] == '-' ? "" : "-")};
 
-    //path /= boost::filesystem::unique_path("miopen" + p.append(prefix) + "-%%%%-%%%%-%%%%-%%%%").string();
     std::mt19937 prng(std::random_device{}());
     std::uniform_int_distribution<int> rand;
-    path /= fs::temp_directory_path() + "miopen" + p.append(prefix) + std::format("-{:x}", rand(prng));
+    path /=
+        fs::temp_directory_path() + "miopen" + p.append(prefix) + std::format("-{:x}", rand(prng));
 
     fs::create_directories(path);
 }
