@@ -222,7 +222,7 @@ __device__ static void
                     A[kk] = akk;
                     // Fortran 1-based index
                     if(*info == 0)
-                        *info = kcol + 1;
+                        *info = kcol + 1 + row_offset;
                 }
 
                 break;
