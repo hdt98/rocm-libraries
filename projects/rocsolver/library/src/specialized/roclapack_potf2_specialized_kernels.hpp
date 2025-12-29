@@ -58,10 +58,6 @@ ROCSOLVER_BEGIN_NAMESPACE
 template <typename I>
 __device__ static I idx_upper(I i, I j, I n)
 {
-    ASSERT((0 <= i) && (i <= (n - 1)));
-    ASSERT((0 <= j) && (j <= (n - 1)));
-    ASSERT(i <= j);
-
     return (i + (j * (j + 1)) / 2);
 }
 
@@ -80,10 +76,6 @@ __device__ static I idx_upper(I i, I j, I n)
 template <typename I>
 __device__ static I idx_lower(I i, I j, I n)
 {
-    ASSERT((0 <= i) && (i <= (n - 1)));
-    ASSERT((0 <= j) && (j <= (n - 1)));
-    ASSERT(i >= j);
-
     return ((i - j) + (j * (2 * n + 1 - j)) / 2);
 }
 
@@ -94,8 +86,12 @@ __device__ static I idx_lower(I i, I j, I n)
  * ------------------------------------------------------
 **/
 template <typename T, typename I, typename INFO>
-__device__ static void
-    potf2_simple(bool const is_upper, I const n, T* const A, INFO* const info, const I row_offset)
+__device__ static void potf2_simple(bool const is_upper,
+                                    I const n,
+                                    T* const A,
+                                    T* const v,
+                                    INFO* const info,
+                                    const I row_offset)
 {
     auto const lda = n;
     bool const is_lower = (!is_upper);
@@ -165,6 +161,8 @@ __device__ static void
                 auto const j0k = idx_lower(j0, kcol, lda);
 
                 A[j0k] = (A[j0k] / conj_lkk);
+
+                v[j0] = A[j0k];
             }
 
             __syncthreads();
@@ -177,16 +175,18 @@ __device__ static void
 
             for(I j = (kcol + 1) + j_start; j < n; j += j_inc)
             {
-                auto const vj = A[idx_lower(j, kcol, lda)];
+                // auto const conj_vj = conj( A[idx_lower(j, kcol, lda)] );
+                auto const conj_vj = conj(v[j]);
                 for(I i = (kcol + 1) + i_start; i < n; i += i_inc)
                 {
                     bool const lower_part = (i >= j);
                     if(lower_part)
                     {
-                        auto const vi = A[idx_lower(i, kcol, lda)];
+                        // auto const vi = A[idx_lower(i, kcol, lda)];
+                        auto const vi = v[i];
                         auto const ij = idx_lower(i, j, lda);
 
-                        A[ij] = A[ij] - vi * conj(vj);
+                        A[ij] = A[ij] - vi * conj_vj;
                     }
                 }
             }
@@ -243,6 +243,8 @@ __device__ static void
                 auto const kj0 = idx_upper(kcol, j0, lda);
 
                 A[kj0] = A[kj0] / ukk;
+
+                v[j0] = A[kj0];
             }
 
             __syncthreads();
@@ -254,13 +256,15 @@ __device__ static void
             // -----------------------------
             for(I j = (kcol + 1) + j_start; j < n; j += j_inc)
             {
-                auto const vj = A[idx_upper(kcol, j, lda)];
+                // auto const vj = A[idx_upper(kcol, j, lda)];
+                auto const vj = v[j];
                 for(I i = (kcol + 1) + i_start; i < n; i += i_inc)
                 {
                     bool const upper_part = (i <= j);
                     if(upper_part)
                     {
-                        auto const vi = A[idx_upper(kcol, i, lda)];
+                        // auto const vi = A[idx_upper(kcol, i, lda)];
+                        auto const vi = v[i];
                         auto const ij = idx_upper(i, j, lda);
 
                         A[ij] = A[ij] - conj(vi) * vj;
@@ -314,7 +318,9 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
     // assume n by n matrix will fit in LDS cache
     // -----------------------------------------
     extern __shared__ rocblas_int lsmem[];
-    T* Ash = reinterpret_cast<T*>(lsmem);
+    T* const Ash = reinterpret_cast<T*>(lsmem);
+    auto const size_Ash = n * (n + 1) / 2;
+    T* const v = Ash + size_Ash;
 
     // --------------------------------------------------------
     // factoring Lower triangular matrix may be slightly faster
@@ -358,7 +364,7 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
     __syncthreads();
 
     bool const is_up = (use_compute_lower) ? false : is_upper;
-    potf2_simple<T>(is_up, n, Ash, info_bid, row_offset);
+    potf2_simple<T>(is_up, n, Ash, v, info_bid, row_offset);
 
     __syncthreads();
 
@@ -418,7 +424,8 @@ rocblas_status potf2_run_small(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-    size_t lmemsize = sizeof(T) * (n * (n + 1)) / 2;
+    size_t lmemsize = sizeof(T) * (n * (n + 1)) / 2 + // for compressed storage Ash[]
+        sizeof(T) * n; // for vector v[]
 
     bool const is_upper = (uplo == rocblas_fill_upper);
     ROCSOLVER_LAUNCH_KERNEL((potf2_kernel_small<T, I, INFO, U>), dim3(1, 1, batch_count),
