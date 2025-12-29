@@ -29,9 +29,10 @@
 #include <miopen/logger.hpp>
 #include <miopen/process.hpp>
 
-#include <random>
 #include <thread>
 #include <string_view>
+#include <random>
+#include <format>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_SAVE_TEMP_DIR)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_EXIT_STATUS_TEMP_DIR)
