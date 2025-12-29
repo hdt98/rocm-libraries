@@ -54,8 +54,6 @@ bool ValidateGcnAssembler() { return true; }
 #include <unistd.h>
 #endif // __linux__
 
-namespace fs = miopen::fs;
-
 /// SWDEV-233338: hip-clang reports unknown target instead of amdgpu.
 /// \todo Try to assemble AMD GCN source?
 #define WORKAROUND_SWDEV_233338 1
@@ -251,12 +249,11 @@ static void AmdgcnAssembleQuiet(std::string_view source, std::string_view params
 
 static bool GcnAssemblerHasBug34765Impl()
 {
-    auto p = fs::temp_directory_path();
-    miopen::WriteFile(miopen::GetKernelSrc("bugzilla_34765_detect.s"), p);
-    const auto& src = p.string();
+    auto path = miopen::fs::temp_directory_path();
+    miopen::WriteFile(miopen::GetKernelSrc("bugzilla_34765_detect.s"), path);
     try
     {
-        AmdgcnAssembleQuiet(src, "-mcpu=gfx900");
+        AmdgcnAssembleQuiet(path, "-mcpu=gfx900");
         return false;
     }
     catch(...)
@@ -274,12 +271,11 @@ static bool GcnAssemblerHasBug34765()
 
 static bool GcnAssemblerSupportsOption(const std::string& option)
 {
-    auto p = fs::temp_directory_path();
-    miopen::WriteFile(miopen::GetKernelSrc("dummy_kernel.s"), p);
-    const auto& src = p.string();
+    auto path = miopen::fs::temp_directory_path();
+    miopen::WriteFile(miopen::GetKernelSrc("dummy_kernel.s"), path);
     try
     {
-        AmdgcnAssembleQuiet(src, "-mcpu=gfx900 " + option);
+        AmdgcnAssembleQuiet(path, "-mcpu=gfx900 " + option);
         MIOPEN_LOG_NQI("Supported: '" << option << '\'');
         return true;
     }
