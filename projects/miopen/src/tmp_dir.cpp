@@ -46,7 +46,7 @@ TmpDir::TmpDir(std::string_view prefix) : path{fs::temp_directory_path()}
 
     std::mt19937 prng(std::random_device{}());
     std::uniform_int_distribution<int> rand;
-    path /= 
+    path /=
         "miopen" + p.append(prefix) + "-" + (std::stringstream() << std::hex << rand(prng)).str();
 
     fs::create_directories(path);
