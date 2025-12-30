@@ -47,13 +47,15 @@ namespace rocRoller
             const auto& inst    = filteredInstructions[i];
             const auto& profile = profiles[i];
 
-            int modelLatency = inst.totalCycles() * 4;
+            int const modelLatency = inst.totalCycles() * 4;
+            int const delta        = static_cast<int>(profile.meanLatency()) - modelLatency;
 
-            infoMessage << fmt::format("{}, model {}, profiler {}, delta {}\n",
+            infoMessage << fmt::format("{} {}, model {}, profiler {}, delta {}\n",
+                                       delta != 0 ? "*" : " ",
                                        profile.instruction,
                                        modelLatency,
                                        profile.meanLatency(),
-                                       static_cast<int>(profile.meanLatency()) - modelLatency);
+                                       delta);
         }
         return infoMessage.str();
     }
@@ -181,6 +183,7 @@ namespace rocRoller
                                                       LDSTestKernelBase& kernel,
                                                       bool               testIndividual)
     {
+        AssertFatal(!testIndividual); // Avoid accidental check-in of individual test runs
         constexpr int NUM_RUNS = 5; // Should be odd, as median is used
 
         std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
