@@ -197,9 +197,11 @@ namespace rocRoller
             }
             return;
         }
-        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY: // `rocprofiler_thread_trace_decoder_occupancy_t`
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
-            // Ok to ignore both these
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_REALTIME:
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_RT_FREQUENCY:
+            // these data not used currently
             return;
 
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
