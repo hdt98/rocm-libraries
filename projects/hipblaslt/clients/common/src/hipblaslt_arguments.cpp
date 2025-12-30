@@ -127,8 +127,6 @@ void Arguments::init()
     scaleBBlockRowSize = 0;
     scaleBBlockColSize = 0;
 
-    use_ext                  = false;
-    use_ext_setproblem       = false;
     algo_method              = 0;
     use_user_args            = false;
     rotating                 = 0;

@@ -575,8 +575,6 @@ Arguments:
   - scaleABlockColSize: c_uint32
   - scaleBBlockRowSize: c_uint32
   - scaleBBlockColSize: c_uint32
-  - use_ext: c_bool
-  - use_ext_setproblem: c_bool
   - algo_method: c_int32
   - api_method: c_int32
   - use_user_args: c_bool

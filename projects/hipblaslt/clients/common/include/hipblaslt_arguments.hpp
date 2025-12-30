@@ -171,8 +171,6 @@ struct Arguments
     uint32_t scaleBBlockColSize;
 
     // API related
-    bool      use_ext;
-    bool      use_ext_setproblem;
     int       algo_method; // 0 for getheuristic, 1 for get all algos, 2 for algo index
     ApiMethod api_method;
     bool      use_user_args;
@@ -278,8 +276,6 @@ struct Arguments
     OPER(scaleABlockColSize) SEP     \
     OPER(scaleBBlockRowSize) SEP     \
     OPER(scaleBBlockColSize) SEP     \
-    OPER(use_ext) SEP                \
-    OPER(use_ext_setproblem) SEP     \
     OPER(algo_method) SEP            \
     OPER(api_method) SEP             \
     OPER(use_user_args) SEP          \
