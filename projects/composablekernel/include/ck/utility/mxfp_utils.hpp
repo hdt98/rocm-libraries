@@ -11,9 +11,9 @@
 #define CK_MX_ARCH_950 0
 #endif
 #if defined(__gfx125__) && __HIP_DEVICE_COMPILE__
-#define CK_MX_ARCH_1250 1
+#define CK_MX_ARCH_125 1
 #else
-#define CK_MX_ARCH_1250 0
+#define CK_MX_ARCH_125 0
 #endif
 
 #ifdef CK_CODE_GEN_RTC

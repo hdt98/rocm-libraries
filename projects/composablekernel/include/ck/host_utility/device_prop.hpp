@@ -52,6 +52,23 @@ inline std::string get_device_name()
     }
 }
 
+inline int get_device_revision()
+{
+    hipDeviceProp_t props{};
+    int device;
+    auto status = hipGetDevice(&device);
+    if(status != hipSuccess)
+    {
+        return -1; // Error: cannot get device
+    }
+    status = hipGetDeviceProperties(&props, device);
+    if(status != hipSuccess)
+    {
+        return -1; // Error: cannot get device properties
+    }
+    return props.asicRevision;
+}
+
 inline bool is_gfx12_supported()
 {
     return ck::get_device_name() == "gfx1200" || ck::get_device_name() == "gfx1201" ||
