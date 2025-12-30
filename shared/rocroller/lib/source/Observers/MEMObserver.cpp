@@ -298,13 +298,16 @@ namespace rocRoller
 
                     const auto cmdQueueStr = fmt::format(
                         "{}", fmt::join(m_commandQueue.begin(), m_commandQueue.end(), ", "));
+                    const auto dataQueueStr = fmt::format(
+                        "{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", "));
 
                     const_cast<Instruction&>(inst).addComment(
-                        fmt::format("WeightlessDSMemObserver {}: {} dataCycles, "
-                                    "cmd {}",
+                        fmt::format("WeightlessDSMemObserver end of observe {}: {} dataCycles, "
+                                    "cmd queue {}, data queue {}",
                                     m_programCycle,
                                     dataCycles,
-                                    cmdQueueStr));
+                                    cmdQueueStr,
+                                    dataQueueStr));
                 }
             }
         }

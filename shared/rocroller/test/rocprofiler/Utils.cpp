@@ -38,23 +38,24 @@
 
 namespace rocRoller
 {
-    std::string formatLatencyComparison(const std::vector<Instruction>& filteredInstructions,
-                                        const std::vector<profiler::InstructionProfile>& profiles)
+    std::string
+        formatLatencyComparison(const std::vector<Instruction>& filteredInstructions,
+                                const std::vector<std::tuple<std::string, size_t>>& latencies)
     {
         std::stringstream infoMessage;
-        for(size_t i = 0; i < std::min(filteredInstructions.size(), profiles.size()); ++i)
+        for(size_t i = 0; i < std::min(filteredInstructions.size(), latencies.size()); ++i)
         {
-            const auto& inst    = filteredInstructions[i];
-            const auto& profile = profiles[i];
+            const auto& inst                 = filteredInstructions[i];
+            const auto& [inst_name, latency] = latencies[i];
 
             int const modelLatency = inst.totalCycles() * 4;
-            int const delta        = static_cast<int>(profile.meanLatency()) - modelLatency;
+            int const delta        = static_cast<int>(latency) - modelLatency;
 
             infoMessage << fmt::format("{} {}, model {}, profiler {}, delta {}\n",
                                        delta != 0 ? "*" : " ",
-                                       profile.instruction,
+                                       inst_name,
                                        modelLatency,
-                                       profile.meanLatency(),
+                                       latency,
                                        delta);
         }
         return infoMessage.str();
@@ -199,8 +200,6 @@ namespace rocRoller
         const auto filteredInstructions
             = filterAndVerifyInstructions(instructions, allLatencies[0]);
 
-        const auto infoStr = formatLatencyComparison(filteredInstructions, allLatencies[0]);
-
         size_t expectedSize = allLatencies[0].size();
         REQUIRE(std::all_of(
             allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
@@ -220,6 +219,7 @@ namespace rocRoller
             medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
         }
 
+        const auto infoStr = formatLatencyComparison(filteredInstructions, medianLatencies);
         if(testIndividual)
         {
             Log::info(context.output());
