@@ -889,9 +889,9 @@ struct UniversalGemmBasePolicy
         constexpr auto DataTypeSize     = sizeof(DataType);
 
         constexpr auto is_tr_load = IsA ? is_a_load_tr<Problem> : is_b_load_tr<Problem>;
+        constexpr auto PackedSize = numeric_traits<DataType>::PackedSize;
         if constexpr(is_tr_load)
         {
-            constexpr auto PackedSize = numeric_traits<DataType>::PackedSize;
             constexpr index_t banks_per_mblk =
                 MNPerBlock * DataTypeSize / PackedSize / BytesPerDword;
             // 8 * PackedSize means 8 * PackedSize columns which is in gfx1250 tr load instructions
@@ -914,9 +914,14 @@ struct UniversalGemmBasePolicy
         }
         else
         {
+            constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+            constexpr index_t banks_per_kblk =
+                KPerBlock * DataTypeSize / PackedSize / BytesPerDword;
             // log2 minus 1 of the number of dwords to store into the destination before adding
             // padding; one bank is 1 dword size
-            constexpr index_t pad_interval = constexpr_log2_floor(get_n_lds_banks()) - 1;
+            constexpr index_t pad_interval = (banks_per_kblk < get_n_lds_banks())
+                                                 ? constexpr_log2_floor(get_n_lds_banks()) - 1
+                                                 : constexpr_log2_floor(banks_per_kblk) - 1;
             // always use b128 to ds_load; this value calculate the bank number per 128 bits
             constexpr index_t banks_per_128b = get_n_words_per_128b();
             // amount of padding to add in dwords 0 means 1 dword padding; 1 means 2 dwords
