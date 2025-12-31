@@ -46,6 +46,7 @@ set(roclapack_test_source
   lapack/sytf2_sytrf_gtest.cpp
   lapack/geblttrf_gtest.cpp
   # orthogonal factorizations
+  lapack/cholqr_gtest.cpp
   lapack/geqr2_geqrf_gtest.cpp
   lapack/gerq2_gerqf_gtest.cpp
   lapack/geql2_geqlf_gtest.cpp
