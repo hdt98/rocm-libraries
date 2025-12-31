@@ -437,12 +437,19 @@ protected:
                     dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
         };
 
-        for(int i = 1; i <= 2; ++i)
+        for(int i = 1; i <= 4; ++i)
         {
-            for(int j = 0; j < i; ++j)
+            if(i > 1)
             {
-                co_yield scheduleLds();
+                for(int j = 0; j < i; ++j)
+                    co_yield scheduleLds();
+                for(int j = 0; j < i; ++j)
+                    co_yield Instruction::Wait(
+                        WaitCount::DSCnt(m_context->targetArchitecture(), i - j - 1));
             }
+
+            for(int j = 0; j < i; ++j)
+                co_yield scheduleLds();
             co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
         }
     }
@@ -465,7 +472,7 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
     {
         instrDwords      = GENERATE(1);
         strideMultiplier = GENERATE(2);
-        write            = GENERATE(false);
+        write            = GENERATE(true);
     }
     else
     {

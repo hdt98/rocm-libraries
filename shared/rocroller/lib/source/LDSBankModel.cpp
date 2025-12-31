@@ -153,10 +153,14 @@ namespace rocRoller::Scheduling::LDSBankModel
         {
             const auto commandsToWaitFor   = m_commandQueue.size() - static_cast<size_t>(waitcnt);
             const auto waitCompletionCycle = m_commandQueue[commandsToWaitFor - 1];
-            const auto roundtripLatency    = 40;
-            stallCycles
-                = (static_cast<int>(waitCompletionCycle) - m_programCycle) + roundtripLatency;
+            stallCycles = (static_cast<int>(waitCompletionCycle) - m_programCycle);
         }
+
+        // stallCycles += -4; // for ds_read_b32 stride 1
+        // stallCycles += 0; // for ds_write_b32 stride 1/2 or ds_read_b32 stride 2
+        // stallCycles += 4; // for ds_read/write_b32 stride 4
+        // stallCycles += 16; // for ds_read/write_b32 stride 8
+        // stallCycles += 32; // for ds_read/write_b32 stride 16
 
         return stallCycles;
     }
@@ -177,25 +181,44 @@ namespace rocRoller::Scheduling::LDSBankModel
                         "Expected queue space to be accounted for in predict function and passed "
                         "through to total cycles calculation.");
 
-            auto base = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
+            auto base = m_commandQueue.empty() ? (m_programCycle + 40) : (m_commandQueue.back());
 
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
-                base += 4 * instr.dwords;
-                m_commandQueue.push_back(base + dataCycles);
-                const auto cyclesPerSlot = dataCycles / requiredSlots;
+                // tuned for ds_write_b32 only
+                if(m_commandQueue.empty())
+                {
+                    base += 8;
+                    base += dataCycles;
+                }
+                else
+                {
+                    base += std::max(8, dataCycles);
+                }
+
+                m_commandQueue.push_back(base);
                 for(int j = 0; j < requiredSlots; ++j)
                 {
-                    const auto queueFreedCycle = base + j * cyclesPerSlot;
-                    m_dataQueue.push_back(queueFreedCycle);
+                    m_dataQueue.push_back(base);
                 }
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
-                base += 4;
-                m_commandQueue.push_back(base + dataCycles);
                 AssertFatal(requiredSlots == 1,
                             ShowValue(requiredSlots)); // read shouldn't use data queue slots
+
+                // tuned for ds_read_b32 only
+                if(m_commandQueue.empty())
+                {
+                    if(dataCycles >= 4)
+                        base += 4;
+                    base += dataCycles;
+                }
+                else
+                {
+                    base += dataCycles;
+                }
+                m_commandQueue.push_back(base);
                 m_dataQueue.push_back(base);
             }
         }
