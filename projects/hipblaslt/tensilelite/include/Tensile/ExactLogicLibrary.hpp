@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -56,6 +56,7 @@ namespace TensileLite
     {
         using Row = LibraryRow<MyProblem, MySolution, MyPredicate>;
         std::vector<Row> rows;
+        mutable bool     lastFindTopRetAll;
 
         ExactLogicLibrary() = default;
         ExactLogicLibrary(std::initializer_list<Row> init)
@@ -128,17 +129,64 @@ namespace TensileLite
                              = SolutionLibrarySearchType::DEFAULT) const override
         {
             SolutionSet<MySolution> rv;
-            const bool              streamK = Debug::Instance().useExperimentalSelection() == 2;
+
+            const bool  streamK = Debug::Instance().useExperimentalSelection() == 2;
+            // const bool predictionLib = Debug::Instance().usePredictionLibrary();
+            const bool  use_predict   = Debug::Instance().usePredictionSelection() != 2; // origami or formocast
+            const bool  use_gridbased = Debug::Instance().usePredictionSelection() == 2;
+            const auto& excludedLib   = Debug::Instance().excludedLibFromGetAll();
 
             for(auto const& row : rows)
             {
+                // we want to exclude this lib from getAll
+                if(excludedLib.count(row.first.value->type()))
+                    continue;
+
                 if(row.first.value->type() == "ExperimentalStreamK" && !streamK)
                     continue;
 
                 if(row.first.value->type() == "AMDGPU" && !row.first(problem, hardware))
                     continue;
 
+                // if(predictionLib && ((row.first.value->type() == "EqualityMatching")
+                //                      || (row.first.value->type() == "RangeMatching")))
+                //     continue;
+
+                if(row.first.value->type() == "PredictionMatching" && !use_predict)
+                    continue;
+
+                if(row.first.value->type() == "GridBasedMatching" && !use_gridbased)
+                    continue;
+
                 auto rowSolutions = row.second->findAllSolutions(problem, hardware, searchType);
+
+                if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
+                {
+                    for(auto& sol : rowSolutions)
+                        sol->tag = MySolution::MatchingTag::Equal;
+                }
+                else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
+                {
+                    for(auto& sol : rowSolutions)
+                        sol->tag = MySolution::MatchingTag::Prediction;
+                }
+                else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(row.first.value.get()))
+                {
+                    for(auto& sol : rowSolutions)
+                        sol->tag = MySolution::MatchingTag::GridBased;
+                }
+                else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(row.first.value.get()))
+                {
+                    for(auto& sol : rowSolutions)
+                        sol->tag = MySolution::MatchingTag::Range;
+                }
+                else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(row.first.value.get()))
+                {
+                    for(auto& sol : rowSolutions)
+                        sol->tag = MySolution::MatchingTag::FreeSize;
+                }
+                // TODO- Experimental?
+
                 rv.insert(rowSolutions.begin(), rowSolutions.end());
             }
 

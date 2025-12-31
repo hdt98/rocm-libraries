@@ -163,6 +163,19 @@ namespace TensileLite
 
         int nonTemporalA = 0;
         int nonTemporalB = 0;
+        int NonTemporalD = 0;
+        int WaveSeparateGlobalReadA = 0;
+        int WaveSeparateGlobalReadB = 0;
+        int UnrollLoopSwapGlobalReadOrder = 0;
+        bool DirectToVgprA = false;
+        bool DirectToVgprB = false;
+        int NumLoadsCoalescedA = 0;
+        int NumLoadsCoalescedB = 0;
+        int VectorWidthA = 1;
+        int VectorWidthB = 1;
+        int LocalSplitU = 1;
+
+        std::array<int, 2> waveGroup;
     };
 
     struct StreamKSettings
@@ -187,12 +200,17 @@ namespace TensileLite
         using ParamsCache  = CacheMap<std::pair<int32_t, int32_t>, Problem>;
 
         /**
-         * Indicate a solution is equally or estimatedly matched.
+         * Indicate a solution's matching type
          */
         enum class MatchingTag
         {
-            Equal,
-            Estimated
+            Equal,        // EqualityMatching
+            Range,        // RangeMatching
+            FreeSize,     // FreeSizeMatching
+            GridBased,    // GridBasedMatching
+            Prediction,   // PredictionMatching
+            Experimental, // ExperimentalStreamK or ExperimentalMLP
+            Others,       // Default
         };
 
         static std::string Type()
@@ -217,6 +235,7 @@ namespace TensileLite
         {
             return kernelName;
         }
+        virtual std::string matchingTag() const;
         virtual bool isFallbackForHW(Hardware const&) const;
 
         bool isStreamK() const
@@ -324,6 +343,7 @@ namespace TensileLite
         /**
          * Generate a set of kernel calls to solve a particular problem.
          */
+
         virtual std::vector<KernelInvocation> solve(ContractionProblem const& problem,
                                                     ProblemInputs const&      inputs,
                                                     Hardware const&           hardware,
@@ -565,7 +585,7 @@ namespace TensileLite
         int32_t               libraryLogicIndex = -1;
         std::map<int, double> ideals;
         LinearModel           linearModel;
-        MatchingTag           tag{MatchingTag::Estimated};
+        MatchingTag           tag{MatchingTag::Others};
 
         uint32_t magicNumberAlg1(uint32_t x, uint32_t* magicShift) const;
         uint32_t magicNumberAlg2(uint32_t x, uint32_t* magicShift) const;
@@ -576,6 +596,12 @@ namespace TensileLite
                                                      Hardware const* hardware,
                                                      uint32_t        skgrid) const;
         uint32_t calculateAutoGSU(Problem const& problem, Hardware const* hardware) const;
+
+        double calculateDimensionM(Problem const&  problem) const;
+        double calculateDimensionN(Problem const&  problem) const;
+        double calculateNumBatches(Problem const&  problem) const;
+        SizeMapping getSizeMapping(void) const {return sizeMapping;};
+        origami::data_type_t getOrigamiDatatype(Problem const&  problem) const;
     };
 
     template <typename TAct>

@@ -48,6 +48,10 @@
 #include <roctracer/roctx.h>
 #endif
 
+#define TO_STR(x) #x
+#define ENUMSTR(x) x, TO_STR(x)
+#define STRENUM(x) TO_STR(x), x
+
 namespace TensileLite
 {
     enum class KERNELARGTYPE
@@ -310,6 +314,24 @@ namespace TensileLite
                                  DeviceUserArguments<float>*                      args);
 
     PerfModel perf;
+
+    static const std::map<ContractionSolution::MatchingTag, const char*>& MatchingTag2StringMap()
+    {
+        static const std::map<ContractionSolution::MatchingTag, const char*> MatchingTag2String
+            = {{ENUMSTR(ContractionSolution::MatchingTag::Equal)},
+               {ENUMSTR(ContractionSolution::MatchingTag::GridBased)},
+               {ENUMSTR(ContractionSolution::MatchingTag::Range)},
+               {ENUMSTR(ContractionSolution::MatchingTag::FreeSize)},
+               {ENUMSTR(ContractionSolution::MatchingTag::Prediction)},
+               {ENUMSTR(ContractionSolution::MatchingTag::Experimental)},
+               {ENUMSTR(ContractionSolution::MatchingTag::Others)}};
+        return MatchingTag2String;
+    }
+
+    std::string ContractionSolution::matchingTag() const
+    {
+        return MatchingTag2StringMap().at(tag);
+    }
 
     // check if this solution is a CU-Fallback solution for current hardware
     bool ContractionSolution::isFallbackForHW(Hardware const& hardware) const
@@ -1289,11 +1311,14 @@ namespace TensileLite
         static_cast<void>(hipGetDevice(&deviceId));
         static_cast<void>(hipGetDeviceProperties(&deviceProperties, deviceId));
         auto gpu_arch_no_prefix = removePrefix(deviceProperties.gcnArchName);
-        if(internalArgsSupport.version >= 1)
+        if(stoi(gpu_arch_no_prefix) / 100 != 12)
         {
-            rv.numWorkGroups.x *= (rv.numWorkGroups.y * rv.numWorkGroups.z);
-            rv.numWorkGroups.y = 1;
-            rv.numWorkGroups.z = 1;
+            if(internalArgsSupport.version >= 1)
+            {
+                rv.numWorkGroups.x *= (rv.numWorkGroups.y * rv.numWorkGroups.z);
+                rv.numWorkGroups.y = 1;
+                rv.numWorkGroups.z = 1;
+            }
         }
 
         rv.numWorkItems.x = rv.workGroupSize.x * rv.numWorkGroups.x;
@@ -3436,6 +3461,54 @@ namespace TensileLite
         pp.CUs         = NumCUs;
 
         return pp;
+    }
+
+    double ContractionSolution::calculateDimensionM(Problem const&  problem) const
+    {
+        double M = 1.0;
+        if(problem.freeIndicesA().size() > 1 || sizeMapping.packBatchDims & 0x1)
+        {
+            std::vector<size_t> packedIndices
+                = generatePackedIndicesA(problem, sizeMapping.packBatchDims);
+            for(auto pi = packedIndices.begin(); pi != packedIndices.end(); pi++)
+                M *= problem.a().sizes()[*pi];
+        }
+        else
+        {
+            M = problem.freeSizeA(0);
+        }
+        return M;
+    }
+
+    double ContractionSolution::calculateDimensionN(Problem const&  problem) const
+    {
+        double N = 1.0;
+        if(problem.freeIndicesB().size() > 1 || sizeMapping.packBatchDims & 0x2)
+        {
+            std::vector<size_t> packedIndices
+                = generatePackedIndicesB(problem, sizeMapping.packBatchDims);
+            for(auto pi = packedIndices.begin(); pi != packedIndices.end(); pi++)
+                N *= problem.b().sizes()[*pi];
+        }
+        else
+            N = problem.freeSizeB(0);
+        return N;
+    }
+
+    double ContractionSolution::calculateNumBatches(Problem const&  problem) const
+    {
+        double NumBatches = 1;
+        if(sizeMapping.packBatchDims == 0)
+        {
+            for(size_t i = 0; i < problem.batchIndices().size(); i++)
+                NumBatches *= problem.batchSize(i);
+        }
+        return NumBatches;
+    }
+
+    origami::data_type_t ContractionSolution::getOrigamiDatatype(Problem const&  problem) const
+    {
+        return datatypeToAnalyticalDatatype(problem.computeInputType());
     }
 
     std::ostream& operator<<(std::ostream&                                      stream,

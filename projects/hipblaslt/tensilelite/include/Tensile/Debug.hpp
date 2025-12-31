@@ -27,6 +27,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <set>
 #include <string>
 #ifdef Tensile_ENABLE_MARKER
 #include <roctracer/roctx.h>
@@ -36,6 +37,8 @@
 
 namespace TensileLite
 {
+    using StringSet = std::set<std::string>;
+
     /**
      * @brief Common place for defining flags which enable debug behaviour.
      */
@@ -55,6 +58,8 @@ namespace TensileLite
         bool printWinningKernelName() const;
 
         bool usePredictionLibrary() const;
+
+        int usePredictionSelection() const;
 
         bool printLibraryLogicIndex() const;
 
@@ -83,6 +88,10 @@ namespace TensileLite
         bool gridBasedBatchExp() const;
 
         bool disableStaggerU() const;
+
+        StringSet excludedLibFromGetAll() const;
+
+        void setExcludedLibFromGetAll(StringSet& excludedSet);
 
         __attribute__((always_inline)) inline void markerStart(const char* name) const
         {
@@ -126,6 +135,7 @@ namespace TensileLite
         int         m_experimentSelection = 0;
         int         m_solution_index      = -1;
         bool        m_predictionLib       = false;
+        int         m_predictionSelection = 0; // 0: origami, 1: formocast, 2: gridbased
         std::string m_metric              = "";
         int         m_gridbasedTopSols    = 1;
         bool        m_benchmark           = false;
@@ -133,6 +143,7 @@ namespace TensileLite
         bool        m_gridbasedBatchExp   = false;
         bool        m_printMarker         = false;
         bool        m_disableStaggerU     = false;
+        StringSet   m_excludedFromGetAll;
 
         Debug();
     };
