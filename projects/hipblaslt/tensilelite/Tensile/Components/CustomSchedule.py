@@ -111,7 +111,26 @@ def inflight(lst, index):
     """
     return sum(val < (index) for val in lst)
 
-def duplicate_list_items(input_list: list, repeat_count: int, step: int = 0) -> list:
+def create_snop_code(optSchedule: dict[str, list[list[int]]], num_mfmas: int) -> list[SNop]:
+    """
+    Create a list of SNop instructions based on the optSchedule.
+    """
+    snop_code = []
+    snop_index_list = []
+    k = None
+
+    for i in range(-1, num_mfmas):
+        for key, value in optSchedule.items():
+            if i in value[0]:
+                k = key
+        if k == "PackA0" or k == "PackB0" or k == "PackA3" or k == "PackB3":
+            snop_code.append(SNop(0))
+            snop_index_list.append(i)
+        k = None
+    optSchedule["SNOP"] = [snop_index_list]
+    return optSchedule, snop_code
+
+def duplicate_list_items(input_list: list, repeat_count: int, step:int=0) -> list:
     """
     Duplicate each item in input_list repeat_count times. Optionally duplicate with a step
 
