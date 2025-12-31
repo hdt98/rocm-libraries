@@ -103,7 +103,26 @@ def create_range(min_val: int, num: int, max_val: int, step: int = 1, repeat: in
     """
     return [min(val, max_val) for val in range(min_val, min_val + num, step) for _ in range(repeat)]
 
-def duplicate_list_items(input_list: list, repeat_count: int, step: int = 0) -> list:
+def create_snop_code(optSchedule: dict[str, list[list[int]]], num_mfmas: int) -> list[SNop]:
+    """
+    Create a list of SNop instructions based on the optSchedule.
+    """
+    snop_code = []
+    snop_index_list = []
+    k = None
+
+    for i in range(-1, num_mfmas):
+        for key, value in optSchedule.items():
+            if i in value[0]:
+                k = key
+        if k == "PackA0" or k == "PackB0" or k == "PackA3" or k == "PackB3":
+            snop_code.append(SNop(0))
+            snop_index_list.append(i)
+        k = None
+    optSchedule["SNOP"] = [snop_index_list]
+    return optSchedule, snop_code
+
+def duplicate_list_items(input_list: list, repeat_count: int, step:int=0) -> list:
     """
     Duplicate each item in input_list repeat_count times. Optionally duplicate with a step
 
@@ -548,7 +567,6 @@ class RegisterSchedule:
         # Return original function unchanged (so it can still be called directly)
         return func
 
-
 @RegisterSchedule(
     tile_config=TileConfig(256, 96, 64, 2, 1, True, 0, 0),
     dtype_predicate=is16bit,
@@ -573,7 +591,6 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
                     15, SBarrier(comment=""),
 
                     23, SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="1/3 LRB0 done"),
-
                     29, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="All LRB0 done"),
                     29, SBarrier(comment=""),
 
@@ -2254,6 +2271,74 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
+    tile_config=TileConfig(160, 128, 32, 2, 0, True, 0, 0),
+    dtype_predicate=isTF32,
+    vector_widths=[4, 4, 4],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[1, 2]
+)
+def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+    optSchedule = dict()
+    syncCode = []
+    numMfma = 120
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    if isNN(kernel) and TLDS==1:
+        kernel["SwapGlobalReadOrder"] = False
+        
+        optSchedule = {
+            'SYNC': [[-1, 9, 29, 59, 59, 89, 89]], # 9
+            'PackA3': [[-1, -1, -1, -1, 
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                        1, 1, 1, 1, 
+                        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
+                        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]], # 120
+            'PackB3': [[-1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]], # 48
+            'PackA0': [[29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33]], # 120
+            # 'PackA0': [[23, 23, 23, 23, 24, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 29, 29, 29, 30, 30, 30, 30, 31, 31, 31, 31, 32, 32, 32, 32, 33, 33, 33, 33, 34, 34, 34, 34, 35, 35, 35, 35, 36, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 40, 41, 41, 41, 41, 42, 42, 42, 42, 43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45, 46, 46, 46, 46, 47, 47, 47, 47, 48, 48, 48, 48, 49, 49, 49, 49, 50, 50, 50, 50, 51, 51, 51, 51, 52]],
+            'PackB0': [[29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32]], # 48
+            'LRA0': [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19]], # 40
+            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]], # 9
+            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]], # 9
+            'LRB0': [
+                # [20, 20, 22, 22],
+                [20,20,20,21],
+                # [21,22,23,24]
+                ], # 4
+            'LRSA': [[28]], # 1
+            'LRSB': [[28]], # 1
+            'GRA': [[59, 59, 60, 60, 61,61, 63,63,65,65, 66,66, 67,67, 68,68, 69,69,70,70]], # 20
+            # 'GRA': [[59,59, 60,60, 61,61, 62,62, 63,63, 64,64, 65,65, 66,66, 67,67, 68,68]], # 20
+            # 'GRB': [[67,67,69,69,71,71,73,73,75,75,77,77,79,79,81,81]], # 16
+            'GRB': [[71,71,73,73,75,75,77,77,79,79,81,81,82,82,83,83]], # 16
+            'LWSA': [[87]], # 1
+            'LWSB': [[88]], # 1
+            'LRA3': [[90, 90, 91, 91, 92, 92, 93, 93, 95, 95, 96, 96, 97, 97, 98, 98, 99, 99, 100, 100, 101, 101, 102, 102, 103, 103, 104, 104, 105, 105, 106, 106, 107, 107, 108, 108, 109, 109, 110, 110]], # 40
+            'LRB3': [[94, 94, 111, 111],
+                     [112, 112, 113, 113]], # 4
+            'LCC': [[119, 119]], # 2
+        }
+
+        # Add explicit s_nop to avoid VALU-pack -> MFMA read hazards.
+        optSchedule, snopCode = create_snop_code(optSchedule, numMfma)
+
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
+            SWaitCnt(dscnt=15, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=18, vscnt=-1, comment="wait for previous set of global reads"),
+            SBarrier(comment=""),
+        ]
+        nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2 # vmcnt shift for ngl and nll
+    else:
+        return False, None
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
+    return True, opt1
+
+
+@RegisterSchedule(
     tile_config=TileConfig(192, 256, 32, 2, 0, True, 0, 0),
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
@@ -2267,7 +2352,6 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isTN(kernel) and not useLDSTr and TLDS==1:
-        kernel["UsePLRPack"] = True
         numPackInstr = 24 
         numPackIndices = numPackInstr // 2 # We put 2 pack instructions per index
 
