@@ -36,6 +36,19 @@
 #include "common/misc/rocsolver_test.hpp"
 #include "common/misc/rocsolver_timer.hpp"
 
+#include <iomanip>
+#include <iostream>
+
+// Helper for conjugate that works for both real and complex types
+template <typename T>
+inline T conj_helper(const T& x)
+{
+    if constexpr(rocblas_is_complex<T>)
+        return std::conj(x);
+    else
+        return x;
+}
+
 template <bool STRIDED, typename T, typename I, typename S, typename U, typename V>
 void cholqr_checkBadArgs(const rocblas_handle handle,
                          const I m,
@@ -194,7 +207,7 @@ void cholqr_initData(const rocblas_handle handle,
                     for(I i = 0; i < m; ++i)
                     {
                         T val = hA[b][i + j * lda];
-                        gnorm_sq += std::real(val * std::conj(val));
+                        gnorm_sq += std::real(val * conj_helper(val));
                     }
                 }
                 // sigma = 11 * n * eps * (m + (n+1)) * gnorm_sq
@@ -217,6 +230,66 @@ void cholqr_initData(const rocblas_handle handle,
         CHECK_HIP_ERROR(dA.transfer_from(hA));
         CHECK_HIP_ERROR(dSigma.transfer_from(hSigma));
     }
+}
+
+// Helper function to normalize QR signs: make R's diagonal positive
+// For each k, if R[k,k] < 0 (or has negative real part for complex),
+// flip signs of column k of Q and row k of R
+template <typename T, typename I>
+void normalize_qr_signs(T* Q, I m, I ldq, T* R, I n, I ldr, I min_mn)
+{
+    using S = decltype(std::real(T{}));
+    
+    for(I k = 0; k < min_mn; ++k)
+    {
+        // Check if diagonal of R is negative
+        T diag = R[k + k * ldr];
+        S real_diag = std::real(diag);
+        
+        if(real_diag < S(0))
+        {
+            // Flip sign of column k of Q
+            for(I i = 0; i < m; ++i)
+            {
+                Q[i + k * ldq] = -Q[i + k * ldq];
+            }
+            
+            // Flip sign of row k of R (only upper triangular part matters)
+            for(I j = k; j < n; ++j)
+            {
+                R[k + j * ldr] = -R[k + j * ldr];
+            }
+        }
+    }
+}
+
+// Helper function to print a matrix for debugging (first 10x10 elements)
+template <typename T, typename I>
+void print_matrix(const char* name, const T* A, I rows, I cols, I lda)
+{
+    const I max_print = 10;
+    I print_rows = std::min(rows, max_print);
+    I print_cols = std::min(cols, max_print);
+    
+    std::cout << "\n=== " << name << " (" << rows << " x " << cols << ", showing " 
+              << print_rows << " x " << print_cols << ") ===" << std::endl;
+    
+    for(I i = 0; i < print_rows; ++i)
+    {
+        for(I j = 0; j < print_cols; ++j)
+        {
+            if constexpr(std::is_same_v<T, float> || std::is_same_v<T, double>)
+                std::cout << std::setw(12) << std::fixed << std::setprecision(6) << A[i + j * lda] << " ";
+            else
+                std::cout << "(" << std::setw(9) << std::fixed << std::setprecision(4) << std::real(A[i + j * lda]) 
+                          << "," << std::setw(9) << std::fixed << std::setprecision(4) << std::imag(A[i + j * lda]) << ") ";
+        }
+        if(cols > max_print)
+            std::cout << "...";
+        std::cout << std::endl;
+    }
+    if(rows > max_print)
+        std::cout << "  ... (" << (rows - max_print) << " more rows)" << std::endl;
 }
 
 template <bool STRIDED, typename T, typename I, typename Td, typename Ud, typename Sd, typename Id, typename Th, typename Uh, typename Sh, typename Ih>
@@ -271,14 +344,25 @@ void cholqr_getError(const rocblas_handle handle,
             *max_err += 1;
     }
 
-    // Compute error: ||Q_cpu - Q_gpu||_F + ||R_cpu - R_gpu||_F
+    // Compute Error Option 1: Check factorization quality
+    // ||Q^T Q - I||_F (orthogonality) and ||A - QR||_F (reconstruction)
     double err = 0;
     for(I b = 0; b < bc; ++b)
     {
         // Only compute numerical error if factorization succeeded
         if(hInfo[b][0] == 0)
         {
-            // CPU GEQRF: compute QR factorization
+            // Save a copy of original A before CPU reference computation overwrites it
+            std::vector<T> A_orig(size_t(lda) * n);
+            for(I j = 0; j < n; ++j)
+            {
+                for(I i = 0; i < m; ++i)
+                {
+                    A_orig[i + j * lda] = hA[b][i + j * lda];
+                }
+            }
+
+            // CPU GEQRF: compute QR factorization (for comparison/debugging)
             // After geqrf, hA contains Householder vectors (below diagonal) and R (on and above diagonal)
             cpu_geqrf(m, n, hA[b], lda, hTau.data(), hW.data(), lwork);
 
@@ -296,6 +380,276 @@ void cholqr_getError(const rocblas_handle handle,
             // cpu_orgqr_ungqr overwrites hA with Q
             cpu_orgqr_ungqr(m, min_mn, min_mn, hA[b], lda, hTau.data(), hW.data(), lwork);
 
+            normalize_qr_signs(hA[b], m, lda, R_cpu.data(), n, ldr, min_mn);
+            normalize_qr_signs(hARes[b], m, lda, hRRes[b], n, ldr, min_mn);
+
+            // Debug: Print matrices for this batch (after sign normalization)
+            std::cout << "\n========== BATCH " << b << " (signs normalized) ==========" << std::endl;
+            print_matrix("Q_CPU", hA[b], m, min_mn, lda);
+            print_matrix("Q_GPU", hARes[b], m, min_mn, lda);
+            print_matrix("R_CPU", R_cpu.data(), n, n, ldr);
+            print_matrix("R_GPU", hRRes[b], n, n, ldr);
+            std::cout << "================================\n" << std::endl;
+
+            // Compute Q_gpu^T * Q_gpu (should be identity for orthogonal Q)
+            // Result is min_mn x min_mn
+            std::vector<T> QtQ(size_t(min_mn) * min_mn, T(0));
+            for(I i = 0; i < min_mn; ++i)
+            {
+                for(I j = 0; j < min_mn; ++j)
+                {
+                    T sum = T(0);
+                    for(I k = 0; k < m; ++k)
+                    {
+                        sum += conj_helper(hARes[b][k + i * lda]) * hARes[b][k + j * lda];
+                    }
+                    QtQ[i + j * min_mn] = sum;
+                }
+            }
+
+            // Compute ||Q^T Q - I||_F
+            S norm_orth_sq = S(0);
+            for(I i = 0; i < min_mn; ++i)
+            {
+                for(I j = 0; j < min_mn; ++j)
+                {
+                    T expected = (i == j) ? T(1) : T(0);
+                    T diff = QtQ[i + j * min_mn] - expected;
+                    norm_orth_sq += std::real(diff * conj_helper(diff));
+                }
+            }
+            S orth_err = std::sqrt(norm_orth_sq);
+
+            // Compute Q_gpu * R_gpu (should equal original A)
+            // Result is m x n
+            std::vector<T> QR(size_t(lda) * n, T(0));
+            for(I i = 0; i < m; ++i)
+            {
+                for(I j = 0; j < n; ++j)
+                {
+                    T sum = T(0);
+                    // R is upper triangular, so only sum up to min(j+1, min_mn)
+                    I k_max = std::min(j + 1, min_mn);
+                    for(I k = 0; k < k_max; ++k)
+                    {
+                        sum += hARes[b][i + k * lda] * hRRes[b][k + j * ldr];
+                    }
+                    QR[i + j * lda] = sum;
+                }
+            }
+
+            // Compute ||A - QR||_F
+            S norm_recon_sq = S(0);
+            for(I j = 0; j < n; ++j)
+            {
+                for(I i = 0; i < m; ++i)
+                {
+                    T diff = A_orig[i + j * lda] - QR[i + j * lda];
+                    norm_recon_sq += std::real(diff * conj_helper(diff));
+                }
+            }
+            S recon_err = std::sqrt(norm_recon_sq);
+
+            // Compute ||A||_F for relative error
+            S norm_A_sq = S(0);
+            for(I j = 0; j < n; ++j)
+            {
+                for(I i = 0; i < m; ++i)
+                {
+                    T val = A_orig[i + j * lda];
+                    norm_A_sq += std::real(val * conj_helper(val));
+                }
+            }
+            S norm_A = std::sqrt(norm_A_sq);
+
+            // ============================================================
+            // Same checks for CPU GEQRF reference
+            // ============================================================
+
+            // Compute Q_cpu^T * Q_cpu (should be identity for orthogonal Q)
+            std::vector<T> QtQ_cpu(size_t(min_mn) * min_mn, T(0));
+            for(I i = 0; i < min_mn; ++i)
+            {
+                for(I j = 0; j < min_mn; ++j)
+                {
+                    T sum = T(0);
+                    for(I k = 0; k < m; ++k)
+                    {
+                        sum += conj_helper(hA[b][k + i * lda]) * hA[b][k + j * lda];
+                    }
+                    QtQ_cpu[i + j * min_mn] = sum;
+                }
+            }
+
+            // Compute ||Q_cpu^T Q_cpu - I||_F
+            S norm_orth_cpu_sq = S(0);
+            for(I i = 0; i < min_mn; ++i)
+            {
+                for(I j = 0; j < min_mn; ++j)
+                {
+                    T expected = (i == j) ? T(1) : T(0);
+                    T diff = QtQ_cpu[i + j * min_mn] - expected;
+                    norm_orth_cpu_sq += std::real(diff * conj_helper(diff));
+                }
+            }
+            S orth_err_cpu = std::sqrt(norm_orth_cpu_sq);
+
+            // Compute Q_cpu * R_cpu (should equal original A)
+            std::vector<T> QR_cpu(size_t(lda) * n, T(0));
+            for(I i = 0; i < m; ++i)
+            {
+                for(I j = 0; j < n; ++j)
+                {
+                    T sum = T(0);
+                    I k_max = std::min(j + 1, min_mn);
+                    for(I k = 0; k < k_max; ++k)
+                    {
+                        sum += hA[b][i + k * lda] * R_cpu[k + j * ldr];
+                    }
+                    QR_cpu[i + j * lda] = sum;
+                }
+            }
+
+            // Compute ||A - Q_cpu R_cpu||_F
+            S norm_recon_cpu_sq = S(0);
+            for(I j = 0; j < n; ++j)
+            {
+                for(I i = 0; i < m; ++i)
+                {
+                    T diff = A_orig[i + j * lda] - QR_cpu[i + j * lda];
+                    norm_recon_cpu_sq += std::real(diff * conj_helper(diff));
+                }
+            }
+            S recon_err_cpu = std::sqrt(norm_recon_cpu_sq);
+
+            // ============================================================
+            // GPU GEQRF reference (for comparison)
+            // ============================================================
+            S orth_err_gpu_geqrf = S(0);
+            S recon_err_gpu_geqrf = S(0);
+            {
+                // Allocate device memory for GPU GEQRF
+                size_t size_A_bytes = size_t(lda) * n * sizeof(T);
+                size_t size_tau_bytes = size_t(min_mn) * sizeof(T);
+                T* dA_geqrf = nullptr;
+                T* dTau = nullptr;
+                CHECK_HIP_ERROR(hipMalloc(&dA_geqrf, size_A_bytes));
+                CHECK_HIP_ERROR(hipMalloc(&dTau, size_tau_bytes));
+
+                // Copy original A to device
+                CHECK_HIP_ERROR(hipMemcpy(dA_geqrf, A_orig.data(), size_A_bytes, hipMemcpyHostToDevice));
+
+                // Run GPU GEQRF (non-strided, single matrix)
+                CHECK_ROCBLAS_ERROR(rocsolver_geqr2_geqrf(false, true, handle, m, n, dA_geqrf, lda, rocblas_stride(0), dTau, rocblas_stride(0), I(1)));
+
+                // Copy results back to extract R
+                std::vector<T> hA_geqrf(size_t(lda) * n);
+                std::vector<T> hTau_geqrf(min_mn);
+                CHECK_HIP_ERROR(hipMemcpy(hA_geqrf.data(), dA_geqrf, size_A_bytes, hipMemcpyDeviceToHost));
+                CHECK_HIP_ERROR(hipMemcpy(hTau_geqrf.data(), dTau, size_tau_bytes, hipMemcpyDeviceToHost));
+
+                // Extract R from upper triangular part
+                std::vector<T> R_gpu_geqrf(size_t(ldr) * n, T(0));
+                for(I j = 0; j < n; ++j)
+                {
+                    for(I i = 0; i <= j && i < min_mn; ++i)
+                    {
+                        R_gpu_geqrf[i + j * ldr] = hA_geqrf[i + j * lda];
+                    }
+                }
+
+                // Run GPU ORGQR/UNGQR to reconstruct Q
+                CHECK_ROCBLAS_ERROR(rocsolver_orgxr_ungxr(true, handle, m, min_mn, min_mn, dA_geqrf, lda, dTau));
+
+                // Copy Q back to host
+                std::vector<T> Q_gpu_geqrf(size_t(lda) * n);
+                CHECK_HIP_ERROR(hipMemcpy(Q_gpu_geqrf.data(), dA_geqrf, size_A_bytes, hipMemcpyDeviceToHost));
+
+                // Free device memory
+                CHECK_HIP_ERROR(hipFree(dA_geqrf));
+                CHECK_HIP_ERROR(hipFree(dTau));
+
+                // Compute Q^T * Q for GPU GEQRF
+                std::vector<T> QtQ_gpu_geqrf(size_t(min_mn) * min_mn, T(0));
+                for(I i = 0; i < min_mn; ++i)
+                {
+                    for(I j = 0; j < min_mn; ++j)
+                    {
+                        T sum = T(0);
+                        for(I k = 0; k < m; ++k)
+                        {
+                            sum += conj_helper(Q_gpu_geqrf[k + i * lda]) * Q_gpu_geqrf[k + j * lda];
+                        }
+                        QtQ_gpu_geqrf[i + j * min_mn] = sum;
+                    }
+                }
+
+                // Compute ||Q^T Q - I||_F for GPU GEQRF
+                S norm_orth_gpu_geqrf_sq = S(0);
+                for(I i = 0; i < min_mn; ++i)
+                {
+                    for(I j = 0; j < min_mn; ++j)
+                    {
+                        T expected = (i == j) ? T(1) : T(0);
+                        T diff = QtQ_gpu_geqrf[i + j * min_mn] - expected;
+                        norm_orth_gpu_geqrf_sq += std::real(diff * conj_helper(diff));
+                    }
+                }
+                orth_err_gpu_geqrf = std::sqrt(norm_orth_gpu_geqrf_sq);
+
+                // Compute Q * R for GPU GEQRF
+                std::vector<T> QR_gpu_geqrf(size_t(lda) * n, T(0));
+                for(I i = 0; i < m; ++i)
+                {
+                    for(I j = 0; j < n; ++j)
+                    {
+                        T sum = T(0);
+                        I k_max = std::min(j + 1, min_mn);
+                        for(I k = 0; k < k_max; ++k)
+                        {
+                            sum += Q_gpu_geqrf[i + k * lda] * R_gpu_geqrf[k + j * ldr];
+                        }
+                        QR_gpu_geqrf[i + j * lda] = sum;
+                    }
+                }
+
+                // Compute ||A - QR||_F for GPU GEQRF
+                S norm_recon_gpu_geqrf_sq = S(0);
+                for(I j = 0; j < n; ++j)
+                {
+                    for(I i = 0; i < m; ++i)
+                    {
+                        T diff = A_orig[i + j * lda] - QR_gpu_geqrf[i + j * lda];
+                        norm_recon_gpu_geqrf_sq += std::real(diff * conj_helper(diff));
+                    }
+                }
+                recon_err_gpu_geqrf = std::sqrt(norm_recon_gpu_geqrf_sq);
+            }
+
+            // Print results for CPU GEQRF, GPU GEQRF, and GPU CHOLQR
+            std::cout << "  CPU GEQRF:" << std::endl;
+            std::cout << "    Orthogonality error ||Q^T Q - I||_F = " << orth_err_cpu << std::endl;
+            std::cout << "    Reconstruction error ||A - QR||_F = " << recon_err_cpu << std::endl;
+            std::cout << "    Relative reconstruction error = " << (norm_A > 0 ? recon_err_cpu / norm_A : recon_err_cpu) << std::endl;
+
+            std::cout << "  GPU GEQRF:" << std::endl;
+            std::cout << "    Orthogonality error ||Q^T Q - I||_F = " << orth_err_gpu_geqrf << std::endl;
+            std::cout << "    Reconstruction error ||A - QR||_F = " << recon_err_gpu_geqrf << std::endl;
+            std::cout << "    Relative reconstruction error = " << (norm_A > 0 ? recon_err_gpu_geqrf / norm_A : recon_err_gpu_geqrf) << std::endl;
+
+            std::cout << "  GPU CHOLQR:" << std::endl;
+            std::cout << "    Orthogonality error ||Q^T Q - I||_F = " << orth_err << std::endl;
+            std::cout << "    Reconstruction error ||A - QR||_F = " << recon_err << std::endl;
+            std::cout << "    Relative reconstruction error = " << (norm_A > 0 ? recon_err / norm_A : recon_err) << std::endl;
+
+            err = orth_err + recon_err;
+            *max_err = err > *max_err ? err : *max_err;
+
+            // ============================================================
+            // Compute Error Option 2: Compare Q and R directly with CPU reference
+            // Requires sign normalization since QR signs are arbitrary
+            // ============================================================
+            /*
             // Compute ||Q_cpu - Q_gpu||_F
             S norm_Q_diff_sq = S(0);
             for(I j = 0; j < min_mn; ++j)
@@ -303,7 +657,7 @@ void cholqr_getError(const rocblas_handle handle,
                 for(I i = 0; i < m; ++i)
                 {
                     T diff = hA[b][i + j * lda] - hARes[b][i + j * lda];
-                    norm_Q_diff_sq += std::real(diff * std::conj(diff));
+                    norm_Q_diff_sq += std::real(diff * conj_helper(diff));
                 }
             }
 
@@ -314,12 +668,13 @@ void cholqr_getError(const rocblas_handle handle,
                 for(I i = 0; i <= j && i < n; ++i)
                 {
                     T diff = R_cpu[i + j * ldr] - hRRes[b][i + j * ldr];
-                    norm_R_diff_sq += std::real(diff * std::conj(diff));
+                    norm_R_diff_sq += std::real(diff * conj_helper(diff));
                 }
             }
 
             err = std::sqrt(norm_Q_diff_sq) + std::sqrt(norm_R_diff_sq);
             *max_err = err > *max_err ? err : *max_err;
+            */
         }
     }
 }
