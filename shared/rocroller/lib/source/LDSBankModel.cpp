@@ -40,6 +40,203 @@
 
 namespace rocRoller::Scheduling::LDSBankModel
 {
+    std::optional<std::pair<LdsDirection, int>> getLdsInfoFromOpcode(const std::string& opCode)
+    {
+        // Model does not support sub-dword or special opcodes
+        // e.g. ds_read_u8, ds_read2st64_b32
+
+        LdsDirection direction;
+        if(opCode.find("ds_write_") != std::string::npos)
+            direction = LdsDirection::Write;
+        else if(opCode.find("ds_read_") != std::string::npos)
+            direction = LdsDirection::Read;
+        else
+            return std::nullopt;
+
+        int dwords;
+        if(opCode.find("_b32") != std::string::npos)
+            dwords = 1;
+        else if(opCode.find("_b64") != std::string::npos)
+            dwords = 2;
+        else if(opCode.find("_b96") != std::string::npos)
+            dwords = 3;
+        else if(opCode.find("_b128") != std::string::npos)
+            dwords = 4;
+        else
+            return std::nullopt;
+
+        return std::make_optional(std::make_pair(direction, dwords));
+    }
+
+    int getQueueSlotsRequired(LdsDirection direction, int dwords)
+    {
+        if(direction == LdsDirection::Write)
+            return dwords + 1;
+        return 1;
+    }
+
+    LDSScheduler::LDSScheduler(GPUArchitectureGFX gfx, int waveCount)
+        : m_gfx(gfx)
+        , m_programCycle(0)
+        // Both SPs share the same LDS, so if more than one wave is active,
+        // conflicts double (assuming waves perfectly interleave)
+        , m_interWaveMultiplier(std::min(2, waveCount))
+        // With 3 or more waves, two SIMDs will be active on at least one SP
+        // so two SIMDs share the same LDS queues
+        , m_intraSPMultiplier(waveCount > 2 ? 2 : 1)
+    {
+        AssertFatal(waveCount >= 1, ShowValue(waveCount));
+        AssertFatal(waveCount != 3, "wave count of 3 is untested");
+    }
+
+    // Advance program cycle by delta cycles
+    void LDSScheduler::incrementProgramCycle(int cycles)
+    {
+        m_programCycle += cycles;
+    }
+
+    void LDSScheduler::reset()
+    {
+        m_programCycle = 0;
+        m_commandQueue.clear();
+        m_dataQueue.clear();
+    }
+
+    int LDSScheduler::getRemainingDataSlots() const
+    {
+        int usedSlots = 0;
+        for(const auto& slotFreedCycle : m_dataQueue)
+        {
+            if(slotFreedCycle > static_cast<unsigned int>(m_programCycle))
+            {
+                usedSlots++;
+            }
+        }
+        return dataQueueSize - usedSlots;
+    }
+
+    std::tuple<int, int> LDSScheduler::predictStallCycles(const RuntimeLDSInstruction& instr) const
+    {
+        int stallCycles = 0;
+
+        const auto multiplier            = getIntraSPConflictMultiplier();
+        const auto [direction, dwords]   = std::make_pair(instr.memoryOp.direction, instr.dwords);
+        const auto requiredDataSlots     = getQueueSlotsRequired(direction, dwords) * multiplier;
+        const auto requiredCommandSlots  = multiplier;
+        const auto remainingDataSlots    = getRemainingDataSlots();
+        const auto remainingCommandSlots = commandQueueSize - m_commandQueue.size();
+
+        if(requiredCommandSlots > remainingCommandSlots)
+        {
+            const auto completionCycle
+                = m_commandQueue[requiredCommandSlots - remainingCommandSlots - 1];
+            stallCycles = std::max(stallCycles, static_cast<int>(completionCycle) - m_programCycle);
+        }
+
+        if(requiredDataSlots > remainingDataSlots)
+        {
+            const auto completionCycle = m_dataQueue[requiredDataSlots - remainingDataSlots - 1];
+            stallCycles = std::max(stallCycles, static_cast<int>(completionCycle) - m_programCycle);
+        }
+
+        MemoryOpLDS memOp{direction};
+        int         additionalCycles = (getInstructionIssueCycles(memOp, dwords) * multiplier) - 4;
+
+        return std::make_tuple(stallCycles, additionalCycles);
+    }
+
+    int LDSScheduler::predictWaitcntStall(int waitcnt) const
+    {
+        int stallCycles = 0;
+
+        if(waitcnt >= 0 && m_commandQueue.size() > static_cast<size_t>(waitcnt))
+        {
+            const auto commandsToWaitFor   = m_commandQueue.size() - static_cast<size_t>(waitcnt);
+            const auto waitCompletionCycle = m_commandQueue[commandsToWaitFor - 1];
+            const auto roundtripLatency    = 40;
+            stallCycles
+                = (static_cast<int>(waitCompletionCycle) - m_programCycle) + roundtripLatency;
+        }
+
+        return stallCycles;
+    }
+
+    void LDSScheduler::scheduleInstruction(const RuntimeLDSInstruction& instr)
+    {
+        updateQueues();
+
+        for(int i = 0; i < getIntraSPConflictMultiplier(); ++i)
+        {
+            int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
+
+            int dataCycles
+                = getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier();
+
+            AssertFatal(getRemainingDataSlots() >= requiredSlots
+                            && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
+                        "Expected queue space to be accounted for in predict function and passed "
+                        "through to total cycles calculation.");
+
+            auto base = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
+
+            if(instr.memoryOp.direction == LdsDirection::Write)
+            {
+                base += 4 * instr.dwords;
+                m_commandQueue.push_back(base + dataCycles);
+                const auto cyclesPerSlot = dataCycles / requiredSlots;
+                for(int j = 0; j < requiredSlots; ++j)
+                {
+                    const auto queueFreedCycle = base + j * cyclesPerSlot;
+                    m_dataQueue.push_back(queueFreedCycle);
+                }
+            }
+            else if(instr.memoryOp.direction == LdsDirection::Read)
+            {
+                base += 4;
+                m_commandQueue.push_back(base + dataCycles);
+                AssertFatal(requiredSlots == 1,
+                            ShowValue(requiredSlots)); // read shouldn't use data queue slots
+                m_dataQueue.push_back(base);
+            }
+        }
+
+        const auto cmdQueueStr
+            = fmt::format("{}", fmt::join(m_commandQueue.begin(), m_commandQueue.end(), ", "));
+        const auto dataQueueStr
+            = fmt::format("{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", "));
+        Log::info("LdsScheduler {}: scheduled ds_{}_b{}, dataCycles {}, command queue cycles [{}], "
+                  "data queue "
+                  "cycles [{}]",
+                  m_programCycle,
+                  instr.memoryOp.direction == LdsDirection::Read ? "read" : "write",
+                  instr.dwords * 32,
+                  getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier(),
+                  cmdQueueStr,
+                  dataQueueStr);
+    }
+
+    void LDSScheduler::updateQueues()
+    {
+        while(!m_commandQueue.empty() && static_cast<int>(m_commandQueue.front()) <= m_programCycle)
+        {
+            m_commandQueue.pop_front();
+        }
+        while(!m_dataQueue.empty() && static_cast<int>(m_dataQueue.front()) <= m_programCycle)
+        {
+            m_dataQueue.pop_front();
+        }
+    }
+
+    std::string RuntimeLDSInstruction::toString() const
+    {
+        std::stringstream ss;
+        ss << fmt::format("ds_{}_b{}, baseAddresses: [",
+                          memoryOp.direction == LdsDirection::Read ? "read" : "write",
+                          dwords * 32);
+        rocRoller::streamJoin(ss, baseAddresses, ", ");
+        ss << "]";
+        return ss.str();
+    }
 
     uint getThreadsPerClock(const MemoryOpLDS& memoryOp, uint dwords, GPUArchitectureGFX gfx)
     {

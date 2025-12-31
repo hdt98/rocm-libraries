@@ -32,6 +32,7 @@
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
 
 #include <common/CommonGraphs.hpp>
+#include <common/Scheduling.hpp>
 
 #include "CustomSections.hpp"
 #include "TestContext.hpp"
@@ -293,5 +294,38 @@ namespace LDSBankModelTest
 
         auto expectedCycles = getInstructionDataCycles(instr, GPUArchitectureGFX::GFX950);
         CHECK(expectedCycles == 16); // Compared to same kernel through rocprofv3
+    }
+
+    TEST_CASE("LDS model data cycle predictions", "[lds-bank-model]")
+    {
+        using namespace rocRoller;
+
+        SECTION("ds_read_b32 stride 1")
+        {
+            const int dwords        = 1;
+            const int stride        = 1;
+            const int workgroupSize = 64;
+
+            CHECK(getInstructionDataCycles(
+                      {.memoryOp      = MemoryOpLDS{LdsDirection::Read},
+                       .dwords        = dwords,
+                       .baseAddresses = generateLDSAddresses(workgroupSize, stride, dwords)},
+                      GPUArchitectureGFX::GFX950)
+                  == 4);
+        }
+
+        SECTION("ds_read_b32 stride 2")
+        {
+            const int dwords        = 1;
+            const int stride        = 2;
+            const int workgroupSize = 64;
+
+            CHECK(getInstructionDataCycles(
+                      {.memoryOp      = MemoryOpLDS{LdsDirection::Read},
+                       .dwords        = dwords,
+                       .baseAddresses = generateLDSAddresses(workgroupSize, stride, dwords)},
+                      GPUArchitectureGFX::GFX950)
+                  == 4);
+        }
     }
 }

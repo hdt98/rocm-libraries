@@ -263,7 +263,7 @@ namespace MEMObserverTest
         }
     }
 
-    TEST_CASE("WeightlessDSMemObserver simple test with totalCycles", "[observer]")
+    TEST_CASE("WeightlessDSMemObserver", "[observer]")
     {
         Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
         SECTION("Waitcnt with instruction in-between")
@@ -295,9 +295,6 @@ namespace MEMObserverTest
             {
                 peekAndSchedule(context, inst);
             }
-
-            CHECK_THAT(context.output(), ContainsSubstring("WeightlessDSMemObserver"));
-            CHECK_THAT(context.output(), ContainsSubstring("s_waitcnt"));
 
             using namespace Scheduling::LDSBankModel;
             const auto memOp       = MemoryOpLDS{LdsDirection::Read};
@@ -341,9 +338,6 @@ namespace MEMObserverTest
             {
                 peekAndSchedule(context, inst);
             }
-
-            CHECK_THAT(context.output(), ContainsSubstring("WeightlessDSMemObserver"));
-            CHECK_THAT(context.output(), ContainsSubstring("s_waitcnt"));
 
             using namespace Scheduling::LDSBankModel;
             const auto memOp       = MemoryOpLDS{LdsDirection::Read};

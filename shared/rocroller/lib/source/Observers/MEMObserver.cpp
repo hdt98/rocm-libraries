@@ -25,7 +25,6 @@
  *******************************************************************************/
 
 #include <concepts>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,35 +41,6 @@ namespace rocRoller
 {
     namespace Scheduling
     {
-        std::optional<std::pair<LDSBankModel::LdsDirection, int>>
-            getLdsInfoFromOpcode(const std::string& opCode)
-        {
-            // Model does not support sub-dword or special opcodes
-            // e.g. ds_read_u8, ds_read2st64_b32
-
-            LDSBankModel::LdsDirection direction;
-            if(opCode.find("ds_write_") != std::string::npos)
-                direction = LDSBankModel::LdsDirection::Write;
-            else if(opCode.find("ds_read_") != std::string::npos)
-                direction = LDSBankModel::LdsDirection::Read;
-            else
-                return std::nullopt;
-
-            int dwords;
-            if(opCode.find("_b32") != std::string::npos)
-                dwords = 1;
-            else if(opCode.find("_b64") != std::string::npos)
-                dwords = 2;
-            else if(opCode.find("_b96") != std::string::npos)
-                dwords = 3;
-            else if(opCode.find("_b128") != std::string::npos)
-                dwords = 4;
-            else
-                return std::nullopt;
-
-            return std::make_optional(std::make_pair(direction, dwords));
-        }
-
         bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
             AssertFatal(context != nullptr);
@@ -81,7 +51,7 @@ namespace rocRoller
             {
                 const auto addrs = inst.getAddresses();
                 return addrs.has_value() && (*addrs).size() % 64 == 0
-                       && getLdsInfoFromOpcode(inst.getOpCode()).has_value()
+                       && LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode()).has_value()
                        && context->targetArchitecture().target().isGFX9GPU();
             }
 
@@ -125,82 +95,48 @@ namespace rocRoller
             return inst.getWaitCount().dscnt();
         }
 
-        int queueSlots(LDSBankModel::LdsDirection direction, int dwords)
-        {
-            if(direction == LDSBankModel::LdsDirection::Write)
-                return dwords + 1;
-            return 1;
-        }
-
-        const int WeightlessDSMemObserver::dataQueueSize    = 10;
-        const int WeightlessDSMemObserver::commandQueueSize = 8;
-
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
-            , m_programCycle(0)
         {
-        }
-
-        int WeightlessDSMemObserver::waveCount() const
-        {
-            auto ctx = m_context.lock();
-            AssertFatal(ctx != nullptr);
-            const auto workgroupSize = product(ctx->kernel()->workgroupSize());
-            return workgroupSize / 64;
-        }
-
-        int WeightlessDSMemObserver::interWaveConflicts() const
-        {
-            // Both SPs share the same LDS, so if more than one wave is active,
-            // conflicts double (assuming waves perfectly interleave)
-            return std::min(2, waveCount());
-        }
-
-        int WeightlessDSMemObserver::intraSPConflicts() const
-        {
-            // With 3 or more waves, two SIMDs will be active on at least one SP
-            // so two SIMDs share the same LDS queues
-            const auto wc = waveCount();
-            AssertFatal(wc != 3, "wave count of 3 not supported");
-            return waveCount() > 2 ? 2 : 1;
         }
 
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
+            if(!m_scheduler.has_value())
+            {
+                // Observers get created before workgroupSize is set
+                auto context = m_context.lock();
+                AssertFatal(context != nullptr);
+
+                const auto& gpuArch = context->targetArchitecture().target();
+                m_scheduler.emplace(gpuArch.gfx, product(context->kernel()->workgroupSize()) / 64);
+            }
 
             InstructionStatus status;
+
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                const auto multiplier = intraSPConflicts();
-                const auto ldsInfo    = getLdsInfoFromOpcode(inst.getOpCode());
-
-                const auto [direction, dwords]   = ldsInfo.value();
-                const auto requiredDataSlots     = queueSlots(direction, dwords) * multiplier;
-                const auto requiredCommandSlots  = multiplier;
-                const auto remainingDataSlots    = getRemainingDataSlots();
-                const auto remainingCommandSlots = commandQueueSize - m_commandQueue.size();
-
-                if(requiredCommandSlots > remainingCommandSlots)
+                const auto ldsInfo = LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode());
+                if(ldsInfo.has_value())
                 {
-                    const auto completionCycle
-                        = m_commandQueue[requiredCommandSlots - remainingCommandSlots - 1];
-                    status.stallCycles
-                        = std::max(status.stallCycles, completionCycle - m_programCycle);
-                }
+                    const auto [direction, dwords] = ldsInfo.value();
 
-                if(requiredDataSlots > remainingDataSlots)
-                {
-                    const auto completionCycle
-                        = m_dataQueue[requiredDataSlots - remainingDataSlots - 1];
-                    status.stallCycles
-                        = std::max(status.stallCycles, completionCycle - m_programCycle);
-                }
+                    auto ctx = m_context.lock();
+                    AssertFatal(ctx != nullptr);
 
-                LDSBankModel::MemoryOpLDS memOp{direction};
-                status.additionalCycles
-                    = (LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 * multiplier) - 1;
+                    std::vector<size_t>                 addresses = inst.getAddresses().value();
+                    LDSBankModel::MemoryOpLDS           memOp{direction};
+                    LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
+
+                    auto [stallCycles, additionalCycles]
+                        = m_scheduler.value().predictStallCycles(ldsInst);
+
+                    status.stallCycles      = stallCycles / 4;
+                    status.additionalCycles = additionalCycles / 4;
+                }
             }
+
             const auto waitcnt = inst.getWaitCount().dscnt();
             if(waitcnt >= 0
                && Settings::Get(Settings::DSObserver) == DSObserverType::WeightlessDSMemObserver)
@@ -208,16 +144,10 @@ namespace rocRoller
                 AssertFatal(status.stallCycles == 0,
                             "No logic to handle both waitcnt stalls and instruction stalls yet");
 
-                const auto initialProgramCycle = m_programCycle;
-                size_t     commandsToWaitFor   = 0;
-                if(m_commandQueue.size() > static_cast<size_t>(waitcnt))
-                {
-                    commandsToWaitFor = m_commandQueue.size() - static_cast<size_t>(waitcnt);
-                    const auto waitCompletionCycle = m_commandQueue[commandsToWaitFor - 1];
-                    const auto roundtripLatency    = 10; // exists after leaving queue
-                    status.stallCycles = (waitCompletionCycle - m_programCycle) + roundtripLatency;
-                }
+                auto stallCycles   = m_scheduler.value().predictWaitcntStall(waitcnt);
+                status.stallCycles = stallCycles / 4;
             }
+
             return status;
         }
 
@@ -228,7 +158,7 @@ namespace rocRoller
             {
                 const auto status = peek(inst);
                 inst.addComment(fmt::format("WeightlessDSMemObserver {}: stall {}, additional {}",
-                                            m_programCycle,
+                                            m_scheduler.value().getProgramCycle(),
                                             status.stallCycles,
                                             status.additionalCycles));
             }
@@ -236,93 +166,24 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
-            m_programCycle += inst.totalCycles();
-
-            while(!m_commandQueue.empty() && m_programCycle >= m_commandQueue.front())
-            {
-                m_commandQueue.pop_front();
-            }
-            while(!m_dataQueue.empty() && m_programCycle >= m_dataQueue.front())
-            {
-                m_dataQueue.pop_front();
-            }
-
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                for(unsigned int i = 0; i < intraSPConflicts(); ++i)
+                auto ldsInfo = LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode());
+                if(ldsInfo.has_value())
                 {
-                    auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
-
                     auto [direction, dwords] = ldsInfo.value();
-                    int requiredSlots        = queueSlots(direction, dwords);
 
-                    LDSBankModel::MemoryOpLDS memOp{direction};
-
-                    std::vector<size_t> addresses = inst.getAddresses().value();
-
+                    LDSBankModel::MemoryOpLDS           memOp{direction};
+                    std::vector<size_t>                 addresses = inst.getAddresses().value();
                     LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
 
-                    auto ctx = m_context.lock();
-                    auto gfx = ctx->targetArchitecture().target().gfx;
-
-                    int dataCycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4
-                                     * interWaveConflicts();
-
-                    AssertFatal(
-                        getRemainingDataSlots() >= requiredSlots
-                            && m_commandQueue.size() < commandQueueSize,
-                        "Expected queue space to be accounted for in peek function and passed "
-                        "through to total cycles calculation.");
-
-                    const auto base
-                        = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
-
-                    m_commandQueue.push_back(base + dataCycles);
-
-                    if(direction == LDSBankModel::LdsDirection::Write)
-                    {
-                        const auto cyclesPerSlot = dataCycles / requiredSlots;
-                        for(int i = 0; i < requiredSlots; ++i)
-                        {
-                            const auto queueFreedCycle = base + i * cyclesPerSlot;
-                            m_dataQueue.push_back(queueFreedCycle);
-                        }
-                    }
-                    else if(direction == LDSBankModel::LdsDirection::Read)
-                    {
-                        AssertFatal(requiredSlots == 1);
-                        const auto queueFreedCycle = base;
-                        m_dataQueue.push_back(queueFreedCycle);
-                    }
-
-                    const auto cmdQueueStr = fmt::format(
-                        "{}", fmt::join(m_commandQueue.begin(), m_commandQueue.end(), ", "));
-                    const auto dataQueueStr = fmt::format(
-                        "{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", "));
-
-                    const_cast<Instruction&>(inst).addComment(
-                        fmt::format("WeightlessDSMemObserver end of observe {}: {} dataCycles, "
-                                    "cmd queue {}, data queue {}",
-                                    m_programCycle,
-                                    dataCycles,
-                                    cmdQueueStr,
-                                    dataQueueStr));
+                    m_scheduler.value().scheduleInstruction(ldsInst);
                 }
             }
-        }
 
-        int WeightlessDSMemObserver::getRemainingDataSlots() const
-        {
-            int usedSlots = 0;
-            for(const auto& slotFreedCycle : m_dataQueue)
-            {
-                if(slotFreedCycle > m_programCycle)
-                {
-                    usedSlots++;
-                }
-            }
-            return dataQueueSize - usedSlots;
+            m_scheduler.value().incrementProgramCycle(inst.totalCycles() * 4);
+            m_scheduler.value().updateQueues();
         }
     }
 }

@@ -31,6 +31,7 @@
 #include <vector>
 
 #include <rocRoller/Scheduling/Costs/LinearWeightedCost.hpp>
+#include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Scheduling/Scheduling.hpp>
 
 namespace rocRoller
@@ -129,29 +130,8 @@ namespace rocRoller
             }
 
         private:
-            // Queue size in hardware is depth 40 width of 16 dwords from MI250 to MI350
-            // This simplifies to depth 10 width of 64 dwords
-            static const int dataQueueSize;
-            static const int commandQueueSize;
-
-            // Stores command completion cycles
-            mutable std::deque<unsigned int> m_commandQueue;
-            // Stores data queue completion cycles
-            mutable std::deque<unsigned int> m_dataQueue;
-
-            int                    m_programCycle;
-            std::weak_ptr<Context> m_context;
-
-            int getRemainingDataSlots() const;
-
-            // Number of waves running on CU
-            int waveCount() const;
-
-            // Accounts for both LDS queues sharing same LDS banks
-            int interWaveConflicts() const;
-
-            // Accounts for two SIMDs on SP sharing same LDS queues
-            int intraSPConflicts() const;
+            std::weak_ptr<Context>                            m_context;
+            mutable std::optional<LDSBankModel::LDSScheduler> m_scheduler;
         };
     }
 }

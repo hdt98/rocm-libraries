@@ -28,6 +28,7 @@
 
 #include <deque>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <unordered_set>
@@ -79,6 +80,8 @@ namespace rocRoller::Scheduling::LDSBankModel
         MemoryOpLDS         memoryOp;
         int                 dwords;
         std::vector<size_t> baseAddresses;
+
+        std::string toString() const;
     };
 
     struct OperationAccesses
@@ -218,4 +221,87 @@ namespace rocRoller::Scheduling::LDSBankModel
      */
     uint calculateTotalCyclesFromBankMappings(
         const std::vector<std::map<uint, uint>>& threadGroupBankMappings);
+
+    /**
+     * @brief Parse LDS instruction information from opcode
+     * 
+     * @param opCode The opcode string (e.g., "ds_read_b64", "ds_write_b128")
+     * @return Optional pair of (LdsDirection, dwords) if opcode is supported, nullopt otherwise
+     */
+    std::optional<std::pair<LdsDirection, int>> getLdsInfoFromOpcode(const std::string& opCode);
+
+    /**
+     * @brief Calculate queue slots required for an LDS operation
+     * 
+     * @param direction Read or Write operation
+     * @param dwords Number of dwords (1-4)
+     * @return Number of queue slots required
+     */
+    int getQueueSlotsRequired(LdsDirection direction, int dwords);
+
+    /**
+     * @brief LDS Scheduler for managing LDS instruction scheduling and queue state
+     * 
+     * This class encapsulates the scheduling logic for LDS instructions,
+     * managing command and data queues, tracking conflicts, and predicting stalls.
+     * It can be used independently of the observer system.
+     * 
+     * Note: This scheduler works in hardware cycles, not quadcycles.
+     */
+    class LDSScheduler
+    {
+    public:
+        LDSScheduler(GPUArchitectureGFX gfx, int waveCount);
+
+        void incrementProgramCycle(int cycles);
+        int  getProgramCycle() const
+        {
+            return m_programCycle;
+        }
+        void reset();
+
+        int getInterWaveConflictMultiplier() const
+        {
+            return m_interWaveMultiplier;
+        }
+        int getIntraSPConflictMultiplier() const
+        {
+            return m_intraSPMultiplier;
+        }
+
+        // Instruction scheduling
+        // Returns tuple of <stall_cycles, additional_cycles>
+        std::tuple<int, int> predictStallCycles(const RuntimeLDSInstruction& instr) const;
+        void                 scheduleInstruction(const RuntimeLDSInstruction& instr);
+
+        // Waitcnt handling
+        int predictWaitcntStall(int waitcnt) const;
+
+        // Queue management
+        void updateQueues();
+
+        // Queue inspection (for debugging/testing)
+        const std::deque<unsigned int>& getCommandQueue() const
+        {
+            return m_commandQueue;
+        }
+        const std::deque<unsigned int>& getDataQueue() const
+        {
+            return m_dataQueue;
+        }
+
+    private:
+        static constexpr int dataQueueSize    = 10;
+        static constexpr int commandQueueSize = 8;
+
+        GPUArchitectureGFX m_gfx;
+        int                m_programCycle;
+        int                m_interWaveMultiplier;
+        int                m_intraSPMultiplier;
+
+        std::deque<unsigned int> m_commandQueue; // Stores completion cycles
+        std::deque<unsigned int> m_dataQueue; // Stores completion cycles
+
+        int getRemainingDataSlots() const;
+    };
 }

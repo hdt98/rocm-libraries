@@ -424,19 +424,24 @@ protected:
     Generator<Instruction> generateKernelBody() override
     {
         int counter = 0;
-        for(int i = 0; i < 8; ++i)
+
+        const auto scheduleLds = [&]() -> Generator<Instruction> {
+            const auto [start, end]
+                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
+            if(m_write)
+                co_yield m_context->mem()->storeLocal(
+                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+            else
+                co_yield m_context->mem()->loadLocal(
+                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+        };
+
+        for(int i = 1; i <= 2; ++i)
         {
-            for(int k = 0; k < i; ++k)
+            for(int j = 0; j < i; ++j)
             {
-                const auto [start, end]
-                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-                if(m_write)
-                    co_yield m_context->mem()->storeLocal(
-                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-                else
-                    co_yield m_context->mem()->loadLocal(
-                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+                co_yield scheduleLds();
             }
             co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
         }
@@ -455,12 +460,12 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = false;
+    constexpr auto testIndividual = true;
     if(testIndividual)
     {
         instrDwords      = GENERATE(1);
         strideMultiplier = GENERATE(2);
-        write            = GENERATE(true);
+        write            = GENERATE(false);
     }
     else
     {

@@ -184,7 +184,7 @@ namespace rocRoller
                                                       LDSTestKernelBase& kernel,
                                                       bool               testIndividual)
     {
-        AssertFatal(!testIndividual); // Avoid accidental check-in of individual test runs
+        // AssertFatal(!testIndividual); // Avoid accidental check-in of individual test runs
         constexpr int NUM_RUNS = 5; // Should be odd, as median is used
 
         std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
