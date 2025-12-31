@@ -625,6 +625,7 @@ struct BlockwiseFasternet50Wcnn
           indata_thread_copy_(indata_origin),
           element_op_(acc_blockwise_op)
     {
+        (void)acc_blockwise_next_op;
         static_assert(WeiDataBlockDesc::IsKnownAtCompileTime() &&
                           InDataBlockDesc::IsKnownAtCompileTime(),
                       "wrong! Desc should be known at compile-time");
@@ -738,6 +739,9 @@ struct BlockwiseFasternet50Wcnn
                         HasMainLoop,
                         IsLast) const
     {
+        (void)predata_block_buf;
+        (void)nextdata_block_buf;
+        (void)semaAccums;
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
             weight_thread_desc_.GetElementSpaceSize());
 

@@ -144,7 +144,7 @@ using device_gemm_wmma_f16_f16_f16_mk_kn_mn_instances = std::tuple<
 #endif
     // clang-format on
     >;
-
+#if 0
 using device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances =
     std::tuple<
         // clang-format off
@@ -181,7 +181,7 @@ using device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances =
         DeviceGemmWmma_GFX13<      Row,     Row,     Row,   F16,   F16,   F16,     F32,      F16, PassThrough, PassThrough, PassThrough, GemmMNKPadding,           1,    32,    16,    16,    64,  8,   16,   16,    16,   1,       1,     S<16, 2, 1>,     S<0, 1, 2>,     S<0, 1, 2>,              1,              1,              8,      true,     false,       false,       false,        ck::TensorLoadOption::DEFAULT_LOAD,            1,            S<16, 2, 1>,     S<0, 1, 2>,     S<0, 1, 2>,              1,              1,              8,      true,        false,       false,       false,        ck::TensorLoadOption::DEFAULT_LOAD,            1,             1,        1,       S<1, 16, 1,  2>,               8,         false,          false,          ck::LoopScheduler::Default,      ck::PipelineVersion::v1>
         // clang-format on
         >;
-
+#endif
 void add_device_gemm_wmma_f16_f16_f16_mk_kn_mn_instances(
     std::vector<std::unique_ptr<
         DeviceGemm<Row, Row, Row, F16, F16, F16, PassThrough, PassThrough, PassThrough>>>&
@@ -195,8 +195,10 @@ void add_device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances(
         DeviceGemm<Row, Row, Row, F16, F16, F16, PassThrough, PassThrough, PassThrough>>>&
         instances)
 {
-    add_device_operation_instances(instances,
-                                   device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances{});
+    ignore = instances;
+    // OOXX
+    // add_device_operation_instances(instances,
+    //                               device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances{});
 }
 
 } // namespace instance

@@ -4,7 +4,7 @@
 #ifndef CK_AMD_SBA_HPP
 #define CK_AMD_SBA_HPP
 
-#include "data_type.hpp"
+#include "dtype_vector.hpp"
 namespace ck {
 
 #if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__)

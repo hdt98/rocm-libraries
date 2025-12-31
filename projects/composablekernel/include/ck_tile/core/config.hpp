@@ -324,6 +324,10 @@ namespace ck_tile::core {
  * @var CK_TILE_ARCH_GFX1200 Indicates if the compiler target architecture is GFX1200.
  * @var CK_TILE_ARCH_GFX1201 Indicates if the compiler target architecture is GFX1201.
  * @var CK_TILE_ARCH_GFX12_GENERIC Indicates if the compiler target architecture is GFX12 generic.
+ * @var CK_TILE_ARCH_GFX130F Indicates if the compiler target architecture is GFX130F.
+ * @var CK_TILE_ARCH_GFX1310 Indicates if the compiler target architecture is GFX1310.
+ * @var CK_TILE_ARCH_GFX1370 Indicates if the compiler target architecture is GFX1370.
+ * @var CK_TILE_ARCH_GFX13_GENERIC Indicates if the compiler target architecture is GFX13 generic.
  */
 struct amdgcn_compiler_target_state
 {
@@ -477,6 +481,31 @@ struct amdgcn_compiler_target_state
 #else
     static constexpr bool CK_TILE_ARCH_GFX12_GENERIC = false;
 #endif // __gfx12_generic__
+
+    // GFX13
+#if defined(__gfx130F__)
+    static constexpr bool CK_TILE_ARCH_GFX130F = true;
+#else
+    static constexpr bool CK_TILE_ARCH_GFX130F = false;
+#endif // __gfx130F__
+
+#if defined(__gfx1310__)
+    static constexpr bool CK_TILE_ARCH_GFX1310 = true;
+#else
+    static constexpr bool CK_TILE_ARCH_GFX1310 = false;
+#endif // __gfx1310__
+
+#if defined(__gfx1370__)
+    static constexpr bool CK_TILE_ARCH_GFX1370 = true;
+#else
+    static constexpr bool CK_TILE_ARCH_GFX1370 = false;
+#endif // __gfx1370__
+
+#if defined(__gfx13_generic__)
+    static constexpr bool CK_TILE_ARCH_GFX13_GENERIC = true;
+#else
+    static constexpr bool CK_TILE_ARCH_GFX13_GENERIC = false;
+#endif // __gfx13_generic__
 };
 
 /**
@@ -522,7 +551,11 @@ CK_TILE_HOST_DEVICE static constexpr uint32_t count_values_of(T search, Ts... se
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX11_GENERIC,   \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1200,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1201,         \
-        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX12_GENERIC
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX12_GENERIC,   \
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX130F,         \
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1310,         \
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1370,         \
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX13_GENERIC
 
 // Sanity check: make sure only one target architecture is defined during device compile
 static_assert(!amdgcn_compiler_target_state::CK_TILE_DEVICE_COMPILE ||

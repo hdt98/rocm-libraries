@@ -8,7 +8,7 @@
 namespace ck {
 
 #if CK_EXPERIMENTAL_BLOCK_SYNC_LDS_WITHOUT_SYNC_VMEM
-#ifdef __gfx12__
+#if defined(__gfx12__) || defined(__gfx13__)
 __device__ void llvm_amdgcn_s_wait_dscnt(short cnt) __asm("llvm.amdgcn.s.wait.dscnt");
 #endif
 #endif

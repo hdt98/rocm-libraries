@@ -211,7 +211,9 @@ inline constexpr bool is_native_type()
     return is_same<T, double>::value || is_same<T, float>::value || is_same<T, half_t>::value ||
            is_same<T, bhalf_t>::value || is_same<T, int32_t>::value ||
            is_same<T, uint32_t>::value || is_same<T, int8_t>::value || is_same<T, uint8_t>::value ||
-           is_same_v<T, _BitInt(8)> || is_same_v<T, unsigned _BitInt(8)> || is_same<T, bool>::value;
+           is_same_v<T, _BitInt(8)> || is_same_v<T, unsigned _BitInt(8)> ||
+           is_same<T, bool>::value || is_same<T, f4_t>::value || is_same<T, f6_t>::value ||
+           is_same<T, bf6_t>::value || is_same<T, __bf16>::value || is_same<T, __fp16>::value;
 }
 
 // scalar_type
