@@ -200,12 +200,11 @@ typedef enum rocsolver_cholqr_algo_
 {
     rocsolver_cholqr_cholqr1 = 406, /**< Computations are all performed using CholeskyQR1 algorithm. */
     rocsolver_cholqr_cholqr2 = 407, /**< Computations are all performed using CholeskyQR2 algorithm. */
-    rocsolver_cholqr_default
-    = rocsolver_cholqr_cholqr2, /**< Default algorithm using CholeskyQR2 algorithm. */
+    rocsolver_cholqr_default = 408, /**< Default algorithm using CholeskyQR2 algorithm. */
     rocsolver_cholqr_cholqr3_compute
-    = 408, /**< Computations are all performed using shifted CholeskyQR3 algorithm with the shifts internally computed. */
+    = 409, /**< Computations are all performed using shifted CholeskyQR3 algorithm with the shifts internally computed. */
     rocsolver_cholqr_cholqr3_user
-    = 409, /**< Computations are all performed using shifted CholeskyQR3 algorithm with the shifts provided by the user. */
+    = 410, /**< Computations are all performed using shifted CholeskyQR3 algorithm with the shifts provided by the user. */
 } rocsolver_cholqr_algo;
 
 #endif /* ROCSOLVER_EXTRA_TYPES_H */
