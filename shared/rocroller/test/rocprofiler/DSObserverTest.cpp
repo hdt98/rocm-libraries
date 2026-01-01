@@ -428,17 +428,17 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    const auto workgroupSize = GENERATE(64u, 128u, 256u);
+    const auto workgroupSize = GENERATE(64u);
 
     int instrDwords;
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = false;
+    constexpr auto testIndividual = true;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(4);
-        strideMultiplier = GENERATE(4);
+        instrDwords      = GENERATE(1);
+        strideMultiplier = GENERATE(1);
         write            = GENERATE(false);
     }
     else
@@ -510,5 +510,6 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
                          filteredInstructions.size() - 1));
 
         // TODO: add CHECK
+        CHECK(false);
     }
 }

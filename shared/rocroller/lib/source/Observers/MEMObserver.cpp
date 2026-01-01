@@ -166,6 +166,9 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
+            m_scheduler.value().incrementProgramCycle(inst.totalCycles() * 4);
+            m_scheduler.value().updateQueues();
+
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
@@ -181,9 +184,6 @@ namespace rocRoller
                     m_scheduler.value().scheduleInstruction(ldsInst);
                 }
             }
-
-            m_scheduler.value().incrementProgramCycle(inst.totalCycles() * 4);
-            m_scheduler.value().updateQueues();
         }
     }
 }

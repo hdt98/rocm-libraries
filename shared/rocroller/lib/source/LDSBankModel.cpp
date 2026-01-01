@@ -156,12 +156,6 @@ namespace rocRoller::Scheduling::LDSBankModel
             stallCycles = (static_cast<int>(waitCompletionCycle) - m_programCycle);
         }
 
-        // stallCycles += -4; // for ds_read_b32 stride 1
-        // stallCycles += 0; // for ds_write_b32 stride 1/2 or ds_read_b32 stride 2
-        // stallCycles += 4; // for ds_read/write_b32 stride 4
-        // stallCycles += 16; // for ds_read/write_b32 stride 8
-        // stallCycles += 32; // for ds_read/write_b32 stride 16
-
         return stallCycles;
     }
 
@@ -188,7 +182,6 @@ namespace rocRoller::Scheduling::LDSBankModel
                 // tuned for ds_write_b32 only
                 if(m_commandQueue.empty())
                 {
-                    base += 8;
                     base += dataCycles;
                 }
                 else
@@ -207,11 +200,8 @@ namespace rocRoller::Scheduling::LDSBankModel
                 AssertFatal(requiredSlots == 1,
                             ShowValue(requiredSlots)); // read shouldn't use data queue slots
 
-                // tuned for ds_read_b32 only
                 if(m_commandQueue.empty())
                 {
-                    if(dataCycles >= 4)
-                        base += 4;
                     base += dataCycles;
                 }
                 else

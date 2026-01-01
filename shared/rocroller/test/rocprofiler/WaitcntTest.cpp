@@ -471,13 +471,13 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
     if(testIndividual)
     {
         instrDwords      = GENERATE(1);
-        strideMultiplier = GENERATE(2);
+        strideMultiplier = GENERATE(1);
         write            = GENERATE(true);
     }
     else
     {
         instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8);
+        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
         write            = GENERATE(true, false);
     }
 
