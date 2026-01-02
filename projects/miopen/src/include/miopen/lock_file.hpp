@@ -172,8 +172,8 @@ public:
         {
             if(!std::ofstream{unique_handle})
                 MIOPEN_THROW("Error creating file <" + unique_handle + "> for locking.");
-            fs::permissions(unique_handle, FS_ENUM_PERMS_ALL);
         }
+        fs::permissions(unique_handle, FS_ENUM_PERMS_ALL);
 
         create_hard_link(unique_handle, lockfile_path, ec);
         if(ec.value() == 0)

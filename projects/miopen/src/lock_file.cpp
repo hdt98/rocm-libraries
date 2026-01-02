@@ -52,8 +52,8 @@ fs::path LockFilePath(const fs::path& filename_)
         if(!fs::exists(directory))
         {
             fs::create_directories(directory);
-            fs::permissions(directory, FS_ENUM_PERMS_ALL);
         }
+        fs::permissions(directory, FS_ENUM_PERMS_ALL);
         const auto file = directory / (filename_.filename() + ".lock");
 
         return file;
@@ -73,8 +73,8 @@ LockFile::LockFile(const fs::path& path_, PassKey) : path(path_)
         {
             if(!std::ofstream{path})
                 MIOPEN_THROW("Error creating file <" + path + "> for locking.");
-            fs::permissions(path, FS_ENUM_PERMS_ALL);
         }
+        fs::permissions(path, FS_ENUM_PERMS_ALL);
         flock   = path.string().c_str();
         fs_lock = FSLockFile(path.string());
     }
