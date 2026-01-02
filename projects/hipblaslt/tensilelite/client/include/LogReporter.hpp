@@ -331,6 +331,12 @@ namespace TensileLite
                                        reinterpret_cast<BFloat8_fnuz const*>(data),
                                        tensor,
                                        reinterpret_cast<BFloat8_fnuz const*>(ptrVal));
+                    else if(tensor.dataType() == rocisa::DataType::ComplexFloat)
+                        logTensorTyped(level,
+                                       name,
+                                       reinterpret_cast<std::complex<float> const*>(data),
+                                       tensor,
+                                       reinterpret_cast<std::complex<float> const*>(ptrVal));
                     else if(tensor.dataType() == rocisa::DataType::ComplexDouble)
                         logTensorTyped(level,
                                        name,
@@ -354,7 +360,7 @@ namespace TensileLite
                 m_firstRun = true;
             }
 
-            virtual void preSolution(ContractionSolution const& solution) override
+            virtual void preSolution(ContractionSolution* const solution) override
             {
                 m_csvOutput.push();
                 m_rowLevel = LogLevel::Normal;

@@ -470,8 +470,13 @@
     PackedC0IndicesX: [0]
     PackedC1IdxChars: [J]
     PackedC1IndicesX: [1]
+<<<<<<< HEAD
     PrefetchGlobalRead: 1
     PrefetchLocalRead: false
+=======
+    PrefetchGlobalRead: 2
+    PrefetchLocalRead: 1
+>>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
     PreloadKernArgs: true
     SFCWGM:
     - [1, 1]

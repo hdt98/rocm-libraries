@@ -1,17 +1,19 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
+#include "ck_tile/host/concat.hpp"
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/common/utils.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 
-#include <optional>
 #include <type_traits>
 
 namespace ck_tile {
+
 template <typename AsDataType_,
           typename BsDataType_,
           typename DsDataType_,
@@ -29,10 +31,12 @@ template <typename AsDataType_,
           index_t KPerXdl_,
           bool isCTransposed_,
           memory_operation_enum MemoryOperation_,
-          index_t kNumWaveGroups_ = 1,
-          bool FixedVectorSize_   = false,
-          index_t VectorSizeC_    = 1,
-          bool TiledMMAPermuteN_  = false>
+          index_t kNumWaveGroups_      = 1,
+          bool FixedVectorSize_        = false,
+          index_t VectorSizeC_         = 1,
+          bool TiledMMAPermuteN_       = false,
+          index_t BlockedXDLN_PerWarp_ = 1, // The number of continuous xdl_output per warp
+          bool DoubleSmemBuffer_       = false>
 struct CShuffleEpilogueProblem
 {
     using AsDataType                                       = remove_cvref_t<AsDataType_>;
@@ -55,6 +59,8 @@ struct CShuffleEpilogueProblem
     static constexpr memory_operation_enum MemoryOperation = MemoryOperation_;
     static constexpr bool FixedVectorSize                  = FixedVectorSize_;
     static constexpr index_t VectorSizeC                   = VectorSizeC_;
+    static constexpr index_t BlockedXDLN_PerWarp           = BlockedXDLN_PerWarp_;
+    static constexpr bool DoubleSmemBuffer                 = DoubleSmemBuffer_;
     static constexpr bool TiledMMAPermuteN                 = TiledMMAPermuteN_;
     static constexpr index_t kNumWaveGroups                = kNumWaveGroups_;
     static constexpr index_t NumDTensor                    = DsDataType::size();
@@ -88,11 +94,17 @@ struct CShuffleEpilogue
     using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
 
-    using ATypeToUse =
-        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>;
+    using ATypeToUse = std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||
+                                              std::is_same_v<ADataType, pk_fp4_t>,
+                                          BDataType,
+                                          ADataType>;
     // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
-    using BTypeToUse =
-        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>;
+    using BTypeToUse = std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
+                                              std::is_same_v<BDataType, pk_fp4_t> ||
+                                              std::is_same_v<BDataType, pk_fp4_raw_t>,
+                                          ADataType,
+                                          BDataType>;
+
     using ELayout       = remove_cvref_t<typename Problem::ELayout>;
     using CDElementwise = remove_cvref_t<typename Problem::CDElementwise>;
     static constexpr memory_operation_enum MemoryOperation = Problem::MemoryOperation;
@@ -107,6 +119,8 @@ struct CShuffleEpilogue
     static constexpr index_t isCTransposed                 = Problem::isCTransposed;
     static constexpr bool FixedVectorSize                  = Problem::FixedVectorSize;
     static constexpr bool TiledMMAPermuteN                 = Problem::TiledMMAPermuteN;
+    static constexpr index_t BlockedXDLN_PerWarp           = Problem::BlockedXDLN_PerWarp;
+    static constexpr bool DoubleSmemBuffer                 = Problem::DoubleSmemBuffer;
     static constexpr index_t VectorSizeC                   = Problem::VectorSizeC;
     static constexpr index_t MPerIteration                 = MPerXdl * MWave;
     static constexpr index_t NPerIteration                 = NPerXdl * NWave;
@@ -114,8 +128,25 @@ struct CShuffleEpilogue
     static constexpr index_t MRepeat                       = kMPerBlock / (MPerXdl * MWave);
     static constexpr index_t NRepeat                       = kNPerBlock / (NPerXdl * NWave);
 
+    CDElementwise elfunc_;
+
+    CK_TILE_DEVICE CShuffleEpilogue(CDElementwise elfunc = CDElementwise{}) : elfunc_(elfunc) {};
+
     static_assert(NumDTensor == DsLayout::size(),
                   "The size of DsDataType and DsLayout should be the same");
+
+    [[nodiscard]] CK_TILE_HOST static const std::string GetName()
+    {
+        // clang-format off
+        return concat('_', "CShuffleEpilogue", 
+                      concat('x', MWave, NWave),
+                      concat('x', MPerXdl, NPerXdl, KPerXdl),
+                      VectorSizeC,
+                      isCTransposed ? "CTransposed" : "CNotTransposed",
+                      mem_op_string<MemoryOperation>());
+        // clang-format on
+    }
+
     /**
      * @brief Get the vector store size for C tensor.
      *
@@ -176,6 +207,26 @@ struct CShuffleEpilogue
         }
         return max_vector_size / sizeof(DiDataType);
     }
+
+    /**
+     * @brief Shuffle tile configuration parameters check and aligment
+     *
+     * @details Return tuple(1, 1) if shuffle_tile values are too large for SMEM.
+     */
+    template <index_t m_shuffle_tile, index_t n_shuffle_tile>
+    CK_TILE_HOST_DEVICE static constexpr auto AlignShuffleTileWithSmem()
+    {
+        constexpr index_t m_val = MPerXdl * MWave * m_shuffle_tile;
+        constexpr index_t n_val = NPerXdl * NWave * n_shuffle_tile;
+
+        constexpr auto shuffle_tile =
+            m_val * n_val * sizeof(ODataType) > get_smem_capacity() || DoubleSmemBuffer
+                ? std::make_tuple(1, 1)
+                : std::make_tuple(m_shuffle_tile, n_shuffle_tile);
+
+        return shuffle_tile;
+    }
+
     /**
      * @brief Shuffle tile configuration parameters
      *
@@ -186,20 +237,23 @@ struct CShuffleEpilogue
      */
     static constexpr auto shuffle_tile_tuple = [] {
         constexpr index_t elem_per_thread = MPerXdl * NPerXdl / get_warp_size();
-        if constexpr(elem_per_thread >= GetVectorSizeC())
+        if constexpr(elem_per_thread <= GetVectorSizeC())
         {
             return std::make_tuple(1, 1);
         }
         else
         {
-            constexpr index_t num_xdl_shuffles = GetVectorSizeC() / elem_per_thread;
+            constexpr index_t num_xdl_shuffles = elem_per_thread / GetVectorSizeC();
+            static_assert(elem_per_thread % GetVectorSizeC() == 0);
             if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)
             {
                 static_assert((kMPerBlock % (MPerXdl * MWave) == 0) &&
                                   (kMPerBlock % num_xdl_shuffles == 0),
                               "kMPerBlock must be divisible by MPerXdl*MWave and "
                               "num_xdl_shuffles for CShuffleEpilogue");
-                return std::make_tuple(min(num_xdl_shuffles, kMPerBlock / (MPerXdl * MWave)), 1);
+                return AlignShuffleTileWithSmem<min(num_xdl_shuffles,
+                                                    kMPerBlock / (MPerXdl * MWave)),
+                                                1>();
             }
             else
             {
@@ -207,12 +261,15 @@ struct CShuffleEpilogue
                                   (kNPerBlock % num_xdl_shuffles == 0),
                               "kNPerBlock must be divisible by NPerXdl*NWave and "
                               "num_xdl_shuffles for CShuffleEpilogue");
-                return std::make_tuple(1, min(num_xdl_shuffles, kNPerBlock / (NPerXdl * NWave)));
+                return AlignShuffleTileWithSmem<1,
+                                                min(num_xdl_shuffles,
+                                                    kNPerBlock / (NPerXdl * NWave))>();
             }
         }
     }();
     static constexpr index_t NumMXdlPerWavePerShuffle = std::get<0>(shuffle_tile_tuple);
-    static constexpr index_t NumNXdlPerWavePerShuffle = std::get<1>(shuffle_tile_tuple);
+    static constexpr index_t NumNXdlPerWavePerShuffle =
+        max(BlockedXDLN_PerWarp, std::get<1>(shuffle_tile_tuple));
 
     static constexpr auto MNPerIterationShuffle = [] {
         constexpr index_t m_val = MPerXdl * MWave * NumMXdlPerWavePerShuffle;
@@ -265,14 +322,31 @@ struct CShuffleEpilogue
 
     CK_TILE_DEVICE static constexpr auto MakeLdsDistributionEncode()
     {
-        constexpr auto block_outer_dstr_encoding =
-            tile_distribution_encoding<sequence<>,
-                                       tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
-                                             sequence<NumNXdlPerWavePerShuffle, NWave>>,
-                                       tuple<sequence<1, 2>>,
-                                       tuple<sequence<1, 1>>,
-                                       sequence<1, 2>,
-                                       sequence<0, 0>>{};
+        constexpr auto block_outer_dstr_encoding = [] {
+            if constexpr(BlockedXDLN_PerWarp == 1)
+            {
+                return tile_distribution_encoding<sequence<>,
+                                                  tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
+                                                        sequence<NumNXdlPerWavePerShuffle, NWave>>,
+                                                  tuple<sequence<1, 2>>,
+                                                  tuple<sequence<1, 1>>,
+                                                  sequence<1, 2>,
+                                                  sequence<0, 0>>{};
+            }
+            else
+            {
+                constexpr int RakedXDLN_PerWarp = NumNXdlPerWavePerShuffle / BlockedXDLN_PerWarp;
+                // BlockedLayout
+                return tile_distribution_encoding<
+                    sequence<>,
+                    tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
+                          sequence<RakedXDLN_PerWarp, NWave, BlockedXDLN_PerWarp>>,
+                    tuple<sequence<1, 2>>,
+                    tuple<sequence<1, 1>>,
+                    sequence<1, 2, 2>,
+                    sequence<0, 0, 2>>{};
+            }
+        }();
         constexpr auto block_dstr_encoding = detail::make_embed_tile_distribution_encoding(
             block_outer_dstr_encoding, typename CWarpDstr::DstrEncode{});
 
@@ -364,7 +438,7 @@ struct CShuffleEpilogue
             generate_tie([&](auto idx) -> const auto& { return ds_tensor[idx]; },
                          number<NumDTensor>{}));
 
-        tile_elementwise_inout_unpack(typename Problem::CDElementwise{}, c_ds_tiles);
+        tile_elementwise_inout_unpack(elfunc_, c_ds_tiles);
     }
 
     template <typename OutDramWindow, typename COutTensor>
@@ -429,7 +503,7 @@ struct CShuffleEpilogue
     CK_TILE_DEVICE auto operator()(ODramWindow& out_dram_window,
                                    const OAccTile& o_acc_tile,
                                    const DsDramWindows& ds_dram_windows,
-                                   void* /*p_smem*/,
+                                   void* /* p_smem */,
                                    const ScaleM& scale_m = {},
                                    const ScaleN& scale_n = {})
     {
@@ -437,7 +511,6 @@ struct CShuffleEpilogue
 
         static_assert(MPerXdl % RowsPerLane == 0,
                       "CShuffle (permuteN): MPerXdl must be divisible by per-lane row count.");
-
         constexpr int kM0 = MWave;
         constexpr int kM2 = RowsPerLane;
         constexpr int kM1 = MPerXdl / kM2;
@@ -527,6 +600,7 @@ struct CShuffleEpilogue
                     const int src = n_idx * plane + m_lane;   // source row in this N-plane
                     const int dst = n_idx + m_lane * NRepeat; // permuted N layout in output
                     AccDataType v = shuffle_acc.get_thread_buffer()[src];
+
                     if constexpr(has_scalar_scales)
                     {
                         v = static_cast<AccDataType>(v * scale_m * scale_n);
@@ -537,6 +611,7 @@ struct CShuffleEpilogue
                         const auto sn = static_cast<float>(sn_tile.get_thread_buffer()[dst]);
                         v             = static_cast<AccDataType>(v * sm * sn);
                     }
+
                     c_out_tensor.get_thread_buffer()[dst] = type_convert<ODataType>(v);
                 });
             });

@@ -71,9 +71,15 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 512]
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
 LibraryLogic:
+<<<<<<< HEAD
     # ScheduleName: "gfx950" #aquavanjaram for 942
     # DeviceNames: ["Device 0049", "Device 0050"]
     # ArchitectureName: "gfx950"
   ScheduleName: aquavanjaram
   DeviceNames: [Device 0049, Device 0050]
   ArchitectureName: gfx942
+=======
+  ScheduleName: "gfx950"
+  DeviceNames: ["Device 0049"]
+  ArchitectureName: "gfx950"
+>>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af

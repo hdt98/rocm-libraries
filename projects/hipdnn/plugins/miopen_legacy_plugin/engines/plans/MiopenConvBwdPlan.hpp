@@ -5,9 +5,9 @@
 
 #include <memory>
 
-#include <hipdnn_sdk/data_objects/convolution_bwd_attributes_generated.h>
-#include <hipdnn_sdk/data_objects/tensor_attributes_generated.h>
-#include <hipdnn_sdk/utilities/ScopedResource.hpp>
+#include <hipdnn_data_sdk/data_objects/convolution_bwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_data_sdk/utilities/ScopedResource.hpp>
 #include <miopen/miopen.h>
 
 #include "MiopenConvDescriptor.hpp"
@@ -21,8 +21,8 @@ class ConvBwdParams
 {
 public:
     ConvBwdParams(
-        const hipdnn_sdk::data_objects::ConvolutionBwdAttributes& attributes,
-        const std::unordered_map<int64_t, const hipdnn_sdk::data_objects::TensorAttributes*>&
+        const hipdnn_data_sdk::data_objects::ConvolutionBwdAttributes& attributes,
+        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
             tensorMap);
 
     ConvBwdParams(const ConvBwdParams&) = delete;
@@ -56,8 +56,8 @@ public:
     ConvBwdPlan(const ConvBwdPlan&) = delete;
     ConvBwdPlan& operator=(const ConvBwdPlan&) = delete;
 
-    ConvBwdPlan(ConvBwdPlan&& other) noexcept;
-    ConvBwdPlan& operator=(ConvBwdPlan&& other) noexcept;
+    ConvBwdPlan(ConvBwdPlan&& other) = default;
+    ConvBwdPlan& operator=(ConvBwdPlan&& other) = default;
 
     size_t getWorkspaceSize(const HipdnnEnginePluginHandle& handle) const override;
 
@@ -68,7 +68,7 @@ public:
 
 private:
     ConvBwdParams _params;
-    hipdnn_sdk::utilities::ScopedResource<miopenSolution_t> _solution;
+    hipdnn_data_sdk::utilities::ScopedResource<miopenSolution_t> _solution;
     size_t _workspaceSize = 0;
 };
 

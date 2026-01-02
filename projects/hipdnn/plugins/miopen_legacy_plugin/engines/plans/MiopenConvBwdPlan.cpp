@@ -3,10 +3,10 @@
 
 #include <array>
 
-#include <hipdnn_sdk/plugin/PluginException.hpp>
-#include <hipdnn_sdk/utilities/FlatbufferUtils.hpp>
-#include <hipdnn_sdk/utilities/ScopedResource.hpp>
-#include <hipdnn_sdk/utilities/ShapeUtilities.hpp>
+#include <hipdnn_data_sdk/utilities/FlatbufferUtils.hpp>
+#include <hipdnn_data_sdk/utilities/ScopedResource.hpp>
+#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
+#include <hipdnn_plugin_sdk/PluginException.hpp>
 
 #include "HipdnnEnginePluginHandle.hpp"
 #include "MiopenConvBwdPlan.hpp"
@@ -16,8 +16,9 @@ namespace miopen_legacy_plugin
 {
 
 ConvBwdParams::ConvBwdParams(
-    const hipdnn_sdk::data_objects::ConvolutionBwdAttributes& attributes,
-    const std::unordered_map<int64_t, const hipdnn_sdk::data_objects::TensorAttributes*>& tensorMap)
+    const hipdnn_data_sdk::data_objects::ConvolutionBwdAttributes& attributes,
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        tensorMap)
     : _spatialDimCount(miopen_utils::getSpatialDimCount(
           miopen_utils::findTensorAttributes(tensorMap, attributes.dx_tensor_uid())))
     , _dx(miopen_utils::createTensor(tensorMap, attributes.dx_tensor_uid()))
@@ -28,9 +29,11 @@ ConvBwdParams::ConvBwdParams(
     const auto& attrW = miopen_utils::findTensorAttributes(tensorMap, _w.uid());
     const auto& attrDY = miopen_utils::findTensorAttributes(tensorMap, _dy.uid());
 
-    const auto inputDims = hipdnn_sdk::utilities::convertFlatBufferVectorToStdVector(attrDX.dims());
-    const auto weightDims = hipdnn_sdk::utilities::convertFlatBufferVectorToStdVector(attrW.dims());
-    const auto groupCount = hipdnn_sdk::utilities::calculateGroupCount(inputDims, weightDims);
+    const auto inputDims
+        = hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(attrDX.dims());
+    const auto weightDims
+        = hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(attrW.dims());
+    const auto groupCount = hipdnn_data_sdk::utilities::calculateGroupCount(inputDims, weightDims);
 
     _conv = MiopenConvDescriptor(_spatialDimCount, attributes, static_cast<int>(groupCount));
 
@@ -69,7 +72,7 @@ ConvBwdPlan::ConvBwdPlan(const HipdnnEnginePluginHandle& handle, ConvBwdParams&&
     miopenProblem_t problem;
     THROW_ON_MIOPEN_FAILURE(miopenCreateConvProblem(
         &problem, _params.conv().convDescriptor(), miopenProblemDirectionBackward));
-    hipdnn_sdk::utilities::ScopedResource problemRes(
+    hipdnn_data_sdk::utilities::ScopedResource problemRes(
         problem, [](miopenProblem_t p) { std::ignore = miopenDestroyProblem(p); });
 
     THROW_ON_MIOPEN_FAILURE(miopenSetProblemTensorDescriptor(
@@ -87,7 +90,7 @@ ConvBwdPlan::ConvBwdPlan(const HipdnnEnginePluginHandle& handle, ConvBwdParams&&
 
     if(solution != nullptr)
     {
-        _solution = hipdnn_sdk::utilities::ScopedResource<miopenSolution_t>(
+        _solution = hipdnn_data_sdk::utilities::ScopedResource<miopenSolution_t>(
             solution, [](miopenSolution_t s) {
                 auto status = miopenDestroySolution(s);
                 if(status != miopenStatusSuccess)
@@ -99,31 +102,11 @@ ConvBwdPlan::ConvBwdPlan(const HipdnnEnginePluginHandle& handle, ConvBwdParams&&
 
     if(numSolutions != 1)
     {
-        throw hipdnn_plugin::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
-                                                   "miopenFindSolutions returned no solutions");
+        throw hipdnn_plugin_sdk::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                                                       "miopenFindSolutions returned no solutions");
     }
 
     THROW_ON_MIOPEN_FAILURE(miopenGetSolutionWorkspaceSize(_solution.get(), &_workspaceSize));
-}
-
-ConvBwdPlan::ConvBwdPlan(ConvBwdPlan&& other) noexcept
-    : _params(std::move(other._params))
-    , _solution(std::move(other._solution))
-    , _workspaceSize(other._workspaceSize)
-{
-    other._workspaceSize = 0;
-}
-
-ConvBwdPlan& ConvBwdPlan::operator=(ConvBwdPlan&& other) noexcept
-{
-    if(this != &other)
-    {
-        _params = std::move(other._params);
-        _solution = std::move(other._solution);
-        _workspaceSize = other._workspaceSize;
-        other._workspaceSize = 0;
-    }
-    return *this;
 }
 
 size_t ConvBwdPlan::getWorkspaceSize([[maybe_unused]] const HipdnnEnginePluginHandle& handle) const

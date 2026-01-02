@@ -423,13 +423,6 @@ namespace TensileLite
         IdentifierToIndices(
             operationIdentifier, freeIndices, batchIndices, boundIndices, aOps, bOps, cOps, dOps);
 
-        // for(size_t i = 0; i < isComplex.size(); i++)
-        // {
-        //     if(isComplex[i])
-        //     {
-        //         std::runtime_error("Complex is not supported.");
-        //     }
-        // }
 
         return FromIndexSizes(freeIndices,
                               batchIndices,
@@ -616,6 +609,64 @@ namespace TensileLite
         , m_batchIndices(batchIndices)
         , m_boundIndices(boundIndices)
         , m_beta(beta)
+        , m_aOps(aOps)
+        , m_bOps(bOps)
+        , m_cOps(cOps)
+        , m_dOps(dOps)
+    {
+        TensorOps nop;
+        m_aOps = m_bOps = m_cOps = m_dOps = nop;
+
+        m_workspaceSize                                          = workspaceSize;
+        m_tensors[ContractionProblemGemm::TENSOR::A]             = a;
+        m_tensors[ContractionProblemGemm::TENSOR::B]             = b;
+        m_tensors[ContractionProblemGemm::TENSOR::C]             = c;
+        m_tensors[ContractionProblemGemm::TENSOR::D]             = d;
+        m_tensors[ContractionProblemGemm::TENSOR::E]             = e;
+        m_tensors[ContractionProblemGemm::TENSOR::BIAS]          = bias;
+        m_tensors[ContractionProblemGemm::TENSOR::SCALEA]        = scaleA;
+        m_tensors[ContractionProblemGemm::TENSOR::SCALEB]        = scaleB;
+        m_tensors[ContractionProblemGemm::TENSOR::SCALEC]        = scaleC;
+        m_tensors[ContractionProblemGemm::TENSOR::SCALED]        = scaleD;
+        m_tensors[ContractionProblemGemm::TENSOR::SCALEALPHAVEC] = scaleAlphaVec;
+        m_tensors[ContractionProblemGemm::TENSOR::D].setAsOutput(true); // Set d as output
+        m_betaRestriction = toScalarValueEnum(
+            m_beta); // Set enum using beta to potentially allow for faster solutions
+        consistencyCheck();
+        normalize();
+        calcArithmeticIntensity();
+    }
+
+    ContractionProblemGemm::ContractionProblemGemm(TensorDescriptor const& a,
+                                                   TensorDescriptor const& b,
+                                                   TensorDescriptor const& c,
+                                                   TensorDescriptor const& d,
+                                                   TensorDescriptor const& e,
+                                                   TensorDescriptor const& bias,
+                                                   TensorDescriptor const& scaleA,
+                                                   TensorDescriptor const& scaleB,
+                                                   TensorDescriptor const& scaleC,
+                                                   TensorDescriptor const& scaleD,
+                                                   TensorDescriptor const& scaleAlphaVec,
+                                                   FreeIndices const&      freeIndices,
+                                                   BatchIndices const&     batchIndices,
+                                                   BoundIndices const&     boundIndices,
+                                                   double                  beta,
+												   TensorOps const&        aOps,
+                                                   TensorOps const&        bOps,
+                                                   TensorOps const&        cOps,
+                                                   TensorOps const&        dOps,
+                                                   size_t                  workspaceSize
+                                                   )
+        : ContractionProblem(ContractionProblemGemm::TENSOR::TENSOR_COUNT)
+        , m_freeIndices(freeIndices)
+        , m_batchIndices(batchIndices)
+        , m_boundIndices(boundIndices)
+        , m_beta(beta)
+        , m_aOps(aOps)
+        , m_bOps(bOps)
+        , m_cOps(cOps)
+        , m_dOps(dOps)
     {
         TensorOps nop;
         m_aOps = m_bOps = m_cOps = m_dOps = nop;
@@ -745,8 +796,7 @@ namespace TensileLite
 
         numWG.x = CeilDivide(numWG.x, sizeMapping.macroTile.x);
         numWG.y = CeilDivide(numWG.y, sizeMapping.macroTile.y);
-        if(sizeMapping.streamK == 0)
-            numWG.y *= gsu;
+        numWG.y *= gsu;
 
         size_t problemTiles = numWG.x * numWG.y;
         if(sizeMapping.persistentKernelAlongBatch || sizeMapping.streamK != 0)

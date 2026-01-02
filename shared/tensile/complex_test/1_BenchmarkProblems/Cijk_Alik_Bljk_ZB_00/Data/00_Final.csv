@@ -1,0 +1,17 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
+GFlops, SizeI, SizeJ, SizeK, SizeL, LDD, LDC, LDA, LDB, WinnerFreq, TotalFlops, WinnerPower, WinnerTemperature, Cijk_Alik_Bljk_ZB_MT16x16x8_MI16x16x4x1_SN_K1
+0, 16, 16, 1, 2, 16, 16, 2, 2, 0, 1024, 0, 0, 0.168421
+=======
+GFlops, SizeI, SizeJ, SizeK, SizeL, LDD, LDC, LDA, LDB, WinnerFreq, TotalFlops, WinnerPower, WinnerTemperature, Cijk_Alik_Bljk_ZB_MT64x128x8_SN_K1_LPA1_LPB1_TT4_8_WG16_16_1, Cijk_Alik_Bljk_ZB_MT128x32x8_SN_K1_LPA1_LPB1_TT4_8_WG32_4_1
+0, 127, 127, 2, 63, 127, 127, 63, 63, 0, 4064508, 0, 0, 132.304, 143.111
+1, 128, 128, 2, 63, 128, 128, 63, 63, 0, 4128768, 0, 0, 110.274, 147.879
+2, 129, 129, 2, 63, 129, 129, 63, 63, 0, 4193532, 0, 0, 131.376, 149.125
+3, 127, 127, 2, 64, 127, 127, 64, 64, 0, 4129024, 0, 0, 134.234, 144.17
+4, 128, 128, 2, 64, 128, 128, 64, 64, 0, 4194304, 0, 0, 139.248, 151.092
+5, 129, 129, 2, 64, 129, 129, 64, 64, 0, 4260096, 0, 0, 141.433, 152.364
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+GFlops, SizeI, SizeJ, SizeK, SizeL, LDD, LDC, LDA, LDB, WinnerFreq, TotalFlops, WinnerPower, WinnerTemperature, Cijk_Alik_Bljk_ZB_MT16x16x8_MI16x16x4x1_SN_K1
+0, 16, 16, 1, 2, 16, 16, 2, 2, 0, 1024, 0, 0, 0.168421
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)

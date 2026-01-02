@@ -27,8 +27,6 @@
 #include "gemm.hpp"
 #include "runtime_args_selection.hpp"
 
-#include <rocRoller/Parameters/Solution/StreamK.hpp>
-
 #include "utility.hpp"
 
 using namespace rocRoller;
@@ -63,7 +61,6 @@ void setPredicates(std::shared_ptr<GemmKernel> gemmKernel)
     });
 
     // parameters
-    auto unrollKExp        = literal(params->unrollK);
     auto workgroupTileMExp = literal(solutionParams->workgroupTile.m);
     auto workgroupTileNExp = literal(solutionParams->workgroupTile.n);
     auto workgroupTileKExp = literal(solutionParams->workgroupTile.k);
@@ -71,10 +68,6 @@ void setPredicates(std::shared_ptr<GemmKernel> gemmKernel)
     // constants
     auto zero = literal(0u);
     auto one  = literal(1u);
-
-    // sanitize parameters
-    auto sanUnrollKExp
-        = convert(DataType::UInt32, conditional(unrollKExp <= zero, one, unrollKExp));
 
     // predicates
     std::stringstream ss;
@@ -90,9 +83,8 @@ void setPredicates(std::shared_ptr<GemmKernel> gemmKernel)
     commandKernel->addPredicate(unrollYPredicate);
     ss.str("");
 
-    auto unrollKPredicate = (aSizeExps[1] % (workgroupTileKExp * sanUnrollKExp) == zero);
-    ss << "K must be a multiple of workgroupTile.k=" << solutionParams->workgroupTile.k
-       << " * unrollK=" << rocRoller::Expression::evaluate(sanUnrollKExp);
+    auto unrollKPredicate = (aSizeExps[1] % workgroupTileKExp == zero);
+    ss << "K must be a multiple of workgroupTile.k=" << solutionParams->workgroupTile.k;
     setComment(unrollKPredicate, ss.str());
     commandKernel->addPredicate(unrollKPredicate);
     ss.str("");
@@ -121,11 +113,15 @@ std::string genKernelName(std::shared_ptr<SolutionParameters> gemm)
                          gemm->kernelType.typeAcc})
         rv << toString(t) << "_";
 
-    if(gemm->kernelType.scaleAMode != Operations::ScaleMode::None)
-        rv << "SA_" << genScaleModeString(gemm->kernelType.scaleAMode) << "_";
-    if(gemm->kernelType.scaleBMode != Operations::ScaleMode::None)
-        rv << "SB_" << genScaleModeString(gemm->kernelType.scaleBMode) << "_";
+    if(gemm->kernelType.scaleTypeA.mode != Operations::ScaleMode::None)
+        rv << "SA_" << genScaleModeString(gemm->kernelType.scaleTypeA.mode) << "_";
+    if(gemm->kernelType.scaleTypeB.mode != Operations::ScaleMode::None)
+        rv << "SB_" << genScaleModeString(gemm->kernelType.scaleTypeB.mode) << "_";
 
+    if(gemm->streamK)
+    {
+        rv << "SK_";
+    }   
     rv << "WGT_";
     rocRoller::streamJoin(
         rv, std::vector{gemm->workgroupTile.m, gemm->workgroupTile.n, gemm->workgroupTile.k}, "x");
@@ -166,25 +162,26 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     auto mulInputA = tagLoadA;
     auto mulInputB = tagLoadB;
 
-    AssertFatal(gemm->kernelType.scaleAMode == Operations::ScaleMode::None
-                    || gemm->kernelType.scaleAMode == Operations::ScaleMode::SingleScale
-                    || gemm->kernelType.scaleAMode == Operations::ScaleMode::Separate,
+    AssertFatal(gemm->kernelType.scaleTypeA.mode == Operations::ScaleMode::None
+                    || gemm->kernelType.scaleTypeA.mode == Operations::ScaleMode::SingleScale
+                    || gemm->kernelType.scaleTypeA.mode == Operations::ScaleMode::Separate,
                 "Scale mode not supported!",
-                ShowValue(gemm->kernelType.scaleAMode));
-    AssertFatal(gemm->kernelType.scaleBMode == Operations::ScaleMode::None
-                    || gemm->kernelType.scaleBMode == Operations::ScaleMode::SingleScale
-                    || gemm->kernelType.scaleBMode == Operations::ScaleMode::Separate,
+                ShowValue(gemm->kernelType.scaleTypeA.mode));
+    AssertFatal(gemm->kernelType.scaleTypeB.mode == Operations::ScaleMode::None
+                    || gemm->kernelType.scaleTypeB.mode == Operations::ScaleMode::SingleScale
+                    || gemm->kernelType.scaleTypeB.mode == Operations::ScaleMode::Separate,
                 "Scale mode not supported!",
-                ShowValue(gemm->kernelType.scaleBMode));
+                ShowValue(gemm->kernelType.scaleTypeB.mode));
 
     std::optional<Operations::OperationTag> tagTensorScaleA, tagLoadScaleA, tagBlockScaleA,
-        tagTensorScaleB, tagLoadScaleB, tagBlockScaleB, tagScratch, tagSKGrid, tagWGM;
+        tagTensorScaleB, tagLoadScaleB, tagBlockScaleB, tagSKGrid, tagWGM;
+    std::map<Operations::ScratchPolicy, Operations::OperationTag> tagScratch;
 
-    if(gemm->kernelType.scaleAMode == Operations::ScaleMode::Separate)
+    if(gemm->kernelType.scaleTypeA.mode == Operations::ScaleMode::Separate)
     {
         tagTensorScaleA = command->addOperation(rocRoller::Operations::Tensor(
             2,
-            gemm->kernelType.scaleTypeA,
+            gemm->kernelType.scaleTypeA.type,
             gemm->kernelType.transA ? oneStridesT : oneStridesN));
         tagLoadScaleA
             = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleA));
@@ -193,14 +190,14 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
             tagLoadA,
             2,
             tagLoadScaleA,
-            {gemm->kernelType.scaleABlockColSize, gemm->kernelType.scaleABlockRowSize}));
+            {gemm->kernelType.scaleTypeA.blockColSize, gemm->kernelType.scaleTypeA.blockRowSize}));
     }
 
-    if(gemm->kernelType.scaleBMode == Operations::ScaleMode::Separate)
+    if(gemm->kernelType.scaleTypeB.mode == Operations::ScaleMode::Separate)
     {
         tagTensorScaleB = command->addOperation(rocRoller::Operations::Tensor(
             2,
-            gemm->kernelType.scaleTypeA,
+            gemm->kernelType.scaleTypeA.type,
             gemm->kernelType.transB ? oneStridesT : oneStridesN));
         tagLoadScaleB
             = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleB));
@@ -209,7 +206,7 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
             tagLoadB,
             2,
             tagLoadScaleB,
-            {gemm->kernelType.scaleBBlockColSize, gemm->kernelType.scaleBBlockRowSize}));
+            {gemm->kernelType.scaleTypeB.blockColSize, gemm->kernelType.scaleTypeB.blockRowSize}));
     }
 
     auto tagTensorC
@@ -273,12 +270,19 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
                                 DataDirection::ReadOnly,
                                 rocRoller::NUMWGS);
 
-        tagScratch = command->allocateTag();
-        command->allocateArgument(VariableType(DataType::UInt32, PointerType::PointerGlobal),
-                                *tagScratch,
-                                ArgumentType::Value,
-                                DataDirection::ReadWrite,
-                                rocRoller::SCRATCH);
+        // Create Scratch operations for each ScratchPolicy
+        for(int i = 0; i < static_cast<int>(Operations::ScratchPolicy::Count); ++i)
+        {
+            auto policy = static_cast<Operations::ScratchPolicy>(i);
+            auto tag = command->allocateTag();
+            command->addOperation(Operations::Scratch(tag, policy));
+            command->allocateArgument(VariableType(DataType::UInt32, PointerType::PointerGlobal),
+                                    tag,
+                                    ArgumentType::Value,
+                                    DataDirection::ReadWrite,
+                                    rocRoller::getScratchName(policy));
+            tagScratch[policy] = tag;
+        }
     }
 
     if(gemm->workgroupMappingDim != -1)
@@ -327,12 +331,6 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     params->setWaveTilesPerWavefront(wavetilePerWavefrontM, wavetilePerWavefrontN);
 
     {
-        auto memoryTypeA = MemoryType::WAVE;
-        if(gemm->direct2LDSA)
-            memoryTypeA = MemoryType::WAVE_Direct2LDS;
-        else if(gemm->loadLDSA)
-            memoryTypeA = MemoryType::LDS;
-
         auto macTileA = KernelGraph::CoordinateGraph::MacroTile(
             {gemm->workgroupTile.m, gemm->workgroupTile.k},
             LayoutType::MATRIX_A,
@@ -340,15 +338,15 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
              gemm->machineInstruction.n,
              gemm->machineInstruction.k,
              gemm->machineInstruction.b},
-            memoryTypeA);
+            GetMemoryType(gemm->loadPathA));
         params->setDimensionInfo(tagLoadA, macTileA);
     }
 
-    if(gemm->kernelType.scaleAMode == Operations::ScaleMode::Separate)
+    if(gemm->kernelType.scaleTypeA.mode == Operations::ScaleMode::Separate)
     {
         // TODO: verify the division of scale block size is correct
         auto const scaleBlockSize
-            = gemm->kernelType.scaleABlockRowSize * gemm->kernelType.scaleABlockColSize;
+            = gemm->kernelType.scaleTypeA.blockRowSize * gemm->kernelType.scaleTypeA.blockColSize;
         auto macTileAScale = KernelGraph::CoordinateGraph::MacroTile(
             {gemm->workgroupTile.m, gemm->workgroupTile.k / (int)scaleBlockSize},
             LayoutType::MATRIX_A,
@@ -361,12 +359,6 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     }
 
     {
-        auto memoryTypeB = MemoryType::WAVE;
-        if(gemm->direct2LDSB)
-            memoryTypeB = MemoryType::WAVE_Direct2LDS;
-        else if(gemm->loadLDSB)
-            memoryTypeB = MemoryType::LDS;
-
         auto macTileB = KernelGraph::CoordinateGraph::MacroTile(
             {gemm->workgroupTile.k, gemm->workgroupTile.n},
             LayoutType::MATRIX_B,
@@ -374,15 +366,15 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
              gemm->machineInstruction.n,
              gemm->machineInstruction.k,
              gemm->machineInstruction.b},
-            memoryTypeB);
+            GetMemoryType(gemm->loadPathB));
         params->setDimensionInfo(tagLoadB, macTileB);
     }
 
-    if(gemm->kernelType.scaleBMode == Operations::ScaleMode::Separate)
+    if(gemm->kernelType.scaleTypeB.mode == Operations::ScaleMode::Separate)
     {
         // TODO: verify the division of scale block size is correct
         auto const scaleBlockSize
-            = gemm->kernelType.scaleBBlockRowSize * gemm->kernelType.scaleBBlockColSize;
+            = gemm->kernelType.scaleTypeB.blockRowSize * gemm->kernelType.scaleTypeB.blockColSize;
         auto macTileBScale = KernelGraph::CoordinateGraph::MacroTile(
             {gemm->workgroupTile.k / (int)scaleBlockSize, gemm->workgroupTile.n},
             LayoutType::MATRIX_B,
@@ -509,8 +501,7 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     if(tagTensorScaleB)
         gemmKernel->tagTensorScaleB = *tagTensorScaleB;
 
-    if(tagScratch)
-        gemmKernel->tagScratch = *tagScratch;
+    gemmKernel->tagScratch = tagScratch;
 
     if(tagSKGrid)
         gemmKernel->tagSKGrid = *tagSKGrid;
@@ -543,7 +534,9 @@ size_t workspaceRequired(std::shared_ptr<GemmKernel> gemm, const RocblasltContra
 
     auto runtimeArgs = commandArgs.runtimeArguments();
 
-    return gemm->commandKernel->scratchSpaceRequired(runtimeArgs);
+    // Only return scratch space for ScratchPolicy::None (uses prob.workspace)
+    return gemm->commandKernel->scratchSpaceRequired(
+        Operations::ScratchPolicy::None, runtimeArgs);
 }
 
 CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
@@ -567,7 +560,7 @@ CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
     setCommandTensorArg(commandArgs, gemm->tagTensorA, descA, (float*)nullptr);
     setCommandTensorArg(commandArgs, gemm->tagTensorB, descB, (float*)nullptr);
 
-    if(gemm->params->kernelType.scaleAMode == Operations::ScaleMode::Separate)
+    if(gemm->params->kernelType.scaleTypeA.mode == Operations::ScaleMode::Separate)
     {
         auto const scaleBlockSize = prob.scaleABlockRowSize * prob.scaleABlockColSize;
         TensorDescriptor descAScale(gemm->params->kernelType.typeA,
@@ -575,7 +568,7 @@ CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
                                     gemm->params->kernelType.transA ? "T" : "N");
         setCommandTensorArg(commandArgs, gemm->tagTensorScaleA, descAScale, (float*)nullptr);
     }
-    if(gemm->params->kernelType.scaleBMode == Operations::ScaleMode::Separate)
+    if(gemm->params->kernelType.scaleTypeB.mode == Operations::ScaleMode::Separate)
     {
         auto const scaleBlockSize = prob.scaleBBlockRowSize * prob.scaleBBlockColSize;
         TensorDescriptor descBScale(gemm->params->kernelType.typeB,
@@ -598,12 +591,12 @@ CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
     commandArgs.setArgument(gemm->tagTensorC, ArgumentType::Value, (float*)prob.C);
     commandArgs.setArgument(gemm->tagTensorD, ArgumentType::Value, (float*)prob.D);
 
-    if(gemm->params->kernelType.scaleAMode == Operations::ScaleMode::Separate)
+    if(gemm->params->kernelType.scaleTypeA.mode == Operations::ScaleMode::Separate)
     {
         commandArgs.setArgument(gemm->tagTensorScaleA, ArgumentType::Value, (uint8_t*)prob.scaleA);
     }
 
-    if(gemm->params->kernelType.scaleBMode == Operations::ScaleMode::Separate)
+    if(gemm->params->kernelType.scaleTypeB.mode == Operations::ScaleMode::Separate)
     {
         commandArgs.setArgument(gemm->tagTensorScaleB, ArgumentType::Value, (uint8_t*)prob.scaleB);
     }
@@ -642,14 +635,34 @@ rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
         }
         return rocblaslt_status_invalid_value;
     }
-
     auto commandArgs = createCommandArguments(gemm, prob, DEFAULT_WGM);
 
-    // Add scratch space
-    if(workSpaceRequired > 0)
+
+    if(gemm->params->streamK)
     {
-        commandArgs.setArgument(
-            gemm->tagScratch, ArgumentType::Value, static_cast<unsigned char*>(prob.workspace));
+        auto runtimeArgs = commandArgs.runtimeArguments();
+
+        // Use prob.workspace for ScratchPolicy::None
+        auto noneScratchSize = gemm->commandKernel->scratchSpaceRequired(
+            Operations::ScratchPolicy::None, runtimeArgs);
+        if(noneScratchSize > 0 && prob.workspace != nullptr)
+        {
+            commandArgs.setArgument(
+                gemm->tagScratch.at(Operations::ScratchPolicy::None),
+                ArgumentType::Value,
+                static_cast<unsigned char*>(prob.workspace));
+        }
+
+        // Use prob.Synchronizer for ScratchPolicy::ZeroedBeforeAndAfter
+        auto zeroedScratchSize = gemm->commandKernel->scratchSpaceRequired(
+            Operations::ScratchPolicy::ZeroedBeforeAndAfter, runtimeArgs);
+        if(zeroedScratchSize > 0 && prob.Synchronizer != nullptr)
+        {
+            commandArgs.setArgument(
+                gemm->tagScratch.at(Operations::ScratchPolicy::ZeroedBeforeAndAfter),
+                ArgumentType::Value,
+                static_cast<unsigned char*>(prob.Synchronizer));
+        }
     }
 
     auto runtimeArgs = commandArgs.runtimeArguments();
@@ -660,5 +673,6 @@ rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
     }
 
     gemm->commandKernel->launchKernel(runtimeArgs, prob.stream);
+
     return rocblaslt_status_success;
 }

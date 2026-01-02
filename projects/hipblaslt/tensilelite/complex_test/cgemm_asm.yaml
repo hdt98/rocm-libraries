@@ -18,12 +18,20 @@ GlobalParameters:
   # PrintTensorRef: 0x3
   # ShortNames: False
   # MergeFiles: True
+<<<<<<< HEAD
   #       - Problem-Independent: 0=0, 1=1, 2=2, 3=rand, 4=Nan, 5=Infinity, 6=BadInput(Nan), 7=BadOutput(Inf), 16=RandomNarrow,
   DataInitTypeA: 3 #12 #3
   DataInitTypeB: 3 #13 #3
   DataInitTypeC: 3 #3
   DataInitTypeAlpha: 3
   DataInitTypeBeta: 3
+=======
+  DataInitTypeA: 12 #12 #3
+  DataInitTypeB: 13 #13 #3
+  DataInitTypeC: 12 #3
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 1
+>>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
   KernelTime: True
   PrintSolutionRejectionReason: True
 
@@ -51,6 +59,7 @@ BenchmarkProblems:
       ForkParameters:
         # - StoreCInUnroll: [False]
         - MatrixInstruction:
+<<<<<<< HEAD
           - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
           # - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
           # - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
@@ -60,6 +69,16 @@ BenchmarkProblems:
         - GlobalSplitU: [1] #, 3]
         # - GlobalSplitUAlgorithm: [MultipleBuffer]
         # - StreamK: [3]
+=======
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2]
+        # - ScheduleIterAlg: [1]
+        - GlobalSplitU: [1] #, 3]
+        - StreamK: [3]
+        - ScheduleIterAlg: [1] #[1]
+        - GlobalSplitU: [1] #, 3]
+
+>>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
         - PrefetchLocalRead: [False]
         - PrefetchGlobalRead: [True]
         # - ThreadTile:
@@ -76,12 +95,19 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
+<<<<<<< HEAD
           # - Exact: [32, 32, 1, 8]
           - Exact: [16, 16, 1, 2]
           # - Exact: [2048, 2048, 1, 256] #128x128(times16)
           # - Exact: [1024, 1024, 1, 64] #64x64(times16)
           # - Exact: [512, 512, 1, 32] #32x32
           # - Exact: [64, 64, 1, 16]
+=======
+          - Exact: [32, 32, 1, 8]
+          # - Exact: [16, 16, 1, 2]
+          # - Exact: [64, 64, 1, 16]
+          # - Exact: [64, 64, 1, 128]
+>>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
           # - Exact: [4096, 4096, 1, 8192]
 
           # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
@@ -363,6 +389,7 @@ BenchmarkProblems:
   #     ComplexConjugateA: True
   #     ComplexConjugateB: True
 
+<<<<<<< HEAD
   #   - # BenchmarkProblemSizeGroup - Assembly
   #     InitialSolutionParameters:
   #     BenchmarkCommonParameters:
@@ -387,6 +414,30 @@ BenchmarkProblems:
   #         - Exact: [2048, 2048, 1, 256] #128x128(times16)
   #         - Exact: [1024, 1024, 1, 64] #64x64(times16)
   #         - Exact: [512, 512, 1, 32] #32x32
+=======
+    - # BenchmarkProblemSizeGroup - Assembly
+      # InitialSolutionParameters:
+      # BenchmarkCommonParameters:
+      #   - KernelLanguage: ["Assembly"]
+      # ForkParameters:
+      #   - MatrixInstruction:
+      #     - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+      #     - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+      #     - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+      #     - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
+      #   - ScheduleIterAlg: [1]
+      #   - GlobalSplitU: [1]
+      #   - PrefetchLocalRead: [False]
+      #   - PrefetchGlobalRead: [True]
+      #   - DepthU: [8]
+      # BenchmarkForkParameters:
+      # JoinParameters:
+      # BenchmarkJoinParameters:
+      # BenchmarkFinalParameters:
+      #   - ProblemSizes:
+      #     - Exact: [16, 16, 1, 2]
+          # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+>>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
   
 LibraryLogic:
     ScheduleName: "gfx950" #aquavanjaram for 942
