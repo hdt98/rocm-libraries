@@ -111,6 +111,20 @@ public:
         auto last_write_time         = fs::last_write_time(lockfile_path);
         auto now                     = fs::file_time_type::clock::now();
         auto age = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_write_time);
+        static fs::file_time_type last_write_seen, now_at_write;
+
+        if(now < last_write_time)
+        {
+            MIOPEN_LOG_I2("Clocks desyncronized, Lock write time is later than present < " << lockfile_path.string()
+                                                   << ", Age(ms): " << age.count());
+            if(last_write_seen != last_write_time)
+            {
+                last_write_seen = last_write_time;
+                now_at_write = now;
+            }
+            age = std::chrono::duration_cast<std::chrono::milliseconds>(now - now_at_write);
+        }
+
         if(age > timeout)
         {
             MIOPEN_LOG_I2("Removing Stale Lock < " << lockfile_path.string()
@@ -143,7 +157,7 @@ public:
                 }
                 last_refresh = fs::file_time_type::clock::now();
             }
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             auto now = fs::file_time_type::clock::now();
             age      = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_refresh);
         }
