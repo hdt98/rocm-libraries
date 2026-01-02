@@ -1791,7 +1791,7 @@ namespace TensileLite
                               << DataTypeInfo::Get(prop.dataType).abbrev << std::endl;
             }
             //mchirila: setting custom values for alpha/beta:
-            bool custom = true;
+            bool custom = false;
             if(custom){
             m_cdata[ContractionProblemGemm::CONST::ALPHA].value =  std::complex<float>(75.0, 48.0);
             // m_cdata[ContractionProblemGemm::CONST::BETA].value =  std::complex<double>(-3.0, 1.0);
