@@ -142,7 +142,7 @@ rocblas_trmvn_kernel(rocblas_int    n,
 
 #if DEVICE_GRID_YZ_16BIT
     DEVICE_GRID_SETUP
-    do
+    for(; batch < batch_count; batch += dc_YZ_grid_launch_limit)
     {
 #endif
 
@@ -155,7 +155,7 @@ rocblas_trmvn_kernel(rocblas_int    n,
             load_ptr_batch(workspace, batch, shiftw, stride_w));
 
 #if DEVICE_GRID_YZ_16BIT
-    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
+    }
 #endif
 }
 
@@ -186,7 +186,7 @@ rocblas_trmvt_kernel(rocblas_int    n,
 
 #if DEVICE_GRID_YZ_16BIT
     DEVICE_GRID_SETUP
-    do
+    for(; batch < batch_count; batch += dc_YZ_grid_launch_limit)
     {
 #endif
 
@@ -199,7 +199,7 @@ rocblas_trmvt_kernel(rocblas_int    n,
             load_ptr_batch(workspace, batch, shiftw, stride_w));
 
 #if DEVICE_GRID_YZ_16BIT
-    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
+    }
 #endif
 }
 

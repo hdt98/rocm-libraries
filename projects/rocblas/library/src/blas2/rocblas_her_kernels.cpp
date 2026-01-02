@@ -97,7 +97,7 @@ rocblas_her_kernel(bool           is_upper,
 
 #if DEVICE_GRID_YZ_16BIT
     DEVICE_GRID_SETUP
-    do
+    for(; batch < batch_count; batch += dc_YZ_grid_launch_limit)
     {
 #endif
 
@@ -117,7 +117,7 @@ rocblas_her_kernel(bool           is_upper,
         rocblas_her_kernel_calc<DIM_X>(is_upper, n, alpha, x, incx, A, lda);
 
 #if DEVICE_GRID_YZ_16BIT
-    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
+    }
 #endif
 }
 
