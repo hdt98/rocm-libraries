@@ -437,8 +437,8 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
     constexpr auto testIndividual = true;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(1);
-        strideMultiplier = GENERATE(1);
+        instrDwords      = GENERATE(4);
+        strideMultiplier = GENERATE(32);
         write            = GENERATE(false);
     }
     else

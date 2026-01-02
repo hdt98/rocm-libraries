@@ -276,7 +276,7 @@ protected:
     }
 };
 
-TEST_CASE("Weave LDS and non-zero waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Steady state weave LDS and non-zero waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     /*
     ...
@@ -471,7 +471,7 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
     if(testIndividual)
     {
         instrDwords      = GENERATE(1);
-        strideMultiplier = GENERATE(1);
+        strideMultiplier = GENERATE(4);
         write            = GENERATE(true);
     }
     else

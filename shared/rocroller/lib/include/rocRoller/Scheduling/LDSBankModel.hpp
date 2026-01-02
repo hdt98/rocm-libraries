@@ -299,8 +299,9 @@ namespace rocRoller::Scheduling::LDSBankModel
         int                m_interWaveMultiplier;
         int                m_intraSPMultiplier;
 
-        std::deque<unsigned int> m_commandQueue; // Stores completion cycles
-        std::deque<unsigned int> m_dataQueue; // Stores completion cycles
+        std::deque<unsigned int> m_commandQueue;
+        std::deque<unsigned int> m_waitcntQueue; // Includes round-trip delay
+        std::deque<unsigned int> m_dataQueue;
 
         int getRemainingDataSlots() const;
     };

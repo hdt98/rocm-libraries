@@ -99,6 +99,7 @@ namespace rocRoller::Scheduling::LDSBankModel
     {
         m_programCycle = 0;
         m_commandQueue.clear();
+        m_waitcntQueue.clear();
         m_dataQueue.clear();
     }
 
@@ -149,10 +150,10 @@ namespace rocRoller::Scheduling::LDSBankModel
     {
         int stallCycles = 0;
 
-        if(waitcnt >= 0 && m_commandQueue.size() > static_cast<size_t>(waitcnt))
+        if(waitcnt >= 0 && m_waitcntQueue.size() > static_cast<size_t>(waitcnt))
         {
-            const auto commandsToWaitFor   = m_commandQueue.size() - static_cast<size_t>(waitcnt);
-            const auto waitCompletionCycle = m_commandQueue[commandsToWaitFor - 1];
+            const auto commandsToWaitFor   = m_waitcntQueue.size() - static_cast<size_t>(waitcnt);
+            const auto waitCompletionCycle = m_waitcntQueue[commandsToWaitFor - 1];
             stallCycles = (static_cast<int>(waitCompletionCycle) - m_programCycle);
         }
 
@@ -175,24 +176,34 @@ namespace rocRoller::Scheduling::LDSBankModel
                         "Expected queue space to be accounted for in predict function and passed "
                         "through to total cycles calculation.");
 
-            auto base = m_commandQueue.empty() ? (m_programCycle + 40) : (m_commandQueue.back());
+            auto cmdBase = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
+            auto waitcntBase
+                = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
 
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
-                // tuned for ds_write_b32 only
                 if(m_commandQueue.empty())
                 {
-                    base += dataCycles;
+                    cmdBase += dataCycles;
                 }
                 else
                 {
-                    base += std::max(8, dataCycles);
+                    cmdBase += std::max(8, dataCycles);
+                }
+                if(m_waitcntQueue.empty())
+                {
+                    waitcntBase += dataCycles;
+                }
+                else
+                {
+                    waitcntBase += std::max(8, dataCycles);
                 }
 
-                m_commandQueue.push_back(base);
+                m_commandQueue.push_back(cmdBase);
+                m_waitcntQueue.push_back(waitcntBase);
                 for(int j = 0; j < requiredSlots; ++j)
                 {
-                    m_dataQueue.push_back(base);
+                    m_dataQueue.push_back(cmdBase);
                 }
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
@@ -200,24 +211,22 @@ namespace rocRoller::Scheduling::LDSBankModel
                 AssertFatal(requiredSlots == 1,
                             ShowValue(requiredSlots)); // read shouldn't use data queue slots
 
-                if(m_commandQueue.empty())
-                {
-                    base += dataCycles;
-                }
-                else
-                {
-                    base += dataCycles;
-                }
-                m_commandQueue.push_back(base);
-                m_dataQueue.push_back(base);
+                cmdBase += dataCycles;
+                waitcntBase += dataCycles;
+                m_commandQueue.push_back(cmdBase);
+                m_waitcntQueue.push_back(waitcntBase);
+                m_dataQueue.push_back(cmdBase);
             }
         }
 
         const auto cmdQueueStr
             = fmt::format("{}", fmt::join(m_commandQueue.begin(), m_commandQueue.end(), ", "));
+        const auto waitcntQueueStr
+            = fmt::format("{}", fmt::join(m_waitcntQueue.begin(), m_waitcntQueue.end(), ", "));
         const auto dataQueueStr
             = fmt::format("{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", "));
         Log::info("LdsScheduler {}: scheduled ds_{}_b{}, dataCycles {}, command queue cycles [{}], "
+                  "waitcnt queue [{}],"
                   "data queue "
                   "cycles [{}]",
                   m_programCycle,
@@ -225,6 +234,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                   instr.dwords * 32,
                   getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier(),
                   cmdQueueStr,
+                  waitcntQueueStr,
                   dataQueueStr);
     }
 
@@ -233,6 +243,10 @@ namespace rocRoller::Scheduling::LDSBankModel
         while(!m_commandQueue.empty() && static_cast<int>(m_commandQueue.front()) <= m_programCycle)
         {
             m_commandQueue.pop_front();
+        }
+        while(!m_waitcntQueue.empty() && static_cast<int>(m_waitcntQueue.front()) <= m_programCycle)
+        {
+            m_waitcntQueue.pop_front();
         }
         while(!m_dataQueue.empty() && static_cast<int>(m_dataQueue.front()) <= m_programCycle)
         {
