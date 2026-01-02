@@ -163,24 +163,20 @@ TEST_CASE("Weave multiple LDS and waitcnt", "[rocprofiler][scheduler][lds-model]
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
-    const auto name = fmt::format("lds_weave_multiple_{}_b{}_stride{}",
-                                  write ? "write" : "read",
-                                  instrDwords * 32,
-                                  strideMultiplier);
-
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, name);
+    auto context = TestContext::ForTestDevice({}, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
         SKIP("Currently only testing on gfx950");
     }
 
-    SECTION(name)
+    LDSWaitcntWeaveKernel kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
+
+    SECTION(kernel.getSectionName())
     {
-        LDSWaitcntWeaveKernel kernel(
-            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
         INFO(result.infoStr);
@@ -330,24 +326,20 @@ TEST_CASE("Steady state weave LDS and non-zero waitcnt", "[rocprofiler][schedule
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
-    const auto name = fmt::format("lds_weave_multiple_{}_b{}_stride{}",
-                                  write ? "write" : "read",
-                                  instrDwords * 32,
-                                  strideMultiplier);
-
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, name);
+    auto context = TestContext::ForTestDevice({}, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
         SKIP("Currently only testing on gfx950");
     }
 
-    SECTION(name)
+    WeaveLdsAndNonzeroWaitcnt kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
+
+    SECTION(kernel.getSectionName())
     {
-        WeaveLdsAndNonzeroWaitcnt kernel(
-            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
         INFO(result.infoStr);
@@ -483,24 +475,20 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
-    const auto name = fmt::format("lds_weave_zero_waitcnt_{}_b{}_stride{}",
-                                  write ? "write" : "read",
-                                  instrDwords * 32,
-                                  strideMultiplier);
-
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, name);
+    auto context = TestContext::ForTestDevice({}, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
         SKIP("Currently only testing on gfx950");
     }
 
-    SECTION(name)
+    WeaveLdsAndWaitcntZeroNoSaturation kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
+
+    SECTION(kernel.getSectionName())
     {
-        WeaveLdsAndWaitcntZeroNoSaturation kernel(
-            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
         INFO(result.infoStr);

@@ -126,6 +126,12 @@ namespace rocRoller
         return m_instructions;
     }
 
+    std::string LDSTestKernelBase::getSectionName() const
+    {
+        return fmt::format(
+            "{} b{} stride{}", m_write ? "write" : "read", m_instrDwords * 32, m_strideMultiplier);
+    }
+
     void LDSTestKernelBase::generate()
     {
         auto k = m_context->kernel();

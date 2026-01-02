@@ -92,6 +92,8 @@ namespace rocRoller
 
         const std::vector<Instruction>& getInstructions() const;
 
+        std::string getSectionName() const;
+
     protected:
         virtual void generate() override;
 

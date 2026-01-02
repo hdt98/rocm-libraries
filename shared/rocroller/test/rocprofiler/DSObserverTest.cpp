@@ -133,31 +133,20 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
-    const auto name = fmt::format("lds_weave_waitcnt_{}_b{}_stride{}",
-                                  write ? "write" : "read",
-                                  instrDwords * 32,
-                                  strideMultiplier);
-
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, name);
+    auto context = TestContext::ForTestDevice({}, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
         SKIP("Currently only testing on gfx950");
     }
 
-    SECTION(name)
-    {
-        CAPTURE(name);
+    LDSWaitcntTestKernel kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write, iters);
 
-        LDSWaitcntTestKernel kernel(context.get(),
-                                    workgroupSize,
-                                    instrDwords,
-                                    strideMultiplier,
-                                    baseAddresses,
-                                    write,
-                                    iters);
+    SECTION(kernel.getSectionName())
+    {
 
         auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
         const auto& filteredInstructions = result.filteredInstructions;
@@ -318,22 +307,20 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
-    const auto name = fmt::format(
-        "lds_weave_{}_b{}_stride{}", write ? "write" : "read", instrDwords * 32, strideMultiplier);
-
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, name);
+    auto context = TestContext::ForTestDevice({}, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
         SKIP("Currently only testing on gfx950");
     }
 
-    SECTION(name)
+    LDSArithmeticWeaveTestKernel kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
+
+    SECTION(kernel.getSectionName())
     {
-        LDSArithmeticWeaveTestKernel kernel(
-            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
         const auto& filteredInstructions = result.filteredInstructions;
@@ -450,22 +437,20 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
-    const auto name = fmt::format(
-        "lds_weave_{}_b{}_stride{}", write ? "write" : "read", instrDwords * 32, strideMultiplier);
-
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, name);
+    auto context = TestContext::ForTestDevice({}, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
         SKIP("Currently only testing on gfx950");
     }
 
-    SECTION(name)
+    JustLdsInstructions kernel(
+        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
+
+    SECTION(kernel.getSectionName())
     {
-        JustLdsInstructions kernel(
-            context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
         auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
         const auto& filteredInstructions = result.filteredInstructions;
