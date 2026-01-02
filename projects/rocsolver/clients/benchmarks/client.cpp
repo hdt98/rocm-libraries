@@ -635,9 +635,8 @@ try
 
         ("norm_type",
          value<char>()->default_value('M'),
-            "1 = one-norm, F = Frobenius, I = infinity-norm, M = max element.\n"
+            "1 (or O) = one-norm, F = Frobenius, I = infinity-norm, M = max element.\n"
             "                           Specifies which matrix norm to compute.\n"
-            "                           Only applicable to lange.\n"
             "                           ")
 
         ("uplo",

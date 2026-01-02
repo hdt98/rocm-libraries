@@ -477,16 +477,13 @@ constexpr rocsolver_rfinfo_mode char2rocsolver_rfinfo_mode(char value)
 
 constexpr rocsolver_norm_type char2rocsolver_norm_type(char value)
 {
-    switch(value)
+    switch(std::toupper(value))
     {
     case 'O':
     case '1': return rocsolver_norm_type_one;
-    case 'F':
-    case 'f': return rocsolver_norm_type_frobenius;
-    case 'I':
-    case 'i': return rocsolver_norm_type_infinity;
-    case 'M':
-    case 'm': return rocsolver_norm_type_max;
+    case 'F': return rocsolver_norm_type_frobenius;
+    case 'I': return rocsolver_norm_type_infinity;
+    case 'M': return rocsolver_norm_type_max;
     default: return static_cast<rocsolver_norm_type>(0);
     }
 }
