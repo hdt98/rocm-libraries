@@ -65,7 +65,8 @@ __device__ __host__ inline bool rocblas_isnan(T)
 template <typename T,
           std::enable_if_t<!std::is_integral<T>{} && !rocblas_is_complex<T>
                                && !std::is_same_v<T, rocblas_half> && !std::is_same_v<T, rocblas_bfloat16>,
-                           int> = 0>
+                           int>
+          = 0>
 __device__ __host__ inline bool rocblas_isnan(T arg)
 {
     return std::isnan(arg);
@@ -82,7 +83,7 @@ __device__ __host__ inline bool rocblas_isnan(rocblas_half arg)
     union
     {
         rocblas_half fp;
-        uint16_t     data;
+        uint16_t data;
     } x = {arg};
     // NaN if exponent is all 1s and mantissa is non-zero (IEEE 754 half)
     return (~x.data & 0x7c00) == 0 && (x.data & 0x03ff) != 0;
@@ -106,7 +107,8 @@ __device__ __host__ inline T rocblas_max_nan(T x, T y)
 template <typename T,
           std::enable_if_t<!std::is_integral<T>{} && !rocblas_is_complex<T>
                                && !std::is_same_v<T, rocblas_half> && !std::is_same_v<T, rocblas_bfloat16>,
-                           int> = 0>
+                           int>
+          = 0>
 __device__ __host__ inline T rocblas_max_nan(T x, T y)
 {
     return (rocblas_isnan(y) || y >= x) ? y : x;
