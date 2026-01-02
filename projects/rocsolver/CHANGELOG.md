@@ -25,7 +25,7 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Added
 
-* Compute the norm of a matrix for the following routines:
+* Compute the norm of a matrix using the following routines:
     * LANGE
     * LANGE_64
 
