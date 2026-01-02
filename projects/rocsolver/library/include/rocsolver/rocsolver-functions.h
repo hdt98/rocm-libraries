@@ -259,7 +259,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlacgv_64(rocblas_handle handle,
     lda         rocblas_int. lda >= m.
                 The leading dimension of A.
     @param[out]
-    norms       pointer to real type. Scalar on the GPU.
+    norm       pointer to real type. Scalar on the GPU.
                 The computed norm of the matrix A.
     *************************************************************************/
 
@@ -269,7 +269,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_slange(rocblas_handle handle,
                                                  const rocblas_int n,
                                                  float* A,
                                                  const rocblas_int lda,
-                                                 float* norms);
+                                                 float* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dlange(rocblas_handle handle,
                                                  const rocsolver_norm_type norm_type,
@@ -277,7 +277,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_dlange(rocblas_handle handle,
                                                  const rocblas_int n,
                                                  double* A,
                                                  const rocblas_int lda,
-                                                 double* norms);
+                                                 double* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_clange(rocblas_handle handle,
                                                  const rocsolver_norm_type norm_type,
@@ -285,7 +285,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_clange(rocblas_handle handle,
                                                  const rocblas_int n,
                                                  rocblas_float_complex* A,
                                                  const rocblas_int lda,
-                                                 float* norms);
+                                                 float* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zlange(rocblas_handle handle,
                                                  const rocsolver_norm_type norm_type,
@@ -293,7 +293,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange(rocblas_handle handle,
                                                  const rocblas_int n,
                                                  rocblas_double_complex* A,
                                                  const rocblas_int lda,
-                                                 double* norms);
+                                                 double* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_slange_64(rocblas_handle handle,
                                                     const rocsolver_norm_type norm_type,
@@ -301,7 +301,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_slange_64(rocblas_handle handle,
                                                     const int64_t n,
                                                     float* A,
                                                     const int64_t lda,
-                                                    float* norms);
+                                                    float* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dlange_64(rocblas_handle handle,
                                                     const rocsolver_norm_type norm_type,
@@ -309,7 +309,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_dlange_64(rocblas_handle handle,
                                                     const int64_t n,
                                                     double* A,
                                                     const int64_t lda,
-                                                    double* norms);
+                                                    double* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_clange_64(rocblas_handle handle,
                                                     const rocsolver_norm_type norm_type,
@@ -317,7 +317,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_clange_64(rocblas_handle handle,
                                                     const int64_t n,
                                                     rocblas_float_complex* A,
                                                     const int64_t lda,
-                                                    float* norms);
+                                                    float* norm);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
                                                     const rocsolver_norm_type norm_type,
@@ -325,7 +325,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
                                                     const int64_t n,
                                                     rocblas_double_complex* A,
                                                     const int64_t lda,
-                                                    double* norms);
+                                                    double* norm);
 //! @}
 
 /*! @{
