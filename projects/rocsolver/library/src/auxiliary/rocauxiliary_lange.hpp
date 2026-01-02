@@ -220,24 +220,24 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     S norm_one = 0;
     for(I i = tid; i < m; i += LANGE_THDS)
     {
-        norm_one = std::max(norm_one, row_sums_block[i]);
+        norm_one = rocblas_max_nan(norm_one, row_sums_block[i]);
     }
 
     // reduce to find max
-    norm_one = std::max(norm_one, shift_left(norm_one, 1));
-    norm_one = std::max(norm_one, shift_left(norm_one, 2));
-    norm_one = std::max(norm_one, shift_left(norm_one, 4));
-    norm_one = std::max(norm_one, shift_left(norm_one, 8));
-    norm_one = std::max(norm_one, shift_left(norm_one, 16));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 1));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 2));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 4));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 8));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 16));
     if(warpSize > 32)
-        norm_one = std::max(norm_one, shift_left(norm_one, 32));
+        norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 32));
     if(tid % warpSize == 0)
         sval[tid / warpSize] = norm_one;
     __syncthreads();
     if(tid == 0)
     {
         for(I k = 1; k < LANGE_THDS / warpSize; k++)
-            norm_one = std::max(norm_one, sval[k]);
+            norm_one = rocblas_max_nan(norm_one, sval[k]);
         final_norms[bid] = norm_one;
     }
 }
@@ -318,24 +318,24 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     S norm_one = 0;
     for(I i = tid; i < n; i += LANGE_THDS)
     {
-        norm_one = std::max(norm_one, col_sums_block[i]);
+        norm_one = rocblas_max_nan(norm_one, col_sums_block[i]);
     }
 
     // reduce to find max
-    norm_one = std::max(norm_one, shift_left(norm_one, 1));
-    norm_one = std::max(norm_one, shift_left(norm_one, 2));
-    norm_one = std::max(norm_one, shift_left(norm_one, 4));
-    norm_one = std::max(norm_one, shift_left(norm_one, 8));
-    norm_one = std::max(norm_one, shift_left(norm_one, 16));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 1));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 2));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 4));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 8));
+    norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 16));
     if(warpSize > 32)
-        norm_one = std::max(norm_one, shift_left(norm_one, 32));
+        norm_one = rocblas_max_nan(norm_one, shift_left(norm_one, 32));
     if(tid % warpSize == 0)
         sval[tid / warpSize] = norm_one;
     __syncthreads();
     if(tid == 0)
     {
         for(I k = 1; k < LANGE_THDS / warpSize; k++)
-            norm_one = std::max(norm_one, sval[k]);
+            norm_one = rocblas_max_nan(norm_one, sval[k]);
         final_norms[bid] = norm_one;
     }
 }
@@ -374,24 +374,24 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
         {
             int row = i % m;
             int col = i / m;
-            block_max = std::max(block_max, rocblas_abs(a[row + col * lda]));
+            block_max = rocblas_max_nan(block_max, rocblas_abs(a[row + col * lda]));
         }
 
         // reduce to get block max
-        block_max = std::max(block_max, shift_left(block_max, 1));
-        block_max = std::max(block_max, shift_left(block_max, 2));
-        block_max = std::max(block_max, shift_left(block_max, 4));
-        block_max = std::max(block_max, shift_left(block_max, 8));
-        block_max = std::max(block_max, shift_left(block_max, 16));
+        block_max = rocblas_max_nan(block_max, shift_left(block_max, 1));
+        block_max = rocblas_max_nan(block_max, shift_left(block_max, 2));
+        block_max = rocblas_max_nan(block_max, shift_left(block_max, 4));
+        block_max = rocblas_max_nan(block_max, shift_left(block_max, 8));
+        block_max = rocblas_max_nan(block_max, shift_left(block_max, 16));
         if(warpSize > 32)
-            block_max = std::max(block_max, shift_left(block_max, 32));
+            block_max = rocblas_max_nan(block_max, shift_left(block_max, 32));
         if(tid % warpSize == 0)
             sval[tid / warpSize] = block_max;
         __syncthreads();
         if(tid == 0)
         {
             for(I k = 1; k < LANGE_FROBENIUS_MAX_BDIM / warpSize; k++)
-                block_max = std::max(block_max, sval[k]);
+                block_max = rocblas_max_nan(block_max, sval[k]);
             block_maxs_block[block_id] = block_max;
         }
         __syncthreads();
@@ -423,24 +423,24 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     S norm_max = 0;
     for(I i = tid; i < blocks; i += LANGE_FROBENIUS_MAX_BDIM)
     {
-        norm_max = std::max(norm_max, block_max[i]);
+        norm_max = rocblas_max_nan(norm_max, block_max[i]);
     }
 
     // reduce to find max
-    norm_max = std::max(norm_max, shift_left(norm_max, 1));
-    norm_max = std::max(norm_max, shift_left(norm_max, 2));
-    norm_max = std::max(norm_max, shift_left(norm_max, 4));
-    norm_max = std::max(norm_max, shift_left(norm_max, 8));
-    norm_max = std::max(norm_max, shift_left(norm_max, 16));
+    norm_max = rocblas_max_nan(norm_max, shift_left(norm_max, 1));
+    norm_max = rocblas_max_nan(norm_max, shift_left(norm_max, 2));
+    norm_max = rocblas_max_nan(norm_max, shift_left(norm_max, 4));
+    norm_max = rocblas_max_nan(norm_max, shift_left(norm_max, 8));
+    norm_max = rocblas_max_nan(norm_max, shift_left(norm_max, 16));
     if(warpSize > 32)
-        norm_max = std::max(norm_max, shift_left(norm_max, 32));
+        norm_max = rocblas_max_nan(norm_max, shift_left(norm_max, 32));
     if(tid % warpSize == 0)
         sval[tid / warpSize] = norm_max;
     __syncthreads();
     if(tid == 0)
     {
         for(I k = 1; k < LANGE_FROBENIUS_MAX_BDIM / warpSize; k++)
-            norm_max = std::max(norm_max, sval[k]);
+            norm_max = rocblas_max_nan(norm_max, sval[k]);
         final_norms[bid] = norm_max;
     }
 }
