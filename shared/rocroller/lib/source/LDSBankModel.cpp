@@ -211,13 +211,13 @@ namespace rocRoller::Scheduling::LDSBankModel
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
-                auto cmdBase = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
+                auto cmdBase = m_commandQueue.empty() ? (m_programCycle + dataCycles + 4)
+                                                      : (m_commandQueue.back() + dataCycles);
                 auto waitcntBase
                     = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
                 AssertFatal(requiredSlots == 1,
-                            ShowValue(requiredSlots)); // read shouldn't use data queue slots
+                            ShowValue(requiredSlots)); // read should only need 1 slot
 
-                cmdBase += dataCycles;
                 waitcntBase += dataCycles;
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase);

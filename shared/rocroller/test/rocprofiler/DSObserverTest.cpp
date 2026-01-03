@@ -138,14 +138,14 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
     constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(4);
-        strideMultiplier = GENERATE(4);
-        write            = GENERATE(false);
+        instrDwords      = 4;
+        strideMultiplier = 4;
+        write            = false;
     }
     else
     {
         instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8);
+        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
         write            = GENERATE(true, false);
     }
 
@@ -224,6 +224,12 @@ protected:
 
 TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][gpu]")
 {
+    // Expect 562 passed : 48 failed
+    /*
+    ds_read_b128 v[4:7], v1, model 4, profiler 4, delta 0
+    ds_read_b128 v[8:11], v1, model 4, profiler 4, delta 0
+    ... 32 times
+    */
     using namespace Scheduling::LDSBankModel;
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
@@ -237,14 +243,14 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][
     constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(4);
-        strideMultiplier = GENERATE(32);
-        write            = GENERATE(false);
+        instrDwords      = 4;
+        strideMultiplier = 32;
+        write            = false;
     }
     else
     {
         instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8);
+        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
         write            = GENERATE(true, false);
     }
 
@@ -265,7 +271,8 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][
     SECTION(kernel.getSectionName())
     {
 
-        auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
@@ -276,7 +283,12 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
-        // TODO: add CHECK
-        CHECK(false);
+        // More errors for high stride
+        if(true || strideMultiplier <= 4)
+        {
+            CHECK(analysis.totalAbsoluteDelta == 0);
+            CHECK(analysis.totalDelta == 0);
+            CHECK(analysis.incorrectPredictionCount == 0);
+        }
     }
 }

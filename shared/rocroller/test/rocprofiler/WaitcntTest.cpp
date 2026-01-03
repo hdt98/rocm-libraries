@@ -137,14 +137,14 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-mode
     constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(2);
-        strideMultiplier = GENERATE(4);
-        write            = GENERATE(true);
+        instrDwords      = 2;
+        strideMultiplier = 4;
+        write            = true;
     }
     else
     {
         instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8);
+        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
         write            = GENERATE(true, false);
     }
 
@@ -270,14 +270,14 @@ TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds
     constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(4);
-        strideMultiplier = GENERATE(4);
-        write            = GENERATE(false);
+        instrDwords      = 4;
+        strideMultiplier = 4;
+        write            = false;
     }
     else
     {
         instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8);
+        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
         write            = GENERATE(true, false);
     }
 
@@ -407,9 +407,9 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
     constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(1);
-        strideMultiplier = GENERATE(4);
-        write            = GENERATE(true);
+        instrDwords      = 1;
+        strideMultiplier = 4;
+        write            = true;
     }
     else
     {
