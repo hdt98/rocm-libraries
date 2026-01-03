@@ -164,24 +164,22 @@ namespace rocRoller::Scheduling::LDSBankModel
     {
         updateQueues();
 
+        int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
+        int dataCycles = getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier();
+
         for(int i = 0; i < getIntraSPConflictMultiplier(); ++i)
         {
-            int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
-
-            int dataCycles
-                = getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier();
-
             AssertFatal(getRemainingDataSlots() >= requiredSlots
                             && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
                         "Expected queue space to be accounted for in predict function and passed "
                         "through to total cycles calculation.");
 
-            auto cmdBase = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
-            auto waitcntBase
-                = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
-
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
+                auto cmdBase = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
+                auto waitcntBase
+                    = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
+
                 if(m_commandQueue.empty())
                 {
                     cmdBase += dataCycles;
@@ -200,14 +198,22 @@ namespace rocRoller::Scheduling::LDSBankModel
                 }
 
                 m_commandQueue.push_back(cmdBase);
-                m_waitcntQueue.push_back(waitcntBase);
-                for(int j = 0; j < requiredSlots; ++j)
+                m_waitcntQueue.push_back(waitcntBase
+                                         + getInstructionIssueCycles(instr.memoryOp, instr.dwords));
                 {
-                    m_dataQueue.push_back(cmdBase);
+                    auto const base
+                        = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
+                    for(int j = 0; j < requiredSlots; ++j)
+                    {
+                        m_dataQueue.push_back(base + i * 2 * dataCycles);
+                    }
                 }
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
+                auto cmdBase = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
+                auto waitcntBase
+                    = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
                 AssertFatal(requiredSlots == 1,
                             ShowValue(requiredSlots)); // read shouldn't use data queue slots
 
@@ -225,17 +231,19 @@ namespace rocRoller::Scheduling::LDSBankModel
             = fmt::format("{}", fmt::join(m_waitcntQueue.begin(), m_waitcntQueue.end(), ", "));
         const auto dataQueueStr
             = fmt::format("{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", "));
-        Log::info("LdsScheduler {}: scheduled ds_{}_b{}, dataCycles {}, command queue cycles [{}], "
-                  "waitcnt queue [{}],"
-                  "data queue "
-                  "cycles [{}]",
+        Log::info("LdsScheduler {}: scheduled ds_{}_b{}, dataCycles {}, "
+                  "issue cycles {}, "
+                  "command queue cycles [{}], "
+                  "data queue [{}], "
+                  "waitcnt queue [{}]",
                   m_programCycle,
                   instr.memoryOp.direction == LdsDirection::Read ? "read" : "write",
                   instr.dwords * 32,
-                  getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier(),
+                  dataCycles,
+                  getInstructionIssueCycles(instr.memoryOp, instr.dwords),
                   cmdQueueStr,
-                  waitcntQueueStr,
-                  dataQueueStr);
+                  dataQueueStr,
+                  waitcntQueueStr);
     }
 
     void LDSScheduler::updateQueues()

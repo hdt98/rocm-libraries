@@ -186,6 +186,33 @@ namespace rocRoller
         m_context->schedule(k->amdgpu_metadata());
     }
 
+    LatencyAnalysisResult
+        analyzeLatencyDeltas(const std::vector<Instruction>& filteredInstructions,
+                             const std::vector<std::tuple<std::string, size_t>>& medianLatencies)
+    {
+        LatencyAnalysisResult result = {0, 0, 0};
+
+        // Skip the last instruction (s_endpgm)
+        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i)
+        {
+            const auto& inst = filteredInstructions[i];
+
+            int modelLatency  = inst.totalCycles() * 4;
+            int actualLatency = std::get<1>(medianLatencies[i]);
+            int delta         = actualLatency - modelLatency;
+
+            result.totalDelta += delta;
+            result.totalAbsoluteDelta += std::abs(delta);
+
+            if(delta != 0)
+            {
+                result.incorrectPredictionCount++;
+            }
+        }
+
+        return result;
+    }
+
     KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
                                                       LDSTestKernelBase& kernel,
                                                       bool               testIndividual)

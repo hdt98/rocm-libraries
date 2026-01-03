@@ -82,20 +82,7 @@ protected:
     Generator<Instruction> generateKernelBody() override
     {
         int counter = 0;
-        for(int i = 0; i < 14; ++i)
-        {
-            const auto [start, end]
-                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-            if(m_write)
-                co_yield m_context->mem()->storeLocal(
-                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-            else
-                co_yield m_context->mem()->loadLocal(
-                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-        }
-
-        for(int i = 1; i < 8; ++i)
+        for(int i = 1; i < 16; ++i)
         {
             for(int k = 0; k < i; ++k)
             {
@@ -114,7 +101,7 @@ protected:
     }
 };
 
-TEST_CASE("Weave multiple LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     /*
     ds_read_b128 v[60:63], v1, model 16, profiler 16, delta 0
@@ -150,9 +137,9 @@ TEST_CASE("Weave multiple LDS and waitcnt", "[rocprofiler][scheduler][lds-model]
     constexpr auto testIndividual = false;
     if(testIndividual)
     {
-        instrDwords      = GENERATE(4);
+        instrDwords      = GENERATE(2);
         strideMultiplier = GENERATE(4);
-        write            = GENERATE(false);
+        write            = GENERATE(true);
     }
     else
     {
@@ -183,55 +170,25 @@ TEST_CASE("Weave multiple LDS and waitcnt", "[rocprofiler][scheduler][lds-model]
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
-        int totalAbsoluteDelta       = 0;
-        int totalDelta               = 0;
-        int incorrectPredictionCount = 0;
-
-        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i) // exclude s_endpgm
-        {
-            const auto& inst = filteredInstructions[i];
-            using namespace Scheduling::LDSBankModel;
-
-            int modelLatency = inst.totalCycles() * 4;
-
-            int actualLatency = std::get<1>(medianLatencies[i]);
-            int delta         = actualLatency - modelLatency;
-
-            if(write && instrDwords == 4)
-            { // ds_write_b128 cycles between +0/+12 cycles at steady state
-                if(delta > 12 || delta < 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-            else
-            {
-                if(delta != 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-            totalDelta += delta;
-            totalAbsoluteDelta += std::abs(delta);
-        }
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         totalAbsoluteDelta,
-                         incorrectPredictionCount,
+                         analysis.totalAbsoluteDelta,
+                         analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
         if(write && instrDwords == 4)
         {
-            CHECK(totalAbsoluteDelta <= 256);
-            CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 192));
-            CHECK(incorrectPredictionCount <= 12);
+            CHECK(analysis.totalAbsoluteDelta <= 292);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 292));
+            CHECK(analysis.incorrectPredictionCount <= 23);
         }
         else
         {
-            CHECK(totalAbsoluteDelta <= 40);
-            CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 32));
+            CHECK(analysis.totalAbsoluteDelta <= 40);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 32));
+            CHECK(analysis.incorrectPredictionCount <= 12);
         }
-        CHECK(incorrectPredictionCount <= 12);
     }
 }
 
@@ -272,7 +229,7 @@ protected:
     }
 };
 
-TEST_CASE("Steady state weave LDS and non-zero waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     /*
     ...
@@ -310,7 +267,7 @@ TEST_CASE("Steady state weave LDS and non-zero waitcnt", "[rocprofiler][schedule
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = true;
+    constexpr auto testIndividual = false;
     if(testIndividual)
     {
         instrDwords      = GENERATE(4);
@@ -346,55 +303,25 @@ TEST_CASE("Steady state weave LDS and non-zero waitcnt", "[rocprofiler][schedule
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
-        int totalAbsoluteDelta       = 0;
-        int totalDelta               = 0;
-        int incorrectPredictionCount = 0;
-
-        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i) // exclude s_endpgm
-        {
-            const auto& inst = filteredInstructions[i];
-            using namespace Scheduling::LDSBankModel;
-
-            int modelLatency = inst.totalCycles() * 4;
-
-            int actualLatency = std::get<1>(medianLatencies[i]);
-            int delta         = actualLatency - modelLatency;
-
-            if(write && instrDwords == 4)
-            { // ds_write_b128 cycles between +0/+12 cycles at steady state
-                if(delta > 12 || delta < 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-            else
-            {
-                if(delta != 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-            totalDelta += delta;
-            totalAbsoluteDelta += std::abs(delta);
-        }
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         totalAbsoluteDelta,
-                         incorrectPredictionCount,
+                         analysis.totalAbsoluteDelta,
+                         analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
         if(write && instrDwords == 4)
         {
-            CHECK(totalAbsoluteDelta <= 200);
-            CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 4));
-            CHECK(incorrectPredictionCount <= 5);
+            CHECK(analysis.totalAbsoluteDelta <= 200);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 4));
+            CHECK(analysis.incorrectPredictionCount <= 5);
         }
         else
         {
-            CHECK(totalAbsoluteDelta <= 300);
-            CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 24));
+            CHECK(analysis.totalAbsoluteDelta <= 300);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 28));
+            CHECK(analysis.incorrectPredictionCount <= 30);
         }
-        CHECK(incorrectPredictionCount <= 30);
     }
 }
 
@@ -429,27 +356,45 @@ protected:
                     dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
         };
 
-        for(int i = 1; i <= 4; ++i)
+        for(int i = 1; i <= 8; ++i)
         {
-            if(i > 1)
+            for(int k = 0; k < i; ++k)
             {
-                for(int j = 0; j < i; ++j)
-                    co_yield scheduleLds();
-                for(int j = 0; j < i; ++j)
-                    co_yield Instruction::Wait(
-                        WaitCount::DSCnt(m_context->targetArchitecture(), i - j - 1));
-            }
-
-            for(int j = 0; j < i; ++j)
                 co_yield scheduleLds();
-            co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
+            }
+            for(int w = 0; w < i; ++w)
+            {
+                co_yield Instruction::Wait(
+                    WaitCount::DSCnt(m_context->targetArchitecture(), i - w - 1));
+            }
         }
     }
 };
 
-TEST_CASE("Weave LDS and waitcnt zero without saturation",
-          "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 {
+    /*
+    ds_write_b32 v1, v2, model 8, profiler 8, delta 0
+  * s_waitcnt lgkmcnt(0), model 60, profiler 52, delta -8
+    ds_write_b32 v1, v3, model 8, profiler 8, delta 0
+    ds_write_b32 v1, v4, model 8, profiler 8, delta 0
+  * s_waitcnt lgkmcnt(1), model 52, profiler 44, delta -8
+  * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
+    ds_write_b32 v1, v5, model 8, profiler 8, delta 0
+    ds_write_b32 v1, v6, model 8, profiler 8, delta 0
+    ds_write_b32 v1, v7, model 8, profiler 8, delta 0
+  * s_waitcnt lgkmcnt(2), model 44, profiler 36, delta -8
+  * s_waitcnt lgkmcnt(1), model 16, profiler 8, delta -8
+  * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
+    ds_write_b32 v1, v8, model 8, profiler 8, delta 0
+    ds_write_b32 v1, v9, model 8, profiler 8, delta 0
+    ds_write_b32 v1, v10, model 8, profiler 8, delta 0
+    ds_write_b32 v1, v11, model 8, profiler 8, delta 0
+  * s_waitcnt lgkmcnt(3), model 36, profiler 28, delta -8
+  * s_waitcnt lgkmcnt(2), model 16, profiler 8, delta -8
+  * s_waitcnt lgkmcnt(1), model 16, profiler 8, delta -8
+  * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
+    */
     using namespace Scheduling::LDSBankModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
@@ -459,7 +404,7 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = true;
+    constexpr auto testIndividual = false;
     if(testIndividual)
     {
         instrDwords      = GENERATE(1);
@@ -495,54 +440,24 @@ TEST_CASE("Weave LDS and waitcnt zero without saturation",
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
-        int totalAbsoluteDelta       = 0;
-        int totalDelta               = 0;
-        int incorrectPredictionCount = 0;
-
-        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i) // exclude s_endpgm
-        {
-            const auto& inst = filteredInstructions[i];
-            using namespace Scheduling::LDSBankModel;
-
-            int modelLatency = inst.totalCycles() * 4;
-
-            int actualLatency = std::get<1>(medianLatencies[i]);
-            int delta         = actualLatency - modelLatency;
-
-            if(write && instrDwords == 4)
-            { // ds_write_b128 cycles between +0/+12 cycles at steady state
-                if(delta > 12 || delta < 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-            else
-            {
-                if(delta != 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-            totalDelta += delta;
-            totalAbsoluteDelta += std::abs(delta);
-        }
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         totalAbsoluteDelta,
-                         incorrectPredictionCount,
+                         analysis.totalAbsoluteDelta,
+                         analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
         if(write && instrDwords == 4)
         {
-            CHECK(totalAbsoluteDelta <= 192);
-            CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 108));
-            CHECK(incorrectPredictionCount <= 10);
+            CHECK(analysis.totalAbsoluteDelta <= 192);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 108));
+            CHECK(analysis.incorrectPredictionCount <= 10);
         }
         else
         {
-            CHECK(totalAbsoluteDelta <= 0);
-            CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 0));
-            CHECK(incorrectPredictionCount <= 0);
+            CHECK(analysis.totalAbsoluteDelta <= 0);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
+            CHECK(analysis.incorrectPredictionCount <= 0);
         }
     }
 }

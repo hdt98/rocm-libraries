@@ -63,162 +63,6 @@ using namespace rocRoller;
 
 const int NUM_RUNS = 5; // Should be odd, as median is used
 
-class LDSWaitcntTestKernel : public LDSTestKernelBase
-{
-public:
-    LDSWaitcntTestKernel(ContextPtr                 context,
-                         uint32_t                   workgroupSize,
-                         size_t                     instrDwords,
-                         size_t                     strideMultiplier,
-                         const std::vector<size_t>& baseAddresses,
-                         bool                       write,
-                         int                        iterations = 8)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
-        , m_iterations(iterations)
-    {
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
-    {
-        int counter = 0;
-        for(int i = 0; i < m_iterations; ++i)
-        {
-            const auto [start, end]
-                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-
-            if(m_write)
-                co_yield m_context->mem()->storeLocal(
-                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-            else
-                co_yield m_context->mem()->loadLocal(
-                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-
-            co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
-        }
-    }
-
-private:
-    int m_iterations;
-};
-
-TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
-{
-    using namespace Scheduling::LDSBankModel;
-
-    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
-
-    constexpr auto workgroupSize = 64u;
-
-    int instrDwords;
-    int strideMultiplier;
-    int write;
-
-    constexpr auto testIndividual = false;
-    if(testIndividual)
-    {
-        instrDwords      = GENERATE(4);
-        strideMultiplier = GENERATE(2);
-        write            = GENERATE(false);
-    }
-    else
-    {
-        instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8);
-        write            = GENERATE(true, false);
-    }
-    constexpr auto iters = 8;
-
-    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    auto context = TestContext::ForTestDevice({}, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    LDSWaitcntTestKernel kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write, iters);
-
-    SECTION(kernel.getSectionName())
-    {
-
-        auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        int totalAbsoluteDelta       = 0;
-        int totalDelta               = 0;
-        int incorrectPredictionCount = 0;
-        int waitcntInstructionCount  = 0;
-
-        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i)
-        {
-            const auto& inst = filteredInstructions[i];
-
-            int modelLatency = inst.totalCycles() * 4;
-
-            int actualLatency = std::get<1>(medianLatencies[i]);
-            int delta         = actualLatency - modelLatency;
-
-            totalAbsoluteDelta += std::abs(delta);
-            totalDelta += delta;
-
-            if(delta != 0)
-            {
-                incorrectPredictionCount++;
-            }
-
-            if(inst.getWaitCount().dscnt() >= 0)
-            {
-                waitcntInstructionCount++;
-            }
-        }
-
-        INFO(fmt::format(
-            "Total absolute delta: {}, Incorrect predictions: {}/{}, Waitcnt instructions: {}",
-            totalAbsoluteDelta,
-            incorrectPredictionCount,
-            filteredInstructions.size() - 1,
-            waitcntInstructionCount));
-
-        CHECK(waitcntInstructionCount == iters);
-
-        if(strideMultiplier == 1)
-        {
-            /* In case of no bank conflicts, profiler reports ~1 quadcycle slower than model predicts -- not sure why.
-            Examples:
-            1)
-                ds_write_b128 v1, v[20:23], model 20, profiler 24, delta 4
-                s_waitcnt lgkmcnt(0), model 60, profiler 48, delta -12
-            2)
-                ds_write_b128 v1, v[16:19], model 20, profiler 20, delta 0
-                s_waitcnt lgkmcnt(0), model 60, profiler 52, delta -8
-            3)
-                ds_read_b64 v[2:3], v1, model 4, profiler 8, delta 4
-                s_waitcnt lgkmcnt(0), model 48, profiler 44, delta -4
-            */
-
-            CHECK(totalAbsoluteDelta <= 16 * iters); // for case 1)
-            CHECK(totalDelta >= -8 * waitcntInstructionCount); // for case 1)/2)
-        }
-        else
-        {
-            /*  Sometimes get this:
-                ds_read_b32 v2, v1, model 4, profiler 8, delta 4
-                s_waitcnt lgkmcnt(0), model 52, profiler 48, delta -4
-            */
-            CHECK(totalAbsoluteDelta <= 4 * 2 * iters);
-            CHECK(totalDelta == 0);
-        }
-    }
-}
-
 class LDSArithmeticWeaveTestKernel : public LDSTestKernelBase
 {
 public:
@@ -326,42 +170,11 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
-        int totalAbsoluteDelta       = 0;
-        int totalDelta               = 0;
-        int incorrectPredictionCount = 0;
-
-        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i)
-        {
-            const auto& inst = filteredInstructions[i];
-
-            int modelLatency = inst.totalCycles() * 4;
-
-            int actualLatency = std::get<1>(medianLatencies[i]);
-            int delta         = actualLatency - modelLatency;
-
-            if(write && instrDwords == 4)
-            {
-                if(delta > 12)
-                {
-                    incorrectPredictionCount++;
-                    totalDelta += delta;
-                }
-                totalAbsoluteDelta += std::max(0, std::abs(delta) - 12);
-            }
-            else
-            {
-                totalDelta += delta;
-                totalAbsoluteDelta += std::abs(delta);
-                if(delta != 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-        }
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         totalAbsoluteDelta,
-                         incorrectPredictionCount,
+                         analysis.totalAbsoluteDelta,
+                         analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
         /* Sometimes as steady state is reached, there are deltas during transition
@@ -370,21 +183,21 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
         ds_read_b128 v[40:43], v1, model 32, profiler 24, delta -8
         ds_read_b128 v[44:47], v1, model 32, profiler 32, delta 0
         */
-        CHECK(totalAbsoluteDelta <= 20);
-        CHECK_THAT(totalDelta, Catch::Matchers::WithinAbs(0, 20));
-        CHECK(incorrectPredictionCount <= 4);
+        CHECK(analysis.totalAbsoluteDelta <= 20);
+        CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 20));
+        CHECK(analysis.incorrectPredictionCount <= 4);
     }
 }
 
-class JustLdsInstructions : public LDSTestKernelBase
+class SteadyStateLdsInstructions : public LDSTestKernelBase
 {
 public:
-    JustLdsInstructions(ContextPtr                 context,
-                        uint32_t                   workgroupSize,
-                        size_t                     instrDwords,
-                        size_t                     strideMultiplier,
-                        const std::vector<size_t>& baseAddresses,
-                        bool                       write)
+    SteadyStateLdsInstructions(ContextPtr                 context,
+                               uint32_t                   workgroupSize,
+                               size_t                     instrDwords,
+                               size_t                     strideMultiplier,
+                               const std::vector<size_t>& baseAddresses,
+                               bool                       write)
         : LDSTestKernelBase(
             context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
     {
@@ -409,7 +222,7 @@ protected:
     }
 };
 
-TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][gpu]")
 {
     using namespace Scheduling::LDSBankModel;
 
@@ -421,7 +234,7 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = true;
+    constexpr auto testIndividual = false;
     if(testIndividual)
     {
         instrDwords      = GENERATE(4);
@@ -446,7 +259,7 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
         SKIP("Currently only testing on gfx950");
     }
 
-    JustLdsInstructions kernel(
+    SteadyStateLdsInstructions kernel(
         context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
 
     SECTION(kernel.getSectionName())
@@ -456,42 +269,11 @@ TEST_CASE("Just LDS Instructions", "[rocprofiler][scheduler][lds-model][gpu]")
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
-        int totalAbsoluteDelta       = 0;
-        int totalDelta               = 0;
-        int incorrectPredictionCount = 0;
-
-        for(size_t i = 0; i < filteredInstructions.size() - 1; ++i)
-        {
-            const auto& inst = filteredInstructions[i];
-
-            int modelLatency = inst.totalCycles() * 4;
-
-            int actualLatency = std::get<1>(medianLatencies[i]);
-            int delta         = actualLatency - modelLatency;
-
-            if(write && instrDwords == 4)
-            {
-                if(delta > 12)
-                {
-                    incorrectPredictionCount++;
-                    totalDelta += delta;
-                }
-                totalAbsoluteDelta += std::max(0, std::abs(delta) - 12);
-            }
-            else
-            {
-                totalDelta += delta;
-                totalAbsoluteDelta += std::abs(delta);
-                if(delta != 0)
-                {
-                    incorrectPredictionCount++;
-                }
-            }
-        }
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         totalAbsoluteDelta,
-                         incorrectPredictionCount,
+                         analysis.totalAbsoluteDelta,
+                         analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
         // TODO: add CHECK

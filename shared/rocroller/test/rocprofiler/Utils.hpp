@@ -55,6 +55,16 @@ namespace rocRoller
     };
 
     /**
+     * @brief Results from latency delta analysis
+     */
+    struct LatencyAnalysisResult
+    {
+        int totalDelta;
+        int totalAbsoluteDelta;
+        int incorrectPredictionCount;
+    };
+
+    /**
      * @brief Formats a comparison between model predictions and profiler measurements
      * 
      * @param filteredInstructions The list of instructions to compare
@@ -118,5 +128,16 @@ namespace rocRoller
     KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
                                                       LDSTestKernelBase& kernel,
                                                       bool               testIndividual);
+
+    /**
+     * @brief Analyzes latency deltas between model predictions and profiler measurements
+     * 
+     * @param filteredInstructions The list of instructions to analyze
+     * @param medianLatencies The measured latencies for each instruction
+     * @return Structure containing total delta, absolute delta, and incorrect prediction count
+     */
+    LatencyAnalysisResult
+        analyzeLatencyDeltas(const std::vector<Instruction>& filteredInstructions,
+                             const std::vector<std::tuple<std::string, size_t>>& medianLatencies);
 
 } // namespace rocRoller
