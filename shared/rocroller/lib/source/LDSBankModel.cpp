@@ -176,26 +176,10 @@ namespace rocRoller::Scheduling::LDSBankModel
 
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
-                auto cmdBase = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
-                auto waitcntBase
-                    = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
-
-                if(m_commandQueue.empty())
-                {
-                    cmdBase += dataCycles;
-                }
-                else
-                {
-                    cmdBase += std::max(8, dataCycles);
-                }
-                if(m_waitcntQueue.empty())
-                {
-                    waitcntBase += dataCycles;
-                }
-                else
-                {
-                    waitcntBase += std::max(8, dataCycles);
-                }
+                auto cmdBase     = m_commandQueue.empty() ? (m_programCycle + dataCycles)
+                                                          : (m_commandQueue.back() + dataCycles);
+                auto waitcntBase = m_waitcntQueue.empty() ? (m_programCycle + dataCycles + 40)
+                                                          : (m_waitcntQueue.back() + dataCycles);
 
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase
