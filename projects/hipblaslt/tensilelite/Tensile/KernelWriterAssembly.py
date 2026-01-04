@@ -920,7 +920,7 @@ class KernelWriterAssembly(KernelWriter):
 
     if ((tPA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]) or                                              \
         (tPB["bpe"] < 4 and not kernel["UnrollMajorLDSB"]) or                                              \
-        (not kernel["UnrollMajorLDSMetadata"] and kernel["MIInputPerThreadMetadata"] == 4))                \
+        (kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"] and kernel["MIInputPerThreadMetadata"] == 4))                \
         and (kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()):
       moduleVgprMacro.add(RegSet("v", "vgprPackTemp", "vgprBase", self.states.a.startVgprValuPackTemp - self.states.startVgpr))
 
@@ -4783,7 +4783,7 @@ class KernelWriterAssembly(KernelWriter):
     numVgprPackTemp = 0
     if ((tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"])                                   \
         or (tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"])                                \
-        or (not kernel["UnrollMajorLDSMetadata"] and kernel["MIInputPerThreadMetadata"] == 4))             \
+        or (kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"] and kernel["MIInputPerThreadMetadata"] == 4))             \
         and (kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()):
       numVgprPackTemp = 1
     numVgprCvtTemp = 0

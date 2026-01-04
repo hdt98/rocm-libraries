@@ -90,6 +90,7 @@ def getRequiredParametersMin() -> set:
         'StreamKXCCMapping',
         'StreamKFixupTreeReduction',
         'TransposeLDS',
+        'TransposeLDSMetadata',
         'UnrollLoopSwapGlobalReadOrder',
         'Use64bShadowLimit',
         'UseInstOffsetForGRO',
