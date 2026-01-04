@@ -76,14 +76,18 @@ rocm_export_targets(
 )
 
 if(FORMOCAST_BUILD_TESTING OR BUILD_TESTING)
-    rocm_install(TARGETS formocast-tests
-        COMPONENT tests
-    )
+    if(TARGET formocast-tests)
+        rocm_install(TARGETS formocast-tests
+            COMPONENT tests
+        )
+    endif()
     
-    rocm_install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/tests/formocast_gtest.yaml"
-        DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        COMPONENT tests
-    )
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/formocast_gtest.yaml")
+        rocm_install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/tests/formocast_gtest.yaml"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            COMPONENT tests
+        )
+    endif()
 endif()
 
 rocm_install(
