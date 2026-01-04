@@ -328,55 +328,127 @@ struct tile_window_with_static_distribution
             else
                 return get_load_offset(offset_t{});
         }();
-        // loop over thread tensor space [y0, y1, ...]
-        static_for<0, NumCoord, 1>{}([&](auto iCoord) {
-            /// TODO: use structure binding (to be captured later) if compiled in C++20
-            auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
-            auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
 
-            static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
-                constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
+        // this is an optimization used in gfx125 where lds descriptor don't include xor swizzle
+        if constexpr((Base::BottomTensorView::buffer_view::get_address_space() ==
+                      address_space_enum::lds) &&
+                     (!remove_cvref_t<
+                         decltype(typename Base::BottomTensorView{}.get_tensor_descriptor())>::
+                          template has_transform<coord_transform_enum::xor_t>()))
+        {
+            static_assert(
+                []() constexpr {
+                    [[maybe_unused]] constexpr auto desc =
+                        typename Base::BottomTensorView{}.get_tensor_descriptor();
+                    return true;
+                }(),
+                "BottomTensorView::get_tensor_descriptor() must be constexpr for LDS");
+            // For LDS, compute offsets at compile time to optimize LDS access
+            static_for<0, NumCoord, 1>{}([&](auto iCoord) {
+                /// TODO: use structure binding (to be captured later) if compiled in C++20
+                const auto& bottom_tensor_thread_coord = pre_computed_coords_[iCoord][I1];
 
-                // data index [y0, y1, ...]
-                constexpr auto idx_ys_start = SFC_Ys::get_index(iAccess);
+                static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
+                    constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
 
-                // read from bottom tensor
-                const vector_t vec_value =
-                    this->get_bottom_tensor_view().template get_vectorized_elements<vector_t>(
-                        bottom_tensor_thread_coord,
-                        linear_off,
-                        bool_constant<oob_conditional_check>{});
-                // write into distributed tensor
-                static_for<0, Traits::ScalarPerVector, Traits::PackedSize>{}([&](auto j) {
-                    constexpr auto idx_ys = generate_tuple(
-                        [&](auto jj) {
-                            return jj == Traits::VectorDimY ? (idx_ys_start[jj] + j)
-                                                            : idx_ys_start[jj];
-                        },
-                        number<Base::NDimY>{});
+                    // data index [y0, y1, ...]
+                    constexpr auto idx_ys_start = SFC_Ys::get_index(iAccess);
 
-                    constexpr index_t d =
-                        tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys) /
-                        Traits::PackedSize;
+                    // Compute compile-time offset from access 0 to current access
+                    constexpr auto lds_access_offset = [&]() {
+                        constexpr auto idx_off_ys = SFC_Ys::get_step_between(number<0>{}, iAccess);
+                        constexpr auto adapter_ys_offset = make_tensor_adaptor_coordinate(
+                            tile_dstr.get_ps_ys_to_xs_adaptor(),
+                            container_concat(array<index_t, Base::NDimP>{0},
+                                             to_array<index_t, idx_off_ys.size()>(idx_off_ys)));
+                        constexpr auto coord_ys_offset = make_tensor_coordinate(
+                            typename Base::BottomTensorView{}.get_tensor_descriptor(),
+                            adapter_ys_offset.get_bottom_index());
+                        return coord_ys_offset.get_offset();
+                    }();
 
-                    dst_tensor.get_thread_buffer().template at<d>() =
-                        vec_value
-                            .template get_as<typename Base::DataType>()[j / Traits::PackedSize];
+                    // read from bottom tensor with compile-time offset
+                    const vector_t vec_value =
+                        this->get_bottom_tensor_view()
+                            .template get_vectorized_elements<vector_t, lds_access_offset>(
+                                bottom_tensor_thread_coord,
+                                linear_off,
+                                bool_constant<oob_conditional_check>{});
+                    // write into distributed tensor
+                    static_for<0, Traits::ScalarPerVector, Traits::PackedSize>{}([&](auto j) {
+                        constexpr auto idx_ys = generate_tuple(
+                            [&](auto jj) {
+                                return jj == Traits::VectorDimY ? (idx_ys_start[jj] + j)
+                                                                : idx_ys_start[jj];
+                            },
+                            number<Base::NDimY>{});
+
+                        constexpr index_t d =
+                            tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys) /
+                            Traits::PackedSize;
+
+                        dst_tensor.get_thread_buffer().template at<d>() =
+                            vec_value
+                                .template get_as<typename Base::DataType>()[j / Traits::PackedSize];
+                    });
                 });
-                // move thread coordinate
-                if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
-                {
-                    constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
-
-                    constexpr auto idx_diff_ps_ys = container_concat(
-                        generate_tuple([&](auto) { return number<0>{}; }, number<Base::NDimP>{}),
-                        idx_diff_ys);
-
-                    Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
-                        window_adaptor_thread_coord, bottom_tensor_thread_coord, idx_diff_ps_ys);
-                }
             });
-        });
+        }
+        else
+        {
+            // loop over thread tensor space [y0, y1, ...]
+            static_for<0, NumCoord, 1>{}([&](auto iCoord) {
+                /// TODO: use structure binding (to be captured later) if compiled in C++20
+                auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
+                auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
+
+                static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
+                    constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
+
+                    // data index [y0, y1, ...]
+                    constexpr auto idx_ys_start = SFC_Ys::get_index(iAccess);
+
+                    // read from bottom tensor
+                    const vector_t vec_value =
+                        this->get_bottom_tensor_view().template get_vectorized_elements<vector_t>(
+                            bottom_tensor_thread_coord,
+                            linear_off,
+                            bool_constant<oob_conditional_check>{});
+                    // write into distributed tensor
+                    static_for<0, Traits::ScalarPerVector, Traits::PackedSize>{}([&](auto j) {
+                        constexpr auto idx_ys = generate_tuple(
+                            [&](auto jj) {
+                                return jj == Traits::VectorDimY ? (idx_ys_start[jj] + j)
+                                                                : idx_ys_start[jj];
+                            },
+                            number<Base::NDimY>{});
+
+                        constexpr index_t d =
+                            tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys) /
+                            Traits::PackedSize;
+
+                        dst_tensor.get_thread_buffer().template at<d>() =
+                            vec_value
+                                .template get_as<typename Base::DataType>()[j / Traits::PackedSize];
+                    });
+                    // move thread coordinate
+                    if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
+                    {
+                        constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
+
+                        constexpr auto idx_diff_ps_ys =
+                            container_concat(generate_tuple([&](auto) { return number<0>{}; },
+                                                            number<Base::NDimP>{}),
+                                             idx_diff_ys);
+
+                        Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
+                            window_adaptor_thread_coord,
+                            bottom_tensor_thread_coord,
+                            idx_diff_ps_ys);
+                    }
+                });
+            });
+        }
     }
 
     template <typename DstTile,

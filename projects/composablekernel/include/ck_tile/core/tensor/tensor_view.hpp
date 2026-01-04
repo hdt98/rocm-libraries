@@ -79,7 +79,9 @@ struct tensor_view
 
     // X is vector of DataType.
     // "coord" is coordinate of DataType, not X. "coord" should be aligned to X
+    // static_offset is compile-time offset for LDS access optimization
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -90,7 +92,7 @@ struct tensor_view
                             index_t linear_offset,
                             bool_constant<oob_conditional_check> = {}) const
     {
-        return buf_.template get<X>(
+        return buf_.template get<X, static_offset / PackedSize>(
             coord.get_offset() / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
@@ -98,6 +100,7 @@ struct tensor_view
     }
 
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -109,10 +112,11 @@ struct tensor_view
                             bool is_valid_element, // flag
                             bool_constant<oob_conditional_check> = {}) const
     {
-        return buf_.template get<X>(coord.get_offset() / PackedSize,
-                                    linear_offset / PackedSize,
-                                    is_valid_element,
-                                    bool_constant<oob_conditional_check>{});
+        return buf_.template get<X, static_offset / PackedSize>(
+            coord.get_offset() / PackedSize,
+            linear_offset / PackedSize,
+            is_valid_element,
+            bool_constant<oob_conditional_check>{});
     }
 
     // X is vector of DataType.
