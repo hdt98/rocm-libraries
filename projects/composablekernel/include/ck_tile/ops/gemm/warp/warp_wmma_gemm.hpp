@@ -108,6 +108,10 @@ using WarpGemmWmma_f32_16x16x128_f8_f4 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_f4, kTransC>>;
 
 template <bool kTransC = false>
+using WarpGemmWmma_f32_16x16x128_bf8_f4 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_bf8_f4, kTransC>>;
+
+template <bool kTransC = false>
 using WarpGemmWmma_f32_16x16x128_f4_f4 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f4_f4, kTransC>>;
 } // namespace ck_tile

@@ -252,8 +252,17 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
 
     if(init_method == 0)
     {
-        ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f}(a_m_k);
-        ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f}(b_k_n);
+        if constexpr(std::is_same_v<BDataType, ck_tile::pk_fp4_t>)
+        {
+            // Shrink the init range for the lower precision of fp4
+            ck_tile::FillUniformDistribution<ADataType>{0.0f, 1.0f}(a_m_k);
+            ck_tile::FillUniformDistribution<BDataType>{-.25f, .25f}(b_k_n);
+        }
+        else
+        {
+            ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f}(a_m_k);
+            ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f}(b_k_n);
+        }
     }
     else if(init_method == 1)
     {
@@ -367,9 +376,12 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
 
     c_m_n_dev_buf.FromDevice(c_m_n_dev_result.data());
 
-    std::size_t flop = std::size_t(2) * M * N * K;
-    std::size_t num_byte =
-        sizeof(ADataType) * M * K + sizeof(BDataType) * N * K + sizeof(CDataType) * M * N;
+    constexpr int PackedSizeA = ck_tile::numeric_traits<ADataType>::PackedSize;
+    constexpr int PackedSizeB = ck_tile::numeric_traits<BDataType>::PackedSize;
+
+    std::size_t flop     = std::size_t(2) * M * N * K;
+    std::size_t num_byte = sizeof(ADataType) * M * K / PackedSizeA +
+                           sizeof(BDataType) * N * K / PackedSizeB + sizeof(CDataType) * M * N;
     float tflops     = static_cast<float>(flop) / 1.E9 / ave_time;
     float gb_per_sec = num_byte / 1.E6 / ave_time;
 

@@ -779,7 +779,7 @@ __global__ void naive_gemm_kernel(ADataType* A,
             }
             else if constexpr(std::is_same_v<BDataType, pk_fp4_t>)
             {
-                const fp32x2_t fp32_val = pk_fp4_to_fp32x2(B[b_index / packed_size_b]);
+                const fp32x2_t fp32_val = pk_fp4_to_fp32x2(B[b_index / packed_size_b], 1.0f);
                 if(k % 2 == 1)
                     v_b = fp32_val.hi;
                 else
