@@ -50,7 +50,7 @@ struct UniversalGemmBasePolicy
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
         constexpr index_t kMaxKWarpTile = (sizeof(ADataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<BDataType, pk_int4_t> || std::is_same_v<ADataType, pk_fp4_t>)
+        if constexpr(std::is_same_v<BDataType, pk_int4_t> || std::is_same_v<BDataType, pk_fp4_t>)
             return false;
         else if constexpr(kKWarpTile > kMaxKWarpTile)
             return false;
