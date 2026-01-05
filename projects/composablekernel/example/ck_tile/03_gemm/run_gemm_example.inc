@@ -252,17 +252,8 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
 
     if(init_method == 0)
     {
-        if constexpr(std::is_same_v<BDataType, ck_tile::pk_fp4_t>)
-        {
-            // Shrink the init range for the lower precision of fp4
-            ck_tile::FillUniformDistribution<ADataType>{0.0f, 1.0f}(a_m_k);
-            ck_tile::FillUniformDistribution<BDataType>{-.25f, .25f}(b_k_n);
-        }
-        else
-        {
-            ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f}(a_m_k);
-            ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f}(b_k_n);
-        }
+        ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f}(a_m_k);
+        ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f}(b_k_n);
     }
     else if(init_method == 1)
     {

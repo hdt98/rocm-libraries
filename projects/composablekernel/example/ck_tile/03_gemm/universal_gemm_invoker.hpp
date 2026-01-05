@@ -156,13 +156,20 @@ struct UniversalInvoker
             {
                 std::cout << "Flushing cache..." << std::endl;
 
+                constexpr ck_tile::index_t APackedSize =
+                    ck_tile::numeric_traits<ADataType>::PackedSize;
+                constexpr ck_tile::index_t BPackedSize =
+                    ck_tile::numeric_traits<BDataType>::PackedSize;
+
                 ck_tile::HostTensor<ADataType> a_m(ck_tile::host_tensor_descriptor(
                     args.M, args.K, args.stride_A, is_row_major(ALayout{})));
                 ck_tile::HostTensor<BDataType> b_n(ck_tile::host_tensor_descriptor(
                     args.K, args.N, args.stride_B, is_row_major(BLayout{})));
 
-                auto size_a_buffer = a_m.get_element_space_size_in_bytes();
-                auto size_b_buffer = b_n.get_element_space_size_in_bytes();
+                auto size_a_buffer = a_m.get_element_space_size_in_bytes() / APackedSize;
+                ;
+                auto size_b_buffer = b_n.get_element_space_size_in_bytes() / BPackedSize;
+                ;
 
                 rotating_mem_ptr =
                     std::make_unique<ck_tile::RotatingMemWrapper<ADataType, BDataType>>(

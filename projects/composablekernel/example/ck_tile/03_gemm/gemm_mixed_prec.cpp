@@ -4,7 +4,7 @@
 #include "gemm_utils.hpp"
 #include "run_gemm_example.inc"
 #include "run_gemm_example_common.hpp"
-#include "gemm_mixed_prec_invoker.hpp"
+#include "universal_gemm_invoker.hpp"
 
 template <template <typename PreType> typename GemmConfig>
 int run_gemm_example(ck_tile::ArgParser& arg_parser)
@@ -13,7 +13,7 @@ int run_gemm_example(ck_tile::ArgParser& arg_parser)
     std::string a_layout  = arg_parser.get_str("a_layout");
     std::string b_layout  = arg_parser.get_str("b_layout");
 
-    using Invoker = MixedPrecInvoker;
+    using Invoker = UniversalInvoker;
 
     // Validate mixed precision combinations
     if(data_type == "fp8fp4")
