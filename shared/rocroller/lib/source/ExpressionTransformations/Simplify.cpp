@@ -203,6 +203,118 @@ namespace rocRoller
             }
         };
 
+        /**
+         * Helper to check if a value is a consecutive-ones bitmask starting from bit 0.
+         * Returns the number of 1-bits (width) if valid, nullopt otherwise.
+         * Example: 0xFF -> 8, 0x1F -> 5, 0x3 -> 2
+         */
+        template <typename T>
+        requires(CIntegral<T>) std::optional<uint32_t> getConsecutiveOnesMaskWidth(T mask)
+        {
+            if(mask <= 0)
+                return std::nullopt;
+
+            using UT = typename std::make_unsigned<T>::type;
+            UT umask = static_cast<UT>(mask);
+
+            // Check if mask is of the form 2^n - 1 (all 1s in lower bits)
+            // This is true iff (mask & (mask + 1)) == 0
+            if((umask & (umask + 1)) != 0)
+                return std::nullopt;
+
+            // Count the number of 1s (which is the width)
+            uint32_t width = 0;
+            while(umask)
+            {
+                width++;
+                umask >>= 1;
+            }
+            return width;
+        }
+
+        /**
+         * Fuse LogicalShiftR + BitwiseAnd into BitFieldExtract.
+         *
+         * Pattern: (a >> shift) & mask, where mask has consecutive 1s from bit 0
+         * Result: bfe(a, shift, popcount(mask))
+         *
+         * Only applies when:
+         * - Target is 32-bit
+         * - mask is a literal with consecutive 1s from bit 0 (e.g., 0xFF, 0x1F)
+         * - shift is a literal
+         * - The bitfield extraction is within bounds (offset + width <= 32)
+         */
+        struct FuseLogicalShiftRBitwiseAndToBfe
+        {
+            VariableType resultVarType;
+
+            ExpressionPtr tryFuse(ExpressionPtr lhs, ExpressionPtr rhs)
+            {
+                // Only for 32-bit results
+                if(resultVarType.getElementSize() != 4)
+                    return nullptr;
+
+                // Check if lhs is LogicalShiftR
+                if(!lhs || !std::holds_alternative<LogicalShiftR>(*lhs))
+                    return nullptr;
+
+                auto const& shiftExpr = std::get<LogicalShiftR>(*lhs);
+
+                // Check if shift amount is a translation-time constant
+                if(!evaluationTimes(shiftExpr.rhs)[EvaluationTime::Translate])
+                    return nullptr;
+
+                // Check if rhs (mask) is a translation-time constant
+                if(!evaluationTimes(rhs)[EvaluationTime::Translate])
+                    return nullptr;
+
+                auto shiftAmount = evaluate(shiftExpr.rhs);
+                auto mask        = evaluate(rhs);
+
+                // Extract shift offset as uint32
+                auto maybeOffset = std::visit(
+                    [](auto val) -> std::optional<uint32_t> {
+                        using T = std::decay_t<decltype(val)>;
+                        if constexpr(CIntegral<T>)
+                        {
+                            if(val >= 0 && val < 32)
+                                return static_cast<uint32_t>(val);
+                        }
+                        return std::nullopt;
+                    },
+                    shiftAmount);
+
+                if(!maybeOffset)
+                    return nullptr;
+
+                uint32_t offset = *maybeOffset;
+
+                // Extract width from mask
+                auto maybeWidth = std::visit(
+                    [](auto val) -> std::optional<uint32_t> {
+                        using T = std::decay_t<decltype(val)>;
+                        if constexpr(CIntegral<T>)
+                        {
+                            return getConsecutiveOnesMaskWidth(val);
+                        }
+                        return std::nullopt;
+                    },
+                    mask);
+
+                if(!maybeWidth)
+                    return nullptr;
+
+                uint32_t width = *maybeWidth;
+
+                // Check that the extraction is valid (offset + width <= 32)
+                if(offset + width > 32)
+                    return nullptr;
+
+                // Create BitFieldExtract
+                return bfe(resultVarType.dataType, shiftExpr.lhs, offset, width);
+            }
+        };
+
         template <>
         struct SimplifyByConstant<LogicalAnd>
         {
@@ -813,6 +925,70 @@ namespace rocRoller
                 }
 
                 return std::make_shared<Expression>(Expr({lhs, rhs, expr.comment}));
+            }
+
+            ExpressionPtr operator()(BitwiseAnd const& expr) const
+            {
+                auto resultVarType = resultVariableType(expr);
+
+                auto lhs = call(expr.lhs);
+                auto rhs = call(expr.rhs);
+
+                bool eval_lhs = evaluationTimes(lhs)[EvaluationTime::Translate];
+                bool eval_rhs = evaluationTimes(rhs)[EvaluationTime::Translate];
+
+                auto simplifier = SimplifyByConstant<BitwiseAnd>{resultVarType};
+
+                ExpressionPtr rv = nullptr;
+
+                if(eval_lhs && eval_rhs)
+                {
+                    rv = literal(evaluate(BitwiseAnd({lhs, rhs})));
+                }
+                else if(eval_lhs)
+                {
+                    // BitwiseAnd is commutative, so we can swap
+                    rv = simplifier.call(rhs, evaluate(lhs));
+                }
+                else if(eval_rhs)
+                {
+                    rv = simplifier.call(lhs, evaluate(rhs));
+                }
+
+                if(rv != nullptr)
+                {
+                    if(resultVariableType(rv) != resultVarType)
+                    {
+                        AssertFatal(!resultVarType.isPointer(),
+                                    ShowValue(expr),
+                                    ShowValue(rv),
+                                    ShowValue(resultVarType));
+                        rv = convert(resultVarType.dataType, rv);
+                    }
+
+                    copyComment(rv, expr);
+                    return rv;
+                }
+
+                // Try to fuse LogicalShiftR + BitwiseAnd into BitFieldExtract
+                auto fuseToBfe = FuseLogicalShiftRBitwiseAndToBfe{resultVarType};
+                if(eval_rhs)
+                {
+                    rv = fuseToBfe.tryFuse(lhs, rhs);
+                }
+                else if(eval_lhs)
+                {
+                    // BitwiseAnd is commutative
+                    rv = fuseToBfe.tryFuse(rhs, lhs);
+                }
+
+                if(rv != nullptr)
+                {
+                    copyComment(rv, expr);
+                    return rv;
+                }
+
+                return std::make_shared<Expression>(BitwiseAnd({lhs, rhs, expr.comment}));
             }
 
             ExpressionPtr operator()(BitfieldCombine const& expr) const
