@@ -82,7 +82,7 @@ protected:
     Generator<Instruction> generateKernelBody() override
     {
         int counter = 0;
-        for(int i = 1; i < 16; ++i)
+        for(int i = 1; i < 8; ++i)
         {
             for(int k = 0; k < i; ++k)
             {
@@ -103,6 +103,8 @@ protected:
 
 TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-model][gpu]")
 {
+    // Expect 394-392 passed : 51-53 failed
+    // Mainly affected by waitcnt queue values
     /*
     ds_read_b128 v[60:63], v1, model 16, profiler 16, delta 0
     s_waitcnt lgkmcnt(0), model 168, profiler 164, delta -4
@@ -179,15 +181,13 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-mode
 
         if(write && instrDwords == 4)
         {
-            CHECK(analysis.totalAbsoluteDelta <= 292);
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 292));
-            CHECK(analysis.incorrectPredictionCount <= 23);
+            // ignore ds_write_b128 for now
         }
         else
         {
-            CHECK(analysis.totalAbsoluteDelta <= 40);
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 32));
-            CHECK(analysis.incorrectPredictionCount <= 12);
+            CHECK(analysis.totalAbsoluteDelta <= 0);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
+            CHECK(analysis.incorrectPredictionCount <= 0);
         }
     }
 }

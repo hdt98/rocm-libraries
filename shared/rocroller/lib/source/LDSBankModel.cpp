@@ -176,14 +176,16 @@ namespace rocRoller::Scheduling::LDSBankModel
 
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
-                auto cmdBase     = m_commandQueue.empty() ? (m_programCycle + dataCycles)
-                                                          : (m_commandQueue.back() + dataCycles);
-                auto waitcntBase = m_waitcntQueue.empty() ? (m_programCycle + dataCycles + 40)
-                                                          : (m_waitcntQueue.back() + dataCycles);
+                auto cmdBase = m_commandQueue.empty() ? (m_programCycle + dataCycles)
+                                                      : (m_commandQueue.back() + dataCycles);
+
+                // The following std::max improves accuracy for ds_write_b32 with no bank conflicts
+                auto waitcntBase = m_waitcntQueue.empty()
+                                       ? (m_programCycle + dataCycles + 40)
+                                       : (m_waitcntQueue.back() + std::max(8, dataCycles));
 
                 m_commandQueue.push_back(cmdBase);
-                m_waitcntQueue.push_back(waitcntBase
-                                         + getInstructionIssueCycles(instr.memoryOp, instr.dwords));
+                m_waitcntQueue.push_back(waitcntBase);
                 {
                     auto const base
                         = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
@@ -195,14 +197,13 @@ namespace rocRoller::Scheduling::LDSBankModel
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
-                auto cmdBase = m_commandQueue.empty() ? (m_programCycle + dataCycles + 4)
-                                                      : (m_commandQueue.back() + dataCycles);
-                auto waitcntBase
-                    = m_waitcntQueue.empty() ? (m_programCycle + 40) : (m_waitcntQueue.back());
+                auto cmdBase     = m_commandQueue.empty() ? (m_programCycle + dataCycles + 4)
+                                                          : (m_commandQueue.back() + dataCycles);
+                auto waitcntBase = m_waitcntQueue.empty() ? (m_programCycle + 40 + dataCycles)
+                                                          : (m_waitcntQueue.back() + dataCycles);
                 AssertFatal(requiredSlots == 1,
                             ShowValue(requiredSlots)); // read should only need 1 slot
 
-                waitcntBase += dataCycles;
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase);
                 m_dataQueue.push_back(cmdBase);

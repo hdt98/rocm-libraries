@@ -269,26 +269,13 @@ namespace rocRoller::Scheduling::LDSBankModel
             return m_intraSPMultiplier;
         }
 
-        // Instruction scheduling
         // Returns tuple of <stall_cycles, additional_cycles>
         std::tuple<int, int> predictStallCycles(const RuntimeLDSInstruction& instr) const;
         void                 scheduleInstruction(const RuntimeLDSInstruction& instr);
 
-        // Waitcnt handling
         int predictWaitcntStall(int waitcnt) const;
 
-        // Queue management
         void updateQueues();
-
-        // Queue inspection (for debugging/testing)
-        const std::deque<unsigned int>& getCommandQueue() const
-        {
-            return m_commandQueue;
-        }
-        const std::deque<unsigned int>& getDataQueue() const
-        {
-            return m_dataQueue;
-        }
 
     private:
         static constexpr int dataQueueSize    = 10;
@@ -299,9 +286,9 @@ namespace rocRoller::Scheduling::LDSBankModel
         int                m_interWaveMultiplier;
         int                m_intraSPMultiplier;
 
-        std::deque<unsigned int> m_commandQueue;
-        std::deque<unsigned int> m_waitcntQueue; // Includes round-trip delay
-        std::deque<unsigned int> m_dataQueue;
+        std::deque<int> m_commandQueue;
+        std::deque<int> m_waitcntQueue; // Includes round-trip delay
+        std::deque<int> m_dataQueue;
 
         int getRemainingDataSlots() const;
     };

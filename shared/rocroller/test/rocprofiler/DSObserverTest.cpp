@@ -224,7 +224,8 @@ protected:
 
 TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][gpu]")
 {
-    // Expect 562 passed : 33 failed
+    // Expect 562-559 passed : 33-36 failed
+    // Mainly affected by the queue size, e.g. when does steady state get reached?
     /*
     ds_read_b128 v[4:7], v1, model 4, profiler 4, delta 0
     ds_read_b128 v[8:11], v1, model 4, profiler 4, delta 0
