@@ -218,7 +218,7 @@ protected:
 TEST_CASE("Weave LDS and waitcnt at steady state",
           "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
 {
-    // Expect 572 passed : 38 failed
+    // Expect 381 passed : 69 failed
     /*
     ...
     s_waitcnt lgkmcnt(2), model 136, profiler 132, delta -4

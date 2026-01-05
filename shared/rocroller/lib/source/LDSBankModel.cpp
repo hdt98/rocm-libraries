@@ -191,7 +191,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                         = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
                     for(int j = 0; j < requiredSlots; ++j)
                     {
-                        m_dataQueue.push_back(base + 2 * dataCycles);
+                        m_dataQueue.push_back(base + (j * 2) * dataCycles);
                     }
                 }
             }
