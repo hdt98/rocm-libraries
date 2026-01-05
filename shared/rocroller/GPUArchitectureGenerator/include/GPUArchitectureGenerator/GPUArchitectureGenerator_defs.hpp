@@ -117,15 +117,25 @@ namespace GPUArchitectureGenerator
              {{"v_mfma_f32_32x32x16_bf16 a[0:15], v[32:35], v[36:39], a[0:15]"}, ""}},
 
             {rocRoller::GPUCapability::HasWMMA,
-             {{"v_wmma_f32_16x16x16_f16 v[0:7], v[32:35], v[36:39], v[0:7]"}, ""}},
+             {{"v_wmma_f32_16x16x16_f16 v[0:7], v[32:35], v[36:39], v[0:7]",
+               "v_wmma_f32_16x16x16_f16 v[0:7], v[32:39], v[40:47], v[0:7]"},
+              ""}},
             {rocRoller::GPUCapability::HasWMMA_F16_ACC,
-             {{"v_wmma_f16_16x16x16_f16 v[0:3], v[32:35], v[36:39], v[0:3]"}, ""}},
+             {{"v_wmma_f16_16x16x16_f16 v[0:3], v[32:35], v[36:39], v[0:3]",
+               "v_wmma_f16_16x16x16_f16 v[0:7], v[32:39], v[40:47], v[0:7]"},
+              ""}},
             {rocRoller::GPUCapability::HasWMMA_f32_16x16x16_f16,
-             {{"v_wmma_f32_16x16x16_f16 v[0:7], v[32:35], v[36:39], v[0:7]"}, ""}},
+             {{"v_wmma_f32_16x16x16_f16 v[0:7], v[32:35], v[36:39], v[0:7]",
+               "v_wmma_f32_16x16x16_f16 v[0:7], v[32:39], v[40:47], v[0:7]"},
+              ""}},
             {rocRoller::GPUCapability::HasWMMA_f16_16x16x16_f16,
-             {{"v_wmma_f16_16x16x16_f16 v[0:3], v[32:35], v[36:39], v[0:3]"}, ""}},
+             {{"v_wmma_f16_16x16x16_f16 v[0:3], v[32:35], v[36:39], v[0:3]",
+               "v_wmma_f16_16x16x16_f16 v[0:7], v[32:39], v[40:47], v[0:7]"},
+              ""}},
             {rocRoller::GPUCapability::HasWMMA_bf16_16x16x16_bf16,
-             {{"v_wmma_bf16_16x16x16_bf16 v[0:3], v[32:35], v[36:39], v[0:3]"}, ""}},
+             {{"v_wmma_bf16_16x16x16_bf16 v[0:3], v[32:35], v[36:39], v[0:3]",
+               "v_wmma_bf16_16x16x16_bf16 v[0:7], v[32:39], v[40:47], v[0:7]"},
+              ""}},
             {rocRoller::GPUCapability::HasWMMA_f32_16x16x16_f8,
              {{"v_wmma_f32_16x16x16_fp8_fp8 v[0:7], v[32:33], v[34:35], v[0:7]"}, ""}},
 
@@ -199,7 +209,8 @@ namespace GPUArchitectureGenerator
             {rocRoller::GPUCapability::HasPermLanes32, {{"v_permlane32_swap_b32 v4, v5"}, ""}},
             {rocRoller::GPUCapability::UnalignedSGPRs,
              {{"s_cmp_eq_u64 s[0:1], s[0:1], s[3:4]"}, ""}},
-            {rocRoller::GPUCapability::SeparateVscnt, {{"s_waitcnt_vscnt 0"}, ""}},
+            {rocRoller::GPUCapability::SeparateVscnt,
+             {{"s_waitcnt_vscnt 0", "s_waitcnt_vscnt null 0"}, ""}},
             {rocRoller::GPUCapability::HasSplitWaitCounters, {{"s_wait_kmcnt 0"}, ""}},
 
     };
@@ -345,6 +356,29 @@ namespace GPUArchitectureGenerator
         return retval;
     }
 
+    inline std::vector<rocRoller::GPUArchitectureTarget> gfx11ISAs()
+    {
+        std::vector<rocRoller::GPUArchitectureTarget> retval;
+        std::copy_if(rocRoller::SupportedArchitectures.begin(),
+                     rocRoller::SupportedArchitectures.end(),
+                     std::back_inserter(retval),
+                     [](rocRoller::GPUArchitectureTarget const& x) -> bool {
+                         return x.isRDNA3GPU() || x.isRDNA35GPU();
+                     });
+        return retval;
+    }
+
+    inline std::vector<rocRoller::GPUArchitectureTarget> gfx115XISAs()
+    {
+        std::vector<rocRoller::GPUArchitectureTarget> retval;
+        std::copy_if(
+            rocRoller::SupportedArchitectures.begin(),
+            rocRoller::SupportedArchitectures.end(),
+            std::back_inserter(retval),
+            [](rocRoller::GPUArchitectureTarget const& x) -> bool { return x.isRDNA35GPU(); });
+        return retval;
+    }
+
     inline std::vector<rocRoller::GPUArchitectureTarget> gfx120XISAs()
     {
         std::vector<rocRoller::GPUArchitectureTarget> retval;
@@ -421,9 +455,13 @@ namespace GPUArchitectureGenerator
                  return x.isCDNA2GPU() || x.isCDNA3GPU() || x.isCDNA35GPU() || x.isRDNA4GPU();
              }},
             {rocRoller::GPUCapability::WorkgroupIdxViaTTMP,
-             [](rocRoller::GPUArchitectureTarget x) -> bool { return x.isGFX12GPU(); }},
+             [](rocRoller::GPUArchitectureTarget x) -> bool {
+                 return x.isGFX11GPU() || x.isGFX12GPU();
+             }},
             {rocRoller::GPUCapability::HasBufferOutOfBoundsCheckOption,
-             [](rocRoller::GPUArchitectureTarget x) -> bool { return x.isGFX12GPU(); }},
+             [](rocRoller::GPUArchitectureTarget x) -> bool {
+                 return x.isGFX11GPU() || x.isGFX12GPU();
+             }},
 
     };
     // This is the way to add a set of instructions that have the same wait value and wait queues.
@@ -574,6 +612,154 @@ namespace GPUArchitectureGenerator
                  "scratch_store_dwordx2",
                  "scratch_store_dwordx3",
                  "scratch_store_dwordx4",
+                 "scratch_store_short",
+                 "scratch_store_short_d16_hi",
+                  // clang-format on
+              },
+              0,
+              {rocRoller::GPUWaitQueueType::StoreQueue},
+              (1 << 12) - 1}}, // the offset is a `signed` 13-bit  (i.e., -4096..4095)
+            {gfx11ISAs(),
+             {{
+                  // clang-format off
+                 "buffer_load_b32",
+                 "buffer_load_b64",
+                 "buffer_load_b96",
+                 "buffer_load_b128",
+                 "buffer_load_sbyte",
+                 "buffer_load_sbyte_d16",
+                 "buffer_load_sbyte_d16_hi",
+                 "buffer_load_short_d16",
+                 "buffer_load_short_d16_hi",
+                 "buffer_load_sshort",
+                 "buffer_load_ubyte",
+                 "buffer_load_ubyte_d16",
+                 "buffer_load_ubyte_d16_hi",
+                 "buffer_load_ushort",
+                  // clang-format on
+              },
+              1,
+              {rocRoller::GPUWaitQueueType::LoadQueue},
+              (1 << 12) - 1}},
+            {gfx11ISAs(),
+             {{
+                  // clang-format off
+                 "buffer_store_byte",
+                 "buffer_store_byte_d16_hi",
+                 "buffer_store_b32",
+                 "buffer_store_b64",
+                 "buffer_store_b96",
+                 "buffer_store_b128",
+                 "buffer_store_short",
+                 "buffer_store_short_d16_hi",
+                  // clang-format on
+              },
+              1,
+              {rocRoller::GPUWaitQueueType::StoreQueue},
+              (1 << 12) - 1}},
+            // single-address LDS instructions
+            {gfx11ISAs(),
+             {{
+                  // clang-format off
+                 "ds_read_addtid_b32",
+                 "ds_read_b128",
+                 "ds_read_b32",
+                 "ds_read_b64",
+                 "ds_read_b96",
+                 "ds_read_i16",
+                 "ds_read_i8",
+                 "ds_read_i8_d16",
+                 "ds_read_i8_d16_hi",
+                 "ds_read_u16",
+                 "ds_read_u8",
+                 "ds_read_u16_d16",
+                 "ds_read_u16_d16_hi",
+                 "ds_read_u8_d16",
+                 "ds_read_u8_d16_hi",
+                 "ds_write_addtid_b32",
+                 "ds_write_b128",
+                 "ds_write_b16",
+                 "ds_write_b16_d16_hi",
+                 "ds_write_b32",
+                 "ds_write_b64",
+                 "ds_write_b8",
+                 "ds_write_b8_d16_hi",
+                 "ds_write_b96",
+                  // clang-format on
+              },
+              1,
+              {rocRoller::GPUWaitQueueType::DSQueue},
+              (1 << 16) - 1}},
+            // two-address LDS instructions
+            {gfx11ISAs(),
+             {{
+                  // clang-format off
+                 "ds_read2_b32",
+                 "ds_read2_b64",
+                 "ds_read2st64_b32",
+                 "ds_read2st64_b64",
+                 "ds_write2_b32",
+                 "ds_write2_b64",
+                 "ds_write2st64_b32",
+                 "ds_write2st64_b64",
+                  // clang-format on
+              },
+              1,
+              {rocRoller::GPUWaitQueueType::DSQueue},
+              (1 << 8) - 1}},
+            {gfx11ISAs(),
+             {{
+                  // clang-format off
+                 "global_load_b32",
+                 "global_load_b64",
+                 "global_load_b96",
+                 "global_load_b128",
+                 "global_load_sbyte",
+                 "global_load_sbyte_d16",
+                 "global_load_sbyte_d16_hi",
+                 "global_load_short_d16",
+                 "global_load_short_d16_hi",
+                 "global_load_sshort",
+                 "global_load_ubyte",
+                 "global_load_ubyte_d16",
+                 "global_load_ubyte_d16_hi",
+                 "global_load_ushort",
+                 "scratch_load_b32",
+                 "scratch_load_b64",
+                 "scratch_load_b96",
+                 "scratch_load_b128",
+                 "scratch_load_sbyte",
+                 "scratch_load_sbyte_d16",
+                 "scratch_load_sbyte_d16_hi",
+                 "scratch_load_short_d16",
+                 "scratch_load_short_d16_hi",
+                 "scratch_load_sshort",
+                 "scratch_load_ubyte",
+                 "scratch_load_ubyte_d16",
+                 "scratch_load_ubyte_d16_hi",
+                 "scratch_load_ushort",
+                  // clang-format on
+              },
+              0,
+              {rocRoller::GPUWaitQueueType::LoadQueue},
+              (1 << 12) - 1}}, // the offset is a `signed` 13-bit  (i.e., -4096..4095)
+            {gfx11ISAs(),
+             {{
+                  // clang-format off
+                 "global_store_byte",
+                 "global_store_byte_d16_hi",
+                 "global_store_b32",
+                 "global_store_b64",
+                 "global_store_b96",
+                 "global_store_b128",
+                 "global_store_short",
+                 "global_store_short_d16_hi",
+                 "scratch_store_byte",
+                 "scratch_store_byte_d16_hi",
+                 "scratch_store_b32",
+                 "scratch_store_b64",
+                 "scratch_store_b96",
+                 "scratch_store_b128",
                  "scratch_store_short",
                  "scratch_store_short_d16_hi",
                   // clang-format on
@@ -814,6 +1000,31 @@ namespace GPUArchitectureGenerator
                  rocRoller::GPUInstructionInfo("v_accvgpr_read_b32", 0, {}, 1),
                  rocRoller::GPUInstructionInfo("v_accvgpr_write", 0, {}, 2),
                  rocRoller::GPUInstructionInfo("v_accvgpr_write_b32", 0, {}, 2),
+             }},
+            {gfx11ISAs(),
+             {
+                 rocRoller::GPUInstructionInfo(
+                     "s_buffer_load_b32", 1, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_buffer_load_b64", 2, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_buffer_load_b128", 2, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_buffer_load_b256", 2, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_buffer_load_b512", 2, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_load_b32", 0, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_load_b64", 0, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_load_b128", 0, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_load_b256", 0, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_load_b512", 0, {rocRoller::GPUWaitQueueType::SMemQueue}),
+                 rocRoller::GPUInstructionInfo(
+                     "s_sendmsg", 1, {rocRoller::GPUWaitQueueType::SendMsgQueue}),
              }},
             {gfx12ISAs(),
              {
@@ -1066,6 +1277,13 @@ namespace GPUArchitectureGenerator
                                                /*implicitAccess*/ false,
                                                /*branch*/ false,
                                                (1 << 16) - 1),
+             }},
+            {gfx115XISAs(),
+             {
+                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_f16", 0, {}, 16),
+                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_bf16", 0, {}, 16),
+                 rocRoller::GPUInstructionInfo("v_wmma_f16_16x16x16_f16", 0, {}, 16),
+                 rocRoller::GPUInstructionInfo("v_wmma_bf16_16x16x16_bf16", 0, {}, 16),
              }},
             {gfx120XISAs(),
              {

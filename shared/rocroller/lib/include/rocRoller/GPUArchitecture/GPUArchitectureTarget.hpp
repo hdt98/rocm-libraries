@@ -65,6 +65,10 @@ namespace rocRoller
         GFX1011,
         GFX1012,
         GFX1030,
+        GFX1150,
+        GFX1151,
+        GFX1152,
+        GFX1153,
         GFX1200,
         GFX1201,
 
@@ -137,6 +141,12 @@ namespace rocRoller
             return false;
         }
 
+        constexpr bool isRDNA35GPU() const
+        {
+            return gfx == GPUArchitectureGFX::GFX1150 || gfx == GPUArchitectureGFX::GFX1151
+                   || gfx == GPUArchitectureGFX::GFX1152 || gfx == GPUArchitectureGFX::GFX1153;
+        }
+
         constexpr bool isRDNA4GPU() const
         {
             return gfx == GPUArchitectureGFX::GFX1200 || gfx == GPUArchitectureGFX::GFX1201;
@@ -144,7 +154,7 @@ namespace rocRoller
 
         constexpr bool isRDNAGPU() const
         {
-            return isRDNA1GPU() || isRDNA2GPU() || isRDNA3GPU() || isRDNA4GPU();
+            return isRDNA1GPU() || isRDNA2GPU() || isRDNA3GPU() || isRDNA35GPU() || isRDNA4GPU();
         }
 
         constexpr bool isCDNAGPU() const
@@ -160,6 +170,11 @@ namespace rocRoller
         constexpr bool isGFX10GPU() const
         {
             return isRDNA1GPU() || isRDNA2GPU();
+        }
+
+        constexpr bool isGFX11GPU() const
+        {
+            return isRDNA3GPU() || isRDNA35GPU();
         }
 
         constexpr bool isGFX12GPU() const
@@ -203,7 +218,7 @@ namespace rocRoller
         return target.name();
     }
 
-    constexpr std::array<rocRoller::GPUArchitectureTarget, 16> SupportedArchitectures
+    constexpr std::array<rocRoller::GPUArchitectureTarget, 20> SupportedArchitectures
         = {GPUArchitectureTarget{GPUArchitectureGFX::GFX908},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX908, {.xnack = true}},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX908, {.sramecc = true}},
@@ -218,6 +233,10 @@ namespace rocRoller
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1012},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1012, {.xnack = true}},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1030},
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX1150},
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX1151},
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX1152},
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX1153},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}};
 }

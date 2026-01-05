@@ -43,9 +43,14 @@ namespace WMMAObserverUnitTests
             : TestContext(TestContext::ForTarget({gfx})){};
     };
 
-    TEST_CASE("Unit test observer regarding WMMA hazards on GFX1200/1201", "[observer]")
+    TEST_CASE("Unit test observer regarding WMMA hazards on GFX115x/120x", "[observer]")
     {
-        auto target = GENERATE(GPUArchitectureGFX::GFX1200, GPUArchitectureGFX::GFX1201);
+        auto                 target = GENERATE(GPUArchitectureGFX::GFX1150,
+                               GPUArchitectureGFX::GFX1151,
+                               GPUArchitectureGFX::GFX1152,
+                               GPUArchitectureGFX::GFX1153,
+                               GPUArchitectureGFX::GFX1200,
+                               GPUArchitectureGFX::GFX1201);
         WMMAObserverUnitTest t{target};
         std::string          opCode{"v_wmma_f32_16x16x16_f16"};
         auto                 ctx = t.get();

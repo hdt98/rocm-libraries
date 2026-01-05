@@ -168,12 +168,36 @@ TEST_F(GPUArchitectureTest, WaveFrontSize)
                   {GPUArchitectureGFX::GFX1030}, GPUCapability::DefaultWavefrontSize),
               32);
 
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->HasCapability({GPUArchitectureGFX::GFX1150},
+                                                                   GPUCapability::HasWave32),
+              true);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->HasCapability({GPUArchitectureGFX::GFX1151},
+                                                                   GPUCapability::HasWave32),
+              true);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->HasCapability({GPUArchitectureGFX::GFX1152},
+                                                                   GPUCapability::HasWave32),
+              true);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->HasCapability({GPUArchitectureGFX::GFX1153},
+                                                                   GPUCapability::HasWave32),
+              true);
     EXPECT_EQ(GPUArchitectureLibrary::getInstance()->HasCapability({GPUArchitectureGFX::GFX1200},
                                                                    GPUCapability::HasWave32),
               true);
     EXPECT_EQ(GPUArchitectureLibrary::getInstance()->HasCapability({GPUArchitectureGFX::GFX1201},
                                                                    GPUCapability::HasWave32),
               true);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->GetCapability(
+                  {GPUArchitectureGFX::GFX1150}, GPUCapability::DefaultWavefrontSize),
+              32);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->GetCapability(
+                  {GPUArchitectureGFX::GFX1151}, GPUCapability::DefaultWavefrontSize),
+              32);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->GetCapability(
+                  {GPUArchitectureGFX::GFX1152}, GPUCapability::DefaultWavefrontSize),
+              32);
+    EXPECT_EQ(GPUArchitectureLibrary::getInstance()->GetCapability(
+                  {GPUArchitectureGFX::GFX1153}, GPUCapability::DefaultWavefrontSize),
+              32);
     EXPECT_EQ(GPUArchitectureLibrary::getInstance()->GetCapability(
                   {GPUArchitectureGFX::GFX1200}, GPUCapability::DefaultWavefrontSize),
               32);
