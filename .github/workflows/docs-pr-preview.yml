@@ -21,7 +21,7 @@ on:
     branches:
       - '**'  # Any branch for testing
     types: [opened, synchronize, reopened, ready_for_review]
-  
+
   # For production: Comment trigger (only works after merge to DEFAULT branch)
   # Currently disabled for testing because workflow not in default branch yet
   # issue_comment:
