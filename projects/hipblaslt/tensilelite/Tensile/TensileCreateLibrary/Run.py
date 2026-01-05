@@ -327,7 +327,7 @@ def writeSolutionsAndKernels(
             assemblyTmpPath,
             compress,
         )
-        if not complexKernel:
+        if complexKernel:#not complexKernel:
             buildSourceCodeObjectFiles(
                 srcToolchain.compiler,
                 srcToolchain.bundler,
@@ -433,7 +433,7 @@ def writeSolutionsAndKernelsTCL(
     for ko in kernelHelperObjs:
         if ko.state["ProblemType"]["DataType"].isComplex(): complexKernel = True
 
-    if not complexKernel:
+    if complexKernel:#not complexKernel:
         buildSourceCodeObjectFiles(
             srcToolchain.compiler,
             srcToolchain.bundler,

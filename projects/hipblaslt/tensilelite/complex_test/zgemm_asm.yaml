@@ -28,78 +28,18 @@ GlobalParameters:
 
 BenchmarkProblems:
 
-  # - # zgemm NN
-  #   - # ProblemType
-  #     OperationType: GEMM
-  #     DataType: Z
-  #     DestDataType: Z
-  #     ComputeDataType: Z
-  #     TransposeA: False
-  #     TransposeB: False
-  #     UseBeta: True
-  #     Batched: True
-  #     # ComplexConjugateA: True
-
-  #   - # BenchmarkProblemSizeGroup - Assembly
-  #     InitialSolutionParameters:
-  #     BenchmarkCommonParameters:
-  #       # - LoopTail: [True]
-  #       # - EdgeType: ["ShiftPtr"]
-  #       - KernelLanguage: ["Assembly"]
-  #     ForkParameters:
-  #       # - StoreCInUnroll: [False]
-  #       - MatrixInstruction:
-  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-  #         # - [16, 16, 4, 1, 1, 2, 2, 2, 2]
-  #       # - ScheduleIterAlg: [1]
-  #       - GlobalSplitU: [1] #, 3]
-  #       - StreamK: [3]
-  #       - PrefetchLocalRead: [False]
-  #       - PrefetchGlobalRead: [True]
-  #       # - ThreadTile:
-  #         ##- [ 3, 5 ]
-  #         # - [ 2, 2 ]
-  #         # - [ 8, 8 ]
-  #       # - WorkGroup:
-  #         # - [ 32,  4,  1 ]
-  #         # - [  4,  4,  2 ]
-  #       - DepthU: [8] #,16,32]
-  #       # - VectorWidth: [-1]
-  #     BenchmarkForkParameters:
-  #     JoinParameters:
-  #     BenchmarkJoinParameters:
-  #     BenchmarkFinalParameters:
-  #       - ProblemSizes:
-  #         # - Exact: [32, 32, 1, 8]
-  #         - Exact: [16, 16, 1, 2]
-  #         # - Exact: [64, 64, 1, 16]
-  #         # - Exact: [64, 64, 1, 128]
-  #         # - Exact: [4096, 4096, 1, 8192]
-
-  #         # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
-  #         # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
-
-  - # zgemm CN
+  - # zgemm NN
     - # ProblemType
       OperationType: GEMM
       DataType: Z
       DestDataType: Z
       ComputeDataType: Z
-<<<<<<< HEAD
-      TransposeA: False
-      TransposeB: True
-      UseBeta: True
-      Batched: True
-      ComplexConjugateA: False
-      ComplexConjugateB: True
-=======
       UseBeta: True
       Batched: True
       TransposeA: False
       TransposeB: False
       ComplexConjugateA: False
       ComplexConjugateB: False
->>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -110,33 +50,13 @@ BenchmarkProblems:
       ForkParameters:
         # - StoreCInUnroll: [False]
         - MatrixInstruction:
-<<<<<<< HEAD
-        - StreamK: [3]
-=======
->>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
-          # - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
-          # - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
-          # - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
-          # - [16, 16, 4, 1, 1, 8, 4, 2, 2] #256x128
-          # - [16, 16, 4, 4, 1, 2, 2, 4, 1] #128x128 not-working
-          # - [16, 16, 4, 4, 4, 4, 4, 1, 4] #256x256 not-working
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
           # - [16, 16, 4, 1, 1, 2, 2, 2, 2]
-        - ScheduleIterAlg: [3]
+        # - ScheduleIterAlg: [1]
         - GlobalSplitU: [1] #, 3]
-<<<<<<< HEAD
-        # - StreamK: [3]
-        # - StreamKAtomic: [1]
-        # - StreamKXCCMapping: [0, 2]
-        # - StreamKFixupTreeReduction: [0, 1]
-        - PrefetchLocalRead: [1]
-        - PrefetchGlobalRead: [2]
-        # - 1LDSBuffer: [-1,0,1]
-
-=======
+        - StreamK: [3]
         - PrefetchLocalRead: [False]
         - PrefetchGlobalRead: [True]
->>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
         # - ThreadTile:
           ##- [ 3, 5 ]
           # - [ 2, 2 ]
@@ -151,20 +71,8 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-<<<<<<< HEAD
-
-          # - Exact: [2, 2, 1, 2]
-          - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 512] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
           # - Exact: [32, 32, 1, 8]
-          # - Exact: [16, 16, 1, 2]
-
-=======
-          # - Exact: [2, 2, 1, 2]
           - Exact: [16, 16, 1, 2]
->>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
           # - Exact: [64, 64, 1, 16]
           # - Exact: [64, 64, 1, 128]
           # - Exact: [4096, 4096, 1, 8192]
@@ -485,15 +393,9 @@ BenchmarkProblems:
   #         - Exact: [512, 512, 1, 32] #32x32
   
 LibraryLogic:
-<<<<<<< HEAD
   ScheduleName: "gfx950" #aquavanjaram for 942
   DeviceNames: ["Device 0049", "Device 0050"]
   ArchitectureName: "gfx950"
   # ScheduleName: aquavanjaram
   # DeviceNames: [Device 0049, Device 0050]
   # ArchitectureName: gfx942
-=======
-      ScheduleName: "gfx950"
-      DeviceNames: ["Device 0049", "Device 0050"]
-      ArchitectureName: "gfx950"
->>>>>>> b6e0b97267cc992ea79a34fe0e32716e7a7093af
