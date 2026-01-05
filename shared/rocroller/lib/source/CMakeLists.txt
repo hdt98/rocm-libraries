@@ -58,35 +58,8 @@ add_subdirectory(CodeGen)
 add_subdirectory(Costs)
 add_subdirectory(ExpressionTransformations)
 add_subdirectory(Observers)
-add_subdirectory(Utilities)
 add_subdirectory(Operations)
+add_subdirectory(Utilities)
 add_subdirectory(Parameters)
 add_subdirectory(Graph)
 add_subdirectory(KernelGraph)
-
-add_library(rocroller-no-rtti
-    OBJECT
-        "${CMAKE_CURRENT_SOURCE_DIR}/Utilities/ReadELF.cpp"
-)
-if(ROCROLLER_ENABLE_LLD)
-    target_compile_definitions(rocroller-no-rtti PRIVATE ROCROLLER_USE_LLD)
-    target_link_libraries(rocroller-no-rtti PRIVATE lldELF)
-    target_include_directories(rocroller-no-rtti
-        PRIVATE
-            "${LLVM_INCLUDE_DIRS}"
-    )
-endif()
-target_compile_options(rocroller-no-rtti PRIVATE -fno-rtti)
-target_compile_features(rocroller-no-rtti PRIVATE cxx_std_20)
-target_compile_definitions(rocroller-no-rtti
-    PUBLIC
-        ROCROLLER_USE_HIP
-        __HIP_PLATFORM_AMD__
-)
-target_link_libraries(rocroller-no-rtti PUBLIC rocroller-public-interface)
-
-target_link_libraries(rocroller PRIVATE $<BUILD_INTERFACE:rocroller-no-rtti>)
-
-set_target_properties(
-    rocroller-no-rtti PROPERTIES POSITION_INDEPENDENT_CODE ON # necessary?
-)
