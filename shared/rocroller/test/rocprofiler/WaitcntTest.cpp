@@ -132,23 +132,9 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-mode
 
     constexpr auto workgroupSize = 64u;
 
-    int instrDwords;
-    int strideMultiplier;
-    int write;
-
-    constexpr auto testIndividual = false;
-    if(testIndividual)
-    {
-        instrDwords      = 2;
-        strideMultiplier = 4;
-        write            = true;
-    }
-    else
-    {
-        instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-        write            = GENERATE(true, false);
-    }
+    int instrDwords      = GENERATE(1, 2, 4);
+    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+    int write            = GENERATE(true, false);
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -167,7 +153,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-mode
     SECTION(kernel.getSectionName())
     {
 
-        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel);
         INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
@@ -264,23 +250,9 @@ TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds
 
     constexpr auto workgroupSize = 64u;
 
-    int instrDwords;
-    int strideMultiplier;
-    int write;
-
-    constexpr auto testIndividual = false;
-    if(testIndividual)
-    {
-        instrDwords      = 4;
-        strideMultiplier = 4;
-        write            = false;
-    }
-    else
-    {
-        instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-        write            = GENERATE(true, false);
-    }
+    int instrDwords      = GENERATE(1, 2, 4);
+    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+    int write            = GENERATE(true, false);
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -299,7 +271,7 @@ TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds
     SECTION(kernel.getSectionName())
     {
 
-        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel);
         INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
@@ -402,23 +374,9 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 
     constexpr auto workgroupSize = 64u;
 
-    int instrDwords;
-    int strideMultiplier;
-    int write;
-
-    constexpr auto testIndividual = false;
-    if(testIndividual)
-    {
-        instrDwords      = 1;
-        strideMultiplier = 4;
-        write            = true;
-    }
-    else
-    {
-        instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-        write            = GENERATE(true, false);
-    }
+    int instrDwords      = GENERATE(1, 2, 4);
+    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+    int write            = GENERATE(true, false);
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -437,7 +395,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
     SECTION(kernel.getSectionName())
     {
 
-        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel);
         INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;

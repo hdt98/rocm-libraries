@@ -126,8 +126,7 @@ namespace rocRoller
      * @brief Helper function for profiling and collecting median latencies
      */
     KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
-                                                      LDSTestKernelBase& kernel,
-                                                      bool               testIndividual);
+                                                      LDSTestKernelBase& kernel);
 
     /**
      * @brief Analyzes latency deltas between model predictions and profiler measurements

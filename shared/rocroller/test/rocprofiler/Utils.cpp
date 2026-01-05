@@ -214,10 +214,8 @@ namespace rocRoller
     }
 
     KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
-                                                      LDSTestKernelBase& kernel,
-                                                      bool               testIndividual)
+                                                      LDSTestKernelBase& kernel)
     {
-        // AssertFatal(!testIndividual); // Avoid accidental check-in of individual test runs
         constexpr int NUM_RUNS = 5; // Should be odd, as median is used
 
         std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
@@ -253,11 +251,6 @@ namespace rocRoller
         }
 
         const auto infoStr = formatLatencyComparison(filteredInstructions, medianLatencies);
-        if(testIndividual)
-        {
-            Log::info(context.output());
-            Log::info(infoStr);
-        }
 
         return KernelLatencyResults{.filteredInstructions = std::move(filteredInstructions),
                                     .medianLatencies      = std::move(medianLatencies),

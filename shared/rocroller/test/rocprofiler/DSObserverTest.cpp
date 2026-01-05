@@ -132,23 +132,9 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
 
     constexpr auto workgroupSize = 64u;
 
-    int instrDwords;
-    int strideMultiplier;
-    int write;
-
-    constexpr auto testIndividual = false;
-    if(testIndividual)
-    {
-        instrDwords      = 4;
-        strideMultiplier = 4;
-        write            = false;
-    }
-    else
-    {
-        instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-        write            = GENERATE(true, false);
-    }
+    int instrDwords      = GENERATE(1, 2, 4);
+    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+    int write            = GENERATE(true, false);
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -167,7 +153,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
     SECTION(kernel.getSectionName())
     {
 
-        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel);
         INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
@@ -239,23 +225,9 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][
 
     const auto workgroupSize = GENERATE(64u);
 
-    int instrDwords;
-    int strideMultiplier;
-    int write;
-
-    constexpr auto testIndividual = false;
-    if(testIndividual)
-    {
-        instrDwords      = 4;
-        strideMultiplier = 32;
-        write            = false;
-    }
-    else
-    {
-        instrDwords      = GENERATE(1, 2, 4);
-        strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-        write            = GENERATE(true, false);
-    }
+    int instrDwords      = GENERATE(1, 2, 4);
+    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+    int write            = GENERATE(true, false);
 
     const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
@@ -274,7 +246,7 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][scheduler][lds-model][
     SECTION(kernel.getSectionName())
     {
 
-        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel);
         INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
