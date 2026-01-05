@@ -1,12 +1,13 @@
 # Create a documentation preview in the pull request 
 # --------------------------------------------------
-# This GitHub Actions workflow triggers by openning/updating a PR. If the PR changes any
-# docs content, it will build the change and display the preview.
+# This GitHub Actions workflow triggers by opening/updating a PR. If the PR changes any
+# docs content, it will build the change and display the preview via Netlify.
+#
 # Key Steps:
 # 1. Use the script (.github/scripts/pr_detect_changed_subtrees.py) to detect changed project
 # 2. Build the environment and dependencies using project's requirements.txt
-# 3. Build the documentation using sphinx and doxygen
-# 4. Deploy the page onto github-pages 
+# 3. Build the documentation using Sphinx and Doxygen
+# 4. Deploy the preview to Netlify
 #
 # This blocks changes that can potentially broke the docs build, also provides a look
 # and feel to the reviewer. Note if multiple projects are involved in one PR, the workflow
@@ -26,8 +27,7 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
+  pull-requests: write
 
 jobs:
   build:
@@ -115,19 +115,19 @@ jobs:
             echo "No requirements.txt found at $REQ_FILE, skipping."
           fi
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+      # Deploy to Netlify
+      - name: Deploy PR preview to Netlify
+        if: steps.extract.outputs.project
+        uses: nwtgck/actions-netlify@v3.0
         with:
-          path: ${{ steps.extract.outputs.project }}/docs/_build/html
-  
-  # Deploy the content onto github-pages
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          publish-dir: ${{ steps.extract.outputs.project }}/docs/_build/html
+          production-deploy: false
+          github-token: ${{ steps.generate-token.outputs.token }}
+          deploy-message: "Deploy preview for PR #${{ github.event.pull_request.number }}"
+          alias: pr-${{ github.event.pull_request.number }}
+          enable-pull-request-comment: true
+          enable-commit-comment: false
+          overwrites-pull-request-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_PAT }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_PROJECT_ID }}
