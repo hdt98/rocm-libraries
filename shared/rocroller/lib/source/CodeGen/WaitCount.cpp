@@ -37,6 +37,7 @@ namespace rocRoller
     {
         m_isSplitCounter = arch.HasCapability(GPUCapability::HasSplitWaitCounters);
         m_hasVSCnt       = arch.HasCapability(GPUCapability::SeparateVscnt);
+        m_vsCntHasDest   = arch.target().isGFX11GPU();
         m_hasEXPCnt      = arch.HasCapability(GPUCapability::HasExpcnt);
         if(message.length() > 0)
         {
@@ -59,6 +60,7 @@ namespace rocRoller
         , m_expcnt(expcnt)
         , m_isSplitCounter(arch.HasCapability(GPUCapability::HasSplitWaitCounters))
         , m_hasVSCnt(arch.HasCapability(GPUCapability::SeparateVscnt))
+        , m_vsCntHasDest(arch.target().isGFX11GPU())
         , m_hasEXPCnt(arch.HasCapability(GPUCapability::HasExpcnt))
     {
     }
@@ -449,7 +451,7 @@ namespace rocRoller
         {
             AssertFatal(m_hasVSCnt, "VSCnt is not a valid counter in target architecture");
 
-            os << "s_waitcnt_vscnt " << m_vscnt;
+            os << "s_waitcnt_vscnt " << (m_vsCntHasDest ? "null " : "") << m_vscnt;
 
             if(commentIter != m_comments.end())
             {

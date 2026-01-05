@@ -243,10 +243,13 @@ namespace rocRoller
         AssertFatal(numBytes > 0 && (numBytes < m_wordSize || numBytes % m_wordSize == 0),
                     "Invalid number of bytes");
 
-        auto ctx = m_context.lock();
-        co_yield addLargerOffset2Addr(offset, addr, "global_load_dword");
+        auto        ctx = m_context.lock();
+        const auto& gpu = ctx->targetArchitecture().target();
+        co_yield addLargerOffset2Addr(
+            offset, addr, gpu.isGFX11GPU() ? "global_load_b32" : "global_load_dword");
 
-        co_yield addLargerOffset2Addr(offset, addr, "flat_load_dword");
+        co_yield addLargerOffset2Addr(
+            offset, addr, gpu.isGFX11GPU() ? "flat_load_b32" : "flat_load_dword");
 
         if(numBytes < m_wordSize)
         {
@@ -289,13 +292,18 @@ namespace rocRoller
             {
                 auto width = chooseWidth(
                     numWords - count, potentialWords, ctx->kernelOptions()->loadGlobalWidth);
-                auto offsetModifier = genOffsetModifier(offset + count * m_wordSize);
-                co_yield_(Instruction(
-                    concatenate("global_load_dword", width == 1 ? "" : "x" + std::to_string(width)),
-                    {dest->subset(Generated(iota(count, count + width)))},
-                    {addr},
-                    {"off", offsetModifier},
-                    "Load value"));
+                auto        offsetModifier = genOffsetModifier(offset + count * m_wordSize);
+                std::string opString;
+                if(gpu.isGFX11GPU())
+                    opString = "global_load_b" + std::to_string(width * 32);
+                else
+                    opString
+                        = "global_load_dword" + (width == 1 ? "" : "x" + std::to_string(width));
+                co_yield_(Instruction(opString,
+                                      {dest->subset(Generated(iota(count, count + width)))},
+                                      {addr},
+                                      {"off", offsetModifier},
+                                      "Load value"));
                 count += width;
             }
         }
@@ -314,10 +322,13 @@ namespace rocRoller
         AssertFatal(numBytes > 0 && (numBytes < m_wordSize || numBytes % m_wordSize == 0),
                     "Invalid number of bytes");
 
-        auto ctx = m_context.lock();
-        co_yield addLargerOffset2Addr(offset, addr, "global_store_dword");
+        auto        ctx = m_context.lock();
+        const auto& gpu = ctx->targetArchitecture().target();
+        co_yield addLargerOffset2Addr(
+            offset, addr, gpu.isGFX11GPU() ? "global_store_b32" : "global_store_dword");
 
-        co_yield addLargerOffset2Addr(offset, addr, "flat_store_dword");
+        co_yield addLargerOffset2Addr(
+            offset, addr, gpu.isGFX11GPU() ? "flat_store_b32" : "flat_store_dword");
 
         if(numBytes < m_wordSize)
         {
@@ -361,9 +372,18 @@ namespace rocRoller
                 auto width = chooseWidth(
                     numWords - count, potentialWords, ctx->kernelOptions()->storeGlobalWidth);
                 // Find the largest store instruction that can be used
-                auto offsetModifier = genOffsetModifier(offset + count * m_wordSize);
-                co_yield_(Instruction(concatenate("global_store_dword",
-                                                  width == 1 ? "" : "x" + std::to_string(width)),
+                auto        offsetModifier     = genOffsetModifier(offset + count * m_wordSize);
+                std::string instruction_string = "";
+                if(gpu.isGFX11GPU())
+                {
+                    instruction_string = concatenate("global_store_b", std::to_string(width * 32));
+                }
+                else
+                {
+                    instruction_string = concatenate("global_store_dword",
+                                                     width == 1 ? "" : "x" + std::to_string(width));
+                }
+                co_yield_(Instruction(instruction_string,
                                       {},
                                       {addr, data->subset(Generated(iota(count, count + width)))},
                                       {"off", offsetModifier},
@@ -388,17 +408,26 @@ namespace rocRoller
 
         auto offsetLiteral = Register::Value::Literal(offset);
 
-        std::string instruction_string
-            = concatenate("s_load_dword",
-                          (numBytes > 4 ? "x" : ""),
-                          (numBytes > 4 ? std::to_string(numBytes / 4) : ""));
+        auto        ctx                = m_context.lock();
+        const auto& gpu                = ctx->targetArchitecture().target();
+        std::string instruction_string = "";
+        if(gpu.isGFX11GPU())
+        {
+            instruction_string
+                = concatenate("s_load_b", (numBytes > 4 ? std::to_string(numBytes * 8) : "32"));
+        }
+        else
+        {
+            instruction_string = concatenate("s_load_dword",
+                                             (numBytes > 4 ? "x" : ""),
+                                             (numBytes > 4 ? std::to_string(numBytes / 4) : ""));
+        }
 
         std::string modifier = glc ? "glc" : "";
 
         co_yield_(Instruction(
             instruction_string, {dest}, {base, offsetLiteral}, {modifier}, "Load scalar value"));
 
-        auto ctx = m_context.lock();
         if(ctx->kernelOptions()->alwaysWaitAfterLoad)
             co_yield Instruction::Wait(
                 WaitCount::Zero(ctx->targetArchitecture(), "DEBUG: Wait after load"));
@@ -415,17 +444,25 @@ namespace rocRoller
 
         auto offsetLiteral = Register::Value::Literal(offset);
 
-        std::string instruction_string
-            = concatenate("s_store_dword",
-                          (numBytes > 4 ? "x" : ""),
-                          (numBytes > 4 ? std::to_string(numBytes / 4) : ""));
-
+        auto        ctx                = m_context.lock();
+        const auto& gpu                = ctx->targetArchitecture().target();
+        std::string instruction_string = "";
+        if(gpu.isGFX11GPU())
+        {
+            instruction_string
+                = concatenate("s_store_b", (numBytes > 4 ? std::to_string(numBytes * 8) : "32"));
+        }
+        else
+        {
+            instruction_string = concatenate("s_store_dword",
+                                             (numBytes > 4 ? "x" : ""),
+                                             (numBytes > 4 ? std::to_string(numBytes / 4) : ""));
+        }
         std::string modifier = glc ? "glc" : "";
 
         co_yield_(Instruction(
             instruction_string, {}, {data, addr, offsetLiteral}, {modifier}, "Store scalar value"));
 
-        auto ctx = m_context.lock();
         if(ctx->kernelOptions()->alwaysWaitAfterStore)
             co_yield Instruction::Wait(
                 WaitCount::Zero(ctx->targetArchitecture(), "DEBUG: Wait after store"));
@@ -606,8 +643,11 @@ namespace rocRoller
                     "Operation doesn't support hi argument for sizes of "
                         + std::to_string(numBytes));
 
-        auto ctx = m_context.lock();
-        co_yield addLargerOffset2Addr(offset, addr, "buffer_load_dword");
+        auto        ctx     = m_context.lock();
+        const auto& gpu     = ctx->targetArchitecture().target();
+        std::string opStart = "buffer_load_";
+
+        co_yield addLargerOffset2Addr(offset, addr, opStart + (gpu.isGFX11GPU() ? "b32" : "dword"));
 
         std::string offsetModifier = "", glc = "", slc = "", lds = "";
         if(buffOpts.offen || offset == 0)
@@ -641,22 +681,22 @@ namespace rocRoller
                 {
                     AssertFatal(m_context.lock()->targetArchitecture().HasCapability(
                         GPUCapability::HasMFMA_fp8));
-                    opEnd += "ubyte_d16_hi";
+                    opEnd += gpu.isGFX11GPU() ? "d16_hi_u8" : "ubyte_d16_hi";
                 }
                 else
-                    opEnd += "ubyte";
+                    opEnd += gpu.isGFX11GPU() ? "u8" : "ubyte";
             }
             else if(numBytes == 2)
             {
                 if(high)
-                    opEnd += "short_d16_hi";
+                    opEnd += gpu.isGFX11GPU() ? "d16_hi_b16" : "short_d16_hi";
                 else
-                    opEnd += "ushort";
+                    opEnd += gpu.isGFX11GPU() ? "u16" : "ushort";
             }
-            const auto& gpu = ctx->targetArchitecture().target();
-            const auto  soffset
-                = gpu.isGFX12GPU() ? Register::Value::NullLiteral() : Register::Value::Literal(0);
-            co_yield_(Instruction("buffer_load_" + opEnd,
+            const auto soffset = gpu.isGFX11GPU() || gpu.isGFX12GPU()
+                                     ? Register::Value::NullLiteral()
+                                     : Register::Value::Literal(0);
+            co_yield_(Instruction(opStart + opEnd,
                                   {dest},
                                   {addr, sgprSrd, soffset},
                                   {"offen", offsetModifier, glc, slc, lds},
@@ -672,15 +712,24 @@ namespace rocRoller
             {
                 auto width = chooseWidth(
                     numWords - count, potentialWords, ctx->kernelOptions()->loadGlobalWidth);
-                auto       offsetModifier = genOffsetModifier(offset + count * m_wordSize);
-                const auto soffset        = gpu.isGFX12GPU() ? Register::Value::NullLiteral()
-                                                             : Register::Value::Literal(0);
-                co_yield_(Instruction(
-                    concatenate("buffer_load_dword", width == 1 ? "" : "x" + std::to_string(width)),
-                    {dest->subset(Generated(iota(count, count + width)))},
-                    {addr, sgprSrd, soffset},
-                    {"offen", offsetModifier, glc, slc, lds},
-                    "Load value"));
+                auto        offsetModifier = genOffsetModifier(offset + count * m_wordSize);
+                const auto  soffset        = gpu.isGFX11GPU() || gpu.isGFX12GPU()
+                                                 ? Register::Value::NullLiteral()
+                                                 : Register::Value::Literal(0);
+                std::string opFull;
+                if(gpu.isGFX11GPU())
+                {
+                    opFull = concatenate(opStart, "b", std::to_string(width * 32));
+                }
+                else
+                {
+                    opFull = concatenate(opStart, width == 1 ? "" : "x" + std::to_string(width));
+                }
+                co_yield_(Instruction(opFull,
+                                      {dest->subset(Generated(iota(count, count + width)))},
+                                      {addr, sgprSrd, soffset},
+                                      {"offen", offsetModifier, glc, slc, lds},
+                                      "Load value"));
                 count += width;
             }
         }
@@ -784,8 +833,10 @@ namespace rocRoller
                         && ((numBytes < m_wordSize && numBytes != 3) || numBytes % m_wordSize == 0),
                     "Invalid number of bytes");
 
-        auto ctx = m_context.lock();
-        co_yield addLargerOffset2Addr(offset, addr, "buffer_store_dword");
+        auto        ctx     = m_context.lock();
+        const auto& gpu     = ctx->targetArchitecture().target();
+        std::string opStart = "buffer_store_";
+        co_yield addLargerOffset2Addr(offset, addr, opStart + (gpu.isGFX11GPU() ? "b32" : "dword"));
 
         std::string offsetModifier = "", glc = "", slc = "", sc1 = "", lds = "";
         if(buffOpts.offen || offset == 0)
@@ -830,24 +881,29 @@ namespace rocRoller
             AssertFatal(numBytes <= 2);
             if(numBytes == 1)
             {
-                opEnd += "byte";
                 if(high)
                 {
                     AssertFatal(m_context.lock()->targetArchitecture().HasCapability(
                         GPUCapability::HasMFMA_fp8));
-                    opEnd += "_d16_hi";
+                    opEnd += gpu.isGFX11GPU() ? "d16_hi_b8" : "byte_d16_hi";
+                }
+                else
+                {
+                    opEnd += gpu.isGFX11GPU() ? "b8" : "byte";
                 }
             }
             else if(numBytes == 2)
             {
-                opEnd += "short";
                 if(high)
-                    opEnd += "_d16_hi";
+                    opEnd += gpu.isGFX11GPU() ? "d16_hi_b16" : "short_d16_hi";
+                else
+                    opEnd += gpu.isGFX11GPU() ? "b16" : "short";
             }
-            const auto& gpu = ctx->targetArchitecture().target();
-            const auto  soffset
-                = gpu.isGFX12GPU() ? Register::Value::NullLiteral() : Register::Value::Literal(0);
-            co_yield_(Instruction("buffer_store_" + opEnd,
+            const auto& gpu     = ctx->targetArchitecture().target();
+            const auto  soffset = gpu.isGFX11GPU() || gpu.isGFX12GPU()
+                                      ? Register::Value::NullLiteral()
+                                      : Register::Value::Literal(0);
+            co_yield_(Instruction(opStart + opEnd,
                                   {},
                                   {data, addr, sgprSrd, soffset},
                                   {"offen", offsetModifier, glc, slc, sc1, lds},
@@ -879,10 +935,15 @@ namespace rocRoller
                 {
                     dataSubset = data->subset(Generated(iota(count, count + width)));
                 }
-                const auto soffset = gpu.isGFX12GPU() ? Register::Value::NullLiteral()
-                                                      : Register::Value::Literal(0);
-                co_yield_(Instruction(concatenate("buffer_store_dword",
-                                                  width == 1 ? "" : "x" + std::to_string(width)),
+                const auto  soffset = gpu.isGFX11GPU() || gpu.isGFX12GPU()
+                                          ? Register::Value::NullLiteral()
+                                          : Register::Value::Literal(0);
+                std::string opFull;
+                if(gpu.isGFX11GPU())
+                    opFull = concatenate(opStart, "b", std::to_string(width * 32));
+                else
+                    opFull = concatenate(opStart, width == 1 ? "" : "x" + std::to_string(width));
+                co_yield_(Instruction(opFull,
                                       {},
                                       {dataSubset, addr, sgprSrd, soffset},
                                       {"offen", offsetModifier, glc, slc, sc1, lds},

@@ -32,7 +32,7 @@ namespace MatrixMultiplyTest
     namespace SolutionParams = rocRoller::Parameters::Solution;
 
     // Params are: (AB type, waveK), (transA, transB), loadPathAB
-    class WMMATestGFX120X
+    class WMMATestRDNAGPU
         : public BaseMatrixMultiplyContextFixture<std::tuple<std::pair<rocRoller::DataType, int>,
                                                              std::pair<std::string, std::string>,
                                                              SolutionParams::LoadPath>>
@@ -40,7 +40,7 @@ namespace MatrixMultiplyTest
     };
 
     // Params are: (AB type, waveK), (transA, transB), loadPathAB
-    class F16AccWMMATestGFX120X
+    class F16AccWMMATestRDNAGPU
         : public BaseMatrixMultiplyContextFixture<std::tuple<std::pair<rocRoller::DataType, int>,
                                                              std::pair<std::string, std::string>,
                                                              SolutionParams::LoadPath>>
@@ -48,7 +48,7 @@ namespace MatrixMultiplyTest
     };
 
     // Params are: A type, B type, waveK, (transA, transB), loadPathAB
-    class MixedWMMATestGFX120X
+    class MixedWMMATestRDNAGPU
         : public BaseMatrixMultiplyContextFixture<std::tuple<rocRoller::DataType,
                                                              rocRoller::DataType,
                                                              int,
@@ -58,12 +58,12 @@ namespace MatrixMultiplyTest
     };
 
     // Params: waveK, laodPathAB
-    class ABCWMMATestGFX120X
+    class ABCWMMATestRDNAGPU
         : public BaseMatrixMultiplyContextFixture<std::tuple<int, SolutionParams::LoadPath>>
     {
     };
 
-    TEST_P(WMMATestGFX120X, GPU_MatrixMultiplyMacroTileWMMA)
+    TEST_P(WMMATestRDNAGPU, GPU_MatrixMultiplyMacroTileWMMA)
     {
         const auto [typeAndWaveK, transOp, loadPathB] = std::get<1>(GetParam());
         const auto [typeAB, waveK]                    = typeAndWaveK;
@@ -95,7 +95,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(F16AccWMMATestGFX120X, GPU_MatrixMultiplyMacroTileWMMA)
+    TEST_P(F16AccWMMATestRDNAGPU, GPU_MatrixMultiplyMacroTileWMMA)
     {
         const auto [typeAndWaveK, transOp, loadPathB] = std::get<1>(GetParam());
         const auto [dataType, waveK]                  = typeAndWaveK;
@@ -140,7 +140,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(WMMATestGFX120X, GPU_MatrixMultiplyABWMMA)
+    TEST_P(WMMATestRDNAGPU, GPU_MatrixMultiplyABWMMA)
     {
         const auto [typeAndWaveK, transOp, loadPathAB] = std::get<1>(GetParam());
         const auto [typeAB, waveK]                     = typeAndWaveK;
@@ -173,7 +173,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(F16AccWMMATestGFX120X, GPU_MatrixMultiplyABWMMA)
+    TEST_P(F16AccWMMATestRDNAGPU, GPU_MatrixMultiplyABWMMA)
     {
         const auto [typeAndWaveK, transOp, loadPathAB] = std::get<1>(GetParam());
         const auto [typeAB, waveK]                     = typeAndWaveK;
@@ -218,7 +218,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(MixedWMMATestGFX120X, GPU_MatrixMultiplyMacroTileMixedWMMA)
+    TEST_P(MixedWMMATestRDNAGPU, GPU_MatrixMultiplyMacroTileMixedWMMA)
     {
         const auto [typeA, typeB, waveK, transOp, loadPathB] = std::get<1>(GetParam());
         const auto [transA, transB]                          = transOp;
@@ -266,7 +266,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(MixedWMMATestGFX120X, GPU_MatrixMultiplyABMixedWMMA)
+    TEST_P(MixedWMMATestRDNAGPU, GPU_MatrixMultiplyABMixedWMMA)
     {
         const auto [typeA, typeB, waveK, transOp, loadPathAB] = std::get<1>(GetParam());
         const auto [transA, transB]                           = transOp;
@@ -316,7 +316,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(ABCWMMATestGFX120X, GPU_MatrixMultiplyABCF16AccWMMAFP16)
+    TEST_P(ABCWMMATestRDNAGPU, GPU_MatrixMultiplyABCF16AccWMMAFP16)
     {
         const auto [waveK, loadPathAB] = std::get<1>(GetParam());
         REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_F16_ACC);
@@ -337,7 +337,7 @@ namespace MatrixMultiplyTest
         EXPECT_EQ(countSubstring(generatedCode, wmmaMnemonic), numWMMAs);
     }
 
-    TEST_P(ABCWMMATestGFX120X, GPU_MatrixMultiplyABCF16AccWMMABFloat16)
+    TEST_P(ABCWMMATestRDNAGPU, GPU_MatrixMultiplyABCF16AccWMMABFloat16)
     {
         const auto [waveK, loadPathAB] = std::get<1>(GetParam());
         REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_F16_ACC);
@@ -359,10 +359,14 @@ namespace MatrixMultiplyTest
     }
 
     INSTANTIATE_TEST_SUITE_P(
-        MatrixMultiply120X,
-        WMMATestGFX120X,
+        MatrixMultiplyRDNAGPU,
+        WMMATestRDNAGPU,
         ::testing::Combine(
-            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
+            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1150},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1151},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1152},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1153},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
                               GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}),
             ::testing::Combine(
                 ::testing::Values(std::make_pair(rocRoller::DataType::Half, /*waveK*/ 16),
@@ -374,10 +378,14 @@ namespace MatrixMultiplyTest
                 ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR))));
 
     INSTANTIATE_TEST_SUITE_P(
-        MatrixMultiply120X,
-        F16AccWMMATestGFX120X,
+        MatrixMultiplyRDNAGPU,
+        F16AccWMMATestRDNAGPU,
         ::testing::Combine(
-            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
+            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1150},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1151},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1152},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1153},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
                               GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}),
             ::testing::Combine(
                 ::testing::Values(std::make_pair(rocRoller::DataType::Half, /*waveK*/ 16),
@@ -389,8 +397,8 @@ namespace MatrixMultiplyTest
                 ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR))));
 
     INSTANTIATE_TEST_SUITE_P(
-        MatrixMultiply120X,
-        MixedWMMATestGFX120X,
+        MatrixMultiplyRDNAGPU,
+        MixedWMMATestRDNAGPU,
         ::testing::Combine(
             ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
                               GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}),
@@ -405,19 +413,27 @@ namespace MatrixMultiplyTest
                 ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR))));
 
     INSTANTIATE_TEST_SUITE_P(
-        MatrixMultiplyABC120X,
-        ABCWMMATestGFX120X,
+        MatrixMultiplyABCRDNAGPU,
+        ABCWMMATestGFXRDNAGPU,
         ::testing::Combine(
-            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
+            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1150},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1151},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1152},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1153},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
                               GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}),
             ::testing::Combine(::testing::Values(/*waveK*/ 16),
                                ::testing::Values(SolutionParams::LoadPath::BufferToVGPR))));
 
     INSTANTIATE_TEST_SUITE_P(
-        MatrixMultiplyABCWMMA120X,
-        ABCWMMATestGFX120X,
+        MatrixMultiplyABCWMMARDNAGPU,
+        ABCWMMATestGFXRDNAGPU,
         ::testing::Combine(
-            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
+            ::testing::Values(GPUArchitectureTarget{GPUArchitectureGFX::GFX1150},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1151},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1152},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1153},
+                              GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
                               GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}),
             ::testing::Combine(::testing::Values(/*waveK*/ 16),
                                ::testing::Values(SolutionParams::LoadPath::BufferToVGPR))));
