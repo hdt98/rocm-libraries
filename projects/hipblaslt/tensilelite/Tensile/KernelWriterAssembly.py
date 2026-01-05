@@ -713,6 +713,23 @@ class KernelWriterAssembly(KernelWriter):
     module.add(MacroVMagicDiv(kernel["MagicDivAlg"]))
 
     tPM = tPA["tpsMetadata"] if tPA["is_sparse"] else tPB["tpsMetadata"]
+    
+    ########################################
+    # VGPR Macros
+    ########################################
+    module.addComment2("Siavash")
+    module.addComment2("LDS Assignments")
+
+    ldsSize = kernel["LdsNumBytes"]
+    module.add(ValueSet("LDSBufferSize1Iter", ldsSize, format=1))
+    totalLDSSize = ldsSize * kernel["1LDSBuffer"] 
+    module.add(ValueSet("LDSBufferSizeTotal", ldsSize, format=1))
+    
+    if kernel["1LDSBuffer"] > 1:
+      self.defineSgpr("LocalWriteAddrATmp", 2, 2)
+      self.defineSgpr("LocalWriteAddrBTmp", 2, 2)
+      
+
     ########################################
     # VGPR Macros
     ########################################
@@ -8822,22 +8839,40 @@ class KernelWriterAssembly(KernelWriter):
 
     if needSwap:
       #fixme-iui  need to use wrapping increment for double or triple buffering:
-
-      if internalPointerSwap and not kernel["StoreSwapAddr"]:
-        tP["localWriteSwapByteOffset"] = 0 if tP["localWriteSwapByteOffset"] else kernel["LdsOffsetA_Blk"]
-        module.addComment1("(EPS=1) local write swap internal offset -> %u" % tP["localWriteSwapByteOffset"])
-      else:
-        src0Val = None
-        if kernel["StoreSwapAddr"]:
-          if kernel["LocalWriteUseSgpr%s"%tc]:
-            src0Val = sgpr("Swap%s"%tc)
-          else:
-            src0Val = vgpr("LocalWriteSwapAddr%s"%tc)
+      if kernel['1LDSBuffer'] == 2:
+        # @Siavash use wrapping incremet if we have more than 3 LDSBuffer
+        
+        module.add(SAddU32(dst=sgpr("LocalWriteAddrA"), src0=sgpr("LocalWriteAddrA"), src1="LDSBufferSize"))
+        module.add(SAddU32(dst=sgpr("LocalWriteAddrB"), src0=sgpr("LocalWriteAddrB"), src1="LDSBufferSize"))
+        module.add(SSubU32(dst=sgpr("LocalWriteAddrATmp"), src0=sgpr("LocalWriteAddrA"), src1="TotalLDSBufferSize"))
+        module.add(SSubU32(dst=sgpr("LocalWriteAddrBTmp"), src0=sgpr("LocalWriteAddrB"), src1="TotalLDSBufferSize"))
+        module.add(SCSelectB32(dst=sgpr("LocalWriteAddrA"), src0=sgpr("LocalWriteAddrATmp"), src1=sgpr("LocalWriteAddrATmp")))
+        module.add(SCSelectB32(dst=sgpr("LocalWriteAddrB"), src0=sgpr("LocalWriteAddrBTmp"), src1=sgpr("LocalWriteAddrBTmp")))
+        
+        # s_add_u32 s[sgprLocalWriteAddrA], s[sgprLocalWriteAddrA], LDSBufferSize
+        # s_add_u32 s[sgprLocalWriteAddrB], s[sgprLocalWriteAddrB], LDSBufferSize
+        # s_sub_u32 s[sgprTmp0], s[sgprLocalWriteAddrA], TotalLDSBufferSize
+        # s_sub_u32 s[sgprTmp1], s[sgprLocalWriteAddrB], TotalLDSBufferSize
+        # s_cmp_ge_u32 s[sgprLocalWriteAddrA], TotalLDSBufferSize
+        # s_cselect_b32 s[sgprLocalWriteAddrA], s[sgprTmp0], s[sgprLocalWriteAddrA]
+        # s_cselect_b32 s[sgprLocalWriteAddrB], s[sgprTmp1], s[sgprLocalWriteAddrB]
+        pass
+      else:  
+        if internalPointerSwap and not kernel["StoreSwapAddr"]:
+          tP["localWriteSwapByteOffset"] = 0 if tP["localWriteSwapByteOffset"] else kernel["LdsOffsetA_Blk"]
+          module.addComment1("(EPS=1) local write swap internal offset -> %u" % tP["localWriteSwapByteOffset"])
         else:
-          # Using inlined constants
-          src0Val = hex(kernel["LdsOffsetA_Blk"])
-        numLwa = self.states.a.numVgprLocalWriteAddr if tP["isA"] else self.states.b.numVgprLocalWriteAddr
-        localWriteSwapXOR(tc, src0Val, numLwa)
+          src0Val = None
+          if kernel["StoreSwapAddr"]:
+            if kernel["LocalWriteUseSgpr%s"%tc]:
+              src0Val = sgpr("Swap%s"%tc)
+            else:
+              src0Val = vgpr("LocalWriteSwapAddr%s"%tc)
+          else:
+            # Using inlined constants
+            src0Val = hex(kernel["LdsOffsetA_Blk"])
+          numLwa = self.states.a.numVgprLocalWriteAddr if tP["isA"] else self.states.b.numVgprLocalWriteAddr
+          localWriteSwapXOR(tc, src0Val, numLwa)
 
     # This used to control where to store the metadata
     if needMetaSwap:

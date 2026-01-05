@@ -279,7 +279,13 @@ def writeSolutionsAndKernels(
         itertools.repeat(splitGSU),
         asmKernels
     )
-    asmResults = ParallelMap2(processKernelSource, asmIter, "Generating assembly kernels", return_as="list")
+    
+    asmResults = [] 
+    for item in asmIter: 
+        result = processKernelSource(*item) 
+        asmResults.append(result)
+    
+    # asmResults = ParallelMap2(processKernelSource, asmIter, "Generating assembly kernels", return_as="list")
     removeInvalidSolutionsAndKernels(
         asmResults, asmKernels, solutions, errorTolerant, getVerbosity(), splitGSU
     )

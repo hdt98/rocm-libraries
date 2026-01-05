@@ -251,7 +251,7 @@ validParameters = { # we need to make sure this matches develop
     #    SIA2: 1LDSBuffer is set to 1 natively
     #    SIA3: 1LDSBuffer works only when PGR=True
     # TODO: optimize scheduling to support more cases.
-    "1LDSBuffer": [-1, 0, 1],
+    "1LDSBuffer": [-1, 0, 1, 2],
     # Split the unroll summation into multiple sections and combine the sections
     # GSU applies only to the unroll summation dimension
     # Set to 0 to disable GSU, kernel code will be generated without GSU support
