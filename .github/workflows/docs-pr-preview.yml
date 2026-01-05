@@ -1,4 +1,4 @@
-# Create a documentation preview in the pull request 
+# Create a documentation preview in the pull request
 # --------------------------------------------------
 # This GitHub Actions workflow triggers by opening/updating a PR. If the PR changes any
 # docs content, it will build the change and display the preview via Netlify.
