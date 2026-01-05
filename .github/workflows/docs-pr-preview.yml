@@ -16,12 +16,6 @@
 name: Docs Preview
 
 on:
-  pull_request_target:
-    # branches:
-    #   - 'develop'
-    #   - 'docs/**'
-    types: [opened, synchronize, reopened, ready_for_review]
-
   issue_comment:
     types: [created, edited]
 
@@ -32,14 +26,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Only run if either:
-    # 1. PR modifies docs files
-    # 2. A comment "/docs-check" is made on a PR
+    # Only run when '/preview-docs' is commented on a PR
     if: |
-      github.event_name == 'pull_request_target' ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request &&
-       contains(github.event.comment.body, '/docs-check'))
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/preview-docs')
     steps:
       - name: Generate a token
         id: generate-token
@@ -71,14 +62,14 @@ jobs:
           git config user.name "assistant-librarian[bot]"
           git config user.email "assistant-librarian[bot]@users.noreply.github.com"
 
-      - name: Detect changed subtrees from merged PR
+      - name: Detect changed subtrees from PR
         id: detect
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           python .github/scripts/pr_detect_changed_subtrees.py \
             --repo "${{ github.repository }}" \
-            --pr "${{ github.event.pull_request.number }}" \
+            --pr "${{ github.event.issue.number }}" \
             --config ".github/repos-config.json" \
             --require-auto-push
 
@@ -88,11 +79,21 @@ jobs:
           project=$(echo "${{ steps.detect.outputs.subtrees }}" | head -n1)
           echo "project=$project" >> $GITHUB_OUTPUT
 
+      - name: Get PR details
+        if: steps.extract.outputs.project
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          PR_DATA=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          echo "head_sha=$(echo $PR_DATA | jq -r .head.sha)" >> $GITHUB_OUTPUT
+          echo "pr_number=$(echo $PR_DATA | jq -r .number)" >> $GITHUB_OUTPUT
+
       - name: Checkout full repo with changed project
         if: steps.extract.outputs.project
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ steps.pr.outputs.head_sha }}
           sparse-checkout: |
             .github
             ${{ steps.extract.outputs.project }}
@@ -123,8 +124,8 @@ jobs:
           publish-dir: ${{ steps.extract.outputs.project }}/docs/_build/html
           production-deploy: false
           github-token: ${{ steps.generate-token.outputs.token }}
-          deploy-message: "Deploy preview for PR #${{ github.event.pull_request.number }}"
-          alias: pr-${{ github.event.pull_request.number }}
+          deploy-message: "Deploy preview for PR #${{ steps.pr.outputs.pr_number }}"
+          alias: pr-${{ steps.pr.outputs.pr_number }}
           enable-pull-request-comment: true
           enable-commit-comment: false
           overwrites-pull-request-comment: true
