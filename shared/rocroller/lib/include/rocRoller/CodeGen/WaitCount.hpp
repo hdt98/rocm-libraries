@@ -147,6 +147,7 @@ namespace rocRoller
 
         bool m_isSplitCounter = false;
         bool m_hasVSCnt       = false;
+        bool m_vsCntHasDest   = false;
         bool m_hasEXPCnt      = false;
     };
 

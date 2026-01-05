@@ -53,9 +53,14 @@ namespace WMMAObserverTests
         }
     };
 
-    TEST_CASE("RAW hazards on GFX1200/GFX1201", "[codegen]")
+    TEST_CASE("RAW hazards on GFX115x/GFX120x", "[codegen]")
     {
-        auto target = GENERATE(GPUArchitectureGFX::GFX1200, GPUArchitectureGFX::GFX1201);
+        auto             target = GENERATE(GPUArchitectureGFX::GFX1150,
+                               GPUArchitectureGFX::GFX1151,
+                               GPUArchitectureGFX::GFX1152,
+                               GPUArchitectureGFX::GFX1153,
+                               GPUArchitectureGFX::GFX1200,
+                               GPUArchitectureGFX::GFX1201);
         WMMAObserverTest t{target};
 
         { // A/B is previous D
@@ -175,9 +180,14 @@ namespace WMMAObserverTests
         }
     }
 
-    TEST_CASE("WAR/WAW hazards on GFX1200/GFX1201", "[codegen]")
+    TEST_CASE("WAR/WAW hazards on GFX115x/GFX120x", "[codegen]")
     {
-        auto target = GENERATE(GPUArchitectureGFX::GFX1200, GPUArchitectureGFX::GFX1201);
+        auto             target = GENERATE(GPUArchitectureGFX::GFX1150,
+                               GPUArchitectureGFX::GFX1151,
+                               GPUArchitectureGFX::GFX1152,
+                               GPUArchitectureGFX::GFX1153,
+                               GPUArchitectureGFX::GFX1200,
+                               GPUArchitectureGFX::GFX1201);
         WMMAObserverTest t{target};
 
         const auto v0 = t.createRegisters(Register::Type::Vector, DataType::Half, 4);
