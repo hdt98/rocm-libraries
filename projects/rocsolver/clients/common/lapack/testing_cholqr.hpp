@@ -279,10 +279,10 @@ void print_matrix(const char* name, const T* A, I rows, I cols, I lda)
         for(I j = 0; j < print_cols; ++j)
         {
             if constexpr(std::is_same_v<T, float> || std::is_same_v<T, double>)
-                std::cout << std::setw(12) << std::fixed << std::setprecision(6) << A[i + j * lda] << " ";
+                std::cout << std::setw(12) << std::fixed << std::setprecision(std::numeric_limits<T>::digits10) << A[i + j * lda] << " ";
             else
-                std::cout << "(" << std::setw(9) << std::fixed << std::setprecision(4) << std::real(A[i + j * lda]) 
-                          << "," << std::setw(9) << std::fixed << std::setprecision(4) << std::imag(A[i + j * lda]) << ") ";
+                std::cout << "(" << std::setw(9) << std::fixed << std::setprecision(std::numeric_limits<T>::digits10) << std::real(A[i + j * lda]) 
+                          << "," << std::setw(9) << std::fixed << std::setprecision(std::numeric_limits<T>::digits10) << std::imag(A[i + j * lda]) << ") ";
         }
         if(cols > max_print)
             std::cout << "...";
