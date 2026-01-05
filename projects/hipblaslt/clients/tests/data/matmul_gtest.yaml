@@ -971,8 +971,7 @@ Tests:
   batch_count: [1, 5]
   transA: T
   transB: N
-  use_ext: [1]
-  use_ext_setproblem: [0, 1]
+  api_method: [1, 2]
   alpha: 1
   beta: [ 0.0, 2.0 ]
   bias_vector: [0, 1]
@@ -1009,8 +1008,7 @@ Tests:
   batch_count: [1, 5]
   transA: T
   transB: N
-  use_ext: [1]
-  use_ext_setproblem: [0, 1]
+  api_method: [1, 2]
   alpha: 1
   beta: [ 0.0, 2.0 ]
   bias_vector: [0, 1]
@@ -1445,7 +1443,7 @@ Tests:
   K: [127, 129]
   transA_transB: *transA_transB_range
   grouped_gemm: [2]
-  use_ext_setproblem: [0, 1]
+  api_method: [0, 1, 2]
   algo_method: [2]
   alpha: 1
   beta: [ 0.0, 2.0 ]
@@ -1461,7 +1459,7 @@ Tests:
   K: [127, 129]
   transA_transB: *transA_transB_range
   grouped_gemm: [2]
-  use_ext_setproblem: [1]
+  api_method: 2
   algo_method: [2]
   use_user_args: 1
   alpha: 1
@@ -1827,8 +1825,7 @@ Tests:
   N: [127, 129]
   K: [127, 129]
   transA_transB: *transA_transB_range
-  use_ext: [1]
-  use_ext_setproblem: [0, 1]
+  api_method: [1, 2]
   algo_method: [0, 1, 2]
   alpha: 1
   beta: [ 0.0, 2.0 ]
@@ -1991,8 +1988,7 @@ Tests:
   transA_transB: *transA_transB_range
   alpha: 1
   beta: [ 0, 2 ]
-  use_ext: [1]
-  use_ext_setproblem: [0, 1]
+  api_method: [1, 2]
   bias_vector: 1
   bias_type: [f32_r]
   unit_check: 1
@@ -2028,8 +2024,7 @@ Tests:
   transA_transB: *transA_transB_range
   alpha: 1
   beta: [ 0, 2 ]
-  use_ext: [1]
-  use_ext_setproblem: [1]
+  api_method: 2
   bias_vector: 1
   bias_type: [f32_r]
   unit_check: 1
@@ -2049,8 +2044,7 @@ Tests:
   scaleB: [0,1]
   scaleC: [0,1]
   scaleD: [0,1]
-  use_ext: [1]
-  use_ext_setproblem: [1]
+  api_method: 2
   bias_vector: 1
   bias_type: [f32_r]
   unit_check: 1
@@ -2070,8 +2064,7 @@ Tests:
   scaleB: [0,1]
   amaxScaleA: [0, 1]
   amaxScaleB: [0, 1]
-  use_ext: [1]
-  use_ext_setproblem: [1]
+  api_method: 2
   bias_vector: 1
   bias_type: [f32_r]
   unit_check: 1
@@ -2085,8 +2078,7 @@ Tests:
     - { M:  128,   N:  128,    K:  65536 }
   transA_transB: *transA_transB_range
   algo_method: [2]
-  use_ext: [1]
-  use_ext_setproblem: [0]
+  api_method: 1
   gsu_vector: [[0], [1], [4], [7], [38]]
   alpha: 1
   beta: 2.0
@@ -2101,8 +2093,7 @@ Tests:
     - { M:  1024, N:  1024, K:  80 }
   transA_transB: *transA_transB_range
   algo_method: [2]
-  use_ext: [1]
-  use_ext_setproblem: [0]
+  api_method: 1
   grouped_gemm: [0]
   wgm_vector: [[0], [4], [9], [16]]
   alpha: 1
@@ -2118,8 +2109,7 @@ Tests:
     - { M:  1024, N:  1024, K:  80 }
   transA_transB: *transA_transB_range
   algo_method: [2]
-  use_ext: [1]
-  use_ext_setproblem: [0]
+  api_method: 1
   grouped_gemm: [2]
   wgm_vector: [[0], [4], [9], [16]]
   alpha: 1
