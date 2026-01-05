@@ -16,14 +16,10 @@
 name: Docs Preview
 
 on:
-  pull_request_target:
-    # branches:
-    #   - 'develop'
-    #   - 'docs/**'
+  pull_request:
+    branches:
+      - 'users/alexxu12/docs-pr-preview'
     types: [opened, synchronize, reopened, ready_for_review]
-
-  issue_comment:
-    types: [created, edited]
 
 permissions:
   contents: read
@@ -32,14 +28,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Only run if either:
-    # 1. PR modifies docs files
-    # 2. A comment "/docs-check" is made on a PR
-    if: |
-      github.event_name == 'pull_request_target' ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request &&
-       contains(github.event.comment.body, '/docs-check'))
+    if: github.event_name == 'pull_request'
     steps:
       - name: Generate a token
         id: generate-token
