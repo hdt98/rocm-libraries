@@ -125,7 +125,7 @@ protected:
 
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 {
-    // Expect 489 passed : 26 failed
+    // Expect 559 passed : 36 failed
     using namespace Scheduling::LDSBankModel;
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);

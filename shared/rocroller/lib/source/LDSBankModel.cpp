@@ -172,7 +172,10 @@ namespace rocRoller::Scheduling::LDSBankModel
             AssertFatal(getRemainingDataSlots() >= requiredSlots
                             && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
                         "Expected queue space to be accounted for in predict function and passed "
-                        "through to total cycles calculation.");
+                        "through to total cycles calculation",
+                        ShowValue(getRemainingDataSlots()),
+                        ShowValue(requiredSlots));
+            ;
 
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
@@ -189,9 +192,10 @@ namespace rocRoller::Scheduling::LDSBankModel
                 {
                     auto const base
                         = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
+                    const auto fraction = dataCycles / requiredSlots;
                     for(int j = 0; j < requiredSlots; ++j)
                     {
-                        m_dataQueue.push_back(base + (j * 2) * dataCycles);
+                        m_dataQueue.push_back(base + (j * 1) * fraction);
                     }
                 }
             }
@@ -249,6 +253,18 @@ namespace rocRoller::Scheduling::LDSBankModel
         {
             m_dataQueue.pop_front();
         }
+        // Assert invariant that all queues are in increasing order
+        AssertFatal(
+            std::is_sorted(m_commandQueue.begin(), m_commandQueue.end()),
+            "Command queue not sorted: ",
+            fmt::format("{}", fmt::join(m_commandQueue.begin(), m_commandQueue.end(), ", ")));
+        AssertFatal(
+            std::is_sorted(m_waitcntQueue.begin(), m_waitcntQueue.end()),
+            "Waitcnt queue not sorted: ",
+            fmt::format("{}", fmt::join(m_waitcntQueue.begin(), m_waitcntQueue.end(), ", ")));
+        AssertFatal(std::is_sorted(m_dataQueue.begin(), m_dataQueue.end()),
+                    "Data queue not sorted: ",
+                    fmt::format("{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", ")));
     }
 
     std::string RuntimeLDSInstruction::toString() const
