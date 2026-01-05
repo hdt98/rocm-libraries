@@ -125,6 +125,7 @@ protected:
 
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
 {
+    // Expect 562 passed : 48 failed
     using namespace Scheduling::LDSBankModel;
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
@@ -166,7 +167,8 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
     SECTION(kernel.getSectionName())
     {
 
-        auto        result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        auto result = runKernelAndCollectLatencies(context, kernel, testIndividual);
+        INFO(result.infoStr);
         const auto& filteredInstructions = result.filteredInstructions;
         const auto& medianLatencies      = result.medianLatencies;
 
@@ -183,9 +185,9 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler][lds-model][gpu]")
         ds_read_b128 v[40:43], v1, model 32, profiler 24, delta -8
         ds_read_b128 v[44:47], v1, model 32, profiler 32, delta 0
         */
-        CHECK(analysis.totalAbsoluteDelta <= 20);
-        CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 20));
-        CHECK(analysis.incorrectPredictionCount <= 4);
+        CHECK(analysis.totalAbsoluteDelta <= 0);
+        CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
+        CHECK(analysis.incorrectPredictionCount <= 0);
     }
 }
 

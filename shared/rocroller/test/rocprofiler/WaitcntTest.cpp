@@ -231,6 +231,7 @@ protected:
 
 TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds-model][gpu]")
 {
+    // Expect 572 passed : 38 failed
     /*
     ...
     s_waitcnt lgkmcnt(2), model 136, profiler 132, delta -4
@@ -373,6 +374,7 @@ protected:
 
 TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 {
+    // Expect 544 passed : 66 failed
     /*
     ds_write_b32 v1, v2, model 8, profiler 8, delta 0
   * s_waitcnt lgkmcnt(0), model 60, profiler 52, delta -8
