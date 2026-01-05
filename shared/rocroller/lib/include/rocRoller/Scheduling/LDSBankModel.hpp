@@ -84,6 +84,8 @@ namespace rocRoller::Scheduling::LDSBankModel
         std::string toString() const;
     };
 
+    std::ostream& operator<<(std::ostream& stream, RuntimeLDSInstruction const& instruction);
+
     struct OperationAccesses
     {
         int                                operationTag;

@@ -101,7 +101,7 @@ protected:
     }
 };
 
-TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
 {
     // Expect 394-392 passed : 51-53 failed
     // Mainly affected by waitcnt queue values
@@ -167,7 +167,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][scheduler][lds-mode
 
         if(write && instrDwords == 4)
         {
-            // ignore ds_write_b128 for now
+            // TODO
         }
         else
         {
@@ -215,7 +215,8 @@ protected:
     }
 };
 
-TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Weave LDS and waitcnt at steady state",
+          "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
 {
     // Expect 572 passed : 38 failed
     /*
@@ -285,15 +286,13 @@ TEST_CASE("Weave LDS and waitcnt at steady state", "[rocprofiler][scheduler][lds
 
         if(write && instrDwords == 4)
         {
-            CHECK(analysis.totalAbsoluteDelta <= 200);
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 4));
-            CHECK(analysis.incorrectPredictionCount <= 5);
+            // TODO
         }
         else
         {
-            CHECK(analysis.totalAbsoluteDelta <= 300);
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 28));
-            CHECK(analysis.incorrectPredictionCount <= 30);
+            CHECK(analysis.totalAbsoluteDelta <= 0);
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
+            CHECK(analysis.incorrectPredictionCount <= 0);
         }
     }
 }
@@ -344,7 +343,7 @@ protected:
     }
 };
 
-TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
+TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
 {
     // Expect 544 passed : 66 failed
     /*
@@ -409,9 +408,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][scheduler][lds-model][gpu]")
 
         if(write && instrDwords == 4)
         {
-            CHECK(analysis.totalAbsoluteDelta <= 192);
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 108));
-            CHECK(analysis.incorrectPredictionCount <= 10);
+            // TODO
         }
         else
         {

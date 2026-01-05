@@ -191,7 +191,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                         = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
                     for(int j = 0; j < requiredSlots; ++j)
                     {
-                        m_dataQueue.push_back(base + i * 2 * dataCycles);
+                        m_dataQueue.push_back(base + 2 * dataCycles);
                     }
                 }
             }
@@ -207,6 +207,10 @@ namespace rocRoller::Scheduling::LDSBankModel
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase);
                 m_dataQueue.push_back(cmdBase);
+            }
+            else
+            {
+                Throw<FatalError>("Unsupported LDS direction", ShowValue(instr.toString()));
             }
         }
 
@@ -559,5 +563,10 @@ namespace rocRoller::Scheduling::LDSBankModel
     std::ostream& operator<<(std::ostream& stream, Summary const& summary)
     {
         return stream << summary.toString();
+    }
+
+    std::ostream& operator<<(std::ostream& stream, RuntimeLDSInstruction const& instruction)
+    {
+        return stream << instruction.toString();
     }
 }

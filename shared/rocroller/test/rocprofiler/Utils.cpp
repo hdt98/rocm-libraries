@@ -126,6 +126,8 @@ namespace rocRoller
         return m_instructions;
     }
 
+    // Tests tagged [lds-model] should all have this suite of section names, e.g.
+    // test/rocroller-tests-rocprofiler "[lds-model]" -c "write b64 stride8"
     std::string LDSTestKernelBase::getSectionName() const
     {
         return fmt::format(
