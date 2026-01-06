@@ -1,17 +1,16 @@
 # Create a documentation preview in the pull request
 # --------------------------------------------------
-# This GitHub Actions workflow triggers by opening/updating a PR. If the PR changes any
-# docs content, it will build the change and display the preview via Netlify.
+# This GitHub Actions workflow triggers by commenting '/docs-preview' on a PR. 
+# It will build the documentation and display the preview via Netlify.
 #
 # Key Steps:
 # 1. Use the script (.github/scripts/pr_detect_changed_subtrees.py) to detect changed project
-# 2. Build the environment and dependencies using project's requirements.txt
+# 2. Install the environment and dependencies using project's requirements.txt
 # 3. Build the documentation using Sphinx and Doxygen
 # 4. Deploy the preview to Netlify
 #
-# This blocks changes that can potentially broke the docs build, also provides a look
-# and feel to the reviewer. Note if multiple projects are involved in one PR, the workflow
-# will display preview for one of the projects.
+# The workflow provides a look and feel to the reviewer. Note if multiple projects are involved in one PR, 
+# it will only display the preview for one of the projects.
 
 name: Docs Preview
 
