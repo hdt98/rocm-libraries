@@ -382,10 +382,14 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
                     c["ForkParams"] == benchmarkStep.forkParams and \
                     c["ParamGroups"] == benchmarkStep.paramGroups and \
                     c["CustomKernels"] == benchmarkStep.customKernels and \
-                    c["InternalSupportParams"] == benchmarkStep.internalSupportParams and \
+                    c.get("InternalSupportParams", {}) == benchmarkStep.internalSupportParams and \
                     c["CustomKernelWildcard"] == benchmarkStep.customKernelWildcard:
-                cacheValid = True
                 codeObjectFiles = c["CodeObjectFiles"]
+                # Check if all cached code object files actually exist
+                if all(os.path.exists(os.path.join(sourcePath, f)) for f in codeObjectFiles):
+                    cacheValid = True
+                else:
+                    printWarning("Cached code object files missing: redoing solution generation")
             else:
                 printWarning("Cache data does not match config: redoing solution generation")
 
@@ -440,6 +444,7 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
                 "ForkParams": benchmarkStep.forkParams,
                 "ParamGroups": benchmarkStep.paramGroups,
                 "CustomKernels": benchmarkStep.customKernels,
+                "InternalSupportParams": benchmarkStep.internalSupportParams,
                 "CustomKernelWildcard": benchmarkStep.customKernelWildcard
             }
             LibraryIO.writeYAML(cachePath, cacheData)
@@ -464,8 +469,8 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
             writeClientConfigIni(True, benchmarkStep.problemSizes, benchmarkStep.biasTypeArgs,
                                  benchmarkStep.factorDimArgs, benchmarkStep.activationArgs,
                                  benchmarkStep.icacheFlushArgs, conProblemType,
-                                 stepBaseDir, codeObjectFiles, resultsFileName,
-                                 outFile, deviceId, probSolMap=probSolMap)
+                                 sourcePath, codeObjectFiles, resultsFileName,
+                                 outFile, deviceId, gfxName, probSolMap=probSolMap)
 
         # I think the size portion of this yaml could be removed,
         # but for now it's needed, so we update it even in the cache case

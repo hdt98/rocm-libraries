@@ -116,15 +116,16 @@ def writeSolutions(filename, problemSizes, biasTypeArgs, activationArgs, solutio
     # convert objects to nested dictionaries
     solutionStates = []
 
-    if cache:
+    if cache and os.path.exists(filename):
         solYaml = read(filename)
-        if biasTypeArgs and activationArgs:
-            solutionStates = solYaml[4:]
-        elif biasTypeArgs or activationArgs:
-            solutionStates = solYaml[3:]
-        else:
-            solutionStates = solYaml[2:]
-    else:
+        if solYaml is not None:
+            if biasTypeArgs and activationArgs:
+                solutionStates = solYaml[4:]
+            elif biasTypeArgs or activationArgs:
+                solutionStates = solYaml[3:]
+            else:
+                solutionStates = solYaml[2:]
+    elif solutions is not None:
         for solution in solutions:
             solutionState = solution.getAttributes()
             solutionState["ProblemType"] = solutionState["ProblemType"].state
@@ -148,7 +149,8 @@ def writeSolutions(filename, problemSizes, biasTypeArgs, activationArgs, solutio
             f.write("- ActivationArgs:\n")
             for setting in activationArgs.settingList:
                 f.write("  - [Enum: %s]\n"%(setting.activationEnum))
-        yaml.dump(solutionStates, f, default_flow_style=None)
+        if solutionStates:  # Only dump if we have solution states
+            yaml.dump(solutionStates, f, default_flow_style=None)
 
 
 ###############################
