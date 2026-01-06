@@ -305,6 +305,18 @@ struct GemmConfigPreshufflePrefill_Wmma : public GemmConfigPreshufflePrefill<Pre
         ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile, true>();
 };
 
+template <typename PrecType>
+struct GemmConfigMixedPrec_Wmma : public GemmConfigComputeV3_WMMA<PrecType>
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 128;
+};
+
 template <typename ADataType, typename BDataType = ADataType, typename CDataType = ADataType>
 struct GemmTypeConfig;
 
@@ -379,6 +391,24 @@ struct GemmTypeConfig<ck_tile::int8_t, ck_tile::int8_t, int32_t>
     using BDataType   = ck_tile::int8_t;
     using AccDataType = int32_t;
     using CDataType   = int32_t;
+};
+
+template <>
+struct GemmTypeConfig<ck_tile::fp8_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::fp8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
+template <>
+struct GemmTypeConfig<ck_tile::bf8_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::bf8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
 };
 
 template <ck_tile::GemmPipeline PipelineId>

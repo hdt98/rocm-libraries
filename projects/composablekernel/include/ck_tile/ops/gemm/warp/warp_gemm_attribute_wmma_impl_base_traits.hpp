@@ -14,18 +14,31 @@ struct LayoutFromDataType<DataType, K, false>
     static constexpr index_t kK0PerLane = K / (kK1PerLane * kKLane);
 };
 
-template <>
-struct LayoutFromDataType<fp8_t, 128, true>
+struct LayoutFrom8BitMixPrec
 {
     static constexpr index_t kK1PerLane = 16;
     static constexpr index_t kK0PerLane = 4;
 };
 
-template <>
-struct LayoutFromDataType<pk_fp4_t, 128, true>
+struct LayoutFromNon8BitMixPrec
 {
     static constexpr index_t kK1PerLane = 32;
     static constexpr index_t kK0PerLane = 2;
+};
+
+template <>
+struct LayoutFromDataType<fp8_t, 128, true> : LayoutFrom8BitMixPrec
+{
+};
+
+template <>
+struct LayoutFromDataType<bf8_t, 128, true> : LayoutFrom8BitMixPrec
+{
+};
+
+template <>
+struct LayoutFromDataType<pk_fp4_t, 128, true> : LayoutFromNon8BitMixPrec
+{
 };
 
 template <typename Arch,
