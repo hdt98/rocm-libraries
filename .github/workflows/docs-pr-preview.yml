@@ -16,10 +16,8 @@
 name: Docs Preview
 
 on:
-  pull_request:
-    branches:
-      - 'users/alexxu12/docs-pr-preview'
-    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited]
 
 permissions:
   contents: read
@@ -28,7 +26,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    # Only run when '/docs-preview' is commented on a PR by a member, owner, or collaborator
+    if: >
+      ${{ github.event.issue.pull_request }} &&
+      contains(github.event.comment.body, '/docs-preview') &&
+      (
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      )
     steps:
       - name: Generate a token
         id: generate-token
@@ -67,7 +73,7 @@ jobs:
         run: |
           python .github/scripts/pr_detect_changed_subtrees.py \
             --repo "${{ github.repository }}" \
-            --pr "${{ github.event.pull_request.number }}" \
+            --pr "${{ github.event.issue.number }}" \
             --config ".github/repos-config.json" \
             --require-auto-push
 
@@ -77,11 +83,21 @@ jobs:
           project=$(echo "${{ steps.detect.outputs.subtrees }}" | head -n1)
           echo "project=$project" >> $GITHUB_OUTPUT
 
+      - name: Get PR details
+        if: steps.extract.outputs.project
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          PR_DATA=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          echo "head_sha=$(echo $PR_DATA | jq -r .head.sha)" >> $GITHUB_OUTPUT
+          echo "pr_number=$(echo $PR_DATA | jq -r .number)" >> $GITHUB_OUTPUT
+
       - name: Checkout full repo with changed project
         if: steps.extract.outputs.project
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ steps.pr.outputs.head_sha }}
           sparse-checkout: |
             .github
             ${{ steps.extract.outputs.project }}
