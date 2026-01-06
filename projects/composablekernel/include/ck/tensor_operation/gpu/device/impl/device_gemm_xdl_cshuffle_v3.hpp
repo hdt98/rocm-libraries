@@ -953,6 +953,12 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             << PrefetchStages << ", "
             << "Kpack: "
             << AMmaKStride;
+
+            if constexpr (UseDataCachePrefetch)
+            {
+                str << ", UseDataCachePrefetch";
+            }
+
         // clang-format on
 
         return str.str();
