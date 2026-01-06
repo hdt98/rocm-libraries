@@ -224,19 +224,19 @@ namespace rocRoller::Scheduling::LDSBankModel
             = fmt::format("{}", fmt::join(m_waitcntQueue.begin(), m_waitcntQueue.end(), ", "));
         const auto dataQueueStr
             = fmt::format("{}", fmt::join(m_dataQueue.begin(), m_dataQueue.end(), ", "));
-        Log::info("LdsScheduler {}: scheduled ds_{}_b{}, dataCycles {}, "
-                  "issue cycles {}, "
-                  "command queue cycles [{}], "
-                  "data queue [{}], "
-                  "waitcnt queue [{}]",
-                  m_programCycle,
-                  instr.memoryOp.direction == LdsDirection::Read ? "read" : "write",
-                  instr.dwords * 32,
-                  dataCycles,
-                  getInstructionIssueCycles(instr.memoryOp, instr.dwords),
-                  cmdQueueStr,
-                  dataQueueStr,
-                  waitcntQueueStr);
+        Log::debug("LdsScheduler {}: scheduled ds_{}_b{}, dataCycles {}, "
+                   "issue cycles {}, "
+                   "command queue cycles [{}], "
+                   "data queue [{}], "
+                   "waitcnt queue [{}]",
+                   m_programCycle,
+                   instr.memoryOp.direction == LdsDirection::Read ? "read" : "write",
+                   instr.dwords * 32,
+                   dataCycles,
+                   getInstructionIssueCycles(instr.memoryOp, instr.dwords),
+                   cmdQueueStr,
+                   dataQueueStr,
+                   waitcntQueueStr);
     }
 
     void LDSScheduler::updateQueues()
