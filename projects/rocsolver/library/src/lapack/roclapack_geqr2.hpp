@@ -53,10 +53,48 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
                                                                      const rocblas_stride strideP)
 {
     bool constexpr is_complex = rocblas_is_complex<T>;
-    bool constexpr use_org = false;
+    bool use_org = false;
+    I const bid = blockIdx.z;
+    I const tid = threadIdx.x;
 
-    I bid = blockIdx.z;
-    I tid = threadIdx.x;
+    I constexpr nthreads = MAX_THDS;
+    assert((blockDim.x == MAX_THDS) && (blockDim.y == 1) && (blockDim.z == 1));
+
+    I const tx = (tid % warpSize);
+    I const nx = warpSize;
+    I const ty = (tid / warpSize);
+    I const ny = (nthreads / warpSize);
+
+    auto const sum_reduce_d = [=](auto& x) {
+        uint64_t const mask = 0xFFFFFFFFFFFFFFFFULL;
+        x += __shfl_down_sync(mask, x, 1);
+        x += __shfl_down_sync(mask, x, 2);
+        x += __shfl_down_sync(mask, x, 4);
+        x += __shfl_down_sync(mask, x, 8);
+        x += __shfl_down_sync(mask, x, 16);
+        if(warpSize > 32)
+        {
+            x += __shfl_down_sync(mask, x, 32);
+        }
+
+        // broadcast to warp
+        x = __shfl_sync(mask, x, 0);
+    };
+
+    auto const sum_reduce = [=](T& x) {
+        if constexpr(is_complex)
+        {
+            auto x_r = x.real();
+            auto x_c = x.imag();
+            sum_reduce_d(x_r);
+            sum_reduce_d(x_c);
+            x = T{x_r, x_c};
+        }
+        else
+        {
+            sum_reduce_d(x);
+        }
+    };
 
     // select batch instance
     T* A = load_ptr_batch<T>(AA, bid, shiftA, strideA);
@@ -74,18 +112,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
 
     I dim = std::min(m, n); // total number of pivots
 
-    I const tx = (tid % warpSize);
-    I const nx = warpSize;
-    I const ty = (tid / warpSize);
-    I const ny = (MAX_THDS / warpSize);
-
     // load A to lds
 
     if(use_org)
     {
-        for(I i = tid % (MAX_THDS / 2); i < m; i += (MAX_THDS / 2))
+        for(I i = tid % (nthreads / 2); i < m; i += (nthreads / 2))
         {
-            const auto tidy = tid / (MAX_THDS / 2);
+            const auto tidy = tid / (nthreads / 2);
             for(I j = tidy; j < n; j += 2)
             {
                 a[i + (j * m)] = A[i + (j * lda)];
@@ -106,7 +139,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
     __syncthreads();
 
     // main loop running forwards (for each column)
-    for(rocblas_int j = 0; j < dim; ++j)
+    for(I j = 0; j < dim; ++j)
     {
         I const mm = m - j;
         I const nn = n - j;
@@ -120,7 +153,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
 
         if(use_org)
         {
-            for(I i = tid; i < mm - 1; i += MAX_THDS)
+            for(I i = tid; i < mm - 1; i += nthreads)
                 norm2 += x[i + 1] * conj(x[i + 1]);
 
             // reduce squared entries to find squared norm of x
@@ -138,19 +171,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
         {
             double dnorm2 = 0;
 
-            for(I i = tid; i < mm - 1; i += MAX_THDS)
+            for(I i = tid; i < mm - 1; i += nthreads)
             {
                 dnorm2 += std::norm(x[i + 1]);
             }
-
-            // reduce squared entries to find squared norm of x
-            dnorm2 += shift_left(dnorm2, 1);
-            dnorm2 += shift_left(dnorm2, 2);
-            dnorm2 += shift_left(dnorm2, 4);
-            dnorm2 += shift_left(dnorm2, 8);
-            dnorm2 += shift_left(dnorm2, 16);
-            if(warpSize > 32)
-                dnorm2 += shift_left(dnorm2, 32);
+            sum_reduce_d(dnorm2);
 
             norm2 = dnorm2;
             if(tid % warpSize == 0)
@@ -160,7 +185,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
         __syncthreads();
         if(tid == 0)
         {
-            for(I k = 1; k < MAX_THDS / warpSize; k++)
+            for(I k = 1; k < nthreads / warpSize; k++)
                 norm2 += sval[k];
 
             // set tau, beta, and put scaling factor into sval[0]
@@ -174,41 +199,86 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
         __syncthreads();
 
         // scale x by scaling factor
-        for(I i = tid; i < mm - 1; i += MAX_THDS)
+        for(I i = tid; i < mm - 1; i += nthreads)
             x[i + 1] *= sval[0];
         __syncthreads();
 
-        // ----- 2. compute w = tau'*v'*A -----
-        // gemv
-        for(I i = tid; i < nn - 1; i += MAX_THDS)
+        if(true)
         {
-            T temp = 0;
-            T* Atmp = a + j + j * m;
-            for(I jj = 0; jj < mm; jj++)
-                temp += Atmp[jj + (i + 1) * m] * conj(x[jj]);
-            w[i] = tmptau[0] * temp;
-        }
-        __syncthreads();
-
-        // ----- 3. apply the Householder reflector to A as a rank-1 update: A = A - v*w -----
-        // ger
-        for(I i = tid; i < mm; i += MAX_THDS)
-        {
-            T* Atmp = a + j + j * m;
-            for(I jj = 0; jj < nn - 1; jj++)
+            // ----- 2. compute w = tau'*v'*A -----
+            // gemv
+            for(I i = tid; i < nn - 1; i += nthreads)
             {
-                Atmp[i + (jj + 1) * m] = Atmp[i + (jj + 1) * m] - x[i] * w[jj];
+                T temp = 0;
+                T* Atmp = a + j + j * m;
+                for(I jj = 0; jj < mm; jj++)
+                    temp += Atmp[jj + (i + 1) * m] * conj(x[jj]);
+                w[i] = tmptau[0] * temp;
+            }
+            __syncthreads();
+
+            // ----- 3. apply the Householder reflector to A as a rank-1 update: A = A - v*w -----
+            // ger
+            for(I i = tid; i < mm; i += nthreads)
+            {
+                T* Atmp = a + j + j * m;
+                for(I jj = 0; jj < nn - 1; jj++)
+                {
+                    Atmp[i + (jj + 1) * m] = Atmp[i + (jj + 1) * m] - x[i] * w[jj];
+                }
             }
         }
+        else
+        {
+            // ----- 2. compute w = tau'*v'*A -----
+            // gemv
+            T* const Atmp = a + j + j * m;
+
+            // ---------------------------------
+            // note w[i] is dot product with column "(i+1)"
+            //
+            // compute w[i] =  sum( conj( x[jj] ) * Atmp[ jj + (i+1) * m ] ), jj=0:(mm-1)
+            // w[i] = w[i] * temptau[0]
+            // ---------------------------------
+            for(I i = ty; i < nn - 1; i += ny)
+            {
+                T w_i = 0;
+                for(I irow = tx; irow < (mm - 1); irow += nx)
+                {
+                    w_i += Atmp[irow + ((i + 1) * m)] * conj(x[irow]);
+                }
+                // sum reduction within warp
+                sum_reduce(w_i);
+
+                w_i *= tmptau[0];
+
+                // ----- 3. apply the Householder reflector to A as a rank-1 update: A = A - v*w -----
+                // ger
+                //
+                // update submatrix is size mm by (nn-1)
+                // ---------------------------------
+                // update  colum j  in computing A <-  (I - tau * x * x') * A
+                // or  A <-  A - tau * x * (x' * A)
+                // or  A <-  A - x * (tau * (x' * A) )
+                // or  A <-  A - x * w,   where w = tau * (x' * A)
+                // ---------------------------------
+
+                for(I irow = tx; irow < mm; irow += nx)
+                {
+                    Atmp[irow + ((i + 1) * m)] -= x[irow] * w_i;
+                }
+
+            } // end for i
+        } // end if use_org
         __syncthreads();
-    }
+    } // end for j
 
     // write lds back to A
     if(use_org)
     {
-        for(I i = tid % (MAX_THDS / 2); i < m; i += (MAX_THDS / 2))
+        for(I i = tid % (nthreads / 2); i < m; i += (nthreads / 2))
         {
-            const auto tidy = tid / (MAX_THDS / 2);
+            const auto tidy = tid / (nthreads / 2);
             for(I j = tidy; j < n; j += 2)
             {
                 A[i + j * lda] = a[i + j * m];
@@ -226,6 +296,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
         }
     }
 }
+
 template <int MAX_THDS, typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     geqr2_kernel_small_org(const I m,
