@@ -91,6 +91,10 @@ enum struct amdgcn_target_id
     GFX1200        = 0x1200,
     GFX1201        = 0x1201,
     GFX12_GENERIC  = 0x12FF,
+    GFX130F        = 0x130F,
+    GFX1310        = 0x1310,
+    GFX1370        = 0x1370,
+    GFX13_GENERIC  = 0x13FF,
     HOST           = 0x0000,
 };
 
@@ -100,6 +104,7 @@ enum struct amdgcn_target_family_id
     GFX10_3 = 0x10,
     GFX11   = 0x11,
     GFX12   = 0x12,
+    GFX13   = 0x13,
     HOST    = 0x00,
 };
 
@@ -167,6 +172,15 @@ static constexpr auto make_amdgcn_gfx12_target()
                          amdgcn_target_wave_size_id::WAVE32>{};
 }
 
+template <amdgcn_target_id targetId>
+static constexpr auto make_amdgcn_gfx13_target()
+{
+    return amdgcn_target<targetId,
+                         amdgcn_target_family_id::GFX13,
+                         amdgcn_target_arch_id::RDNA,
+                         amdgcn_target_wave_size_id::WAVE32>{};
+}
+
 template <typename CompilerTarget, amdgcn_target_id... TargetIds>
 static constexpr auto is_target_id_any_of()
 {
@@ -201,6 +215,12 @@ template <typename CompilerTarget>
 static constexpr bool is_target_family_gfx12()
 {
     return CompilerTarget::FAMILY_ID == amdgcn_target_family_id::GFX12;
+}
+
+template <typename CompilerTarget>
+static constexpr bool is_target_family_gfx13()
+{
+    return CompilerTarget::FAMILY_ID == amdgcn_target_family_id::GFX13;
 }
 
 template <typename CompilerTarget>
@@ -257,6 +277,13 @@ static constexpr bool is_target_wave_size_64()
     }                                                                   \
     else
 
+#define MAP_COMPILER_STATE_TO_GFX13_TARGET(COMPILER_STATE, TARGET_ID)   \
+    if constexpr(amdgcn_compiler_target_state::COMPILER_STATE)          \
+    {                                                                   \
+        return make_amdgcn_gfx13_target<amdgcn_target_id::TARGET_ID>(); \
+    }                                                                   \
+    else
+
 /**
  * @brief Returns the amdgcn_target of the current compiler pass.
  * @note This is where we tie the compiler state to our internal target architecture representation
@@ -286,6 +313,10 @@ constexpr auto get_compiler_target()
     MAP_COMPILER_STATE_TO_GFX12_TARGET(CK_TILE_ARCH_GFX1200, GFX1200);
     MAP_COMPILER_STATE_TO_GFX12_TARGET(CK_TILE_ARCH_GFX1201, GFX1201);
     MAP_COMPILER_STATE_TO_GFX12_TARGET(CK_TILE_ARCH_GFX12_GENERIC, GFX12_GENERIC);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX130F, GFX130F);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX1310, GFX1310);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX1370, GFX1370);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX13_GENERIC, GFX13_GENERIC);
 
     // Return HOST by default
     if constexpr(amdgcn_compiler_target_state::CK_TILE_HOST_COMPILE)
@@ -299,6 +330,7 @@ constexpr auto get_compiler_target()
 #undef MAP_COMPILER_STATE_TO_GFX10_3_TARGET
 #undef MAP_COMPILER_STATE_TO_GFX11_TARGET
 #undef MAP_COMPILER_STATE_TO_GFX12_TARGET
+#undef MAP_COMPILER_STATE_TO_GFX13_TARGET
 
 // Sanity check: device compile must have a valid target architecture
 static_assert(!amdgcn_compiler_target_state::CK_TILE_DEVICE_COMPILE ||
@@ -352,6 +384,10 @@ CK_TILE_HOST auto hip_device_prop_gcn_arch_name_to_amdgcn_target_id(char const* 
     MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx1200", GFX1200);
     MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx1201", GFX1201);
     MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx12_generic", GFX12_GENERIC);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx130F", GFX130F);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx1310", GFX1310);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx1370", GFX1370);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_TARGET_ID("gfx13_generic", GFX13_GENERIC);
 
     // Default case: return HOST target if no match is found
     return amdgcn_target_id::HOST;
@@ -435,6 +471,14 @@ using enable_if_target_family_gfx12_t =
     enable_if_target_family_id_t<CompilerTarget, amdgcn_target_family_id::GFX12>;
 
 /**
+ * @brief SFINAE enabler for GFX13 family targets
+ * @tparam CompilerTarget The compiler target to check
+ */
+template <typename CompilerTarget>
+using enable_if_target_family_gfx13_t =
+    enable_if_target_family_id_t<CompilerTarget, amdgcn_target_family_id::GFX13>;
+
+/**
  * @brief SFINAE enabler for CDNA architecture targets
  * @tparam CompilerTarget The compiler target to check
  */
@@ -514,6 +558,14 @@ static constexpr auto make_amdgcn_gfx12_target(amdgcn_target_id targetId)
                          .WAVE_SIZE_ID = amdgcn_target_wave_size_id::WAVE32};
 }
 
+static constexpr auto make_amdgcn_gfx13_target(amdgcn_target_id targetId)
+{
+    return amdgcn_target{.TARGET_ID    = targetId,
+                         .FAMILY_ID    = amdgcn_target_family_id::GFX13,
+                         .ARCH_ID      = amdgcn_target_arch_id::RDNA,
+                         .WAVE_SIZE_ID = amdgcn_target_wave_size_id::WAVE32};
+}
+
 static constexpr bool is_target_family_gfx9(amdgcn_target target)
 {
     return target.FAMILY_ID == amdgcn_target_family_id::GFX9;
@@ -532,6 +584,11 @@ static constexpr bool is_target_family_gfx11(amdgcn_target target)
 static constexpr bool is_target_family_gfx12(amdgcn_target target)
 {
     return target.FAMILY_ID == amdgcn_target_family_id::GFX12;
+}
+
+static constexpr bool is_target_family_gfx13(amdgcn_target target)
+{
+    return target.FAMILY_ID == amdgcn_target_family_id::GFX13;
 }
 
 static constexpr bool is_target_arch_cdna(amdgcn_target target)
@@ -579,6 +636,12 @@ static constexpr bool is_target_wave_size_64(amdgcn_target target)
         return make_amdgcn_gfx12_target(amdgcn_target_id::TARGET_ID); \
     }
 
+#define MAP_COMPILER_STATE_TO_GFX13_TARGET(COMPILER_STATE, TARGET_ID) \
+    if constexpr(amdgcn_compiler_target_state::COMPILER_STATE)        \
+    {                                                                 \
+        return make_amdgcn_gfx13_target(amdgcn_target_id::TARGET_ID); \
+    }
+
 /*! @brief Returns the amdgcn_target of the current compiler pass.
  * @note This is where we tie the compiler state to our internal target architecture representation
  * at compile time.
@@ -607,7 +670,10 @@ CK_TILE_HOST_DEVICE constexpr auto get_compiler_target()
     MAP_COMPILER_STATE_TO_GFX12_TARGET(CK_TILE_ARCH_GFX1200, GFX1200);
     MAP_COMPILER_STATE_TO_GFX12_TARGET(CK_TILE_ARCH_GFX1201, GFX1201);
     MAP_COMPILER_STATE_TO_GFX12_TARGET(CK_TILE_ARCH_GFX12_GENERIC, GFX12_GENERIC);
-
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX130F, GFX130F);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX1310, GFX1310);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX1370, GFX1370);
+    MAP_COMPILER_STATE_TO_GFX13_TARGET(CK_TILE_ARCH_GFX13_GENERIC, GFX13_GENERIC);
     // Default to HOST
     return amdgcn_target{};
 }
@@ -617,6 +683,7 @@ CK_TILE_HOST_DEVICE constexpr auto get_compiler_target()
 #undef MAP_COMPILER_STATE_TO_GFX10_3_TARGET
 #undef MAP_COMPILER_STATE_TO_GFX11_TARGET
 #undef MAP_COMPILER_STATE_TO_GFX12_TARGET
+#undef MAP_COMPILER_STATE_TO_GFX13_TARGET
 
 // Sanity check: device compile must have a valid target architecture
 static_assert(!amdgcn_compiler_target_state::CK_TILE_DEVICE_COMPILE ||
@@ -656,6 +723,13 @@ static_assert(!amdgcn_compiler_target_state::CK_TILE_HOST_COMPILE ||
     }                                                                                    \
     else
 
+#define MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX13_TARGET(NAME_STRING, TARGET_ID) \
+    if constexpr(str.find(NAME_STRING) != std::string::npos)                             \
+    {                                                                                    \
+        return make_amdgcn_gfx13_target(amdgcn_target_id::TARGET_ID);                    \
+    }                                                                                    \
+    else
+
 /**
  * @brief Converts a lower-case string to the corresponding amdgcn_target_arch_id value.
  *        Returns amdgcn_target_arch_id::HOST if no match is found.
@@ -687,7 +761,10 @@ CK_TILE_HOST auto hip_device_prop_gcn_arch_name_to_amdgcn_target(char const* tes
     MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX12_TARGET("gfx1200", GFX1200);
     MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX12_TARGET("gfx1201", GFX1201);
     MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX12_TARGET("gfx12_generic", GFX12_GENERIC);
-
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX13_TARGET("gfx130F", GFX130F);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX13_TARGET("gfx1310", GFX1310);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX13_TARGET("gfx1370", GFX1370);
+    MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX13_TARGET("gfx13_generic", GFX13_GENERIC);
     // Default case
     return amdgcn_target{};
 }
@@ -696,6 +773,7 @@ CK_TILE_HOST auto hip_device_prop_gcn_arch_name_to_amdgcn_target(char const* tes
 #undef MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX10_3_TARGET
 #undef MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX11_TARGET
 #undef MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX12_TARGET
+#undef MAP_HIP_DEVICE_PROP_GCN_ARCH_NAME_STRING_TO_GFX13_TARGET
 
 /**
  * @brief SFINAE enabler for a compiler target if the target id is in the list of supported target
@@ -771,6 +849,14 @@ using enable_if_target_family_gfx11_t =
 template <amdgcn_target CompilerTarget>
 using enable_if_target_family_gfx12_t =
     enable_if_target_family_id_t<CompilerTarget, amdgcn_target_family_id::GFX12>;
+
+/**
+ * @brief SFINAE enabler for GFX13 family targets
+ * @tparam CompilerTarget The compiler target to check
+ */
+template <amdgcn_target CompilerTarget>
+using enable_if_target_family_gfx13_t =
+    enable_if_target_family_id_t<CompilerTarget, amdgcn_target_family_id::GFX13>;
 
 /**
  * @brief SFINAE enabler for CDNA architecture targets

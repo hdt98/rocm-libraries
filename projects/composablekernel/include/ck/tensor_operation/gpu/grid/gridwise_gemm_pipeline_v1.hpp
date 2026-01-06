@@ -419,8 +419,12 @@ struct GridwiseGemmPipeline_v1<1, false, true>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+#else
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        auto a_block_buf_switch           = a_block_buf;
+#endif
+        auto a_block_buf_switch = a_block_buf;
 
         // preload data into LDS
         b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
@@ -617,10 +621,15 @@ struct GridwiseGemmPipeline_v1<1, false, false>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+#else
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        auto b_block_buf_switch           = b_block_buf;
-        auto a_block_buf_switch           = a_block_buf;
+#endif
+        auto b_block_buf_switch = b_block_buf;
+        auto a_block_buf_switch = a_block_buf;
 
         // preload data into LDS
         a_blockwise_copy.Run(
@@ -727,10 +736,15 @@ struct GridwiseGemmPipeline_v1<1, false, false>
                                BScaleBlockTransfer& b_scale_blockwise_copy,
                                const BScaleBlockTransferStep& b_scale_block_copy_step)
     {
+#if defined(__gfx13__)
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
-        auto b_block_buf_switch           = b_block_buf;
-        auto a_block_buf_switch           = a_block_buf;
+#else
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+#endif
+        auto b_block_buf_switch = b_block_buf;
+        auto a_block_buf_switch = a_block_buf;
 
         constexpr auto b_scale_block_origin_idx = make_tuple(I0, I0, I0, I0, I0);
         constexpr auto a_scale_block_origin_idx = make_tuple(I0, I0, I0, I0, I0);
@@ -862,10 +876,17 @@ struct GridwiseGemmPipeline_v1<1, false, false, ALoadOption, BLoadOption>
                                index_t a_cluster_size,
                                index_t b_cluster_size)
     {
+#if defined(__gfx13__)
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
-        auto b_block_buf_switch           = b_block_buf;
-        auto a_block_buf_switch           = a_block_buf;
+#else
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+#endif
+        auto b_block_buf_switch = b_block_buf;
+        auto a_block_buf_switch = a_block_buf;
+        ignore                  = a_cluster_size;
+        ignore                  = b_cluster_size;
 
 #if defined(__gfx13__)
         if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
@@ -875,11 +896,7 @@ struct GridwiseGemmPipeline_v1<1, false, false, ALoadOption, BLoadOption>
             __builtin_amdgcn_s_barrier_signal(-3);
             __builtin_amdgcn_s_barrier_wait(-3);
         }
-#else
-        ignore = a_cluster_size;
-        ignore = b_cluster_size;
 #endif
-
         a_blockwise_copy.Run(
             a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
         b_blockwise_copy.Run(
@@ -1119,10 +1136,9 @@ struct GridwiseGemmPipeline_v1<1,
         const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
 #else
         const int wgRank = 0;
-        ignore           = a_cluster_size;
-        ignore           = b_cluster_size;
 #endif
 
+        ignore    = b_cluster_size;
         index_t k = 0;
         do
         {
@@ -1237,7 +1253,11 @@ struct GridwiseGemmPipeline_v1<1,
                                index_t a_cluster_size,
                                index_t b_cluster_size)
     {
+#if defined(__gfx13__)
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+#else
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+#endif
         // Initialize C
         c_thread_buf.Clear();
 
@@ -1257,10 +1277,8 @@ struct GridwiseGemmPipeline_v1<1,
         const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
 #else
         const int wgRank = 0;
-        ignore           = a_cluster_size;
-        ignore           = b_cluster_size;
 #endif
-
+        ignore    = a_cluster_size;
         index_t k = 0;
         do
         {
@@ -1373,7 +1391,11 @@ struct GridwiseGemmPipeline_v1<1,
                                index_t a_cluster_size,
                                index_t b_cluster_size)
     {
+#if defined(__gfx13__)
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+#else
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+#endif
         // Initialize C
         c_thread_buf.Clear();
 
@@ -1393,9 +1415,8 @@ struct GridwiseGemmPipeline_v1<1,
         const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
 #else
         const int wgRank = 0;
-        ignore           = a_cluster_size;
-        ignore           = b_cluster_size;
 #endif
+        ignore = a_cluster_size;
 
         index_t k = 0;
         do

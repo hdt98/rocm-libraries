@@ -2,6 +2,7 @@ include_directories(AFTER
   ${CMAKE_CURRENT_LIST_DIR}
 )
 
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx9|gfx1[12]")
 add_subdirectory(01_fmha)
 add_subdirectory(02_layernorm2d)
 add_subdirectory(03_gemm)
@@ -27,6 +28,7 @@ add_subdirectory(36_pooling)
 add_subdirectory(38_block_scale_gemm)
 add_subdirectory(40_streamk_gemm)
 add_subdirectory(41_batched_contraction)
+endif()
 
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
 add_subdirectory(01_fmha)

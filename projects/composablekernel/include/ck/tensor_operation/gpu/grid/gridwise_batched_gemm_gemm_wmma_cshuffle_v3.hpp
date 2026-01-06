@@ -862,6 +862,27 @@ struct GridwiseBatchedGemmGemm_wmma_cshuffle_v3
 
         constexpr auto b1_block_slice_copy_step = MakeB1BlockSliceCopyStep();
 
+#if (defined(__gfx13__))
+        auto blockwise_gemm1 =
+            BlockwiseGemmWMMA<ThisThreadBlock,
+                              ADataType,
+                              B1DataType,
+                              Acc1DataType,
+                              decltype(MakeA1WaveDescriptor_L0_M0_M1_M2_L1(a1_thread_desc_l0perblock_mperblock_l1)),
+                              decltype(MakeB1WaveDescriptor(b1_block_desc)),
+                              MPerBlock,
+                              NPerBlock,
+                              LTilePerBlock,
+                              MPerWmma,
+                              NPerWmma,
+                              16, //KPerWmma,
+                              MRepeat,
+                              NRepeat,
+                              KPack,
+                              false, // Acc1EnableLds
+                              true,  // B1EnableLds
+                              true>{make_tuple(0, 0, 0, 0, 0, 0)};
+#else
         auto blockwise_gemm1 =
             BlockwiseGemmWMMA<BlockSize,
                               ADataType,
@@ -880,6 +901,7 @@ struct GridwiseBatchedGemmGemm_wmma_cshuffle_v3
                               false, // Acc1EnableLds
                               true,  // B1EnableLds
                               true>{make_tuple(0, 0, 0, 0, 0, 0)};
+#endif
 
         auto acc1_thread_buf = blockwise_gemm1.GetCThreadBuffer();
 

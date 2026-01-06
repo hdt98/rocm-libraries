@@ -1194,7 +1194,9 @@ struct DeviceFasternet50_Wcnn_CShuffle
 
         return std::make_unique<Argument>(p_a,
                                           p_b,
-                                          p_ds,
+                                          p_ds_0,
+                                          p_ds_1,
+                                          p_ds_2,
                                           p_e,
                                           a_g_n_c_wis_lengths_i32,
                                           a_g_n_c_wis_strides_i32,
