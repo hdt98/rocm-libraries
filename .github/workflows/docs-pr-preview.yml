@@ -1,6 +1,6 @@
 # Create a documentation preview in the pull request
 # --------------------------------------------------
-# This GitHub Actions workflow triggers by commenting '/docs-preview' on a PR. 
+# This GitHub Actions workflow triggers by commenting '/docs-preview' on a PR.
 # It will build the documentation and display the preview via Netlify.
 #
 # Key Steps:
@@ -9,7 +9,7 @@
 # 3. Build the documentation using Sphinx and Doxygen
 # 4. Deploy the preview to Netlify
 #
-# The workflow provides a look and feel to the reviewer. Note if multiple projects are involved in one PR, 
+# The workflow provides a look and feel to the reviewer. Note if multiple projects are involved in one PR,
 # it will only display the preview for one of the projects.
 
 name: Docs Preview
