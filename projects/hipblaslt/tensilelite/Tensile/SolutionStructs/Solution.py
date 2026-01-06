@@ -1879,7 +1879,7 @@ class Solution(collections.abc.Mapping):
 
         if autoLRVW:
           if state["LocalReadVectorWidth"] // state["MIInputPerThread"] > 1:
-            if (sol["DepthU"] // sol["MatrixInstK"] // sol["LocalSplitU"] <= sol["LocalReadVectorWidth"] // sol["MIInputPerThread"]):
+            if (state["DepthU"] // state["MatrixInstK"] // state["LocalSplitU"] <= state["LocalReadVectorWidth"] // state["MIInputPerThread"]):
               # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
               state["LocalReadVectorWidth"] //= 2
           if state["LocalReadVectorWidth"] // state["MIInputPerThread"] > 1:
