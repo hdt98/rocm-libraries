@@ -73,8 +73,7 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
     {
         using BlockGemm = remove_cvref_t<decltype(GetQKBlockGemm<Problem>())>;
 
-        return BlockGemm::template MakeBScaleBlockTileDistribution<Problem::BlockFmhaShape::kN0,
-                                                                   Problem::BlockFmhaShape::kK0>();
+        return BlockGemm::MakeBScaleBlockTileDistribution();
     }
 
     template <typename Problem>
@@ -555,6 +554,46 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
         return k_lds_block_desc;
     }
 
+    // TODO: hardcoded, make it generic somehow
+    // Used for loading from LDS!
+    // Consider to shuffle K DRAM, similarly to k_scale_dram_unmerged
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeKLdsBlockDescriptor2()
+    {
+        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
+        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
+        constexpr index_t kKPack     = GetSmemKPackK<Problem>();
+
+        static_assert(kNPerBlock % (4 * 4 * 4) == 0);
+
+        constexpr auto k_lds_block_desc_0 =
+            make_naive_tensor_descriptor(make_tuple(number<kKPerBlock / kKPack>{},
+                                                    number<kNPerBlock / (4 * 4 * 4)>{},
+                                                    number<4>{},
+                                                    number<4>{},
+                                                    number<4>{},
+                                                    number<kKPack>{}),
+                                         make_tuple(number<(kNPerBlock + 1) * kKPack>{}, // 0
+                                                    number<(4 * 4 * 4) * kKPack>{},      // 1
+                                                    number<(4 * 4) * kKPack>{},          // 2
+                                                    number<4 * kKPack>{},                // 3
+                                                    number<kKPack>{},                    // 4
+                                                    number<1>{}),                        // 5
+                                         number<kKPack>{},
+                                         number<1>{});
+
+        constexpr auto k_lds_block_desc = transform_tensor_descriptor(
+            k_lds_block_desc_0,
+            make_tuple(
+                make_merge_transform(make_tuple(
+                    number<kNPerBlock / (4 * 4 * 4)>{}, number<4>{}, number<4>{}, number<4>{})),
+                make_merge_transform(make_tuple(number<kKPerBlock / kKPack>{}, number<kKPack>{}))),
+            make_tuple(sequence<1, 3, 2, 4>{}, sequence<0, 5>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
+
+        return k_lds_block_desc;
+    }
+
     template <typename Problem, index_t IBuf = 0>
     CK_TILE_HOST_DEVICE static constexpr auto
     MakeKLdsStoreBlockDescriptor(number<IBuf> = number<0>{})
@@ -1003,6 +1042,22 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
     }
 
     template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakePScaleRegTileDistribution()
+    {
+        using BlockGemm = remove_cvref_t<decltype(GetKVBlockGemm<Problem>())>;
+
+        return BlockGemm::MakeAScaleBlockTileDistribution();
+    }
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeVScaleRegTileDistribution()
+    {
+        using BlockGemm = remove_cvref_t<decltype(GetKVBlockGemm<Problem>())>;
+
+        return BlockGemm::MakeBScaleBlockTileDistribution();
+    }
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetKVBlockGemm()
     {
         using GemmProblem =
@@ -1031,7 +1086,7 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             {
                 constexpr auto AttrNumAccess =
                     Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 128
-                        ? WGAttrNumAccessEnum::Octa // 16x16x128 fp8
+                        ? WGAttrNumAccessEnum::Double // 16x16x128 fp8
                     : Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 64
                         ? WGAttrNumAccessEnum::Double // 32x32x64 fp8
                         : WGAttrNumAccessEnum::Single;
@@ -1056,7 +1111,14 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
                                                  typename Problem::OaccDataType,
                                                  typename Problem::BlockFmhaShape::Gemm1BlockWarps,
                                                  WarpGemm>;
-        return BlockGemmARegBSmemCRegV2<GemmProblem, BlockGemmPolicy>{};
+        if constexpr(Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+        {
+            return BlockGemmMxARegBSmemCRegV1<GemmProblem, BlockGemmPolicy>{};
+        }
+        else
+        {
+            return BlockGemmARegBSmemCRegV2<GemmProblem, BlockGemmPolicy>{};
+        }
     }
 };
 

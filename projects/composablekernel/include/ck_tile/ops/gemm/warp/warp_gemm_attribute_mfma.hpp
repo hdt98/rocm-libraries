@@ -14,7 +14,6 @@ enum class WGAttrNumAccessEnum
     Single  = 1,
     Double  = 2,
     Quad    = 4,
-    Octa    = 8,
     Invalid = -1
 };
 

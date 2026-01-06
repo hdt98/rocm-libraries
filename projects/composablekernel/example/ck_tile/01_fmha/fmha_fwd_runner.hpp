@@ -848,7 +848,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         };
         gen_scales(q_descale_host, -3, +1);
         gen_scales(k_descale_host, -3, +1);
-        gen_scales(v_descale_host, 0, 0);
+        gen_scales(v_descale_host, -3, +1);
     }
 
     iota_shuffle(block_table_host.begin(), block_table_host.end(), 0, random_engine);
@@ -2130,6 +2130,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 // TODO: P is not quantized and then dequantized here (PDataType = float).
                 // Check if it's worth doing it.
 
+                // p_host_ref.ForEach(
+                //     [&](auto& self, auto i) { self(i) = ck_tile::type_convert<PDataType>(1.0f);
+                //     });
                 ck_tile::reference_batched_gemm<PDataType, OaccDataType, OaccDataType, ODataType>(
                     p_host_ref,
                     v_host_ref2,

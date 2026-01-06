@@ -62,17 +62,6 @@ struct BlockGemmMxARegBSmemCRegV1
 
         const index_t iNWarp = get_warp_id() % NWarp;
 
-        constexpr auto c_block_outer_dstr_encoding = tile_distribution_encoding<
-            sequence<>,
-            tuple<sequence<MIterPerWarp, MWarp>, sequence<NIterPerWarp, NWarp>>,
-            tuple<sequence<1, 2>>,
-            tuple<sequence<1, 1>>,
-            sequence<1, 2>,
-            sequence<0, 0>>{};
-
-        constexpr auto c_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
-            c_block_outer_dstr_encoding, typename WG::CWarpDstrEncoding{});
-
         // construct A-block-tensor from A-Block-tensor-tmp
         auto a_block_tensor = make_static_distributed_tensor<typename ABlockTensorTmp::DataType>(
             MakeABlockTileDistribution());
@@ -95,23 +84,11 @@ struct BlockGemmMxARegBSmemCRegV1
             b_block_window_tmp.get_window_origin() + multi_index<2>{iNWarp * WG::kN, 0},
             make_static_tile_distribution(typename WG::BWarpDstrEncoding{}));
 
-        statically_indexed_array<
-            statically_indexed_array<decltype(b_warp_window_tmp), KIterPerWarp>,
-            NIterPerWarp>
-            b_warp_windows;
-
-        static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
-            static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
-                b_warp_windows(nIter)(kIter) = b_warp_window_tmp;
-
-                move_tile_window(b_warp_windows(nIter)(kIter),
-                                 {nIter * NPerBlockPerIter, kIter * KPerBlockPerIter});
-            });
-        });
-
         // check C-block-distribution
         static_assert(
-            std::is_same_v<remove_cvref_t<decltype(c_block_dstr_encode)>,
+            std::is_same_v<remove_cvref_t<decltype(MakeCBlockTile()
+                                                       .get_tile_distribution()
+                                                       .get_static_tile_distribution_encoding())>,
                            remove_cvref_t<decltype(CBlockTensor::get_tile_distribution()
                                                        .get_static_tile_distribution_encoding())>>);
 
@@ -154,8 +131,11 @@ struct BlockGemmMxARegBSmemCRegV1
         // hot loop:
         static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
             static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
+                auto b_warp_window = b_warp_window_tmp;
+                move_tile_window(b_warp_window,
+                                 {nIter * NPerBlockPerIter, kIter * KPerBlockPerIter});
                 // read B warp tensor from B Block window
-                const auto b_warp_tensor = load_tile(b_warp_windows(nIter)(kIter));
+                const auto b_warp_tensor = load_tile(b_warp_window);
 
                 BScaleWarpTensor b_scale_warp_tensor;
 
