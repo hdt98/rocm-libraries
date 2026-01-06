@@ -401,10 +401,14 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
                     c["ForkParams"] == benchmarkStep.forkParams and \
                     c["ParamGroups"] == benchmarkStep.paramGroups and \
                     c["CustomKernels"] == benchmarkStep.customKernels and \
-                    c["InternalSupportParams"] == benchmarkStep.internalSupportParams and \
+                    c.get("InternalSupportParams", {}) == benchmarkStep.internalSupportParams and \
                     c["CustomKernelWildcard"] == benchmarkStep.customKernelWildcard:
-                cacheValid = True
                 codeObjectFiles = c["CodeObjectFiles"]
+                # Check if all cached code object files actually exist
+                if all(os.path.exists(os.path.join(sourcePath, f)) for f in codeObjectFiles):
+                    cacheValid = True
+                else:
+                    printWarning("Cached code object files missing: redoing solution generation")
             else:
                 printWarning("Cache data does not match config: redoing solution generation")
 
