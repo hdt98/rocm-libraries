@@ -53,7 +53,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
                                                                      const rocblas_stride strideP)
 {
     bool constexpr is_complex = rocblas_is_complex<T>;
-    bool use_org = false;
+    bool constexpr use_org = false;
     I const bid = blockIdx.z;
     I const tid = threadIdx.x;
 
@@ -203,7 +203,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
             x[i + 1] *= sval[0];
         __syncthreads();
 
-        if(true)
+        if(use_org)
         {
             // ----- 2. compute w = tau'*v'*A -----
             // gemv
@@ -243,7 +243,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
             for(I i = ty; i < nn - 1; i += ny)
             {
                 T w_i = 0;
-                for(I irow = tx; irow < (mm - 1); irow += nx)
+                for(I irow = tx; irow < mm; irow += nx)
                 {
                     w_i += Atmp[irow + ((i + 1) * m)] * conj(x[irow]);
                 }
@@ -251,26 +251,31 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
                 sum_reduce(w_i);
 
                 w_i *= tmptau[0];
+                w[i] = w_i;
+            }
+            __syncthreads();
 
-                // ----- 3. apply the Householder reflector to A as a rank-1 update: A = A - v*w -----
-                // ger
-                //
-                // update submatrix is size mm by (nn-1)
-                // ---------------------------------
-                // update  colum j  in computing A <-  (I - tau * x * x') * A
-                // or  A <-  A - tau * x * (x' * A)
-                // or  A <-  A - x * (tau * (x' * A) )
-                // or  A <-  A - x * w,   where w = tau * (x' * A)
-                // ---------------------------------
+            // ----- 3. apply the Householder reflector to A as a rank-1 update: A = A - v*w -----
+            // ger
+            //
+            // update submatrix is size mm by (nn-1)
+            // ---------------------------------
+            // update  colum j  in computing A <-  (I - tau * x * x') * A
+            // or  A <-  A - tau * x * (x' * A)
+            // or  A <-  A - x * (tau * (x' * A) )
+            // or  A <-  A - x * w,   where w = tau * (x' * A)
+            // ---------------------------------
 
+            for(I i = ty; i < nn - 1; i += ny)
+            {
+                auto const w_i = w[i];
                 for(I irow = tx; irow < mm; irow += nx)
                 {
                     Atmp[irow + ((i + 1) * m)] -= x[irow] * w_i;
                 }
-
             } // end for i
+            __syncthreads();
         } // end if use_org
-        __syncthreads();
     } // end for j
 
     // write lds back to A
