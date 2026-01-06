@@ -149,12 +149,18 @@ namespace rocRoller::Scheduling::LDSBankModel
     int LDSScheduler::predictWaitcntStall(int waitcnt) const
     {
         int stallCycles = 0;
-
-        if(waitcnt >= 0 && m_waitcntQueue.size() > static_cast<size_t>(waitcnt))
+        AssertFatal(m_waitcntQueue.size() <= std::numeric_limits<int>::max(),
+                    "Waitcnt queue size exceeds int max");
+        const auto size = static_cast<int>(m_waitcntQueue.size());
+        if(waitcnt >= 0 && size > waitcnt)
         {
-            const auto commandsToWaitFor   = m_waitcntQueue.size() - static_cast<size_t>(waitcnt);
-            const auto waitCompletionCycle = m_waitcntQueue[commandsToWaitFor - 1];
-            stallCycles = (static_cast<int>(waitCompletionCycle) - m_programCycle);
+            const auto commandsToWaitFor = size - waitcnt - 1;
+            AssertFatal(commandsToWaitFor >= 0 && commandsToWaitFor < size,
+                        ShowValue(commandsToWaitFor),
+                        ShowValue(size),
+                        ShowValue(waitcnt));
+            const auto waitCompletionCycle = m_waitcntQueue[commandsToWaitFor];
+            stallCycles                    = waitCompletionCycle - m_programCycle;
         }
 
         return stallCycles;

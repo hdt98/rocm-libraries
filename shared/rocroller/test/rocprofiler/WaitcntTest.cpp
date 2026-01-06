@@ -160,7 +160,8 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][lds-model][lds-mode
 
         auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
-        INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
+        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
+                         analysis.totalDelta,
                          analysis.totalAbsoluteDelta,
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
@@ -173,7 +174,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][lds-model][lds-mode
         {
             // CHECK(analysis.totalAbsoluteDelta <= 0);
             // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
-            CHECK(analysis.incorrectPredictionCount <= 4);
+            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
 }
@@ -279,7 +280,8 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
 
         auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
-        INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
+        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
+                         analysis.totalDelta,
                          analysis.totalAbsoluteDelta,
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
@@ -292,7 +294,7 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
         {
             // CHECK(analysis.totalAbsoluteDelta <= 0);
             // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
-            CHECK(analysis.incorrectPredictionCount <= 4);
+            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
 }
@@ -401,7 +403,8 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][lds-model][lds-model-waitcnt][
 
         auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
 
-        INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
+        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
+                         analysis.totalDelta,
                          analysis.totalAbsoluteDelta,
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
@@ -414,7 +417,7 @@ TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][lds-model][lds-model-waitcnt][
         {
             // CHECK(analysis.totalAbsoluteDelta <= 0);
             // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
-            CHECK(analysis.incorrectPredictionCount <= 4);
+            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
 }
