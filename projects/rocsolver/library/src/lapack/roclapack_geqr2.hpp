@@ -114,7 +114,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
 
     // load A to lds
 
-    if(use_org)
+    if constexpr(use_org)
     {
         for(I i = tid % (nthreads / 2); i < m; i += (nthreads / 2))
         {
@@ -151,7 +151,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
         // larfg
         T norm2 = 0;
 
-        if(use_org)
+        if constexpr(use_org)
         {
             for(I i = tid; i < mm - 1; i += nthreads)
                 norm2 += x[i + 1] * conj(x[i + 1]);
@@ -203,7 +203,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
             x[i + 1] *= sval[0];
         __syncthreads();
 
-        if(use_org)
+        if constexpr(use_org)
         {
             // ----- 2. compute w = tau'*v'*A -----
             // gemv
@@ -279,7 +279,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) geqr2_kernel_small(const I m,
     } // end for j
 
     // write lds back to A
-    if(use_org)
+    if constexpr(use_org)
     {
         for(I i = tid % (nthreads / 2); i < m; i += (nthreads / 2))
         {
