@@ -1180,7 +1180,7 @@ private:
     hipEvent_wrapper_t event;
 };
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 // RCCL-based all-to-all communication for multi-GPU transpose
 struct CommRCCLAllToAll : public MultiPlanItem
 {
@@ -1343,7 +1343,7 @@ private:
 public:
     std::vector<Transfer> transfers;
 };
-#endif // ROCFFT_RCCL_ENABLED
+#endif // ROCFFT_RCCL_ENABLE
 
 // This struct has a vector of ranks to scatter to.  Executing can
 // create an MPI group with those ranks.

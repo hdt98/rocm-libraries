@@ -427,7 +427,7 @@ if( ROCFFT_MPI_ENABLE )
 endif()
 
 if( rccl_FOUND )
-  target_compile_definitions(rocfft PRIVATE ROCFFT_RCCL_ENABLED)
+  target_compile_definitions(rocfft PRIVATE ROCFFT_RCCL_ENABLE)
 endif()
 
 add_library( roc::rocfft ALIAS rocfft )

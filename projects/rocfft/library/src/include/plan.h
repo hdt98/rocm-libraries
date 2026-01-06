@@ -361,7 +361,7 @@ private:
                             std::vector<size_t>&       outputItems,
                             const std::string&         itemGroup);
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
     // RCCL-based global transpose for single-process multi-GPU
     void GlobalTransposeRCCL(size_t                     elem_size,
                              const rocfft_field_t&      inField,

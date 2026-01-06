@@ -28,7 +28,7 @@
 #include "rocfft_mpi.h"
 #include "twiddles.h"
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 #include "rccl_wrapper.h"
 #endif
 
@@ -659,7 +659,7 @@ void CommPointToPoint::Print(rocfft_ostream& os, const int indent) const
     os << std::endl;
 }
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 // RCCL AllToAll implementation (currently unused - kept for potential future use)
 void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
                                     void*                 in_buffer[],
@@ -839,7 +839,7 @@ void CommRCCLGrouped::Print(rocfft_ostream& os, const int indent) const
     }
     os << std::endl;
 }
-#endif // ROCFFT_RCCL_ENABLED
+#endif // ROCFFT_RCCL_ENABLE
 
 void CommScatter::ExecuteAsync(const rocfft_plan     plan,
                                void*                 in_buffer[],

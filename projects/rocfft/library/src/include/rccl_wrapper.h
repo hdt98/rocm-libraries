@@ -25,7 +25,7 @@
 #include <memory>
 #include <vector>
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 #include <rccl/rccl.h>
 #endif
 

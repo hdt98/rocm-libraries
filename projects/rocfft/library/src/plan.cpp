@@ -42,7 +42,7 @@
 #include "tuning_helper.h"
 #include "tuning_plan_tuner.h"
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 #include "rccl_wrapper.h"
 #endif
 
@@ -2041,7 +2041,7 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
                    || rocfft_plan_description_t::multiple_devices_in_rank(outField);
 
     // check if RCCL is available for single-process multi-GPU
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
     bool rccl_available = false;
     rccl_available      = use_p2p && rocfft_rccl::RCCLCommunicator::instance().is_available();
 #endif
@@ -2057,7 +2057,7 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
     // possible.
     std::string itemGroup = "transpose_" + std::to_string(transposeNumber);
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
     if(rccl_available)
     {
         // use RCCL for single-process multi-GPU
@@ -2080,7 +2080,7 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
     }
 }
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
                                         const rocfft_field_t&      inField,
                                         const rocfft_field_t&      outField,
@@ -2244,7 +2244,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
         }
     }
 }
-#endif // ROCFFT_RCCL_ENABLED
+#endif // ROCFFT_RCCL_ENABLE
 
 void rocfft_plan_t::GlobalTransposeP2P(size_t                     elem_size,
                                        const rocfft_field_t&      inField,
@@ -2859,7 +2859,7 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
     if(desc.inFields.empty() || desc.outFields.empty())
         return false;
 
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
     // initialize RCCL for single-process multi-GPU if not already initialized
     if(rocfft_plan_description_t::multiple_devices_in_rank(desc.inFields.front())
        || rocfft_plan_description_t::multiple_devices_in_rank(desc.outFields.front()))

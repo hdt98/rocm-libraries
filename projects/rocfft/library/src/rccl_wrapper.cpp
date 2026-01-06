@@ -26,7 +26,7 @@
 
 namespace rocfft_rccl
 {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
 
     // RCCL data type mapping - returns base NCCL type for given element size.
     // for complex types (8 or 16 bytes), callers must double the count.
@@ -97,7 +97,7 @@ namespace rocfft_rccl
 
     bool RCCLCommunicator::is_available() const
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         return pimpl && pimpl->initialized;
 #else
         return false;
@@ -106,7 +106,7 @@ namespace rocfft_rccl
 
     bool RCCLCommunicator::initialize(const std::vector<int>& devices)
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         // check if RCCL is disabled via environment variable
         const char* disable_rccl = std::getenv("ROCFFT_DISABLE_RCCL");
         if(disable_rccl && std::string(disable_rccl) == "1")
@@ -167,7 +167,7 @@ namespace rocfft_rccl
 
     void RCCLCommunicator::finalize()
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         if(pimpl && pimpl->initialized)
         {
             pimpl->initialized = false;
@@ -178,7 +178,7 @@ namespace rocfft_rccl
 
     void* RCCLCommunicator::get_comm(int device_id) const
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
             return nullptr;
 
@@ -198,7 +198,7 @@ namespace rocfft_rccl
 
     int RCCLCommunicator::get_nranks() const
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
             return 0;
         return static_cast<int>(pimpl->devices.size());
@@ -209,7 +209,7 @@ namespace rocfft_rccl
 
     int RCCLCommunicator::get_device_for_rank(int rank) const
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
             return -1;
 
@@ -222,7 +222,7 @@ namespace rocfft_rccl
 
     int RCCLCommunicator::get_rank_for_device(int device_id) const
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
             return -1;
 
@@ -236,7 +236,7 @@ namespace rocfft_rccl
     const std::vector<int>& RCCLCommunicator::get_devices() const
     {
         static const std::vector<int> empty;
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         return (pimpl && pimpl->initialized) ? pimpl->devices : empty;
 #else
         return empty;
@@ -245,7 +245,7 @@ namespace rocfft_rccl
 
     bool RCCLCommunicator::has_device(int device_id) const
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
             return false;
         return pimpl->device_to_rank.find(device_id) != pimpl->device_to_rank.end();
@@ -257,14 +257,14 @@ namespace rocfft_rccl
     // RAII group wrapper
     RCCLGroup::RCCLGroup()
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         ncclGroupStart();
 #endif
     }
 
     RCCLGroup::~RCCLGroup()
     {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
         ncclGroupEnd();
 #endif
     }
@@ -279,7 +279,7 @@ namespace rocfft_rccl
                       hipStream_t stream,
                       size_t      elem_size)
         {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
             auto& rccl = RCCLCommunicator::instance();
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
@@ -330,7 +330,7 @@ namespace rocfft_rccl
                        hipStream_t                stream,
                        size_t                     elem_size)
         {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
             auto& rccl = RCCLCommunicator::instance();
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
@@ -403,7 +403,7 @@ namespace rocfft_rccl
                   hipStream_t stream,
                   size_t      elem_size)
         {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
             auto& rccl = RCCLCommunicator::instance();
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
@@ -448,7 +448,7 @@ namespace rocfft_rccl
                   hipStream_t stream,
                   size_t      elem_size)
         {
-#ifdef ROCFFT_RCCL_ENABLED
+#ifdef ROCFFT_RCCL_ENABLE
             auto& rccl = RCCLCommunicator::instance();
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
