@@ -100,17 +100,25 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
         _invVariance = createTensor(tensorMap, attributes.inv_variance_tensor_uid().value());
     }
 
-    // Running statistics not supported - API mismatch between hipDNN and MIOpen
-    // Defensive check: should have been rejected by plan builder
     if(attributes.prev_running_mean_tensor_uid().has_value()
-       || attributes.prev_running_variance_tensor_uid().has_value()
-       || attributes.momentum_tensor_uid().has_value()
-       || attributes.next_running_mean_tensor_uid().has_value()
-       || attributes.next_running_variance_tensor_uid().has_value())
+       && attributes.prev_running_variance_tensor_uid().has_value()
+       && attributes.momentum_tensor_uid().has_value()
+       && attributes.next_running_mean_tensor_uid().has_value()
+       && attributes.next_running_variance_tensor_uid().has_value())
     {
-        throw hipdnn_plugin_sdk::HipdnnPluginException(
-            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
-            "Running statistics should have been rejected by plan builder");
+        // Extract momentum value from pass-by-value tensor (cast to double for MIOpen compatibility)
+        auto momentumTensorAttr = tensorMap.at(attributes.momentum_tensor_uid().value());
+        _momentumValue = miopen_utils::extractDoubleFromTensorValue(momentumTensorAttr, "Momentum");
+
+        _prevRunningMean = miopen_utils::createTensor(
+            tensorMap, attributes.prev_running_mean_tensor_uid().value());
+        _prevRunningVariance = miopen_utils::createTensor(
+            tensorMap, attributes.prev_running_variance_tensor_uid().value());
+        _nextRunningMean = miopen_utils::createTensor(
+            tensorMap, attributes.next_running_mean_tensor_uid().value());
+        _nextRunningVariance = miopen_utils::createTensor(
+            tensorMap, attributes.next_running_variance_tensor_uid().value());
+        _hasRunningStats = true;
     }
 }
 
