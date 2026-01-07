@@ -166,6 +166,19 @@ namespace rocRoller::Scheduling::LDSBankModel
         return stallCycles;
     }
 
+    // TODO: this is a copypaste from test/common
+    std::vector<size_t>
+        generateLDSAddresses(size_t count, size_t strideMultiplier, size_t instrDwords)
+    {
+        std::vector<size_t> addresses;
+        for(size_t workitemId = 0; workitemId < count; ++workitemId)
+        {
+            size_t address = workitemId * (4 * strideMultiplier * instrDwords);
+            addresses.push_back(address);
+        }
+        return addresses;
+    }
+
     void LDSScheduler::scheduleInstruction(const RuntimeLDSInstruction& instr)
     {
         updateQueues();
@@ -188,10 +201,12 @@ namespace rocRoller::Scheduling::LDSBankModel
                 auto cmdBase = m_commandQueue.empty() ? (m_programCycle + dataCycles)
                                                       : (m_commandQueue.back() + dataCycles);
 
-                // The following std::max improves accuracy for ds_write_b32 with no bank conflicts
-                auto waitcntBase = m_waitcntQueue.empty()
-                                       ? (m_programCycle + dataCycles + 40)
-                                       : (m_waitcntQueue.back() + std::max(8, dataCycles));
+                // TODO: write b64 stride1 appears to be off by 4
+                // Perhaps it's due to the longer issue time?
+                const auto first       = m_programCycle + 40 + dataCycles;
+                auto       waitcntBase = m_waitcntQueue.empty()
+                                             ? (first)
+                                             : (std::max(first, m_waitcntQueue.back() + dataCycles));
 
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase);
@@ -207,10 +222,13 @@ namespace rocRoller::Scheduling::LDSBankModel
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
-                auto cmdBase     = m_commandQueue.empty() ? (m_programCycle + dataCycles + 4)
-                                                          : (m_commandQueue.back() + dataCycles);
-                auto waitcntBase = m_waitcntQueue.empty() ? (m_programCycle + 40 + dataCycles)
-                                                          : (m_waitcntQueue.back() + dataCycles);
+                auto       cmdBase     = m_commandQueue.empty() ? (m_programCycle + dataCycles + 4)
+                                                                : (m_commandQueue.back() + dataCycles);
+                const auto first       = m_programCycle + 40 + dataCycles;
+                auto       waitcntBase = m_waitcntQueue.empty()
+                                             ? (first)
+                                             : (std::max(first, m_waitcntQueue.back() + dataCycles));
+
                 AssertFatal(requiredSlots == 1,
                             ShowValue(requiredSlots)); // read should only need 1 slot
 

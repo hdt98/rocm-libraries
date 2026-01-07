@@ -101,7 +101,8 @@ protected:
     }
 };
 
-TEST_CASE("Weave multiple LDS and waitcnt 0", "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
+TEST_CASE("Weave multiple LDS and waitcnt 0",
+          "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
 {
     // Expect 394-392 passed : 51-53 failed
     // Mainly affected by waitcnt queue values
@@ -345,7 +346,8 @@ protected:
     }
 };
 
-TEST_CASE("Weave LDS and waitcnt", "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
+TEST_CASE("Weave LDS and waitcnt",
+          "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
 {
     // Expect 544 passed : 66 failed
     /*
