@@ -788,7 +788,8 @@ def Build_CK(Map conf=[:]){
         def image
         def retimage
 
-        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'composable_kernel') {
+        withCredentials([gitUsernamePassword(credentialsId: "${ck_githubemu_creds}", account: 'AMD-ROCm-Internal', repo: 'composable_kernel'),
+                         gitUsernamePassword(credentialsId: "${ck_githubemu_creds}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries')]) {
             try {
                 (retimage, image) = getDockerImage(conf)
                 withDockerContainer(image: image, args: dockerOpts) {
@@ -880,9 +881,6 @@ def Build_CK(Map conf=[:]){
                     }
                     if (params.hipTensor_test && arch == "gfx90a" ){
                         // build and test hipTensor on gfx90a node
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
-                        try
-                        {
                         sh """#!/bin/bash
                             rm -rf rocm-libraries
                             git clone --no-checkout --filter=blob:none https://github.com/AMD-ROCm-Internal/rocm-libraries.git
@@ -899,12 +897,6 @@ def Build_CK(Map conf=[:]){
                                 cmake --build build -- -j
                             """
                             //  ctest --test-dir build // disable the testing for now
-                        }
-                        }
-                        catch(Exception ex)
-                        {
-                            error "Unable to clone rocm-libraries internal repo"
-                        }
                         }
                     }
                 }
