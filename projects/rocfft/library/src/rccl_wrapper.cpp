@@ -160,17 +160,6 @@ namespace rocfft_rccl
 #endif
     }
 
-    void Communicator::finalize()
-    {
-#ifdef ROCFFT_RCCL_ENABLE
-        if(pimpl && pimpl->initialized)
-        {
-            pimpl->initialized = false;
-            // destructor will clean up comms
-        }
-#endif
-    }
-
     void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
@@ -191,30 +180,6 @@ namespace rocfft_rccl
 #endif
     }
 
-    int Communicator::get_nranks() const
-    {
-#ifdef ROCFFT_RCCL_ENABLE
-        if(!pimpl || !pimpl->initialized)
-            return 0;
-        return static_cast<int>(pimpl->devices.size());
-#else
-        return 0;
-#endif
-    }
-
-    int Communicator::get_device_for_rank(int rank) const
-    {
-#ifdef ROCFFT_RCCL_ENABLE
-        if(!pimpl || !pimpl->initialized)
-            return -1;
-
-        auto it = pimpl->rank_to_device.find(rank);
-        return (it != pimpl->rank_to_device.end()) ? it->second : -1;
-#else
-        return -1;
-#endif
-    }
-
     int Communicator::get_rank_for_device(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
@@ -225,16 +190,6 @@ namespace rocfft_rccl
         return (it != pimpl->device_to_rank.end()) ? it->second : -1;
 #else
         return -1;
-#endif
-    }
-
-    const std::vector<int>& Communicator::get_devices() const
-    {
-        static const std::vector<int> empty;
-#ifdef ROCFFT_RCCL_ENABLE
-        return (pimpl && pimpl->initialized) ? pimpl->devices : empty;
-#else
-        return empty;
 #endif
     }
 

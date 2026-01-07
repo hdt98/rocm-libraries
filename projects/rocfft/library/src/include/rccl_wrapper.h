@@ -47,23 +47,11 @@ namespace rocfft_rccl
         // initialize RCCL for given devices (call once per process)
         bool initialize(const std::vector<int>& devices);
 
-        // finalize RCCL (call at shutdown)
-        void finalize();
-
         // get the RCCL communicator for a specific device
         void* get_comm(int device_id) const;
 
-        // get number of ranks
-        int get_nranks() const;
-
-        // get device ID for a rank
-        int get_device_for_rank(int rank) const;
-
         // get rank for a device ID
         int get_rank_for_device(int device_id) const;
-
-        // get all device IDs
-        const std::vector<int>& get_devices() const;
 
         // check if a specific device is managed
         bool has_device(int device_id) const;
