@@ -168,18 +168,10 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 
         if(write && instrDwords == 4)
         {
-            // TODO
+            // CHECK((analysis.incorrectPredictionCount <= 16));
         }
         else
         {
-            /* Sometimes as steady state is reached, there are deltas during transition
-            ds_read_b128 v[32:35], v1, model 4, profiler 4, delta 0
-            ds_read_b128 v[36:39], v1, model 8, profiler 4, delta -4
-            ds_read_b128 v[40:43], v1, model 32, profiler 24, delta -8
-            ds_read_b128 v[44:47], v1, model 32, profiler 32, delta 0
-            */
-            // CHECK(analysis.totalAbsoluteDelta <= 0);
-            // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
@@ -269,12 +261,10 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
 
         if(write && instrDwords == 4)
         {
-            // TODO
+            // CHECK((analysis.incorrectPredictionCount <= 16));
         }
         else
         {
-            // CHECK(analysis.totalAbsoluteDelta == 0);
-            // CHECK(analysis.totalDelta == 0);
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }

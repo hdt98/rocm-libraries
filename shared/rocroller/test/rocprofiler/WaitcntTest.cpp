@@ -169,12 +169,10 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
 
         if(write && instrDwords == 4)
         {
-            // TODO
+            // CHECK((analysis.incorrectPredictionCount <= 16));
         }
         else
         {
-            // CHECK(analysis.totalAbsoluteDelta <= 0);
-            // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
@@ -275,12 +273,10 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
 
         if(write && instrDwords == 4)
         {
-            // TODO
+            // CHECK((analysis.incorrectPredictionCount <= 16));
         }
         else
         {
-            // CHECK(analysis.totalAbsoluteDelta <= 0);
-            // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
@@ -399,12 +395,10 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
 
         if(write && instrDwords == 4)
         {
-            // TODO
+            // CHECK((analysis.incorrectPredictionCount <= 16));
         }
         else
         {
-            // CHECK(analysis.totalAbsoluteDelta <= 0);
-            // CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 0));
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
     }
