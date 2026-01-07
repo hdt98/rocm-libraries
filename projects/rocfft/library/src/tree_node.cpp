@@ -694,7 +694,7 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
     // RCCL collectives must be called from ALL devices simultaneously.
     // use ncclGroupStart/End to batch all calls together
     {
-        rocfft_rccl::RCCLGroup group; // ncclGroupStart called in constructor
+        rocfft_rccl::Group group; // ncclGroupStart called in constructor
 
         size_t stream_idx = 0;
         for(size_t i = 0; i < locations.size(); ++i)
@@ -771,7 +771,7 @@ void CommRCCLGrouped::ExecuteAsync(const rocfft_plan     plan,
     const size_t elem_size = element_size(precision, arrayType);
 
     // group all operations - ncclGroupStart called in constructor
-    rocfft_rccl::RCCLGroup group;
+    rocfft_rccl::Group group;
 
     for(auto& t : transfers)
     {

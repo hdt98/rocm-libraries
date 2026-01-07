@@ -32,14 +32,14 @@
 namespace rocfft_rccl
 {
     // RCCL communicator wrapper for single-process multi-GPU
-    class RCCLCommunicator
+    class Communicator
     {
     public:
-        RCCLCommunicator();
-        ~RCCLCommunicator() = default;
+        Communicator();
+        ~Communicator() = default;
 
         // singleton allocated in rocfft_setup and freed in rocfft_cleanup
-        static std::unique_ptr<RCCLCommunicator> single;
+        static std::unique_ptr<Communicator> single;
 
         // check if RCCL is available and initialized
         bool is_available() const;
@@ -70,25 +70,25 @@ namespace rocfft_rccl
 
     private:
         // non-copyable
-        RCCLCommunicator(const RCCLCommunicator&) = delete;
-        RCCLCommunicator& operator=(const RCCLCommunicator&) = delete;
+        Communicator(const Communicator&) = delete;
+        Communicator& operator=(const Communicator&) = delete;
 
         struct Impl;
         std::unique_ptr<Impl> pimpl;
     };
 
     // RAII wrapper for RCCL group operations
-    class RCCLGroup
+    class Group
     {
     public:
-        RCCLGroup();
-        ~RCCLGroup();
+        Group();
+        ~Group();
 
         // non-copyable, non-movable
-        RCCLGroup(const RCCLGroup&) = delete;
-        RCCLGroup& operator=(const RCCLGroup&) = delete;
-        RCCLGroup(RCCLGroup&&)                 = delete;
-        RCCLGroup& operator=(RCCLGroup&&) = delete;
+        Group(const Group&) = delete;
+        Group& operator=(const Group&) = delete;
+        Group(Group&&)                 = delete;
+        Group& operator=(Group&&) = delete;
     };
 
     // helper functions for RCCL operations

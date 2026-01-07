@@ -26,7 +26,7 @@
 
 namespace rocfft_rccl
 {
-    std::unique_ptr<RCCLCommunicator> RCCLCommunicator::single;
+    std::unique_ptr<Communicator> Communicator::single;
 #ifdef ROCFFT_RCCL_ENABLE
 
     // RCCL data type mapping - returns base NCCL type for given element size.
@@ -53,7 +53,7 @@ namespace rocfft_rccl
     }
 
     // implementation details
-    struct RCCLCommunicator::Impl
+    struct Communicator::Impl
     {
         std::vector<ncclComm_t> comms; // one per device
         std::vector<int>        devices; // device IDs
@@ -79,18 +79,18 @@ namespace rocfft_rccl
 
 #else
     // dummy implementation when RCCL is disabled
-    struct RCCLCommunicator::Impl
+    struct Communicator::Impl
     {
         bool initialized = false;
     };
 #endif
 
-    RCCLCommunicator::RCCLCommunicator()
+    Communicator::Communicator()
     {
         pimpl = std::make_unique<Impl>();
     }
 
-    bool RCCLCommunicator::is_available() const
+    bool Communicator::is_available() const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         return pimpl && pimpl->initialized;
@@ -99,7 +99,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    bool RCCLCommunicator::initialize(const std::vector<int>& devices)
+    bool Communicator::initialize(const std::vector<int>& devices)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         // check if RCCL is disabled via environment variable
@@ -160,7 +160,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    void RCCLCommunicator::finalize()
+    void Communicator::finalize()
     {
 #ifdef ROCFFT_RCCL_ENABLE
         if(pimpl && pimpl->initialized)
@@ -171,7 +171,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    void* RCCLCommunicator::get_comm(int device_id) const
+    void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
@@ -191,7 +191,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    int RCCLCommunicator::get_nranks() const
+    int Communicator::get_nranks() const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
@@ -202,7 +202,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    int RCCLCommunicator::get_device_for_rank(int rank) const
+    int Communicator::get_device_for_rank(int rank) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
@@ -215,7 +215,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    int RCCLCommunicator::get_rank_for_device(int device_id) const
+    int Communicator::get_rank_for_device(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
@@ -228,7 +228,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    const std::vector<int>& RCCLCommunicator::get_devices() const
+    const std::vector<int>& Communicator::get_devices() const
     {
         static const std::vector<int> empty;
 #ifdef ROCFFT_RCCL_ENABLE
@@ -238,7 +238,7 @@ namespace rocfft_rccl
 #endif
     }
 
-    bool RCCLCommunicator::has_device(int device_id) const
+    bool Communicator::has_device(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         if(!pimpl || !pimpl->initialized)
@@ -250,14 +250,14 @@ namespace rocfft_rccl
     }
 
     // RAII group wrapper
-    RCCLGroup::RCCLGroup()
+    Group::Group()
     {
 #ifdef ROCFFT_RCCL_ENABLE
         ncclGroupStart();
 #endif
     }
 
-    RCCLGroup::~RCCLGroup()
+    Group::~Group()
     {
 #ifdef ROCFFT_RCCL_ENABLE
         ncclGroupEnd();
@@ -275,7 +275,7 @@ namespace rocfft_rccl
                       size_t      elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *RCCLCommunicator::single;
+            auto& rccl = *Communicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
@@ -326,7 +326,7 @@ namespace rocfft_rccl
                        size_t                     elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *RCCLCommunicator::single;
+            auto& rccl = *Communicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
@@ -399,7 +399,7 @@ namespace rocfft_rccl
                   size_t      elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *RCCLCommunicator::single;
+            auto& rccl = *Communicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
@@ -444,7 +444,7 @@ namespace rocfft_rccl
                   size_t      elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *RCCLCommunicator::single;
+            auto& rccl = *Communicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
