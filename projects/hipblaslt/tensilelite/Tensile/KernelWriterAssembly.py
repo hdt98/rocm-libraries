@@ -717,7 +717,7 @@ class KernelWriterAssembly(KernelWriter):
     ########################################
     # VGPR Macros
     ########################################
-    module.addComment2("Siavash")
+    # @Siavash
     module.addComment2("LDS Assignments")
 
     ldsSize = kernel["LdsNumBytes"]
@@ -726,8 +726,11 @@ class KernelWriterAssembly(KernelWriter):
     module.add(ValueSet("LDSBufferSizeTotal", ldsSize, format=1))
     
     if kernel["1LDSBuffer"] > 1:
-      self.defineSgpr("LocalWriteAddrATmp", 2, 2)
-      self.defineSgpr("LocalWriteAddrBTmp", 2, 2)
+      self.defineSgpr("LocalWriteAddrTmpA", 1, 1)
+      self.defineSgpr("LocalWriteAddrTmpB", 1, 1)
+      module.add(RegSet("s", "LocalWriteAddrTmpA", self.sgprs["LocalWriteAddrTmpA"]))
+      module.add(RegSet("s", "LocalWriteAddrTmpB", self.sgprs["LocalWriteAddrTmpB"]))
+      
       
 
     ########################################
@@ -8803,6 +8806,8 @@ class KernelWriterAssembly(KernelWriter):
   def localWriteSwapOffsets(self, kernel, internalPointerSwap, tP):
     tc = tP["tensorChar"]
     if not self.do["LocalWrite%s"%tc]: return Module("localWriteSwapOffsets (No local write%s)"%tc)
+    needWrappingIncrement = True if kernel["1LDSBuffer"]==2 else False
+    needWrappingIncrement = needWrappingIncrement and "DirectToLds%s"%tc
     needSwap = False if kernel["1LDSBuffer"] else True
     doMetadataCheck = kernel["ProblemType"]["Sparse"] and \
                       ((kernel["ProblemType"]["Sparse"] ==2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]))
@@ -8814,7 +8819,7 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["DirectToVgprSparseMetadata"]:
         needMetaSwap = (kernel["PrefetchGlobalRead"] == 2 and kernel["ExpandPointerSwap"])
 
-    if not (needSwap or needMetaSwap): return Module("localWriteSwapOffsets (Empty)")
+    if not (needSwap or needMetaSwap or needWrappingIncrement): return Module("localWriteSwapOffsets (Empty)")
     module = Module("localWriteSwapOffsets")
 
     def localWriteSwapXOR(tc, src0Val, numLwa):
@@ -8837,18 +8842,13 @@ class KernelWriterAssembly(KernelWriter):
             src1=vgpr("LocalWriteAddr%s"%tc), \
             comment="Final Offset Plus %uK"%((i * self.states.regCaps["maxLDSConstOffset"]) / 1024)))
 
-    if needSwap:
-      #fixme-iui  need to use wrapping increment for double or triple buffering:
-      if kernel['1LDSBuffer'] == 2:
+    if needWrappingIncrement:
         # @Siavash use wrapping incremet if we have more than 3 LDSBuffer
         
-        module.add(SAddU32(dst=sgpr("LocalWriteAddrA"), src0=sgpr("LocalWriteAddrA"), src1="LDSBufferSize"))
-        module.add(SAddU32(dst=sgpr("LocalWriteAddrB"), src0=sgpr("LocalWriteAddrB"), src1="LDSBufferSize"))
-        module.add(SSubU32(dst=sgpr("LocalWriteAddrATmp"), src0=sgpr("LocalWriteAddrA"), src1="TotalLDSBufferSize"))
-        module.add(SSubU32(dst=sgpr("LocalWriteAddrBTmp"), src0=sgpr("LocalWriteAddrB"), src1="TotalLDSBufferSize"))
-        module.add(SCSelectB32(dst=sgpr("LocalWriteAddrA"), src0=sgpr("LocalWriteAddrATmp"), src1=sgpr("LocalWriteAddrATmp")))
-        module.add(SCSelectB32(dst=sgpr("LocalWriteAddrB"), src0=sgpr("LocalWriteAddrBTmp"), src1=sgpr("LocalWriteAddrBTmp")))
-        
+        module.add(SAddU32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSize1Iter"))
+        module.add(SSubU32(dst=sgpr("LocalWriteAddrTmp%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSizeTotal"))
+        module.add(SCSelectB32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddrTmp%s"%tc), src1=sgpr("LocalWriteAddr%s"%tc)))
+                
         # s_add_u32 s[sgprLocalWriteAddrA], s[sgprLocalWriteAddrA], LDSBufferSize
         # s_add_u32 s[sgprLocalWriteAddrB], s[sgprLocalWriteAddrB], LDSBufferSize
         # s_sub_u32 s[sgprTmp0], s[sgprLocalWriteAddrA], TotalLDSBufferSize
@@ -8856,8 +8856,8 @@ class KernelWriterAssembly(KernelWriter):
         # s_cmp_ge_u32 s[sgprLocalWriteAddrA], TotalLDSBufferSize
         # s_cselect_b32 s[sgprLocalWriteAddrA], s[sgprTmp0], s[sgprLocalWriteAddrA]
         # s_cselect_b32 s[sgprLocalWriteAddrB], s[sgprTmp1], s[sgprLocalWriteAddrB]
-        pass
-      else:  
+    else:
+      if needSwap:  
         if internalPointerSwap and not kernel["StoreSwapAddr"]:
           tP["localWriteSwapByteOffset"] = 0 if tP["localWriteSwapByteOffset"] else kernel["LdsOffsetA_Blk"]
           module.addComment1("(EPS=1) local write swap internal offset -> %u" % tP["localWriteSwapByteOffset"])
@@ -9850,7 +9850,7 @@ class KernelWriterAssembly(KernelWriter):
   def localReadResetOffsets(self, kernel, tP):
     tc=tP["tensorChar"]
     if not self.do["LocalRead%s"%tc]: return Module("localReadResetOffsets (no local read)")
-    if kernel["1LDSBuffer"] or ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]): # no local read code if DirectToVgpr is enabled
+    if (kernel["1LDSBuffer"]==0 or kernel["1LDSBuffer"]==2) or ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]): # no local read code if DirectToVgpr is enabled
       return Module("localReadResetOffsets (Empty)")
     module = Module("localReadResetOffsets")
     if tP["localReadInstruction"].numOffsets == 1:

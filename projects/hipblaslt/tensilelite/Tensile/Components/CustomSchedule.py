@@ -1938,6 +1938,8 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 def hasCustomSchedule(kernel):
+    # @Siavash TODO/FIXME
+    return False, None
 
     if not kernel["UseCustomMainLoopSchedule"]:
         return False, None

@@ -771,7 +771,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         iterCode.add(macIterItems.pop(0))
 
       iterCode.add(SSetPrior(prior=1, comment="Raise priority while processing macs"))
-      if kernel["1LDSBuffer"]:
+      if kernel["1LDSBuffer"]==1:
         barrier = Module()
         barrier.addComment0("1 LDS buffer: read-sync-write")
         barrier.add(SWaitCnt(dscnt=0, comment=""))
@@ -1280,7 +1280,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         ####
         # scheduled local write
         ####
-        if kernel["1LDSBuffer"] and mfmaIndex == self.states.sync1LdsMfmaIndex:
+        if kernel["1LDSBuffer"]==1 and mfmaIndex == self.states.sync1LdsMfmaIndex:
           barrier = Module()
           barrier.addComment0("1 LDS buffer: read-sync-write")
           barrier.add(SWaitCnt(dscnt=0, comment=""))

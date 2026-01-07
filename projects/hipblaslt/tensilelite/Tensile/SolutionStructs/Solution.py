@@ -1490,7 +1490,7 @@ class Solution(collections.abc.Mapping):
     TLUB = state["ProblemType"]["TLUB"]
     if (
       state["EnableMatrixInstruction"] and not state["ExpandPointerSwap"] and
-      state["DepthU"] == state["MatrixInstK"] and state["PrefetchGlobalRead"] and not state["1LDSBuffer"]
+      state["DepthU"] == state["MatrixInstK"] and state["PrefetchGlobalRead"] and state["1LDSBuffer"] == 0
       and (state["MIWaveTile"][0] > 2  and state["MIWaveTile"][1] > 2)
       and (state["MIWaveTile"][0] % 2 == 0 and state["MIWaveTile"][1] % 2 == 0)
       and (sizeDataTypeA == sizeDataType) and (sizeDataTypeB == sizeDataType)
@@ -2544,6 +2544,7 @@ class Solution(collections.abc.Mapping):
 
       # Update parent variable so kernel display is accurate
       state["DirectToLds"] = state["DirectToLdsA"] or state["DirectToLdsB"]
+      # @Siavash TODO/FIXME add support for tripple LDS buffer
       if state["1LDSBuffer"] == -1 and state["DirectToLds"]:
         #1LDS buffer must be 0 for DirectToLdsA
         state["1LDSBuffer"] = 0
@@ -2828,18 +2829,36 @@ class Solution(collections.abc.Mapping):
     #  print("LdsOffsetMetadata_BLK", state["LdsOffsetMetadata_Blk"])
 
     if state["EnableMatrixInstruction"]:
-      if state["DirectToLds"] and state["1LDSBuffer"]:
-        reject(state, printRejectionReason, "1LDSBuffer must be 0 for directToLds")
+      if state["DirectToLds"] and state["1LDSBuffer"]==1:
+        reject(state, printRejectionReason, "1LDSBuffer must be 0 or 2 (double or tripple buffer) for directToLds")
 
-    if state["1LDSBuffer"] == -1:
-      if ldsNumBytesAB  <= max(ldsSizeOccupancy,32768) or \
-          (state["ProblemType"]["ComputeDataType"].numBytes() * state["MacroTile0"] * state["MacroTile1"] > 32768*4 and \
-            not (ldsNumBytesAB > isaInfoMap[isa].archCaps["DeviceLDS"])):
+    # TODO/FIXME @Siavash cleanup this code!
+    # if state["1LDSBuffer"] == -1:
+    #   if ldsNumBytesAB  <= max(ldsSizeOccupancy,32768) or \
+    #       (state["ProblemType"]["ComputeDataType"].numBytes() * state["MacroTile0"] * state["MacroTile1"] > 32768*4 and \
+    #         not (ldsNumBytesAB > isaInfoMap[isa].archCaps["DeviceLDS"])):
+    #     state["1LDSBuffer"] = 0
+    #   else:
+    #     state["1LDSBuffer"] = 1
+    
+    deviceLDSBufferSizeInBytes = isaInfoMap[isa].archCaps["DeviceLDS"]
+    maxPossibleLDSBuffers = math.ceil(deviceLDSBufferSizeInBytes // ldsNumBytesAB)
+    maxPossibleLDSBuffers = min(maxPossibleLDSBuffers,3)
+    
+    if state['1LDSBuffer'] == 2:
+      if state['1LDSBuffer'] > maxPossibleLDSBuffers:
+          reject(state, printRejectionReason, f"Not enough LDS space for triple LDS buffer! ({ldsNumBytesAB * 3} > {deviceLDSBufferSizeInBytes})")
+
+    
+    if state["1LDSBuffer"] == -1:      
+      if maxPossibleLDSBuffers == 3:
+        state["1LDSBuffer"] = 2
+      elif maxPossibleLDSBuffers == 2:
         state["1LDSBuffer"] = 0
-      else:
+      elif maxPossibleLDSBuffers == 1:
         state["1LDSBuffer"] = 1
 
-    if state["1LDSBuffer"]:
+    if state["1LDSBuffer"]==1:
       if not state["PrefetchGlobalRead"]:
         reject(state, printRejectionReason, "PGR=0 already use 1 LDS buffer only")
       # Should be able to support as long as NO scheduleLocalWrite
