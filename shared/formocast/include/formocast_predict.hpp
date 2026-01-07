@@ -76,6 +76,7 @@ namespace Tensilelite
             int LocalSplitU = 1;
 
             std::array<int, 2> waveGroup;
+            std::string solutionName;
         };
         struct PredictedPerformance
         {

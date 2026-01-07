@@ -243,6 +243,8 @@ namespace TensileLite
             sm.LocalSplitU        = sizeMapping.LocalSplitU;
 
             sm.waveGroup = sizeMapping.waveGroup;
+            
+            sm.solutionName = solution.name();
             return sm;
         }
 
