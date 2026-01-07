@@ -35,7 +35,7 @@ template <bool Use2LDS,
           TailNumber TailNum       = TailNumber::Full>
 __global__ enable_if_t<!Use2LDS, void>
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
 #endif
     // __attribute__((amdgpu_waves_per_eu(1, 1)))
     kernel_gemm_xdl_cshuffle_v3_mx(typename GridwiseGemm::Argument karg)
@@ -69,7 +69,7 @@ template <bool Use2LDS,
           TailNumber TailNum       = TailNumber::Full>
 __global__ enable_if_t<Use2LDS, void>
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
 #endif
     // __attribute__((amdgpu_waves_per_eu(1, 1)))
     kernel_gemm_xdl_cshuffle_v3_mx(typename GridwiseGemm::Argument karg)
@@ -172,6 +172,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
     static constexpr auto BK0Number = Number<KPerBlock / BK1Value>{};
     static constexpr auto AK1Number = Number<AK1Value>{};
     static constexpr auto BK1Number = Number<BK1Value>{};
+
+    static constexpr auto MaxBlockSize = BlockSize;
 
     static constexpr auto lcm_AK1_BK1         = math::lcm(AK1Number, BK1Number);
     static constexpr bool is_single_rate_mfma = false;

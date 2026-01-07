@@ -30,7 +30,7 @@ template <typename GridwiseGemm,
           TailNumber TailNum       = TailNumber::Even>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
 #endif
     // __attribute__((amdgpu_waves_per_eu(1, 1)))
     kernel_gemm_xdl_cshuffle_v3_b_preshuffle(typename GridwiseGemm::Argument karg)
@@ -69,7 +69,7 @@ template <typename GridwiseGemm,
           TailNumber TailNum       = TailNumber::Even>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
 #endif
     // __attribute__((amdgpu_waves_per_eu(1, 1)))
     kernel_gemm_xdl_cshuffle_v3_b_preshuffle_2lds(typename GridwiseGemm::Argument karg)
@@ -152,7 +152,8 @@ template <typename ALayout,
           typename ComputeTypeA                       = CDataType,
           typename ComputeTypeB                       = ComputeTypeA,
           bool PermuteA                               = false,
-          bool PermuteB                               = false>
+          bool PermuteB                               = false,
+          index_t MinimumOccupancy                    = 0>
 struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
 {
     static constexpr auto I0 = Number<0>{};
@@ -170,6 +171,8 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
     static constexpr auto AK1Number = Number<AK1Value>{};
     static constexpr auto BK1Number = Number<BK1Value>{};
 
+    static constexpr auto MaxBlockSize = BlockSize;
+
     // Use singal rate mfma instruction for this special case A (f8_t) * B (pk_i4_t)
     // See example gemm_xdl_fp8_pk_i4_bpreshuffle_v3
     // TODO: explore optimization opportunity by using new mfma instructions on gfx950
@@ -182,12 +185,22 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                                                              ComputeTypeA,
                                                              is_single_rate_mfma,
                                                              is_scale_mfma>{};
-    static constexpr index_t KPack = math::max(lcm_AK1_BK1, mfma.selected_mfma.k_per_blk);
-    static constexpr index_t KLane = mfma.GetKPerXdlops() / mfma.GetK1PerXdlops();
-
-    static constexpr index_t KRepeat = KPerBlock / KLane / KPack;
-    static constexpr index_t NLane   = NPerXdl;
-    static constexpr index_t NWave   = NPerBlock / NPerXdl / NXdlPerWave;
+    static constexpr index_t KPack  = math::max(lcm_AK1_BK1, mfma.selected_mfma.k_per_blk);
+    static constexpr index_t KGroup = []() {
+        // A memory instruction can only read 16 bytes at a time. If K1PerXdlops *
+        // sizeof(ComputeDataType) > 16, memory read will not conitnues in a wave in B preshuffle
+        // mode. So, we need split K into mutiple groups.
+        // TODO: Dequant pipeline doesn't support KGroup now, we have to align it in grid level.
+        constexpr bool isDequantPipe = (is_same_v<ADataType, BDataType> == false) &&
+                                       (BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 ||
+                                        BlkGemmPipelineVer == BlockGemmPipelineVersion::v3);
+        return (mfma.GetK1PerXdlops() * sizeof(ComputeTypeA) > 16) && !isDequantPipe ? 2 : 1;
+    }();
+    static constexpr index_t KLane         = mfma.GetKPerXdlops() / mfma.GetK1PerXdlops();
+    static constexpr index_t KPackPerGroup = KPack / KGroup;
+    static constexpr index_t KRepeat       = KPerBlock / KLane / KPackPerGroup;
+    static constexpr index_t NLane         = NPerXdl;
+    static constexpr index_t NWave         = NPerBlock / NPerXdl / NXdlPerWave;
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
@@ -227,7 +240,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
 
     __host__ __device__ static auto CalculateBK0Shuffled(index_t K)
     {
-        return math::integer_divide_ceil(K, KLane * KPack);
+        return math::integer_divide_ceil(K, KLane * KPackPerGroup);
     }
 
     __host__ static auto CalculateKPadded(index_t K)
@@ -371,7 +384,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
     {
         constexpr index_t MWave           = MPerBlock / (MXdlPerWave * MPerXdl);
         constexpr index_t WaveSize        = BlockSize / (MWave * NWave);
-        constexpr index_t NkSwizzleNumber = Number<WaveSize * KPack>{};
+        constexpr index_t NkSwizzleNumber = Number<WaveSize * KPackPerGroup>{};
         return make_naive_tensor_descriptor(
             make_tuple(N0 / NWave, NWave, K0, NkSwizzleNumber),
             make_tuple(NWave * K0 * NkSwizzleNumber, K0 * NkSwizzleNumber, NkSwizzleNumber, I1));
@@ -817,6 +830,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
 
     __device__ static constexpr auto GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1()
     {
+        static_assert(KPackPerGroup == BK1Value);
         // K0 -> N0/NWave -> NWave -> KLane -> NLane -> KPack
         return make_naive_tensor_descriptor_packed(
             make_tuple(Number<NXdlPerWave>{},
@@ -887,7 +901,39 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                          c_block_size * sizeof(CShuffleDataType));
     }
 
-    IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
+    template <
+        InMemoryDataOperationEnum CGlobalMemoryDataOperation_ = InMemoryDataOperationEnum::Set>
+    __device__ static bool constexpr IsValidCompilationParameter()
+    {
+        constexpr bool valid = ck::tensor_operation::device::IsValidGemmCompilationParameter<
+            BlockSize,
+            MPerBlock,
+            NPerBlock,
+            MPerXdl,
+            NPerXdl,
+            MXdlPerWave,
+            NXdlPerWave,
+            CDataType,
+            CGlobalMemoryDataOperation_>();
+        if constexpr(!valid)
+        {
+            return false;
+        }
+
+        if constexpr(NXdlPerWave % CShuffleNXdlPerWavePerShuffle != 0)
+        {
+            return false;
+        }
+
+        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
+        {
+            if constexpr(MXdlPerWave < 4)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 
     // block_id to matrix tile idx (m0, n0) mapping are controlled by {M01, N01}
     __host__ static constexpr bool CheckValidity(const Argument& karg)
@@ -899,6 +945,14 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
         if constexpr(NXdlPerWave % CShuffleNXdlPerWavePerShuffle != 0)
         {
             return false;
+        }
+
+        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
+        {
+            if constexpr(MXdlPerWave < 4)
+            {
+                return false;
+            }
         }
 
         if constexpr(!(GemmSpec == tensor_operation::device::GemmSpecialization::MPadding ||
@@ -1229,7 +1283,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                   make_multi_index(n_block_data_idx_on_grid,
                                    get_warp_local_1d_id() % NWave,
                                    k_id,
-                                   KPack * (get_thread_local_1d_id() % WarpSize)));
+                                   KPackPerGroup * (get_thread_local_1d_id() % WarpSize)));
 
         // LDS allocation for A and B: be careful of alignment
 
@@ -1613,7 +1667,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                   make_multi_index(n_block_data_idx_on_grid,
                                    get_warp_local_1d_id() % NWave,
                                    k_id,
-                                   KPack * (get_thread_local_1d_id() % WarpSize)));
+                                   KPackPerGroup * (get_thread_local_1d_id() % WarpSize)));
 
         // LDS allocation for A and B: be careful of alignment
         auto a_block_buf_ping = make_dynamic_buffer<AddressSpaceEnum::Lds>(

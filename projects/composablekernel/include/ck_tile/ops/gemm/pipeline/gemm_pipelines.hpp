@@ -18,7 +18,8 @@ enum struct GemmPipeline
     PRESHUFFLE_V2,
     COMPUTE_TDM_V1,
     COMPUTE_TDM_V2,
-    COMPUTE_ASYNC_V2
+    COMPUTE_ASYNC_V2,
+    PRESHUFFLE_FLATMM,
 };
 
 } // namespace ck_tile

@@ -169,7 +169,6 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
     }
     else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
     {
-        static_assert(MRepeat >= 4, "MRepeat should at least be 4 in BlockGemmPipelineVersion::v3");
         if constexpr(std::is_same<ADataType, BDataType>::value)
         {
             if constexpr(GUFusion)

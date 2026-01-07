@@ -66,7 +66,8 @@ template <typename ALayout,
           typename ComputeTypeA                       = CDataType,
           typename ComputeTypeB                       = ComputeTypeA,
           bool PermuteA                               = false,
-          bool PermuteB                               = false>
+          bool PermuteB                               = false,
+          index_t MinimumOccupancy                    = 0>
 struct DeviceGemm_Xdl_CShuffleV3_BPreshuffle : public DeviceGemmV2BPreshuffle<ALayout,
                                                                               BLayout,
                                                                               CLayout,
@@ -131,7 +132,8 @@ struct DeviceGemm_Xdl_CShuffleV3_BPreshuffle : public DeviceGemmV2BPreshuffle<AL
         ComputeTypeA,
         ComputeTypeB,
         PermuteA,
-        PermuteB>;
+        PermuteB,
+        MinimumOccupancy>;
     using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
     using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
 
@@ -244,7 +246,8 @@ struct DeviceGemm_Xdl_CShuffleV3_BPreshuffle : public DeviceGemmV2BPreshuffle<AL
             constexpr auto estimated_reg_total =
                 estimated_reg_a + estimated_reg_b + estimated_reg_c;
 
-            constexpr index_t minimum_occupancy = (estimated_reg_total >= 256) ? 1 : 2;
+            constexpr index_t minimum_occupancy =
+                (MinimumOccupancy == 0) ? ((estimated_reg_total >= 256) ? 1 : 2) : MinimumOccupancy;
 
             if(has_main_k_block_loop)
             {

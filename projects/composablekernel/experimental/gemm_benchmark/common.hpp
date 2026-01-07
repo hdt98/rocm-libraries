@@ -91,7 +91,7 @@ struct ExecutionConfig final
     int cold_niters     = 50;
     int nrepeat         = 100;
     int rotating_count  = 4;
-    int use_gfx9_i4     = 1;
+    int verbosity       = 1;
 };
 
 template <ck::index_t... Is>
@@ -319,10 +319,6 @@ bool parse_cmd_args<ProblemSizeSplitK>(int argc,
         {
             config.rotating_count = std::stoi(argv[14]);
         }
-        if(argc >= 16)
-        {
-            config.use_gfx9_i4 = std::stoi(argv[15]);
-        }
     }
     else
     {
@@ -431,6 +427,148 @@ inline __host__ __device__ constexpr double get_atol()
     }
 }
 
+template <bool KLast>
+void preShuffleScaleBuffer_gfx950(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, int K)
+{
+    int MNXdlPack = 2;
+    int KXdlPack  = 2;
+
+    int XdlMNThread = 16;
+    int XdlKThread  = 64 / XdlMNThread;
+
+    int K0 = K / KXdlPack / XdlKThread; // KRepeat
+
+    // On gfx950, WarpSize=64:
+    // The 4 16x128 building blocks will be packed into 1 32x256
+    // The 8 16x16x128 mfma will be packed into 1 32x32x256
+
+    // unfold the MN32xK(256/32) scale buffer
+    //    4            16             2           2
+    // To XdlKThread-> XdlMNThread -> KXdlPack -> MNXdlPack
+    // Then, MNRepeat->KRepeat
+
+    for(int n = 0; n < MN; ++n)
+    {
+        for(int k = 0; k < K; ++k)
+        {
+            int n0    = n / (XdlMNThread * MNXdlPack); // i MNRepeat
+            int tempn = n % (XdlMNThread * MNXdlPack);
+            int n1    = tempn % XdlMNThread; // i XdlMNThread
+            int n2    = tempn / XdlMNThread; // i MNXdlPack
+
+            int k0    = k / (XdlKThread * KXdlPack); // i KRepeat
+            int tempk = k % (XdlKThread * KXdlPack);
+            int k1    = tempk % XdlKThread; // i XdlKThread
+            int k2    = tempk / XdlKThread; // i KXdlPack
+
+            int outputIndex = n0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 +
+                              k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
+                              k1 * MNXdlPack * KXdlPack * XdlMNThread + n1 * MNXdlPack * KXdlPack +
+                              k2 * MNXdlPack + n2;
+            // src[n * K + k] = ck::type_convert<ck::e8m0_bexp_t>(static_cast<float>(powf(2.0f,
+            // 2-k)));
+
+            if constexpr(KLast)
+                dst[outputIndex] = src[n * K + k];
+            else
+                dst[outputIndex] = src[k * MN + n];
+        }
+    }
+}
+
+/**
+ * Pre-shuffle scale buffer for gfx1250 16x16x128 wmma scale instruction
+ *
+ * @tparam ScaleType Scale data type
+ * @tparam KStride Whether K is the leading dimension of the scale buffer
+ */
+template <typename ScaleType, ck::index_t ScaleBlockSize, bool KStride>
+void preShuffleScaleBuffer_gfx1250(const ScaleType* src,
+                                   ScaleType* dst,
+                                   ck::index_t MN,
+                                   ck::index_t K)
+{
+
+    static_assert(ScaleBlockSize == 32 && sizeof(ScaleType) == 1,
+                  "wrong! only support 8-bit scale with ScaleBlockSize=32");
+
+    constexpr ck::index_t MPerXdlops = 16;
+    // constexpr ck::index_t NPerXdlops = 16;
+    constexpr ck::index_t KPerXdlops = 128;
+
+    int MNPack = 2; // 2 sets of scales in M/N direction
+    int KPack  = 1; // 1 set of scales in K direction
+
+    int MNStep = MPerXdlops;
+    int KStep  = KPerXdlops / ScaleBlockSize; // scales per thread
+
+    int K0 = K / KPack / KStep; // KRepeat - how many KStep blocks
+
+    // On gfx1250, WarpSize=32:
+    // -- The 2 16x128 building blocks will be packed into 1 32x128
+    // -- The 4 16x16x128 wmma will be packed into 1 32x32x128
+
+    // unfold the MN32xK(128/32) scale buffer
+    //    4            16        1        2
+    // To KStep  ->  MNStep -> KPack -> MNPack
+    // or ???
+    //    2         16        1        4
+    //  MNPack -> MNStep -> KPack -> KStep
+    for(int mn = 0; mn < MN; ++mn)
+    {
+        int iMNRepeat = mn / (MNStep * MNPack); // i MNRepeat (MN block id)
+        int tempmn    = mn % (MNStep * MNPack); // position in MN block
+
+        for(int k = 0; k < K; ++k)
+        {
+            int iKRepeat = k / (KStep * KPack); // i KRepeat
+            int tempk    = k % (KStep * KPack); // position in KStep block
+
+            int outputIndex = (iMNRepeat * MNPack * MNStep) * (KStep * KPack * K0) +
+                              (iKRepeat * KStep * KPack) * (MNStep * MNPack) +
+                              tempmn * (KStep * KPack) + tempk;
+
+            if constexpr(KStride)
+            {
+                dst[outputIndex] = src[mn * K + k];
+            }
+            else
+                dst[outputIndex] = src[k * MN + mn];
+        }
+    }
+}
+
+template <typename T>
+void preShuffleBuffer(const T* src, T* dst, int N, int K, int NXdl, int KPack)
+{
+    int NLane = NXdl;
+    int KLane = ck::get_warp_size() / NLane;
+    int K_pk  = std::is_same_v<T, ck::f4x2_pk_t> ? K / 2 : K;
+    int K0    = K_pk / (KLane * KPack);
+    // K -> K0 KLane KPack
+    // N -> N0 NLane
+    // N, K -> N0 K0 KLane NLane KPack
+    int tempk;
+    for(int n = 0; n < N; ++n)
+    {
+        for(int k = 0; k < K_pk; ++k)
+        {
+            int n0 = n / NLane;
+            int n1 = n % NLane;
+
+            int k0 = k / (KLane * KPack);
+            tempk  = k % (KLane * KPack);
+            int k1 = tempk / KPack;
+            int k2 = tempk % KPack;
+
+            int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
+                              k1 * KPack * NLane + n1 * KPack + k2;
+
+            dst[outputIndex] = src[n * K_pk + k];
+        }
+    }
+}
+
 float i4_to_f32_gfx9(uint8_t i4)
 {
     static std::unordered_map<uint8_t, float> u = {{0b1000, -0.5000f},
@@ -453,8 +591,11 @@ float i4_to_f32_gfx9(uint8_t i4)
     return u[i4];
 }
 
-inline void permute_b_pk_i4(
-    Tensor<ck::pk_i4_t>& b_k_n_permute, int N, int K, Tensor<float>& b_k_n_f32, bool use_gfx9_i4)
+inline void permute_b_pk_i4(Tensor<ck::pk_i4_t>& b_k_n_permute,
+                            int N,
+                            int K,
+                            Tensor<float>& b_k_n_f32,
+                            Tensor<float>& b_k_n_gfx9_f32)
 {
     for(int n = 0; n < N; n++)
     {
@@ -468,8 +609,8 @@ inline void permute_b_pk_i4(
             else
                 i4 = (i4x2.data >> 4) & 0xf;
 
-            float v_b       = use_gfx9_i4 ? i4_to_f32_gfx9(i4) : (((i4 & 0x0f) >> 0) - 8.f);
-            b_k_n_f32(k, n) = v_b;
+            b_k_n_f32(k, n)      = (((i4 & 0x0f) >> 0) - 8.f);
+            b_k_n_gfx9_f32(k, n) = i4_to_f32_gfx9(i4);
         }
     }
 
@@ -523,8 +664,11 @@ inline void permute_b_pk_i4(
     }
 }
 
-inline void permute_a_pk_i4(
-    Tensor<ck::pk_i4_t>& a_m_k_permute, int M, int K, Tensor<float>& a_m_k_f32, bool use_gfx9_i4)
+inline void permute_a_pk_i4(Tensor<ck::pk_i4_t>& a_m_k_permute,
+                            int M,
+                            int K,
+                            Tensor<float>& a_m_k_f32,
+                            Tensor<float>& a_m_k_gfx9_f32)
 {
     for(int m = 0; m < M; m++)
     {
@@ -538,8 +682,8 @@ inline void permute_a_pk_i4(
             else
                 i4 = (i4x2.data >> 4) & 0xf;
 
-            float v_b       = use_gfx9_i4 ? i4_to_f32_gfx9(i4) : (((i4 & 0x0f) >> 0) - 8.f);
-            a_m_k_f32(m, k) = v_b;
+            a_m_k_f32(m, k)      = (((i4 & 0x0f) >> 0) - 8.f);
+            a_m_k_gfx9_f32(m, k) = i4_to_f32_gfx9(i4);
         }
     }
 

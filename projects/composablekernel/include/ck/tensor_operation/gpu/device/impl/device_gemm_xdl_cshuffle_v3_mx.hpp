@@ -149,8 +149,8 @@ template <typename ALayout,
           typename ComputeTypeA =
               ADataType, // XXX: These should always be the same as ADataType and BDataType
           typename ComputeTypeB =
-              BDataType // TODO: Hardcode them and remove from the list of template parameters
-          >
+              BDataType, // TODO: Hardcode them and remove from the list of template parameters
+          index_t MinimumOccupancy = 0>
 struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
                                                          BLayout,
                                                          CLayout,
@@ -367,12 +367,15 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
 
             // TODO: Check if this is the right algorithm for minimum_occupancy
             constexpr index_t minimum_occupancy =
-                BlkGemmPipeSched == BlockGemmPipelineScheduler::Intrawave
-                    ? (BlkGemmPipelineVer == BlockGemmPipelineVersion::v3 &&
-                       MPerBlock * NPerBlock * KPerBlock * sizeof(ADataType) <= 128 * 128 * 64 * 2)
-                          ? 2
-                          : 1
-                    : 2;
+                MinimumOccupancy > 0
+                    ? MinimumOccupancy
+                    : (BlkGemmPipeSched == BlockGemmPipelineScheduler::Intrawave
+                           ? (BlkGemmPipelineVer == BlockGemmPipelineVersion::v3 &&
+                              MPerBlock * NPerBlock * KPerBlock * sizeof(ADataType) <=
+                                  128 * 128 * 64 * 2)
+                                 ? 2
+                                 : 1
+                           : 2);
 
             constexpr auto TailNumChoices = []() {
                 if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
@@ -456,10 +459,11 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
             return false;
         }
 
-        if((arg.K % AK1 != 0 || arg.K % BK1 != 0) && !(GemmSpec == GemmSpecialization::MKPadding ||
-                                                       GemmSpec == GemmSpecialization::NKPadding ||
-                                                       GemmSpec == GemmSpecialization::MNKPadding ||
-                                                       GemmSpec == GemmSpecialization::KPadding))
+        if((arg.K % AK1 != 0 || arg.K % BK1 != 0) &&
+           !(GemmSpec == GemmSpecialization::MKPadding ||
+             GemmSpec == GemmSpecialization::NKPadding ||
+             GemmSpec == GemmSpecialization::MNKPadding ||
+             GemmSpec == GemmSpecialization::KPadding || GemmSpec == GemmSpecialization::Default))
         {
             return false;
         }

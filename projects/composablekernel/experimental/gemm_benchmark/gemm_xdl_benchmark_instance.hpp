@@ -273,25 +273,29 @@ using GemmCkTile =
 #if CK_TILE_USE_WMMA
 #if defined(CK_USE_GFX1250)
 static constexpr ck::index_t KPerXDL = 64 / DataSize;
-#define LDS_SIZE 320
 #else
 static constexpr ck::index_t KPerXDL = 16;
-#define LDS_SIZE 64
 #endif
 #else
 #if defined(CK_GFX950_SUPPORT)
 static constexpr ck::index_t KPerXDL =
     std::is_same_v<ADataType, ck::f8_t> || std::is_same_v<ADataType, ck::bf8_t> ? 128 : 32;
-#define LDS_SIZE 160
 #else
 static constexpr ck::index_t KPerXDL = 32;
-#define LDS_SIZE 64
 #endif
 #endif
 
+struct GemmConfig
+{
+    static constexpr index_t M_Warp_Tile = 16;
+    static constexpr index_t N_Warp_Tile = 16;
+    static constexpr index_t K_Warp_Tile = KPerXDL;
+};
+
+// pk int4 32
 static constexpr ck::index_t AB_K1 =
     ck::math::max(static_cast<ck::index_t>(16 / DataSize), static_cast<ck::index_t>(8));
-
+static constexpr ck::index_t KPack = AB_K1;
 // clang-format off
              // Block|  MPer|  NPer|  KPer|             AK1| BK1|MPer| NPer| MXdl| NXdl|  ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockTransfer|  BBlockTransfer| BBlockTransfer| BBlockTransfer| BlockTransfer| BBlockTransfer| BBlockTransfer|    CShuffle|    CShuffle|     CBlockTransferClusterLengths|  CBlockTransfer| Block-wiseGemm|  Block-wiseGemm|
              //  Size| Block| Block| Block|                |    | XDL|  XDL|  Per|  Per|   ThreadCluster|  ThreadCluster| SrcAccessOrder|   SrcVectorDim|      SrcScalar|      DstScalar|   ThreadCluster|  ThreadCluster| SrcAccessOrder|  SrcVectorDim|      SrcScalar|      DstScalar| MXdlPerWave| NXdlPerWave| _MBlock_MXdlPerWave_MWaveMPerXdl| ScalarPerVector|       Pipeline|        Pipeline|
@@ -446,4 +450,4 @@ using DeviceOp = ck::tensor_operation::device::DeviceGemmV2<ALayout,
                                                             BElementOp,
                                                             CElementOp>;
 
-using example_gemm_xdl_v3_benchmark_instances = std::vector<std::unique_ptr<DeviceOp>>;
+using gemm_xdl_benchmark_instances = std::vector<std::unique_ptr<DeviceOp>>;

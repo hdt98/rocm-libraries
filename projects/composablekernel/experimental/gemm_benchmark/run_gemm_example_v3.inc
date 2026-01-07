@@ -3,19 +3,12 @@
 
 #pragma once
 
-using ::ck::DeviceMem;
-using ::ck::HostTensorDescriptor;
-using ::ck::Tensor;
+using ReferenceGemmInstance = ck::tensor_operation::host::
+    ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
 
-static example_gemm_xdl_v3_benchmark_instances op_ptrs;
-
-template <typename ProblemType>
-bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
+template <bool BPreShuffle, typename GemmInstance, typename ProblemType>
+bool run_gemm(GemmInstance& op_ptrs, const ProblemType& problem_size, const ExecutionConfig& config)
 {
-#if defined(BUILD_INT4_EXAMPLE) && defined(CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4)
-    static_assert(sizeof(ck::int4_t) == sizeof(int8_t));
-#endif
-
     using namespace ck::literals;
 
     auto M       = problem_size.M;
@@ -86,43 +79,68 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 
     Tensor<float> a_m_k_f32({M, K});
     Tensor<float> b_k_n_f32({K, N});
+    Tensor<float> a_m_k_gfx9_f32({M, K});
+    Tensor<float> b_k_n_gfx9_f32({K, N});
 
     if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t>)
     {
-        permute_a_pk_i4(a_m_k, M, K, a_m_k_f32, config.use_gfx9_i4);
+        permute_a_pk_i4(a_m_k, M, K, a_m_k_f32, a_m_k_gfx9_f32);
     }
 
     if constexpr(ck::is_same_v<BDataType, ck::pk_i4_t>)
     {
-        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, config.use_gfx9_i4);
+        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, a_m_k_gfx9_f32);
     }
 
     Tensor<CDataType> c_m_n_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
+    Tensor<CDataType> c_m_n_gfx9_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
     Tensor<CDataType> c_m_n_device_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
 
     std::cout << "a_m_k: " << a_m_k.mDesc << std::endl;
     std::cout << "b_k_n: " << b_k_n.mDesc << std::endl;
     std::cout << "c_m_n: " << c_m_n_host_result.mDesc << std::endl;
 
-#ifdef BUILD_INT4_EXAMPLE
-    DeviceMem a_m_k_device_buf(sizeof(KernelADataType) * a_m_k.mDesc.GetElementSpaceSize());
-    DeviceMem b_k_n_device_buf(sizeof(KernelBDataType) * b_k_n.mDesc.GetElementSpaceSize());
-    DeviceMem c_m_n_device_buf(sizeof(KernelCDataType) *
-                               c_m_n_device_result.mDesc.GetElementSpaceSize());
+    ck::index_t first_index =
+        (config.instance_index != -1 && config.instance_index < static_cast<int>(op_ptrs.size()))
+            ? config.instance_index
+            : 0;
+    Tensor<BDataType> b_preshuffled(
+        f_host_tensor_descriptor(K, N, StrideB, BLayout{})); // use laout only for size
+    Tensor<BDataType> b_preshuffled_ck_tile(
+        f_host_tensor_descriptor(K, N, StrideB, BLayout{})); // use laout only for size
+    bool isCkTileWpMm = (op_ptrs[first_index]->GetKPerBlock() & IsPreShuffleMM) ? true : false;
+    if constexpr(BPreShuffle)
+    {
+        static_assert(std::is_same_v<BLayout, ck::tensor_layout::gemm::RowMajor> == false);
+        if(config.instance_index == -1 || isCkTileWpMm)
+        {
+            ck_tile::HostTensor<BDataType> tmp(
+                ck_tile::host_tensor_descriptor(K, N, StrideB, ck_tile::bool_constant<false>{}));
+            tmp.mData                   = b_k_n.mData;
+            auto tmp_preshuffled        = ck_tile::shuffle_b<GemmConfig>(tmp);
+            b_preshuffled_ck_tile.mData = tmp_preshuffled.mData;
+        }
+        if(config.instance_index == -1 || !isCkTileWpMm)
+        {
+            constexpr int NPerXdl = GemmConfig::N_Warp_Tile;
+            preShuffleBuffer(b_k_n.mData.data(), b_preshuffled.mData.data(), N, K, NPerXdl, KPack);
+        }
+    }
 
-    const Tensor<KernelADataType> a_m_k_converted(a_m_k);
-    const Tensor<KernelBDataType> b_k_n_converted(b_k_n);
-
-    a_m_k_device_buf.ToDevice(a_m_k_converted.mData.data());
-    b_k_n_device_buf.ToDevice(b_k_n_converted.mData.data());
-#else
     DeviceMem a_m_k_device_buf(sizeof(ADataType) * a_m_k.mDesc.GetElementSpaceSize());
     DeviceMem b_k_n_device_buf(sizeof(BDataType) * b_k_n.mDesc.GetElementSpaceSize());
     DeviceMem c_m_n_device_buf(sizeof(CDataType) * c_m_n_device_result.mDesc.GetElementSpaceSize());
 
     a_m_k_device_buf.ToDevice(a_m_k.mData.data());
-    b_k_n_device_buf.ToDevice(b_k_n.mData.data());
-#endif
+    if constexpr(BPreShuffle)
+    {
+        b_k_n_device_buf.ToDevice(isCkTileWpMm ? b_preshuffled_ck_tile.mData.data()
+                                               : b_preshuffled.mData.data());
+    }
+    else
+    {
+        b_k_n_device_buf.ToDevice(b_k_n.mData.data());
+    }
     DeviceMem workspace;
 
     auto a_element_op = AElementOp{};
@@ -153,6 +171,15 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
                                                       PassThrough{});
 
             ref_invoker.Run(ref_argument);
+
+            auto ref_gfx9_argument = ref_gemm.MakeArgument(a_m_k_gfx9_f32,
+                                                           b_k_n_gfx9_f32,
+                                                           c_m_n_gfx9_host_result,
+                                                           PassThrough{},
+                                                           PassThrough{},
+                                                           PassThrough{});
+
+            ref_invoker.Run(ref_gfx9_argument);
         }
         else
         {
@@ -180,31 +207,33 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         auto invoker_ptr = gemm->MakeInvokerPointer();
         float ave_time   = 0;
 
-        auto argument_ptr = gemm->MakeArgumentPointer(
-#ifdef BUILD_INT4_EXAMPLE
-            static_cast<KernelADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-            static_cast<KernelBDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
-            static_cast<KernelCDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
-#else
-            static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-            static_cast<BDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
-            static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
-#endif
-            M,
-            N,
-            K,
-            StrideA,
-            StrideB,
-            StrideC,
-            KBatch,
-            a_element_op,
-            b_element_op,
-            c_element_op);
-
         if(config.instance_index != -1 && config.instance_index != static_cast<int>(i))
         {
             continue;
         }
+
+        bool isCkTileWpMm_new = (gemm->GetKPerBlock() & IsPreShuffleMM) ? true : false;
+        if(BPreShuffle && isCkTileWpMm_new != isCkTileWpMm)
+        {
+            isCkTileWpMm = isCkTileWpMm_new;
+            b_k_n_device_buf.ToDevice(isCkTileWpMm ? b_preshuffled_ck_tile.mData.data()
+                                                   : b_preshuffled.mData.data());
+        }
+
+        auto argument_ptr =
+            gemm->MakeArgumentPointer(static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
+                                      static_cast<BDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
+                                      static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
+                                      M,
+                                      N,
+                                      K,
+                                      StrideA,
+                                      StrideB,
+                                      StrideC,
+                                      KBatch,
+                                      a_element_op,
+                                      b_element_op,
+                                      c_element_op);
 
         if(!gemm->IsSupportedArgument(argument_ptr.get()))
         {
@@ -215,29 +244,25 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         if(config.do_verification)
         {
             ave_time = invoker_ptr->Run(argument_ptr.get(), StreamConfig{nullptr, false, 1});
-#ifdef BUILD_INT4_EXAMPLE
-            Tensor<CDataType> c_m_n_device_result_converted(c_m_n_host_result.mDesc);
 
-            c_m_n_device_buf.FromDevice(c_m_n_device_result_converted.mData.data());
-
-            c_m_n_device_result = c_m_n_device_result_converted.CopyAsType<CDataType>();
-
-            return ck::utils::check_err(c_m_n_device_result_converted, c_m_n_host_result);
-#else
             c_m_n_device_buf.FromDevice(c_m_n_device_result.mData.data());
 
-            bool ret = ck::utils::check_err(c_m_n_device_result,
-                                            c_m_n_host_result,
-                                            "Error: Incorrect results!",
-                                            get_rtol<CDataType>(),
-                                            get_atol<CDataType>());
+            bool useGfx9Result =
+                (ck::is_same_v<ADataType, ck::pk_i4_t> && ck::is_same_v<BDataType, ck::pk_i4_t> &&
+                 (gemm->GetKPerBlock() & DisableGfx9I4ToF32) == 0);
+
+            bool ret =
+                ck::utils::check_err(c_m_n_device_result,
+                                     useGfx9Result ? c_m_n_gfx9_host_result : c_m_n_host_result,
+                                     "Error: Incorrect results!",
+                                     get_rtol<CDataType>(),
+                                     get_atol<CDataType>());
             pass &= ret;
             if(!ret)
             {
                 std::cout << "Error: [" << i << "]: " << gemm->GetTypeString()
                           << " results incorrect!" << std::endl;
             }
-#endif
         }
 
         if(config.time_kernel)
@@ -292,24 +317,12 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     return pass;
 }
 
-namespace ck::tensor_operation::device::instance {
-
-extern void
-add_example_gemm_xdl_v3_benchmark_instances(example_gemm_xdl_v3_benchmark_instances& instances);
-
-bool init_opt_ptrs()
-{
-    add_example_gemm_xdl_v3_benchmark_instances(op_ptrs);
-    return true;
-}
-
-} // namespace ck::tensor_operation::device::instance
-
-bool run_gemm_splitk_example(int argc, char* argv[])
+template <bool BPreshuffle, typename GemmInstance>
+bool run_gemm_splitk_example(GemmInstance& op_ptrs, int argc, char* argv[])
 {
     ProblemSizeSplitK problem_size;
     ExecutionConfig config;
 
-    return !ck::tensor_operation::device::instance::init_opt_ptrs() ||
-           !parse_cmd_args(argc, argv, problem_size, config) || run_gemm(problem_size, config);
+    return !parse_cmd_args(argc, argv, problem_size, config) ||
+           run_gemm<BPreshuffle>(op_ptrs, problem_size, config);
 }

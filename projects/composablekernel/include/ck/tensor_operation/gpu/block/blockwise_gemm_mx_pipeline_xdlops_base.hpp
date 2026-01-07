@@ -122,9 +122,10 @@ struct BlockwiseGemmXdlops_mx_pipeline_base
         NPerXDL,
         xdlops_gemm.KPerXdlops,
         (packed_size_v<ComputeTypeA> > 1 || packed_size_v<ComputeTypeB> > 1)>;
-
+#if defined(__HIP_DEVICE_COMPILE__)
     static_assert(KPerThread % KPack == 0,
                   "Wrong KPack setting; try increasing KPerThread or decreasing KPack");
+#endif
 
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                               AccType,
