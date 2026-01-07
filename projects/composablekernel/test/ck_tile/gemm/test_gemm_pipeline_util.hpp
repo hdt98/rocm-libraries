@@ -288,9 +288,31 @@ class TestCkTileGemmPipeline : public ::testing::Test
         using GemmPipeline =
             typename GemmPipelineTypeSelector<PipelineType, UniversalGemmProblem>::pipeline;
 
-        const auto Run = [&](const auto memory_operation_) {
-            constexpr auto memory_operation = memory_operation_.value;
+        using GemmEpilogue = ck_tile::CShuffleEpilogue<
+            ck_tile::CShuffleEpilogueProblem<ADataType,
+                                             BDataType,
+                                             DsDataType,
+                                             AccDataType,
+                                             CDataType,
+                                             DsLayout,
+                                             CLayout,
+                                             ck_tile::element_wise::PassThrough,
+                                             TilePartitioner::MPerBlock,
+                                             TilePartitioner::NPerBlock,
+                                             M_Warp,
+                                             N_Warp,
+                                             M_Warp_Tile,
+                                             N_Warp_Tile,
+                                             K_Warp_Tile,
+                                             UniversalGemmProblem::TransposeC,
+                                             1,     /*kNumWaveGroups_*/
+                                             false, /*FixedVectorSize_*/
+                                             1,     /*VectorSizeC_*/
+                                             false, /*TiledMMAPermuteN_*/
+                                             1,     /*BlockedXDLN_PerWarp_*/
+                                             DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
 
+<<<<<<< HEAD
             using GemmEpilogue = typename GemmEpilogueTypeSelector<
                 PipelineType,
                 ck_tile::CShuffleEpilogueProblem<ADataType,
@@ -358,15 +380,36 @@ class TestCkTileGemmPipeline : public ::testing::Test
         };
 
         if(args.k_batch == 1)
+=======
+        using Kernel     = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
+        const auto kargs = Kernel::MakeKernelArgs(args);
+
+        const dim3 blocks = Kernel::BlockSize();
+        dim3 grids;
+        if constexpr(Persistent)
+>>>>>>> develop
         {
-            Run(ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                           ck_tile::memory_operation_enum::set>{});
+            grids = Kernel::MaxOccupancyGridSize(s);
         }
         else
         {
-            Run(ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                           ck_tile::memory_operation_enum::atomic_add>{});
+            grids = Kernel::GridSize(args.M, args.N, args.k_batch);
         }
+
+        if(!Kernel::IsSupportedArgument(kargs))
+        {
+            throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!\n");
+        }
+
+        if(s.log_level_ > 0)
+        {
+            std::cout << "Launching kernel with args:" << " grid: {" << grids.x << ", " << grids.y
+                      << ", " << grids.z << "}" << ", blocks: {" << blocks.x << ", " << blocks.y
+                      << ", " << blocks.z << "}" << std::endl;
+        }
+
+        ck_tile::ignore = ck_tile::launch_kernel(
+            s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
     }
 
     public:

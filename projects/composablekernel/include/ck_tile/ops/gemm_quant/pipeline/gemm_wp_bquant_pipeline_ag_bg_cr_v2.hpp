@@ -563,7 +563,7 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
                                    const BQDramBlockWindowTmp& bq_dram_block_window_tmp,
                                    index_t num_loop,
                                    void* p_smem,
-                                   index_t n = 0) const // Default value for non-preshuffle case
+                                   index_t n = 0) const
     {
         return operator()<TailNum>(
             a_dram_block_window_tmp,
