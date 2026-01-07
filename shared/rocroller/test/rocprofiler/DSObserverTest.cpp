@@ -125,7 +125,7 @@ protected:
 
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 {
-    // Expect 559 passed : 36 failed
+    // Expect 545 passed : 0 failed
     using namespace Scheduling::LDSBankModel;
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
@@ -220,7 +220,7 @@ protected:
 
 TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
 {
-    // Expect 562-559 passed : 33-36 failed
+    // Expect 545 passed : 0 failed
     // Mainly affected by the queue size, e.g. when does steady state get reached?
     /*
     ds_read_b128 v[4:7], v1, model 4, profiler 4, delta 0

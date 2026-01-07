@@ -218,7 +218,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                     const auto fraction = dataCycles / requiredSlots;
                     for(int j = 0; j < requiredSlots; ++j)
                     {
-                        m_dataQueue.push_back(base + (j * 1) * fraction);
+                        m_dataQueue.push_back(base + (j + 1) * fraction);
                     }
                 }
             }

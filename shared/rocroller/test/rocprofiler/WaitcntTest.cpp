@@ -104,7 +104,7 @@ protected:
 TEST_CASE("Weave multiple LDS and waitcnt 0",
           "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
 {
-    // Expect 394-392 passed : 51-53 failed
+    // Expect 391 passed : 4 failed
     // Mainly affected by waitcnt queue values
     /*
     ds_read_b128 v[60:63], v1, model 16, profiler 16, delta 0
@@ -200,7 +200,7 @@ protected:
         int counter = 0;
         for(int i = 0; i < 8; ++i)
         {
-            for(int k = 0; k < 10; ++k)
+            for(int k = 0; k < 16; ++k)
             {
                 const auto [start, end]
                     = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
@@ -220,30 +220,16 @@ protected:
 TEST_CASE("Weave LDS and waitcnt at steady state",
           "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
 {
-    // Expect 381 passed : 69 failed
+    // Expect 527 passed : 18 failed
     /*
     ...
     s_waitcnt lgkmcnt(2), model 136, profiler 132, delta -4
     ds_read_b128 v[124:127], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[128:131], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[132:135], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[136:139], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[140:143], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[144:147], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[148:151], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[152:155], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[156:159], v1, model 4, profiler 4, delta 0
+    ...
     ds_read_b128 v[160:163], v1, model 4, profiler 4, delta 0
     s_waitcnt lgkmcnt(3), model 120, profiler 116, delta -4
     ds_read_b128 v[164:167], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[168:171], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[172:175], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[176:179], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[180:183], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[184:187], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[188:191], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[192:195], v1, model 4, profiler 4, delta 0
-    ds_read_b128 v[196:199], v1, model 4, profiler 4, delta 0
+    ...
     ds_read_b128 v[200:203], v1, model 4, profiler 8, delta 4
     s_waitcnt lgkmcnt(4), model 104, profiler 100, delta -4
     ...
@@ -346,10 +332,10 @@ protected:
     }
 };
 
-TEST_CASE("Weave LDS and waitcnt",
+TEST_CASE("Weave LDS and waitcnt not steady state",
           "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
 {
-    // Expect 544 passed : 66 failed
+    // Expect 541 passed : 4 failed
     /*
     ds_write_b32 v1, v2, model 8, profiler 8, delta 0
   * s_waitcnt lgkmcnt(0), model 60, profiler 52, delta -8
