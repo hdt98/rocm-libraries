@@ -1028,7 +1028,10 @@ namespace rocRoller
             auto numAccumTiles = argInfo.numTileArgExprs.back();
             auto numTotalTiles = numAccumTiles;
             for(auto d : loopInfo.dimensionIndices)
-                numTotalTiles = numTotalTiles * argInfo.numTileArgExprs.at(d);
+            {
+                if(argInfo.numTileArgExprs.at(d))
+                    numTotalTiles = numTotalTiles * argInfo.numTileArgExprs.at(d);
+            }
             numTotalTiles = simplify(numTotalTiles);
             enableDivideBy(numTotalTiles, context);
 
@@ -1510,9 +1513,6 @@ namespace rocRoller
             // Make kernel arguments:
             //
             // numWGs:          Value
-            // numTiles0:       Computed on host: M / macM
-            // numTiles1:       Computed on host: N / macN
-            // numTilesAcc:     Computed on host: K / macK
             // numSKTilesPerWG: Computed on host:
             //
             //   for basic StreamK:   (numTiles0 * numTiles1 * numTilesAcc + numWGs - 1) / numWGs
