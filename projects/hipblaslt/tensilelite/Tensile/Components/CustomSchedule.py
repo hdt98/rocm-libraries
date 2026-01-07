@@ -2271,154 +2271,69 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
-    tile_config=TileConfig(160, 128, 32, 2, 0, True, 0, 0),
+    tile_config=TileConfig(128, 192, 32, 2, 0, True, 0, 0),
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
     optSchedule = dict()
     syncCode = []
-    numMfma = 60
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
-    print("####################################### get_schedule_160x128x32_TF32")
-    if isNN(kernel) and TLDS==1:
-        kernel["SwapGlobalReadOrder"] = False
-        kernel["MfmaInitCVgprs"] = True
+    if isNN(kernel) and not useLDSTr and TLDS==1:
+        # TODO: Add NN schedule in upcoming PR
+        return False, None
+    elif isTN(kernel) and not useLDSTr and TLDS==1:
         kernel["UsePLRPack"] = True
-
-        # plr = 3 if kernel["ForceUnrollSubIter"] else 1
-        optSchedule = {
-            'SYNC': [[-1, -1, -1, 29, 29, 33, 33]], # 5
-            'LRA0': [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]], # 20
-            'LRB0': [[-1, -1, -1, -1]], # 4
-            'PackA0': [[-1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4]], # 60
-            'PackB0': [[-1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]], # 48
-            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]], # 9
-            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]], # 9
-            'GRA': [[33, 33, 36, 36, 39, 39, 42, 42, 45, 45]], # 10
-            'GRB': [[48, 48, 51, 51, 54, 54, 58, 58]], # 8
-            'LWSA': [[58]], # 1
-            'LWSB': [[58]], # 1
-            'LRSA': [[58]], # 1
-            'LRSB': [[58]], # 1
-            'PackA1': [[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]], # 60
-            'LRA1': [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]], # 20
-            'PackB1': [[3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6]], # 48
-            'LRB1': [[-1, -1, -1, -1]], # 4
-            'LCC': [[59, 59]], # 2
-        }
-
-        syncCode = [
-            SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="11wait for global read"),
-            SBarrier(comment=""),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for dependent lr"),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for dependent lr"),
-            SBarrier(comment=""),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
-            SBarrier(comment="")
+        syncTable = [
+            -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Begininng of a iteration. Wait for prior local read.") ,
+            5,  SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="Before PackA0. Wait for first two LRA0. Skip 2*LRA0 + 1*LRB0.") ,
+            17, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Before GRA and PackB0. Wait for all prior LRA0 for GRA and the first 2*LRB0 for PackB0. Skip 4*LRB0.") ,
+            17, SBarrier(comment="GRA") ,
+            32, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Before GRB. Wait for all prior LRB0.") ,
+            32, SBarrier(comment="GRB") ,
+            35, SWaitCnt(dscnt=-1, vlcnt=6, vscnt=-1, comment="Before LRB3. Wait for GRB from previous iter. Skip 4*GRA + 2*GRB") ,
+            35, SBarrier(comment="LRB") ,
+            44, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Before PackB3. Wait for first two LRB3. Skip 4*LRA0.") ,
+            53, SWaitCnt(dscnt=0, vlcnt=10, vscnt=-1, comment="Before LRA3. Wait for GRA from previous iter. Skip 4*GRA + 6*GRB") ,
+            53, SBarrier(comment="LRA") ,
+            63, SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="Before PackA3. Wait for first two LRA3. Skip 2*LRA3.") ,
         ]
-        # Add explicit s_nop to avoid VALU-pack -> MFMA read hazards.
-        optSchedule, snopCode = create_snop_code(optSchedule, numMfma)
-        
+        optSchedule = {
+            'SYNC'  : [syncTable[::2]],
+            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
+            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
+            'LRA0'  : [[0, 1, 2, 3]],
+            'LRB0'  : [[4, 6, 8, 10, 12, 14],
+                       [4, 7, 9, 11, 13, 15]],
+            'PackA0': [create_range(5,12,17, 1, 4)],
+            'PackB0': [create_range(18,18,34, 1, 4)],
+            'GRA'   : [[17,17, 18,18, 19,19, 20,20]],
+            'GRB'   : [[33, 33, 34, 34, 41, 42, 43, 44, 51, 51, 52, 52]],
+            'LRB3'  : [[36, 37, 38, 39, 40, 41]],
+            'LRA3'  : [[53, 55, 57, 59],
+                       [54, 56, 58, 60]],
+            'PackB3': [create_range(44,9,52, 1, 8)],
+            'PackA3': [create_range(63,8,71, 1, 6)],
+            'LRSA'  : [[16]],
+            'LRSB'  : [[16]],
+            'LWSA'  : [[61]],
+            'LWSB'  : [[62]],
+            'LCC'   : [[71, 71]],
+        }
+        syncCode = syncTable[1::2]
+        nglshift = nllshift = 10
+    elif isNT(kernel) and useLDSTr and TLDS==0:
+        # TODO: Add NT schedule in upcoming PR
+        return False, None
     else:
         return False, None
-    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
+    
+    numMfma = 72
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
-
-@RegisterSchedule(
-    tile_config=TileConfig(160, 128, 32, 2, 0, True, 0, 0),
-    dtype_predicate=isTF32,
-    vector_widths=[4, 4, 4],
-    matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[1, 2]
-)
-def _get_schedule_160x128x32_10x4_TF32(kernel, useLDSTr, TLDS):
-    optSchedule = dict()
-    syncCode = []
-    numMfma = 120
-    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
-    if isNN(kernel) and TLDS==1:
-        kernel["SwapGlobalReadOrder"] = False
-        kernel["MfmaInitCVgprs"] = True
-        optSchedule = {
-            'SYNC': [[-1, 9, 29, 59, 59, 89, 89]], # 9
-            'PackA3': [[-1, -1, -1, -1, 
-                        0, 0, 0, 0, 
-                        0, 0, 0, 0, 
-                        0, 0, 0, 0, 
-                        0, 0, 0, 0, 
-                        0, 0, 0, 0, 
-                        1, 1, 1, 1, 
-                        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
-                        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 
-                        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 
-                        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 
-                        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]], # 120
-            # 'PackA3': [create_range(-1, 3, 4, 1, 40)],
-            'PackB3': [[-1, -1, -1, -1, 
-                        1, 1, 1, 1, 
-                        1, 1, 1, 1, 
-                        1, 1, 1, 1, 
-                        1, 1, 1, 1, 
-                        1, 1, 1, 1, 
-                        2, 2, 2, 2, 
-                        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]], # 48
-            'LRB0': [[23,25,27,29],], # 4
-            'PackA0': [[23, 23, 23, 23, 
-                        24, 24, 24, 24, 
-                        25, 25, 25, 25, 
-                        26, 26, 26, 26, 
-                        27, 27, 27, 27, 
-                        28, 28, 28, 28, 
-                        29, 29, 29, 29, 
-                        30, 30, 30, 30, 
-                        31, 31, 31, 31, 
-                        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
-                        33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
-                        33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
-                        33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
-                        33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33]], # 120
-            # 'PackA0': [create_range(23, 6, 33, 1, 8) + [
-            #             33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
-            #             33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
-            #             33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
-            #             33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33
-            # ]],
-            'PackB0': [create_range(33, 24, 56, 1, 2)],
-            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]], # 9
-            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]], # 9
-            'LRA0': [[-1, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19]], # 40
-            'LRSA': [[28]], # 1
-            'LRSB': [[28]], # 1
-            'GRA': [[59, 60, 60, 60, 61,61, 63,63,65,65, 66,66, 67,67, 68,68, 69,69,70,70]], # 20
-            'GRB': [[71,71,73,73,75,75,77,77,79,79,81,81,82,82,84,84]], # 16
-            'LWSA': [[87]], # 1
-            'LWSB': [[88]], # 1
-            'LRA3': [[90, 90, 91, 91, 92, 92, 93, 93, 95, 95, 96, 96, 97, 97, 98, 98, 99, 99, 100, 100, 101, 101, 102, 102, 103, 103, 104, 104, 105, 105, 106, 106, 107, 107, 108, 108, 109, 109, 110, 110]], # 40
-            'LRB3': [[94, 94, 111, 111]], # 4
-            'LCC': [[119, 119]], # 2
-        }
-
-        # Add explicit s_nop to avoid VALU-pack -> MFMA read hazards.
-        optSchedule, snopCode = create_snop_code(optSchedule, numMfma)
-
-        syncCode = [
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0 for iteration == 0"),
-            SWaitCnt(dscnt=15, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
-            SBarrier(comment=""),
-            SWaitCnt(dscnt=0, vlcnt=18, vscnt=-1, comment="wait for previous set of global reads"),
-            SBarrier(comment=""),
-        ]
-        nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2 # vmcnt shift for ngl and nll
-    else:
-        return False, None
-    opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
-    return True, opt1
-
 
 @RegisterSchedule(
     tile_config=TileConfig(192, 256, 32, 2, 0, True, 0, 0),
