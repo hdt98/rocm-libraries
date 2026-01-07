@@ -2282,7 +2282,7 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
             41, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Before PackB3. Wait for first two LRB3 for PackB3. Skip 4*LRA0.") ,
             53, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Before LRA3. Wait for GRA from previous iter. Skip 4*GRA + 6*GRB") ,
             53, SBarrier(comment="LRA") ,
-            61, SWaitCnt(dscnt=14, vlcnt=-1, vscnt=-1, comment="Before PackA3. Wait for first two LRA3. Skip 14*LRA3.") ,
+            62, SWaitCnt(dscnt=14, vlcnt=-1, vscnt=-1, comment="Before PackA3. Wait for first two LRA3. Skip 14*LRA3.") ,
         ]
         optSchedule = {
             'SYNC'  : [syncTable[::2]],
@@ -2294,15 +2294,15 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
             'PackA0': [create_range(9,   8, 17, 1, 6)],
             'PackB0': [create_range(18, 18, 34, 1, 4)],
             'GRA'   : [[19, 20, 21, 22, 23, 24, 25, 26]],
-            'GRB'   : [[29, 30, 31, 32, 56, 57, 58, 59, 60, 61, 62, 63]],
+            'GRB'   : [[29, 30, 31, 32, 52, 53, 54, 55, 56, 57, 58, 59]],
             'LRB3'  : [[35, 36, 37, 38, 39, 40]],
-            'LRA3'  : [[53, 53, 54, 54, 55, 55, 56, 56, 57, 57, 58, 58, 59, 59, 60, 60]],
+            'LRA3'  : [[53, 53, 54, 54, 55, 55, 56, 56, 57, 57, 58, 58, 59, 59, 60, 61]],
             'PackB3': [create_range(41, 12, 54, 1, 6)],
-            'PackA3': [create_range(61,  8, 71, 1, 6)],
+            'PackA3': [create_range(62,  8, 71, 1, 6)],
             'LRSA'  : [[28]],
             'LRSB'  : [[28]],
-            'LWSA'  : [[65]],
-            'LWSB'  : [[66]],
+            'LWSA'  : [[60]],
+            'LWSB'  : [[61]],
             'LCC'   : [[71, 71]],
         }
         syncCode = syncTable[1::2]
