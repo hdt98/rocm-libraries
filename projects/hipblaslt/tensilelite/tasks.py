@@ -14,7 +14,7 @@ import os
         "gpu_targets": "Comma-separated list of GPU targets (e.g. gfx90a,gfx1101)."
     }
 )
-def build_client(c, clean=False, configure=True, build=True, build_dir="build_tmp", build_type="Release", gpu_targets="gfx90a"):
+def build_client(c, clean=False, configure=True, build=True, build_dir="build_tmp", build_type="Release", gpu_targets="all"):
 
     if clean and os.path.exists(build_dir):
         c.run(f"rm -rf {build_dir}")
