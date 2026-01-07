@@ -26,6 +26,7 @@
 
 namespace rocfft_rccl
 {
+    std::unique_ptr<RCCLCommunicator> RCCLCommunicator::single;
 #ifdef ROCFFT_RCCL_ENABLE
 
     // RCCL data type mapping - returns base NCCL type for given element size.
@@ -84,15 +85,9 @@ namespace rocfft_rccl
     };
 #endif
 
-    // singleton instance
-    RCCLCommunicator& RCCLCommunicator::instance()
+    RCCLCommunicator::RCCLCommunicator()
     {
-        static RCCLCommunicator inst;
-        if(!inst.pimpl)
-        {
-            inst.pimpl = std::make_unique<Impl>();
-        }
-        return inst;
+        pimpl = std::make_unique<Impl>();
     }
 
     bool RCCLCommunicator::is_available() const
@@ -280,7 +275,7 @@ namespace rocfft_rccl
                       size_t      elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = RCCLCommunicator::instance();
+            auto& rccl = *RCCLCommunicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
@@ -331,7 +326,7 @@ namespace rocfft_rccl
                        size_t                     elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = RCCLCommunicator::instance();
+            auto& rccl = *RCCLCommunicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
@@ -404,7 +399,7 @@ namespace rocfft_rccl
                   size_t      elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = RCCLCommunicator::instance();
+            auto& rccl = *RCCLCommunicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 
@@ -449,7 +444,7 @@ namespace rocfft_rccl
                   size_t      elem_size)
         {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = RCCLCommunicator::instance();
+            auto& rccl = *RCCLCommunicator::single;
             if(!rccl.is_available() || !rccl.has_device(device_id))
                 return false;
 

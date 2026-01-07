@@ -2042,8 +2042,8 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
 
     // check if RCCL is available for single-process multi-GPU
 #ifdef ROCFFT_RCCL_ENABLE
-    bool rccl_available = false;
-    rccl_available      = use_p2p && rocfft_rccl::RCCLCommunicator::instance().is_available();
+    const bool rccl_available = use_p2p && rocfft_rccl::RCCLCommunicator::single
+                                && rocfft_rccl::RCCLCommunicator::single->is_available();
 #endif
 
     // All-to-all transpose is preferred as it's faster. This requires
@@ -2095,7 +2095,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     // for better performance
 
     const auto local_comm_rank = get_local_comm_rank();
-    auto&      rccl            = rocfft_rccl::RCCLCommunicator::instance();
+    auto&      rccl            = *rocfft_rccl::RCCLCommunicator::single;
 
     std::vector<TempBufferLease> packBufs;
 
@@ -2864,8 +2864,8 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
     if(rocfft_plan_description_t::multiple_devices_in_rank(desc.inFields.front())
        || rocfft_plan_description_t::multiple_devices_in_rank(desc.outFields.front()))
     {
-        auto& rccl = rocfft_rccl::RCCLCommunicator::instance();
-        if(!rccl.is_available())
+        if(rocfft_rccl::RCCLCommunicator::single
+           && rocfft_rccl::RCCLCommunicator::single->is_available())
         {
             // collect all unique device IDs from bricks
             std::set<int> device_set;
@@ -2884,7 +2884,7 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
             if(!device_set.empty())
             {
                 std::vector<int> devices(device_set.begin(), device_set.end());
-                rccl.initialize(devices);
+                rocfft_rccl::RCCLCommunicator::single->initialize(devices);
             }
         }
     }

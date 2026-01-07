@@ -35,8 +35,11 @@ namespace rocfft_rccl
     class RCCLCommunicator
     {
     public:
-        // get singleton instance
-        static RCCLCommunicator& instance();
+        RCCLCommunicator();
+        ~RCCLCommunicator() = default;
+
+        // singleton allocated in rocfft_setup and freed in rocfft_cleanup
+        static std::unique_ptr<RCCLCommunicator> single;
 
         // check if RCCL is available and initialized
         bool is_available() const;
@@ -66,9 +69,6 @@ namespace rocfft_rccl
         bool has_device(int device_id) const;
 
     private:
-        RCCLCommunicator()  = default;
-        ~RCCLCommunicator() = default;
-
         // non-copyable
         RCCLCommunicator(const RCCLCommunicator&) = delete;
         RCCLCommunicator& operator=(const RCCLCommunicator&) = delete;
