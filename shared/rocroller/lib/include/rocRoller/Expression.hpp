@@ -263,9 +263,9 @@ namespace rocRoller
 
         struct BitfieldCombine : Binary
         {
-            unsigned srcOffset = 0u;
-            unsigned dstOffset = 0u;
-            unsigned width     = 0u;
+            uint32_t srcOffset = 0u;
+            uint32_t dstOffset = 0u;
+            uint32_t width     = 0u;
 
             // if srcIsZero sets to true, that means bits outside [srcOffset:srcOffset+width-1] are 0
             std::optional<bool> srcIsZero = std::nullopt;
@@ -273,7 +273,7 @@ namespace rocRoller
             std::optional<bool> dstIsZero = std::nullopt;
 
             constexpr static inline auto                Type = Category::Arithmetic;
-            constexpr static inline EvaluationTimes     EvalTimes{};
+            constexpr static inline EvaluationTimes     EvalTimes{EvaluationTime::Translate};
             constexpr static inline AlgebraicProperties Properties{};
             constexpr static inline int                 Complexity = 4;
         };
@@ -503,6 +503,22 @@ namespace rocRoller
             DataType destinationType = DataType::None;
         };
 
+        struct Reinterpret : Unary
+        {
+            inline Reinterpret& copyParams(const Reinterpret& other)
+            {
+                destinationType = other.destinationType;
+
+                return *this;
+            }
+
+            constexpr static inline auto Type       = Category::Conversion;
+            constexpr static inline auto EvalTimes  = EvaluationTimes::All();
+            constexpr static inline int  Complexity = 0;
+
+            DataType destinationType = DataType::None;
+        };
+
         struct LogicalNot : Unary
         {
             constexpr static inline auto Type       = Category::Logical;
@@ -591,10 +607,10 @@ namespace rocRoller
         struct Concatenate : Nary
         {
             constexpr static inline auto            Type       = Category::Value;
-            constexpr static inline EvaluationTimes EvalTimes  = EvaluationTimes::All();
+            constexpr static inline EvaluationTimes EvalTimes  = EvaluationTimes{};
             constexpr static inline int             Complexity = 1;
 
-            DataType destinationType = DataType::None;
+            VariableType destinationType;
 
             inline Concatenate& copyParams(const Concatenate& other)
             {
@@ -676,8 +692,20 @@ namespace rocRoller
         template <DataType DATATYPE>
         ExpressionPtr convert(ExpressionPtr a);
 
+        ExpressionPtr reinterpret(DataType dt, ExpressionPtr a);
+
         ExpressionPtr bfe(DataType dt, ExpressionPtr a, uint8_t offset, uint8_t width);
         ExpressionPtr bfe(ExpressionPtr a, uint8_t offset, uint8_t width);
+
+        ExpressionPtr bfc(ExpressionPtr       src,
+                          ExpressionPtr       dst,
+                          uint32_t            srcOffset,
+                          uint32_t            dstOffset,
+                          uint32_t            width,
+                          std::optional<bool> srcIsZero = std::nullopt,
+                          std::optional<bool> dstIsZero = std::nullopt);
+
+        ExpressionPtr concat(const std::vector<ExpressionPtr>& ops, VariableType v);
 
         template <CCommandArgumentValue T>
         ExpressionPtr literal(T value);

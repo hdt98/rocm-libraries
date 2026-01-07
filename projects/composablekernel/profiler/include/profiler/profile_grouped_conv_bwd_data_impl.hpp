@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -18,6 +18,7 @@
 #include "ck/library/utility/convolution_parameter.hpp"
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_bwd_data.hpp"
+#include "ck/library/reference_tensor_operation/gpu/naive_conv_bwd_data_gpu.hpp"
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_data.hpp"
 
 namespace ck {
@@ -29,7 +30,8 @@ template <ck::index_t NDimSpatial,
           typename InLayout,
           typename OutDataType,
           typename WeiDataType,
-          typename InDataType>
+          typename InDataType,
+          typename ComputeDataType = InDataType>
 bool profile_grouped_conv_bwd_data_impl(int do_verification,
                                         int init_method,
                                         bool do_log,
@@ -88,15 +90,50 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
     wei_device_buf.ToDevice(wei.mData.data());
 
     float max_accumulated_value = 0;
-    if(do_verification)
+    if(do_verification == 2)
     {
+        // Use GPU reference for verification
+        std::cout << "Using GPU reference for verification" << std::endl;
+
+        // Allocate GPU reference output buffer
+        DeviceMem gpu_ref_in_buf(sizeof(InDataType) * in_host.mDesc.GetElementSpaceSize());
+
+        // Call GPU reference with ConvParam directly
+        ref::naive_conv_bwd_data<InLayout,
+                                 WeiLayout,
+                                 OutLayout,
+                                 InDataType,
+                                 WeiDataType,
+                                 OutDataType,
+                                 InElementOp,
+                                 WeiElementOp,
+                                 OutElementOp>(
+            reinterpret_cast<InDataType*>(gpu_ref_in_buf.GetDeviceBuffer()),
+            reinterpret_cast<const WeiDataType*>(wei_device_buf.GetDeviceBuffer()),
+            reinterpret_cast<const OutDataType*>(out_device_buf.GetDeviceBuffer()),
+            conv_param,
+            in_element_op,
+            wei_element_op,
+            out_element_op);
+
+        // Copy GPU reference result to host for comparison
+        gpu_ref_in_buf.FromDevice(in_host.mData.data());
+        max_accumulated_value = *std::max_element(in_host.mData.begin(), in_host.mData.end());
+    }
+    else if(do_verification == 1)
+    {
+        // Use CPU reference for verification (default)
         auto ref_conv = ck::tensor_operation::host::ReferenceConvBwdData<NDimSpatial,
                                                                          InDataType,
                                                                          WeiDataType,
                                                                          OutDataType,
                                                                          InElementOp,
                                                                          WeiElementOp,
-                                                                         OutElementOp>();
+                                                                         OutElementOp,
+                                                                         0,
+                                                                         0,
+                                                                         0,
+                                                                         ComputeDataType>();
 
         auto ref_invoker = ref_conv.MakeInvoker();
 
@@ -171,9 +208,13 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
             {
                 in_device_buf.FromDevice(in_device.mData.data());
 
-                using ComputeType = std::conditional_t<sizeof(OutDataType) < sizeof(WeiDataType),
-                                                            OutDataType,
-                                                            WeiDataType>;
+                using ComputeType_ = std::conditional_t<sizeof(OutDataType) < sizeof(WeiDataType),
+                                                             OutDataType,
+                                                             WeiDataType>;
+                using ComputeType =
+                    std::conditional_t<sizeof(ComputeType_) < sizeof(ComputeDataType),
+                                            ComputeType_,
+                                            ComputeDataType>;
                 using AccDataType =
                     std::conditional_t<std::is_same_v<ComputeType, int8_t>, int32_t, float>;
                 const index_t num_accums = conv_param.K_;
@@ -222,18 +263,21 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
     };
 
     // do GEMM
-    using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD<NDimSpatial,
-                                                                                     OutLayout,
-                                                                                     WeiLayout,
-                                                                                     ck::Tuple<>,
-                                                                                     InLayout,
-                                                                                     OutDataType,
-                                                                                     WeiDataType,
-                                                                                     ck::Tuple<>,
-                                                                                     InDataType,
-                                                                                     OutElementOp,
-                                                                                     WeiElementOp,
-                                                                                     InElementOp>;
+    using DeviceOp =
+        ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD<NDimSpatial,
+                                                                        OutLayout,
+                                                                        WeiLayout,
+                                                                        ck::Tuple<>,
+                                                                        InLayout,
+                                                                        OutDataType,
+                                                                        WeiDataType,
+                                                                        ck::Tuple<>,
+                                                                        InDataType,
+                                                                        OutElementOp,
+                                                                        WeiElementOp,
+                                                                        InElementOp,
+                                                                        ComputeDataType,
+                                                                        ComputeDataType>;
 
     // get device op instances
     const auto op_ptrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<

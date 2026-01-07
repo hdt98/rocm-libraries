@@ -10,9 +10,7 @@
 
 #include "PluginCore.hpp"
 
-namespace hipdnn_backend
-{
-namespace plugin
+namespace hipdnn_backend::plugin
 {
 
 class EnginePlugin : public PluginBase
@@ -43,6 +41,8 @@ public:
     virtual size_t getWorkspaceSize(hipdnnEnginePluginHandle_t handle,
                                     const hipdnnPluginConstData_t* engineConfig,
                                     const hipdnnPluginConstData_t* opGraph) const;
+    virtual size_t getWorkspaceSize(hipdnnEnginePluginHandle_t handle,
+                                    hipdnnEnginePluginExecutionContext_t executionContext) const;
 
     // Execution functions
     [[nodiscard]] virtual hipdnnEnginePluginExecutionContext_t
@@ -99,6 +99,8 @@ private:
                                                         hipdnnEnginePluginExecutionContext_t*);
     hipdnnPluginStatus_t (*_funcDestroyExecutionContext)(hipdnnEnginePluginHandle_t,
                                                          hipdnnEnginePluginExecutionContext_t);
+    hipdnnPluginStatus_t (*_funcGetWorkspaceSizeFromExecutionContext)(
+        hipdnnEnginePluginHandle_t, hipdnnEnginePluginExecutionContext_t, size_t*);
     hipdnnPluginStatus_t (*_funcExecuteOpGraph)(hipdnnEnginePluginHandle_t,
                                                 hipdnnEnginePluginExecutionContext_t,
                                                 void*,
@@ -108,5 +110,4 @@ private:
     friend class PluginManagerBase<EnginePlugin>;
 };
 
-} // namespace plugin
-} // hipdnn_backend
+} // namespace hipdnn_backend::plugin

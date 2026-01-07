@@ -80,6 +80,7 @@ set( MIOpen_Source
     adam_api.cpp
     addlayernorm_api.cpp
     api/find2_0_commons.cpp
+    api/tuning.cpp
     base64.cpp
     batch_norm.cpp
     batch_norm_api.cpp
@@ -337,6 +338,7 @@ set( MIOpen_Source
     solver/tensorOp/OpTensorFwdBias.cpp
     solver/tensorOp/OpTensorLeadingOnes.cpp
     subbuffers.cpp
+    sysinfo_utils.cpp
     t5layernorm_api.cpp
     target_properties.cpp
     temp_file.cpp
@@ -345,11 +347,13 @@ set( MIOpen_Source
     tensor_api.cpp
     transformers_adam_w_api.cpp
     seq_tensor.cpp
-    api/tuning.cpp
 )
 
 if(MIOPEN_ENABLE_AI_KERNEL_TUNING OR MIOPEN_ENABLE_AI_IMMED_MODE_FALLBACK)
     list(APPEND MIOpen_Source conv/heuristics/ai_heuristics.cpp)
+    list(APPEND MIOpen_Source conv/heuristics/metadata_3d.cpp)
+    list(APPEND MIOpen_Source conv/heuristics/ai_candidate_selection.cpp)
+    list(APPEND MIOpen_Source conv/heuristics/ai_conv_3d_kernel_tuning_utils.cpp)
     list(APPEND MIOpen_Source anyramdb.cpp)
 endif()
 
@@ -485,6 +489,19 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/Conv_Winograd_v30_3_1_gfx11_fp32_f3x2_stride1.inc
         kernels/Conv_Winograd_v30_3_1_gfx11_fp32_f3x2_stride2.inc
         kernels/Conv_Winograd_v30_3_1_metadata.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp16_dot2_f2x3_dilation2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp16_dot2_f2x3_stride1.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp16_dot2_f2x3_stride2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp16_dot2_f3x2_dilation2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp16_dot2_f3x2_stride1.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp16_dot2_f3x2_stride2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp32_f2x3_dilation2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp32_f2x3_stride1.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp32_f2x3_stride2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp32_f3x2_dilation2.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp32_f3x2_stride1.inc
+        kernels/Conv_Winograd_v40_6_0_gfx12_fp32_f3x2_stride2.inc
+        kernels/Conv_Winograd_v40_6_0_metadata.inc
         kernels/MIOpenReduceCalculation.hpp
         kernels/MIOpenReduceExtreme.hpp
         kernels/bfloat16_dev.hpp
@@ -492,13 +509,16 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/conv_common.inc
         kernels/conv_sizes.inc
         kernels/float_types.h
+        kernels/pooling_functions.h
         kernels/gpr_alloc.inc
         kernels/hip_atomic.hpp
         kernels/hip_f8_impl.hpp
         kernels/hip_float8.hpp
+        kernels/hip_math_ops.hpp
         kernels/inst_wrappers.inc
         kernels/miopen_cstdint.hpp
         kernels/miopen_limits.hpp
+        kernels/miopen_math.hpp
         kernels/miopen_rocrand.hpp
         kernels/miopen_type_traits.hpp
         kernels/miopen_utility.hpp
@@ -513,7 +533,9 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/winograd/Conv_Winograd_Fury_v2_4_1_gfx11_1536vgprs_fp16_fp16acc_f2x3_c16_stride1.inc
         kernels/winograd/Conv_Winograd_Fury_v2_4_1_gfx11_1536vgprs_fp16_fp16acc_f2x3_c32_stride1.inc
         kernels/winograd/Conv_Winograd_Fury_v2_4_1_gfx11_1024vgprs_fp16_fp16acc_f2x3_c16_stride1.inc
-        kernels/winograd/Conv_Winograd_Fury_v2_4_1_metadata.inc
+        kernels/winograd/Conv_Winograd_Fury_v4_6_0_gfx12_1536vgprs_fp16_fp32acc_f2x3_c16_stride1.inc
+        kernels/winograd/Conv_Winograd_Fury_v4_6_0_gfx12_1536vgprs_fp16_fp32acc_f2x3_c32_stride1.inc
+        kernels/winograd/Conv_Winograd_Fury_v2_X_X_X_metadata.inc
         kernels/winograd/Conv_Winograd_Rage_v4_6_0_gfx94x_fp16_fp32acc_f2x3_stride1.inc
         kernels/winograd/Conv_Winograd_Rage_v4_6_0_metadata.inc
         kernels/winograd/Conv_Winograd_Rage_v4_7_0_gfx94x_fp16_fp32acc_f2x3_stride1.inc
@@ -534,19 +556,23 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         ${GPU_BATCHED_TRANSPOSE_KERNEL_HIP}
         ${GPU_GENERAL_TENSOR_REORDER_KERNEL_HIP_SOURCE}
         kernels/MIOpenAdam.cpp
+        kernels/MIOpenAddLayerNorm.cpp
         kernels/MIOpenCat.cpp
         kernels/MIOpenCheckNumerics.cpp
-        kernels/MIOpenBatchNormActivBwdPerAct.cl
-        kernels/MIOpenBatchNormActivBwdSpatial.cl
+        kernels/MIOpenBatchNormActivBwdPerAct.cpp
+        kernels/MIOpenBatchNormActivBwdSpatial.cpp
         kernels/MIOpenBatchNormActivFwdTrainPerAct.cl
         kernels/MIOpenBatchNormActivFwdTrainSpatial.cl
         kernels/MIOpenBatchNormFwdTrainSpatial.cl
         kernels/MIOpenBatchNormFwdTrainSpatialHIP.cpp
         kernels/MIOpenBatchNormFwdTrainPerAct.cl
         kernels/MIOpenBatchNormFwdInferSpatial.cl
+        kernels/MIOpenBatchNormFwdInferSpatialHIP.cpp
         kernels/MIOpenBatchNormFwdInferPerAct.cl
+        kernels/MIOpenBatchNormFwdInferPerActHIP.cpp
         kernels/MIOpenBatchNormBwdSpatial.cl
         kernels/MIOpenBatchNormBwdPerAct.cl
+        kernels/MIOpenBatchNormBwdPerActHIP.cpp
         kernels/MIOpenConvDirUni.cl
         kernels/MIOpenConvDirBatchNormActiv.cl
         kernels/MIOpenConvDirGenFwd.cl
@@ -558,13 +584,13 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/MIOpenLRNBwd.cl
         kernels/MIOpenLRNFwd.cl
         kernels/MIOpenMultiMarginLoss.cpp
-        kernels/MIOpenNeuron.cl
+        kernels/MIOpenNeuron.cpp
         kernels/MIOpenPReLU.cpp
-        kernels/MIOpenPooling.cl
-        kernels/MIOpenPoolingBwd.cl
-        kernels/MIOpenPoolingBwdND.cl
-        kernels/MIOpenPoolingForwardNaive.cl
-        kernels/MIOpenPoolingND.cl
+        kernels/MIOpenPooling.cpp
+        kernels/MIOpenPoolingBwd.cpp
+        kernels/MIOpenPoolingBwdND.cpp
+        kernels/MIOpenPoolingForwardNaive.cpp
+        kernels/MIOpenPoolingND.cpp
         kernels/MIOpenConv1x1S.cl
         kernels/MIOpenConv1x1J1.cl
         kernels/MIOpenConv1x1J1_stride.cl
@@ -573,17 +599,19 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/MIOpenReduceSum.cpp
         kernels/MIOpenRoPE.cpp
         kernels/MIOpenSoftMarginLoss.cpp
-        kernels/MIOpenSoftmax.cl
+        kernels/MIOpenSoftmax.cpp
         kernels/MIOpenSoftmaxAttn.cpp
-        kernels/MIOpenUtilKernels3.cl
+        kernels/MIOpenSubSample.cpp
+        kernels/MIOpenT5LayerNorm.cpp
+        kernels/MIOpenUpSample.cpp
         kernels/MIOpenUtilKernels4.cl
         kernels/MIOpenUtilKernels5.cl
         kernels/MIOpenVecAdd.cpp
         kernels/MIOpenVecAddOCL.cl
-        kernels/MIOpenIm2d2Col.cl
-        kernels/MIOpenIm3d2Col.cl
-        kernels/MIOpenCol2Im2d.cl
-        kernels/MIOpenCol2Im3d.cl
+        kernels/MIOpenIm2d2Col.cpp
+        kernels/MIOpenIm3d2Col.cpp
+        kernels/MIOpenCol2Im2d.cpp
+        kernels/MIOpenCol2Im3d.cpp
         kernels/MIOpenConvBwdWrWS2.cl
         kernels/MIOpenGroupConvBwdWrWS2.cl
         kernels/MIOpenConvBwdWrW_LxG_P53.cl
@@ -591,7 +619,7 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/MIOpenConvBwdWrW_LxG_5x5.cl
         kernels/MIOpenConvBwdWrW1x1_PAD_read4.cl
         kernels/MIOpenConvFwd_LxL_11.cl
-        kernels/MIOpenConvFFT.cl
+        kernels/MIOpenConvFFT.cpp
         kernels/MIOpenRNNHiddenStateUpdate.cl
         kernels/bugzilla_34765_detect.s
         kernels/dummy_kernel.s
@@ -646,13 +674,27 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         kernels/Conv_Winograd_v30_3_1_fp32_f3x2_dilation2.s
         kernels/Conv_Winograd_v30_3_1_fp32_f3x2_stride1.s
         kernels/Conv_Winograd_v30_3_1_fp32_f3x2_stride2.s
+        kernels/Conv_Winograd_v40_6_0_fp16_dot2_f2x3_dilation2.s
+        kernels/Conv_Winograd_v40_6_0_fp16_dot2_f2x3_stride1.s
+        kernels/Conv_Winograd_v40_6_0_fp16_dot2_f2x3_stride2.s
+        kernels/Conv_Winograd_v40_6_0_fp16_dot2_f3x2_dilation2.s
+        kernels/Conv_Winograd_v40_6_0_fp16_dot2_f3x2_stride1.s
+        kernels/Conv_Winograd_v40_6_0_fp16_dot2_f3x2_stride2.s
+        kernels/Conv_Winograd_v40_6_0_fp32_f2x3_dilation2.s
+        kernels/Conv_Winograd_v40_6_0_fp32_f2x3_stride1.s
+        kernels/Conv_Winograd_v40_6_0_fp32_f2x3_stride2.s
+        kernels/Conv_Winograd_v40_6_0_fp32_f3x2_dilation2.s
+        kernels/Conv_Winograd_v40_6_0_fp32_f3x2_stride1.s
+        kernels/Conv_Winograd_v40_6_0_fp32_f3x2_stride2.s
         kernels/MIOpenConvBwdBias.cl
         kernels/MIOpenBatchNormActivInfer.cl
         kernels/MIOpenBatchNormActivInferHIP.cpp
-        kernels/MIOpenCTCLoss.cl
+        kernels/MIOpenCTCLoss.cpp
         kernels/MIOpenDropoutHIP.cpp
         kernels/winograd/Conv_Winograd_Fury_v2_4_1_fp16_fp16acc_f2x3_c16_stride1.s
         kernels/winograd/Conv_Winograd_Fury_v2_4_1_fp16_fp16acc_f2x3_c32_stride1.s
+        kernels/winograd/Conv_Winograd_Fury_v4_6_0_fp16_fp32acc_f2x3_c16_stride1.s
+        kernels/winograd/Conv_Winograd_Fury_v4_6_0_fp16_fp32acc_f2x3_c32_stride1.s
         kernels/winograd/Conv_Winograd_Rage_v4_6_0_fp16_fp32acc_f2x3_stride1.s
         kernels/winograd/Conv_Winograd_Rage_v4_7_0_fp16_fp32acc_f2x3_stride1.s
         kernels/xform_data.s
@@ -705,10 +747,8 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         ocl/convolutionocl.cpp
         ocl/lrn_ocl.cpp
         ocl/mloNorm.cpp
-        ocl/pooling_ocl.cpp
         ocl/rnnocl.cpp
         ocl/utilocl.cpp
-        ocl/ctcocl.cpp
         ocl/dropoutocl.cpp
         ocl/gcn_asm_utils.cpp
         ocl/rnn_util_ocl.cpp

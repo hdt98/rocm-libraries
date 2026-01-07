@@ -18,6 +18,7 @@
 
 using namespace hipdnn_backend;
 using namespace plugin;
+using namespace hipdnn_backend::test_utilities;
 using namespace ::testing;
 
 using ::testing::Return;
@@ -25,14 +26,6 @@ using ::testing::Return;
 class TestEngineConfigDescriptor : public ::testing::Test
 {
 public:
-    std::unique_ptr<HipdnnBackendDescriptor> _engineConfigWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockEngineWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockEngineBadTypeWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockWrongTypeWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockGraphWrapper = nullptr;
-    std::unique_ptr<MockHandle> _mockHandle = nullptr;
-    std::shared_ptr<MockEnginePluginResourceManager> _mockEnginePluginResourceManager = nullptr;
-
     std::shared_ptr<EngineConfigDescriptor> getEngineConfigDescriptor() const
     {
         return _engineConfigWrapper->asDescriptor<EngineConfigDescriptor>();
@@ -83,16 +76,21 @@ public:
     }
 
 protected:
+    std::unique_ptr<HipdnnBackendDescriptor> _engineConfigWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockEngineWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockEngineBadTypeWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockWrongTypeWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockGraphWrapper = nullptr;
+    std::unique_ptr<MockHandle> _mockHandle = nullptr;
+    std::shared_ptr<MockEnginePluginResourceManager> _mockEnginePluginResourceManager = nullptr;
+
     void SetUp() override
     {
-        _engineConfigWrapper
-            = hipdnn_sdk::test_utilities::createDescriptor<EngineConfigDescriptor>();
-        _mockEngineWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockEngineDescriptor>();
-        _mockEngineBadTypeWrapper
-            = hipdnn_sdk::test_utilities::createDescriptor<MockEngineDescriptor>();
-        _mockWrongTypeWrapper = hipdnn_sdk::test_utilities::createDescriptor<
-            MockDescriptor<EngineConfigDescriptor>>();
-        _mockGraphWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockGraphDescriptor>();
+        _engineConfigWrapper = createDescriptor<EngineConfigDescriptor>();
+        _mockEngineWrapper = createDescriptor<MockEngineDescriptor>();
+        _mockEngineBadTypeWrapper = createDescriptor<MockEngineDescriptor>();
+        _mockWrongTypeWrapper = createDescriptor<MockDescriptor<EngineConfigDescriptor>>();
+        _mockGraphWrapper = createDescriptor<MockGraphDescriptor>();
         _mockHandle = std::make_unique<MockHandle>();
         _mockEnginePluginResourceManager = std::make_shared<MockEnginePluginResourceManager>();
     }

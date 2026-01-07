@@ -10,25 +10,21 @@
 #include <vector>
 
 #include <hip/hip_runtime.h>
-#include <hipdnn_sdk/plugin/PluginApiDataTypes.h>
+#include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 
 #include "hipdnn_backend.h"
 
-namespace hipdnn_sdk
-{
-namespace data_objects
+namespace hipdnn_data_sdk::data_objects
 {
 // NOLINTNEXTLINE(readability-identifier-naming)
 struct EngineDetails;
-}
-}
+} // namespace hipdnn_data_sdk::data_objects
 
 namespace hipdnn_backend
 {
-
 class GraphDescriptor;
-
-namespace plugin
+}
+namespace hipdnn_backend::plugin
 {
 
 class EngineDetailsWrapper;
@@ -69,6 +65,8 @@ public:
     virtual size_t getWorkspaceSize(int64_t engineId,
                                     const hipdnnPluginConstData_t* engineConfig,
                                     const GraphDescriptor* graphDesc) const;
+    virtual size_t getWorkspaceSize(int64_t engineId,
+                                    hipdnnEnginePluginExecutionContext_t executionContext) const;
 
     virtual void executeOpGraph(hipdnnBackendDescriptor_t executionPlan,
                                 hipdnnBackendDescriptor_t variantPack) const;
@@ -85,6 +83,8 @@ public:
 
     virtual void
         getLoadedPluginFiles(size_t* numPlugins, char** pluginPaths, size_t* maxStringLen) const;
+
+    virtual std::string toString() const;
 
 private:
     // MT-unsafe instance methods
@@ -134,7 +134,7 @@ public:
     EngineDetailsWrapper(EngineDetailsWrapper&& other) noexcept;
     EngineDetailsWrapper& operator=(EngineDetailsWrapper&& other) noexcept;
 
-    const hipdnn_sdk::data_objects::EngineDetails* get() const;
+    const hipdnn_data_sdk::data_objects::EngineDetails* get() const;
 
 private:
     std::shared_ptr<EnginePluginResourceManager> _rm;
@@ -167,5 +167,4 @@ private:
     hipdnnEnginePluginExecutionContext_t _executionContext;
 };
 
-} // namespace plugin
-} // hipdnn_backend
+} // namespace hipdnn_backend::plugin

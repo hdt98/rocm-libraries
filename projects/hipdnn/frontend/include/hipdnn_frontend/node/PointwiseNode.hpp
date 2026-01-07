@@ -3,12 +3,12 @@
 #pragma once
 
 #include "Node.hpp"
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/GraphAttributes.hpp>
 #include <hipdnn_frontend/attributes/PointwiseAttributes.hpp>
-#include <hipdnn_sdk/data_objects/graph_generated.h>
-#include <hipdnn_sdk/utilities/ShapeUtilities.hpp>
 
 namespace hipdnn_frontend::graph
 {
@@ -18,9 +18,9 @@ class PointwiseNode : public BaseNode<PointwiseNode>
 public:
     PointwiseAttributes attributes;
 
-    PointwiseNode(PointwiseAttributes&& batchnormAttrs, const GraphAttributes& graphAttrs)
+    PointwiseNode(PointwiseAttributes&& pointwiseAttributes, const GraphAttributes& graphAttrs)
         : BaseNode(graphAttrs)
-        , attributes(std::move(batchnormAttrs))
+        , attributes(std::move(pointwiseAttributes))
     {
     }
 
@@ -111,13 +111,14 @@ public:
         return {};
     }
 
-    flatbuffers::Offset<hipdnn_sdk::data_objects::Node>
+    flatbuffers::Offset<hipdnn_data_sdk::data_objects::Node>
         pack_node(flatbuffers::FlatBufferBuilder& builder) const override
     {
-        return hipdnn_sdk::data_objects::CreateNodeDirect(
+        return hipdnn_data_sdk::data_objects::CreateNodeDirect(
             builder,
             attributes.get_name().c_str(),
-            hipdnn_sdk::data_objects::NodeAttributes::PointwiseAttributes,
+            toSdkType(attributes.compute_data_type),
+            hipdnn_data_sdk::data_objects::NodeAttributes::PointwiseAttributes,
             attributes.pack_attributes(builder).Union());
     }
 
@@ -170,8 +171,8 @@ private:
                 {
                     const auto& inputDims = inputTensor->get_dim();
 
-                    if(!hipdnn_sdk::utilities::areDimensionsBroadcastCompatible(inputDims,
-                                                                                outputDims))
+                    if(!hipdnn_data_sdk::utilities::areDimensionsBroadcastCompatible(inputDims,
+                                                                                     outputDims))
                     {
                         return {ErrorCode::INVALID_VALUE,
                                 "PointwiseNode input '" + inputTensor->get_name()

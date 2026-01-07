@@ -15,14 +15,14 @@
 #include "mocks/MockHandle.hpp"
 
 #include <gtest/gtest.h>
-#include <hipdnn_sdk/data_objects/engine_details_generated.h>
+#include <hipdnn_data_sdk/data_objects/engine_details_generated.h>
 
 #include <memory>
 #include <vector>
 
 using namespace hipdnn_backend;
 using namespace plugin;
-using namespace hipdnn_sdk::test_utilities;
+using namespace hipdnn_backend::test_utilities;
 using namespace ::testing;
 
 using ::testing::Return;
@@ -30,13 +30,6 @@ using ::testing::Return;
 class TestEngineHeuristicDescriptor : public ::testing::Test
 {
 public:
-    std::unique_ptr<HipdnnBackendDescriptor> _engineHeuristicWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockGraphWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockGraphBadTypeWrapper = nullptr;
-    std::unique_ptr<HipdnnBackendDescriptor> _mockWrongTypeWrapper = nullptr;
-    std::unique_ptr<MockHandle> _mockHandle = nullptr;
-    std::shared_ptr<MockEnginePluginResourceManager> _mockEnginePluginResourceManager = nullptr;
-
     std::shared_ptr<EngineHeuristicDescriptor> getEngineHeuristicDescriptor() const
     {
         return _engineHeuristicWrapper->asDescriptor<EngineHeuristicDescriptor>();
@@ -89,6 +82,13 @@ public:
     }
 
 protected:
+    std::unique_ptr<HipdnnBackendDescriptor> _engineHeuristicWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockGraphWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockGraphBadTypeWrapper = nullptr;
+    std::unique_ptr<HipdnnBackendDescriptor> _mockWrongTypeWrapper = nullptr;
+    std::unique_ptr<MockHandle> _mockHandle = nullptr;
+    std::shared_ptr<MockEnginePluginResourceManager> _mockEnginePluginResourceManager = nullptr;
+
     void SetUp() override
     {
         _engineHeuristicWrapper = createDescriptor<EngineHeuristicDescriptor>();
@@ -107,7 +107,7 @@ protected:
     hipdnnPluginConstData_t serializeEngineDetails(int64_t gidx)
     {
         flatbuffers::FlatBufferBuilder builder;
-        hipdnn_sdk::data_objects::EngineDetailsBuilder engineDetailsBuilder(builder);
+        hipdnn_data_sdk::data_objects::EngineDetailsBuilder engineDetailsBuilder(builder);
         engineDetailsBuilder.add_engine_id(gidx);
         builder.Finish(engineDetailsBuilder.Finish());
         auto engineDetailsBuffer = builder.Release();

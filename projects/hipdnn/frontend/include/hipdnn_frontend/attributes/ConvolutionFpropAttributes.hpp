@@ -4,15 +4,13 @@
 
 #include "Attributes.hpp"
 #include "TensorAttributes.hpp"
+#include <hipdnn_data_sdk/data_objects/convolution_fwd_attributes_generated.h>
 #include <hipdnn_frontend/Types.hpp>
-#include <hipdnn_sdk/data_objects/convolution_fwd_attributes_generated.h>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
-namespace hipdnn_frontend
-{
-namespace graph
+namespace hipdnn_frontend::graph
 {
 class ConvFpropAttributes : public Attributes<ConvFpropAttributes>
 {
@@ -34,10 +32,11 @@ public:
     std::unordered_map<OutputNames, std::shared_ptr<TensorAttributes>> outputs;
 
     // Convolution parameters
-    std::vector<int64_t> pre_padding;
-    std::vector<int64_t> post_padding;
+    std::vector<int64_t> pre_padding; // NOLINT(readability-identifier-naming)
+    std::vector<int64_t> post_padding; // NOLINT(readability-identifier-naming)
     std::vector<int64_t> stride;
     std::vector<int64_t> dilation;
+    // NOLINTNEXTLINE(readability-identifier-naming)
     ConvolutionMode math_mode = ConvolutionMode::CROSS_CORRELATION;
 
     // Getters for tensors
@@ -186,65 +185,20 @@ public:
         return math_mode;
     }
 
-    flatbuffers::Offset<hipdnn_sdk::data_objects::ConvolutionFwdAttributes>
+    flatbuffers::Offset<hipdnn_data_sdk::data_objects::ConvolutionFwdAttributes>
         pack_attributes(flatbuffers::FlatBufferBuilder& builder) const // NOLINT
     {
-        return hipdnn_sdk::data_objects::CreateConvolutionFwdAttributesDirect(builder,
-                                                                              get_x()->get_uid(),
-                                                                              get_w()->get_uid(),
-                                                                              get_y()->get_uid(),
-                                                                              &pre_padding,
-                                                                              &post_padding,
-                                                                              &stride,
-                                                                              &dilation,
-                                                                              toSdkType(math_mode));
-    }
-
-private:
-    std::shared_ptr<TensorAttributes> getInput(InputNames name) const
-    {
-        auto it = inputs.find(name);
-        if(it != inputs.end())
-        {
-            return it->second;
-        }
-        return nullptr;
-    }
-
-    std::shared_ptr<TensorAttributes> getOutput(OutputNames name) const
-    {
-        auto it = outputs.find(name);
-        if(it != outputs.end())
-        {
-            return it->second;
-        }
-        return nullptr;
-    }
-
-    ConvFpropAttributes& setInput(InputNames name, const std::shared_ptr<TensorAttributes>& value)
-    {
-        inputs[name] = value;
-        return *this;
-    }
-
-    ConvFpropAttributes& setInput(InputNames name, std::shared_ptr<TensorAttributes>&& value)
-    {
-        inputs[name] = std::move(value);
-        return *this;
-    }
-
-    ConvFpropAttributes& setOutput(OutputNames name, const std::shared_ptr<TensorAttributes>& value)
-    {
-        outputs[name] = value;
-        return *this;
-    }
-
-    ConvFpropAttributes& setOutput(OutputNames name, std::shared_ptr<TensorAttributes>&& value)
-    {
-        outputs[name] = std::move(value);
-        return *this;
+        return hipdnn_data_sdk::data_objects::CreateConvolutionFwdAttributesDirect(
+            builder,
+            get_x()->get_uid(),
+            get_w()->get_uid(),
+            get_y()->get_uid(),
+            &pre_padding,
+            &post_padding,
+            &stride,
+            &dilation,
+            toSdkType(math_mode));
     }
 };
 typedef ConvFpropAttributes Conv_fprop_attributes;
-}
-}
+} // namespace hipdnn_frontend::graph

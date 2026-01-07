@@ -755,6 +755,10 @@ auto _clamp = [](auto in, auto alpha, auto beta) -> decltype(in) {
         std::max(static_cast<Tc>(alpha), std::min(in_Tc, static_cast<Tc>(beta))));
 };
 
+auto _sigmoid = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
+    return static_cast<decltype(in)>(static_cast<decltype(in)>(1)/(static_cast<decltype(in)>(1) + std::exp(-in)));
+};
+
 void testing_matmul_bad_arg(const Arguments& arg)
 {
     const int64_t M = 128;
@@ -1724,66 +1728,83 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         // allocate memory on device
         dA.emplace_back(TiA, size_dA[i] * block_count, HMM);
+        CHECK_DEVICE_ALLOCATION(hipGetLastError());
         dB.emplace_back(TiB, size_dB[i] * block_count, HMM);
+        CHECK_DEVICE_ALLOCATION(hipGetLastError());
         dC.emplace_back(To, size_C[i] * block_count, HMM);
+        CHECK_DEVICE_ALLOCATION(hipGetLastError());
 
         if(!arg.c_equal_d)
         {
             dD.emplace_back(To, size_D[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
             dDp = &dD;
         }
         else
             dDp = &dC;
 
         if(size_bias[i] * block_count != 0)
+        {
             dBias.emplace_back(Tbias, size_bias[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
+        }
 
         if(arg.scaleAlpha_vector)
         {
             dScaleAlphaVec.emplace_back(Talpha, size_scaleAlphaVec[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
 
         if(arg.use_e)
         {
             dE.emplace_back(Taux, size_E[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
 
         if(arg.scaleA == hipblaslt_scaling_format::Scalar
            || arg.scaleA == hipblaslt_scaling_format::Vector)
         {
             dScaleA.emplace_back(Talpha, size_scaleAVec[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         else if(arg.scaleA == hipblaslt_scaling_format::Block)
         {
             // For MX format, use uin8_t for the scale (E8M0)
             dScaleA.emplace_back(HIP_R_8U, size_scaleAVec[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         if(arg.scaleB == hipblaslt_scaling_format::Scalar
            || arg.scaleB == hipblaslt_scaling_format::Vector)
         {
             dScaleB.emplace_back(Talpha, size_scaleBVec[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         else if(arg.scaleB == hipblaslt_scaling_format::Block)
         {
             // For MX format, use uin8_t for the scale (E8M0)
             dScaleB.emplace_back(HIP_R_8U, size_scaleBVec[i] * block_count, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         if(arg.scaleC)
         {
             dScaleC.emplace_back(Talpha, 1, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         if(arg.scaleD)
         {
             dScaleD.emplace_back(Talpha, 1, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         if(arg.amaxD)
         {
             epilogue_on[i] = true;
             dAmaxD.emplace_back(Talpha, 1, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
         if(arg.scaleE)
         {
             dScaleE.emplace_back(Talpha, 1, HMM);
+            CHECK_DEVICE_ALLOCATION(hipGetLastError());
         }
 
         // Naming: dX is in GPU (device) memory. hK is in CPU (host) memory
@@ -1850,10 +1871,11 @@ void testing_matmul_with_bias(const Arguments& arg,
         if(arg.scaleA == hipblaslt_scaling_format::Block)
         {
             if(arg.initialization != hipblaslt_initialization::hpl
-               && arg.initialization != hipblaslt_initialization::trig_float)
+               && arg.initialization != hipblaslt_initialization::trig_float
+               && arg.initialization != hipblaslt_initialization::uniform_01)
             {
                 hipblaslt_cout
-                    << "Initialization of microscaling data only allows hpl and trig_float not "
+                    << "Initialization of microscaling data only allows hpl, trig_float or uniform_01, not "
                     << hipblaslt_initialization2string(arg.initialization) << std::endl;
                 return;
             }
@@ -1901,10 +1923,11 @@ void testing_matmul_with_bias(const Arguments& arg,
         if(arg.scaleB == hipblaslt_scaling_format::Block)
         {
             if(arg.initialization != hipblaslt_initialization::hpl
-               && arg.initialization != hipblaslt_initialization::trig_float)
+               && arg.initialization != hipblaslt_initialization::trig_float
+               && arg.initialization != hipblaslt_initialization::uniform_01)
             {
                 hipblaslt_cout
-                    << "Initialization of microscaling data only allows hpl and trig_float not "
+                    << "Initialization of microscaling data only allows hpl, trig_float or uniform_01, not "
                     << hipblaslt_initialization2string(arg.initialization) << std::endl;
                 return;
             }
@@ -1985,6 +2008,13 @@ void testing_matmul_with_bias(const Arguments& arg,
                                         realDataTypeSize(TiB),
                                         do_swizzle_b));
             CHECK_HIP_ERROR(synchronize(hC[i], dC[i]));
+
+            if(arg.dump_matrix)
+            {
+                hipblasltDispatchValuesToFile(transA, TiA, M[i], K[i], lda[i], hA[i].buf(), "batch_"+ std::to_string(i)+"_A_input.txt");
+                hipblasltDispatchValuesToFile(transB, TiB, K[i], N[i], ldb[i], hB[i].buf(), "batch_"+ std::to_string(i)+"_B_input.txt");
+                hipblasltDispatchValuesToFile(HIPBLAS_OP_N, To, M[i], N[i], ldc[i], hC[i].buf(), "batch_"+ std::to_string(i)+"_C_input.txt");
+            }
         }
 
         if(do_swizzle_a)
@@ -3619,31 +3649,25 @@ void testing_matmul_with_bias(const Arguments& arg,
         double flush_time_used = 0;
         if(arg.flush)
         {
-            for(int i = 0; i < flush_iter; i++)
-                hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
-
-            if(arg.use_gpu_timer)
-                CHECK_HIP_ERROR(hipEventRecord(event_gpu_time_start, stream));
-            else
+            static std::unordered_map<std::string, double> flush_times_cache;
+            static std::mutex mtx;
+            std::lock_guard<std::mutex> lock(mtx);
+            std::string device_uuid(deviceProps.uuid.bytes);
+            if(!flush_times_cache.count(device_uuid))
             {
-                flush_time_used = get_time_us_sync(stream);
-            }
-            for(int i = 0; i < flush_iter; i++)
-                hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
-            if(arg.use_gpu_timer)
-            {
-                CHECK_HIP_ERROR(hipEventRecord(event_gpu_time_end, stream));
-                CHECK_HIP_ERROR(hipEventSynchronize(event_gpu_time_end));
-                float gpu_time_ms;
-                CHECK_HIP_ERROR(
-                    hipEventElapsedTime(&gpu_time_ms, event_gpu_time_start, event_gpu_time_end));
-                flush_time_used = gpu_time_ms * 1000; // ms to us
+                for(int i = 0; i < flush_iter; i++)
+                    hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, flush_time_used, stream);
+                for(int i = 0; i < flush_iter; i++)
+                    hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                post_gpu_time(arg.use_gpu_timer, event_gpu_time_start, event_gpu_time_end, flush_time_used, stream);
+                flush_time_used /= flush_iter;
+                flush_times_cache[device_uuid] = flush_time_used;
             }
             else
             {
-                flush_time_used = get_time_us_sync(stream) - flush_time_used;
+                flush_time_used = flush_times_cache[device_uuid];
             }
-            flush_time_used /= flush_iter;
         }
 
         for(size_t sol = 0; sol < heuristicResult.size(); sol++)
@@ -3953,6 +3977,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                 case hipblaslt_activation_type::clamp:
                     flops += clamp_gflop_count(M[gemmIdx], N[gemmIdx], Talpha);
                     break;
+                case hipblaslt_activation_type::sigmoid:
+                    flops += sigmoid_gflop_count(M[gemmIdx], N[gemmIdx], Talpha);
+                    break;
                 default:
                     break;
                 }
@@ -3972,6 +3999,11 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
             if(arg.unit_check || arg.norm_check || arg.allclose_check)
             {
+                if(arg.dump_matrix)
+                {
+                    hipblasltDispatchValuesToFile(HIPBLAS_OP_N, To, M[0], N[0], ldd[0], hD_1[0].buf(), "batch_0_D_output.txt");
+                    hipblasltDispatchValuesToFile(HIPBLAS_OP_N, To, M[0], N[0], ldd[0], hD_gold[0].buf(), "batch_0_D_Gold_output.txt");
+                }
                 check(stream,
                       arg,
                       gemm_count,

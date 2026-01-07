@@ -146,7 +146,8 @@ enum class Gpu : int
     gfx950  = 1 << 5,
     gfx103X = 1 << 6,
     gfx110X = 1 << 7,
-    gfx120X = 1 << 8,
+    gfx115X = 1 << 8,
+    gfx120X = 1 << 9,
     gfxLast = Gpu::gfx120X, // \note Change the value when adding a new device
     All     = -1
 };
@@ -202,7 +203,7 @@ public:
 
     // Add additional methods here if needed
     const std::string& Name() const override;
-    boost::optional<bool> Xnack() const override;
+    bool isXnackEnabled() const override;
 
 private:
     std::string name;

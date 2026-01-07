@@ -5,7 +5,7 @@
 
 #include "engines/plans/PlanInterface.hpp"
 #include <gmock/gmock.h>
-#include <hipdnn_sdk/plugin/PluginApiDataTypes.h>
+#include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 
 namespace miopen_legacy_plugin
 {
@@ -13,6 +13,10 @@ namespace miopen_legacy_plugin
 class MockPlan : public IPlan
 {
 public:
+    MOCK_METHOD(size_t,
+                getWorkspaceSize,
+                (const HipdnnEnginePluginHandle& handle),
+                (const, override));
     MOCK_METHOD(void,
                 execute,
                 (const HipdnnEnginePluginHandle& handle,

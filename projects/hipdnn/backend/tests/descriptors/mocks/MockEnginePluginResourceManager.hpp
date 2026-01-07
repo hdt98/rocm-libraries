@@ -6,9 +6,7 @@
 #include "plugin/EnginePluginResourceManager.hpp"
 #include <gmock/gmock.h>
 
-namespace hipdnn_backend
-{
-namespace plugin
+namespace hipdnn_backend::plugin
 {
 
 class MockEnginePluginResourceManager : public EnginePluginResourceManager
@@ -49,7 +47,10 @@ public:
                 destroyExecutionContext,
                 (int64_t engineId, hipdnnEnginePluginExecutionContext_t executionContext),
                 (const, override));
+    MOCK_METHOD(size_t,
+                getWorkspaceSize,
+                (int64_t engineId, hipdnnEnginePluginExecutionContext_t executionContext),
+                (const, override));
 };
 
-}
-}
+} // namespace hipdnn_backend::plugin

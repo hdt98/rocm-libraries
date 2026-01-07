@@ -37,9 +37,10 @@ std::string SolutionParameters::toString() const
     result << "MachineInstruction:" << machineInstruction.m << "x" << machineInstruction.n << "x"
            << machineInstruction.k << std::endl;
     result << "WorkgroupSize:" << workgroupSizeX << "x" << workgroupSizeY << std::endl;
+    result << "StreamK: " << streamK << std::endl;
+    result << "LoadA: " << loadPathA << std::endl;
+    result << "LoadB: " << loadPathB << std::endl;
     result << "LDS Usage";
-    result << " A:" << (direct2LDSA ? "DirectToLDS" : (loadLDSA ? "On" : "Off"));
-    result << " B:" << (direct2LDSB ? "DirectToLDS" : (loadLDSB ? "On" : "Off"));
     result << " D:" << (storeLDSD ? "On" : "Off") << std::endl;
     result << "Workgroup Mapping: Dim:" << workgroupMappingDim << " RemapXCC:" << workgroupRemapXCC << std::endl;
     result << "Prefetch:" << prefetch << " InFlight:" << prefetchInFlight
@@ -95,6 +96,7 @@ std::shared_ptr<SolutionParameters>
     genSolutionParameters(const KernelType&              kernelType,
                           const SolutionIndexParameters& solutionIndexParameters)
 {
+    namespace SolutionParams = rocRoller::Parameters::Solution;
     auto gemm = std::make_shared<SolutionParameters>();
 
     gemm->kernelType = kernelType;
@@ -103,19 +105,15 @@ std::shared_ptr<SolutionParameters>
 
     gemm->machineInstruction = pickMI(gemm->kernelType.typeA, gemm->kernelType.typeB, gemm->workgroupTile);
 
-    if(solutionIndexParameters.prefetchInFlight == 1)
-    {
+    gemm->prefetchInFlight = preferredUnrolling(kernelType.typeA, kernelType.typeB, gemm->workgroupTile);
+
+    if(gemm->prefetchInFlight <= 1)
         gemm->prefetch = false;
-    }
-    else
-    {
-        gemm->prefetchInFlight = solutionIndexParameters.prefetchInFlight;
-    }
 
     // Swizzle Scale only support in certain situations
     // Swizzle Scale also runs out of registers with FP8
-    if (kernelType.scaleAMode != rocRoller::Operations::ScaleMode::Separate ||
-        kernelType.scaleBMode != rocRoller::Operations::ScaleMode::Separate)
+    if (kernelType.scaleTypeA.mode != rocRoller::Operations::ScaleMode::Separate ||
+        kernelType.scaleTypeB.mode != rocRoller::Operations::ScaleMode::Separate)
     {
         gemm->swizzleScale = false;
         gemm->prefetchScale = false;
@@ -143,19 +141,20 @@ std::shared_ptr<SolutionParameters>
 
     // Direct To LDS only supported in certain situations
     if(kernelType.typeA == rocRoller::DataType::FP6 || kernelType.typeA == rocRoller::DataType::BF6)
-        gemm->direct2LDSA = false;
+        gemm->loadPathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
     if(kernelType.typeB == rocRoller::DataType::FP6 || kernelType.typeB == rocRoller::DataType::BF6)
-        gemm->direct2LDSB = false;
+        gemm->loadPathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
     if((kernelType.typeA == rocRoller::DataType::FP4
         || kernelType.typeB == rocRoller::DataType::FP4)
        && (solutionIndexParameters.workgroupTile.m <= 64
            || solutionIndexParameters.workgroupTile.n <= 64))
     {
-        gemm->direct2LDSA = false;
-        gemm->direct2LDSB = false;
+        gemm->loadPathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm->loadPathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
     }
 
-    if(gemm->direct2LDSA == false || gemm->direct2LDSB == false)
+    if(not(SolutionParams::IsBufferToLDS(gemm->loadPathA)
+           and SolutionParams::IsBufferToLDS(gemm->loadPathB)))
     {
         gemm->prefetchLDSFactor = 2;
     }
@@ -163,18 +162,18 @@ std::shared_ptr<SolutionParameters>
     // LDS can only be used for scaling data with certain workgroup tile sizes
     auto workgroupSizeTotal = gemm->workgroupSizeX * gemm->workgroupSizeY;
     auto numScaleElementsA = 0;
-    if(gemm->kernelType.scaleABlockRowSize * gemm->kernelType.scaleABlockColSize != 0)
+    if(gemm->kernelType.scaleTypeA.blockRowSize * gemm->kernelType.scaleTypeA.blockColSize != 0)
     {
         numScaleElementsA = gemm->workgroupTile.m
           * (gemm->workgroupTile.k
-             / (gemm->kernelType.scaleABlockRowSize * gemm->kernelType.scaleABlockColSize));
+             / (gemm->kernelType.scaleTypeA.blockRowSize * gemm->kernelType.scaleTypeA.blockColSize));
     }
     auto numScaleElementsB = 0;
-    if(gemm->kernelType.scaleBBlockRowSize * gemm->kernelType.scaleBBlockColSize != 0)
+    if(gemm->kernelType.scaleTypeB.blockRowSize * gemm->kernelType.scaleTypeB.blockColSize != 0)
     {
         numScaleElementsB = gemm->workgroupTile.n
           * (gemm->workgroupTile.k
-             / (gemm->kernelType.scaleBBlockRowSize * gemm->kernelType.scaleBBlockColSize));
+             / (gemm->kernelType.scaleTypeB.blockRowSize * gemm->kernelType.scaleTypeB.blockColSize));
     }
     if(numScaleElementsA % workgroupSizeTotal != 0)
     {
@@ -198,10 +197,12 @@ std::shared_ptr<SolutionParameters>
         gemm->workgroupRemapXCC = true;
     }
 
-    // TODO: StreamK is not currently working with prefetching or workgroup mapping
+    // Pass StreamK flag from solution index parameters
+    gemm->streamK = solutionIndexParameters.streamK;
+
+    // StreamK is not currently working with workgroup mapping due to register pressure
     if(gemm->streamK)
     {
-        gemm->prefetch = false;
         gemm->workgroupMappingDim = -1;
         gemm->workgroupRemapXCC = false;
     }

@@ -33,13 +33,8 @@
 
 #ifdef WIN32
 
-#ifdef __cpp_lib_filesystem
 #include <filesystem>
 namespace fs = std::filesystem;
-#else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#endif
 
 #else
 #include <sys/wait.h>
@@ -220,8 +215,10 @@ bool rocsparse_parse_data(int& argc, char** argv, const std::string& default_fil
         {
             include_path = argv[++i];
         }
-        else if(!strcmp(argv[i], "--data") || (yaml |= !strcmp(argv[i], "--yaml")))
+        else if(!strcmp(argv[i], "--data") || !strcmp(argv[i], "--yaml"))
         {
+            yaml = true;
+
             if(filename != "")
             {
                 std::cerr << "Only one of the --yaml and --data options may be specified"
