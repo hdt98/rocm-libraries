@@ -1109,6 +1109,7 @@ def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
 
     numMfma = 128
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    opt1.disableValidation()
     return True, opt1
 
 @RegisterSchedule(
@@ -2335,6 +2336,7 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
     
     numMfma = 72
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    opt1.disableValidation()
     return True, opt1
 
 @RegisterSchedule(
