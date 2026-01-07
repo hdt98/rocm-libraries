@@ -225,6 +225,7 @@ class StateValues:
   startVgprAlphaTmp: int                 = -1
   startVgprSerial: int                   = -1
   startVgprCvt: int                      = -1
+  startVgprTmp0: int                     = -1
 
   numSgprSizesSum: int                   = 0
   numSgprSizesFree: int                  = 0
@@ -4732,7 +4733,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # code doesn't have to deal with fragmentation
     self.states.startVgprSerial = vgprIdx
     vgprIdx += 1 # for vgpr serial id
-
+    
+    # @Siavash
+    if kernel["1LDSBuffer"] == 2:
+      self.states.startVgprTmp0 = vgprIdx
+      vgprIdx += 1 
+      
     if kernel["UseDirect32XEmulation"]:
       numVgprsEmu = (self.states.a.numVgprValu + self.states.b.numVgprValu) // 2
       if (vgprIdx >= (self.states.regCaps["MaxVgpr"] - numVgprsEmu)):
