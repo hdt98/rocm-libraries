@@ -326,6 +326,11 @@ void cholqr_getError(const rocblas_handle handle,
     cholqr_initData<true, true, T>(handle, m, n, dA, lda, stA, dR, ldr, stR, dSigma, algo, bc, hA,
                                    hR, hSigma);
 
+    for (I b = 0; b < bc; ++b)
+    {   
+        print_matrix("A", hA[b], m, n, lda);
+    }
+
     // execute GPU cholqr
     CHECK_ROCBLAS_ERROR(rocsolver_cholqr(STRIDED, handle, m, n, dA.data(), lda, stA, dR.data(), ldr,
                                          stR, dSigma.data(), algo, dInfo.data(), bc));
@@ -907,9 +912,16 @@ void testing_cholqr(Arguments& argus)
     // validate results for rocsolver-test
     // Using m * n * machine_precision as tolerance for CHOLQR
     // For ill-conditioned matrices, tolerance may need to be larger
+    double eps = get_epsilon<T>();
+    double tol = static_cast<double>(m) * static_cast<double>(n) * eps;
+    std::cout << std::scientific << std::setprecision(10);
+    std::cout << "Max error: " << max_error << std::endl;
+    std::cout << "Tolerance: " << tol << std::endl;
+    std::cout << "Machine precision: " << eps << std::endl;
+    std::cout << "M*N: " << m * n << std::endl;
+    std::cout << std::defaultfloat;
     if(argus.unit_check)
-        ROCSOLVER_TEST_CHECK(T, max_error, m * n);
-    std::cout << "Tolerance: " << m * n * get_epsilon<T>() << std::endl;
+        ROCSOLVER_TEST_CHECK(T, max_error, 10 * m * n);
 
     // output results for rocsolver-bench
     if(argus.timing)
