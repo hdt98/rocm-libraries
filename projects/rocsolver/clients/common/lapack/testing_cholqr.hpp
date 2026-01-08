@@ -232,35 +232,6 @@ void cholqr_initData(const rocblas_handle handle,
     }
 }
 
-// Helper function to print a matrix for debugging (first 10x10 elements)
-template <typename T, typename I>
-void print_matrix(const char* name, const T* A, I rows, I cols, I lda)
-{
-    const I max_print = 10;
-    I print_rows = std::min(rows, max_print);
-    I print_cols = std::min(cols, max_print);
-    
-    std::cout << "\n=== " << name << " (" << rows << " x " << cols << ", showing " 
-              << print_rows << " x " << print_cols << ") ===" << std::endl;
-    
-    for(I i = 0; i < print_rows; ++i)
-    {
-        for(I j = 0; j < print_cols; ++j)
-        {
-            if constexpr(std::is_same_v<T, float> || std::is_same_v<T, double>)
-                std::cout << std::setw(12) << std::fixed << std::setprecision(std::numeric_limits<T>::digits10) << A[i + j * lda] << " ";
-            else
-                std::cout << "(" << std::setw(9) << std::fixed << std::setprecision(std::numeric_limits<T>::digits10) << std::real(A[i + j * lda]) 
-                          << "," << std::setw(9) << std::fixed << std::setprecision(std::numeric_limits<T>::digits10) << std::imag(A[i + j * lda]) << ") ";
-        }
-        if(cols > max_print)
-            std::cout << "...";
-        std::cout << std::endl;
-    }
-    if(rows > max_print)
-        std::cout << "  ... (" << (rows - max_print) << " more rows)" << std::endl;
-}
-
 template <bool STRIDED, typename T, typename I, typename Td, typename Ud, typename Sd, typename Id, typename Th, typename Uh, typename Sh, typename Ih>
 void cholqr_getError(const rocblas_handle handle,
                      const I m,
@@ -295,11 +266,6 @@ void cholqr_getError(const rocblas_handle handle,
     cholqr_initData<true, true, T>(handle, m, n, dA, lda, stA, dR, ldr, stR, dSigma, algo, bc, hA,
                                    hR, hSigma);
 
-    for (I b = 0; b < bc; ++b)
-    {   
-        print_matrix("A", hA[b], m, n, lda);
-    }
-
     // execute GPU cholqr
     CHECK_ROCBLAS_ERROR(rocsolver_cholqr(STRIDED, handle, m, n, dA.data(), lda, stA, dR.data(), ldr,
                                          stR, dSigma.data(), algo, dInfo.data(), bc));
@@ -318,7 +284,7 @@ void cholqr_getError(const rocblas_handle handle,
             *max_err += 1;
     }
 
-    // Compute Error Option 1: Check factorization quality
+    // Compute Error
     // ||Q^T Q - I||_F (orthogonality) and ||A - QR||_F (reconstruction)
     double err = 0;
     for(I b = 0; b < bc; ++b)
@@ -326,45 +292,6 @@ void cholqr_getError(const rocblas_handle handle,
         // Only compute numerical error if factorization succeeded
         if(hInfo[b][0] == 0)
         {
-            // Save a copy of original A before CPU reference computation overwrites it
-            std::vector<T> A_orig(size_t(lda) * n);
-            for(I j = 0; j < n; ++j)
-            {
-                for(I i = 0; i < m; ++i)
-                {
-                    A_orig[i + j * lda] = hA[b][i + j * lda];
-                }
-            }
-
-            // CPU GEQRF: compute QR factorization (for comparison/debugging)
-            // After geqrf, hA contains Householder vectors (below diagonal) and R (on and above diagonal)
-            cpu_geqrf(m, n, hA[b], lda, hTau.data(), hW.data(), lwork);
-
-            // Extract R_cpu from the upper triangular part of hA
-            std::vector<T> R_cpu(size_t(ldr) * n, T(0));
-            for(I j = 0; j < n; ++j)
-            {
-                for(I i = 0; i <= j && i < min_mn; ++i)
-                {
-                    R_cpu[i + j * ldr] = hA[b][i + j * lda];
-                }
-            }
-
-            // Reconstruct Q_cpu from Householder vectors using ORGQR/UNGQR
-            // cpu_orgqr_ungqr overwrites hA with Q
-            cpu_orgqr_ungqr(m, min_mn, min_mn, hA[b], lda, hTau.data(), hW.data(), lwork);
-
-            // Debug: Print matrices for this batch (after sign normalization)
-            std::cout << "\n========== BATCH " << b << " (signs normalized) ==========" << std::endl;
-            print_matrix("Q_CPU", hA[b], m, min_mn, lda);
-            print_matrix("Q_GPU", hARes[b], m, min_mn, lda);
-            print_matrix("R_CPU", R_cpu.data(), n, n, ldr);
-            print_matrix("R_GPU", hRRes[b], n, n, ldr);
-            std::cout << "================================\n" << std::endl;
-
-            // Compute ||A||_F for relative error
-            S norm_A = snorm('F', m, n, A_orig.data(), lda);
-
             // Compute Q_gpu^H * Q_gpu using GEMM (should be identity for orthogonal Q)
             // QtQ = Q^H * Q, result is min_mn x min_mn
             std::vector<T> QtQ(size_t(min_mn) * min_mn, T(0));
@@ -399,179 +326,15 @@ void cholqr_getError(const rocblas_handle handle,
             {
                 for(I i = 0; i < m; ++i)
                 {
-                    T diff = A_orig[i + j * lda] - QR[i + j * lda];
+                    T diff = hA[b][i + j * lda] - QR[i + j * lda];
                     recon_err_sq += std::real(diff * conj_helper(diff));
                 }
             }
             S recon_err = std::sqrt(recon_err_sq);
 
-            // ============================================================
-            // Same checks for CPU GEQRF reference
-            // ============================================================
-
-            // Compute Q_cpu^H * Q_cpu using GEMM (should be identity)
-            std::vector<T> QtQ_cpu(size_t(min_mn) * min_mn, T(0));
-            cpu_gemm(transQ, rocblas_operation_none, min_mn, min_mn, m,
-                     T(1), hA[b], lda, hA[b], lda, T(0), QtQ_cpu.data(), min_mn);
-
-            // Subtract identity
-            for(I i = 0; i < min_mn; ++i)
-                QtQ_cpu[i + i * min_mn] -= T(1);
-
-            S orth_err_cpu = snorm('F', min_mn, min_mn, QtQ_cpu.data(), min_mn);
-
-            // Compute Q_cpu * R_cpu using GEMM
-            // R_cpu is already properly upper triangular (zero below diagonal)
-            std::vector<T> QR_cpu(size_t(lda) * n, T(0));
-            cpu_gemm(rocblas_operation_none, rocblas_operation_none, m, n, min_mn,
-                     T(1), hA[b], lda, R_cpu.data(), ldr, T(0), QR_cpu.data(), lda);
-
-            // Compute ||A - Q_cpu R_cpu||_F
-            S recon_err_cpu_sq = S(0);
-            for(I j = 0; j < n; ++j)
-            {
-                for(I i = 0; i < m; ++i)
-                {
-                    T diff = A_orig[i + j * lda] - QR_cpu[i + j * lda];
-                    recon_err_cpu_sq += std::real(diff * conj_helper(diff));
-                }
-            }
-            S recon_err_cpu = std::sqrt(recon_err_cpu_sq);
-
-            // ============================================================
-            // GPU GEQRF reference (for comparison)
-            // ============================================================
-            S orth_err_gpu_geqrf = S(0);
-            S recon_err_gpu_geqrf = S(0);
-            {
-                // Allocate device memory for GPU GEQRF
-                size_t size_A_bytes = size_t(lda) * n * sizeof(T);
-                size_t size_tau_bytes = size_t(min_mn) * sizeof(T);
-                T* dA_geqrf = nullptr;
-                T* dTau = nullptr;
-                CHECK_HIP_ERROR(hipMalloc(&dA_geqrf, size_A_bytes));
-                CHECK_HIP_ERROR(hipMalloc(&dTau, size_tau_bytes));
-
-                // Copy original A to device
-                CHECK_HIP_ERROR(hipMemcpy(dA_geqrf, A_orig.data(), size_A_bytes, hipMemcpyHostToDevice));
-
-                // Run GPU GEQRF (non-strided, single matrix)
-                CHECK_ROCBLAS_ERROR(rocsolver_geqr2_geqrf(false, true, handle, m, n, dA_geqrf, lda, rocblas_stride(0), dTau, rocblas_stride(0), I(1)));
-
-                // Copy results back to extract R
-                std::vector<T> hA_geqrf(size_t(lda) * n);
-                std::vector<T> hTau_geqrf(min_mn);
-                CHECK_HIP_ERROR(hipMemcpy(hA_geqrf.data(), dA_geqrf, size_A_bytes, hipMemcpyDeviceToHost));
-                CHECK_HIP_ERROR(hipMemcpy(hTau_geqrf.data(), dTau, size_tau_bytes, hipMemcpyDeviceToHost));
-
-                // Extract R from upper triangular part
-                std::vector<T> R_gpu_geqrf(size_t(ldr) * n, T(0));
-                for(I j = 0; j < n; ++j)
-                {
-                    for(I i = 0; i <= j && i < min_mn; ++i)
-                    {
-                        R_gpu_geqrf[i + j * ldr] = hA_geqrf[i + j * lda];
-                    }
-                }
-
-                // Run GPU ORGQR/UNGQR to reconstruct Q
-                CHECK_ROCBLAS_ERROR(rocsolver_orgxr_ungxr(true, handle, m, min_mn, min_mn, dA_geqrf, lda, dTau));
-
-                // Copy Q back to host
-                std::vector<T> Q_gpu_geqrf(size_t(lda) * n);
-                CHECK_HIP_ERROR(hipMemcpy(Q_gpu_geqrf.data(), dA_geqrf, size_A_bytes, hipMemcpyDeviceToHost));
-
-                // Free device memory
-                CHECK_HIP_ERROR(hipFree(dA_geqrf));
-                CHECK_HIP_ERROR(hipFree(dTau));
-
-                // Compute Q^H * Q for GPU GEQRF using GEMM
-                std::vector<T> QtQ_gpu_geqrf(size_t(min_mn) * min_mn, T(0));
-                cpu_gemm(transQ, rocblas_operation_none, min_mn, min_mn, m,
-                         T(1), Q_gpu_geqrf.data(), lda, Q_gpu_geqrf.data(), lda, T(0), QtQ_gpu_geqrf.data(), min_mn);
-
-                // Subtract identity
-                for(I i = 0; i < min_mn; ++i)
-                    QtQ_gpu_geqrf[i + i * min_mn] -= T(1);
-
-                orth_err_gpu_geqrf = snorm('F', min_mn, min_mn, QtQ_gpu_geqrf.data(), min_mn);
-
-                // Compute Q * R for GPU GEQRF using GEMM
-                // R_gpu_geqrf is already properly upper triangular (extracted above)
-                std::vector<T> QR_gpu_geqrf(size_t(lda) * n, T(0));
-                cpu_gemm(rocblas_operation_none, rocblas_operation_none, m, n, min_mn,
-                         T(1), Q_gpu_geqrf.data(), lda, R_gpu_geqrf.data(), ldr, T(0), QR_gpu_geqrf.data(), lda);
-
-                // Compute ||A - QR||_F for GPU GEQRF
-                S recon_err_gpu_geqrf_sq = S(0);
-                for(I j = 0; j < n; ++j)
-                {
-                    for(I i = 0; i < m; ++i)
-                    {
-                        T diff = A_orig[i + j * lda] - QR_gpu_geqrf[i + j * lda];
-                        recon_err_gpu_geqrf_sq += std::real(diff * conj_helper(diff));
-                    }
-                }
-                recon_err_gpu_geqrf = std::sqrt(recon_err_gpu_geqrf_sq);
-            }
-
-            // Print results for CPU GEQRF, GPU GEQRF, and GPU CHOLQR
-            std::cout << "  CPU GEQRF:" << std::endl;
-            std::cout << "    Orthogonality error ||Q^T Q - I||_F = " << orth_err_cpu << std::endl;
-            std::cout << "    Reconstruction error ||A - QR||_F = " << recon_err_cpu << std::endl;
-            std::cout << "    Relative reconstruction error = " << (norm_A > 0 ? recon_err_cpu / norm_A : recon_err_cpu) << std::endl;
-
-            std::cout << "  GPU GEQRF:" << std::endl;
-            std::cout << "    Orthogonality error ||Q^T Q - I||_F = " << orth_err_gpu_geqrf << std::endl;
-            std::cout << "    Reconstruction error ||A - QR||_F = " << recon_err_gpu_geqrf << std::endl;
-            std::cout << "    Relative reconstruction error = " << (norm_A > 0 ? recon_err_gpu_geqrf / norm_A : recon_err_gpu_geqrf) << std::endl;
-
-            std::cout << "  GPU CHOLQR:" << std::endl;
-            std::cout << "    Orthogonality error ||Q^T Q - I||_F = " << orth_err << std::endl;
-            std::cout << "    Reconstruction error ||A - QR||_F = " << recon_err << std::endl;
-            std::cout << "    Relative reconstruction error = " << (norm_A > 0 ? recon_err / norm_A : recon_err) << std::endl;
-
-            // Use relative errors for the test check:
-            // - Orthogonality error normalized by sqrt(min_mn) (size of identity matrix)
-            // - Reconstruction error normalized by ||A||_F
-            // S rel_orth_err = orth_err;
-            // S rel_orth_err = (min_mn > 0) ? orth_err / std::sqrt(S(min_mn)) : orth_err;
-            // S rel_recon_err = (norm_A > 0) ? recon_err / norm_A : recon_err;
-            // err = rel_orth_err + rel_recon_err;
             err = orth_err + recon_err;
-            std::cout << "Error: " << err << std::endl;
             *max_err = err > *max_err ? err : *max_err;
 
-            // ============================================================
-            // Compute Error Option 2: Compare Q and R directly with CPU reference
-            // Requires sign normalization since QR signs are arbitrary
-            // ============================================================
-            /*
-            // Compute ||Q_cpu - Q_gpu||_F
-            S norm_Q_diff_sq = S(0);
-            for(I j = 0; j < min_mn; ++j)
-            {
-                for(I i = 0; i < m; ++i)
-                {
-                    T diff = hA[b][i + j * lda] - hARes[b][i + j * lda];
-                    norm_Q_diff_sq += std::real(diff * conj_helper(diff));
-                }
-            }
-
-            // Compute ||R_cpu - R_gpu||_F
-            S norm_R_diff_sq = S(0);
-            for(I j = 0; j < n; ++j)
-            {
-                for(I i = 0; i <= j && i < n; ++i)
-                {
-                    T diff = R_cpu[i + j * ldr] - hRRes[b][i + j * ldr];
-                    norm_R_diff_sq += std::real(diff * conj_helper(diff));
-                }
-            }
-
-            err = std::sqrt(norm_Q_diff_sq) + std::sqrt(norm_R_diff_sq);
-            *max_err = err > *max_err ? err : *max_err;
-            */
         }
     }
 }
@@ -875,17 +638,8 @@ void testing_cholqr(Arguments& argus)
                                            argus.profile_kernels, argus.perf);
     }
 
-    // validate results for rocsolver-test
-    // Using m * n * machine_precision as tolerance for CHOLQR
+    // Using 10 * m * n * machine_precision as tolerance for CHOLQR
     // For ill-conditioned matrices, tolerance may need to be larger
-    double eps = get_epsilon<T>();
-    double tol = static_cast<double>(m) * static_cast<double>(n) * eps;
-    std::cout << std::scientific << std::setprecision(10);
-    std::cout << "Max error: " << max_error << std::endl;
-    std::cout << "Tolerance: " << tol << std::endl;
-    std::cout << "Machine precision: " << eps << std::endl;
-    std::cout << "M*N: " << m * n << std::endl;
-    std::cout << std::defaultfloat;
     if(argus.unit_check)
         ROCSOLVER_TEST_CHECK(T, max_error, 10 * m * n);
 
