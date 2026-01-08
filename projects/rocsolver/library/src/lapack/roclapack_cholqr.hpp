@@ -1430,7 +1430,6 @@ rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
 
                                                           I const batch_count)
 {
-    // 2. invalid size
     bool const isok_size = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_size)
     {
@@ -1473,7 +1472,6 @@ rocblas_status rocsolver_cholqr2_strided_batched_argCheck(rocblas_handle handle,
 
                                                           I const batch_count)
 {
-    // 2. invalid size
     bool const isok_size = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_size)
     {
@@ -1503,7 +1501,6 @@ rocblas_status rocsolver_cholqr3_strided_batched_argCheck(rocblas_handle handle,
 
                                                           I const batch_count)
 {
-    // 2. invalid size
     bool const isok_size = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_size)
     {
@@ -1533,7 +1530,6 @@ static rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
 
                                                          I const batch_count)
 {
-    // 2. invalid size
     bool const isok_size = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_size)
     {
@@ -1563,7 +1559,6 @@ static rocblas_status rocsolver_cholqr2_batched_argCheck(rocblas_handle handle,
 
                                                          I const batch_count)
 {
-    // 2. invalid size
     bool const isok_size = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_size)
     {
@@ -1593,7 +1588,6 @@ static rocblas_status rocsolver_cholqr3_batched_argCheck(rocblas_handle handle,
 
                                                          I const batch_count)
 {
-    // 2. invalid size
     bool const isok_size = (m >= 0) && (n >= 0) && (batch_count >= 0) && (lda >= m) && (ldr >= n);
     if(!isok_size)
     {
@@ -2774,7 +2768,7 @@ static rocblas_status rocsolver_cholqr_general_batched_argCheck(rocblas_handle h
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
         if(has_work)
         {
-            bool const is_valid_pointers = (A != nullptr) && (R != nullptr);
+            bool const is_valid_pointers = (A != nullptr) && (R != nullptr) && (info != nullptr);
             if(!is_valid_pointers)
             {
                 return (rocblas_status_invalid_pointer);
