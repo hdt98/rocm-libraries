@@ -232,37 +232,6 @@ void cholqr_initData(const rocblas_handle handle,
     }
 }
 
-// Helper function to normalize QR signs: make R's diagonal positive
-// For each k, if R[k,k] < 0 (or has negative real part for complex),
-// flip signs of column k of Q and row k of R
-template <typename T, typename I>
-void normalize_qr_signs(T* Q, I m, I ldq, T* R, I n, I ldr, I min_mn)
-{
-    using S = decltype(std::real(T{}));
-    
-    for(I k = 0; k < min_mn; ++k)
-    {
-        // Check if diagonal of R is negative
-        T diag = R[k + k * ldr];
-        S real_diag = std::real(diag);
-        
-        if(real_diag < S(0))
-        {
-            // Flip sign of column k of Q
-            for(I i = 0; i < m; ++i)
-            {
-                Q[i + k * ldq] = -Q[i + k * ldq];
-            }
-            
-            // Flip sign of row k of R (only upper triangular part matters)
-            for(I j = k; j < n; ++j)
-            {
-                R[k + j * ldr] = -R[k + j * ldr];
-            }
-        }
-    }
-}
-
 // Helper function to print a matrix for debugging (first 10x10 elements)
 template <typename T, typename I>
 void print_matrix(const char* name, const T* A, I rows, I cols, I lda)
@@ -384,9 +353,6 @@ void cholqr_getError(const rocblas_handle handle,
             // Reconstruct Q_cpu from Householder vectors using ORGQR/UNGQR
             // cpu_orgqr_ungqr overwrites hA with Q
             cpu_orgqr_ungqr(m, min_mn, min_mn, hA[b], lda, hTau.data(), hW.data(), lwork);
-
-            normalize_qr_signs(hA[b], m, lda, R_cpu.data(), n, ldr, min_mn);
-            normalize_qr_signs(hARes[b], m, lda, hRRes[b], n, ldr, min_mn);
 
             // Debug: Print matrices for this batch (after sign normalization)
             std::cout << "\n========== BATCH " << b << " (signs normalized) ==========" << std::endl;
