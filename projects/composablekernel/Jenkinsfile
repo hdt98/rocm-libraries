@@ -894,7 +894,7 @@ def Build_CK(Map conf=[:]){
                                 mkdir -p build
                                 ls -ltr
                                 CC=hipcc CXX=hipcc cmake -Bbuild . -D CMAKE_PREFIX_PATH="${env.WORKSPACE}/install"
-                                cmake --build build -- -j
+                                cmake --build build -- -j64
                             """
                             //  ctest --test-dir build // disable the testing for now
                         }
