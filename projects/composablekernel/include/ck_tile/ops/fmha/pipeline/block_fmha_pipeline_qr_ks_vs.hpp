@@ -245,11 +245,6 @@ struct BlockFmhaPipelineQRKSVS
             k_lds_ptr, Policy::template MakeKLdsBlockDescriptor<Problem>());
         auto k_lds_window =
             make_tile_window(k_lds, make_tuple(number<kN0>{}, number<kK0>{}), {0, 0});
-        auto k_lds_window2 = if_mx([&] {
-            auto k_lds2 = make_tensor_view<address_space_enum::lds>(
-                k_lds_ptr, Policy::template MakeKLdsBlockDescriptor2<Problem>());
-            return make_tile_window(k_lds2, make_tuple(number<kN0>{}, number<kK0>{}), {0, 0});
-        });
 
         // V tile in LDS
         auto v_lds = make_tensor_view<address_space_enum::lds>(
@@ -495,7 +490,7 @@ struct BlockFmhaPipelineQRKSVS
                         get_slice_tile(q_scale,
                                        sequence<0, i_k0*(kK0 / kQKScaleGranularity)>{},
                                        sequence<kM0, (i_k0 + 1) * (kK0 / kQKScaleGranularity)>{});
-                    gemm_0(s_acc, q_slice, q_scale_slice, k_lds_window2, k_scale_block_tile);
+                    gemm_0(s_acc, q_slice, q_scale_slice, k_lds_window, k_scale_block_tile);
                 }
                 else
                 {

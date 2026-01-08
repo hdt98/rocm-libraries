@@ -1541,10 +1541,43 @@ struct FmhaFwdKernel
                     number<1>{});
 
                 constexpr bool kPadSeqLenK_ = kUseAsyncCopy ? kPadSeqLenK : false;
-                return pad_tensor_view(
+                const auto k_dram_pad       = pad_tensor_view(
                     k_dram_naive,
                     make_tuple(number<FmhaPipeline::kN0>{}, number<FmhaPipeline::kK0>{}),
                     sequence<kPadSeqLenK_, kPadHeadDimQ>{});
+
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    // Shuffle N dim of K in such a way that C of the first GEMM can be used as
+                    // A for the second GEMM
+                    // TODO: hardcoded, make it generic somehow. See also k_scale_dram
+                    static_assert(FmhaPipeline::kN0 % (4 * 4 * 4) == 0);
+                    const auto k_dram_unmerged = transform_tensor_view(
+                        k_dram_pad,
+                        make_tuple(make_unmerge_transform(
+                                       make_tuple(number<FmhaPipeline::kN0 / (4 * 4 * 4)>{},
+                                                  number<4>{},
+                                                  number<4>{},
+                                                  number<4>{})),
+                                   make_pass_through_transform(number<FmhaPipeline::kK0>{})),
+                        make_tuple(sequence<0>{}, sequence<1>{}),
+                        make_tuple(sequence<0, 2, 1, 3>{}, sequence<4>{}));
+
+                    return transform_tensor_view(
+                        k_dram_unmerged,
+                        make_tuple(make_merge_transform(
+                                       make_tuple(number<FmhaPipeline::kN0 / (4 * 4 * 4)>{},
+                                                  number<4>{},
+                                                  number<4>{},
+                                                  number<4>{})),
+                                   make_pass_through_transform(number<FmhaPipeline::kK0>{})),
+                        make_tuple(sequence<0, 1, 2, 3>{}, sequence<4>{}),
+                        make_tuple(sequence<0>{}, sequence<1>{}));
+                }
+                else
+                {
+                    return k_dram_pad;
+                }
             }();
             const auto v_dram = [&]() {
                 if constexpr(std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::RowMajor>)
@@ -1965,7 +1998,7 @@ struct FmhaFwdKernel
 
                         // Shuffle N dim of K in such a way that C of the first GEMM can be used as
                         // A for the second GEMM
-                        // TODO: hardcoded, make it generic somehow
+                        // TODO: hardcoded, make it generic somehow. See also k_dram
                         static_assert(FmhaPipeline::kN0 % (4 * 4 * 4) == 0);
                         const auto k_scale_dram_unmerged = transform_tensor_view(
                             k_scale_dram_pad,
