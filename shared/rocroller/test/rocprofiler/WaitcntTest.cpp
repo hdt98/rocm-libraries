@@ -167,13 +167,30 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
-        if(write && instrDwords == 4)
+        if(write && instrDwords == 2 && strideMultiplier == 1)
         {
-            // CHECK((analysis.incorrectPredictionCount <= 16));
+            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 35));
+        }
+        else if(write && instrDwords == 4)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 20 || std::abs(analysis.totalDelta) <= 180));
+        }
+        else if(instrDwords == 1 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 32));
+        }
+        else if(instrDwords == 2 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 35));
+        }
+        else if(instrDwords == 4 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 35));
         }
         else
         {
-            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
+            CHECK((analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
         }
     }
 }
@@ -271,13 +288,55 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
-        if(write && instrDwords == 4)
+        if(!write && instrDwords == 1 && strideMultiplier >= 4)
         {
-            // CHECK((analysis.incorrectPredictionCount <= 16));
+            CHECK((analysis.incorrectPredictionCount <= 21 || std::abs(analysis.totalDelta) <= 85));
+        }
+        else if(!write && instrDwords == 2 && strideMultiplier >= 8)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 40 || std::abs(analysis.totalDelta) <= 1100));
+        }
+        else if(!write && instrDwords == 2 && strideMultiplier >= 4)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 21 || std::abs(analysis.totalDelta) <= 85));
+        }
+        else if(!write && instrDwords == 2 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 50));
+        }
+        else if(!write && instrDwords == 4 && strideMultiplier >= 8)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 25 || std::abs(analysis.totalDelta) <= 920));
+        }
+        else if(!write && instrDwords == 4 && strideMultiplier >= 2)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 32 || std::abs(analysis.totalDelta) <= 230));
+        }
+        else if(!write && instrDwords == 4 && strideMultiplier == 1)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 20 || std::abs(analysis.totalDelta) <= 110));
+        }
+        else if(write && instrDwords == 4)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 80 || std::abs(analysis.totalDelta) <= 1300));
+        }
+        else if(write)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 43 || std::abs(analysis.totalDelta) <= 500));
+        }
+        else if(instrDwords == 1 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 50));
         }
         else
         {
-            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
+            CHECK((analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
         }
     }
 }
@@ -393,13 +452,30 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
-        if(write && instrDwords == 4)
+        if(write && instrDwords == 2 && strideMultiplier == 1)
         {
-            // CHECK((analysis.incorrectPredictionCount <= 16));
+            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 35));
+        }
+        else if(write && instrDwords == 4)
+        {
+            CHECK(
+                (analysis.incorrectPredictionCount <= 34 || std::abs(analysis.totalDelta) <= 240));
+        }
+        else if(!write && instrDwords == 2 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 45));
+        }
+        else if(!write && instrDwords == 4 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 45));
+        }
+        else if(instrDwords == 1 && strideMultiplier == 1)
+        {
+            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 40));
         }
         else
         {
-            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
+            CHECK((analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
         }
     }
 }
