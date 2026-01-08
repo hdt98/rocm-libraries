@@ -262,15 +262,6 @@ namespace rocRoller::Scheduling::LDSBankModel
         }
         void reset();
 
-        int getInterWaveConflictMultiplier() const
-        {
-            return m_interWaveMultiplier;
-        }
-        int getIntraSPConflictMultiplier() const
-        {
-            return m_intraSPMultiplier;
-        }
-
         // Returns tuple of <stall_cycles, additional_cycles>
         std::tuple<int, int> predictStallCycles(const RuntimeLDSInstruction& instr) const;
         void                 scheduleInstruction(const RuntimeLDSInstruction& instr);
@@ -285,8 +276,8 @@ namespace rocRoller::Scheduling::LDSBankModel
 
         GPUArchitectureGFX m_gfx;
         int                m_programCycle;
-        int                m_interWaveMultiplier;
-        int                m_intraSPMultiplier;
+        int                m_multiplierQueueSlots;
+        int                m_multiplierWaveCount;
 
         std::deque<int> m_commandQueue;
         std::deque<int> m_waitcntQueue; // Includes round-trip delay

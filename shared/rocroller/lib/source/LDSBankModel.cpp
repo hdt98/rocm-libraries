@@ -78,12 +78,14 @@ namespace rocRoller::Scheduling::LDSBankModel
     LDSScheduler::LDSScheduler(GPUArchitectureGFX gfx, int waveCount)
         : m_gfx(gfx)
         , m_programCycle(0)
-        // Both SPs share the same LDS, so if more than one wave is active,
-        // conflicts double (assuming waves perfectly interleave)
-        , m_interWaveMultiplier(std::min(2, waveCount))
         // With 3 or more waves, two SIMDs will be active on at least one SP
         // so two SIMDs share the same LDS queues
-        , m_intraSPMultiplier(waveCount > 2 ? 2 : 1)
+        // , m_multiplierQueueSlots(std::atoi(std::getenv("INTER")))
+        , m_multiplierQueueSlots(waveCount > 2 ? 2 : 1)
+        // Both SPs share the same LDS, so if more than one wave is active,
+        // conflicts double (assuming waves perfectly interleave)
+        // , m_multiplierWaveCount(std::atoi(std::getenv("INTRA")))
+        , m_multiplierWaveCount(waveCount)
     {
         AssertFatal(waveCount >= 1, ShowValue(waveCount));
         AssertFatal(waveCount != 3, "wave count of 3 is untested");
@@ -120,7 +122,7 @@ namespace rocRoller::Scheduling::LDSBankModel
     {
         int stallCycles = 0;
 
-        const auto multiplier            = getIntraSPConflictMultiplier();
+        const auto multiplier            = m_multiplierQueueSlots;
         const auto [direction, dwords]   = std::make_pair(instr.memoryOp.direction, instr.dwords);
         const auto requiredDataSlots     = getQueueSlotsRequired(direction, dwords) * multiplier;
         const auto requiredCommandSlots  = multiplier;
@@ -141,7 +143,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         }
 
         MemoryOpLDS memOp{direction};
-        int         additionalCycles = (getInstructionIssueCycles(memOp, dwords) * multiplier) - 4;
+        int         additionalCycles = (getInstructionIssueCycles(memOp, dwords)) - 4;
 
         return std::make_tuple(stallCycles, additionalCycles);
     }
@@ -183,19 +185,19 @@ namespace rocRoller::Scheduling::LDSBankModel
     {
         updateQueues();
 
-        int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
-        int dataCycles = getInstructionDataCycles(instr, m_gfx) * getInterWaveConflictMultiplier();
+        const int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
+        const int dataCycles    = getInstructionDataCycles(instr, m_gfx);
 
-        for(int i = 0; i < getIntraSPConflictMultiplier(); ++i)
+        AssertFatal(getRemainingDataSlots() >= requiredSlots
+                        && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
+                    "Expected queue space to be accounted for in predict function and passed "
+                    "through to total cycles calculation",
+                    ShowValue(getRemainingDataSlots()),
+                    ShowValue(requiredSlots));
+
+        // TODO: if both SIMD on SP active, double the queue entries
+        for(int i = 0; i < 1; ++i)
         {
-            AssertFatal(getRemainingDataSlots() >= requiredSlots
-                            && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
-                        "Expected queue space to be accounted for in predict function and passed "
-                        "through to total cycles calculation",
-                        ShowValue(getRemainingDataSlots()),
-                        ShowValue(requiredSlots));
-            ;
-
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
                 auto cmdBase = m_programCycle + dataCycles;
@@ -224,10 +226,11 @@ namespace rocRoller::Scheduling::LDSBankModel
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
-                auto cmdBase = m_programCycle + dataCycles;
+                const auto extra   = m_multiplierWaveCount == 4 ? (dataCycles + 4) * 2 : dataCycles;
+                auto       cmdBase = m_programCycle + dataCycles * m_multiplierWaveCount;
                 if(!m_commandQueue.empty())
                 {
-                    cmdBase = m_commandQueue.back() + dataCycles;
+                    cmdBase = m_commandQueue.back() + dataCycles * m_multiplierWaveCount;
                 }
                 auto waitcntBase = m_programCycle + 40 + dataCycles;
                 if(!m_waitcntQueue.empty())

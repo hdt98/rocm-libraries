@@ -126,12 +126,13 @@ namespace rocRoller
         return m_instructions;
     }
 
-    // Tests tagged [lds-model] should all have this suite of section names, e.g.
-    // test/rocroller-tests-rocprofiler "[lds-model]" -c "write b64 s8."
     std::string LDSTestKernelBase::getSectionName() const
     {
-        return fmt::format(
-            "{} b{} s{}.", m_write ? "write" : "read", m_instrDwords * 32, m_strideMultiplier);
+        return fmt::format("{} b{} s{} wgs{}.",
+                           m_write ? "write" : "read",
+                           m_instrDwords * 32,
+                           m_strideMultiplier,
+                           m_workgroupSize);
     }
 
     void LDSTestKernelBase::generate()

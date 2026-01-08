@@ -131,7 +131,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
     using namespace Scheduling::LDSBankModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    constexpr auto workgroupSize = 64u;
+    const auto workgroupSize = GENERATE(64u);
 
     int instrDwords      = GENERATE(1, 2, 4);
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
