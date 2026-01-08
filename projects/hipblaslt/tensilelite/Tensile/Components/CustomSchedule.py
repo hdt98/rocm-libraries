@@ -2207,10 +2207,10 @@ def _get_schedule_128x128x64_16bit(kernel, useLDSTr, TLDS):
                     [8, 9, 10, 11, 12, 13, 14, 14]],
             'GRB': [[16, 16, 18, 18, 18, 20, 20, 22],
                     [15, 15, 17, 19, 19, 21, 23, 23]],
-            'LRA1': [[15, 15, 19, 19, 21, 21, 23, 25],
+            'LRA1': [[17, 17, 19, 19, 21, 21, 23, 27],
                      [16, 16, 18, 18, 20, 24, 26, 26]],
-            'LRB1': [[24, 25, 26, 27, 28, 29, 30, 31],
-                     [24, 25, 26, 27, 28, 29, 30, 31]],
+            'LRB1': [[24, 24, 26, 26, 28, 28, 30, 30],
+                     [25, 25, 27, 27, 29, 29, 31, 31]],
             'LRSA': [[15]],
             'LRSB': [[15]],
             'LWSA': [[31]],
@@ -2219,22 +2219,13 @@ def _get_schedule_128x128x64_16bit(kernel, useLDSTr, TLDS):
         }
         
         syncCode = [
-            # Index 0 at -1: Wait for prior LRA1/LRB1 (16 reads total)
-            SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
-            SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
-            # Index 1 at -1: Barrier to ensure prior GRA/GRB complete (LDS valid for LR0)
-            #SBarrier(comment="barrier: prior GR complete, LDS valid for LRA0/LRB0"),
-            # Index 2 at 8: Wait for LRA0 (8 reads) before GRA
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRA0 before GRA"),
-            # Index 3 at 8: Barrier before GRA DirectToLds
+            SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
+            SWaitCnt(dscnt=5, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
+            SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="wait for LRA0 before GRA"),
             SBarrier(comment="barrier: all waves finish LRA0 before GRA DirectToLds"),
-            # Index 4 at 16: Wait for LRB0 (8 reads) before GRB
             SWaitCnt(dscnt=0, vlcnt=8, vscnt=-1, comment="wait for LRB0 before GRB"),
-            # Index 5 at 16: Barrier before GRB DirectToLds
             SBarrier(comment="barrier: all waves finish LRB0 before GRB DirectToLds"),
-            # Index 6 at 24: Wait for GRA/GRB to complete (16 reads)
             SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="wait for GRA/GRB to complete"),
-            # Index 7 at 24: Barrier before LRA1/LRB1
             SBarrier(comment="barrier: GRA/GRB complete, LDS updated for LRA1/LRB1"),
             
         ]
