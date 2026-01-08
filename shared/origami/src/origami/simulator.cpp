@@ -24,8 +24,8 @@
  *
  *******************************************************************************/
 
+#include <origami/math.hpp>
 #include <origami/simulator.hpp>
-#include <origami/simulator_utils.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -34,10 +34,8 @@
 #include <iostream>
 #include <vector>
 
-namespace Tensilelite {
+namespace origami {
 namespace Simulator {
-using Utils::ceilDivide;
-using Utils::ceiling_math;
 
 // Load request calculation functions
 /**
@@ -68,10 +66,10 @@ double getLoadRequest(double MTX, double DU, double L1CacheLineSize, uint32_t gr
         // Transposed matrix load pattern
         if (isSwizzled) {
             L1_req = MTX * DU * bpe / 64;
-            L1_req *= ceilDivide(VW, uint32_t(2));
+            L1_req *= math::safe_ceil_div(VW, uint32_t(2));
         } else {
             L1_req = MTX * DU * bpe / 64;
-            tcc_ea0_coalesced = ceilDivide((uint32_t)L1CacheLineSize, (uint32_t)DU * bpe);
+            tcc_ea0_coalesced = math::safe_ceil_div((uint32_t)L1CacheLineSize, (uint32_t)DU * bpe);
             if (grvw * bpe == 8 || grvw * bpe <= 2) L1_req *= 2;
             if (dtv) L1_req *= 4;
         }
@@ -262,7 +260,7 @@ L1CacheHitRate computeL1CacheHitRate(double L1CacheCapacity, double L1CacheLineS
         if (GRVWA * bpeA == 8 || GRVWA * bpeA <= 2) A_L1_hit *= 2;
         if (DTVA) A_L1_hit *= 4;
         A_L1_hit = isL1BypassA ? 0 : 1 - 1 / A_L1_hit;
-        A_L1_hit = isSwizzleA ? 1 - 1 / ceilDivide(VWA, uint32_t(2)) : A_L1_hit;
+        A_L1_hit = isSwizzleA ? 1 - 1 / math::safe_ceil_div(VWA, uint32_t(2)) : A_L1_hit;
     } else {
         // A is N
         uint32_t L1Limit = L1CacheCapacity;
@@ -314,7 +312,7 @@ L1CacheHitRate computeL1CacheHitRate(double L1CacheCapacity, double L1CacheLineS
         if (GRVWB * bpeB == 8 || GRVWB * bpeB <= 2) B_L1_hit *= 2;
         if (DTVB) B_L1_hit *= 4;
         B_L1_hit = isL1BypassB ? 0 : 1 - 1 / B_L1_hit;
-        B_L1_hit = isSwizzleB ? 1 - 1 / ceilDivide(VWB, uint32_t(2)) : B_L1_hit;
+        B_L1_hit = isSwizzleB ? 1 - 1 / math::safe_ceil_div(VWB, uint32_t(2)) : B_L1_hit;
     }
 
     hr.tile0HitRate = A_L1_hit;
@@ -359,8 +357,8 @@ L2CacheHitRate computeL2CacheHitRate(uint32_t M, uint32_t N, uint32_t K, uint32_
                                      bool isGSUWGMRR) {
     L2CacheHitRate hitRate;
 
-    uint32_t wg0 = ceilDivide(M, MT0);
-    uint32_t wg1 = ceilDivide(N, MT1);
+    uint32_t wg0 = math::safe_ceil_div(M, MT0);
+    uint32_t wg1 = math::safe_ceil_div(N, MT1);
 
     uint32_t MT0_Edge = MT0 - ((wg0 * MT0) - M);
     uint32_t MT1_Edge = MT1 - ((wg1 * MT1) - N);
@@ -645,11 +643,11 @@ double calculateStoreL3Request(double M, double N, double MT0, double MT1, doubl
 
     double edge_size = std::fmod(M, MT0);
     double numWGsNonEdge = std::floor(M / MT0);
-    result = N * ((numWGsNonEdge * ceiling_math(MT0 / 32)) + ceiling_math(edge_size / 32));
+    result = N * ((numWGsNonEdge * math::ceiling_math(MT0 / 32)) + math::ceiling_math(edge_size / 32));
 
     double maxMT1 = std::min(N, MT1);
-    double nonEdgeRequestPerMT = maxMT1 * (ceiling_math(MT0 / 32));
-    double edgeRequestPerMT = maxMT1 * ceiling_math(edge_size / 32);
+    double nonEdgeRequestPerMT = maxMT1 * (math::ceiling_math(MT0 / 32));
+    double edgeRequestPerMT = maxMT1 * math::ceiling_math(edge_size / 32);
     if (numWGsNonEdge > 0.0)
         non_edge_req = nonEdgeRequestPerMT;
     else
@@ -667,11 +665,11 @@ double calculateStoreL2Request(double M, double N, double MT0, double MT1, doubl
     double numWGsNonEdge = std::floor(M / MT0);
     double M_MOD_16SVW = std::fmod(M, 16 * SVW);
 
-    double non_edge_0 = MT0 * 2 / 64 * ceiling_math(64 / (16 * 2 * SVW));
-    double edge_0 = (ceiling_math(std::floor(edge_size / (16 * SVW)) * (16 * SVW) * 2 / 64 *
-                                  ceiling_math(64 / (16 * 2 * SVW))) *
+    double non_edge_0 = MT0 * 2 / 64 * math::ceiling_math(64 / (16 * 2 * SVW));
+    double edge_0 = (math::ceiling_math(std::floor(edge_size / (16 * SVW)) * (16 * SVW) * 2 / 64 *
+                                  math::ceiling_math(64 / (16 * 2 * SVW))) *
                      SVW);
-    double edge_1 = (std::floor(M_MOD_16SVW * 2 / 64 * ceiling_math(64 / (16 * 2 * SVW))) *
+    double edge_1 = (std::floor(M_MOD_16SVW * 2 / 64 * math::ceiling_math(64 / (16 * 2 * SVW))) *
                      std::min(M_MOD_16SVW, SVW));
     double edge_2 = (std::min(std::fmod(M, std::min(16 * SVW, 32.0)), SVW));
 

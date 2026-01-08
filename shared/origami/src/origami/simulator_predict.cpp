@@ -24,9 +24,8 @@
  *
  *******************************************************************************/
 
-#include <origami/simulator_predict.hpp>
-#include <origami/simulator_utils.hpp>
 #include <origami/simulator.hpp>
+#include <origami/simulator_predict.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -36,8 +35,7 @@
 #include <iomanip>
 #include <random>
 
-namespace Tensilelite {
-using Utils::ceilDivide;
+namespace origami {
 
 static double getPrefetchPerformance(int pgr, int grvwa, int grvwb, int bpeA, int bpeB,
                                      uint32_t depthU, int waveNum, double MT0, double MT1,
@@ -163,9 +161,9 @@ Formocast::HardwareConstants archConstantMap(const unsigned char* magic, size_t 
 }
 
 Formocast::HardwareConstants Formocast::getHardwareConstants(
-    const HardwareArchitecture arch) const {
+    const hardware_t::architecture_t arch) const {
     HardwareConstants hw;
-    if (arch == HardwareArchitecture::gfx950) {
+    if (arch == hardware_t::architecture_t::gfx950) {
         unsigned char magic[184] = {
             0,   0,   0,   0,   0,   0,   224, 64,  0,   0,   0,   0,   0,   0,   80,  65,  0,
             0,   0,   0,   0,   0,   176, 65,  0,   0,   0,   0,   0,   0,   96,  64,  0,   0,
@@ -179,7 +177,7 @@ Formocast::HardwareConstants Formocast::getHardwareConstants(
             0,   0,   0,   0,   0,   80,  64,  205, 204, 204, 204, 204, 204, 236, 63,  0,   0,
             0,   0,   0,   0,   232, 63,  8,   0,   0,   0,   0,   0,   0,   0};
         hw = archConstantMap(magic, 184);
-    } else if (arch == HardwareArchitecture::gfx942) {
+    } else if (arch == hardware_t::architecture_t::gfx942) {
         unsigned char magic[184] = {
             0,   0,   0,   0,   0,   0,   224, 64,  0,   0,   0,   0,   0,   0,   80,  65,  0,
             0,   0,   0,   0,   0,   176, 65,  0,   0,   0,   0,   0,   0,   96,  64,  0,   0,
@@ -193,7 +191,7 @@ Formocast::HardwareConstants Formocast::getHardwareConstants(
             0,   0,   0,   0,   0,   80,  64,  205, 204, 204, 204, 204, 204, 236, 63,  143, 194,
             245, 40,  92,  143, 226, 63,  8,   0,   0,   0,   0,   0,   0,   0};
         hw = archConstantMap(magic, 184);
-    } else if (arch == HardwareArchitecture::gfx1201) {
+    } else if (arch == hardware_t::architecture_t::gfx1201) {
         unsigned char magic[184] = {
             0,   0,   0,  0,  0,   0,   224, 64,  0,   0,   0,   0,   0,   0,   96,  65,  0,
             0,   0,   0,  0,  0,   144, 65,  0,   0,   0,   0,   0,   0,   96,  64,  0,   0,
@@ -553,10 +551,10 @@ Formocast::PredictedPerformance Formocast::predictedPerformance(void) const {
     // std::cout<<"[Formocast] predictedPerformance"<<std::endl;
 
     // 1. Problem Dimension Calculation
-    double M = problem.M;
-    double N = problem.N;
-    double NumBatches = problem.NumBatches;
-    double K = problem.K;
+    size_t M = problem.M;
+    size_t N = problem.N;
+    size_t NumBatches = problem.NumBatches;
+    size_t K = problem.K;
     bool transA = problem.transA;
     bool transB = problem.transB;
     uint32_t bpeA = problem.bpeA;
@@ -573,8 +571,8 @@ Formocast::PredictedPerformance Formocast::predictedPerformance(void) const {
     // 3. Variables directly from sizeMapping
 
     // Basic tile and workgroup configuration
-    double MT0 = sizeMapping.macroTile[0];
-    double MT1 = sizeMapping.macroTile[1];
+    size_t MT0 = sizeMapping.macroTile[0];
+    size_t MT1 = sizeMapping.macroTile[1];
     int WGM = sizeMapping.workGroupMapping != 0 ? sizeMapping.workGroupMapping : 1;
     int CUOccupancy = sizeMapping.CUOccupancy;
     uint32_t depthU = sizeMapping.depthU;
@@ -650,7 +648,7 @@ Formocast::PredictedPerformance Formocast::predictedPerformance(void) const {
         pp.hitRate = 0;
         return pp;
     }
-    if (problem.dataType == DataType::BFloat16 || problem.dataType == DataType::Half) {
+    if (problem.dataType == data_type_t::BFloat16 || problem.dataType == data_type_t::Half) {
         // TODO: handle TF32 problem so that check the BPE here.
         if (problem.bpeA == 2 && problem.bpeB == 2)
             if (((K >= 64 && depthU <= 32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) &&
@@ -663,20 +661,20 @@ Formocast::PredictedPerformance Formocast::predictedPerformance(void) const {
     }
 
     // 4. Derived Problem/Workgroup Dimensions
-    double K_AfterGSU = ceilDivide((uint32_t)K, GlobalSplitU);
-    uint32_t M_WGs_total = ceilDivide(M, MT0);
-    uint32_t N_WGs_total = ceilDivide(N, MT1);
-    int N_WGs_per_tile_XCD = std::min((uint32_t)WGM, N_WGs_total);
-    int M_WGs_per_tile_XCD = std::min(
-        M_WGs_total, ceilDivide(int(hw_consts.NumCUs / hw_consts.NumXCDs), N_WGs_per_tile_XCD));
-    int M_WGs_per_tile =
-        std::min(M_WGs_total, ceilDivide(int(hw_consts.NumCUs), N_WGs_per_tile_XCD));
-    int N_WGs_per_tile =
-        std::min(N_WGs_total, N_WGs_per_tile_XCD * ceilDivide(M_WGs_per_tile, M_WGs_total));
+    uint32_t  K_AfterGSU = math::safe_ceil_div((uint32_t)K, GlobalSplitU);
+    uint32_t M_WGs_total = math::safe_ceil_div(M, MT0);
+    uint32_t N_WGs_total = math::safe_ceil_div(N, MT1);
+    uint32_t  N_WGs_per_tile_XCD = std::min((uint32_t)WGM, N_WGs_total);
+    uint32_t  M_WGs_per_tile_XCD = std::min(
+        M_WGs_total, math::safe_ceil_div(uint32_t(hw_consts.NumCUs / hw_consts.NumXCDs), N_WGs_per_tile_XCD));
+    uint32_t  M_WGs_per_tile =
+        std::min(M_WGs_total, math::safe_ceil_div(uint32_t(hw_consts.NumCUs), N_WGs_per_tile_XCD));
+    uint32_t   N_WGs_per_tile =
+        std::min(N_WGs_total, N_WGs_per_tile_XCD * math::safe_ceil_div(M_WGs_per_tile, M_WGs_total));
     uint32_t numberWGs = M_WGs_total * N_WGs_total * NumBatches * GlobalSplitU;
     uint32_t WGs_per_tile = std::min(uint32_t(hw_consts.NumCUs), numberWGs);
     uint32_t WGs_per_tile_XCD = WGs_per_tile / hw_consts.NumXCDs;
-    uint32_t num_tiles = ceilDivide(numberWGs, uint32_t(hw_consts.NumCUs));
+    uint32_t num_tiles = math::safe_ceil_div(numberWGs, uint32_t(hw_consts.NumCUs));
     uint32_t loopCnt = K_AfterGSU / depthU;
     uint32_t K_tail = K_AfterGSU - (loopCnt * depthU);
 
@@ -890,7 +888,7 @@ void Formocast::setSolution(SizeMapping sm) {
     sizeMapping = sm;
 }
 
-void Formocast::setHardware(HardwareArchitecture hw) {
+void Formocast::setHardware(hardware_t::architecture_t hw) {
     hw_consts = getHardwareConstants(hw);
 }
 

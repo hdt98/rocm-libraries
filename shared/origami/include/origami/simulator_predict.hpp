@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include <origami/hardware.hpp>
 #include <origami/simulator.hpp>
+#include <origami/types.hpp>
 
 #include <array>
 #include <cstddef>
@@ -15,12 +17,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Tensilelite {
-// Hardware architecture enum
-enum class HardwareArchitecture { gfx950, gfx942, gfx1201, Unknown };
-
-// Data type enum
-enum class DataType { Float, Half, BFloat16, TF32, Int8, Int32, Double, Unknown };
+namespace origami {
 
 class Formocast {
    public:
@@ -216,13 +213,13 @@ class Formocast {
         bool transB;
         bool swizzleTensorA;
         bool swizzleTensorB;
-        DataType dataType;
+        data_type_t  dataType;
     };
 
     void setProblem(ProblemInfo p);
     void setSolution(SizeMapping sm);
-    void setHardware(HardwareArchitecture arch);
-    HardwareConstants getHardwareConstants(const HardwareArchitecture arch) const;
+    void setHardware(hardware_t::architecture_t arch);
+    HardwareConstants getHardwareConstants(const hardware_t::architecture_t arch) const;
     void calculateStorePerformance(double M, double N, double NumBatches, double MT0, double MT1,
                                    uint32_t GWVWD, uint32_t bpeD,
                                    const HardwareConstants& hw_consts, uint32_t WGs_per_tile,
