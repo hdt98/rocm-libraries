@@ -2272,17 +2272,18 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
         kernel["UsePLRPack"] = True
         syncTable = [
             -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Begininng of a iteration. Wait for prior local read.") ,
-             8, SWaitCnt(dscnt=14, vlcnt=-1, vscnt=-1, comment="Before PackA0. Wait for first two LRA0. Skip 14*LRA0") ,
-            17, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="Before GRA and PackB0. Wait for all prior LRA0 for GRA and the first 2*LRB0 for PackB0. Skip 3*LRB0.") ,
+            10, SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="Before PackA0. Wait for first all LRA0. Skip 1*LRB0") ,
+            17, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Before GRA. Wait for all prior LRA0 for GRA. Skip 6*LRB0") ,
             17, SBarrier(comment="GRA") ,
+            20, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Before PackB0. Wait for all prior LRB0.") ,
             29, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Before GRB. Wait for all prior LRB0.") ,
             29, SBarrier(comment="GRB") ,
             35, SWaitCnt(dscnt=-1, vlcnt=6, vscnt=-1, comment="Before LRB3. Wait for GRB from previous iter. Skip 4*GRA + 2*GRB") ,
             35, SBarrier(comment="LRB") ,
-            41, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Before PackB3. Wait for first two LRB3 for PackB3. Skip 4*LRA0.") ,
+            44, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Before PackB3. Wait for all LRB3 for PackB3.") ,
             53, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Before LRA3. Wait for GRA from previous iter. Skip 4*GRA + 6*GRB") ,
             53, SBarrier(comment="LRA") ,
-            62, SWaitCnt(dscnt=14, vlcnt=-1, vscnt=-1, comment="Before PackA3. Wait for first two LRA3. Skip 14*LRA3.") ,
+            64, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Before PackA3. Wait for all prior LRA3.") ,
         ]
         optSchedule = {
             'SYNC'  : [syncTable[::2]],
@@ -2291,14 +2292,14 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
             'LRA0'  : [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7]],
             'LRB0'  : [[8, 10, 12, 14, 16, 17],
                        [9, 11, 13, 15, 16, 18]],
-            'PackA0': [create_range(9,   8, 17, 1, 6)],
-            'PackB0': [create_range(18, 18, 34, 1, 4)],
+            'PackA0': [create_range(10,  6, 17, 1, 8)],
+            'PackB0': [create_range(20, 12, 34, 1, 6)],
             'GRA'   : [[19, 20, 21, 22, 23, 24, 25, 26]],
             'GRB'   : [[29, 30, 31, 32, 52, 53, 54, 55, 56, 57, 58, 59]],
             'LRB3'  : [[35, 36, 37, 38, 39, 40]],
             'LRA3'  : [[53, 53, 54, 54, 55, 55, 56, 56, 57, 57, 58, 58, 59, 59, 60, 61]],
-            'PackB3': [create_range(41, 12, 54, 1, 6)],
-            'PackA3': [create_range(62,  8, 71, 1, 6)],
+            'PackB3': [create_range(44, 9, 54, 1, 8)],
+            'PackA3': [create_range(64, 6, 71, 1, 8)],
             'LRSA'  : [[28]],
             'LRSB'  : [[28]],
             'LWSA'  : [[60]],
@@ -2355,7 +2356,6 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
     
     numMfma = 72
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    opt1.disableValidation()
     return True, opt1
 
 @RegisterSchedule(
