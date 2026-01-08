@@ -28,11 +28,11 @@ jobs:
     # Only run when '/docs-preview' is commented on a PR by a member, owner, or collaborator
     if: >
       ${{ github.event.issue.pull_request }} &&
-      contains(github.event.comment.body, '/docs-preview') &&
+      contains(${{ github.event.comment.body }}, '/docs-preview') &&
       (
-        github.event.comment.author_association == 'MEMBER' ||
-        github.event.comment.author_association == 'OWNER' ||
-        github.event.comment.author_association == 'COLLABORATOR'
+        ${{ github.event.comment.author_association }} == 'MEMBER' ||
+        ${{ github.event.comment.author_association }} == 'OWNER' ||
+        ${{ github.event.comment.author_association }} == 'COLLABORATOR'
       )
     steps:
       - name: Generate a token
