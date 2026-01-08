@@ -741,7 +741,7 @@ int main(int argc, const char* argv[])
         std::cout << ss.str();
     }
 
-    while(listeners.needMoreBenchmarkRuns())
+    while(listeners.needMoreBenchmarkRuns() && runKernels)
     {
         listeners.preBenchmarkRun();
         const auto flushGridSize = flush_grid_size();

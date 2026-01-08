@@ -669,18 +669,20 @@ namespace Tensilelite
         if (GlobalSplitU == 0)
         {
             // FIXME: Need to support streamK kernels.
+            std::cout << "Formocast-earlycut:" << sizeMapping.solutionName << ",cause1," << std::endl;
             GlobalSplitU = 1;
             pp.microSeconds = 9999999.9;
             pp.hitRate = 0;
             return pp;
         }
-        if (MT0 - M >= 16 || MT1 - N >= 16)
-        {
-            //std::cout<<"M:"<<M<<",N:"<<N<<",MT0:"<<MT0<<",MT1:"<<MT1<<std::endl;
-            pp.microSeconds = 9999999.9;
-            pp.hitRate = 0;
-            return pp;
-        }
+        // if (MT0 - M >= 16 || MT1 - N >= 16)
+        // {
+        //     //std::cout<<"M:"<<M<<",N:"<<N<<",MT0:"<<MT0<<",MT1:"<<MT1<<std::endl;
+        //     std::cout << "Formocast-earlycut:" << sizeMapping.solutionName << ",cause2," << std::endl;
+        //     pp.microSeconds = 9999999.9;
+        //     pp.hitRate = 0;
+        //     return pp;
+        // }
         if(problem.dataType == DataType::BFloat16 || problem.dataType == DataType::Half)
         {
             //TODO: handle TF32 problem so that check the BPE here.
@@ -688,6 +690,7 @@ namespace Tensilelite
                 if (((K >= 64 && depthU <=32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) && NumBatches < hw_consts.NumCUs && sizeMapping.matrixInstruction[2] >= 32)
                 {
                     //std::cout<<"K:"<<K<<",depthU:"<<depthU<<",NumBatches:"<<NumBatches<<",sizeMapping.matrixInstruction[2]:"<<sizeMapping.matrixInstruction[2]<<std::endl;
+                    std::cout << "Formocast-earlycut:" << sizeMapping.solutionName << ",cause3," << std::endl;
                     pp.microSeconds = 9999999.9;
                     pp.hitRate = 0;
                     return pp;
@@ -876,96 +879,47 @@ namespace Tensilelite
 #if 1
         std::ostringstream oss;
 
+        /////////////////////////////
+        // metrics print in csv form
+
         // create problem hash
-        oss << "M" << problem.M << "-";
-        oss << "N" << problem.N << "-";
-        oss << "K" << problem.K << "-";
-        oss << "NB" << problem.NumBatches << "-";
-        oss << "bpeA" << problem.bpeA << "-";
-        oss << "bpeB" << problem.bpeB << "-";
-        oss << "bpeC" << problem.bpeCompute << "-";
-        oss << "bpeD" << problem.bpeD << "-";
-        oss << "tA" << problem.transA << "-";
-        oss << "tB" << problem.transB << "-";
-        oss << "sA" << problem.swizzleTensorA << "-";
-        oss << "sB" << problem.swizzleTensorB << "-";
-        oss << "dt" << int(problem.dataType) << ",";
+        // oss << "Formocast-internal:M" << problem.M << "-";
+        // oss << "N" << problem.N << "-";
+        // oss << "K" << problem.K << "-";
+        // oss << "NB" << problem.NumBatches << ",";
+
+        // oss << "bpeA" << problem.bpeA << "-";
+        // oss << "bpeB" << problem.bpeB << "-";
+        // oss << "bpeC" << problem.bpeCompute << "-";
+        // oss << "bpeD" << problem.bpeD << "-";
+        // oss << "tA" << problem.transA << "-";
+        // oss << "tB" << problem.transB << "-";
+        // oss << "sA" << problem.swizzleTensorA << "-";
+        // oss << "sB" << problem.swizzleTensorB << "-";
+        // oss << "dt" << int(problem.dataType) << ",";
 
         // create SizeMapping hash
-        // oss << "nW" << sizeMapping.waveNum << "-";
-        // oss << "mT" << sizeMapping.macroTile[0] << "|" << sizeMapping.macroTile[1]<< "|" << sizeMapping.macroTile[2] << "-";
-        // oss << "mI" << sizeMapping.matrixInstruction[0] << "|" << sizeMapping.matrixInstruction[1] << "|" << sizeMapping.matrixInstruction[2] << "|" << sizeMapping.matrixInstruction[3] << "-";
-        // oss << "gA" << sizeMapping.grvwA << "-";
-        // oss << "gB" << sizeMapping.grvwB << "-";
-        // oss << "gC" << sizeMapping.gwvwC << "-";
-        // oss << "gD" << sizeMapping.gwvwD << "-";
-        // oss << "dU" << sizeMapping.depthU << "-";
-        // oss << "gU" << sizeMapping.globalSplitU << "-";
-        // oss << "wGM" << sizeMapping.workGroupMapping << "-";
-        // oss << "gAcc" << sizeMapping.globalAccumulation << "-";
-        // oss << "wGMX" << sizeMapping.workGroupMappingXCC << "-";
-        // oss << "wGMXG" << sizeMapping.workGroupMappingXCCGroup << "-";
-        // oss << "gSC" << sizeMapping.globalSplitUCoalesced << "-";
-        // oss << "gSRR" << sizeMapping.globalSplitUWorkGroupMappingRoundRobin << "-";
-        // oss << "CUo" << sizeMapping.CUOccupancy << "-";
-        // oss << "pf" << sizeMapping.PrefetchGlobalRead << "-";
-        // oss << "mc" << sizeMapping.MathClocksUnrolledLoop << "-";
-        // oss << "DtVA" << sizeMapping.DirectToVgprA << "-";
-        // oss << "DtVB" << sizeMapping.DirectToVgprB << "-";
-        // oss << "lcA" << sizeMapping.NumLoadsCoalescedA << "-";
-        // oss << "lcB" << sizeMapping.NumLoadsCoalescedB << "-";
-        // oss << "vwA" << sizeMapping.VectorWidthA << "-";
-        // oss << "vwB" << sizeMapping.VectorWidthA << "-";
-        // oss << "lsu" << sizeMapping.LocalSplitU << ",";
+        // oss <<  sizeMapping.solutionName << ",";
 
-        oss <<  sizeMapping.solutionName << ",";
+        /////////////////////////////////////////
+        // no not enough, give me all the details
 
-        // print metrics
-        oss << mem_costs.l1_hit << ",";
-        oss << mem_costs.l2_hit << ",";
-        oss << mem_costs.l3_hit << ",";
+        // print problem
+        oss << "Problem: [ " << problem.M << ", " << problem.N << ", " << problem.K << ", " << problem.NumBatches << "]\n";
+
+        oss << "Solution grid:"
+            << "\n\tM_WGs_total " << M_WGs_total
+            << "\n\tN_WGs_total " << N_WGs_total
+            << "\n\tM_WGs_per_tile_XCD " << M_WGs_per_tile_XCD
+            << "\n\tN_WGs_per_tile_XCD " << N_WGs_per_tile_XCD
+            << "\n\tM_WGs_per_tile " << M_WGs_per_tile
+            << "\n\tN_WGs_per_tile " << N_WGs_per_tile
+            << "\n\tnumberWGs " << numberWGs << " | num_tiles " << num_tiles << " | loopCnt " << loopCnt << " | K_tail " << K_tail
+            << "\n\tWGs_per_tile " << WGs_per_tile << " | WGs_per_tile_XCD " << WGs_per_tile_XCD
+            << "\n";
 
         std::cout << oss.str() << std::endl;
 
-        // std::cout<<"MT0               =          "<<MT0<<std::endl;
-        // std::cout<<"MT1               =          "<<MT1<<std::endl;
-        // std::cout<<"depthU            =          "<<depthU<<std::endl;
-        // std::cout<<"NumCUs            =          "<<hw_consts.NumCUs<<std::endl;
-        // std::cout<<"WorkGroupMapping  =          "<<WGM<<std::endl;
-        // std::cout<<"CUOccupancy       =          "<<CUOccupancy<<std::endl;
-        // std::cout<<"GlobalSplitU      =          "<<GlobalSplitU<<std::endl;
-        // std::cout<<"loopCnt           =          "<<loopCnt<<std::endl;
-        // std::cout<<"flopsPerClk       =          "<<hw_consts.flopsPerClk<<std::endl;
-        // std::cout<<"A_L1_req          =          "<<mem_costs.A_L1_req<<std::endl;
-        // std::cout<<"B_L1_req          =          "<<mem_costs.B_L1_req<<std::endl;
-        // std::cout<<"A_L2_req          =          "<<mem_costs.A_L2_req<<std::endl;
-        // std::cout<<"B_L2_req          =          "<<mem_costs.B_L2_req<<std::endl;
-        // std::cout<<"A_L1_hit          =          "<<cache_hits.A_L1_hit<<std::endl;
-        // std::cout<<"B_L1_hit          =          "<<cache_hits.B_L1_hit<<std::endl;
-        // std::cout<<"A_L2_hit          =          "<<cache_hits.A_L2_hit<<std::endl;
-        // std::cout<<"B_L2_hit          =          "<<cache_hits.B_L2_hit<<std::endl;
-        // std::cout<<"overall L2 Hit    =          "<<cache_hits.totalL2HitRate<<std::endl;
-        // std::cout<<"A_L3_hit          =          "<<cache_hits.A_L3_hit<<std::endl;
-        // std::cout<<"B_L3_hit          =          "<<cache_hits.B_L3_hit<<std::endl;
-        // std::cout<<"math_clk          =          "<<math_clk<<std::endl;
-        // std::cout<<"mem_l1            =          "<<mem_costs.mem_l1<<std::endl;
-        // std::cout<<"mem_l2            =          "<<mem_costs.mem_l2<<std::endl;
-        // std::cout<<"mem_l3            =          "<<mem_costs.mem_l3<<std::endl;
-        // std::cout<<"mem_hbm           =          "<<mem_costs.mem_hbm<<std::endl;
-        // std::cout<<"mem_overall       =          "<<mem_costs.mem_overall<<std::endl;
-        // std::cout<<"math_overall      =          "<<math_overall<<std::endl;
-        // std::cout<<"tail_overall      =          "<<tail_overall<<std::endl;
-        // std::cout<<"M_WGs_total       =          "<<M_WGs_total<<std::endl;
-        // std::cout<<"N_WGs_total       =          "<<N_WGs_total<<std::endl;
-        // std::cout<<"K_tail            =          "<<K_tail<<std::endl;
-        // std::cout<<"loop_overall      =          "<<loop_overall<<std::endl;
-        // std::cout<<"preLoopCost       =          "<<preLoopCost<<std::endl;
-        // std::cout<<"prefetch          =          "<<prefetch<<std::endl;
-        // std::cout<<"store             =          "<<store<<std::endl;
-        // std::cout<<"gsu_overall       =          "<<gsu_overall<<std::endl;
-        // std::cout<<"lsu_overall       =          "<<lsu_overall<<std::endl;
-        // std::cout<<"num_tiles         =          "<<num_tiles<<std::endl;
-        // std::cout<<"=================="<<perf<<" us"<<std::endl;
 #endif
         return pp;
     }
