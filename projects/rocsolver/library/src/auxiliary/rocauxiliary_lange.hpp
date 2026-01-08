@@ -44,8 +44,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_frobenius_kernel(const I m,
                            const I n,
                            const U A,
-                           const I lda,
                            const rocblas_stride shiftA,
+                           const I lda,
                            const rocblas_stride strideA,
                            S* block_sums)
 {
@@ -102,8 +102,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_frobenius_final_kernel(const I m,
                                  const I n,
                                  const U A,
-                                 const I lda,
                                  const rocblas_stride shiftA,
+                                 const I lda,
                                  const rocblas_stride strideA,
                                  S* block_sums,
                                  S* final_norms)
@@ -149,8 +149,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     lange_inf_rows_kernel(const I m,
                           const I n,
                           const U A,
-                          const I lda,
                           const rocblas_stride shiftA,
+                          const I lda,
                           const rocblas_stride strideA,
                           S* row_sums)
 {
@@ -201,8 +201,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     lange_inf_final_kernel(const I m,
                            const I n,
                            const U A,
-                           const I lda,
                            const rocblas_stride shiftA,
+                           const I lda,
                            const rocblas_stride strideA,
                            S* row_sums,
                            S* final_norms)
@@ -247,8 +247,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     lange_one_columns_kernel(const I m,
                              const I n,
                              const U A,
-                             const I lda,
                              const rocblas_stride shiftA,
+                             const I lda,
                              const rocblas_stride strideA,
                              S* col_sums)
 {
@@ -299,8 +299,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     lange_one_final_kernel(const I m,
                            const I n,
                            const U A,
-                           const I lda,
                            const rocblas_stride shiftA,
+                           const I lda,
                            const rocblas_stride strideA,
                            S* col_sums,
                            S* final_norms)
@@ -345,8 +345,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_max_kernel(const I m,
                      const I n,
                      const U A,
-                     const I lda,
                      const rocblas_stride shiftA,
+                     const I lda,
                      const rocblas_stride strideA,
                      S* block_maxs)
 {
@@ -403,8 +403,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_max_final_kernel(const I m,
                            const I n,
                            const U A,
-                           const I lda,
                            const rocblas_stride shiftA,
+                           const I lda,
                            const rocblas_stride strideA,
                            S* block_maxs,
                            S* final_norms)
@@ -560,10 +560,10 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>), dim3(grid_blocks, 1, batch_count),
-                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
+                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, shiftA, lda,
                                 strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_max_final_kernel<T, I, S>), dim3(1, 1, batch_count),
-                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
+                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, shiftA, lda,
                                 strideA, work, norms);
         break;
     }
@@ -572,9 +572,9 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         // Launch one-norm kernels with grid clamping to handle overflow
         I grid_n = std::min(n, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_one_columns_kernel<T, I, S>), dim3(grid_n, 1, batch_count),
-                                dim3(LANGE_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work);
+                                dim3(LANGE_THDS), 0, stream, m, n, A, shiftA, lda, strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_one_final_kernel<T, I, S>), dim3(1, 1, batch_count),
-                                dim3(LANGE_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work,
+                                dim3(LANGE_THDS), 0, stream, m, n, A, shiftA, lda, strideA, work,
                                 norms);
         break;
     }
@@ -585,9 +585,9 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<T, I, S>),
                                 dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM),
-                                0, stream, m, n, A, lda, shiftA, strideA, work);
+                                0, stream, m, n, A, shiftA, lda, strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_final_kernel<T, I, S>), dim3(1, 1, batch_count),
-                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, lda, shiftA,
+                                dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, shiftA, lda,
                                 strideA, work, norms);
         break;
     }
@@ -596,9 +596,9 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         // Launch infinity-norm kernels with grid clamping to handle overflow
         I grid_m = std::min(m, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_inf_rows_kernel<T, I, S>), dim3(grid_m, 1, batch_count),
-                                dim3(LANGE_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work);
+                                dim3(LANGE_THDS), 0, stream, m, n, A, shiftA, lda, strideA, work);
         ROCSOLVER_LAUNCH_KERNEL((lange_inf_final_kernel<T, I, S>), dim3(1, 1, batch_count),
-                                dim3(LANGE_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work,
+                                dim3(LANGE_THDS), 0, stream, m, n, A, shiftA, lda, strideA, work,
                                 norms);
         break;
     }
