@@ -319,7 +319,6 @@ struct GemmPipelineAgBgCrImplBase
                 return ALdsLoadTileDistr{};
         }();
 
-<<<<<<< HEAD
         constexpr index_t KSubTileNum = []() {
             if constexpr(has_get_pipeline_subtile_params<Policy, Problem>::value)
                 return Policy::template GetPipelineSubTileNum<Problem>().value;
@@ -334,30 +333,8 @@ struct GemmPipelineAgBgCrImplBase
                 return make_tuple(number<MPerBlock>{}, number<KPerBlock / KSubTileNum>{});
         }();
 
-=======
->>>>>>> develop
         auto a_lds_gemm_window =
             make_tile_window(a_lds_block_view, a_lds_gemm_shape, {0, 0}, a_lds_load_tile_distr);
-
-        return make_tuple(std::move(a_copy_lds_window), std::move(a_lds_gemm_window));
-    }
-
-    template <
-        typename ADramBlockWindowTmp,
-        typename ALdsTensorView,
-        typename ALdsLoadTileDistr,
-        typename std::enable_if_t<!is_detected<is_tuple, ALdsTensorView>::value, bool>* = nullptr>
-    CK_TILE_DEVICE constexpr auto GetAWindows(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                              const ALdsTensorView& a_lds_block_view,
-                                              const ALdsLoadTileDistr& a_lds_load_tile_distr,
-                                              const array<index_t, 2>& offset = {0, 0}) const
-    {
-        // A DRAM tile window for load
-        auto a_copy_dram_window = CopyADramWindow(a_dram_block_window_tmp, offset);
-
-        // Create LDS windows
-        auto [a_copy_lds_window, a_lds_gemm_window] =
-            MakeALdsWindows(a_lds_block_view, a_lds_load_tile_distr);
 
         return make_tuple(std::move(a_copy_lds_window), std::move(a_lds_gemm_window));
     }
@@ -439,7 +416,6 @@ struct GemmPipelineAgBgCrImplBase
                 return BLdsLoadTileDistr{};
         }();
 
-<<<<<<< HEAD
         constexpr index_t KSubTileNum = []() {
             if constexpr(has_get_pipeline_subtile_params<Policy, Problem>::value)
                 return Policy::template GetPipelineSubTileNum<Problem>().value;
@@ -454,30 +430,8 @@ struct GemmPipelineAgBgCrImplBase
                 return make_tuple(number<NPerBlock>{}, number<KPerBlock / KSubTileNum>{});
         }();
 
-=======
->>>>>>> develop
         auto b_lds_gemm_window =
             make_tile_window(b_lds_block_view, b_lds_gemm_shape, {0, 0}, b_lds_load_tile_distr);
-
-        return make_tuple(std::move(b_copy_lds_window), std::move(b_lds_gemm_window));
-    }
-
-    template <
-        typename BDramBlockWindowTmp,
-        typename BLdsTensorView,
-        typename BLdsLoadTileDistr,
-        typename std::enable_if_t<!is_detected<is_tuple, BLdsTensorView>::value, bool>* = nullptr>
-    CK_TILE_DEVICE constexpr auto GetBWindows(const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                              const BLdsTensorView& b_lds_block_view,
-                                              const BLdsLoadTileDistr& b_lds_load_tile_distr,
-                                              const array<index_t, 2>& offset = {0, 0}) const
-    {
-        // A DRAM tile window for load
-        auto b_copy_dram_window = CopyBDramWindow(b_dram_block_window_tmp, offset);
-
-        // Create LDS windows
-        auto [b_copy_lds_window, b_lds_gemm_window] =
-            MakeBLdsWindows(b_lds_block_view, b_lds_load_tile_distr);
 
         return make_tuple(std::move(b_copy_lds_window), std::move(b_lds_gemm_window));
     }

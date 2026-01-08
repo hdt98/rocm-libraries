@@ -531,10 +531,6 @@ struct UniversalGemmKernel
                     // oob can support to dword level
                     if(remainder_in_bytes % 4 == 0)
                     {
-<<<<<<< HEAD
-=======
-
->>>>>>> develop
                         AsTensorIsValid = true;
                     }
                     else
@@ -598,28 +594,7 @@ struct UniversalGemmKernel
                         }
                         BsTensorIsValid = false;
                     }
-<<<<<<< HEAD
-                    BsTensorIsValid = false;
-                }
-                if(kargs.K % vectorSizeB != 0)
-                {
-                    const auto remainder = kargs.K % vectorSizeB;
-                    constexpr ck_tile::index_t BPackedSize =
-                        ck_tile::numeric_traits<BDataType>::PackedSize;
-                    const auto remainder_in_bytes = remainder * sizeof(BDataType) / BPackedSize;
-                    // oob can support to dword level
-                    if(remainder_in_bytes % 4 == 0)
-                    {
-                        BsTensorIsValid = true;
-                    }
-                    else
-                    {
-                        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                        {
-                            CK_TILE_ERROR("K is not a multiple of vector load size for B tensor!");
-                        }
-                        BsTensorIsValid = false;
-=======
+
                     if(kargs.K % vectorSizeB != 0)
                     {
                         const auto remainder = kargs.K % vectorSizeB;
@@ -640,7 +615,6 @@ struct UniversalGemmKernel
                             }
                             BsTensorIsValid = false;
                         }
->>>>>>> develop
                     }
                 }
             }
@@ -1123,7 +1097,7 @@ struct UniversalGemmKernel
                                        const index_t block_idx_m,
                                        const index_t block_idx_n)
     {
-<<<<<<< HEAD
+
         // cluster launch GridDim is aligned to clusterDim, need to skip out-of-bound blocks
         if constexpr(ClusterLaunch && (TilePartitioner::BlockGemmShape::kclusterM *
                                            TilePartitioner::BlockGemmShape::kclusterN *
@@ -1133,21 +1107,12 @@ struct UniversalGemmKernel
             if(block_idx_m >= kargs.M || block_idx_n >= kargs.N)
                 return;
         }
-        // Create Gemm tensor views, pad views and tile windows
-        const auto& gemm_tensor_views_tuple =
-            MakeGemmTensorViews<EpiloguePipeline::MemoryOperation>(
-                as_ptr, bs_ptr, ds_ptr, e_ptr, kargs, splitk_batch_offset.splitted_k);
-
-        const auto& gemm_pad_views = MakeGemmPadViews(gemm_tensor_views_tuple);
-        auto gemm_tile_windows     = MakeGemmTileWindows(gemm_pad_views, block_idx_m, block_idx_n);
-=======
         // Create block windows using specialized methods
         const auto& as_block_window =
             MakeABlockWindows(as_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_m);
         const auto& bs_block_window =
             MakeBBlockWindows(bs_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_n);
         const auto& ds_block_window = MakeDBlockWindows(ds_ptr, kargs, block_idx_m, block_idx_n);
->>>>>>> develop
 
         const index_t num_loop =
             amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
@@ -1160,11 +1125,6 @@ struct UniversalGemmKernel
         // Run Epilogue Pipeline
         if(k_batch == 1)
         {
-<<<<<<< HEAD
-            // Run Epilogue Pipeline
-            auto& c_block_window = gemm_tile_windows.at(I3);
-
-=======
             auto c_block_window = MakeCBlockWindows<memory_operation_enum::set>(
                 e_ptr, kargs, block_idx_m, block_idx_n);
             EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
@@ -1173,7 +1133,6 @@ struct UniversalGemmKernel
         {
             auto c_block_window = MakeCBlockWindows<memory_operation_enum::atomic_add>(
                 e_ptr, kargs, block_idx_m, block_idx_n);
->>>>>>> develop
             EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
         }
     }
@@ -1183,7 +1142,6 @@ struct UniversalGemmKernel
     {
         index_t iM, iN;
 
-<<<<<<< HEAD
         if constexpr(ClusterLaunch)
         {
             // Cluster launch: use 2D block indexing
@@ -1203,13 +1161,6 @@ struct UniversalGemmKernel
             iM = tile_m;
             iN = tile_n;
         }
-=======
-        // Regular launch: use 1D block indexing
-        const auto blockId          = amd_wave_read_first_lane(blockIdx.x);
-        const auto [tile_m, tile_n] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
-        iM                          = tile_m;
-        iN                          = tile_n;
->>>>>>> develop
 
         const index_t i_m = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
         const index_t i_n = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
@@ -1217,7 +1168,6 @@ struct UniversalGemmKernel
         return make_tuple(i_m, i_n);
     }
 
-<<<<<<< HEAD
     // Helper functions for persistent kernel with cluster support
     CK_TILE_DEVICE static auto GetBlockId() -> index_t
     {
@@ -1234,18 +1184,10 @@ struct UniversalGemmKernel
             // For 1D regular launch
             return amd_wave_read_first_lane(get_block_id());
         }
-=======
-    // Helper functions
-    CK_TILE_DEVICE static auto GetBlockId() -> index_t
-    {
-        // For 1D regular launch
-        return amd_wave_read_first_lane(get_block_id());
->>>>>>> develop
     }
 
     CK_TILE_DEVICE static auto GetGridSize() -> index_t
     {
-<<<<<<< HEAD
         if constexpr(ClusterLaunch)
         {
             // For 2D cluster launch: total blocks = gridDim.x * gridDim.y
@@ -1256,10 +1198,6 @@ struct UniversalGemmKernel
             // For 1D regular launch
             return amd_wave_read_first_lane(get_grid_size());
         }
-=======
-        // For 1D regular launch
-        return amd_wave_read_first_lane(get_grid_size());
->>>>>>> develop
     }
 
     // Helper to get total number of tiles, handling both dim3 and index_t return types
@@ -1314,29 +1252,10 @@ struct UniversalGemmKernel
         // allocate LDS
         __shared__ char smem_ptr[GetSmemSize()];
 
-<<<<<<< HEAD
-        if constexpr(!(EpiloguePipeline::MemoryOperation == memory_operation_enum::atomic_add &&
-                       EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
-                       is_any_of<EDataType, fp16_t, bf16_t>::value))
-        {
-            constexpr auto scheduler_type =
-                GemmPipeline::DoubleSmemBuffer || (GemmPipeline::NumWaveGroups == 1);
-            RunGemm<scheduler_type>(as_ptr,
-                                    bs_ptr,
-                                    kargs.ds_ptr,
-                                    e_ptr,
-                                    smem_ptr,
-                                    kargs,
-                                    splitk_batch_offset,
-                                    i_m,
-                                    i_n);
-        }
-=======
         constexpr auto scheduler_type =
             GemmPipeline::DoubleSmemBuffer || (GemmPipeline::NumWaveGroups == 1);
         RunGemm<scheduler_type>(
             as_ptr, bs_ptr, kargs.ds_ptr, e_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
->>>>>>> develop
     }
 
     // Persistent kernel entry point
@@ -1384,23 +1303,6 @@ struct UniversalGemmKernel
             // allocate LDS
             __shared__ char smem_ptr[GetSmemSize()];
             // Run the GEMM
-<<<<<<< HEAD
-            if constexpr(!(EpiloguePipeline::MemoryOperation == memory_operation_enum::atomic_add &&
-                           EpiloguePipeline::GetVectorSizeC() % 2 != 0 &&
-                           is_any_of<EDataType, fp16_t, bf16_t>::value))
-            {
-                RunGemm(as_ptr,
-                        bs_ptr,
-                        kargs.ds_ptr,
-                        e_ptr,
-                        smem_ptr,
-                        kargs,
-                        splitk_batch_offset,
-                        i_m,
-                        i_n);
-            }
-=======
-
             RunGemm(as_ptr,
                     bs_ptr,
                     kargs.ds_ptr,
@@ -1410,7 +1312,6 @@ struct UniversalGemmKernel
                     splitk_batch_offset,
                     i_m,
                     i_n);
->>>>>>> develop
 
             // Advance to the next work item
             block_id += grid_size;

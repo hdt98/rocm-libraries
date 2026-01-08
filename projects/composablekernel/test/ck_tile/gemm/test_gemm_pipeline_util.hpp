@@ -288,7 +288,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
         using GemmPipeline =
             typename GemmPipelineTypeSelector<PipelineType, UniversalGemmProblem>::pipeline;
 
-        using GemmEpilogue = ck_tile::CShuffleEpilogue<
+        using GemmEpilogue = typename GemmEpilogueTypeSelector<
+            PipelineType,
             ck_tile::CShuffleEpilogueProblem<ADataType,
                                              BDataType,
                                              DsDataType,
@@ -310,84 +311,14 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                              1,     /*VectorSizeC_*/
                                              false, /*TiledMMAPermuteN_*/
                                              1,     /*BlockedXDLN_PerWarp_*/
-                                             DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
+                                             DoubleSmemBuffer /*DoubleSmemBuffer*/>>::epilogue;
 
-<<<<<<< HEAD
-            using GemmEpilogue = typename GemmEpilogueTypeSelector<
-                PipelineType,
-                ck_tile::CShuffleEpilogueProblem<ADataType,
-                                                 BDataType,
-                                                 DsDataType,
-                                                 AccDataType,
-                                                 CDataType,
-                                                 DsLayout,
-                                                 CLayout,
-                                                 ck_tile::element_wise::PassThrough,
-                                                 TilePartitioner::MPerBlock,
-                                                 TilePartitioner::NPerBlock,
-                                                 M_Warp,
-                                                 N_Warp,
-                                                 M_Warp_Tile,
-                                                 N_Warp_Tile,
-                                                 K_Warp_Tile,
-                                                 UniversalGemmProblem::TransposeC,
-                                                 memory_operation,
-                                                 1,     /*kNumWaveGroups_*/
-                                                 false, /*FixedVectorSize_*/
-                                                 1,     /*VectorSizeC_*/
-                                                 false, /*TiledMMAPermuteN_*/
-                                                 1,     /*BlockedXDLN_PerWarp_*/
-                                                 DoubleSmemBuffer /*DoubleSmemBuffer*/>>::epilogue;
-
-            using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
-            auto kargs   = Kernel::MakeKernelArgs(args);
-
-            dim3 grids;
-            if constexpr(Persistent)
-            {
-                grids = Kernel::MaxOccupancyGridSize(s);
-            }
-            else
-            {
-                grids = Kernel::GridSize(args.M, args.N, args.k_batch);
-            }
-            const dim3 blocks = Kernel::BlockSize();
-
-            if(!Kernel::IsSupportedArgument(kargs))
-            {
-                throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!\n");
-            }
-
-            if(s.log_level_ > 0)
-            {
-                std::cout << "Launching kernel with args:" << " grid: {" << grids.x << ", "
-                          << grids.y << ", " << grids.z << "}" << ", blocks: {" << blocks.x << ", "
-                          << blocks.y << ", " << blocks.z << "}" << std::endl;
-            }
-
-            if constexpr(ClusterLaunch)
-            {
-                dim3 clusters = Kernel::ClusterSize();
-                ck_tile::launch_kernel(
-                    s,
-                    ck_tile::make_kernel<kBlockPerCu>(Kernel{}, clusters, grids, blocks, 0, kargs));
-            }
-            else
-            {
-                ck_tile::launch_kernel(
-                    s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
-            }
-        };
-
-        if(args.k_batch == 1)
-=======
-        using Kernel     = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
-        const auto kargs = Kernel::MakeKernelArgs(args);
+        using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
+        auto kargs   = Kernel::MakeKernelArgs(args);
 
         const dim3 blocks = Kernel::BlockSize();
         dim3 grids;
         if constexpr(Persistent)
->>>>>>> develop
         {
             grids = Kernel::MaxOccupancyGridSize(s);
         }
@@ -408,8 +339,17 @@ class TestCkTileGemmPipeline : public ::testing::Test
                       << ", " << blocks.z << "}" << std::endl;
         }
 
-        ck_tile::ignore = ck_tile::launch_kernel(
-            s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+        if constexpr(ClusterLaunch)
+        {
+            dim3 clusters = Kernel::ClusterSize();
+            ck_tile::launch_kernel(
+                s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, clusters, grids, blocks, 0, kargs));
+        }
+        else
+        {
+            ck_tile::launch_kernel(
+                s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+        }
     }
 
     public:

@@ -208,8 +208,6 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
     }
 
     private:
-<<<<<<< HEAD
-=======
     template <typename ALayout, typename BLayout, typename CLayout>
     void invoke_grouped_gemm_persistent(const std::vector<grouped_gemm_kargs>& gemm_descs,
                                         const ck_tile::stream_config& s,
@@ -294,7 +292,6 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
                                        gemm_descs.size()));
     }
 
->>>>>>> develop
     struct BShuffleGemmConfig
     {
         static constexpr ck_tile::index_t N_Warp_Tile =

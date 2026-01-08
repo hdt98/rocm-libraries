@@ -450,37 +450,6 @@ struct GroupedGemmKernel
         const index_t num_loop =
             amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
 
-<<<<<<< HEAD
-        // Run GEMM pipeline with compile-time branching
-        const auto& c_block_tile = [&]() {
-            if constexpr(GemmPipeline::Preshuffle)
-            {
-                // Preshuffle version - without has_hot_loop parameter
-                return GemmPipeline{}.template operator()(a_block_window[Base::I0],
-                                                          b_block_window[Base::I0],
-                                                          num_loop,
-                                                          tail_num,
-                                                          smem_ptr);
-            }
-            else
-            {
-                // Regular version - with has_hot_loop parameter
-                const bool has_hot_loop = GemmPipeline::BlockHasHotloop(num_loop);
-                return GemmPipeline{}.template operator()(a_block_window[Base::I0],
-                                                          b_block_window[Base::I0],
-                                                          num_loop,
-                                                          has_hot_loop,
-                                                          tail_num,
-                                                          smem_ptr);
-            }
-        }();
-
-        // Run Epilogue Pipeline
-        auto& c_block_window = gemm_tile_windows.at(Base::I3);
-        EpiloguePipeline{}.template
-        operator()<decltype(c_block_window), decltype(c_block_tile), decltype(d_block_window)>(
-            c_block_window, c_block_tile, d_block_window, smem_ptr);
-=======
         // Run GEMM cooperatively by whole workgroup.
         const auto& c_block_tile =
             GemmPipeline{}.template operator()(a_block_window, b_block_window, num_loop, smem_ptr);
@@ -501,7 +470,6 @@ struct GroupedGemmKernel
 
             EpiloguePipeline{}(c_block_window, c_block_tile, d_block_window, smem_ptr);
         }
->>>>>>> develop
     }
 
     CK_TILE_DEVICE index_t FindGroupId(const GemmTransKernelArg<NumDTensor_>* gemm_desc_ptr,

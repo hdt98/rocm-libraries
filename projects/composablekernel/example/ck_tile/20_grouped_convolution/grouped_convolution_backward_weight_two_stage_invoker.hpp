@@ -64,54 +64,6 @@ struct GroupedConvolutionBackwardWeightTwoStageInvoker
             ConvConfig::NumWaveGroups>;
 
         constexpr auto scheduler = ConvConfig::Scheduler;
-<<<<<<< HEAD
-        const auto Run           = [&](const auto memory_operation_) {
-            constexpr auto memory_operation = memory_operation_.value;
-
-            using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
-                          OutDataType,
-                          InDataType,
-                          AccDataType,
-                          GemmShape,
-                          GemmUniversalTraits,
-                          scheduler,
-                          ck_tile::element_wise::PassThrough,
-                          ck_tile::element_wise::PassThrough,
-                          WeiDataType,
-                          GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
-                          GroupedConvTraitsType::VectorSizeA,
-                          GroupedConvTraitsType::VectorSizeB>;
-
-            using GemmPipeline = typename PipelineTypeTraits<
-                          ConvConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
-
-            using ConvEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
-                          OutDataType, // A: Out
-                          InDataType,  // B: In
-                          DsDataType,
-                          AccDataType,
-                          WorkspaceDataType, // C: Workspace  normally Out
-                          typename GroupedConvTraitsType::ImplicitGemmDsLayout,
-                          typename GroupedConvTraitsType::FixedGemmParams::ELayout,
-                          CDEElementWise,
-                          TilePartitioner::MPerBlock,
-                          TilePartitioner::NPerBlock,
-                          ConvConfig::M_Warp,
-                          ConvConfig::N_Warp,
-                          ConvConfig::M_Warp_Tile,
-                          ConvConfig::N_Warp_Tile,
-                          ConvConfig::K_Warp_Tile,
-                          GroupedConvTraitsType::FixedGemmParams::TransposeC,
-                          memory_operation,
-                          ConvConfig::NumWaveGroups,
-                          GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
-                          GroupedConvTraitsType::VectorSizeC>>;
-
-            using Kernel = ck_tile::GroupedConvolutionBackwardWeightKernel<GroupedConvTraitsType,
-                                                                                     TilePartitioner,
-                                                                                     GemmPipeline,
-                                                                                     ConvEpilogue>;
-=======
 
         using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
             OutDataType,
@@ -166,7 +118,6 @@ struct GroupedConvolutionBackwardWeightTwoStageInvoker
         ck_tile::GroupedConvBwdWeightHostArgs ws_args = ck_tile::GroupedConvBwdWeightHostArgs(args);
         auto c_ptr                                    = ws_args.wei_ptr;
         ws_args.wei_ptr                               = ws_m_n_dev_buf.GetDeviceBuffer();
->>>>>>> develop
 
         const auto kargs  = Kernel::MakeKernelArgs(ws_args);
         const dim3 grids  = Kernel::GridSize(kargs);
@@ -192,22 +143,10 @@ struct GroupedConvolutionBackwardWeightTwoStageInvoker
         using ElementwiseKernel =
             ck_tile::ElementWiseKernel<Problem, ck_tile::ElementWiseDefaultPolicy>;
 
-<<<<<<< HEAD
-            using ElementwiseShape =
-                ck_tile::ElementWiseShape<BlockWarps, BlockTile, WarpTile, WorkspaceDataType>;
-            using Problem = ck_tile::ElementWisePipelineProblem<WorkspaceDataType,
-                                                                          WorkspaceDataType,
-                                                                          WeiDataType,
-                                                                          ElementwiseShape,
-                                                                          XElementwiseOperation>;
-            using ElementwiseKernel =
-                ck_tile::ElementWiseKernel<Problem, ck_tile::ElementWiseDefaultPolicy>;
-=======
         ck_tile::index_t total_elements     = 1;
         std::vector<ck_tile::index_t> shape = {
             static_cast<ck_tile::index_t>(args.G_ * args.K_),
             static_cast<ck_tile::index_t>(args.C_ * spatial_lengths_accum)};
->>>>>>> develop
 
         for(auto d : shape)
             total_elements *= d;

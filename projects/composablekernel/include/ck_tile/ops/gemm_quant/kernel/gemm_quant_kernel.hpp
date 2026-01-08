@@ -1805,85 +1805,14 @@ struct QuantGemmKernel
         // Run Epilogue Pipeline with k_batch dispatch
         if(k_batch == 1)
         {
-<<<<<<< HEAD
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
-        }
-        else if constexpr(kQuantType == QuantType::RowColQuant)
-        {
-            const auto& aq_block_window = gemm_tile_windows.at(I1);
-            const auto& bq_block_window = gemm_tile_windows.at(I3);
-            EpiloguePipeline{}(c_block_window,
-                               c_block_tile,
-                               c_block_window,
-                               smem_ptr,
-                               aq_block_window,
-                               bq_block_window);
-        }
-        else if constexpr(kQuantType == QuantType::TensorQuant)
-        {
-            // TODO: why doesn't readfirstlane work here?
-            // const AccDataType aq_scale =
-            //     __builtin_amdgcn_readfirstlane(type_convert<AccDataType>(*aq_ptr));
-            // const AccDataType bq_scale =
-            //     __builtin_amdgcn_readfirstlane(type_convert<AccDataType>(*bq_ptr));
-            const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
-            const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
-            EpiloguePipeline{}(
-                c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
-        }
-    }
-    /**
-     * @brief Runs single GEMM problem cooperatively by whole workgroup.
-     *
-     * @param a_ptr input A pointer
-     * @param b_ptr input B pointer
-     * @param aq_ptr input AQ pointer
-     * @param bq_ptr input BQ pointer
-     * @param c_ptr output C pointer
-     * @param smem_ptr The start memory pointer of the shared memory block.
-     * @param kargs GEMM kernel arguments
-     * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k batch.
-     * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.
-     * @param block_idx_n The GEMM's output N dimension tile index processed by this workgroup.
-     *
-     * @tparam DstInMemOp Destination memory operation (default: set).
-     */
-    template <memory_operation_enum DstInMemOp = memory_operation_enum::set>
-    CK_TILE_DEVICE static void RunGemm2LDS(const ADataType* a_ptr,
-                                           const BDataType* b_ptr,
-                                           const AQDataType* aq_ptr,
-                                           const BQDataType* bq_ptr,
-                                           CDataType* c_ptr,
-                                           void* smem_ptr,
-                                           const QuantGemmKernelArgs& kargs,
-                                           const SplitKBatchOffset& splitk_batch_offset,
-                                           const index_t block_idx_m,
-                                           const index_t block_idx_n)
-    {
-        // Create Gemm tensor views, pad views and tile windows
-        const auto& gemm_tensor_views_tuple = MakeGemmTensorViews<DstInMemOp>(
-            a_ptr, b_ptr, aq_ptr, bq_ptr, c_ptr, kargs, splitk_batch_offset);
-=======
             auto c_block_window = MakeCBlockWindow<memory_operation_enum::set>(
                 c_ptr, kargs, block_idx_m, block_idx_n);
->>>>>>> develop
 
             if constexpr(kQuantType == QuantType::ABQuantGrouped ||
                          kQuantType == QuantType::AQuantGrouped ||
                          kQuantType == QuantType::BQuantGrouped)
             {
-<<<<<<< HEAD
-                const auto& bq_block_window = gemm_tile_windows.at(I3);
-                index_t n                   = 0;
-                if constexpr(PreshuffleQuant)
-                {
-                    n = kargs.N;
-                }
-                return GemmPipeline{}.template operator()(
-                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
-=======
                 EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
->>>>>>> develop
             }
             else if constexpr(kQuantType == QuantType::RowColQuant)
             {
@@ -1901,17 +1830,6 @@ struct QuantGemmKernel
                 EpiloguePipeline{}(
                     c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
             }
-<<<<<<< HEAD
-        }();
-
-        // Run Epilogue Pipeline
-        auto& c_block_window = gemm_tile_windows.at(I4);
-
-        if constexpr(kQuantType == QuantType::BQuantGrouped)
-        {
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
-=======
->>>>>>> develop
         }
         else
         {

@@ -119,11 +119,7 @@ struct WarpGemmAttributeWmma
     {
         if constexpr(kTransC)
         {
-<<<<<<< HEAD
             TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(c_vec, b_vec, a_vec);
-=======
-            TransposedImpl{}(c_vec, b_vec, a_vec, bool_constant<post_nop_>{});
->>>>>>> develop
         }
         else
         {
@@ -137,11 +133,7 @@ struct WarpGemmAttributeWmma
     {
         if constexpr(kTransC)
         {
-<<<<<<< HEAD
             return TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(b_vec, a_vec);
-=======
-            return TransposedImpl{}(b_vec, a_vec);
->>>>>>> develop
         }
         else
         {

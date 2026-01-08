@@ -62,7 +62,8 @@ struct ABTransferWaveTiles
             ? std::min(MNPerBlock / MNPerWmma, NumberOfWaves)
             : (MNPerBlock / MNPerWmma % 2 == 0 ? 2 : 1);
     static constexpr index_t KMajorWaves_ =
-        KPerBlock / KPack % std::min(KPerBlock / KPack, NumberOfWaves) == 0
+        KPerBlock <= KPack ? 1
+        : KPerBlock / KPack % std::min(KPerBlock / KPack, NumberOfWaves) == 0
             ? std::min(KPerBlock / KPack, NumberOfWaves)
             : (KPerBlock / KPack % 2 == 0 ? 2 : 1);
 

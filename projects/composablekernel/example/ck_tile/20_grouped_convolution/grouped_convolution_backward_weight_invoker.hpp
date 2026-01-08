@@ -58,58 +58,6 @@ struct GroupedConvolutionBackwardWeightInvoker
             GroupedConvTraitsType::FixedGemmParams::Persistent,
             ConvConfig::NumWaveGroups>;
         constexpr auto scheduler = ConvConfig::Scheduler;
-<<<<<<< HEAD
-        const auto Run           = [&](const auto memory_operation_) {
-            constexpr auto memory_operation = memory_operation_.value;
-
-            using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
-                          OutDataType,
-                          InDataType,
-                          AccDataType,
-                          GemmShape,
-                          GemmUniversalTraits,
-                          scheduler,
-                          ck_tile::element_wise::PassThrough,
-                          ck_tile::element_wise::PassThrough,
-                          WeiDataType,
-                          GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
-                          GroupedConvTraitsType::VectorSizeA,
-                          GroupedConvTraitsType::VectorSizeB>;
-
-            using GemmPipeline = typename PipelineTypeTraits<
-                          ConvConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
-
-            using ConvEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
-                          OutDataType,
-                          InDataType,
-                          DsDataType,
-                          AccDataType,
-                          WeiDataType,
-                          typename GroupedConvTraitsType::ImplicitGemmDsLayout,
-                          typename GroupedConvTraitsType::FixedGemmParams::ELayout,
-                          CDEElementWise,
-                          TilePartitioner::MPerBlock,
-                          TilePartitioner::NPerBlock,
-                          ConvConfig::M_Warp,
-                          ConvConfig::N_Warp,
-                          ConvConfig::M_Warp_Tile,
-                          ConvConfig::N_Warp_Tile,
-                          ConvConfig::K_Warp_Tile,
-                          GroupedConvTraitsType::FixedGemmParams::TransposeC,
-                          memory_operation,
-                          ConvConfig::NumWaveGroups,
-                          GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
-                          GroupedConvTraitsType::VectorSizeC>>;
-
-            using Kernel = ck_tile::GroupedConvolutionBackwardWeightKernel<GroupedConvTraitsType,
-                                                                                     TilePartitioner,
-                                                                                     GemmPipeline,
-                                                                                     ConvEpilogue>;
-
-            const auto kargs  = Kernel::MakeKernelArgs(args);
-            const dim3 grids  = Kernel::GridSize(kargs);
-            const dim3 blocks = Kernel::BlockSize();
-=======
 
         using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
             OutDataType,
@@ -162,7 +110,6 @@ struct GroupedConvolutionBackwardWeightInvoker
         {
             throw std::runtime_error("Wrong! Arguments not supported! Skipping conv!\n");
         }
->>>>>>> develop
 
         if(s.log_level_ > 0)
         {

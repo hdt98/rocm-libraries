@@ -534,202 +534,10 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
         // __builtin_amdgcn_sched_barrier(0);
     }
 
-<<<<<<< HEAD
-    template <TailNumber TailNum,
-              typename ADramBlockWindowTmp,
-              typename BFlatBlockWindowTmp,
-              typename AElementFunction,
-              typename std::enable_if_t<!is_detected<is_tuple, ADramBlockWindowTmp>::value &&
-                                            !is_detected<is_tuple, BFlatBlockWindowTmp>::value,
-                                        bool>* = nullptr,
-              index_t UnaryOpSize_             = 8>
-    CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                   const AElementFunction& a_element_func,
-                                   const BFlatBlockWindowTmp& b_flat_dram_block_window_tmp,
-                                   index_t num_loop,
-                                   void* p_smem) const
-=======
     struct PipelineImpl : public PipelineImplBase
->>>>>>> develop
     {
         using Base = PipelineImplBase;
 
-<<<<<<< HEAD
-        static_assert(kMPerBlock == ADramBlockWindowTmp{}.get_window_lengths()[number<0>{}],
-                      "wrong!");
-        static_assert(kKPerBlock == ADramBlockWindowTmp{}.get_window_lengths()[number<1>{}],
-                      "wrong!");
-
-        constexpr auto MIter_2nd_last = (MIterPerWarp >= 2) ? MIterPerWarp - 2 : MIterPerWarp - 1;
-        const index_t iMWarp          = get_warp_id() / NWarp;
-
-        using CWarpDstr   = typename WG::CWarpDstr;
-        using CWarpTensor = typename WG::CWarpTensor;
-
-        constexpr auto c_warp_y_lengths =
-            to_sequence(CWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
-        constexpr auto c_warp_y_index_zeros = uniform_sequence_gen_t<CWarpDstr::NDimY, 0>{};
-
-        __builtin_amdgcn_sched_barrier(0);
-
-        // A tile in LDS
-        constexpr index_t smem_size = PipelinePolicy::template GetSmemSize<Problem>();
-        ADataType* p_a_lds_ping     = static_cast<ADataType*>(p_smem);
-        ADataType* p_a_lds_pong =
-            reinterpret_cast<ADataType*>(static_cast<char*>(p_smem) + smem_size);
-
-        constexpr auto a_lds_block_desc =
-            PipelinePolicy::template MakeALdsBlockDescriptor<Problem>();
-
-        auto a_lds_block_ping =
-            make_tensor_view<address_space_enum::lds>(p_a_lds_ping, a_lds_block_desc);
-        auto a_lds_block_pong =
-            make_tensor_view<address_space_enum::lds>(p_a_lds_pong, a_lds_block_desc);
-
-        // A DRAM tile window for load
-        auto a_copy_dram_window =
-            make_tile_window(a_dram_block_window_tmp.get_bottom_tensor_view(),
-                             make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
-                             a_dram_block_window_tmp.get_window_origin(),
-                             PipelinePolicy::template MakeADramTileDistribution<Problem>());
-
-        auto a_copy_lds_window_ping =
-            make_tile_window(a_lds_block_ping,
-                             make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
-                             {0, 0},
-                             PipelinePolicy::template MakeADramTileDistribution<Problem>());
-
-        auto a_copy_lds_window_pong =
-            make_tile_window(a_lds_block_pong,
-                             make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
-                             {0, 0},
-                             PipelinePolicy::template MakeADramTileDistribution<Problem>());
-
-        // ping-pong window for A LDS
-        auto a_warp_window_ping_tmp =
-            make_tile_window(a_lds_block_ping,
-                             make_tuple(number<WG::kM>{}, number<WG::kK>{}),
-                             {iMWarp * WG::kM, 0},
-                             make_static_tile_distribution(typename WG::AWarpDstrEncoding{}));
-
-        auto a_warp_window_pong_tmp =
-            make_tile_window(a_lds_block_pong,
-                             make_tuple(number<WG::kM>{}, number<WG::kK>{}),
-                             {iMWarp * WG::kM, 0},
-                             make_static_tile_distribution(typename WG::AWarpDstrEncoding{}));
-
-        statically_indexed_array<
-            statically_indexed_array<decltype(a_warp_window_ping_tmp), KIterPerWarp>,
-            MIterPerWarp>
-            a_warp_windows_ping;
-
-        statically_indexed_array<
-            statically_indexed_array<decltype(a_warp_window_pong_tmp), KIterPerWarp>,
-            MIterPerWarp>
-            a_warp_windows_pong;
-
-        static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-            static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
-                a_warp_windows_ping(mIter)(kIter) = a_warp_window_ping_tmp;
-
-                move_tile_window(a_warp_windows_ping(mIter)(kIter),
-                                 {mIter * MPerBlockPerIter, kIter * KPerBlockPerIter});
-            });
-        });
-
-        static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-            static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
-                a_warp_windows_pong(mIter)(kIter) = a_warp_window_pong_tmp;
-
-                move_tile_window(a_warp_windows_pong(mIter)(kIter),
-                                 {mIter * MPerBlockPerIter, kIter * KPerBlockPerIter});
-            });
-        });
-
-        // Block GEMM
-        auto block_weight_preshuffle = BlockWeightPreshuffle();
-        // Acc register tile
-        auto c_block_tile = block_weight_preshuffle.MakeCBlockTile();
-
-        // B flat DRAM window for load
-        auto b_flat_distribution =
-            PipelinePolicy::template MakeBFlatDramTileDistribution<Problem>();
-        auto b_flat_dram_window = // tile_window_with_static_distribution
-            make_tile_window(
-                b_flat_dram_block_window_tmp.get_bottom_tensor_view(), // from kernel gemm_pad_views
-                make_tuple(number<flatNPerWarp>{}, number<flatKPerWarp>{}),
-                b_flat_dram_block_window_tmp.get_window_origin(),
-                b_flat_distribution);
-
-        // pingpong buffer for B
-        using BTypeToUse =
-            std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>;
-        using BTileType = decltype(make_static_distributed_tensor<BTypeToUse>(b_flat_distribution));
-
-        statically_indexed_array<
-            statically_indexed_array<decltype(b_flat_dram_window), KIterPerWarp>,
-            NIterPerWarp>
-            b_flat_dram_windows;
-
-        statically_indexed_array<statically_indexed_array<BTileType, KIterPerWarp>, NIterPerWarp>
-            b_warp_tensor_ping;
-
-        statically_indexed_array<statically_indexed_array<BTileType, KIterPerWarp>, NIterPerWarp>
-            b_warp_tensor_pong;
-
-        // Prefetch A0
-        auto a_block_tile = load_tile(a_copy_dram_window);
-        // move A window to next k
-        move_tile_window(a_copy_dram_window, {0, kKPerBlock});
-
-        // prefetch B
-        static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
-            static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
-                b_flat_dram_windows(nIter)(kIter) = b_flat_dram_window;
-
-                move_tile_window(b_flat_dram_windows(nIter)(kIter),
-                                 {nIter * NFlatPerBlockPerIter, kIter * KFlatPerBlockPerIter});
-
-                load_int4_tile<BDataType, ADataType, UnaryOpSize_>(
-                    b_warp_tensor_ping(nIter)(kIter), b_flat_dram_windows(nIter)(kIter));
-            });
-        });
-        // move B window to next flat K
-        move_tile_window(b_flat_dram_window, {0, BlockGemmShape::flatKPerBlock});
-
-        // Prefill A0
-        auto a_block_tile_tmp = tile_elementwise_in(a_element_func, a_block_tile);
-        store_tile(a_copy_lds_window_ping, a_block_tile_tmp);
-
-        __builtin_amdgcn_sched_barrier(0);
-
-        // Prefetch A1
-        a_block_tile = load_tile(a_copy_dram_window);
-        // move A window to next k
-        move_tile_window(a_copy_dram_window, {0, kKPerBlock});
-
-        // initialize C
-        tile_elementwise_inout([](auto& c) { c = 0; }, c_block_tile);
-
-        block_sync_lds();
-
-        // preload A00,A10 from lds
-        statically_indexed_array<decltype(load_tile(a_warp_windows_ping(number<0>{})(number<0>{}))),
-                                 m_preload>
-            a_warp_tensor;
-
-        static_for<0, m_preload, 1>{}([&](auto loadIter) {
-            constexpr auto mIter = loadIter % MIterPerWarp;
-            constexpr auto kIter = loadIter / MIterPerWarp;
-            a_warp_tensor(loadIter) =
-                load_tile(a_warp_windows_ping(number<mIter>{})(number<kIter>{}));
-        });
-        __builtin_amdgcn_sched_barrier(0);
-
-        // MAIN LOOP
-        index_t iCounter = (num_loop - 1) / 2;
-        while(iCounter > 0)
-=======
         template <bool HasHotLoop,
                   TailNumber TailNum,
                   typename ADramBlockWindowTmp,
@@ -744,7 +552,6 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
                                        const BFlatBlockWindowTmp& b_flat_dram_block_window_tmp,
                                        index_t num_loop,
                                        void* p_smem) const
->>>>>>> develop
         {
             static_assert(
                 std::is_same_v<ADataType, remove_cvref_t<typename ADramBlockWindowTmp::DataType>>,
@@ -924,17 +731,6 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
         const auto has_hot_loop = Base::BlockHasHotloop(num_loop);
         const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
 
-<<<<<<< HEAD
-        const auto RunPipeline = [&](auto bool_val, auto tail_num_) {
-            (void)bool_val; // Suppress unused parameter warning
-            constexpr auto tail_num    = tail_num_.value;
-            constexpr auto PassThrough = [](const ADataType& a) { return a; };
-            return operator()<tail_num>(a_dram_block_window_tmp[number<0>{}],
-                                        PassThrough,
-                                        b_flat_dram_block_window_tmp[number<0>{}],
-                                        num_loop,
-                                        p_smem);
-=======
         const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
             return PipelineImpl{}.template operator()<hot_loop_.value, tail_num_.value>(
                 a_dram_block_window_tmp[number<0>{}],
@@ -942,7 +738,6 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
                 b_flat_dram_block_window_tmp[number<0>{}],
                 num_loop,
                 p_smem);
->>>>>>> develop
         };
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
@@ -963,20 +758,12 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
 
         const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
             constexpr auto PassThrough = [](const ADataType& a) { return a; };
-<<<<<<< HEAD
-            return operator()<tail_num>(a_dram_block_window_tmp,
-                                        PassThrough,
-                                        b_flat_dram_block_window_tmp,
-                                        num_loop,
-                                        p_smem);
-=======
             return PipelineImpl{}.template operator()<hot_loop_.value, tail_num_.value>(
                 a_dram_block_window_tmp,
                 PassThrough,
                 b_flat_dram_block_window_tmp,
                 num_loop,
                 p_smem);
->>>>>>> develop
         };
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
@@ -996,20 +783,12 @@ struct WeightPreshufflePipelineAGmemBGmemCRegV2
         const auto has_hot_loop = Base::BlockHasHotloop(num_loop);
         const auto RunPipeline  = [&](auto hot_loop_, auto tail_num_) {
             constexpr auto PassThrough = [](const auto& x) { return x; };
-<<<<<<< HEAD
-            return operator()<tail_num>(a_dram_block_window_tmp,
-                                        PassThrough,
-                                        b_flat_dram_block_window_tmp,
-                                        num_loop,
-                                        p_smem);
-=======
             return PipelineImpl{}.template operator()<hot_loop_.value, tail_num_.value>(
                 a_dram_block_window_tmp,
                 PassThrough,
                 b_flat_dram_block_window_tmp,
                 num_loop,
                 p_smem);
->>>>>>> develop
         };
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }

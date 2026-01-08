@@ -39,34 +39,6 @@ template <typename AsDataType_,
           typename ComputeDataType_    = void>
 struct CShuffleEpilogueProblem
 {
-<<<<<<< HEAD
-    using AsDataType                                       = remove_cvref_t<AsDataType_>;
-    using BsDataType                                       = remove_cvref_t<BsDataType_>;
-    using AccDataType                                      = remove_cvref_t<AccDataType_>;
-    using ODataType                                        = remove_cvref_t<ODataType_>;
-    using DsDataType                                       = remove_cvref_t<DsDataType_>;
-    using DsLayout                                         = remove_cvref_t<DsLayout_>;
-    using ELayout                                          = remove_cvref_t<ELayout_>;
-    using CDElementwise                                    = remove_cvref_t<CDElementwise_>;
-    using ComputeDataType                                  = remove_cvref_t<ComputeDataType_>;
-    static constexpr index_t kBlockSize                    = MWave_ * NWave_ * get_warp_size();
-    static constexpr index_t kMPerBlock                    = kM_;
-    static constexpr index_t kNPerBlock                    = kN_;
-    static constexpr index_t MWave                         = MWave_;
-    static constexpr index_t NWave                         = NWave_;
-    static constexpr index_t MPerXdl                       = MPerXdl_;
-    static constexpr index_t NPerXdl                       = NPerXdl_;
-    static constexpr index_t KPerXdl                       = KPerXdl_;
-    static constexpr index_t isCTransposed                 = isCTransposed_;
-    static constexpr memory_operation_enum MemoryOperation = MemoryOperation_;
-    static constexpr bool FixedVectorSize                  = FixedVectorSize_;
-    static constexpr index_t VectorSizeC                   = VectorSizeC_;
-    static constexpr index_t BlockedXDLN_PerWarp           = BlockedXDLN_PerWarp_;
-    static constexpr bool DoubleSmemBuffer                 = DoubleSmemBuffer_;
-    static constexpr bool TiledMMAPermuteN                 = TiledMMAPermuteN_;
-    static constexpr index_t kNumWaveGroups                = kNumWaveGroups_;
-    static constexpr index_t NumDTensor                    = DsDataType::size();
-=======
     using AsDataType                             = remove_cvref_t<AsDataType_>;
     using BsDataType                             = remove_cvref_t<BsDataType_>;
     using AccDataType                            = remove_cvref_t<AccDataType_>;
@@ -75,6 +47,7 @@ struct CShuffleEpilogueProblem
     using DsLayout                               = remove_cvref_t<DsLayout_>;
     using ELayout                                = remove_cvref_t<ELayout_>;
     using CDElementwise                          = remove_cvref_t<CDElementwise_>;
+    using ComputeDataType                        = remove_cvref_t<ComputeDataType_>;
     static constexpr index_t kBlockSize          = MWave_ * NWave_ * get_warp_size();
     static constexpr index_t kMPerBlock          = kM_;
     static constexpr index_t kNPerBlock          = kN_;
@@ -91,7 +64,6 @@ struct CShuffleEpilogueProblem
     static constexpr bool TiledMMAPermuteN       = TiledMMAPermuteN_;
     static constexpr index_t kNumWaveGroups      = kNumWaveGroups_;
     static constexpr index_t NumDTensor          = DsDataType::size();
->>>>>>> develop
 
     static_assert(NumDTensor == DsLayout::size(),
                   "The size of DsDataType and DsLayout should be the same");
