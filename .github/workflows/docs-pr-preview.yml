@@ -1,22 +1,25 @@
 # Create a documentation preview in the pull request
 # --------------------------------------------------
-# This GitHub Actions workflow triggers by commenting '/docs-preview' on a PR.
-# It will build the documentation and display the preview via Netlify.
+# This GitHub Actions workflow triggers by opening/updating a PR. If the PR changes any
+# docs content, it will build the change and display the preview via Netlify.
 #
 # Key Steps:
 # 1. Use the script (.github/scripts/pr_detect_changed_subtrees.py) to detect changed project
-# 2. Install the environment and dependencies using project's requirements.txt
+# 2. Build the environment and dependencies using project's requirements.txt
 # 3. Build the documentation using Sphinx and Doxygen
 # 4. Deploy the preview to Netlify
 #
-# The workflow provides a look and feel to the reviewer. Note if multiple projects are involved in one PR,
-# it will only display the preview for one of the projects.
+# This blocks changes that can potentially broke the docs build, also provides a look
+# and feel to the reviewer. Note if multiple projects are involved in one PR, the workflow
+# will display preview for one of the projects.
 
 name: Docs Preview
 
 on:
-  issue_comment:
-    types: [created, edited]
+  pull_request:
+    branches:
+      - 'users/alexxu12/preview-demo'
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -25,15 +28,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Only run when '/docs-preview' is commented on a PR by a member, owner, or collaborator
-    if: >
-      ${{ github.event.issue.pull_request }} &&
-      contains(${{ github.event.comment.body }}, '/docs-preview') &&
-      (
-        ${{ github.event.comment.author_association }} == 'MEMBER' ||
-        ${{ github.event.comment.author_association }} == 'OWNER' ||
-        ${{ github.event.comment.author_association }} == 'COLLABORATOR'
-      )
+    if: github.event_name == 'pull_request'
     steps:
       - name: Generate a token
         id: generate-token
@@ -72,7 +67,7 @@ jobs:
         run: |
           python .github/scripts/pr_detect_changed_subtrees.py \
             --repo "${{ github.repository }}" \
-            --pr "${{ github.event.issue.number }}" \
+            --pr "${{ github.event.pull_request.number }}" \
             --config ".github/repos-config.json" \
             --require-auto-push
 
@@ -82,21 +77,11 @@ jobs:
           project=$(echo "${{ steps.detect.outputs.subtrees }}" | head -n1)
           echo "project=$project" >> $GITHUB_OUTPUT
 
-      - name: Get PR details
-        if: steps.extract.outputs.project
-        id: pr
-        env:
-          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-        run: |
-          PR_DATA=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
-          echo "head_sha=$(echo $PR_DATA | jq -r .head.sha)" >> $GITHUB_OUTPUT
-          echo "pr_number=$(echo $PR_DATA | jq -r .number)" >> $GITHUB_OUTPUT
-
       - name: Checkout full repo with changed project
         if: steps.extract.outputs.project
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ steps.pr.outputs.head_sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           sparse-checkout: |
             .github
             ${{ steps.extract.outputs.project }}
