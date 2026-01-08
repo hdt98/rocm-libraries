@@ -184,6 +184,7 @@ option(MIOPEN_EMBED_BINCACHE "Embed Binary Cache or KDB" Off)
 option(MIOPEN_EMBED_BUILD "Build with the set of embed flags." Off)
 option(MIOPEN_DISABLE_USERDB "Disable user database access" ${MIOPEN_EMBED_BUILD})
 option(MIOPEN_BUILD_CK "Build own CK libs inline with MIOpen build" OFF)
+option(MIOPEN_BUILD_ORIGAMI "Build origami inline with MIOpen build" OFF)
 
 # MIOPEN_USE_HIP_KERNELS is a Workaround for COMgr issues
 if(MIOPEN_EMBED_BUILD)
@@ -355,6 +356,16 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
             find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
         endif()
     endif()
+    
+    # Origami for analytical GEMM kernel configuration
+    if(MIOPEN_BUILD_ORIGAMI)
+        include(cmake/Dependencies.cmake)
+        miopen_add_dependency(origami NO_LOCAL)
+    else()
+        find_package(origami 1.0.0 REQUIRED)
+    endif()
+    message(STATUS "Build with origami ${origami_VERSION}")
+    
     if( MIOPEN_BACKEND STREQUAL "HIPNOGPU")
         set(MIOPEN_MODE_NOGPU 1)
     endif()

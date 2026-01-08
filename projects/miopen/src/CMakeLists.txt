@@ -938,6 +938,13 @@ if(MIOPEN_USE_COMPOSABLEKERNEL)
     endif()
 endif()
 
+# Link origami library
+if(MIOPEN_BUILD_ORIGAMI)
+    target_link_libraries(MIOpen PRIVATE origami)
+else()
+    target_link_libraries(MIOpen PRIVATE roc::origami)
+endif()
+
 if(WIN32)
     # Refer to https://en.cppreference.com/w/cpp/language/types for details.
     target_compile_options(MIOpen PRIVATE $<BUILD_INTERFACE:$<$<CXX_COMPILER_ID:Clang>:-U__LP64__>>)
