@@ -3,9 +3,10 @@
 
 #pragma once
 
+#include <origami/simulator.hpp>
+
 #include <array>
 #include <cstddef>
-#include <formocast.hpp>
 #include <iostream>
 #include <limits>
 #include <memory>

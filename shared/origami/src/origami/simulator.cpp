@@ -24,7 +24,8 @@
  *
  *******************************************************************************/
 
-#include "formocast.hpp"
+#include <origami/simulator.hpp>
+#include <origami/simulator_utils.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -32,8 +33,6 @@
 #include <cstring>
 #include <iostream>
 #include <vector>
-
-#include "formocast_utils.hpp"
 
 namespace Tensilelite {
 namespace Simulator {
