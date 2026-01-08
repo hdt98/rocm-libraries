@@ -454,6 +454,53 @@ auto GenericSearch(const Solver s,
     // For random access
     std::vector<PerformanceConfig> all_configs;
     std::copy(tmp_all_configs.begin(), tmp_all_configs.end(), std::back_inserter(all_configs));
+
+    // Filter configs with origami
+#include <origami/origami.hpp>
+#include <origami/types.hpp>
+
+template <typename PerformanceConfig, typename Problem>
+std::vector<PerformanceConfig> GetOrigamiPerformanceConfig(const Problem& problem, const std::vector<PerformanceConfig>& all_configs)
+{
+    auto hardware = origami::hardware_t::get_hardware_for_device(0);
+
+    // Create a problem description
+    origami::problem_t ori_prob;
+    ori_prob.size.m = 2048;  // M dimension
+    ori_prob.size.n = 2048;  // N dimension
+    ori_prob.size.k = 2048;  // K dimension
+    ori_prob.batch = problem.GetBatchSize();
+    ori_prob.a_transpose = origami::transpose_t::T;
+    ori_prob.b_transpose = origami::transpose_t::N;
+    ori_prob.a_dtype = origami::data_type_t::Half;
+    ori_prob.b_dtype = origami::data_type_t::Half;
+    ori_prob.c_dtype = origami::data_type_t::Half;
+    ori_prob.d_dtype = origami::data_type_t::Half;
+    ori_prob.mi_dtype = origami::data_type_t::Half;
+    ori_prob.a_mx_block_size = 0;
+    ori_prob.b_mx_block_size = 0;
+    
+    // Create candidate configurations
+    std::vector<origami::config_t> ori_cfgs;
+
+    for(perf_cfg : all_configs)
+    {
+        auto perf_str = perf_cfg.ToString();
+        origami::config_t ori_cfg;
+        ori_cfg.mt.m = 256;  // Macro tile M
+        ori_cfg.mt.n = 256;  // Macro tile N
+        ori_cfg.mt.k = 64;   // Macro tile K
+        ori_cfg.mi.m = 16;   // Matrix instruction M
+        ori_cfg.mi.n = 16;   // Matrix instruction N
+        ori_cfg.mi.k = 32;   // Matrix instruction K
+        ori_cfg.occupancy = 4;
+        ori_cfgs.push_back(ori_cfg); 
+    }
+
+    // Rank all configurations by performance
+    auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
+}
+
     // shuffle the configs
     std::random_device rd{};
     auto rng = std::default_random_engine{rd()};

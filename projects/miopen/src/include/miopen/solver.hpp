@@ -199,6 +199,12 @@ struct SolverBaseTunable : SolverInterfaceTunable<Context, Problem>, TunableSolv
     virtual PerformanceConfig GetDefaultPerformanceConfig(const Context& ctx,
                                                           const Problem& problem) const = 0;
 
+
+    std::vector<PerformanceConfig> GetOrigamiPerformanceConfig(const std::vector<PerformanceConfig>& all_configs)
+    {
+        return all_configs;
+    }
+
     /// Should return false if performance config is wrong for a problem.
     /// Main use is validation of values read from the perf db.
     virtual bool IsValidPerformanceConfig(const Context& ctx,
