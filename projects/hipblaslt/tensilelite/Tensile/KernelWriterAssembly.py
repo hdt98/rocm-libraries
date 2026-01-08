@@ -67,7 +67,7 @@ from rocisa.instruction import BranchInstruction, BufferLoadB128, BufferLoadB32,
   VCvtScalePkF16toBF8, VCvtScalePkF16toFP8, VCvtScalePkFP8toF16, VLShiftLeftB32, \
   VLShiftLeftB64, VLShiftRightB32, VLShiftRightB64, VMadU32U24, VMaxF32, VMinI32, VMovB32, VMovB64, VMulF32, \
   VMulHIU32, VMulLOU32, VMulPKF32S, VMulU32U24, VNotB32, VOrB32, VPackF16toB32, \
-  VPrngB32, VReadfirstlaneB32, VSubF32, VSubI32, VSubU32, VXorB32, GlobalLoadTR8B64, GlobalLoadTR16B128
+  VPrngB32, VReadfirstlaneB32, VSubF32, VSubI32, VSubU32, VSubRevU32, VXorB32, GlobalLoadTR8B64, GlobalLoadTR16B128
 
 from .Component import Component
 from .KernelWriterModules import *
@@ -715,7 +715,7 @@ class KernelWriterAssembly(KernelWriter):
     tPM = tPA["tpsMetadata"] if tPA["is_sparse"] else tPB["tpsMetadata"]
     
     ########################################
-    # VGPR Macros
+    # LDS Buffers Declarations
     ########################################
     
     if kernel["1LDSBuffer"] > 1:
@@ -734,8 +734,6 @@ class KernelWriterAssembly(KernelWriter):
       module.add(RegSet("s", "LocalWriteAddrTmpB", self.sgprs["LocalWriteAddrTmpB"]))
       module.add(RegSet("v", "vgprTmp0", self.states.startVgprTmp0))
       
-      
-
     ########################################
     # VGPR Macros
     ########################################
@@ -1126,7 +1124,7 @@ class KernelWriterAssembly(KernelWriter):
       reductionOffsetHigh32 = (reductionOffset >> 32) & 0xFFFFFFFF
       module.add(ValueSet("MTOffset", reductionOffsetLow32, format=1))
       module.add(ValueSet("MTOffsetH32", reductionOffsetHigh32, format=1))
-
+      
     ########################################
     # Global Offsets
     ########################################
@@ -1378,6 +1376,28 @@ class KernelWriterAssembly(KernelWriter):
             src="v[\\vgprAddr+0:\\vgprAddr+1]", \
             comment="offset *= bytes/element"))
       module.add(macro)
+      
+    ########################################
+    # LDS Buffers Declarations
+    ########################################
+    
+    if kernel["1LDSBuffer"] > 1:
+    
+      module.addComment2("LDS Assignments")
+      
+      ldsSize = kernel["LdsNumBytes"]
+      module.add(ValueSet("LDSBufferSize1Iter", int(ldsSize/kernel["1LDSBuffer"]), format=1))
+      totalLDSSize = ldsSize * kernel["1LDSBuffer"] 
+      module.add(ValueSet("LDSBufferSizeTotal", ldsSize, format=1))
+      
+      # self.defineSgpr("LocalWriteAddrTmpA", 1, 1)
+      # self.defineSgpr("LocalWriteAddrTmpB", 1, 1)
+      # self.defineVgpr("Tmp0", 1, 1)
+      module.add(RegSet("s", "LocalWriteAddrTmpA", self.sgprs["LocalWriteAddrTmpA"]))
+      module.add(RegSet("s", "LocalWriteAddrTmpB", self.sgprs["LocalWriteAddrTmpB"]))
+      module.add(RegSet("v", "vgprTmp0", self.states.startVgprTmp0))
+    
+
 
     if kernel["ProblemType"]["StochasticRounding"] and not self.states.asmCaps["v_prng_b32"] :
       module.add(PseudoRandomGenerator())
@@ -8850,6 +8870,7 @@ class KernelWriterAssembly(KernelWriter):
         
         module.add(SAddU32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSize1Iter"))
         module.add(SSubU32(dst=sgpr("LocalWriteAddrTmp%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSizeTotal"))
+        module.add(SCmpGeU32(src0=sgpr("LocalWriteAddrTmp%s"%tc), src1="LDSBufferSizeTotal"))
         module.add(SCSelectB32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddrTmp%s"%tc), src1=sgpr("LocalWriteAddr%s"%tc)))
                 
         # s_add_u32 s[sgprLocalWriteAddrA], s[sgprLocalWriteAddrA], LDSBufferSize
@@ -9833,7 +9854,7 @@ class KernelWriterAssembly(KernelWriter):
           dst=vgpr("LocalReadAddr%s"%tc), \
           src0="LDSBufferSize1Iter", \
           src1=vgpr("LocalReadAddr%s"%tc)))
-      module.add(VSubU32(
+      module.add(VSubRevU32(
           dst=vgpr("Tmp0"), \
           src0="LDSBufferSizeTotal", \
           src1=vgpr("LocalReadAddr%s"%tc)))

@@ -1139,6 +1139,18 @@ void common_inst(nb::module_ m_common)
              nb::arg("comment") = "")
         .def("__deepcopy__",
              [](const rocisa::VSubU32& self, nb::dict&) { return new rocisa::VSubU32(self); });
+    
+    nb::class_<rocisa::VSubRevU32, rocisa::CommonInstruction>(m_common, "VSubRevU32")
+        .def(nb::init<const std::shared_ptr<rocisa::Container>&,
+                      const InstructionInput&,
+                      const InstructionInput&,
+                      const std::string&>(),
+             nb::arg("dst"),
+             nb::arg("src0"),
+             nb::arg("src1"),
+             nb::arg("comment") = "")
+        .def("__deepcopy__",
+             [](const rocisa::VSubRevU32& self, nb::dict&) { return new rocisa::VSubRevU32(self); });
 
     nb::class_<rocisa::VSubCoU32, rocisa::CommonInstruction>(m_common, "VSubCoU32")
         .def(nb::init<const std::shared_ptr<rocisa::Container>&,

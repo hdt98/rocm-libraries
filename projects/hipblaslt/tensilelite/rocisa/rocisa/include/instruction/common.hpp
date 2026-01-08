@@ -3000,6 +3000,45 @@ namespace rocisa
         }
     };
 
+    struct VSubRevU32 : public CommonInstruction
+    {
+        VSubRevU32(const std::shared_ptr<Container>& dst,
+                const InstructionInput&           src0,
+                const InstructionInput&           src1,
+                const std::string&                comment = "")
+            : CommonInstruction(InstType::INST_U32,
+                                dst,
+                                {src0, src1},
+                                std::nullopt,
+                                std::nullopt,
+                                std::nullopt,
+                                comment)
+        {
+            if(getAsmBugs()["ExplicitNC"])
+            {
+                setInst("v_subrev_nc_u32");
+            }
+            else if(getAsmBugs()["ExplicitCO"])
+            {
+                setInst("v_subrev_u32");
+            }
+            else
+            {
+                setInst("v_subrev_u32");
+            }
+        }
+
+        VSubRevU32(const VSubRevU32& other)
+            : CommonInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<VSubRevU32>(*this);
+        }
+    };
+
     struct VSubCoU32 : public CommonInstruction
     {
         VSubCoU32(const std::shared_ptr<Container>& dst,
