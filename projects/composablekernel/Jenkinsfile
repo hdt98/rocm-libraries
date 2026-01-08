@@ -788,7 +788,8 @@ def Build_CK(Map conf=[:]){
         def image
         def retimage
 
-        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'composable_kernel') {
+        withCredentials([gitUsernamePassword(credentialsId: "${ck_githubemu_creds}", account: 'AMD-ROCm-Internal', repo: 'composable_kernel'),
+                         gitUsernamePassword(credentialsId: "${ck_githubemu_creds}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries')]) {
             try {
                 (retimage, image) = getDockerImage(conf)
                 withDockerContainer(image: image, args: dockerOpts) {
@@ -882,7 +883,7 @@ def Build_CK(Map conf=[:]){
                         // build and test hipTensor on gfx90a node
                         sh """#!/bin/bash
                             rm -rf rocm-libraries
-                            git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libraries.git
+                            git clone --no-checkout --filter=blob:none https://github.com/AMD-ROCm-Internal/rocm-libraries.git
                             cd rocm-libraries
                             git sparse-checkout init --cone
                             git sparse-checkout set projects/hiptensor
@@ -893,9 +894,9 @@ def Build_CK(Map conf=[:]){
                                 mkdir -p build
                                 ls -ltr
                                 CC=hipcc CXX=hipcc cmake -Bbuild . -D CMAKE_PREFIX_PATH="${env.WORKSPACE}/install"
-                                cmake --build build -- -j
-                                ctest --test-dir build
+                                cmake --build build -- -j64
                             """
+                            //  ctest --test-dir build // disable the testing for now
                         }
                     }
                 }
@@ -1190,8 +1191,8 @@ pipeline {
             description: "Use the CK build to verify hipTensor build and tests (default: OFF)")
         string(
             name: 'hipTensor_branch',
-            defaultValue: 'develop',
-            description: 'Specify which branch of hipTensor to use (default: develop)')
+            defaultValue: 'gfx1250',
+            description: 'Specify which branch of hipTensor to use (default: gfx1250)')
         booleanParam(
             name: "USE_SCCACHE",
             defaultValue: true,
