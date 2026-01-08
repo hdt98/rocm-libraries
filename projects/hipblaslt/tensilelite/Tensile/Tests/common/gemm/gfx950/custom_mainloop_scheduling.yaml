@@ -1843,7 +1843,94 @@ BenchmarkProblems:
           - Range: [[192], [320], [1], [1, 17, 64]]
           - Range: [[192], [320], [1], [32, 64, 256]]
         - BiasTypeArgs: ['b']
-
+    - 
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: [Assembly]
+      ForkParameters:
+        - ActivationFuncCall: [false]
+        - ClusterLocalRead: [0]
+        - DepthU: [64]
+        - DirectToLds: [true]
+        - ExpandPointerSwap: [0]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - GlobalSplitU: [0]
+        - LDSTrInst: [1]
+        - LdsBlockSizePerPadA: [1024]
+        - LdsBlockSizePerPadB: [1024]
+        - LdsPadA: [16]
+        - LdsPadB: [16]
+        - LocalReadVectorWidth: [8]
+        - MaxLDS: [163840]
+        - MbskPrefetchMethod: [0]
+        - NumElementsPerBatchStore: [16]
+        - PrefetchGlobalRead: [2]
+        - SourceSwap: [1]
+        - StaggerU: [8]
+        - StaggerUStride: [128]
+        - StoreVectorWidth: [1]
+        - StreamK: [3]
+        - ThreadTile: [[1, 1]]
+        - TransposeLDS: [1]
+        - UseCustomMainLoopSchedule: [0,1]
+        - UseSgprForGRO: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [4]
+        - WorkGroupMappingXCC: [2]
+        - Groups:
+          - - MatrixInstruction: [16, 16, 32, 1, 1, 4, 4, 2, 2]
+              WorkGroup: [32, 8, 1]
+              MIArchVgpr: 0
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [1024, 1024, 1, 8192]
+        - BiasTypeArgs: [0, 7]
+    - 
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: [Assembly]
+      ForkParameters:
+        - ActivationFuncCall: [false]
+        - ClusterLocalRead: [0]
+        - DepthU: [64]
+        - DirectToLds: [true]
+        - ExpandPointerSwap: [0]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - GlobalSplitU: [0]
+        - LDSTrInst: [1]
+        - LdsBlockSizePerPadA: [1024]
+        - LdsBlockSizePerPadB: [1024]
+        - LdsPadA: [16]
+        - LdsPadB: [16]
+        - LocalReadVectorWidth: [8]
+        - MaxLDS: [163840]
+        - MbskPrefetchMethod: [0]
+        - NumElementsPerBatchStore: [16]
+        - PrefetchGlobalRead: [2]
+        - SourceSwap: [1]
+        - StaggerU: [8]
+        - StaggerUStride: [128]
+        - StoreVectorWidth: [1]
+        - StreamK: [3]
+        - ThreadTile: [[1, 1]]
+        - TransposeLDS: [0]
+        - UseCustomMainLoopSchedule: [0,1]
+        - UseSgprForGRO: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [4]
+        - WorkGroupMappingXCC: [2]
+        - Groups:
+          - - MatrixInstruction: [16, 16, 32, 1, 1, 4, 4, 2, 2]
+              WorkGroup: [32, 8, 1]
+              MIArchVgpr: 0
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [1024, 1024, 1, 8192]
+        - BiasTypeArgs: [0, 7]
   ########################################
   # HHS NT - standard
   ########################################
