@@ -2290,6 +2290,64 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
 def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
     optSchedule = dict()
     syncCode = []
+    numMfma = 60
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    print("####################################### get_schedule_160x128x32_TF32")
+    if isNN(kernel) and TLDS==1:
+        kernel["SwapGlobalReadOrder"] = False
+        kernel["MfmaInitCVgprs"] = True
+        kernel["UsePLRPack"] = True
+
+        # plr = 3 if kernel["ForceUnrollSubIter"] else 1
+        optSchedule = {
+            'SYNC': [[-1, -1, -1, 29, 29, 33, 33]], # 5
+            'LRA0': [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]], # 20
+            'LRB0': [[-1, -1, -1, -1]], # 4
+            'PackA0': [[-1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4]], # 60
+            'PackB0': [[-1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]], # 48
+            'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]], # 9
+            'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]], # 9
+            'GRA': [[33, 33, 36, 36, 39, 39, 42, 42, 45, 45]], # 10
+            'GRB': [[48, 48, 51, 51, 54, 54, 58, 58]], # 8
+            'LWSA': [[58]], # 1
+            'LWSB': [[58]], # 1
+            'LRSA': [[58]], # 1
+            'LRSB': [[58]], # 1
+            'PackA1': [[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]], # 60
+            'LRA1': [[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]], # 20
+            'PackB1': [[3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6]], # 48
+            'LRB1': [[-1, -1, -1, -1]], # 4
+            'LCC': [[59, 59]], # 2
+        }
+
+        syncCode = [
+            SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="11wait for global read"),
+            SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for dependent lr"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for dependent lr"),
+            SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment="")
+        ]
+        # Add explicit s_nop to avoid VALU-pack -> MFMA read hazards.
+        optSchedule, snopCode = create_snop_code(optSchedule, numMfma)
+        
+    else:
+        return False, None
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
+    return True, opt1
+
+@RegisterSchedule(
+    tile_config=TileConfig(160, 128, 32, 2, 0, True, 0, 0),
+    dtype_predicate=isTF32,
+    vector_widths=[4, 4, 4],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[1, 2]
+)
+def _get_schedule_160x128x32_10x4_TF32(kernel, useLDSTr, TLDS):
+    optSchedule = dict()
+    syncCode = []
+    numMfma = 120
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     if isNN(kernel) and TLDS==1:
         kernel["SwapGlobalReadOrder"] = False
