@@ -48,19 +48,19 @@ namespace rocRoller
         std::tuple<ExpressionPtr, ExpressionPtr, ExpressionPtr>
             getMagicMultipleShiftAndSign(ExpressionPtr denominator, ContextPtr context)
         {
-            auto multiple = launchTimeSubExpressions(magicMultiple(denominator), context);
+            auto multiple = magicMultiple(denominator);
 
             auto resultType = resultVariableType(denominator);
             auto typeInfo   = DataTypeInfo::Get(resultType);
 
             if(!typeInfo.isSigned)
             {
-                auto shifts = launchTimeSubExpressions(magicShifts(denominator), context);
+                auto shifts = magicShifts(denominator);
 
                 return {multiple, shifts, nullptr};
             }
 
-            auto bitfield = launchTimeSubExpressions(magicShiftAndSign(denominator), context);
+            auto bitfield = magicShiftAndSign(denominator);
 
             auto mask   = typeInfo.elementBits - 1;
             auto shifts = bitfield & literal(mask);
@@ -105,12 +105,13 @@ namespace rocRoller
             auto const& [magicExpr, numShiftsExpr, signExpr]
                 = getMagicMultipleShiftAndSign(expr, context);
 
+            // Verify expressions are at least KernelLaunch-evaluable
             auto magicTimes = evaluationTimes(magicExpr);
             auto shiftTimes = evaluationTimes(numShiftsExpr);
 
             EvaluationTimes theTimes = magicTimes & shiftTimes;
 
-            AssertFatal(theTimes[EvaluationTime::KernelExecute],
+            AssertFatal(theTimes[EvaluationTime::KernelLaunch],
                         ShowValue(magicTimes),
                         ShowValue(shiftTimes),
                         ShowValue(magicExpr),
@@ -121,7 +122,7 @@ namespace rocRoller
                 AssertFatal(signExpr != nullptr);
                 auto signTimes = evaluationTimes(signExpr);
 
-                AssertFatal(signTimes[EvaluationTime::KernelExecute],
+                AssertFatal(signTimes[EvaluationTime::KernelLaunch],
                             ShowValue(signTimes),
                             ShowValue(signExpr));
             }
@@ -156,22 +157,6 @@ namespace rocRoller
             auto const& [magicExpr, numShiftsExpr, signExpr]
                 = getMagicMultipleShiftAndSign(denominator, context);
 
-            {
-                EvaluationTimes evalTimes
-                    = evaluationTimes(magicExpr) & evaluationTimes(numShiftsExpr);
-
-                if(!evalTimes[EvaluationTime::KernelExecute]
-                   && !evalTimes[EvaluationTime::Translate])
-                {
-                    Log::debug("Returning nullptr from magicNumberDivision expr / shift "
-                               "({})\nmagic: {}\n shift: {}",
-                               toString(evalTimes),
-                               toString(magicExpr),
-                               toString(numShiftsExpr));
-                    return nullptr;
-                }
-            }
-
             ExpressionPtr result;
 
             auto one = literal(1, denominatorType);
@@ -188,18 +173,6 @@ namespace rocRoller
             }
             else
             {
-                {
-                    EvaluationTimes evalTimes = evaluationTimes(signExpr);
-
-                    if(!evalTimes[EvaluationTime::KernelExecute]
-                       && !evalTimes[EvaluationTime::Translate])
-                    {
-                        Log::debug("Returning nullptr from magicNumberDivision sign ({})",
-                                   toString(evalTimes));
-                        return nullptr;
-                    }
-                }
-
                 // Create expression that performs division using the new arguments
 
                 auto numBytes = denominatorType.getElementSize();
@@ -236,12 +209,7 @@ namespace rocRoller
                 setComment(result, "Magic result (signed)");
             }
 
-            result = launchTimeSubExpressions(simplify(result), context);
-
-            {
-                auto evalTimes = evaluationTimes(result);
-                AssertFatal(evalTimes[EvaluationTime::KernelExecute], toString(result), evalTimes);
-            }
+            result = simplify(result);
 
             return result;
         }
