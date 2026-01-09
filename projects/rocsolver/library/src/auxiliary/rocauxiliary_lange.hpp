@@ -52,6 +52,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
 {
     I bid = blockIdx.z;
     I block_start = blockIdx.x;
+    I block_inc = gridDim.x;
     I tid = threadIdx.x;
 
     // select batch instance
@@ -63,7 +64,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // loop over blocks with grid stride (handles grid overflow)
-    for(I block_id = block_start; block_id < blocks; block_id += gridDim.x)
+    for(I block_id = block_start; block_id < blocks; block_id += block_inc)
     {
         // sum absolute values in this block
         S block_sum = 0;
@@ -157,6 +158,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
 {
     I bid = blockIdx.z;
     I row_start = blockIdx.x;
+    I row_inc = gridDim.x;
     I tid = threadIdx.x;
 
     // select batch instance
@@ -167,7 +169,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     __shared__ S sval[LANGE_THDS / WarpSize];
 
     // loop over rows with grid stride (handles grid overflow)
-    for(I row = row_start; row < m; row += gridDim.x)
+    for(I row = row_start; row < m; row += row_inc)
     {
         // sum absolute values in row
         S row_sum = 0;
@@ -255,6 +257,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
 {
     I bid = blockIdx.z;
     I col_start = blockIdx.x;
+    I col_inc = gridDim.x;
     I tid = threadIdx.x;
 
     // select batch instance
@@ -265,7 +268,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
     __shared__ S sval[LANGE_THDS / WarpSize];
 
     // loop over columns with grid stride (handles grid overflow)
-    for(I col = col_start; col < n; col += gridDim.x)
+    for(I col = col_start; col < n; col += col_inc)
     {
         // sum absolute values in column col
         S col_sum = 0;
@@ -353,6 +356,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
 {
     I bid = blockIdx.z;
     I block_start = blockIdx.x;
+    I block_inc = gridDim.x;
     I tid = threadIdx.x;
 
     // select batch instance
@@ -364,7 +368,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // loop over blocks with grid stride (handles grid overflow)
-    for(I block_id = block_start; block_id < blocks; block_id += gridDim.x)
+    for(I block_id = block_start; block_id < blocks; block_id += block_inc)
     {
         // find maximum absolute value in this block
         S block_max = 0;
