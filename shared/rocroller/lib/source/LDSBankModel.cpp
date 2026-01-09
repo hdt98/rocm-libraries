@@ -186,7 +186,15 @@ namespace rocRoller::Scheduling::LDSBankModel
         updateQueues();
 
         const int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
-        const int dataCycles    = getInstructionDataCycles(instr, m_gfx);
+        int       dataCycles    = getInstructionDataCycles(instr, m_gfx) * m_multiplierWaveCount;
+
+        // Log::info("dataCycles {}", dataCycles);
+
+        // if(hasNonOverlappingBankAccess(instr, m_gfx))
+        // {
+        //     Log::info("Non-overlapping bank access detected, reducing data cycles by half");
+        //     dataCycles /= 2;
+        // }
 
         AssertFatal(getRemainingDataSlots() >= requiredSlots
                         && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
@@ -226,11 +234,10 @@ namespace rocRoller::Scheduling::LDSBankModel
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
             {
-                const auto extra   = m_multiplierWaveCount == 4 ? (dataCycles + 4) * 2 : dataCycles;
-                auto       cmdBase = m_programCycle + dataCycles * m_multiplierWaveCount;
+                auto cmdBase = m_programCycle + dataCycles;
                 if(!m_commandQueue.empty())
                 {
-                    cmdBase = m_commandQueue.back() + dataCycles * m_multiplierWaveCount;
+                    cmdBase = m_commandQueue.back() + dataCycles;
                 }
                 auto waitcntBase = m_programCycle + 40 + dataCycles;
                 if(!m_waitcntQueue.empty())
@@ -369,7 +376,7 @@ namespace rocRoller::Scheduling::LDSBankModel
 
         for(size_t groupStart = 0; groupStart < addresses.size(); groupStart += threadsPerClock)
         {
-            size_t              groupEnd = std::min(groupStart + threadsPerClock, addresses.size());
+            size_t              groupEnd = groupStart + threadsPerClock;
             std::vector<size_t> group(addresses.begin() + groupStart, addresses.begin() + groupEnd);
             threadGroups.push_back(group);
         }
@@ -486,6 +493,105 @@ namespace rocRoller::Scheduling::LDSBankModel
         uint issueCycles = getInstructionIssueCycles(instr.memoryOp, instr.dwords);
         uint dataCycles  = getInstructionDataCycles(instr, gfx);
         return std::max(issueCycles, dataCycles);
+    }
+
+    template <std::integral T, class Compare = std::less<T>>
+    bool disjoint_ordered(const std::set<T, Compare>& a, const std::set<T, Compare>& b)
+    {
+        auto       it1  = a.begin();
+        auto       it2  = b.begin();
+        const auto end1 = a.end();
+        const auto end2 = b.end();
+        Compare    comp;
+
+        while(it1 != end1 && it2 != end2)
+        {
+            if(*it1 == *it2)
+                return false; // found common element
+            if(comp(*it1, *it2))
+                ++it1;
+            else
+                ++it2; // advance the smaller
+        }
+        return true; // no common element
+    }
+
+    // Find a rotation k such that for all i, A[i] is disjoint from B[(i + k) % n]
+    template <std::integral T, class Compare = std::less<T>>
+    std::optional<std::size_t> find_disjoint_rotation(const std::vector<std::set<T, Compare>>& A,
+                                                      const std::vector<std::set<T, Compare>>& B)
+    {
+        const std::size_t n = A.size();
+        if(n != B.size())
+            return std::nullopt;
+        if(n == 0)
+            return 0; // vacuously true: rotation 0 is fine
+
+        for(std::size_t k = 0; k < n; ++k)
+        {
+            bool ok = true;
+            for(std::size_t i = 0; i < n; ++i)
+            {
+                const std::size_t j = (i + k) % n;
+                if(!disjoint_ordered<T, Compare>(A[i], B[j]))
+                {
+                    ok = false;
+                    break;
+                }
+            }
+            if(ok)
+                return k; // found a valid rotation
+        }
+        return std::nullopt; // none exists
+    }
+
+    bool hasNonOverlappingBankAccess(const RuntimeLDSInstruction& instr, GPUArchitectureGFX gfx)
+    {
+        if(instr.baseAddresses.size() == 64)
+        {
+            return true;
+        }
+
+        /*
+        Consider the case where at least 2 SIMDs are active (workgroup size >128). 
+        For each SP, at most 16 threads are processed per cycle (regardless of instr dwords).
+        This totals to 32 threads per cycle. If these 32 threads access conflicting banks, then stalls will occur.
+        This type of bank conflict does not occur with workgroup size of 64, where only one SP is active.
+
+        On gfx950, a ds_read_b64 processes 2 dwords per thread, and ds_read_b128 processes 4 dwords per thread.
+
+        The way to reproduce this behavior is to write a microkernel that uses ds_read_b64 with two cases:
+            1) each thread accesses unique banks, e.g. thread 0 accesses bank 0 and 1, thread 1 accesses bank 2 and 3, etc.
+            2) each thread accesses every other bank pairs, e.g. thread 0 accesses bank 0 and 1, thread 1 accesses bank 4, 5, etc.
+            
+            Compare the change in latency numbers from workgroup size of 64 to 128 for both cases.
+            Notice only in case 2) do the latency numbers increase (gradually reach double).
+        */
+
+        // TODO: Workgroup size of 128 should follow same principles
+        AssertFatal(instr.baseAddresses.size() == 256, "Only workgroup size 256 tested");
+
+        const auto threadGroupBankMappings = computeThreadGroupBankMappings(instr, gfx);
+
+        AssertFatal(threadGroupBankMappings.size() % 2 == 0,
+                    "Odd {} number of thread groups not supported",
+                    threadGroupBankMappings.size());
+
+        std::vector<std::set<uint>> threadGroupBankSets;
+        for(const auto& bankMapping : threadGroupBankMappings)
+        {
+            std::set<uint> bankSet;
+            for(const auto& [bankIndex, count] : bankMapping)
+            {
+                bankSet.insert(bankIndex);
+            }
+            threadGroupBankSets.push_back(bankSet);
+        }
+
+        const auto maybeK = find_disjoint_rotation(threadGroupBankSets, threadGroupBankSets);
+        Log::info("Found disjoint rotation k = {}",
+                  maybeK.has_value() ? std::to_string(maybeK.value()) : "none");
+        return maybeK.has_value();
     }
 
     std::string Summary::toString() const

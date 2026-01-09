@@ -200,10 +200,10 @@ namespace rocRoller::Scheduling::LDSBankModel
     uint calculateBankConflictCycles(const std::map<uint, uint>& bankToAddressCounts);
 
     /**
-     * @brief Compute bank-to-address mappings for each thread group
+     * @brief Compute bank-to-address-count mappings for each thread group
      * 
      * This function divides the instruction's base addresses into thread groups
-     * and computes the bank-to-address count mapping for each group.
+     * and computes the bank-to-address-count mapping for each group.
      * 
      * @param instr The LDS instruction containing memory operation details and addresses
      * @param gfx The GPU architecture
@@ -223,6 +223,18 @@ namespace rocRoller::Scheduling::LDSBankModel
      */
     uint calculateTotalCyclesFromBankMappings(
         const std::vector<std::map<uint, uint>>& threadGroupBankMappings);
+
+    /**
+     * @brief Check if an instruction's wave accesses non-overlapping banks across cycles
+     * 
+     * The hardware will optimize this by having the waves access out-of-phase,
+     * resulting in no penalty from bank conflicts in cases where > 1 active SIMD.
+     * 
+     * @param instr The LDS instruction containing memory operation details and addresses
+     * @param gfx The GPU architecture
+     * @return true if each cycle accesses different banks (no overlap), false otherwise
+     */
+    bool hasNonOverlappingBankAccess(const RuntimeLDSInstruction& instr, GPUArchitectureGFX gfx);
 
     /**
      * @brief Parse LDS instruction information from opcode
