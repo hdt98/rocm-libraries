@@ -34,6 +34,7 @@
 
 #include "ideal_sizes.hpp"
 #include "lib_device_helpers.hpp"
+#include "lib_host_helpers.hpp"
 #include "rocblas.hpp"
 #include "rocblas_utility.hpp"
 
@@ -73,7 +74,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
         {
             int row = i % m;
             int col = i / m;
-            block_sum += std::pow(rocblas_abs(a[row + col * lda]), 2);
+            block_sum += std::pow(rocblas_abs(a[idx2D(row, col, lda)]), 2);
         }
 
         // reduce to get block sum
@@ -172,7 +173,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
         S row_sum = 0;
         for(I i = tid; i < n; i += LANGE_THDS)
         {
-            row_sum += rocblas_abs(a[i * lda + row]);
+            row_sum += rocblas_abs(a[idx2D(row, i, lda)]);
         }
 
         // reduce to get row sum
@@ -270,7 +271,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
         S col_sum = 0;
         for(I i = tid; i < m; i += LANGE_THDS)
         {
-            col_sum += rocblas_abs(a[i + col * lda]);
+            col_sum += rocblas_abs(a[idx2D(i, col, lda)]);
         }
 
         // reduce to get column sum
@@ -374,7 +375,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
         {
             int row = i % m;
             int col = i / m;
-            block_max = rocblas_max_nan(block_max, rocblas_abs(a[row + col * lda]));
+            block_max = rocblas_max_nan(block_max, rocblas_abs(a[idx2D(row, col, lda)]));
         }
 
         // reduce to get block max
