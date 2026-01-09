@@ -17,10 +17,10 @@ jobs:
     # TODO: Update to @main after TheRock PR merges
     uses: ROCm/TheRock/.github/workflows/ci.yml@users/jayhawk-commits/deduplicate-ci
     secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
     with:
       external_source_checkout: true
       therock_ref: users/jayhawk-commits/deduplicate-ci
       projects: ${{ inputs.projects || '' }}
-    permissions:
-      contents: read
-      id-token: write
