@@ -1843,6 +1843,29 @@ BenchmarkProblems:
           - Range: [[192], [320], [1], [1, 17, 64]]
           - Range: [[192], [320], [1], [32, 64, 256]]
         - BiasTypeArgs: ['b']
+####################
+# BBS-128-128-64 NN
+###################
+  - 
+    -  
+      OperationType: GEMM
+      Activation: true
+      Batched: true
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      HighPrecisionAccumulate: true
+      IndexAssignmentsA: [0, 3, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      NumIndicesC: 3
+      TransposeA: false
+      TransposeB: false
+      UseBias: 1
+      UseScaleAlphaVec: 1
     - 
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -1887,6 +1910,29 @@ BenchmarkProblems:
         - ProblemSizes:
           - Exact: [1024, 1024, 1, 8192]
         - BiasTypeArgs: [0, 7]
+####################
+# BBS-128-128-64 TN
+###################
+  - 
+    -
+      OperationType: GEMM
+      Activation: true
+      Batched: true
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      HighPrecisionAccumulate: true
+      IndexAssignmentsA: [0, 3, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      NumIndicesC: 3
+      TransposeA: false
+      TransposeB: true
+      UseBias: 1
+      UseScaleAlphaVec: 1
     - 
       InitialSolutionParameters:
       BenchmarkCommonParameters:
