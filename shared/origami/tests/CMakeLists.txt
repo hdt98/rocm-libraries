@@ -31,6 +31,7 @@ if(NOT Catch2_FOUND)
             Catch2 GIT_REPOSITORY https://github.com/catchorg/Catch2.git GIT_TAG devel
         )
         fetchcontent_makeavailable(Catch2)
+        list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
     else()
         message(FATAL_ERROR "Failed to find Catch2")
     endif()
