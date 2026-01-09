@@ -202,7 +202,7 @@ struct SolverBaseTunable : SolverInterfaceTunable<Context, Problem>, TunableSolv
 
     std::vector<PerformanceConfig> GetOrigamiPerformanceConfig(const std::vector<PerformanceConfig>& all_configs)
     {
-        return all_configs;
+        return {};
     }
 
     /// Should return false if performance config is wrong for a problem.

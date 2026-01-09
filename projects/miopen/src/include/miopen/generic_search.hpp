@@ -416,6 +416,87 @@ void CompileAgent(size_t thread_index,
     MIOPEN_LOG_I2("Thread: " << thread_index << " Done, completed tuning");
 }
 
+// Filter configs with origami
+#include <origami/origami.hpp>
+#include <origami/types.hpp>
+
+template <typename PerformanceConfig, typename Problem>
+std::vector<PerformanceConfig> GetOrigamiPerformanceConfig(const Problem& problem, const std::vector<PerformanceConfig>& all_configs)
+{
+    auto hardware = origami::hardware_t::get_hardware_for_device(0);
+
+    auto GetOriDataType = []()
+    {
+        switch(problem.GetInDataType())
+        {
+        case miopenHalf: return origami::data_type_t::Half;
+        case miopenFloat: return origami::data_type_t::Float;
+        case miopenInt8: return origami::data_type_t::Int8;
+        case miopenBFloat16: return origami::data_type_t::BFloat16;
+        case miopenInt64: return origami::data_type_t::Int64;
+        case miopenInt32: return origami::data_type_t::Int32;
+        case miopenFloat8_fnuz: return origami::data_type_t::Float8_fnuz;
+        case miopenBFloat8_fnuz: return origami::data_type_t::BFloat8_fnuz;
+        case miopenDouble: return origami::data_type_t::Double;
+        }
+    }
+    // Create a problem description
+    origami::problem_t ori_prob;
+    ori_prob.size.m = ProblemInterpreter::GetBatchN(problem);  // M dimension // batch size
+    ori_prob.size.n = ProblemInterpreter::GetOutputChannelK(problem);  // N dimension // output channels
+    ori_prob.size.k = ProblemInterpreter::GetInputChannelC(problem);  // K dimension // input channels
+    //TBD
+    ori_prob.batch = 1;
+    //TransA T and TransB N is both K Contiguous (Ks next to each other in memory)
+    //TransA N and TransB T is M/N contiguous (M and N next to each other in memory)
+    ori_prob.a_transpose = origami::transpose_t::T;
+    ori_prob.b_transpose = origami::transpose_t::N;
+    ori_prob.a_dtype = GetOriDataType();
+    ori_prob.b_dtype = GetOriDataType();
+    ori_prob.c_dtype = GetOriDataType();
+    ori_prob.d_dtype = GetOriDataType();
+    ori_prob.mi_dtype = GetOriDataType();
+    //TBD
+    ori_prob.a_mx_block_size = 0;
+    ori_prob.b_mx_block_size = 0;
+    
+    // Create candidate configurations
+    std::vector<origami::config_t> ori_cfgs;
+
+    for(perf_cfg : all_configs)
+    {
+        auto conv_ptrs             = DeviceOpType::GetInstances();
+        std::optional<int> split_k = std::nullopt;
+        std::string id_string      = perf_cfg.kernel_id;
+        auto pos                   = perf_cfg.kernel_id.find_last_of('+');
+        if(pos != std::string::npos)
+        {
+            split_k   = std::stoi(perf_cfg.kernel_id.substr(pos + 1));
+            id_string = perf_cfg.kernel_id.substr(0, pos);
+        }
+
+        auto ptr_iter = FindConvPtrByID(conv_ptrs, id_string);
+
+        auto arg_ptr = MakeArgPtr(*ptr_iter, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k.value_or(1));
+        auto ck_kern_args = arg_ptr.get();
+
+        origami::config_t ori_cfg;
+        ori_cfg.mt.m = ck_kern_args.M;  // Macro tile M
+        ori_cfg.mt.n = ck_kern_args.N;  // Macro tile N
+        ori_cfg.mt.k = ck_kern_args.K;  // Macro tile K
+        ori_cfg.mi.m = 16;   // Matrix instruction M
+        ori_cfg.mi.n = 16;   // Matrix instruction N
+        ori_cfg.mi.k = 32;   // Matrix instruction K
+        //ori_cfg.occupancy = 4;
+        ori_cfgs.push_back(ori_cfg); 
+        MIOPEN_LOG_I2("CK id string: " << id_string << ", MT.M(" << ori_cfg.mt.m << ") MT.N(" << ori_cfg.mt.n << ") MT.K(" << ori_cfg.mt.k 
+                << ") MI.M(" << ori_cfg.mi.m << ") MI.N(" << ori_cfg.mi.n << ") MI.K(" << ori_cfg.mi.k << ")");
+    }
+
+    // Rank all configurations by performance
+    auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
+}
+
 struct SolutionPerf
 {
     std::string params;
@@ -455,56 +536,22 @@ auto GenericSearch(const Solver s,
     std::vector<PerformanceConfig> all_configs;
     std::copy(tmp_all_configs.begin(), tmp_all_configs.end(), std::back_inserter(all_configs));
 
-    // Filter configs with origami
-#include <origami/origami.hpp>
-#include <origami/types.hpp>
-
-template <typename PerformanceConfig, typename Problem>
-std::vector<PerformanceConfig> GetOrigamiPerformanceConfig(const Problem& problem, const std::vector<PerformanceConfig>& all_configs)
-{
-    auto hardware = origami::hardware_t::get_hardware_for_device(0);
-
-    // Create a problem description
-    origami::problem_t ori_prob;
-    ori_prob.size.m = 2048;  // M dimension
-    ori_prob.size.n = 2048;  // N dimension
-    ori_prob.size.k = 2048;  // K dimension
-    ori_prob.batch = problem.GetBatchSize();
-    ori_prob.a_transpose = origami::transpose_t::T;
-    ori_prob.b_transpose = origami::transpose_t::N;
-    ori_prob.a_dtype = origami::data_type_t::Half;
-    ori_prob.b_dtype = origami::data_type_t::Half;
-    ori_prob.c_dtype = origami::data_type_t::Half;
-    ori_prob.d_dtype = origami::data_type_t::Half;
-    ori_prob.mi_dtype = origami::data_type_t::Half;
-    ori_prob.a_mx_block_size = 0;
-    ori_prob.b_mx_block_size = 0;
-    
-    // Create candidate configurations
-    std::vector<origami::config_t> ori_cfgs;
-
-    for(perf_cfg : all_configs)
-    {
-        auto perf_str = perf_cfg.ToString();
-        origami::config_t ori_cfg;
-        ori_cfg.mt.m = 256;  // Macro tile M
-        ori_cfg.mt.n = 256;  // Macro tile N
-        ori_cfg.mt.k = 64;   // Macro tile K
-        ori_cfg.mi.m = 16;   // Matrix instruction M
-        ori_cfg.mi.n = 16;   // Matrix instruction N
-        ori_cfg.mi.k = 32;   // Matrix instruction K
-        ori_cfg.occupancy = 4;
-        ori_cfgs.push_back(ori_cfg); 
-    }
-
-    // Rank all configurations by performance
-    auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
-}
-
     // shuffle the configs
     std::random_device rd{};
     auto rng = std::default_random_engine{rd()};
     std::shuffle(all_configs.begin(), all_configs.end(), rng);
+
+    // rank order configs
+    const size_t origami_ret_size = 5;
+    auto ranked_configs = GetOrigamiPerformanceConfig(problem, all_configs)
+    if(ranked_configs)
+    {
+        if(ranked_configs.size() > origami_ret_size)
+        {
+            ranked_configs.resize(5); 
+        }
+    }
+
     std::size_t n_runs_total = std::min(all_configs.size(), GetTuningIterationsMax());
     all_configs.resize(n_runs_total);
     std::size_t patience = GetTuningPatience(context, problem);
