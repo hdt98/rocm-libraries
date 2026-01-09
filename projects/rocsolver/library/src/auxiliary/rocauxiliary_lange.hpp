@@ -40,6 +40,12 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+template <typename T>
+__device__ inline T square(T x)
+{
+    return x * x;
+}
+
 template <typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_frobenius_kernel(const I m,
@@ -75,7 +81,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
         {
             int row = i % m;
             int col = i / m;
-            block_sum += std::pow(rocblas_abs(a[idx2D(row, col, lda)]), 2);
+            block_sum += square(rocblas_abs(a[idx2D(row, col, lda)]));
         }
 
         // reduce to get block sum
