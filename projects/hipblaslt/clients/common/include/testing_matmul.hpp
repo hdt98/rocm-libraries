@@ -3678,6 +3678,68 @@ void testing_matmul_with_bias(const Arguments& arg,
             if(arg.unit_check || arg.norm_check || arg.allclose_check)
             {
                 copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
+#if 0
+                hipblaslt_cout << "\n===============================================================" << std::endl;
+                hipblaslt_cout << ">>> RK : MATRIX INPUTS & OUTPUTS (First 20 elements) <<<" << std::endl;
+                hipblaslt_cout << "===============================================================" << std::endl;
+
+                size_t debug_limit = 20;
+
+                // 1. Print Matrix A
+                size_t limit_a = std::min(debug_limit, size_A[0]);
+                hipblaslt_cout << "\n[Input A] Type: " << hip_datatype_to_string(TiA) << std::endl;
+                for(size_t i = 0; i < limit_a; i++) {
+                    if (TiA == HIP_C_32F) {
+                        auto val = static_cast<std::complex<float>*>(hA[0].buf())[i];
+                        hipblaslt_cout << val << " ";
+                    } else if (TiA == HIP_C_64F) {
+                        auto val = static_cast<std::complex<double>*>(hA[0].buf())[i];
+                        hipblaslt_cout << val << " ";
+                    } else {
+                        hipblaslt_cout << cast_from_type<double>(hA[0].buf(), TiA, i) << " ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+
+                // 2. Print Matrix B
+                size_t limit_b = std::min(debug_limit, size_B[0]);
+                hipblaslt_cout << "\n[Input B] Type: " << hip_datatype_to_string(TiB) << std::endl;
+                for(size_t i = 0; i < limit_b; i++) {
+                    if (TiB == HIP_C_32F) {
+                        auto val = static_cast<std::complex<float>*>(hB[0].buf())[i];
+                        hipblaslt_cout << val << " ";
+                    } else if (TiB == HIP_C_64F) {
+                        auto val = static_cast<std::complex<double>*>(hB[0].buf())[i];
+                        hipblaslt_cout << val << " ";
+                    } else {
+                        hipblaslt_cout << cast_from_type<double>(hB[0].buf(), TiB, i) << " ";
+                    }
+                }
+                hipblaslt_cout << std::endl;
+
+                // 3. Print Outputs (CPU vs GPU)
+                size_t limit_d = std::min(debug_limit, size_D_copy[0]);
+                hipblaslt_cout << "\n[Outputs] Type: " << hip_datatype_to_string(To) << " (CPU Gold vs GPU)" << std::endl;
+                for(size_t i = 0; i < limit_d; i++)
+                {
+                    if (To == HIP_C_32F) {
+                        auto c = static_cast<std::complex<float>*>(hD_gold[0].buf())[i];
+                        auto g = static_cast<std::complex<float>*>(hD_1[0].buf())[i];
+                        hipblaslt_cout << "Idx " << i << ": CPU=" << c << " GPU=" << g << std::endl;
+                    }
+                    else if (To == HIP_C_64F) {
+                        auto c = static_cast<std::complex<double>*>(hD_gold[0].buf())[i];
+                        auto g = static_cast<std::complex<double>*>(hD_1[0].buf())[i];
+                        hipblaslt_cout << "Idx " << i << ": CPU=" << c << " GPU=" << g << std::endl;
+                    }
+                    else {
+                        double c = cast_from_type<double>(hD_gold[0].buf(), To, i);
+                        double g = cast_from_type<double>(hD_1[0].buf(), To, i);
+                        hipblaslt_cout << "Idx " << i << ": CPU=" << c << " GPU=" << g << " Diff=" << (c - g) << std::endl;
+                    }
+                }
+                hipblaslt_cout << "===============================================================\n" << std::endl;
+#endif
                 check(stream,
                       arg,
                       gemm_count,

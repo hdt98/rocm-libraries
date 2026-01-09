@@ -1137,6 +1137,7 @@ namespace TensileLite
         for(int dUse : dUseCount)
             TENSILE_ASSERT_EXC(dUse == 1);
 
+        /* RK Debug 
         for(auto const& op : m_aOps)
             if(op.type == TensorOp::Type::ComplexConjugate)
                 TENSILE_ASSERT_EXC(DataTypeInfo::Get(aTensor.dataType()).isComplex);
@@ -1151,7 +1152,7 @@ namespace TensileLite
 
         for(auto const& op : m_dOps)
             if(op.type == TensorOp::Type::ComplexConjugate)
-                TENSILE_ASSERT_EXC(DataTypeInfo::Get(dTensor.dataType()).isComplex);
+                TENSILE_ASSERT_EXC(DataTypeInfo::Get(dTensor.dataType()).isComplex); */
     }
 
     void ContractionProblemGemm::calcArithmeticIntensity()

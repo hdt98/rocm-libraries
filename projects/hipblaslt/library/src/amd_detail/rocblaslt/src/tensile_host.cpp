@@ -1628,6 +1628,8 @@ namespace
         tensileProblem.setAlphaType(a_type);
         tensileProblem.setBetaType(a_type);
 
+        std::cout<<"RK: alphaType : " << tensileProblem.alphaType() << ", betaType: "<< tensileProblem.betaType() << std::endl;
+
         // HPA is active iff sizeof(compute type) > sizeof(input type)
         tensileProblem.setHighPrecisionAccumulate(
             TensileLite::DataTypeInfo::Get(compute_type).elementSize
