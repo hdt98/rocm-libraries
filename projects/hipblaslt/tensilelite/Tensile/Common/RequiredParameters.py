@@ -35,6 +35,7 @@ def getRequiredParametersMin() -> set:
     return frozenset({
         '1LDSBuffer',
         'ActivationFuncCall',
+        'AdaptiveGemm',
         'AssertFree0ElementMultiple',
         'AssertFree1ElementMultiple',
         'AssertSummationElementMultiple',
@@ -45,6 +46,8 @@ def getRequiredParametersMin() -> set:
         'DirectToLdsA',
         'DirectToLdsB',
         'ExpandPointerSwap',
+        'ExtraLatencyForLR',
+        'ExtraMiLatencyLeft',
         'ForceDisableShadowInit',
         'GlobalReadPerMfma',
         'GlobalReadVectorWidthA',

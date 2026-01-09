@@ -43,6 +43,7 @@
 #include <miopen/batchnorm/problem_description.hpp>
 #include <miopen/find_solution.hpp>
 
+#include <algorithm>
 #include <chrono>
 
 namespace miopen {
@@ -54,6 +55,51 @@ miopen::PerformanceDb GetDb(const miopen::ExecutionContext& ctx,
     return {DbKinds::PerfDb, ctx.GetPerfDbPath("batchnorm"), ctx.GetUserPerfDbPath("batchnorm")};
 }
 } // namespace batchnorm
+
+namespace {
+// Validate batch norm training input dimensions (PyTorch-compatible)
+// PyTorch rejects training when there's insufficient data for statistics computation
+inline void ValidateBatchNormTrainingInput(const TensorDescriptor& xDesc,
+                                           miopenBatchNormMode_t bn_mode)
+{
+    const auto& lengths = xDesc.GetLengths();
+    const auto N        = lengths[0];
+
+    if(bn_mode == miopenBNSpatial)
+    {
+
+        // For Spatial BN: need N*spatial_size > 1 to compute variance
+        // spatial_size = H*W (2D) or D*H*W (3D)
+
+        // dims are always declared in NCHW & NCDHW order
+        size_t spatial_size = 1;
+        for(size_t i = 2; i < lengths.size(); ++i)
+        {
+            spatial_size *= lengths[i];
+        }
+
+        if(N * spatial_size <= 1)
+        {
+            MIOPEN_THROW(miopenStatusBadParm,
+                         "BatchNorm Spatial training requires N*spatial_size > 1. "
+                         "Got N=" +
+                             std::to_string(N) + ", spatial=" + std::to_string(spatial_size) +
+                             ". This restriction matches PyTorch behavior.");
+        }
+    }
+    else if(bn_mode == miopenBNPerActivation)
+    {
+        // For PerActivation BN: need N > 1 to compute variance across batch dimension
+        if(N <= 1)
+        {
+            MIOPEN_THROW(miopenStatusBadParm,
+                         "BatchNorm PerActivation training requires N > 1. "
+                         "Got N=" +
+                             std::to_string(N) + ". This restriction matches PyTorch behavior.");
+        }
+    }
+}
+} // anonymous namespace
 
 //============ BEGIN FORWARD TRAINING ===============
 
@@ -103,6 +149,10 @@ void BatchNormForwardTraining(const Handle& handle,
     {
         MIOPEN_THROW(miopenStatusBadParm);
     }
+
+    // Validate training input dimensions (PyTorch-compatible) - fail fast
+    ValidateBatchNormTrainingInput(xDesc, bn_mode);
+
     if(!float_equal(*(static_cast<const float*>(alpha)), 1.0) ||
        !float_equal(*(static_cast<const float*>(beta)), 0.0))
     {
@@ -120,19 +170,20 @@ void BatchNormForwardTraining(const Handle& handle,
     const auto resultsave    = resultSaveMean != nullptr && resultSaveInvVariance != nullptr;
     const auto resultrunning = resultRunningMean != nullptr && resultRunningVariance != nullptr;
 
-    const auto problem = batchnorm::ProblemDescription{bn_mode,
-                                                       xDesc,
-                                                       yDesc,
-                                                       scaleDesc,
-                                                       biasDesc,
-                                                       savedMeanDesc,
-                                                       savedVarianceDesc,
-                                                       expAvgFactor,
-                                                       epsilon,
-                                                       resultsave,
-                                                       resultrunning,
-                                                       size_t(0.6f * handle.GetMaxComputeUnits()),
-                                                       activDesc};
+    const auto problem = batchnorm::ProblemDescription{
+        bn_mode,
+        xDesc,
+        yDesc,
+        scaleDesc,
+        biasDesc,
+        savedMeanDesc,
+        savedVarianceDesc,
+        expAvgFactor,
+        epsilon,
+        resultsave,
+        resultrunning,
+        std::max(size_t(1), size_t(0.6f * handle.GetMaxComputeUnits())),
+        activDesc};
 
     const auto algo = bn_mode == miopenBNSpatial
                           ? AlgorithmName{"miopenBatchNormForwardTrainingSpatial"}
@@ -359,6 +410,10 @@ void BatchNormBackward(const Handle& handle,
     {
         MIOPEN_THROW(miopenStatusBadParm);
     }
+
+    // Validate training input dimensions (PyTorch-compatible) - fail fast
+    ValidateBatchNormTrainingInput(xDesc, bn_mode);
+
     if(!float_equal(*(static_cast<const float*>(alphaDataDiff)), 1.0) ||
        !float_equal(*(static_cast<const float*>(betaDataDiff)), 0))
     {
@@ -374,18 +429,19 @@ void BatchNormBackward(const Handle& handle,
 
     const auto useSaved = savedMean != nullptr && savedInvVariance != nullptr;
 
-    const auto problem = batchnorm::ProblemDescription{bn_mode,
-                                                       xDesc,
-                                                       dyDesc,
-                                                       dxDesc,
-                                                       scaleDesc,
-                                                       biasDesc,
-                                                       savedMeanDesc,
-                                                       savedVarianceDesc,
-                                                       epsilon,
-                                                       useSaved,
-                                                       size_t(0.6f * handle.GetMaxComputeUnits()),
-                                                       activDesc};
+    const auto problem = batchnorm::ProblemDescription{
+        bn_mode,
+        xDesc,
+        dyDesc,
+        dxDesc,
+        scaleDesc,
+        biasDesc,
+        savedMeanDesc,
+        savedVarianceDesc,
+        epsilon,
+        useSaved,
+        std::max(size_t(1), size_t(0.6f * handle.GetMaxComputeUnits())),
+        activDesc};
 
     const auto algo = bn_mode == miopenBNSpatial
                           ? AlgorithmName{"miopenBatchNormBackwardPropSpatial"}

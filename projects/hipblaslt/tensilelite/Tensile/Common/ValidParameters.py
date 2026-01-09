@@ -332,7 +332,11 @@ validParameters = { # we need to make sure this matches develop
     #      GlobalReadVectorWidth = 1/2/4 (GRVW * bpe must be 4 for now)
     #      TransposeLDS = 1 for TLU=0 case
     # DirectToLds support for x1 only for now
-    "DirectToLds": [False, True],
+    #  0: no DirectToLds
+    #  1: DirectToLds A and B
+    #  2: DirectToLds A only (no DTLB)
+    #  3: DirectToLds B only (no DTLA)
+    "DirectToLds": [0, 1, 2, 3],
     # Load options:
     # (GRO = Global Read Offset)
     # BufferLoad=0:
@@ -459,7 +463,8 @@ validParameters = { # we need to make sure this matches develop
     # StaggerUStride will be internally increased so it is an integer multiple of DepthU*BpeAB.
     # (the implementation requires this - the unroll iteration accesses data in steps of
     # DepthU*BPE
-    "StaggerUStride": [-1, 16, 32, 64, 128, 256, 512, 1024, 2048],
+    # StaggerUStride = 0 is valid only when StaggerU = 0
+    "StaggerUStride": [-1, 0, 16, 32, 64, 128, 256, 512, 1024, 2048],
     # How the tile assignment (wg0, wg1, wg2) controls the initial StaggerU offset:
     # 0: Use wg0
     # 1: Use wg1
