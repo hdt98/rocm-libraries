@@ -49,20 +49,20 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
                            const rocblas_stride strideA,
                            S* block_sums)
 {
-    I bidz = blockIdx.z;
-    I bid = blockIdx.x;
+    I bid = blockIdx.z;
+    I block_start = blockIdx.x;
     I tid = threadIdx.x;
 
     // select batch instance
     int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
-    T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
-    S* block_sums_block = load_ptr_batch<S>(block_sums, bidz, 0, blocks);
+    T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
+    S* block_sums_block = load_ptr_batch<S>(block_sums, bid, 0, blocks);
 
     // shared variables
     __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // loop over blocks with grid stride (handles grid overflow)
-    for(I block_id = bid; block_id < blocks; block_id += gridDim.x)
+    for(I block_id = block_start; block_id < blocks; block_id += gridDim.x)
     {
         // sum absolute values in this block
         S block_sum = 0;
@@ -154,19 +154,19 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
                           const rocblas_stride strideA,
                           S* row_sums)
 {
-    I bidz = blockIdx.z;
-    I bid = blockIdx.x;
+    I bid = blockIdx.z;
+    I row_start = blockIdx.x;
     I tid = threadIdx.x;
 
     // select batch instance
-    T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
-    S* row_sums_block = load_ptr_batch<S>(row_sums, bidz, 0, m);
+    T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
+    S* row_sums_block = load_ptr_batch<S>(row_sums, bid, 0, m);
 
     // shared variables
     __shared__ S sval[LANGE_THDS / WarpSize];
 
     // loop over rows with grid stride (handles grid overflow)
-    for(I row = bid; row < m; row += gridDim.x)
+    for(I row = row_start; row < m; row += gridDim.x)
     {
         // sum absolute values in row
         S row_sum = 0;
@@ -252,19 +252,19 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
                              const rocblas_stride strideA,
                              S* col_sums)
 {
-    I bidz = blockIdx.z;
-    I bid = blockIdx.x;
+    I bid = blockIdx.z;
+    I col_start = blockIdx.x;
     I tid = threadIdx.x;
 
     // select batch instance
-    T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
-    S* col_sums_block = load_ptr_batch<S>(col_sums, bidz, 0, n);
+    T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
+    S* col_sums_block = load_ptr_batch<S>(col_sums, bid, 0, n);
 
     // shared variables
     __shared__ S sval[LANGE_THDS / WarpSize];
 
     // loop over columns with grid stride (handles grid overflow)
-    for(I col = bid; col < n; col += gridDim.x)
+    for(I col = col_start; col < n; col += gridDim.x)
     {
         // sum absolute values in column col
         S col_sum = 0;
@@ -350,20 +350,20 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
                      const rocblas_stride strideA,
                      S* block_maxs)
 {
-    I bidz = blockIdx.z;
-    I bid = blockIdx.x;
+    I bid = blockIdx.z;
+    I block_start = blockIdx.x;
     I tid = threadIdx.x;
 
     // select batch instance
     I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
-    T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
-    S* block_maxs_block = load_ptr_batch<S>(block_maxs, bidz, 0, blocks);
+    T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
+    S* block_maxs_block = load_ptr_batch<S>(block_maxs, bid, 0, blocks);
 
     // shared variables
     __shared__ S sval[LANGE_FROBENIUS_MAX_BDIM / WarpSize];
 
     // loop over blocks with grid stride (handles grid overflow)
-    for(I block_id = bid; block_id < blocks; block_id += gridDim.x)
+    for(I block_id = block_start; block_id < blocks; block_id += gridDim.x)
     {
         // find maximum absolute value in this block
         S block_max = 0;
