@@ -21,7 +21,9 @@
 #include "origami/streamk.hpp"
 
 namespace origami {
-double calculate_work_utilization(const problem_t& problem, const config_t& config) {
+double calculate_work_utilization(const problem_t& problem,
+                                  const config_t& config,
+                                  const origami_cache_t& cache) {
   const size_t M = problem.size.m;
   const size_t N = problem.size.n;
   const size_t K = problem.size.k;
@@ -33,14 +35,11 @@ double calculate_work_utilization(const problem_t& problem, const config_t& conf
   if (MT_M <= 0 || MT_N <= 0) return 1.0;
 
   // Calculate the full dimensions covered by the launched grid of tiles (spatial).
-  const double launched_M =
-      static_cast<double>(math::safe_ceil_div(M, MT_M)) * static_cast<double>(MT_M);
-  const double launched_N =
-      static_cast<double>(math::safe_ceil_div(N, MT_N)) * static_cast<double>(MT_N);
+  const double launched_M = static_cast<double>(cache.grid_m) * static_cast<double>(MT_M);
+  const double launched_N = static_cast<double>(cache.grid_n) * static_cast<double>(MT_N);
 
   // Calculate the full depth covered by the k-loop iterations (temporal).
-  const double launched_K =
-      static_cast<double>(math::safe_ceil_div(K, MT_K)) * static_cast<double>(MT_K);
+  const double launched_K = static_cast<double>(cache.grid_k) * static_cast<double>(MT_K);
 
   // The utilization is the ratio of the useful problem volume to the total scheduled volume.
   const double useful_volume   = static_cast<double>(M * N * K);
@@ -169,6 +168,7 @@ double emulated_tf32_arithmetic_intensity(double m, double n, double k, double b
 
 // Compute cvt overhead in x1 tf32 emulation
 // TODO: We can generalize the same routine to cover more GEMMs that perform conversion
+// This routine should not rely on problem.size or problem.batch
 static inline double compute_cvt_overhead_x1(const problem_t& problem,
                                              const hardware_t& hardware,
                                              const config_t& config) {
@@ -241,6 +241,7 @@ static inline double compute_cvt_overhead_x1(const problem_t& problem,
 }
 
 // Compute cvt overhead in tf32 emulation
+// This routine should not rely on problem.size or problem.batch
 double compute_cvt_overhead(const problem_t& problem,
                             const hardware_t& hardware,
                             const config_t& config) {
@@ -360,11 +361,13 @@ double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t num_acti
 double estimate_l2_hit(const problem_t& problem,
                        const hardware_t& hardware,
                        const config_t& config,
-                       size_t splitting_factor) {
+                       const origami_cache_t& cache) {
   // Use size_t for dimensions and counts to ensure type safety.
-  const size_t workgroups_m     = math::safe_ceil_div(problem.size.m, config.mt.m);
-  const size_t workgroups_n     = math::safe_ceil_div(problem.size.n, config.mt.n);
+  const size_t workgroups_m     = cache.grid_m;
+  const size_t workgroups_n     = cache.grid_n;
   const size_t total_workgroups = workgroups_m * workgroups_n;
+
+  const auto splitting_factor = cache.splitting_factor;
 
   // Concurrently executing workgroups are limited by the number of CUs.a
   const size_t concurrent_workgroups = std::min(total_workgroups, hardware.N_CU);
@@ -397,8 +400,8 @@ double estimate_l2_hit(const problem_t& problem,
   const auto a_bytes       = data_type_to_bytes(problem.a_dtype);
   const auto b_bytes       = data_type_to_bytes(problem.b_dtype);
   auto calculate_footprint = [&](auto tile_m, auto tile_n) {
-    auto a_footprint = tile_m * config.mt.mk() * a_bytes;
-    auto b_footprint = tile_n * config.mt.nk() * b_bytes;
+    auto a_footprint = tile_m * cache.kernel_cache.a_loads_bytes;
+    auto b_footprint = tile_n * cache.kernel_cache.b_loads_bytes;
     return a_footprint + b_footprint;
   };
 
@@ -416,8 +419,8 @@ double estimate_l2_hit(const problem_t& problem,
   }
 
   // Uncached reads are the first read of each unique element within the L2 tile.
-  const long long uncached_A_reads     = static_cast<long long>(l2_tile_m) * config.mt.mk();
-  const long long uncached_B_reads     = static_cast<long long>(l2_tile_n) * config.mt.nk();
+  const long long uncached_A_reads     = static_cast<long long>(l2_tile_m) * cache.kernel_cache.a_loads_bytes;
+  const long long uncached_B_reads     = static_cast<long long>(l2_tile_n) * cache.kernel_cache.b_loads_bytes;
   const long long total_uncached_reads = uncached_A_reads + uncached_B_reads;
 
   // Total reads are the sum of all reads performed by all workgroups in the L2 tile.
@@ -436,14 +439,16 @@ double estimate_l2_hit(const problem_t& problem,
   return std::max(0.0, std::min(l2_hit_rate, 1.0));
 }
 
-// Estimate MALL hit-rate
-double estimate_mall_hit(const problem_t& problem,
-                         const hardware_t& hardware,
-                         const config_t& config,
-                         size_t num_active_cus,
-                         size_t splitting_factor) {
-  const size_t workgroups_m = math::safe_ceil_div(problem.size.m, config.mt.m);
-  const size_t workgroups_n = math::safe_ceil_div(problem.size.n, config.mt.n);
+// Estimate MALL hit-rate, also return mall tile
+std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
+                                                     const hardware_t& hardware,
+                                                     const config_t& config,
+                                                     const origami_cache_t& cache) {
+  const auto num_active_cus   = cache.num_active_cus;
+  const auto splitting_factor = cache.splitting_factor;
+
+  const size_t workgroups_m = cache.grid_m;
+  const size_t workgroups_n = cache.grid_n;
 
   if (num_active_cus == 0) throw std::runtime_error("Number of Active CUs was 0");
 
@@ -465,18 +470,18 @@ double estimate_mall_hit(const problem_t& problem,
   mall_tile_n = std::max(std::min(workgroups_n, mall_tile_n), static_cast<size_t>(1));
 
   // --- CRITICAL: Shrink tile to fit into MALL Capacity ---
-  const auto a_bytes = data_type_to_bytes(problem.a_dtype);
-  const auto b_bytes = data_type_to_bytes(problem.b_dtype);
+  const auto a_bytes = cache.kernel_cache.a_bytes;
+  const auto b_bytes = cache.kernel_cache.b_bytes;
 
   auto calculate_footprint = [&](auto tile_m, auto tile_n) {
-    auto a_footprint = tile_m * config.mt.mk() * a_bytes;
-    auto b_footprint = tile_n * config.mt.nk() * b_bytes;
+    auto a_footprint = tile_m * cache.kernel_cache.a_loads_bytes;
+    auto b_footprint = tile_n * cache.kernel_cache.b_loads_bytes;
     return a_footprint + b_footprint;
   };
 
   // --- Calculate Hit Rate based on the final, capacity-aware tile size ---
-  const long long uncached_A_reads     = static_cast<long long>(mall_tile_m) * config.mt.mk();
-  const long long uncached_B_reads     = static_cast<long long>(mall_tile_n) * config.mt.nk();
+  const long long uncached_A_reads     = static_cast<long long>(mall_tile_m) * cache.kernel_cache.a_loads_bytes;
+  const long long uncached_B_reads     = static_cast<long long>(mall_tile_n) * cache.kernel_cache.b_loads_bytes;
   const long long total_uncached_reads = uncached_A_reads + uncached_B_reads;
 
   const long long total_A_reads = uncached_A_reads * mall_tile_n;
@@ -488,7 +493,7 @@ double estimate_mall_hit(const problem_t& problem,
   double mall_hit_rate = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
   // Clamp the final result to the valid [0, 1] range.
-  return std::max(0.0, std::min(mall_hit_rate, 1.0));
+  return {std::max(0.0, std::min(mall_hit_rate, 1.0)), mall_tile_m, mall_tile_n};
 }
 
 /**
@@ -498,25 +503,24 @@ double estimate_mall_hit(const problem_t& problem,
 double compute_l2_hit_rate_global(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config,
+                                  const origami_cache_t& cache,
                                   size_t l2_capacity_bytes) {
   // --- Hardware Parameters (as requested, defined locally) ---
   // You would normally get l2_capacity_bytes from your hardware_t struct.
   if (l2_capacity_bytes == 0) throw std::runtime_error("L2 Capacity is zero");
 
   // 1. Calculate the grid dimensions in terms of macro-tiles
-  const size_t grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
-  const size_t grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
+  const size_t grid_m = cache.grid_m;
+  const size_t grid_n = cache.grid_n;
 
   if (grid_m == 0 || grid_n == 0)
     throw std::runtime_error("estimate_l2_hit grid dimensions can not be zero");
 
   // 2. Calculate the working set size for one full pass of global reuse
   // This is the data needed by one full column of CUs (for A) and one full row (for B).
-  const double a_bytes = data_type_to_bytes(problem.a_dtype);
-  const double b_bytes = data_type_to_bytes(problem.b_dtype);
 
-  const double a_working_set           = static_cast<double>(grid_m * config.mt.mk()) * a_bytes;
-  const double b_working_set           = static_cast<double>(grid_n * config.mt.nk()) * b_bytes;
+  const double a_working_set           = grid_m * cache.kernel_cache.a_loads_bytes;
+  const double b_working_set           = grid_n * cache.kernel_cache.b_loads_bytes;
   const double total_working_set_bytes = a_working_set + b_working_set;
 
   // 3. CRUCIAL: Check if the working set fits in the L2 cache.
@@ -530,14 +534,12 @@ double compute_l2_hit_rate_global(const problem_t& problem,
 
   // 4. If it fits, calculate the idealized global hit rate
   // Total reads if nothing was cached
-  const double total_A_reads = static_cast<double>(grid_m * grid_n * config.mt.mk());
-  const double total_B_reads = static_cast<double>(grid_m * grid_n * config.mt.nk());
+  const double total_A_reads = grid_n * a_working_set;
+  const double total_B_reads = grid_m * b_working_set;
 
   // Uncached reads are the first-time fetches for each row/column
-  const double uncached_A_reads =
-      static_cast<double>(grid_m * config.mt.mk());  // One full column fetches A
-  const double uncached_B_reads =
-      static_cast<double>(grid_n * config.mt.nk());  // One full row fetches B
+  const double uncached_A_reads = a_working_set;  // One full column fetches A
+  const double uncached_B_reads = b_working_set;  // One full row fetches B
 
   const double total_reads = total_A_reads + total_B_reads;
   if (total_reads == 0) return 1.0;  // No reads, perfect hit rate.
@@ -561,13 +563,12 @@ size_t round_elements_to_128B(size_t elements, size_t element_size_bits) {
 double compute_memory_latency(const problem_t& problem,
                               const hardware_t& hardware,
                               const config_t& config,
-                              size_t num_active_cus,
-                              size_t splitting_factor) {
+                              const origami_cache_t& cache) {
   // Extract parameters from structured types
-  const auto a_bytes = data_type_to_bytes(problem.a_dtype);
-  const auto b_bytes = data_type_to_bytes(problem.b_dtype);
-  const auto a_bits  = datatype_to_bits(problem.a_dtype);
-  const auto b_bits  = datatype_to_bits(problem.b_dtype);
+  const auto a_bytes = cache.kernel_cache.a_bytes;
+  const auto b_bytes = cache.kernel_cache.b_bytes;
+  const auto a_bits  = cache.kernel_cache.a_bits;
+  const auto b_bits  = cache.kernel_cache.b_bits;
   size_t batch       = problem.batch;
 
   const bool a_trans = (problem.a_transpose == transpose_t::T);
@@ -577,13 +578,15 @@ double compute_memory_latency(const problem_t& problem,
   const size_t MT_N = config.mt.n;
   const size_t MT_K = config.mt.k;
 
+  const auto num_active_cus = cache.num_active_cus;
+
   // 1) Estimate L2 hit-rate
-  double H_mem1 = estimate_l2_hit(problem, hardware, config, splitting_factor);
+  double H_mem1 = estimate_l2_hit(problem, hardware, config, cache);
 
   // Global cap on L2 hit-rate (prevents impossible cache residency claims)
   // (Assumes capacity is given in KiB, convert to bytes)
   double H_mem1_global =
-      compute_l2_hit_rate_global(problem, hardware, config, hardware.L2_capacity * 1024);
+      compute_l2_hit_rate_global(problem, hardware, config, cache, hardware.L2_capacity * 1024);
 
   H_mem1 = std::min(H_mem1, H_mem1_global);
 
@@ -596,26 +599,7 @@ double compute_memory_latency(const problem_t& problem,
           : 0.0;  // MALL is not supported, so we emulate every read as a miss
 
   // 3) Total loads are loads from A and loads from B
-  size_t Ld_A_value = a_trans ?
-      MT_M * round_elements_to_128B(MT_K, a_bits) : round_elements_to_128B(MT_M, a_bits) * MT_K;
-  size_t Ld_B_value = b_trans ?
-      round_elements_to_128B(MT_N, b_bits) * MT_K : MT_N * round_elements_to_128B(MT_K, b_bits);
-  auto Ld_CU_bytes  = (Ld_A_value * a_bytes)    // A Bytes
-                     + (Ld_B_value * b_bytes);  // B Bytes
-
-  // Logic for block scaled datatypes (Assuming BS=32 and 8-bit scales)
-  // TODO This is technically wrong, need separate flag to enable MX so we can differentiate FP8
-  // and MX8
-  if (a_bits < 8 && problem.a_mx_block_size != 0) {
-    // Number of scales per tile
-    size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem.a_mx_block_size);
-    Ld_CU_bytes += num_scales_A;  // One Byte per scale
-  }
-  if (b_bits < 8 && problem.b_mx_block_size != 0) {
-    // Number of scales per tile
-    size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem.b_mx_block_size);
-    Ld_CU_bytes += num_scales_B;  // One Byte per scale
-  }
+  auto Ld_CU_bytes = cache.kernel_cache.Ld_CU_bytes;
 
   // 4) total loads by all CUs
   double total_Ld = Ld_CU_bytes * static_cast<double>(num_active_cus);
@@ -639,8 +623,8 @@ double compute_memory_latency(const problem_t& problem,
 
   // 9) enforce whole‐problem minimum loads when we can fit M/N in the CUs.
   // Calculate the tile of workgroups that can run concurrently (logic from estimate_mall_hit).
-  size_t grid_m = math::safe_ceil_div(problem.size.m, MT_M);
-  size_t grid_n = math::safe_ceil_div(problem.size.n, MT_N);
+  size_t grid_m = cache.grid_m;
+  size_t grid_n = cache.grid_n;
   size_t mall_m =
       math::safe_ceil_div(num_active_cus, static_cast<size_t>(config.workgroup_mapping));
   size_t mall_n = std::min(static_cast<size_t>(config.workgroup_mapping), grid_n);
@@ -656,9 +640,9 @@ double compute_memory_latency(const problem_t& problem,
   // This is the minimum unique bytes needed from HBM to feed the concurrent workgroups.
   double concurrent_batches =
       std::min(static_cast<double>(problem.batch),
-               std::max(static_cast<double>(num_active_cus) / (grid_m * grid_n), 1.));
-  double min_load = static_cast<double>((mall_m * config.mt.mk() * a_bytes) +
-                                        (mall_n * config.mt.nk() * b_bytes)) *
+               std::max(static_cast<double>(num_active_cus) / cache.num_C_tiles, 1.));
+  double min_load = static_cast<double>((mall_m * cache.kernel_cache.a_loads_bytes) +
+                                        (mall_n * cache.kernel_cache.b_loads_bytes)) *
                     concurrent_batches;  // Apply batching to the minimum load itself.
   // The actual loads cannot be less than this physical minimum.
   Ld_MEM  = std::max(Ld_MEM, min_load);
@@ -685,8 +669,7 @@ double compute_memory_latency(const problem_t& problem,
 double compute_tile_latency(const problem_t& problem,
                             const hardware_t& hardware,
                             const config_t& config,
-                            size_t num_active_cus,
-                            size_t splitting_factor) {
+                            const origami_cache_t& cache) {
   // Extract parameters from structured types
   const size_t K = problem.size.k;
   size_t batch   = problem.batch;
@@ -695,29 +678,31 @@ double compute_tile_latency(const problem_t& problem,
   const size_t MT_N = config.mt.n;
   const size_t MT_K = config.mt.k;
 
-  const auto a_bits  = datatype_to_bits(problem.a_dtype);
-  const auto b_bits  = datatype_to_bits(problem.b_dtype);
-  const auto d_bytes = data_type_to_bytes(problem.d_dtype);
+  const auto a_bits  = cache.kernel_cache.a_bits;
+  const auto b_bits  = cache.kernel_cache.b_bits;
+  const auto d_bytes = cache.kernel_cache.d_bytes;
+
+  auto num_active_cus   = cache.num_active_cus;
+  auto splitting_factor = cache.splitting_factor;
 
   // 1) Compute per-tile latencies
-  double L_compute = compute_mt_compute_latency(problem, hardware, config);
+  double L_compute = cache.kernel_cache.mt_compute_latency;
 
-  double L_mem =
-      compute_memory_latency(problem, hardware, config, num_active_cus, splitting_factor);
+  double L_mem = compute_memory_latency(problem, hardware, config, cache);
 
   // TODO Does work utilization need to be 128-byte rounded for a cache line?
-  double utilization        = calculate_work_utilization(problem, config);
-  double output_utilization = calculate_output_utilization(problem, config, 1UL);
+  double utilization        = calculate_work_utilization(problem, config, cache);
+  // double output_utilization = calculate_output_utilization(problem, config, 1UL);
   // The effective latency per useful operation increases as utilization drops.
   // This penalty affects BOTH compute and memory bounds for the tile's core work.
   double effective_tile_penalty = (utilization > 1e-9) ? (1.0 / (utilization)) : 1.0;
-  double output_utilization_penalty =
-      (output_utilization > 1e-9) ? (1.0 / (output_utilization)) : 1.0;
+  // double output_utilization_penalty =
+  //     (output_utilization > 1e-9) ? (1.0 / (output_utilization)) : 1.0;
   // 2) Work-group setup & iteration latencies
   double L_WG_setup = 1;  // WG_setup_Latency
 
   // 3) Prologue: 2.2× memory latency
-  double L_prologue = 1.5 * L_mem;  // 1.5 chosen emprically
+  double L_prologue = 1.5 * L_mem;  // 1.5 chosen empirically
 
   // L_compute *= std::max(L_compute, L_LDS);
 
@@ -732,12 +717,9 @@ double compute_tile_latency(const problem_t& problem,
   // One compute iteration happens in the prologue
   L_epilogue += L_compute * effective_tile_penalty;
   // Epilogue and Prologue overhead are reduced with higher occupancy kernels.
-  int grid_m = static_cast<int>(math::safe_ceil_div(problem.size.m, MT_M));
-  int grid_n = static_cast<int>(math::safe_ceil_div(problem.size.n, MT_N));
-
   size_t real_occupancy =
       std::min(std::max(config.occupancy, static_cast<int>(1)),
-               static_cast<int>(math::safe_ceil_div(grid_m * grid_n * batch * splitting_factor,
+               static_cast<int>(math::safe_ceil_div(cache.num_C_tiles * batch * splitting_factor,
                                                     hardware.N_CU)));  // Number of WGs per CU.
 
   L_prologue = L_prologue * pow(0.95, real_occupancy);  // Factor chosen empirically
@@ -749,11 +731,11 @@ double compute_tile_latency(const problem_t& problem,
 
     // Only the reduction CU reads from all splits.
     double partial_read_bytes =
-        grid_m * grid_n * n_partials * MT_M_rounded_128bytes * MT_N * static_cast<double>(d_bytes);
+        cache.num_C_tiles * n_partials * MT_M_rounded_128bytes * MT_N * static_cast<double>(d_bytes);
 
     // All CUs write (once for each partial, and once by the reduction CU for the output.)
     double partial_write_bytes =
-        grid_m * grid_n * MT_M_rounded_128bytes * MT_N * static_cast<double>(d_bytes);
+        cache.num_C_tiles * MT_M_rounded_128bytes * MT_N * static_cast<double>(d_bytes);
 
     double partial_readwrite_bytes = partial_read_bytes + partial_write_bytes;
 
@@ -766,15 +748,7 @@ double compute_tile_latency(const problem_t& problem,
     L_epilogue += L_reduce + partial_adds + 10000;
   }
   // 4'') tf32 emu has some more overhead
-  double L_cvt = 0;
-  if ((problem.mi_dtype == data_type_t::XFloat32) &&
-      (hardware.arch == hardware_t::architecture_t::gfx950)) {
-    L_cvt = compute_cvt_overhead(problem, hardware, config);
-  } else if ((a_bits == 32) && (b_bits == 32) && (problem.mi_dtype == data_type_t::BFloat16) &&
-             (hardware.arch == hardware_t::architecture_t::gfx950))  // SS_BSS on GFX950
-  {
-    L_cvt = compute_cvt_overhead_x1(problem, hardware, config);
-  }
+  double L_cvt = cache.kernel_cache.L_cvt;
 
   // 5)
   // 5-0) Look up main_loop_efficiency from hardware map
@@ -817,18 +791,109 @@ double compute_tile_latency(const problem_t& problem,
 double compute_timestep_latency(const problem_t& problem,
                                 const hardware_t& hardware,
                                 const config_t& config,
-                                size_t num_active_cus,
-                                size_t splitting_factor) {
+                                const origami_cache_t& cache) {
   // Assume latency of a timestep is latency of a single K-complete output tile computed on one CU.
-  double L_timestep =
-      compute_tile_latency(problem, hardware, config, num_active_cus, splitting_factor);
+  double L_timestep = compute_tile_latency(problem, hardware, config, cache);
 
   return L_timestep;
 }
 
+kernel_cache_t create_kernel_cache(const problem_t& problem_type,
+                                   const hardware_t& hardware,
+                                   const config_t& config) {
+  double L_cvt        = 0.0;
+  const bool tf32_emu = (problem_type.mi_dtype == data_type_t::XFloat32) &&
+                        (hardware.arch == hardware_t::architecture_t::gfx950);
+  if (tf32_emu) {
+    L_cvt = compute_cvt_overhead(problem_type, hardware, config);
+  } else {
+    const bool ss_bss_bf16 = (problem_type.a_dtype == data_type_t::Float) &&
+                             (problem_type.b_dtype == data_type_t::Float) &&
+                             (problem_type.mi_dtype == data_type_t::BFloat16) &&
+                             (hardware.arch == hardware_t::architecture_t::gfx950);
+    if (ss_bss_bf16) { L_cvt = compute_cvt_overhead_x1(problem_type, hardware, config); }
+  }
+  const std::size_t MT_M = config.mt.m;
+  const std::size_t MT_N = config.mt.n;
+  const std::size_t MT_K = config.mt.k;
+
+  const auto a_bytes = data_type_to_bytes(problem_type.a_dtype);
+  const auto b_bytes = data_type_to_bytes(problem_type.b_dtype);
+  const auto d_bytes = data_type_to_bytes(problem_type.d_dtype);
+  const auto a_bits  = datatype_to_bits(problem_type.a_dtype);
+  const auto b_bits  = datatype_to_bits(problem_type.b_dtype);
+
+  const bool a_trans = problem_type.a_transpose == transpose_t::T;
+  const bool b_trans = problem_type.b_transpose == transpose_t::T;
+
+  auto a_loads = config.mt.mk();
+  auto b_loads = config.mt.nk();
+
+  size_t Ld_A_value = a_trans ?
+      MT_M * round_elements_to_128B(MT_K, a_bits) : round_elements_to_128B(MT_M, a_bits) * MT_K;
+  size_t Ld_B_value = b_trans ?
+      round_elements_to_128B(MT_N, b_bits) * MT_K : MT_N * round_elements_to_128B(MT_K, b_bits);
+  auto Ld_CU_bytes  = (Ld_A_value * a_bytes)    // A Bytes
+                     + (Ld_B_value * b_bytes);  // B Bytes
+
+  // Logic for block scaled datatypes (Assuming BS=32 and 8-bit scales)
+  // TODO This is technically wrong, need separate flag to enable MX so we can differentiate FP8
+  // and MX8
+  if (a_bits < 8 && problem.a_mx_block_size != 0) {
+    // Number of scales per tile
+    size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem.a_mx_block_size);
+    Ld_CU_bytes += num_scales_A;  // One Byte per scale
+  }
+  if (b_bits < 8 && problem.b_mx_block_size != 0) {
+    // Number of scales per tile
+    size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem.b_mx_block_size);
+    Ld_CU_bytes += num_scales_B;  // One Byte per scale
+  }
+
+  return kernel_cache_t{
+    .L_cvt = L_cvt,
+    .mt_compute_latency = compute_mt_compute_latency(problem_type, hardware, config),
+    .fits_lds_capacity = check_lds_capacity(hardware, config.mt, problem_type.a_dtype, problem_type.b_dtype),
+    .a_bytes = a_bytes,
+    .b_bytes = b_bytes,
+    .d_bytes = d_bytes,
+    .a_bits = a_bits,
+    .b_bits = b_bits,
+    .a_loads_bytes = a_loads * a_bytes,
+    .b_loads_bytes = b_loads * b_bytes,
+    .Ld_CU_bytes = Ld_CU_bytes,
+  };
+}
+
+origami_cache_t create_origami_cache(const problem_t& problem,
+                                     const hardware_t& hardware,
+                                     const config_t& config,
+                                     size_t max_cus) {
+  // Find CU occupancy
+  auto [num_wgs, num_active_cus, numWaves, splitting_factor] = compute_cu_occupancy(
+      problem, hardware, config, grid_selection_t::k_split_aware, max_cus);
+
+  auto grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
+  auto grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
+  auto grid_k = math::safe_ceil_div(problem.size.k, config.mt.k);
+
+  return origami_cache_t{
+    .grid_m = grid_m,
+    .grid_n = grid_n,
+    .grid_k = grid_k,
+    .num_C_tiles = grid_m * grid_n,
+    .num_waves = numWaves,
+    .num_active_cus = num_active_cus,
+    .splitting_factor = splitting_factor,
+  };
+}
+
+// Compute the total latency of a gemm based on the latency of one wave multiplied by the number of
+// waves A wave is defined as : The time it takes for one CU to complete one K-complete output tile
 double compute_total_latency(const problem_t& problem,
                              const hardware_t& hardware,
                              const config_t& config,
+                             const kernel_cache_t& kernel_cache,
                              size_t max_cus) {
   assert(config.is_valid());
 
@@ -848,24 +913,13 @@ double compute_total_latency(const problem_t& problem,
   size_t MI_N = config.mi.n;
   size_t MI_K = config.mi.k;
 
-  const int a_bits  = datatype_to_bits(problem.a_dtype);
-  const int b_bits  = datatype_to_bits(problem.b_dtype);
-  const int a_bytes = data_type_to_bytes(problem.a_dtype);
+  const auto a_bits  = datatype_to_bits(problem.a_dtype);
+  const auto b_bits  = datatype_to_bits(problem.b_dtype);
 
   // 0) Short-circuit
   // We don't need to compute latency for all MTs. With this, we can shortcut.
   bool shortCircuit = true;
   if (shortCircuit) {
-    // When problem dimensions are small enough that we can fit them in one tile, we should do
-    // so. This short circuit condition also decreases selection latency when problems are very
-    // small :)
-    // TODO 256 and 256 here should be largest M and N tile dimensions in library
-    if (M <= 256 && N <= 256 && K < 1024 && batch != 1 && (MT_M < M || MT_N < N))
-      return std::numeric_limits<double>::max();
-
-    // Use Dot2 only for M < 3
-    if (MI_M == 1 && MI_N == 1 && MI_K == 64 && M > 2) return std::numeric_limits<double>::max();
-
     size_t K_mod_128bytes    = K * a_bits % 1024;
     size_t MT_K_mod_128bytes = MT_K * a_bits % 1024;
     if (K_mod_128bytes == 0 && MT_K_mod_128bytes == 0) {
@@ -885,6 +939,17 @@ double compute_total_latency(const problem_t& problem,
     } else if (config.cache_hints_a || config.cache_hints_b) {
       return std::numeric_limits<double>::max();
     }
+
+    // When problem dimensions are small enough that we can fit them in one tile, we should do
+    // so. This short circuit condition also decreases selection latency when problems are very
+    // small :)
+    // TODO 256 and 256 here should be largest M and N tile dimensions in library
+    if (batch != 1 && M <= 256 && N <= 256 && K < 1024 && (MT_M < M || MT_N < N))
+      return std::numeric_limits<double>::max();
+
+    // Use Dot2 only for M < 3
+    if (MI_M == 1 && MI_N == 1 && MI_K == 64 && M > 2)
+      return std::numeric_limits<double>::max();
   }
 
   // 1-1) To compute the latency, use default WGM. And WGM can't be greater than one
@@ -893,16 +958,16 @@ double compute_total_latency(const problem_t& problem,
   auto config_with_default_wgm              = config;
   config_with_default_wgm.workgroup_mapping = std::max(defaultWGM, 1);
 
-  // 1-2) Find CU occupancy
-  auto [num_wgs, num_active_cus, num_timesteps, splitting_factor] = compute_cu_occupancy(
-      problem, hardware, config_with_default_wgm, config_with_default_wgm.grid_selection, max_cus);
+  // 1-2) Find CU occupancy, etc, store in cache
+  auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, max_cus);
+  cache.kernel_cache = kernel_cache;
 
-  // 2) Compute latency of a timestep
-  double L_timestep = compute_timestep_latency(
-      problem, hardware, config_with_default_wgm, num_active_cus, splitting_factor);
+  // 2) Compute latency of a wave
+  // Compute latency of a wave
+  double L_wave = compute_timestep_latency(problem, hardware, config_with_default_wgm, cache);
 
-  // Compute latency for all timesteps and return it as the latency for the MT/problem
-  double total_latency = L_timestep * num_timesteps;
+  // Compute latency for all waves and return it as the latency for the MT/problem
+  double total_latency = L_wave * cache.num_waves;
 
   // 3) Customized heuristics
   // TODO These are quantifying effects that don't work in the current math.
@@ -919,7 +984,7 @@ double compute_total_latency(const problem_t& problem,
 
     //  Heuristics for TF32
     if (tf32_emu) {
-      double bytes_per_element = a_bytes;
+      double bytes_per_element = cache.kernel_cache.a_bytes;
       double arith             = emulated_tf32_arithmetic_intensity(M, N, K, bytes_per_element);
       double compute_threshold = 1000;  // threshold empirically determined.
 

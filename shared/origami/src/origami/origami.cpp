@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"
@@ -264,33 +265,56 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                                               const std::vector<config_t>& configs) {
   if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
 
-  std::vector<prediction_result_t> results(configs.size());
+  auto problem_type = problem;
+  problem_type.batch = 0;
+  problem_type.size = {0, 0, 0};
 
-  std::transform(configs.begin(),
-                 configs.end(),
-                 results.begin(),
-                 [&](const config_t& config) -> prediction_result_t {
-                   if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) {
-                     return {std::numeric_limits<double>::max(), config};
-                   }
-                   double latency = compute_total_latency(problem, hardware, config, hardware.N_CU);
-                   return {latency, config};
-                 });
+  static std::unordered_map<problem_t, std::vector<kernel_cache_t>> kernel_cache_map;
+  static std::mutex mut;
+  std::unique_lock<std::mutex> lock(mut);
+  auto p_cache_entry = kernel_cache_map.find(problem_type);
+  if (p_cache_entry == kernel_cache_map.end()) {
+    std::vector<kernel_cache_t> caches;
+    caches.reserve(configs.size());
+    for (auto& config : configs)
+      caches.push_back(create_kernel_cache(problem_type, hardware, config));
+    p_cache_entry = kernel_cache_map.insert({problem_type, caches}).first;
+  }
+  auto& cache_entry = p_cache_entry->second;
 
-  results.erase(std::remove_if(results.begin(),
-                               results.end(),
-                               [](const prediction_result_t& p) {
-                                 return p.latency == std::numeric_limits<double>::max();
-                               }),
-                results.end());
+  struct prediction_result_wrapper_t {
+    double latency;
+    std::reference_wrapper<const config_t> config;
+  };
 
-  std::stable_sort(results.begin(),
-                   results.end(),
-                   [](const prediction_result_t& a, const prediction_result_t& b) {
+  std::vector<prediction_result_wrapper_t> latencies_configs;
+  latencies_configs.reserve(configs.size());
+
+  for (std::size_t i = 0; i < configs.size(); i++) {
+    if (!cache_entry[i].fits_lds_capacity)
+      continue;
+    double latency = compute_total_latency(problem, hardware, configs[i], cache_entry[i], hardware.N_CU);
+    if (latency != std::numeric_limits<double>::max())
+      latencies_configs.push_back({latency, std::cref(configs[i])});
+  }
+  lock.unlock();
+
+  if (latencies_configs.empty()) { throw std::runtime_error("No valid configs found."); }
+
+  std::stable_sort(latencies_configs.begin(),
+                   latencies_configs.end(),
+                   [](const auto& a, const auto& b) {
                      return a.latency < b.latency;
                    });
 
-  if (results.empty()) { throw std::runtime_error("No valid configs found."); }
+  std::vector<prediction_result_t> results;
+  results.reserve(latencies_configs.size());
+  std::transform(latencies_configs.begin(),
+                 latencies_configs.end(),
+                 std::back_inserter(results),
+                 [&](const auto& r) -> prediction_result_t {
+                   return {r.latency, r.config.get()};
+                 });
 
   // Compute arithmetic intensity for tie-breaking
   // Flops = 2 * MT_M * MT_N * MT_K, Memory traffic = MT_M*MT_K + MT_K*MT_N + MT_M*MT_N
