@@ -358,11 +358,11 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
     endif()
     
     # Origami for analytical GEMM kernel configuration
+    include(cmake/Dependencies.cmake)
     if(MIOPEN_BUILD_ORIGAMI)
-        include(cmake/Dependencies.cmake)
         miopen_add_dependency(origami NO_LOCAL)
     else()
-        find_package(origami REQUIRED)
+        miopen_add_dependency(origami)
     endif()
     if(origami_VERSION)
         message(STATUS "Build with origami ${origami_VERSION}")
