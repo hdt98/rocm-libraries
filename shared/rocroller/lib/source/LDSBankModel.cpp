@@ -144,7 +144,8 @@ namespace rocRoller::Scheduling::LDSBankModel
         }
 
         MemoryOpLDS memOp{direction};
-        int additionalCycles = (getInstructionIssueCycles(memOp, dwords)) * m_multiplierLdsIo - 4;
+        int         additionalCycles
+            = (getInstructionIssueCycles(memOp, dwords)) * m_multiplierQueueSlots - 4;
 
         return std::make_tuple(stallCycles, additionalCycles);
     }
@@ -182,14 +183,22 @@ namespace rocRoller::Scheduling::LDSBankModel
         return addresses;
     }
 
-    void LDSScheduler::scheduleInstruction(const RuntimeLDSInstruction& instr)
+    void LDSScheduler::scheduleInstruction(const RuntimeLDSInstruction& origInstr)
     {
+        auto instr = origInstr;
         updateQueues();
 
         const int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
-        int       dataCycles    = getInstructionDataCycles(instr, m_gfx) * m_multiplierWaveCount;
 
-        // Log::info("dataCycles {}", dataCycles);
+        std::vector<size_t> truncatedAddresses(
+            instr.baseAddresses.begin(),
+            instr.baseAddresses.begin()
+                + std::min(static_cast<size_t>(128), instr.baseAddresses.size()));
+        instr.baseAddresses = truncatedAddresses;
+
+        int dataCycles = getInstructionDataCycles(instr, m_gfx);
+
+        Log::info("dataCycles {}, m_multiplierQueueSlots {}", dataCycles, m_multiplierQueueSlots);
 
         if(m_multiplierWaveCount > 1 && hasNonOverlappingBankAccess(instr, m_gfx))
         {
@@ -204,8 +213,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                     ShowValue(getRemainingDataSlots()),
                     ShowValue(requiredSlots));
 
-        // TODO: if both SIMD on SP active, double the queue entries
-        for(int i = 0; i < 1; ++i)
+        for(int i = 0; i < m_multiplierQueueSlots; ++i)
         {
             if(instr.memoryOp.direction == LdsDirection::Write)
             {
@@ -564,15 +572,7 @@ namespace rocRoller::Scheduling::LDSBankModel
             Compare the change in latency numbers from workgroup size of 64 to 128 for both cases.
             Notice only in case 2) do the latency numbers increase (gradually reach double).
         */
-
-        // TODO: Workgroup size of 128 should follow same principles
-        AssertFatal(instr.baseAddresses.size() == 256, "Only workgroup size 256 tested");
-
         const auto threadGroupBankMappings = computeThreadGroupBankMappings(instr, gfx);
-
-        Log::info("threadGroupBankMappings {} {}",
-                  threadGroupBankMappings[0],
-                  threadGroupBankMappings[1]);
 
         AssertFatal(threadGroupBankMappings.size() % 2 == 0,
                     "Odd {} number of thread groups not supported",

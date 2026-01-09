@@ -223,7 +223,7 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    const auto workgroupSize = GENERATE(64u);
+    const auto workgroupSize = GENERATE(64u, 128u, 256u);
 
     int instrDwords      = GENERATE(1, 2, 4);
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
@@ -267,5 +267,6 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
         {
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
+        CHECK(false);
     }
 }
