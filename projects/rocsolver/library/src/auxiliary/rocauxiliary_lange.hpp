@@ -181,6 +181,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS)
         S row_sum = 0;
         for(I i = tid; i < n; i += LANGE_THDS)
         {
+            // note: this is not coalesced
             row_sum += rocblas_abs(a[idx2D(row, i, lda)]);
         }
 
