@@ -68,7 +68,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
         const long_index_t e_batch_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx));
 
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
+        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
         GridwiseGemm::template Run<AGridDesc_AK0_M_K1,
                                    BGridDesc_BK0_N_K1,
                                    CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
