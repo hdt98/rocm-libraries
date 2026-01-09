@@ -290,6 +290,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         int                m_programCycle;
         int                m_multiplierQueueSlots;
         int                m_multiplierWaveCount;
+        int                m_multiplierLdsIo;
 
         std::deque<int> m_commandQueue;
         std::deque<int> m_waitcntQueue; // Includes round-trip delay

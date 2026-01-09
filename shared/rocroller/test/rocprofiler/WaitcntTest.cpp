@@ -137,7 +137,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
     int write            = GENERATE(true, false);
 
-    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     rocRoller::profiler::reset();
 
@@ -252,13 +252,13 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
     using namespace Scheduling::LDSBankModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    constexpr auto workgroupSize = 64u;
+    const auto workgroupSize = 64u;
 
     int instrDwords      = GENERATE(1, 2, 4);
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
     int write            = GENERATE(true, false);
 
-    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     rocRoller::profiler::reset();
 
@@ -416,13 +416,13 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
     using namespace Scheduling::LDSBankModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    constexpr auto workgroupSize = 64u;
+    const auto workgroupSize = 64u;
 
     int instrDwords      = GENERATE(1, 2, 4);
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
     int write            = GENERATE(true, false);
 
-    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     rocRoller::profiler::reset();
 

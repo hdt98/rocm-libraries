@@ -130,13 +130,13 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    constexpr auto workgroupSize = 64u;
+    const auto workgroupSize = 64u;
 
     int instrDwords      = GENERATE(1, 2, 4);
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
     int write            = GENERATE(true, false);
 
-    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     rocRoller::profiler::reset();
 
@@ -229,7 +229,7 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
     int write            = GENERATE(true, false);
 
-    const auto baseAddresses = generateLDSAddresses(64, strideMultiplier, instrDwords);
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     rocRoller::profiler::reset();
 

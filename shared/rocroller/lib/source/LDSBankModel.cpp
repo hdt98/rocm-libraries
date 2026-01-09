@@ -86,6 +86,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         // conflicts double (assuming waves perfectly interleave)
         // , m_multiplierWaveCount(std::atoi(std::getenv("INTRA")))
         , m_multiplierWaveCount(waveCount)
+        , m_multiplierLdsIo(waveCount > 1 ? 2 : 1)
     {
         AssertFatal(waveCount >= 1, ShowValue(waveCount));
         AssertFatal(waveCount != 3, "wave count of 3 is untested");
@@ -143,7 +144,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         }
 
         MemoryOpLDS memOp{direction};
-        int         additionalCycles = (getInstructionIssueCycles(memOp, dwords)) - 4;
+        int additionalCycles = (getInstructionIssueCycles(memOp, dwords)) * m_multiplierLdsIo - 4;
 
         return std::make_tuple(stallCycles, additionalCycles);
     }
@@ -190,11 +191,11 @@ namespace rocRoller::Scheduling::LDSBankModel
 
         // Log::info("dataCycles {}", dataCycles);
 
-        // if(hasNonOverlappingBankAccess(instr, m_gfx))
-        // {
-        //     Log::info("Non-overlapping bank access detected, reducing data cycles by half");
-        //     dataCycles /= 2;
-        // }
+        if(m_multiplierWaveCount > 1 && hasNonOverlappingBankAccess(instr, m_gfx))
+        {
+            Log::info("Non-overlapping bank access detected, reducing data cycles by half");
+            dataCycles /= 2;
+        }
 
         AssertFatal(getRemainingDataSlots() >= requiredSlots
                         && m_commandQueue.size() < static_cast<size_t>(commandQueueSize),
@@ -458,10 +459,6 @@ namespace rocRoller::Scheduling::LDSBankModel
 
     uint getInstructionDataCycles(const RuntimeLDSInstruction& instr, GPUArchitectureGFX gfx)
     {
-        AssertFatal(instr.baseAddresses.size() == 64,
-                    "Expected 64 for a wave, got ",
-                    instr.baseAddresses.size());
-
         const auto threadGroupBankMappings = computeThreadGroupBankMappings(instr, gfx);
 
         for(const auto& mapping : threadGroupBankMappings)
@@ -572,6 +569,10 @@ namespace rocRoller::Scheduling::LDSBankModel
         AssertFatal(instr.baseAddresses.size() == 256, "Only workgroup size 256 tested");
 
         const auto threadGroupBankMappings = computeThreadGroupBankMappings(instr, gfx);
+
+        Log::info("threadGroupBankMappings {} {}",
+                  threadGroupBankMappings[0],
+                  threadGroupBankMappings[1]);
 
         AssertFatal(threadGroupBankMappings.size() % 2 == 0,
                     "Odd {} number of thread groups not supported",
