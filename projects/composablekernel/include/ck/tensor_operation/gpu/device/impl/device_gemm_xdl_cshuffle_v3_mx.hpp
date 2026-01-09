@@ -463,14 +463,24 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
             return false;
         }
 
+        const auto ck_logging_enabled = ck::EnvIsEnabled(CK_ENV(CK_LOGGING));
+
         // Only gfx950 and gfx1250 architectures support MX GEMMs
         if(ck::get_device_name() != "gfx950" && !is_gfx125_supported())
         {
+            if(ck_logging_enabled)
+            {
+                std::cerr << "Device not supported: " << ck::get_device_name() << std::endl;
+            }
             return false;
         }
 
         if(!is_bf16_atomic_supported() && std::is_same_v<CDataType, ck::bhalf_t> && arg.KBatch > 1)
         {
+            if(ck_logging_enabled)
+            {
+                std::cerr << "Expected support for bhalf_t atomic." << std::endl;
+            }
             return false;
         }
 
@@ -480,6 +490,10 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
              GemmSpec == GemmSpecialization::MNKPadding ||
              GemmSpec == GemmSpecialization::KPadding || GemmSpec == GemmSpecialization::Default))
         {
+            if(ck_logging_enabled)
+            {
+                std::cerr << "K must be a multiple of AK1 and BK1." << std::endl;
+            }
             return false;
         }
 
@@ -494,10 +508,21 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
         {
             if constexpr(NXdlPerWave32 > 0)
             {
-                return GridwiseGemm32::CheckValidity(
+                auto valid = GridwiseGemm32::CheckValidity(
                     reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
+                if(!valid && ck_logging_enabled)
+                {
+                    std::cerr << "GridwiseGemm32::CheckValidity failed." << std::endl;
+                }
+                return valid;
             }
         }
+
+        if(ck_logging_enabled)
+        {
+            std::cerr << "Unexpected error in IsSupportedArgument." << std::endl;
+        }
+
         return false;
     }
 

@@ -3,8 +3,8 @@
 
 #include "gemm_mx_common.hpp"
 
-using ADataType = ck::f4x2_pk_t;
-using BDataType = ck::f4x2_pk_t;
+using ADataType = ck::f8_t;
+using BDataType = ck::f8_t;
 
 using XDataType       = ck::e8m0_bexp_t;
 using XPackedDataType = int32_t;
@@ -21,16 +21,13 @@ using AElementOp = PassThrough; // elementwise transformation for A matrix
 using BElementOp = PassThrough; // elementwise transformation for B matrix
 using CElementOp = PassThrough; // elementwise transformation for C matrix
 
-constexpr ck::index_t DataPackedSize = 2;                    // Packed representation of data
-constexpr ck::index_t ScaleBlockSize = 32;                   // scaling block size
-constexpr ck::index_t KPerBlock      = 256 / DataPackedSize; // 256 f4 = 128 fp4x2
+constexpr ck::index_t ScaleBlockSize = 32; // scaling block size
+constexpr ck::index_t KPerBlock      = 256;
 
 constexpr auto GemmSpec      = ck::tensor_operation::device::GemmSpecialization::Default;
 constexpr auto BlkGemmPSched = ck::BlockGemmPipelineScheduler::Intrawave;
 constexpr auto BlkGemmPVer   = ck::BlockGemmPipelineVersion::v3;
 
-// AB DataType: f4x2_pk_t
-// Mathematically, all numbers are represented as f4x2.
 using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMX_Xdl_CShuffleV3<
     ALayout,          // ALayout
     BLayout,          // BLayout
@@ -47,24 +44,24 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMX_Xdl_CShuffle
     CElementOp,       // CElementwiseOperation
     GemmSpec,         // GemmSpec
     ScaleBlockSize,   // ScaleBlockSize: Scaling block size
-    128,              // BlockSize: Thread block size
-    64,               // MPerBlock
-    64,               // NPerBlock
+    256,              // BlockSize: Thread block size
+    128,              // MPerBlock
+    128,              // NPerBlock
     KPerBlock,        // KPerBlock
     16,               // AK1
     16,               // BK1
     16,               // MPerXDL
     16,               // NPerXDL
-    2,                // MXdlPerWave
-    2,                // NXdlPerWave
-    S<8, 16, 1>,      // ABlockTransferThreadClusterLengths_AK0_M_AK1
+    4,                // MXdlPerWave
+    4,                // NXdlPerWave
+    S<16, 16, 1>,     // ABlockTransferThreadClusterLengths_AK0_M_AK1
     S<1, 0, 2>,       // ABlockTransferThreadClusterArrangeOrder
     S<1, 0, 2>,       // ABlockTransferSrcAccessOrder
     2,                // ABlockTransferSrcVectorDim
     16,               // ABlockTransferSrcScalarPerVector
     16,               // ABlockTransferDstScalarPerVector_AK1
     true,             // ABlockLdsExtraM
-    S<8, 16, 1>,      // BBlockTransferThreadClusterLengths_BK0_N_BK1
+    S<16, 16, 1>,     // BBlockTransferThreadClusterLengths_BK0_N_BK1
     S<1, 0, 2>,       // BBlockTransferThreadClusterArrangeOrder
     S<1, 0, 2>,       // BBlockTransferSrcAccessOrder
     2,                // BBlockTransferSrcVectorDim
@@ -73,8 +70,8 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMX_Xdl_CShuffle
     true,             // BBlockLdsExtraN
     2,                // CShuffleMXdlPerWavePerShuffle
     2,                // CShuffleNXdlPerWavePerShuffle
-    S<1, 8, 1, 8>,    // CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
-    2,                // CShuffleBlockTransferScalarPerVector_NPerBlock
+    S<1, 32, 1, 8>,   // CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
+    8,                // CShuffleBlockTransferScalarPerVector_NPerBlock
     BlkGemmPSched,    // BlkGemmPipeSched
     BlkGemmPVer,      // BlkGemmPipelineVer
     ADataType,        // ComputeTypeA

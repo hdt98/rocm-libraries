@@ -217,22 +217,21 @@ void preShuffleScaleBuffer_gfx1250(const ScaleType* src,
                               tempmn * (KStep * KPack) + tempk;
 
             if constexpr(KStride)
-            {
                 dst[outputIndex] = src[mn * K + k];
-            }
             else
                 dst[outputIndex] = src[k * MN + mn];
         }
     }
 }
 
-void preShuffleBuffer(const ck::f4x2_pk_t* src, ck::f4x2_pk_t* dst, int N, int K, int NXdl)
+template <typename T>
+void preShuffleBuffer(const T* src, T* dst, int N, int K, int NXdl)
 {
-    int KPack = 16;
-    int NLane = NXdl;
-    int KLane = 64 / NLane;
-    int K_pk  = K / 2;
-    int K0    = K_pk / (KLane * KPack);
+    const int KPack = 16;
+    const int NLane = NXdl;
+    const int KLane = ck::get_warp_size() / NLane;
+    const int K_pk  = K / ck::packed_size_v<T>;
+    const int K0    = K_pk / (KLane * KPack);
     // K -> K0 KLane KPack
     // N -> N0 NLane
     // N, K -> N0 K0 KLane NLane KPack
@@ -457,7 +456,7 @@ bool run_mx_gemm(const ProblemSizeSplitK& problem_size, const ExecutionConfig& c
     }
     else
     {
-        throw std::runtime_error("wrong! unsupported warp size");
+        throw std::runtime_error("wrong! Scale pre-shuffle unsupported warp size");
     }
 
     if constexpr(BPreShuffle)
