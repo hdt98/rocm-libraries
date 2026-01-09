@@ -34,6 +34,7 @@
 #include <miopen/find_controls.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/mlo_internal.hpp>
+#include <miopen/origami_search.hpp>
 #include <miopen/search_options.hpp>
 #include <miopen/solver_id.hpp>
 #include <miopen/solver.hpp>
@@ -81,7 +82,17 @@ auto FindSolutionImpl(rank<1>,
     if(context.disable_perfdb_access)
     {
         MIOPEN_LOG_I(s.SolverDbId() << " (db access disabled)");
-        return s.GetSolution(context, problem, s.GetDefaultPerformanceConfig(context, problem));
+        std::vector<PerformanceConfig> all_configs = GetAllConfigs(s, context, problem);
+        auto ranked_configs = GetOrigamiPerformanceConfig(problem, all_configs);
+        if(ranked_configs)
+        {
+            config = ranked_configs[0];
+            MIOPEN_LOG_I("Origami selected config: " << s.SolverDbId() << ": " << config);
+            return s.GetSolution(context, problem, config);
+        }
+        config = s.GetDefaultPerformanceConfig(context, problem);
+        MIOPEN_LOG_I("Default config selected: " << s.SolverDbId() << ": " << config);
+        return s.GetSolution(context, problem, config);
     }
     MIOPEN_LOG_I(s.SolverDbId());
     if(enforce.IsDbClean(context))
@@ -108,7 +119,7 @@ auto FindSolutionImpl(rank<1>,
                 {
                     return s.GetSolution(context, problem, config);
                 }
-                MIOPEN_LOG_WE("Invalid config loaded from Perf Db: "
+                MIOPEN_LOG_WE("Invalid config loaded from argument: "
                               << s.SolverDbId() << ": " << config << ". Performance may degrade.");
             }
             else if(db().Load(problem, s.SolverDbId(), config))
@@ -164,9 +175,22 @@ auto FindSolutionImpl(rank<1>,
                 return ConvSolution(miopenStatusInternalError);
             }
         }
+        else
+        {
+            std::vector<PerformanceConfig> all_configs = GetAllConfigs(s, context, problem);
+            auto ranked_configs = GetOrigamiPerformanceConfig(problem, all_configs);
+            if(ranked_configs)
+            {
+                config = ranked_configs[0];
+                MIOPEN_LOG_I("Origami selected config: " << s.SolverDbId() << ": " << config);
+                return s.GetSolution(context, problem, config);
+            }
+        }
     }
 
-    return s.GetSolution(context, problem, s.GetDefaultPerformanceConfig(context, problem));
+    config = s.GetDefaultPerformanceConfig(context, problem);
+    MIOPEN_LOG_I("Default config selected: " << s.SolverDbId() << ": " << config);
+    return s.GetSolution(context, problem, config);
 }
 
 template <class Solver, class Context, class Problem, class Db>

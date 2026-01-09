@@ -577,6 +577,12 @@ ConvHipImplicitGemm3DGroupBwdXdlops::GetDefaultPerformanceConfig(
     return pp;
 }
 
+origami::config_t ConvHipImplicitGemm3DGroupBwdXdlops::GetOrigamiConfig(
+    PerformanceConfigHipImplicitGemm3DGroupBwdXdlops perf_cfg) const
+{
+    return miopen::solver::GetOrigamiConfig(perf_cfg);
+}
+
 bool ConvHipImplicitGemm3DGroupBwdXdlops::IsValidPerformanceConfig(
     const ExecutionContext&,
     const ::miopen::conv::ProblemDescription& problem,

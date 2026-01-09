@@ -35,9 +35,10 @@
 #include <miopen/performance_config.hpp>
 #include <miopen/type_name.hpp>
 
+#include <algorithm>
+#include <origami/types.hpp>
 #include <string>
 #include <type_traits>
-#include <algorithm>
 
 namespace miopen {
 
@@ -199,10 +200,9 @@ struct SolverBaseTunable : SolverInterfaceTunable<Context, Problem>, TunableSolv
     virtual PerformanceConfig GetDefaultPerformanceConfig(const Context& ctx,
                                                           const Problem& problem) const = 0;
 
-
-    std::vector<PerformanceConfig> GetOrigamiPerformanceConfig(const std::vector<PerformanceConfig>& all_configs)
+    origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg) const
     {
-        return {};
+        return origami::config_t{};
     }
 
     /// Should return false if performance config is wrong for a problem.

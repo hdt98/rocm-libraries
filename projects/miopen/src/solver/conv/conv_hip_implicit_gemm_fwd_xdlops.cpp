@@ -254,6 +254,12 @@ ConvHipImplicitGemmFwdXdlops::GetDefaultPerformanceConfig(const ExecutionContext
     return pp;
 }
 
+origami::config_t ConvHipImplicitGemmFwdXdlops::GetOrigamiConfig(
+    PerformanceConfigHipImplicitGemmFwdXdlops perf_cfg) const
+{
+    return miopen::solver::GetOrigamiConfig(perf_cfg);
+}
+
 bool ConvHipImplicitGemmFwdXdlops::IsValidPerformanceConfig(
     const ExecutionContext&,
     const ProblemDescription& problem,

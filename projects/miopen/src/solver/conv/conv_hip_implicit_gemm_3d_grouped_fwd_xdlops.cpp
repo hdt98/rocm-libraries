@@ -700,6 +700,12 @@ ConvHipImplicitGemm3DGroupFwdXdlops::GetDefaultPerformanceConfig(
     return pp;
 }
 
+origami::config_t ConvHipImplicitGemm3DGroupFwdXdlops::GetOrigamiConfig(
+    PerformanceConfigHipImplicitGemm3DGroupFwdXdlops perf_cfg) const
+{
+    return miopen::solver::GetOrigamiConfig(perf_cfg);
+}
+
 bool ConvHipImplicitGemm3DGroupFwdXdlops::IsValidPerformanceConfig(
     const ExecutionContext&,
     const ::miopen::conv::ProblemDescription& problem,

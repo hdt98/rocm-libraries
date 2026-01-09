@@ -35,6 +35,8 @@
 #include <miopen/fusion/fusion_invoke_params.hpp>
 #include <miopen/solver/implicitgemm_util.hpp>
 
+#include <origami/types.hpp>
+
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 #include <ck/utility/data_type.hpp>
 #include <ck/utility/numeric_limits.hpp>
@@ -1531,6 +1533,41 @@ static inline bool IsIndexRangeLargeEnough(const miopen::conv::ProblemDescriptio
 
     return problem.GetInSize() < max_index_range && problem.GetWeightsSize() < max_index_range &&
            problem.GetOutSize() < max_index_range;
+}
+
+template <typename PerformanceConfig>
+origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg)
+{
+    auto conv_ptrs             = DeviceOpType::GetInstances();
+    std::optional<int> split_k = std::nullopt;
+    std::string id_string      = perf_cfg.kernel_id;
+    auto pos                   = perf_cfg.kernel_id.find_last_of('+');
+    if(pos != std::string::npos)
+    {
+        split_k   = std::stoi(perf_cfg.kernel_id.substr(pos + 1));
+        id_string = perf_cfg.kernel_id.substr(0, pos);
+    }
+
+    auto ptr_iter = FindConvPtrByID(conv_ptrs, id_string);
+
+    auto arg_ptr =
+        MakeArgPtr(*ptr_iter, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k.value_or(1));
+    auto ck_kern_args = arg_ptr.get();
+
+    origami::config_t ori_cfg;
+    ori_cfg.mt.m = ck_kern_args.M; // Macro tile M
+    ori_cfg.mt.n = ck_kern_args.N; // Macro tile N
+    ori_cfg.mt.k = ck_kern_args.K; // Macro tile K
+    ori_cfg.mi.m = 16;             // Matrix instruction M
+    ori_cfg.mi.n = 16;             // Matrix instruction N
+    ori_cfg.mi.k = 32;             // Matrix instruction K
+    // ori_cfg.occupancy = 4;
+
+    MIOPEN_LOG_I2("CK id string: " << id_string << ", MT.M(" << ori_cfg.mt.m << ") MT.N("
+                                   << ori_cfg.mt.n << ") MT.K(" << ori_cfg.mt.k << ") MI.M("
+                                   << ori_cfg.mi.m << ") MI.N(" << ori_cfg.mi.n << ") MI.K("
+                                   << ori_cfg.mi.k << ")");
+    return ori_cfg;
 }
 
 } // namespace solver
