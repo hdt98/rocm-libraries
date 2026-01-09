@@ -185,6 +185,8 @@ struct BlockWeightPreshuffleASmemBRegCReg
                         merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                         merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
                         c_warp_tensor.get_thread_buffer());
+
+                    __builtin_amdgcn_sched_barrier(0x7F6);
                 });
                 // preload next A from lds
                 if constexpr((kIter * MIterPerWarp + mIter) <
