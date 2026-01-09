@@ -358,12 +358,29 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
     endif()
     
     # Origami for analytical GEMM kernel configuration
+    # If an installed origami is incomplete (missing origami-targets.cmake),
+    # fall back to building it inline.
+    set(_origami_force_build ${MIOPEN_BUILD_ORIGAMI})
+    if(NOT _origami_force_build)
+        find_file(_origami_config origami-config.cmake PATHS ${CMAKE_PREFIX_PATH})
+        if(_origami_config)
+            get_filename_component(_origami_config_dir ${_origami_config} DIRECTORY)
+            if(NOT EXISTS "${_origami_config_dir}/origami-targets.cmake")
+                message(WARNING "origami-config.cmake found but origami-targets.cmake missing; building origami inline")
+                set(_origami_force_build ON)
+            endif()
+        else()
+            set(_origami_force_build ON)
+        endif()
+    endif()
+
     include(cmake/Dependencies.cmake)
-    if(MIOPEN_BUILD_ORIGAMI)
+    if(_origami_force_build)
         miopen_add_dependency(origami NO_LOCAL)
     else()
         miopen_add_dependency(origami)
     endif()
+
     if(origami_VERSION)
         message(STATUS "Build with origami ${origami_VERSION}")
     else()
