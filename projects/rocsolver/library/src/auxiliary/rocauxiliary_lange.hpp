@@ -54,7 +54,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     I tid = threadIdx.x;
 
     // select batch instance
-    I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+    int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
     T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
     S* block_sums_block = load_ptr_batch<S>(block_sums, bidz, 0, blocks);
 
@@ -112,7 +112,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     I tid = threadIdx.x;
 
     // select batch instance
-    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+    int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
     S* block_sum = load_ptr_batch<S>(block_sums, bid, 0, blocks);
 
     // shared variables
@@ -557,7 +557,7 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     case rocsolver_norm_type_max:
     {
         // Launch max kernels with grid clamping to handle overflow
-        I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+        int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>), dim3(grid_blocks, 1, batch_count),
                                 dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, shiftA, lda,
@@ -581,7 +581,7 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     case rocsolver_norm_type_frobenius:
     {
         // Launch Frobenius kernels with grid clamping to handle overflow
-        I blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+        int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
         I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<T, I, S>),
                                 dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM),
