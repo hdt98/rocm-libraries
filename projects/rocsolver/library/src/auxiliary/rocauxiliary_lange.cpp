@@ -58,7 +58,7 @@ rocblas_status rocsolver_lange_impl(rocblas_handle handle,
     // memory workspace sizes:
     // size of workspace (for temporary computations in one-norm and infinity-norm)
     size_t size_work;
-    rocsolver_lange_getMemorySize<T, I, S>(norm_type, m, n, batch_count, &size_work);
+    rocsolver_lange_getMemorySize<T, I, S>(handle, norm_type, m, n, batch_count, &size_work);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_work);

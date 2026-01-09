@@ -458,7 +458,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
 }
 
 template <typename T, typename I, typename S>
-void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
+void rocsolver_lange_getMemorySize(rocblas_handle handle,
+                                   const rocsolver_norm_type norm_type,
                                    const I m,
                                    const I n,
                                    const I batch_count,
@@ -471,12 +472,15 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
         return;
     }
 
+    const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
+
     switch(norm_type)
     {
     case rocsolver_norm_type_max:
     {
         // need space for block maximums
-        int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+        int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+        blocks = std::min(blocks, (int64_t)(props->maxGridSize[0]));
         size_t size_per_batch = blocks;
         *size_work = sizeof(S) * batch_count * size_per_batch;
         break;
@@ -484,14 +488,15 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
     case rocsolver_norm_type_one:
     {
         // need space for column sums (one-norm) or row sums (infinity-norm)
-        size_t size_per_batch = n;
+        I grid_n = std::min(n, static_cast<I>(props->maxGridSize[0]));
+        size_t size_per_batch = grid_n;
         *size_work = sizeof(S) * batch_count * size_per_batch;
         break;
     }
     case rocsolver_norm_type_frobenius:
     {
-        // need space for row sums
-        int blocks = (m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+        int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
+        blocks = std::min(blocks, (int64_t)(props->maxGridSize[0]));
         size_t size_per_batch = blocks;
         *size_work = sizeof(S) * batch_count * size_per_batch;
         break;
@@ -499,7 +504,8 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
     case rocsolver_norm_type_infinity:
     {
         // need space for row sums
-        size_t size_per_batch = m;
+        I grid_m = std::min(m, static_cast<I>(props->maxGridSize[0]));
+        size_t size_per_batch = grid_m;
         *size_work = sizeof(S) * batch_count * size_per_batch;
         break;
     }
@@ -570,7 +576,7 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     {
         // Launch max kernels with grid clamping to handle overflow
         int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
-        I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
+        int64_t grid_blocks = std::min(blocks, (int64_t)(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>), dim3(grid_blocks, 1, batch_count),
                                 dim3(LANGE_FROBENIUS_MAX_BDIM), 0, stream, m, n, A, shiftA, lda,
                                 strideA, work);
@@ -594,7 +600,7 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     {
         // Launch Frobenius kernels with grid clamping to handle overflow
         int64_t blocks = ((int64_t)m * n - 1) / LANGE_FROBENIUS_MAX_BDIM + 1;
-        I grid_blocks = std::min(blocks, static_cast<I>(props->maxGridSize[0]));
+        int64_t grid_blocks = std::min(blocks, (int64_t)(props->maxGridSize[0]));
         ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<T, I, S>),
                                 dim3(grid_blocks, 1, batch_count), dim3(LANGE_FROBENIUS_MAX_BDIM),
                                 0, stream, m, n, A, shiftA, lda, strideA, work);
