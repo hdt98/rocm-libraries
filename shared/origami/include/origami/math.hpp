@@ -50,7 +50,26 @@ inline constexpr N safe_ceil_div(N n, D d) {
  */
 inline double ceiling_math(double value, double significance = 1.0)
 {
-    return std::ceil(value / significance) * significance;
+  return std::ceil(value / significance) * significance;
+}
+
+/**
+ * @brief Helper for hash_combine
+ */
+template <class T>
+inline void hash_combine_helper(std::size_t& seed, const T& v) {
+  seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+/**
+ * @brief Combine multiple hashes into one.
+ */
+template <typename... Types>
+inline std::size_t hash_combine(const Types&... args) {
+    std::size_t seed = 0;
+    // c++17 unary fold
+    (hash_combine_helper(seed, args), ...);
+    return seed;
 }
 
 }  // namespace math

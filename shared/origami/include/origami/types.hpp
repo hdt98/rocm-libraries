@@ -322,6 +322,51 @@ struct runtime_options {
 };
 
 /**
+ * @brief Struct to cache variables for a config_t for a specific problem_type_t.
+ *
+ */
+struct kernel_cache_t {
+  /// TF32 conversion overhead
+  double L_cvt;
+
+  /// latency for single macro-tile
+  size_t mt_compute_latency;
+
+  /// whether the config macrotile fits in LDS
+  bool fits_lds_capacity;
+
+  double a_bytes;
+  double b_bytes;
+  double d_bytes;
+  int a_bits;
+  int b_bits;
+
+  /// data loaded from a single tile of A (MT_M x MT_K elements), in bytes
+  double a_loads_bytes;
+  /// data loaded from a single tile of B (MT_K x MT_N elements), in bytes
+  double b_loads_bytes;
+
+  std::size_t Ld_CU_bytes;
+};
+
+/**
+ * @brief Struct storing intermediate variables.
+ *
+ */
+struct origami_cache_t {
+  std::size_t grid_m;
+  std::size_t grid_n;
+  std::size_t grid_k;
+
+  std::size_t num_C_tiles;
+  std::size_t num_waves;
+  std::size_t num_active_cus;
+  std::size_t splitting_factor;
+
+  kernel_cache_t kernel_cache;
+};
+
+/**
  * @brief Full kernel configuration (tile shape + execution parameters).
  *
  * Holds the geometric tile sizes along with occupancy,
@@ -376,13 +421,11 @@ struct config_t {
   }
 
   std::size_t hash() const {
-    return std::hash<size_t>()(mt.m) ^ std::hash<size_t>()(mt.n) ^ std::hash<size_t>()(mt.k) ^
-           std::hash<size_t>()(mi.m) ^ std::hash<size_t>()(mi.n) ^ std::hash<size_t>()(mi.k) ^
-           std::hash<int>()(custom_mainloop_scheduling) ^
-           std::hash<int>()(cache_hints_a) ^ std::hash<int>()(cache_hints_b) ^
-           std::hash<int>()(workgroup_mapping) ^
-           std::hash<std::uint32_t>()(static_cast<std::uint32_t>(prediction_mode)) ^
-           std::hash<std::uint32_t>()(static_cast<std::uint32_t>(target));
+    return math::hash_combine(mt.m, mt.n, mt.k, mi.m, mi.n, mi.k,
+                              custom_mainloop_scheduling,
+                              cache_hints_a, cache_hints_b,
+                              workgroup_mapping, static_cast<std::uint32_t>(prediction_mode),
+                              static_cast<std::uint32_t>(target));
   }
 
   void validate() const {
@@ -433,6 +476,21 @@ struct problem_t {
   /// MX block size.
   std::size_t a_mx_block_size = 0;
   std::size_t b_mx_block_size = 0;
+
+  constexpr bool operator==(const problem_t& o) const noexcept { // = default;
+    return size == o.size && batch == o.batch &&
+           a_transpose == o.a_transpose && b_transpose == o.b_transpose &&
+           a_dtype == o.a_dtype && b_dtype == o.b_dtype &&
+           c_dtype == o.c_dtype && d_dtype == o.d_dtype && mi_dtype == o.mi_dtype &&
+           a_mx_block_size == o.a_mx_block_size && b_mx_block_size == o.b_mx_block_size;
+  }
+
+  std::size_t hash() const {
+    // problem type (ie everything here except size and batch) is used as a key
+    return math::hash_combine(static_cast<int>(a_transpose), static_cast<int>(b_transpose),
+                              static_cast<int>(a_dtype), static_cast<int>(b_dtype),
+                              static_cast<int>(c_dtype), static_cast<int>(d_dtype));
+  }
 };
 
 /**
@@ -531,5 +589,11 @@ struct hash<origami::config_t> {
     return config.hash();
   }
 };
+
+template <>
+struct hash<origami::problem_t> {
+  inline std::size_t operator()(const origami::problem_t& problem) const noexcept { return problem.hash(); }
+};
+
 }  // namespace std
 

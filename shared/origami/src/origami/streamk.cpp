@@ -307,8 +307,9 @@ size_t grid_analytical(const problem_t& problem,
   size_t best_split   = 1;
   double best_latency = std::numeric_limits<double>::infinity();
 
+  auto cache = create_kernel_cache(problem, hardware, config);
   for (size_t split = 1; split <= MAX_SPLIT; ++split) {
-    double latency = compute_total_latency(problem, hardware, config, max_cus);
+    double latency = compute_total_latency(problem, hardware, config, cache, max_cus);
 
     if (latency < best_latency) {
       best_latency = latency;

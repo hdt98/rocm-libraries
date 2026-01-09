@@ -124,10 +124,13 @@ TEST_CASE("GEMM: compute_memory_latency", "[gemm]") {
       auto config_small = make_config(128, 128, 64, 32, 32, 8, false, 8);
       auto config_large = make_config(256, 256, 128, 32, 32, 8, false, 8);
 
+      auto cache_small  = create_origami_cache(problem, hardware, config_small, hardware.N_CU);
+      auto cache_large  = create_origami_cache(problem, hardware, config_large, hardware.N_CU);
+
       auto mem_latency_small =
-          origami::compute_memory_latency(problem, hardware, config_small, 304, 2);
+          origami::compute_memory_latency(problem, hardware, config_small, cache_small);
       auto mem_latency_large =
-          origami::compute_memory_latency(problem, hardware, config_large, 304, 2);
+          origami::compute_memory_latency(problem, hardware, config_large, cache_large);
 
       REQUIRE(mem_latency_small < mem_latency_large);
     }
@@ -143,10 +146,13 @@ TEST_CASE("GEMM: compute_tile_latency", "[gemm]") {
       auto config_small = make_config(128, 128, 64, 32, 32, 8, false, 6);
       auto config_large = make_config(256, 256, 128, 32, 32, 8, false, 6);
 
+      auto cache_small  = create_origami_cache(problem, hardware, config_small, hardware.N_CU);
+      auto cache_large  = create_origami_cache(problem, hardware, config_large, hardware.N_CU);
+
       auto tile_latency_small =
-          origami::compute_tile_latency(problem, hardware, config_small, 304, 3);
+          origami::compute_tile_latency(problem, hardware, config_small, cache_small);
       auto tile_latency_large =
-          origami::compute_tile_latency(problem, hardware, config_large, 304, 3);
+          origami::compute_tile_latency(problem, hardware, config_large, cache_large);
 
       REQUIRE(tile_latency_large > tile_latency_small);
     }
@@ -160,9 +166,10 @@ TEST_CASE("GEMM: compute_timestep_latency", "[gemm]") {
       auto problem =
           make_problem(4096, 4096, 1024, origami::transpose_t::T, origami::transpose_t::N, 2);
       auto config = make_config(128, 128, 64, 32, 32, 8, false, 8);
+      auto cache  = create_origami_cache(problem, hardware, config, hardware.N_CU);
 
-      auto tile_latency = origami::compute_tile_latency(problem, hardware, config, 304, 4);
-      auto timestep_latency = origami::compute_timestep_latency(problem, hardware, config, 304, 4);
+      auto tile_latency = origami::compute_tile_latency(problem, hardware, config, cache);
+      auto timestep_latency = origami::compute_timestep_latency(problem, hardware, config, cache);
 
       REQUIRE(timestep_latency == Approx(tile_latency));
     }
@@ -209,10 +216,11 @@ TEST_CASE("GEMM: estimate_l2_hit", "[gemm]") {
       auto hardware = make_hardware(gpu_arch);
       auto problem  = make_problem(4096, 4096, 1024);
       auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
+      auto cache    = create_origami_cache(problem, hardware, config, hardware.N_CU);
 
       for (int wgm = 1; wgm < 1025; wgm++) {
         config.workgroup_mapping = wgm;
-        auto l2_hit              = origami::estimate_l2_hit(problem, hardware, config, 3);
+        auto l2_hit              = origami::estimate_l2_hit(problem, hardware, config, cache);
         REQUIRE(l2_hit > 0.0);
         REQUIRE(l2_hit < 1.0);
       }
@@ -226,11 +234,14 @@ TEST_CASE("GEMM: estimate_mall_hit", "[gemm]") {
       auto hardware = make_hardware(gpu_arch);
       auto problem  = make_problem(4096, 4096, 1024);
       auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
+      auto cache    = create_origami_cache(problem, hardware, config, hardware.N_CU);
 
       for (int wgm = 1; wgm < 1025; wgm++) {
-        config.workgroup_mapping = wgm;
-        auto mall_hit            = origami::estimate_mall_hit(problem, hardware, config, 304, 8);
+        config.workgroup_mapping        = wgm;
+        auto [mall_hit, mall_m, mall_n] = origami::estimate_mall_hit(problem, hardware, config, cache);
         REQUIRE(mall_hit > 0.0);
+        REQUIRE(mall_m <= hardware.N_CU);
+        REQUIRE(mall_n <= hardware.N_CU);
       }
     }
   }
