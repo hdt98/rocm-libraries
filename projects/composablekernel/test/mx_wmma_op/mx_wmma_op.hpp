@@ -27,12 +27,16 @@ enum class WMMA_SCALE
 };
 
 // WMMA scale type selector for 16x16 blocks
-template <int32_t BLOCK_M, int32_t BLOCK_N, int32_t BLOCK_X>
+template <int32_t BLOCK_M,
+          int32_t BLOCK_N,
+          int32_t BLOCK_X,
+          typename ScaleTypeA,
+          typename ScaleTypeB>
 struct wmma_scale_type_selector;
 
 // specialization for scale block size 32
-template <>
-struct wmma_scale_type_selector<16, 16, 32>
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<16, 16, 32, ScaleTypeA, ScaleTypeB>
 {
     template <typename AFragT,
               typename AScaleFragT,
@@ -46,13 +50,14 @@ struct wmma_scale_type_selector<16, 16, 32>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125>{};
-        op.template run<16, 16, 1, 0>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<16, 16, 1, 0, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
 // specialization for scale block size 16
-template <>
-struct wmma_scale_type_selector<16, 16, 16>
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<16, 16, 16, ScaleTypeA, ScaleTypeB>
 {
     template <typename AFragT,
               typename AScaleFragT,
@@ -66,7 +71,8 @@ struct wmma_scale_type_selector<16, 16, 16>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125>{};
-        op.template run<16, 16, 1, 0>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<16, 16, 1, 0, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
@@ -523,7 +529,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
     }
 
     // Scaled Matrix multiply-accumulate using WMMA scale units
-    using wmma = wmma_scale_type_selector<BLOCK_M, BLOCK_N, BLOCK_X>;
+    using wmma = wmma_scale_type_selector<BLOCK_M, BLOCK_N, BLOCK_X, AScaleFragT, BScaleFragT>;
     wmma::template run<>(fragA, fragXa, fragB, fragXb, fragAcc);
 
     for(int i = 0; i < vectorSize(fragC); ++i)
