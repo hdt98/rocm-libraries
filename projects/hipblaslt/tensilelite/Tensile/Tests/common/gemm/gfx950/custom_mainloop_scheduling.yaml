@@ -1911,6 +1911,140 @@ BenchmarkProblems:
           - Range: [[192], [320], [1], [1, 17, 64]]
           - Range: [[192], [320], [1], [32, 64, 256]]
         - BiasTypeArgs: ['b']
+####################
+# BBS-128-128-64 NN
+###################
+  - 
+    -  
+      OperationType: GEMM
+      Activation: true
+      Batched: true
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      HighPrecisionAccumulate: true
+      IndexAssignmentsA: [0, 3, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      NumIndicesC: 3
+      TransposeA: false
+      TransposeB: false
+      UseBias: 1
+      UseScaleAlphaVec: 1
+    - 
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: [Assembly]
+      ForkParameters:
+        - ActivationFuncCall: [false]
+        - ClusterLocalRead: [0]
+        - DepthU: [64]
+        - DirectToLds: [true]
+        - ExpandPointerSwap: [0]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - GlobalSplitU: [0]
+        - LDSTrInst: [1]
+        - LdsBlockSizePerPadA: [1024]
+        - LdsBlockSizePerPadB: [1024]
+        - LdsPadA: [16]
+        - LdsPadB: [16]
+        - LocalReadVectorWidth: [8]
+        - MaxLDS: [163840]
+        - MbskPrefetchMethod: [0]
+        - NumElementsPerBatchStore: [16]
+        - PrefetchGlobalRead: [2]
+        - SourceSwap: [1]
+        - StaggerU: [8]
+        - StaggerUStride: [128]
+        - StoreVectorWidth: [1]
+        - StreamK: [3]
+        - ThreadTile: [[1, 1]]
+        - TransposeLDS: [1]
+        - UseCustomMainLoopSchedule: [0,1]
+        - UseSgprForGRO: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [4]
+        - WorkGroupMappingXCC: [2]
+        - Groups:
+          - - MatrixInstruction: [16, 16, 32, 1, 1, 4, 4, 2, 2]
+              WorkGroup: [32, 8, 1]
+              MIArchVgpr: 0
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [1024, 1024, 1, 8192]
+        - BiasTypeArgs: [0, 7]
+####################
+# BBS-128-128-64 TN
+###################
+  - 
+    -
+      OperationType: GEMM
+      Activation: true
+      Batched: true
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      HighPrecisionAccumulate: true
+      IndexAssignmentsA: [0, 3, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      NumIndicesC: 3
+      TransposeA: false
+      TransposeB: true
+      UseBias: 1
+      UseScaleAlphaVec: 1
+    - 
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: [Assembly]
+      ForkParameters:
+        - ActivationFuncCall: [false]
+        - ClusterLocalRead: [0]
+        - DepthU: [64]
+        - DirectToLds: [true]
+        - ExpandPointerSwap: [0]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - GlobalSplitU: [0]
+        - LDSTrInst: [1]
+        - LdsBlockSizePerPadA: [1024]
+        - LdsBlockSizePerPadB: [1024]
+        - LdsPadA: [16]
+        - LdsPadB: [16]
+        - LocalReadVectorWidth: [8]
+        - MaxLDS: [163840]
+        - MbskPrefetchMethod: [0]
+        - NumElementsPerBatchStore: [16]
+        - PrefetchGlobalRead: [2]
+        - SourceSwap: [1]
+        - StaggerU: [8]
+        - StaggerUStride: [128]
+        - StoreVectorWidth: [1]
+        - StreamK: [3]
+        - ThreadTile: [[1, 1]]
+        - TransposeLDS: [0]
+        - UseCustomMainLoopSchedule: [0,1]
+        - UseSgprForGRO: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [4]
+        - WorkGroupMappingXCC: [2]
+        - Groups:
+          - - MatrixInstruction: [16, 16, 32, 1, 1, 4, 4, 2, 2]
+              WorkGroup: [32, 8, 1]
+              MIArchVgpr: 0
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [1024, 1024, 1, 8192]
+        - BiasTypeArgs: [0, 7]
   ########################################
   # HHS NT - standard
   ########################################

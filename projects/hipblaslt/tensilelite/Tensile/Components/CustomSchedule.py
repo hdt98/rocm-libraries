@@ -3275,3 +3275,93 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     opt1.disableValidation() # Disable validation as this schedule re-order pack instructions (Non-descending-order validator to be updated to allow this)
     return True, opt1
+
+
+
+@RegisterSchedule(
+    tile_config=TileConfig(128, 128, 64, 2, 1, True, 0, 0),
+    dtype_predicate=is16bit,
+    vector_widths=[8, 8, 8],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_128x128x64_16bit(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+    
+    numMfma = 32
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0
+    if isNN(kernel) and useLDSTr and TLDS == 1:
+        optSchedule = {
+            'SYNC': [[-1,3, 8, 8,15, 18, 27,27]],
+            'GRIncA': [[0, 0, 1, 1, 2, 2, 3, 3, 4]],
+            'GRIncB': [[4, 5, 5, 6, 6, 7, 7, 12, 13]],
+            'LRA0': [[0, 1, 1, 2, 2, 3, 3, 4]],
+            'GRA': [[8, 8, 9, 10, 11, 12, 13, 14]],
+            'LRB0': [[8, 9, 10, 11]],
+            'GRB': [[18, 18,19, 20, 21, 22, 23, 25]],
+            'LRA1': [[19, 20, 21, 22, 23, 24, 25, 25]],
+            'LRB1': [[27, 28, 29, 30]],
+            'LRSA': [[17]],
+            'LRSB': [[17]],
+            'LWSA': [[30]],
+            'LWSB': [[30]],
+            'LCC': [[31, 31]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
+            SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRA0 before GRA"),
+            SBarrier(comment="barrier: all waves finish LRA0 before GRA DirectToLds"),
+            SWaitCnt(dscnt=0, vlcnt=8, vscnt=-1, comment="wait for LRB0 before GRB"),
+            SBarrier(comment="barrier: all waves finish LRB0 before GRB DirectToLds"),
+            #SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="wait for GRA/GRB to complete"),
+            #SBarrier(comment="barrier: GRA/GRB complete, LDS updated for LRA1/LRB1"),
+            SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="wait for GRA/GRB to complete"),
+            SBarrier(comment="barrier: GRA/GRB complete, LDS updated for LRA1/LRB1"),
+        ]
+        nglshift = nllshift = 8  # 4 GRA + 4 GRB = 8 global reads
+        opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+        return True, opt1
+    elif isNT(kernel) and useLDSTr and TLDS == 0:
+        optSchedule = {
+            'SYNC': [[-1, 3, 8, 8, 15, 15, 24, 24]],
+            'GRIncA': [[0, 0, 1, 1, 2, 2, 3, 3, 3]],
+            'GRIncB': [[4, 4, 5, 5, 6, 6, 7, 7, 7]],
+            'LRA0': [[0, 1, 2, 3, 4, 5, 6, 7],
+                     [0, 1, 2, 3, 4, 5, 6, 7]],
+            'LRB0': [[5, 7, 7, 9, 9, 11, 11, 13],
+                     [6, 6, 8, 8, 10, 10, 12, 12]],
+            'GRA': [[8, 8, 9, 10, 11, 12, 13, 14],
+                    [8, 9, 10, 11, 12, 13, 14, 14]],
+            'GRB': [[16, 16, 18, 18, 18, 20, 20, 22],
+                    [15, 15, 17, 19, 19, 21, 23, 23]],
+            'LRA1': [[17, 17, 19, 19, 21, 21, 23, 27],
+                     [16, 16, 18, 18, 20, 24, 26, 26]],
+            'LRB1': [[24, 24, 26, 26, 28, 28, 30, 30],
+                     [25, 25, 27, 27, 29, 29, 31, 31]],
+            'LRSA': [[15]],
+            'LRSB': [[15]],
+            'LWSA': [[31]],
+            'LWSB': [[31]],
+            'LCC': [[31, 31]],
+        }
+        
+        syncCode = [
+            SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
+            SWaitCnt(dscnt=5, vlcnt=-1, vscnt=-1, comment="wait for prior LRA1/LRB1"),
+            SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="wait for LRA0 before GRA"),
+            SBarrier(comment="barrier: all waves finish LRA0 before GRA DirectToLds"),
+            SWaitCnt(dscnt=0, vlcnt=8, vscnt=-1, comment="wait for LRB0 before GRB"),
+            SBarrier(comment="barrier: all waves finish LRB0 before GRB DirectToLds"),
+            SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="wait for GRA/GRB to complete"),
+            SBarrier(comment="barrier: GRA/GRB complete, LDS updated for LRA1/LRB1"),
+            
+        ]
+        
+        nglshift = nllshift = 8  # 8 GRA + 8 GRB = 16 global reads
+        opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+        return True, opt1
+    # No matching variant found
+    return False, None
