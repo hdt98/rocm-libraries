@@ -119,8 +119,7 @@ if(HIPBLASLT_ENABLE_HOST)
         find_library(rocTracer roctx64 REQUIRED)
         get_filename_component(ROCTRACER_LIB_DIR ${rocTracer} DIRECTORY)
         get_filename_component(ROCTRACER_ROOT_DIR ${ROCTRACER_LIB_DIR} DIRECTORY)
-    
-        find_path(ROCTRACER_INCLUDE_DIR "roctracer/roctx.h" 
+        find_path(ROCTRACER_INCLUDE_DIR "roctracer/roctx.h"
             HINTS ${ROCTRACER_ROOT_DIR}
             PATH_SUFFIXES include
             REQUIRED)
@@ -316,7 +315,7 @@ endif()
 
 if(HIPBLASLT_ENABLE_HOST)
     # work around code object stripping failure if using /usr/bin/strip
-    find_program(LLVM_STRIP 
+    find_program(LLVM_STRIP
         NAMES llvm-strip
         PATH_SUFFIXES lib/llvm/bin llvm/bin bin
     )
@@ -528,8 +527,7 @@ if(HIPBLASLT_ENABLE_CLIENT AND HIPBLASLT_ENABLE_SAMPLES)
         DESTINATION ${CMAKE_INSTALL_DATADIR}/hipblaslt/samples
         COMPONENT samples
         FILES_MATCHING
-        PATTERN "*.cpp"
-        PATTERN "*.h"
+        PATTERN "*.cpp|*.h"
         PATTERN "CMakeLists.txt" EXCLUDE
     )
     rocm_package_setup_client_component(samples)

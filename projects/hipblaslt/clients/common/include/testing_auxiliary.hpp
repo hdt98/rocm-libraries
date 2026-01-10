@@ -1788,7 +1788,8 @@ void testing_aux_auxiliary_func(const Arguments& arg)
                 == HIPBLASLT_EPILOGUE_GELU_AUX);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_GELU_AUX_BIAS")
                 == HIPBLASLT_EPILOGUE_GELU_AUX_BIAS);
-    ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_SIGMOID") == HIPBLASLT_EPILOGUE_SIGMOID);
+    ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_SIGMOID")
+                == HIPBLASLT_EPILOGUE_SIGMOID);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_DGELU") == HIPBLASLT_EPILOGUE_DGELU);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_DGELU_BGRAD")
                 == HIPBLASLT_EPILOGUE_DGELU_BGRAD);
@@ -4265,208 +4266,212 @@ void testing_aux_tuple_helper_equal_func(const Arguments& arg)
 
 void testing_aux_hipblaslt_ostream_func(const Arguments& arg)
 {
-    // Test default (non-enumeration) template operator<<
-    hipblaslt_internal_ostream os1;
-    
-    // Test basic types that use the default template
-    os1 << "Hello";
-    ASSERT_TRUE(os1.str() == "Hello");
-    os1.clear();
-    
-    os1 << 42;
-    ASSERT_TRUE(os1.str() == "42");
-    os1.clear();
-    
-    os1 << 3.14f;
-    ASSERT_TRUE(os1.str().find("3.14") != std::string::npos);
-    os1.clear();
-    
-    // Test enumeration type operator<<
-    hipblaslt_internal_ostream os2;
-    hipblasOperation_t op = HIPBLAS_OP_N;
-    os2 << op;
-    ASSERT_TRUE(os2.str() == "N"); // Assuming hipblas_operation_to_string returns "N"
-    os2.clear();
-    
-    // Test std::pair operator<< (YAML mode toggle)
-    hipblaslt_internal_ostream os3;
-    std::pair<std::string, int> test_pair{"key", 42};
-    os3 << test_pair;
-    ASSERT_TRUE(os3.str() == "key: 42");
-    os3.clear();
-    
-    std::pair<const char*, double> float_pair{"value", 3.14};
-    os3 << float_pair;
-    ASSERT_TRUE(os3.str().find("value: 3.14") != std::string::npos);
-    os3.clear();
-    
-    // Test double operator<< in non-YAML mode
-    hipblaslt_internal_ostream os4;
-    os4 << 3.14159;
-    ASSERT_TRUE(os4.str() == "3.14159");
-    os4.clear();
-    
-    os4 << std::numeric_limits<double>::infinity();
-    ASSERT_TRUE(os4.str() == "inf");
-    os4.clear();
-    
-    os4 << -std::numeric_limits<double>::infinity();
-    ASSERT_TRUE(os4.str() == "-inf");
-    os4.clear();
-    
-    os4 << std::numeric_limits<double>::quiet_NaN();
-    ASSERT_TRUE(os4.str() == "nan");
-    os4.clear();
-    
-    // Test double operator<< in YAML mode
-    hipblaslt_internal_ostream os5;
-    os5 << hipblaslt_internal_ostream::yaml_on;
-    
-    os5 << 1.0;
-    ASSERT_TRUE(os5.str() == "1.0");
-    os5.clear();
-    
-    os5 << std::numeric_limits<double>::infinity();
-    ASSERT_TRUE(os5.str() == ".inf");
-    os5.clear();
-    
-    os5 << -std::numeric_limits<double>::infinity();
-    ASSERT_TRUE(os5.str() == "-.inf");
-    os5.clear();
-    
-    os5 << std::numeric_limits<double>::quiet_NaN();
-    ASSERT_TRUE(os5.str() == ".nan");
-    os5.clear();
-    
-    // Test hipblasLtHalf operator<<
-    hipblaslt_internal_ostream os6;
-    hipblasLtHalf half_val = 2.5f;
-    os6 << half_val;
-    ASSERT_TRUE(os6.str().find("2.5") != std::string::npos);
-    os6.clear();
-    
-    // Test hip_bfloat16 operator<<
-    hipblaslt_internal_ostream os7;
-    hip_bfloat16 bf16_val = static_cast<hip_bfloat16>(1.25f);
-    os7 << bf16_val;
-    ASSERT_TRUE(os7.str().find("1.25") != std::string::npos);
-    os7.clear();
-    
-    // Test integer operators<<
-    hipblaslt_internal_ostream os8;
-    
-    int32_t i32 = -123;
-    os8 << i32;
-    ASSERT_TRUE(os8.str() == "-123");
-    os8.clear();
-    
-    uint32_t u32 = 456;
-    os8 << u32;
-    ASSERT_TRUE(os8.str() == "456");
-    os8.clear();
-    
-    int64_t i64 = -9876543210LL;
-    os8 << i64;
-    ASSERT_TRUE(os8.str() == "-9876543210");
-    os8.clear();
-    
-    uint64_t u64 = 1234567890ULL;
-    os8 << u64;
-    ASSERT_TRUE(os8.str() == "1234567890");
-    os8.clear();
-    
-    // Test bool operator<< in non-YAML mode
-    hipblaslt_internal_ostream os9;
-    os9 << true;
-    ASSERT_TRUE(os9.str() == "1");
-    os9.clear();
-    
-    os9 << false;
-    ASSERT_TRUE(os9.str() == "0");
-    os9.clear();
-    
-    // Test bool operator<< in YAML mode
-    os9 << hipblaslt_internal_ostream::yaml_on;
-    os9 << true;
-    ASSERT_TRUE(os9.str() == "true");
-    os9.clear();
-    
-    os9 << false;
-    ASSERT_TRUE(os9.str() == "false");
-    os9.clear();
-    
-    // Test char operator<< in non-YAML mode
-    hipblaslt_internal_ostream os10;
-    os10 << 'A';
-    ASSERT_TRUE(os10.str() == "A");
-    os10.clear();
-    
-    os10 << '\n';
-    ASSERT_TRUE(os10.str() == "\n");
-    os10.clear();
-    
-    // Test char operator<< in YAML mode
-    os10 << hipblaslt_internal_ostream::yaml_on;
-    os10 << 'B';
-    ASSERT_TRUE(os10.str() == "'B'");
-    os10.clear();
-    
-    os10 << ' ';
-    ASSERT_TRUE(os10.str() == "' '");
-    os10.clear();
-    
-    // Test const char* operator<< in non-YAML mode
-    hipblaslt_internal_ostream os11;
-    os11 << "Hello World";
-    ASSERT_TRUE(os11.str() == "Hello World");
-    os11.clear();
-    
-    os11 << "";
-    ASSERT_TRUE(os11.str() == "");
-    os11.clear();
-    
-    // Test const char* operator<< in YAML mode
-    os11 << hipblaslt_internal_ostream::yaml_on;
-    os11 << "Test String";
-    ASSERT_TRUE(os11.str() == "\"Test String\"");
-    os11.clear();
-    
-    os11 << "String with \"quotes\"";
-    ASSERT_TRUE(os11.str().find("\"") != std::string::npos);
-    os11.clear();
+    hipblasLtHandle_t handle;
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
 
-    // Test UserDrivenTuningParser.cpp
+    hipblasLtMatmulDesc_t matmul;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
 
-    // Test getContractionProblemsFromFile
-    TensileLite::getContractionProblemsFromFile("./code_coverage_tuning_file.txt");
+    hipblasOperation_t opA     = HIPBLAS_OP_T;
+    hipblasOperation_t opB     = HIPBLAS_OP_N;
+    int64_t            m       = 1;
+    int64_t            n       = 1;
+    int64_t            k       = 1;
+    float              alpha_v = arg.alpha;
+    void*              alpha   = &alpha_v;
+    float              beta_v  = arg.beta;
+    void*              beta    = &beta_v;
+    int64_t            lda     = 1;
+    int64_t            ldb     = 1;
+    int64_t            ldc     = 1;
+    int64_t            ldd     = 1;
+    int64_t            lde     = 1;
 
-    // Test ProblemOverride
+    hipStream_t stream;
+    CHECK_HIP_ERROR(hipStreamCreate(&stream));
+    hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matA, arg.a_type, m, k, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matB, arg.a_type, k, n, k));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matC, arg.a_type, m, n, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matD, arg.a_type, m, n, m));
+    hipDataType a_type, b_type, c_type, d_type;
 
-    // Create two ProblemOverride objects
-    TensileLite::ProblemOverride prob1(true, false, rocisa::DataType::Float, 
-                                    rocisa::DataType::Float, rocisa::DataType::XFloat32, 
-                                    rocisa::DataType::Float, 128, 256, 64, 2);
+    const int                        request_solutions = 1;
+    hipblasLtMatmulHeuristicResult_t heuristicResult[request_solutions];
+    int                              returnedAlgoCount  = 0;
+    size_t                           max_workspace_size = 128 * 1024 * 1024;
+    hipblasLtMatmulPreference_t      pref;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
+    CHECK_HIPBLASLT_ERROR(
+        hipblasLtMatmulPreferenceSetAttribute(pref,
+                                              HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                              &max_workspace_size,
+                                              sizeof(max_workspace_size)));
 
-    TensileLite::ProblemOverride prob2(true, false, rocisa::DataType::Float, 
-                                    rocisa::DataType::Float, rocisa::DataType::XFloat32, 
-                                    rocisa::DataType::Float, 128, 256, 64, 1);
+    void* d_workspace;
+    if(max_workspace_size > 0)
+        CHECK_HIP_ERROR(hipMalloc(&d_workspace, max_workspace_size));
 
-    // Use the compare function
-    int result = TensileLite::Comparison<TensileLite::ProblemOverride>::compare(prob1, prob2);
-    ASSERT_TRUE(result > 0);
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulAlgoGetHeuristic(handle,
+                                                          matmul,
+                                                          matA,
+                                                          matB,
+                                                          matC,
+                                                          matD,
+                                                          pref,
+                                                          request_solutions,
+                                                          heuristicResult,
+                                                          &returnedAlgoCount));
 
-    // Use in std::unordered_map
-    std::unordered_map<TensileLite::ProblemOverride, int> problemSolutionMap;
-    problemSolutionMap[prob1] = 42;  // Hash function is called automatically
-    problemSolutionMap[prob2] = 84;
+    CHECK_SOLUTION_FOUND(returnedAlgoCount);
+    rocblaslt_matmul_desc matmul_descr = (rocblaslt_matmul_desc)matmul;
+    int64_t               batch_count  = 1;
+    void *                A, *B, *C, *D, *E, *d_alphaVec; // device
+    CHECK_HIP_ERROR(hipMalloc(&A, m * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&B, n * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&C, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&D, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&E, m * n * batch_count * sizeof(int64_t)));
 
-    // Use in std::unordered_set
-    auto it1 = problemSolutionMap.find(prob1);
-    auto it2 = problemSolutionMap.find(prob2);
-    
-    ASSERT_TRUE(it1 != problemSolutionMap.end());
-    ASSERT_TRUE(it2 != problemSolutionMap.end());
-}
+    int64_t                batch_stride_a = 0;
+    int64_t                batch_stride_b = 0;
+    int64_t                batch_stride_c = 0;
+    int64_t                batch_stride_d = 0;
+    int64_t                batch_stride_e = 0;
+    bool                   strided_batch  = true;
+    bool                   grouped_gemm   = true;
+    void*                  bias           = nullptr;
+    hipDataType            bias_type;
+    void*                  scaleAlphaVec = nullptr;
+    hipDataType            aux_type;
+    bool                   gradient = false;
+    rocblaslt_compute_type compute_type;
+    rocblaslt_handle       roc_handle = (rocblaslt_handle)handle;
+
+    rocblaslt_status isValid = rocblaslt_matmul_valid_args(matmul_descr,
+                                                           A,
+                                                           B,
+                                                           C,
+                                                           D,
+                                                           (rocblaslt_matrix_layout)matA,
+                                                           (rocblaslt_matrix_layout)matB,
+                                                           (rocblaslt_matrix_layout)matC,
+                                                           (rocblaslt_matrix_layout)matD,
+                                                           alpha,
+                                                           beta,
+                                                           m,
+                                                           n,
+                                                           k,
+                                                           a_type,
+                                                           lda,
+                                                           batch_stride_a,
+                                                           b_type,
+                                                           ldb,
+                                                           batch_stride_b,
+                                                           c_type,
+                                                           ldc,
+                                                           batch_stride_c,
+                                                           d_type,
+                                                           ldd,
+                                                           batch_stride_d,
+                                                           lde,
+                                                           batch_stride_e,
+                                                           bias,
+                                                           bias_type,
+                                                           scaleAlphaVec,
+                                                           E,
+                                                           aux_type,
+                                                           gradient,
+                                                           compute_type,
+                                                           false,
+                                                           false);
+
+    ASSERT_TRUE(isValid == rocblaslt_status_continue);
+
+    RocblasltContractionProblem problem{opA,
+                                        opB,
+                                        m,
+                                        n,
+                                        k,
+                                        alpha,
+                                        a_type,
+                                        A, // A
+                                        nullptr,
+                                        lda, // arg.lda
+                                        batch_stride_a,
+                                        b_type,
+                                        B, // B
+                                        nullptr,
+                                        ldb, // arg.ldb
+                                        batch_stride_b,
+                                        beta,
+                                        c_type,
+                                        C, // C
+                                        nullptr,
+                                        ldc, // arg.ldc
+                                        batch_stride_c,
+                                        d_type,
+                                        D, // D
+                                        nullptr,
+                                        ldd, // arg.ldc
+                                        batch_stride_d,
+                                        E, // E
+                                        nullptr,
+                                        lde, //arg.lde
+                                        batch_stride_e,
+                                        batch_count,
+                                        strided_batch,
+                                        grouped_gemm,
+                                        gradient,
+                                        matmul_descr->compute_type,
+                                        HIPBLASLT_DATATYPE_INVALID,
+                                        bias,
+                                        matmul_descr->scaleA,
+                                        matmul_descr->scaleB,
+                                        matmul_descr->scaleC,
+                                        matmul_descr->scaleD,
+                                        matmul_descr->scaleE,
+                                        scaleAlphaVec,
+                                        matmul_descr->scaleAType,
+                                        matmul_descr->scaleBType,
+                                        arg.bias_type,
+                                        arg.aux_type,
+                                        matmul_descr->epilogue,
+                                        matmul_descr->amaxD,
+                                        nullptr,
+                                        max_workspace_size, // workspaceSize
+                                        HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, // act0
+                                        HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, // act1
+                                        stream, // stream
+                                        roc_handle->Synchronizer,
+                                        arg.swizzle_a, // swizzleA
+                                        arg.swizzle_b}; // swizzleB
+
+    const hipblasLtMatmulAlgo_t* hip_algo = &heuristicResult[0].algo;
+    const rocblaslt_matmul_algo* roc_algo = (const rocblaslt_matmul_algo*)hip_algo;
+
+    ASSERT_TRUE(runRocRollerContractionProblem(roc_handle, nullptr, problem)
+                != rocblaslt_status_success);
+    ASSERT_TRUE(runRocRollerContractionProblem(roc_handle, roc_algo, problem)
+                != rocblaslt_status_success);
+
+    hipblasLtMatmulAlgo_t* hip_algo2 = &heuristicResult[0].algo;
+    rocblaslt_matmul_algo* roc_algo2 = (rocblaslt_matmul_algo*)hip_algo;
+    ASSERT_TRUE(isRocRollerSolutionSupported(roc_handle, problem, roc_algo2, &max_workspace_size)
+                != rocblaslt_status_success);
+
+    // Free GPU memory allocations
+    CHECK_HIP_ERROR(hipFree(A));
+    CHECK_HIP_ERROR(hipFree(B));
+    CHECK_HIP_ERROR(hipFree(C));
+    CHECK_HIP_ERROR(hipFree(D));
+    CHECK_HIP_ERROR(hipFree(E));
+
+    // Free workspace
+    CHECK_HIP_ERROR(hipFree(d_workspace));
+
+    // Destroy preference object
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceDestroy(pref));
 
 void testing_aux_handle_func(const Arguments& arg)
 {
