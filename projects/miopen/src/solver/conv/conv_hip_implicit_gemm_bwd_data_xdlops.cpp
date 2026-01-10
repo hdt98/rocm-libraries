@@ -252,10 +252,35 @@ ConvHipImplicitGemmBwdXdlops::GetDefaultPerformanceConfig(const ExecutionContext
     return pp;
 }
 
-origami::config_t ConvHipImplicitGemmBwdXdlops::GetOrigamiConfig(
-    PerformanceConfigHipImplicitGemmBwdXdlops perf_cfg) const
+template <typename DataType>
+origami::config_t ConvHipImplicitGemmBwdXdlops::GetOrigamiConfigByType(
+    const ::miopen::conv::ProblemDescription& problem,
+    const PerformanceConfigHipImplicitGemmBwdXdlops& perf_cfg) const
 {
     return miopen::solver::GetOrigamiConfig(perf_cfg);
+    switch(problem.GetAlphaBetaCase())
+    {
+    case BILINEAR:
+        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdBilinearPtrs<DataType>>(perf_cfg);
+    case SCALE:
+        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdScalePtrs<DataType>>(perf_cfg);
+    default:
+        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdDefaultPtrs<DataType>>(perf_cfg);
+    }
+}
+
+origami::config_t ConvHipImplicitGemmBwdXdlops::GetOrigamiConfig(
+    const ::miopen::conv::ProblemDescription& problem,
+    const PerformanceConfigHipImplicitGemmBwdXdlops& perf_cfg) const
+{
+    switch(problem.GetInDataType())
+    {
+    case miopenHalf: return GetOrigamiConfigByType<ck::half_t>(problem, perf_cfg);
+    case miopenFloat: return GetOrigamiConfigByType<float>(problem, perf_cfg);
+    case miopenInt8: return GetOrigamiConfigByType<int8_t>(problem, perf_cfg);
+    case miopenBFloat16: return GetOrigamiConfigByType<ck::bhalf_t>(problem, perf_cfg);
+    default: break; // Unsupported data types
+    }
 }
 
 bool ConvHipImplicitGemmBwdXdlops::IsValidPerformanceConfig(

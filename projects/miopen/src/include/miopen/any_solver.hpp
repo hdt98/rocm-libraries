@@ -60,6 +60,11 @@ struct AnySolver
         assert(ptr_value != nullptr);
         return ptr_value->IsTunable();
     };
+    bool IsLegacy() const
+    {
+        assert(ptr_value != nullptr);
+        return ptr_value->IsLegacy();
+    };
     bool TestPerfCfgParams(const ExecutionContext& ctx,
                            const miopen::conv::ProblemDescription& problem,
                            const std::string& perf_cfg) const
@@ -180,6 +185,7 @@ struct AnySolver
         virtual bool IsApplicable(const ExecutionContext& ctx,
                                   const miopen::conv::ProblemDescription& problem) const = 0;
         virtual bool IsTunable() const                                                   = 0;
+        virtual bool IsLegacy() const                                                    = 0;
         virtual bool TestPerfCfgParams(const ExecutionContext& ctx,
                                        const miopen::conv::ProblemDescription& problem,
                                        const std::string& perf_cfg) const                = 0;
@@ -406,6 +412,7 @@ struct AnySolver
             return value.IsApplicable(ctx, problem);
         }
         bool IsTunable() const override { return TunableSolver::Is; }
+        bool IsLegacy() const override { return LegacySolver::Is; }
         bool IsDynamic() const override { return value.IsDynamic(); }
         float GetWti(const ExecutionContext& ctx,
                      const miopen::conv::ProblemDescription& problem) const override

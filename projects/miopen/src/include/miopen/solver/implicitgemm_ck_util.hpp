@@ -1535,7 +1535,7 @@ static inline bool IsIndexRangeLargeEnough(const miopen::conv::ProblemDescriptio
            problem.GetOutSize() < max_index_range;
 }
 
-template <typename PerformanceConfig>
+template <typename PerformanceConfig, typename DeviceOpType>
 origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg)
 {
     auto conv_ptrs             = DeviceOpType::GetInstances();
@@ -1561,7 +1561,7 @@ origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg)
     ori_cfg.mi.m = 16;             // Matrix instruction M
     ori_cfg.mi.n = 16;             // Matrix instruction N
     ori_cfg.mi.k = 32;             // Matrix instruction K
-    // ori_cfg.occupancy = 4;
+    ori_cfg.occupancy = 4;
 
     MIOPEN_LOG_I2("CK id string: " << id_string << ", MT.M(" << ori_cfg.mt.m << ") MT.N("
                                    << ori_cfg.mt.n << ") MT.K(" << ori_cfg.mt.k << ") MI.M("

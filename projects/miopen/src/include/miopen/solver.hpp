@@ -200,7 +200,8 @@ struct SolverBaseTunable : SolverInterfaceTunable<Context, Problem>, TunableSolv
     virtual PerformanceConfig GetDefaultPerformanceConfig(const Context& ctx,
                                                           const Problem& problem) const = 0;
 
-    origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg) const
+    origami::config_t GetOrigamiConfig(const Problem& problem,
+                                       const PerformanceConfig& config) const
     {
         return origami::config_t{};
     }

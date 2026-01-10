@@ -37,9 +37,13 @@
 #include <miopen/invoke_params.hpp>
 #include <miopen/logger.hpp>
 #include <miopen/mt_queue.hpp>
-#include <miopen/origami_search.hpp>
 #include <miopen/timer.hpp>
 #include <miopen/utility/modified_z.hpp>
+
+#include <miopen/solver/problem_description_interpreter.hpp>
+
+#include <origami/origami.hpp>
+#include <origami/types.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -417,6 +421,101 @@ void CompileAgent(size_t thread_index,
     MIOPEN_LOG_I2("Thread: " << thread_index << " Done, completed tuning");
 }
 
+origami::data_type_t GetOriDataType(const miopen::conv::ProblemDescription& problem)
+{
+    switch(problem.GetInDataType())
+    {
+    case miopenHalf: return origami::data_type_t::Half;
+    case miopenFloat: return origami::data_type_t::Float;
+    case miopenInt8: return origami::data_type_t::Int8;
+    case miopenBFloat16: return origami::data_type_t::BFloat16;
+    case miopenInt64: return origami::data_type_t::Int64;
+    case miopenInt32: return origami::data_type_t::Int32;
+    case miopenFloat8_fnuz: return origami::data_type_t::Float8_fnuz;
+    case miopenBFloat8_fnuz: return origami::data_type_t::BFloat8_fnuz;
+    case miopenDouble: return origami::data_type_t::Double;
+    }
+    return origami::data_type_t::None;
+}
+
+//template <typename Problem>
+//origami::data_type_t GetOriDataType(const Problem& problem)
+//{
+//    return origami::data_type_t::None;
+//}
+
+template <class Solver, class PerformanceConfig>
+std::vector<PerformanceConfig>
+GetOrigamiPerformanceConfig(const Solver s,
+                            const miopen::conv::ProblemDescription& problem,
+                            const std::vector<PerformanceConfig>& all_configs)
+{
+    auto hardware = origami::hardware_t::get_hardware_for_device(0);
+
+    // Create a problem description
+    origami::problem_t ori_prob;
+    ori_prob.size.m = ProblemInterpreter::GetBatchN(problem); // M dimension // batch size
+    ori_prob.size.n =
+        ProblemInterpreter::GetOutputChannelK(problem); // N dimension // output channels
+    ori_prob.size.k =
+        ProblemInterpreter::GetInputChannelC(problem); // K dimension // input channels
+    // TBD
+    ori_prob.batch = 1;
+    // TransA T and TransB N is both K Contiguous (Ks next to each other in memory)
+    // TransA N and TransB T is M/N contiguous (M and N next to each other in memory)
+    ori_prob.a_transpose = origami::transpose_t::T;
+    ori_prob.b_transpose = origami::transpose_t::N;
+    ori_prob.a_dtype     = GetOriDataType(problem);
+    ori_prob.b_dtype     = GetOriDataType(problem);
+    ori_prob.c_dtype     = GetOriDataType(problem);
+    ori_prob.d_dtype     = GetOriDataType(problem);
+    ori_prob.mi_dtype    = GetOriDataType(problem);
+    // TBD
+    ori_prob.a_mx_block_size = 0;
+    ori_prob.b_mx_block_size = 0;
+
+    // Create candidate configurations
+    std::vector<origami::config_t> ori_cfgs;
+    std::map<size_t, std::vector<PerformanceConfig>> ori_to_perf_cfg;
+
+    for(auto perf_cfg : all_configs)
+    {
+        origami::config_t ori_cfg = s.GetOrigamiConfig(problem, perf_cfg);
+        if(ori_cfg.is_valid())
+        {
+            ori_cfgs.push_back(ori_cfg);
+
+            if(ori_to_perf_cfg.contains(ori_cfg.hash()))
+                ori_to_perf_cfg[ori_cfg.hash()].push_back(perf_cfg);
+            else
+                ori_to_perf_cfg[ori_cfg.hash()] = {perf_cfg};
+        }
+    }
+
+    // Rank all configurations by performance
+    std::vector<PerformanceConfig> ret;
+
+    if(!ori_cfgs.empty())
+    {
+        auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
+
+        for(auto prediction : ranked_configs)
+            for(auto perf_cfg : ori_to_perf_cfg[prediction.config.hash()])
+                ret.push_back(perf_cfg);
+    }
+
+    return ret;
+}
+
+template <class Solver, class PerformanceConfig, class Problem>
+std::vector<PerformanceConfig>
+GetOrigamiPerformanceConfig(const Solver s,
+                            const Problem& problem,
+                            const std::vector<PerformanceConfig>& all_configs)
+{
+    return {};
+}
+
 struct SolutionPerf
 {
     std::string params;
@@ -463,8 +562,8 @@ auto GenericSearch(const Solver s,
 
     // rank order configs
     const size_t origami_ret_size = 5;
-    auto ranked_configs           = GetOrigamiPerformanceConfig(problem, all_configs);
-    if(ranked_configs)
+    auto ranked_configs           = GetOrigamiPerformanceConfig(s, problem, all_configs);
+    if(!ranked_configs.empty())
     {
         if(ranked_configs.size() > origami_ret_size)
         {
