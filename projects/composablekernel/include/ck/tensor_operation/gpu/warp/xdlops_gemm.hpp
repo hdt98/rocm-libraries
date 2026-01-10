@@ -1577,13 +1577,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<float, 32, 32>()
+    constexpr auto GetMfma<float, 32, 32, float, is_single_rate_mfma>()
     {
         return MfmaInstr::mfma_f32_32x32x2f32;
     }
 
     template <>
-    constexpr auto GetMfma<float, 16, 16>()
+    constexpr auto GetMfma<float, 16, 16, float, is_single_rate_mfma>()
     {
 #if defined(__gfx125__)
         return MfmaInstr::wmma_f32_16x16x4_f32_gfx125;
@@ -1597,7 +1597,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<tf32_t, 32, 32, tf32_t>()
+    constexpr auto GetMfma<tf32_t, 32, 32, tf32_t, is_single_rate_mfma>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
@@ -1613,7 +1613,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<tf32_t, 16, 16, tf32_t>()
+    constexpr auto GetMfma<tf32_t, 16, 16, tf32_t, is_single_rate_mfma>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;

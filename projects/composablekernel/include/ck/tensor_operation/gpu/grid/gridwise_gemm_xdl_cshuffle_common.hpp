@@ -951,7 +951,7 @@ struct GridwiseGemm_xdl_cshuffle_base
         constexpr index_t NWave = NPerBlock / (NXdlPerWave * NPerXdl);
 
         constexpr auto c_shuffle_block_desc_mblock_mperblock_nblock_nperblock =
-            GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock<gfx125_t>();
+            GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(gfx125_t{});
         return transform_tensor_descriptor(
             c_shuffle_block_desc_mblock_mperblock_nblock_nperblock,
             make_tuple(make_pass_through_transform(I1),

@@ -176,6 +176,14 @@ inline bool is_xdl_wmma_k_supported()
         }
         return true;
     }
+    else if(is_gfx120_supported())
+    {
+        return (KPerBlock % 16 == 0) && (KPack % 8 == 0);
+    }
+    else if(is_gfx11_supported())
+    {
+        return (KPerBlock % 16 == 0) && (KPack % 16 == 0);
+    }
     return true;
 }
 
