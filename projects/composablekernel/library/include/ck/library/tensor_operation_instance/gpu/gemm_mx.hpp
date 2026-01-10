@@ -16,7 +16,6 @@ namespace ck {
 namespace tensor_operation {
 namespace device {
 namespace instance {
-
 void add_device_gemm_mx_xdl_f8_f8_f16_mk_nk_mn_default_instances(
     std::vector<std::unique_ptr<DeviceGemmMX<Row,
                                              Col,
@@ -31,6 +30,7 @@ void add_device_gemm_mx_xdl_f8_f8_f16_mk_nk_mn_default_instances(
                                              PassThrough,
                                              PassThrough>>>& instances);
 
+#if 0
 void add_device_gemm_mx_xdl_f8_f8_bf16_mk_nk_mn_default_instances(
     std::vector<std::unique_ptr<DeviceGemmMX<Row,
                                              Col,
@@ -59,6 +59,7 @@ void add_device_gemm_mx_xdl_f4_f4_f16_mk_nk_mn_default_instances(
                                              PassThrough,
                                              PassThrough>>>& instances);
 
+#elif 1
 void add_device_gemm_mx_xdl_bf8_f8_f16_mk_kn_mn_default_instances(
     std::vector<std::unique_ptr<DeviceGemmMX<Row,
                                              Row,
@@ -86,7 +87,6 @@ void add_device_gemm_mx_xdl_f8_f8_bf16_km_nk_mn_default_instances(
                                              PassThrough,
                                              PassThrough,
                                              PassThrough>>>& instances);
-
 void add_device_gemm_mx_xdl_f6_f6_f16_mk_nk_mn_default_instances(
     std::vector<std::unique_ptr<DeviceGemmMX<Row,
                                              Col,
@@ -114,7 +114,7 @@ void add_device_gemm_mx_xdl_bf6_bf6_bf16_mk_nk_mn_default_instances(
                                              PassThrough,
                                              PassThrough,
                                              PassThrough>>>& instances);
-
+#endif
 template <typename ADataType,
           typename AScaleDataType,
           typename BDataType,
@@ -163,19 +163,18 @@ struct DeviceOperationInstanceFactory<
             if constexpr(is_same_v<ADataType, F8> && is_same_v<BDataType, F8> &&
                          is_same_v<CDataType, F16>)
             {
-
                 add_device_gemm_mx_xdl_f8_f8_f16_mk_nk_mn_default_instances(op_ptrs);
             }
             else if constexpr(is_same_v<ADataType, F8> && is_same_v<BDataType, F8> &&
                               is_same_v<CDataType, BF16>)
             {
 
-                add_device_gemm_mx_xdl_f8_f8_bf16_mk_nk_mn_default_instances(op_ptrs);
+                //          add_device_gemm_mx_xdl_f8_f8_bf16_mk_nk_mn_default_instances(op_ptrs);
             }
             else if constexpr(is_same_v<ADataType, F4> && is_same_v<BDataType, F4> &&
                               is_same_v<CDataType, F16>)
             {
-                add_device_gemm_mx_xdl_f4_f4_f16_mk_nk_mn_default_instances(op_ptrs);
+                //           add_device_gemm_mx_xdl_f4_f4_f16_mk_nk_mn_default_instances(op_ptrs);
             }
             else if constexpr(is_same_v<ADataType, F6> && is_same_v<BDataType, F6> &&
                               is_same_v<CDataType, F16>)
