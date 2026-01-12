@@ -442,6 +442,20 @@ void cmp_inst(nb::module_ m_cmp)
              nb::arg("comment") = "")
         .def("__deepcopy__",
              [](const rocisa::VCmpLeU32& self, nb::dict&) { return new rocisa::VCmpLeU32(self); });
+    
+    nb::class_<rocisa::VCmpLeU32E32, rocisa::VCmpInstruction>(m_cmp, "VCmpLeU32E32")
+        .def(nb::init<const std::shared_ptr<rocisa::Container>&,
+                      const InstructionInput&,
+                      const InstructionInput&,
+                      std::optional<rocisa::SDWAModifiers>,
+                      const std::string&>(),
+             nb::arg("dst"),
+             nb::arg("src0"),
+             nb::arg("src1"),
+             nb::arg("sdwa")    = std::nullopt,
+             nb::arg("comment") = "")
+        .def("__deepcopy__",
+             [](const rocisa::VCmpLeU32E32& self, nb::dict&) { return new rocisa::VCmpLeU32E32(self); });
 
     nb::class_<rocisa::VCmpLeI32, rocisa::VCmpInstruction>(m_cmp, "VCmpLeI32")
         .def(nb::init<const std::shared_ptr<rocisa::Container>&,

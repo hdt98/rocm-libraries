@@ -1029,6 +1029,29 @@ namespace rocisa
         }
     };
 
+    struct VCmpLeU32E32 : public VCmpInstruction
+    {
+        VCmpLeU32E32(const std::shared_ptr<Container>& dst,
+                  const InstructionInput&           src0,
+                  const InstructionInput&           src1,
+                  std::optional<SDWAModifiers>      sdwa    = std::nullopt,
+                  const std::string&                comment = "")
+            : VCmpInstruction(InstType::INST_U32, dst, src0, src1, sdwa, comment)
+        {
+            setInst("v_cmp_le_u32_e32");
+        }
+
+        VCmpLeU32E32(const VCmpLeU32E32& other)
+            : VCmpInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<VCmpLeU32E32>(*this);
+        }
+    };
+
     struct VCmpLeI32 : public VCmpInstruction
     {
         VCmpLeI32(const std::shared_ptr<Container>& dst,

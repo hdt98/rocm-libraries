@@ -61,7 +61,7 @@ from rocisa.instruction import BranchInstruction, BufferLoadB128, BufferLoadB32,
   SWaitCnt, SWaitAlu, SXorB32, VAShiftRightI32, VAccvgprReadB32, VAccvgprWrite, VAccvgprWriteB32, \
   VAdd3U32, VAddCCOU32, VAddCOU32, VAddF32, VAddF64, VAddLShiftLeftU32, VAddU32, VAndB32, \
   VBfeU32, VCmpEQI32, VCmpEQU32, VCmpGEI32, VCmpGEU32, VCmpGtU32, VCmpLeI32, VCmpLtI32, \
-  VCmpLtU32, VCmpUF32, VCmpXGeU32, VCmpXLtU32, VCmpXLtU64, VCndMaskB32, VCvtF16toF32, \
+  VCmpLeU32E32, VCmpLtU32, VCmpUF32, VCmpXGeU32, VCmpXLtU32, VCmpXLtU64, VCndMaskB32, VCvtF16toF32, \
   VCvtF32toF16, VCvtFP8toF32, VCvtInstruction, VCvtPkF32toBF16, VCvtPkF32toBF8, \
   VCvtPkF32toFP8, VCvtPkFP8toF32, VCvtSRF32toBF8, VCvtSRF32toFP8, VCvtScaleFP8toF16, \
   VCvtScalePkF16toBF8, VCvtScalePkF16toFP8, VCvtScalePkFP8toF16, VLShiftLeftB32, \
@@ -8870,7 +8870,7 @@ class KernelWriterAssembly(KernelWriter):
         
         module.add(SAddU32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSize1Iter"))
         module.add(SSubU32(dst=sgpr("LocalWriteAddrTmp%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSizeTotal"))
-        module.add(SCmpGeU32(src0=sgpr("LocalWriteAddrTmp%s"%tc), src1="LDSBufferSizeTotal"))
+        module.add(SCmpGeU32(src0=sgpr("LocalWriteAddr%s"%tc), src1="LDSBufferSizeTotal"))
         module.add(SCSelectB32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddrTmp%s"%tc), src1=sgpr("LocalWriteAddr%s"%tc)))
                 
         # s_add_u32 s[sgprLocalWriteAddrA], s[sgprLocalWriteAddrA], LDSBufferSize
@@ -9858,7 +9858,7 @@ class KernelWriterAssembly(KernelWriter):
           dst=vgpr("Tmp0"), \
           src0="LDSBufferSizeTotal", \
           src1=vgpr("LocalReadAddr%s"%tc)))
-      module.add(VCmpLtU32(
+      module.add(VCmpLeU32E32(
           dst=VCC(), \
           src0="LDSBufferSizeTotal", \
           src1=vgpr("LocalReadAddr%s"%tc)))
