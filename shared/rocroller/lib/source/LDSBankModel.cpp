@@ -190,6 +190,7 @@ namespace rocRoller::Scheduling::LDSBankModel
 
         const int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
 
+        // For all intents, there's only two SP, so only 128 threads are in consideration per cycle
         std::vector<size_t> truncatedAddresses(
             instr.baseAddresses.begin(),
             instr.baseAddresses.begin()
@@ -198,11 +199,9 @@ namespace rocRoller::Scheduling::LDSBankModel
 
         int dataCycles = getInstructionDataCycles(instr, m_gfx);
 
-        Log::info("dataCycles {}, m_multiplierQueueSlots {}", dataCycles, m_multiplierQueueSlots);
-
         if(m_multiplierWaveCount > 1 && hasNonOverlappingBankAccess(instr, m_gfx))
         {
-            Log::info("Non-overlapping bank access detected, reducing data cycles by half");
+            Log::debug("Non-overlapping bank access detected, reducing data cycles");
             dataCycles /= 2;
         }
 
@@ -213,6 +212,8 @@ namespace rocRoller::Scheduling::LDSBankModel
                     ShowValue(getRemainingDataSlots()),
                     ShowValue(requiredSlots));
 
+        auto waitcntBase = m_programCycle + 40 + dataCycles / m_multiplierWaveCount;
+        Log::debug("dataCycles {}", dataCycles);
         for(int i = 0; i < m_multiplierQueueSlots; ++i)
         {
             if(instr.memoryOp.direction == LdsDirection::Write)
@@ -223,7 +224,6 @@ namespace rocRoller::Scheduling::LDSBankModel
                     cmdBase = m_commandQueue.back() + dataCycles;
                 }
 
-                auto waitcntBase = m_programCycle + 40 + dataCycles;
                 if(!m_waitcntQueue.empty())
                 {
                     waitcntBase = std::max(waitcntBase, m_waitcntQueue.back() + dataCycles);
@@ -232,13 +232,20 @@ namespace rocRoller::Scheduling::LDSBankModel
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase);
                 {
-                    auto const base
-                        = m_commandQueue.empty() ? (m_programCycle) : (m_commandQueue.back());
-                    const auto fraction = dataCycles / requiredSlots;
-                    for(int j = 0; j < requiredSlots; ++j)
+                    auto const base = m_dataQueue.empty() ? (m_programCycle) : (m_dataQueue.back());
+
+                    auto const fraction = dataCycles / (requiredSlots - 1);
+                    m_dataQueue.push_back(base);
+                    for(int j = 0; j < (requiredSlots - 1); ++j)
                     {
-                        m_dataQueue.push_back(base + (j + 1) * fraction);
+                        m_dataQueue.push_back(base + dataCycles);
                     }
+                    // auto const fraction = dataCycles / requiredSlots;
+                    // for(int j = 0; j < requiredSlots; ++j)
+                    // {
+                    //     m_dataQueue.push_back(base + dataCycles
+                    //                           - (requiredSlots - j - 1) * fraction);
+                    // }
                 }
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
@@ -248,7 +255,6 @@ namespace rocRoller::Scheduling::LDSBankModel
                 {
                     cmdBase = m_commandQueue.back() + dataCycles;
                 }
-                auto waitcntBase = m_programCycle + 40 + dataCycles;
                 if(!m_waitcntQueue.empty())
                 {
                     waitcntBase = std::max(waitcntBase, m_waitcntQueue.back() + dataCycles);
@@ -590,8 +596,6 @@ namespace rocRoller::Scheduling::LDSBankModel
         }
 
         const auto maybeK = find_disjoint_rotation(threadGroupBankSets, threadGroupBankSets);
-        Log::info("Found disjoint rotation k = {}",
-                  maybeK.has_value() ? std::to_string(maybeK.value()) : "none");
         return maybeK.has_value();
     }
 

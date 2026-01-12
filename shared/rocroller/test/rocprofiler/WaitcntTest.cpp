@@ -82,7 +82,8 @@ protected:
     Generator<Instruction> generateKernelBody() override
     {
         int counter = 0;
-        for(int i = 1; i < 8; ++i)
+        // Too many iterations, then latency of s_barrier gets noticeable
+        for(int i = 1; i <= 4; ++i)
         {
             for(int k = 0; k < i; ++k)
             {
@@ -97,6 +98,7 @@ protected:
                         dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
             }
             co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
+            co_yield m_context->mem()->barrier({});
         }
     }
 };
@@ -131,7 +133,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
     using namespace Scheduling::LDSBankModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
-    const auto workgroupSize = GENERATE(64u);
+    const auto workgroupSize = GENERATE(64u, 128u, 256u);
 
     int instrDwords      = GENERATE(1, 2, 4);
     int strideMultiplier = GENERATE(1, 2, 4, 8, 16);

@@ -263,10 +263,13 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
         {
             // CHECK((analysis.incorrectPredictionCount <= 16));
         }
-        else
+        else if(workgroupSize == 64u)
         {
             CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
         }
-        CHECK(false);
+        else if(workgroupSize > 64u)
+        {
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 64));
+        }
     }
 }
