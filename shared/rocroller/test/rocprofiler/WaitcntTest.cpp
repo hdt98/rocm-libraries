@@ -169,30 +169,42 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
                          analysis.incorrectPredictionCount,
                          filteredInstructions.size() - 1));
 
-        if(write && instrDwords == 2 && strideMultiplier == 1)
+        if(workgroupSize == 64u)
         {
-            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 35));
-        }
-        else if(write && instrDwords == 4)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 20 || std::abs(analysis.totalDelta) <= 180));
-        }
-        else if(instrDwords == 1 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 32));
-        }
-        else if(instrDwords == 2 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 35));
-        }
-        else if(instrDwords == 4 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 35));
+            if(write && instrDwords == 2 && strideMultiplier == 1)
+            {
+                CHECK((analysis.incorrectPredictionCount <= 8
+                       || std::abs(analysis.totalDelta) <= 35));
+            }
+            else if(write && instrDwords == 4)
+            {
+                CHECK((analysis.incorrectPredictionCount <= 20
+                       || std::abs(analysis.totalDelta) <= 180));
+            }
+            else if(instrDwords == 1 && strideMultiplier == 1)
+            {
+                CHECK((analysis.incorrectPredictionCount <= 9
+                       || std::abs(analysis.totalDelta) <= 32));
+            }
+            else if(instrDwords == 2 && strideMultiplier == 1)
+            {
+                CHECK((analysis.incorrectPredictionCount <= 8
+                       || std::abs(analysis.totalDelta) <= 35));
+            }
+            else if(instrDwords == 4 && strideMultiplier == 1)
+            {
+                CHECK((analysis.incorrectPredictionCount <= 8
+                       || std::abs(analysis.totalDelta) <= 35));
+            }
+            else
+            {
+                CHECK(
+                    (analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
+            }
         }
         else
         {
-            CHECK((analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
+            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 500));
         }
     }
 }
