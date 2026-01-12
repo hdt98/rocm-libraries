@@ -842,9 +842,10 @@ struct BlockFmhaPipelineQRKSVS
                         // (2 lanes, 16 per lane for fp8)
                         SMPLComputeDataType p_max{0};
                         static_for<0, 16, 1>{}([&](auto j) {
-                            p_max = max(p_max, p_.get_thread_buffer()[i * 16 + j]);
+                            p_max = max(p_max, p_compute.get_thread_buffer()[i * 16 + j]);
                         });
-                        p_max = max(p_max, warp_shuffle(p_max, lane ^ 16));
+                        p_max =
+                            min(SMPLComputeDataType{1}, max(p_max, warp_shuffle(p_max, lane ^ 16)));
 
                         static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
                         // For e8m0 round up to the next power of 2
