@@ -234,18 +234,12 @@ namespace rocRoller::Scheduling::LDSBankModel
                 {
                     auto const base = m_dataQueue.empty() ? (m_programCycle) : (m_dataQueue.back());
 
-                    auto const fraction = dataCycles / (requiredSlots - 1);
+                    // For writes, 1 slot for addresses, rest for data
                     m_dataQueue.push_back(base);
                     for(int j = 0; j < (requiredSlots - 1); ++j)
                     {
                         m_dataQueue.push_back(base + dataCycles);
                     }
-                    // auto const fraction = dataCycles / requiredSlots;
-                    // for(int j = 0; j < requiredSlots; ++j)
-                    // {
-                    //     m_dataQueue.push_back(base + dataCycles
-                    //                           - (requiredSlots - j - 1) * fraction);
-                    // }
                 }
             }
             else if(instr.memoryOp.direction == LdsDirection::Read)
