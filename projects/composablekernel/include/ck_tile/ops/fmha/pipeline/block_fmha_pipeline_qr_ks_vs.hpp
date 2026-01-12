@@ -851,9 +851,32 @@ struct BlockFmhaPipelineQRKSVS
                         SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
 
                         // Convert using scales
-                        static_for<0, 16, 1>{}([&](auto j) {
-                            p_result.get_thread_buffer()(i * 16 + j) = type_convert<PDataType>(
-                                p_.get_thread_buffer()[i * 16 + j] * (1 / scale));
+                        static_for<0, 16 / 4, 1>{}([&](auto j) {
+                            using vec_t = ext_vector_t<short, 2>;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
+                            // __builtin_amdgcn_cvt_scalef32_pk_fp8_f32() this builtin requires the
+                            // old value, and will generate a v_mov_b32 vxxx [old] before cvt, which
+                            // result in unwanted ISA so we prepare an uninitialized variable
+                            // purposely, and turn off the warning
+                            vec_t dummy_old;
+                            vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                dummy_old,
+                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
+                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
+                                scale,
+                                false); // false -> WORD0
+#pragma clang diagnostic pop
+
+                            vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                x,
+                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
+                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
+                                scale,
+                                true); // true -> WORD1
+
+                            p_result.get_thread_buffer().template set_as<vec_t>(number<i * 4 + j>{},
+                                                                                y);
                         });
 
                         // Save scale for the corresponding lane
