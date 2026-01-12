@@ -72,13 +72,14 @@ void preShuffleScaleBuffer(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, i
     }
 }
 
-void preShuffleBuffer(const ck::f4x2_pk_t* src, ck::f4x2_pk_t* dst, int N, int K, int NXdl)
+template <typename T>
+void preShuffleBuffer(const T* src, T* dst, int N, int K, int NXdl)
 {
-    int KPack = 16;
-    int NLane = NXdl;
-    int KLane = 64 / NLane;
-    int K_pk  = K / 2;
-    int K0    = K_pk / (KLane * KPack);
+    const int KPack = 16;
+    const int NLane = NXdl;
+    const int KLane = ck::get_warp_size() / NLane;
+    const int K_pk  = K / ck::packed_size_v<T>;
+    const int K0    = K_pk / (KLane * KPack);
     // K -> K0 KLane KPack
     // N -> N0 NLane
     // N, K -> N0 K0 KLane NLane KPack
