@@ -818,9 +818,6 @@ struct BlockFmhaPipelineQRKSVS
                 return t;
             });
 
-            const auto p =
-                cast_tile<PDataType>(tile_elementwise_in(p_compute_element_func, p_compute));
-
             float v_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
             {
@@ -829,13 +826,56 @@ struct BlockFmhaPipelineQRKSVS
                 v_descale            = v_descale_ptr[kv_idx];
             }
 
-            auto p_scale = if_mx([&] {
-                auto t = make_static_distributed_tensor<PScaleDataType>(
-                    Policy::template MakePScaleRegTileDistribution<Problem>());
-                // TODO
-                set_tile(t, type_convert<PScaleDataType>(1.0f));
-                return t;
-            });
+            const auto [p, p_scale] = [&] {
+                const auto p_ = tile_elementwise_in(p_compute_element_func, p_compute);
+                if constexpr(kIsMxType)
+                {
+                    auto p_result =
+                        make_static_distributed_tensor<PDataType>(p_.get_tile_distribution());
+                    auto p_scale_result = make_static_distributed_tensor<PScaleDataType>(
+                        Policy::template MakePScaleRegTileDistribution<Problem>());
+
+                    const index_t lane = __lane_id();
+                    SMPLComputeDataType scale_result{0};
+                    static_for<0, p_.get_thread_buffer().size() / 16, 1>{}([&](auto i) {
+                        // Maximum of consecutive kVScaleGranularity values
+                        // (2 lanes, 16 per lane for fp8)
+                        SMPLComputeDataType p_max{0};
+                        static_for<0, 16, 1>{}([&](auto j) {
+                            p_max = max(p_max, p_.get_thread_buffer()[i * 16 + j]);
+                        });
+                        p_max = max(p_max, warp_shuffle(p_max, lane ^ 16));
+
+                        static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
+                        // For e8m0 round up to the next power of 2
+                        SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
+
+                        // Convert using scales
+                        static_for<0, 16, 1>{}([&](auto j) {
+                            p_result.get_thread_buffer()(i * 16 + j) = type_convert<PDataType>(
+                                p_.get_thread_buffer()[i * 16 + j] * (1 / scale));
+                        });
+
+                        // Save scale for the corresponding lane
+                        scale = warp_shuffle(scale, (lane % 16) | ((lane & 16) << 1));
+                        if((i % 2 == 0) == (lane < 32))
+                        {
+                            scale_result = scale;
+                        }
+                        if(i % 2 == 1)
+                        {
+                            p_scale_result.get_thread_buffer()(i / 2) =
+                                type_convert<PScaleDataType>(scale_result);
+                        }
+                    });
+
+                    return make_tuple(p_result, p_scale_result);
+                }
+                else
+                {
+                    return make_tuple(cast_tile<PDataType>(p_), ignore);
+                }
+            }();
 
             // STAGE 3, KV gemm
             auto o_acc0 = decltype(o_acc){};
