@@ -49,6 +49,24 @@ inline T conj_helper(const T& x)
         return x;
 }
 
+template <typename S>
+S cholqr_getToleranceByAlgo(rocsolver_cholqr_algo algo, int m, int n)
+{
+    switch(algo)
+    {
+        case rocsolver_cholqr_cholqr1:
+            return 10 * m * n;
+        case rocsolver_cholqr_cholqr2:
+            return 10 * m * n;
+        case rocsolver_cholqr_cholqr3_compute:
+            return 10 * m * n;
+        case rocsolver_cholqr_cholqr3_user:
+            return 10 * m * n;
+        default:
+            return 10 * m * n;
+    }
+}
+
 template <bool STRIDED, typename T, typename I, typename S, typename U, typename V>
 void cholqr_checkBadArgs(const rocblas_handle handle,
                          const I m,
@@ -638,10 +656,9 @@ void testing_cholqr(Arguments& argus)
                                            argus.profile_kernels, argus.perf);
     }
 
-    // Using 10 * m * n * machine_precision as tolerance for CHOLQR
-    // For ill-conditioned matrices, tolerance may need to be larger
+    // Use tolerance based on algorithm and problem size
     if(argus.unit_check)
-        ROCSOLVER_TEST_CHECK(T, max_error, 10 * m * n);
+        ROCSOLVER_TEST_CHECK(T, max_error, cholqr_getToleranceByAlgo<S>(algo, m, n));
 
     // output results for rocsolver-bench
     if(argus.timing)
