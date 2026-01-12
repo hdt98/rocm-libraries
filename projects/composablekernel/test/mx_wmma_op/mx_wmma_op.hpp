@@ -694,15 +694,15 @@ struct TestMXWMMA
             break;
         case 2:
             a_m_k.GenerateTensorValue(GeneratorTensor_3<PackedAType>{-2.0, 2.0});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<AScaleType>{126, 129});
+            a_scales.GenerateTensorValue(GeneratorTensor_2<AScaleType>{0, 4});
             b_n_k.GenerateTensorValue(GeneratorTensor_3<PackedBType>{-2.0, 2.0});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<BScaleType>{126, 129});
+            b_scales.GenerateTensorValue(GeneratorTensor_2<BScaleType>{0, 4});
             break;
         default:
             a_m_k.GenerateTensorValue(GeneratorTensor_2<PackedAType>{-6, 7});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<AScaleType>{122, 129});
+            a_scales.GenerateTensorValue(GeneratorTensor_3<AScaleType>{0.0625f, 8.0f});
             b_n_k.GenerateTensorValue(GeneratorTensor_2<PackedBType>{-6, 7});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<BScaleType>{122, 129});
+            b_scales.GenerateTensorValue(GeneratorTensor_3<BScaleType>{0.0625f, 8.0f});
             break;
         }
 

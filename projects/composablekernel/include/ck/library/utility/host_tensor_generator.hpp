@@ -354,18 +354,17 @@ struct GeneratorTensor_2<ck::f4x2_pk_t>
     }
 };
 
-template <typename T>
-struct GeneratorTensor_3
+template <>
+struct GeneratorTensor_2<ck::e8m0_bexp_t>
 {
-    float min_value = 0;
-    float max_value = 1;
+    int min_value = 0;
+    int max_value = 1;
 
     template <typename... Is>
-    T operator()(Is...)
+    ck::e8m0_bexp_t operator()(Is...)
     {
-        float tmp = float(std::rand()) / float(RAND_MAX);
-
-        return static_cast<T>(min_value + tmp * (max_value - min_value));
+        float tmp = (std::rand() % (max_value - min_value)) + min_value;
+        return ck::type_convert<ck::e8m0_bexp_t>(tmp);
     }
 };
 
@@ -394,6 +393,21 @@ struct GeneratorTensor_2<ck::e5m3_scale_t>
     {
         float tmp = (std::rand() % (max_value - min_value)) + min_value;
         return ck::type_convert<ck::e5m3_scale_t>(tmp);
+    }
+};
+
+template <typename T>
+struct GeneratorTensor_3
+{
+    float min_value = 0;
+    float max_value = 1;
+
+    template <typename... Is>
+    T operator()(Is...)
+    {
+        float tmp = float(std::rand()) / float(RAND_MAX);
+
+        return static_cast<T>(min_value + tmp * (max_value - min_value));
     }
 };
 
@@ -541,6 +555,51 @@ struct GeneratorTensor_3<ck::bf6x32_pk_t>
         });
 
         return r;
+    }
+};
+
+template <>
+struct GeneratorTensor_3<ck::e8m0_bexp_t>
+{
+    float min_value = 0;
+    float max_value = 1;
+
+    template <typename... Is>
+    ck::e8m0_bexp_t operator()(Is...)
+    {
+        float tmp      = float(std::rand()) / float(RAND_MAX);
+        float fp32_tmp = min_value + tmp * (max_value - min_value);
+        return ck::type_convert<ck::e8m0_bexp_t>(fp32_tmp);
+    }
+};
+
+template <>
+struct GeneratorTensor_3<ck::e4m3_scale_t>
+{
+    float min_value = 0;
+    float max_value = 1;
+
+    template <typename... Is>
+    ck::e4m3_scale_t operator()(Is...)
+    {
+        float tmp      = float(std::rand()) / float(RAND_MAX);
+        float fp32_tmp = min_value + tmp * (max_value - min_value);
+        return ck::type_convert<ck::e4m3_scale_t>(fp32_tmp);
+    }
+};
+
+template <>
+struct GeneratorTensor_3<ck::e5m3_scale_t>
+{
+    float min_value = 0;
+    float max_value = 1;
+
+    template <typename... Is>
+    ck::e5m3_scale_t operator()(Is...)
+    {
+        float tmp      = float(std::rand()) / float(RAND_MAX);
+        float fp32_tmp = min_value + tmp * (max_value - min_value);
+        return ck::type_convert<ck::e5m3_scale_t>(fp32_tmp);
     }
 };
 
