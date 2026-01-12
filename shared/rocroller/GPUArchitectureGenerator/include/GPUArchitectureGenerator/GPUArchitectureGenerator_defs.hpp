@@ -345,6 +345,29 @@ namespace GPUArchitectureGenerator
         return retval;
     }
 
+    inline std::vector<rocRoller::GPUArchitectureTarget> gfx11ISAs()
+    {
+        std::vector<rocRoller::GPUArchitectureTarget> retval;
+        std::copy_if(rocRoller::SupportedArchitectures.begin(),
+                     rocRoller::SupportedArchitectures.end(),
+                     std::back_inserter(retval),
+                     [](rocRoller::GPUArchitectureTarget const& x) -> bool {
+                         return x.isRDNA3GPU() || x.isRDNA35GPU();
+                     });
+        return retval;
+    }
+
+    inline std::vector<rocRoller::GPUArchitectureTarget> gfx115XISAs()
+    {
+        std::vector<rocRoller::GPUArchitectureTarget> retval;
+        std::copy_if(
+            rocRoller::SupportedArchitectures.begin(),
+            rocRoller::SupportedArchitectures.end(),
+            std::back_inserter(retval),
+            [](rocRoller::GPUArchitectureTarget const& x) -> bool { return x.isRDNA35GPU(); });
+        return retval;
+    }
+
     inline std::vector<rocRoller::GPUArchitectureTarget> gfx120XISAs()
     {
         std::vector<rocRoller::GPUArchitectureTarget> retval;

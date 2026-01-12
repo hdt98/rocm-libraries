@@ -282,6 +282,8 @@ namespace ExpressionTest
             auto const& arch = context->targetArchitecture().target();
             if(arch.isGFX12GPU())
                 SKIP("Instruction not supported on gfx12");
+            if(arch.isGFX11GPU())
+                SKIP("Instruction not supported on gfx11");
 
             auto expr = [&](Expression::ExpressionPtr a,
                             Expression::ExpressionPtr b,
@@ -348,6 +350,8 @@ namespace ExpressionTest
             auto const& arch    = context->targetArchitecture().target();
             if(arch.isGFX12GPU())
                 SKIP("Instruction not supported on gfx12");
+            if(arch.isGFX11GPU())
+                SKIP("Instruction not supported on gfx11");
 
             auto typeResult = DataType::Int32;
 
