@@ -1,0 +1,65 @@
+name: hipDNN Clang Tidy
+description: Runs clang-tidy static analysis on hipDNN code
+
+inputs:
+  therock_path:
+    description: "Path to TheRock checkout"
+    required: true
+    default: "TheRock"
+  venv_dir:
+    description: "Python virtual environment directory"
+    required: true
+  output_artifacts_dir:
+    description: "Directory containing build artifacts"
+    required: true
+  amdgpu_families:
+    description: "AMDGPU families for artifact download"
+    required: true
+  is_pr_from_fork:
+    description: "True if this workflow run is from a PR on a fork"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install clang-tidy
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          ninja-build \
+          lsb-release wget \
+          software-properties-common \
+          gnupg
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 20
+        sudo apt-get update
+        sudo apt-get install -y \
+          clang-tidy-20 \
+          clang-tools-20
+
+    - name: Setup test environment
+      uses: ./TheRock/.github/actions/setup_test_environment
+      with:
+        ARTIFACT_RUN_ID: ${{ github.run_id }}
+        ARTIFACT_GROUP: ${{ inputs.amdgpu_families }}
+        OUTPUT_ARTIFACTS_DIR: ${{ inputs.output_artifacts_dir }}
+        VENV_DIR: ${{ inputs.venv_dir }}
+        FETCH_ARTIFACT_ARGS: "--base-only"
+        IS_PR_FROM_FORK: ${{ inputs.is_pr_from_fork }}
+
+    - name: Run clang-tidy
+      shell: bash
+      run: |
+        . ${{ inputs.venv_dir }}/bin/activate
+        ROCM_PATH=${{ inputs.output_artifacts_dir }}/dist/rocm
+        export PATH=$ROCM_PATH/bin:$ROCM_PATH/llvm/bin:$PATH
+        export CXX=$ROCM_PATH/llvm/bin/clang++
+        cmake -S projects/hipdnn -B build -G Ninja \
+          -DENABLE_CLANG_TIDY=ON \
+          -DROCM_PATH=$ROCM_PATH \
+          -DCMAKE_PREFIX_PATH=$ROCM_PATH \
+          -DENABLE_CLANG_FORMAT=OFF \
+          -DHIP_PLATFORM=amd
+        ninja -C build tidy
