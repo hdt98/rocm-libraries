@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - users/sareeder/CI-refactor
   pull_request:
     types:
       - opened
@@ -153,6 +154,7 @@ jobs:
     uses: ./.github/workflows/therock-ci-windows.yml
     secrets: inherit
     with:
+      therock_ref: ${{ needs.setup.outputs.therock_ref }}
       cmake_options: ${{ matrix.projects.cmake_options }}
       project_to_test: ${{ matrix.projects.project_to_test }}
       test_type: ${{ needs.setup.outputs.test_type }}
