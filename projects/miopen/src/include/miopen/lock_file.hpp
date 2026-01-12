@@ -26,10 +26,10 @@
 #ifndef GUARD_MIOPEN_LOCK_FILE_HPP_
 #define GUARD_MIOPEN_LOCK_FILE_HPP_
 
-#include <miopen/errors.hpp>
 #include <miopen/filesystem.hpp>
 #include <miopen/file_lock.hpp>
 #include <miopen/logger.hpp>
+#include <miopen/errors.hpp>
 
 #include <chrono>
 #include <fstream>
@@ -39,7 +39,6 @@
 #include <shared_mutex>
 #include <string>
 #include <string_view>
-#include <thread>
 
 namespace miopen {
 
@@ -213,16 +212,7 @@ public:
     bool timed_lock(const std::chrono::time_point<std::chrono::steady_clock>& abs_time)
     {
         access_mutex.lock();
-        bool ack = flock.timed_lock(abs_time);
-        if(ack)
-        {
-            ack = fs_lock.timed_lock(abs_time);
-            if(!ack)
-                flock.unlock();
-        }
-        if(!ack)
-            access_mutex.unlock();
-        return ack;
+        return flock.timed_lock(abs_time);
     }
 
     bool timed_lock_shared(const std::chrono::time_point<std::chrono::steady_clock>& abs_time)
@@ -232,8 +222,7 @@ public:
     }
     void lock()
     {
-        LockOperation(
-            "lock", MIOPEN_GET_FN_NAME, [&]() { std::lock(access_mutex, flock, fs_lock); });
+        LockOperation("lock", MIOPEN_GET_FN_NAME, [&]() { std::lock(access_mutex, flock); });
     }
 
     void lock_shared()
@@ -251,9 +240,8 @@ public:
 
     bool try_lock()
     {
-        return TryLockOperation("lock", MIOPEN_GET_FN_NAME, [&]() {
-            return std::try_lock(access_mutex, flock, fs_lock) == -1;
-        });
+        return TryLockOperation(
+            "lock", MIOPEN_GET_FN_NAME, [&]() { return std::try_lock(access_mutex, flock) != 0; });
     }
 
     bool try_lock_shared()
@@ -270,8 +258,7 @@ public:
 
     void unlock()
     {
-        LockOperation("fs_lock unlock", MIOPEN_GET_FN_NAME, [&]() { fs_lock.unlock(); });
-        LockOperation("flock unlock", MIOPEN_GET_FN_NAME, [&]() { flock.unlock(); });
+        LockOperation("unlock", MIOPEN_GET_FN_NAME, [&]() { flock.unlock(); });
         access_mutex.unlock();
     }
 
@@ -290,14 +277,7 @@ public:
             return false;
 
         if(TryLockOperation("timed lock", MIOPEN_GET_FN_NAME, [&]() {
-               bool ack = flock.timed_lock(ToPTime(duration));
-               if(ack)
-               {
-                   ack = fs_lock.timed_lock(ToPTime(duration));
-                   if(!ack)
-                       flock.unlock();
-               }
-               return ack;
+               return flock.timed_lock(ToPTime(duration));
            }))
             return true;
         access_mutex.unlock();

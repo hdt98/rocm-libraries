@@ -38,24 +38,24 @@ endif()
 # 2.  How BF16 kernels (which are kind of mixed-precision now and expected to
 #     remain in the future)  perform final conversion (and rounding) of FP32
 #     to BF16 results. This affects the main functionality of the library.
-option( MIOPEN_USE_RNE_BFLOAT16 "Sets rounding scheme for bfloat16 type" ON )
-option( MIOPEN_FP8_IEEE_EXPONENT_BIAS "Sets the FP8 exponent bias to IEEE" OFF)
-option( MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
+option(MIOPEN_USE_RNE_BFLOAT16 "Sets rounding scheme for bfloat16 type" ON) 
+option(MIOPEN_FP8_IEEE_EXPONENT_BIAS "Sets the FP8 exponent bias to IEEE" OFF)
+option(MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
 
-option( MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
+option(MIOPEN_FP8_CLIPPING "Sets the FP8 clipping" ON)
 
 configure_file("${PROJECT_SOURCE_DIR}/include/miopen/config.h.in" "${PROJECT_BINARY_DIR}/include/miopen/config.h")
 
 # configure a header file to pass the CMake version settings to the source, and package the header files in the output archive
-configure_file( "${PROJECT_SOURCE_DIR}/include/miopen/version.h.in" "${PROJECT_BINARY_DIR}/include/miopen/version.h" )
+configure_file("${PROJECT_SOURCE_DIR}/include/miopen/version.h.in" "${PROJECT_BINARY_DIR}/include/miopen/version.h")
 
-message( STATUS "MIOpen_VERSION= ${MIOpen_VERSION}" )
+message(STATUS "MIOpen_VERSION= ${MIOpen_VERSION}")
 if(NOT MIOPEN_GENERATOR_IS_MULTI_CONFIG)
-    message( STATUS "CMAKE_BUILD_TYPE= ${CMAKE_BUILD_TYPE}" )
+    message(STATUS "CMAKE_BUILD_TYPE= ${CMAKE_BUILD_TYPE}")
 endif()
 
 # This is incremented when the ABI to the library changes
-set( MIOpen_SOVERSION 1.0 )
+set(MIOpen_SOVERSION 1.0)
 
 function(add_kernels FILE_NAME VAR_PREFIX VAR_SUFFIX KERNEL_FILES)
     set(INIT_KERNELS_LIST)

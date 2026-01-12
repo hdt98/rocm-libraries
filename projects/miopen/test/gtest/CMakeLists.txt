@@ -18,7 +18,6 @@ set(SOURCES
     unit_conv_solver.cpp
     )
 
-
 # We use a special entry point for HIP backend testing so we can detect and flag any HIP errors that tests don't
 # clean up themselves
 if(MIOPEN_BACKEND_HIP)
@@ -30,16 +29,16 @@ if(MIOPEN_BACKEND_OPENCL)
 endif()
 
 function(add_gtest_negative_filter NEGATIVE_FILTER_TO_ADD)
-    set (TMP_FILTER ${MIOPEN_GTEST_FILTER_NEGATIVE})
+    set(TMP_FILTER ${MIOPEN_GTEST_FILTER_NEGATIVE})
 
     if (NOT TMP_FILTER )
-        set (TMP_FILTER "-")
+        set(TMP_FILTER "-")
     else()
-        set (TMP_FILTER "${TMP_FILTER}:")
+        set(TMP_FILTER "${TMP_FILTER}:")
     endif()
-    set (TMP_FILTER ${TMP_FILTER}${NEGATIVE_FILTER_TO_ADD})
+    set(TMP_FILTER ${TMP_FILTER}${NEGATIVE_FILTER_TO_ADD})
 
-    set (MIOPEN_GTEST_FILTER_NEGATIVE ${TMP_FILTER} PARENT_SCOPE)
+    set(MIOPEN_GTEST_FILTER_NEGATIVE ${TMP_FILTER} PARENT_SCOPE)
 endfunction()
 
 function(add_gtest TEST_NAME TEST_CPP)

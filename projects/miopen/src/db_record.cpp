@@ -23,12 +23,10 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include <boost/algorithm/string.hpp>
-#include <iostream>
-#include <numeric>
-#include <ostream>
+
 #include <string>
-#include <unordered_map>
+#include <fstream>
+#include <numeric>
 #include <utility>
 
 #include <miopen/config.h>
@@ -39,6 +37,19 @@
 // Keep compatibility with old format for reading existing system find-db files.
 // To be removed when the system find-db files regenerated in the 2.0 format.
 #define WORKAROUND_ISSUE_1987 1
+
+inline std::string trim(const std::string &s)
+{
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && isspace(*it))
+        it++;
+
+    std::string::const_reverse_iterator rit = s.rbegin();
+    while (rit.base() != it && isspace(*rit))
+        rit++;
+
+    return std::string(it, rit.base());
+}
 
 namespace miopen {
 
@@ -139,7 +150,7 @@ bool DbRecord::ParseContents(std::istream& contents)
 
         auto id     = id_and_values.substr(0, id_size);
         auto values = id_and_values.substr(id_size + 1);
-        boost::trim(values);
+        ::trim(values);
 
 #if WORKAROUND_ISSUE_1987
         // Detect legacy find-db item (v.1.0 ID:VALUES) and transform it to the current format.
