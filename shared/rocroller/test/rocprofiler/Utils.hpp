@@ -45,6 +45,13 @@
 namespace rocRoller
 {
     /**
+     * @brief Number of runs for profiling tests
+     * 
+     * Should be odd, as median is used for statistical analysis
+     */
+    constexpr int NUM_RUNS = 5;
+
+    /**
      * @brief Results from kernel profiling and latency collection
      */
     struct KernelLatencyResults

@@ -212,7 +212,8 @@ namespace rocRoller::Scheduling::LDSBankModel
                     ShowValue(getRemainingDataSlots()),
                     ShowValue(requiredSlots));
 
-        auto waitcntBase = m_programCycle + 40 + dataCycles / m_multiplierWaveCount;
+        const auto roundtripLatency = 40;
+        auto waitcntBase = m_programCycle + roundtripLatency + dataCycles / m_multiplierWaveCount;
         Log::debug("dataCycles {}", dataCycles);
         for(int i = 0; i < m_multiplierQueueSlots; ++i)
         {

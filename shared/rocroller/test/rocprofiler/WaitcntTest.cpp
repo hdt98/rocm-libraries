@@ -62,8 +62,6 @@
 
 using namespace rocRoller;
 
-const int NUM_RUNS = 5; // Should be odd, as median is used
-
 class LDSWaitcntWeaveKernel : public LDSTestKernelBase
 {
 public:
