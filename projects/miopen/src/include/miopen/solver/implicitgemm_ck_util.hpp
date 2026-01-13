@@ -1535,9 +1535,11 @@ static inline bool IsIndexRangeLargeEnough(const miopen::conv::ProblemDescriptio
            problem.GetOutSize() < max_index_range;
 }
 
-template <typename PerformanceConfig, typename DeviceOpType>
-origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg)
+template <typename DeviceOpType, typename CKArgsType, typename PerformanceConfig>
+origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& problem,
+                                   const PerformanceConfig& perf_cfg)
 {
+    auto ck_args               = CKArgsType{problem};
     auto conv_ptrs             = DeviceOpType::GetInstances();
     std::optional<int> split_k = std::nullopt;
     std::string id_string      = perf_cfg.kernel_id;
@@ -1549,18 +1551,18 @@ origami::config_t GetOrigamiConfig(PerformanceConfig perf_cfg)
     }
 
     auto ptr_iter = FindConvPtrByID(conv_ptrs, id_string);
-
-    auto arg_ptr =
-        MakeArgPtr(*ptr_iter, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k.value_or(1));
-    auto ck_kern_args = arg_ptr.get();
+    (void)ptr_iter;
+    // auto arg_ptr =
+    //    ck_args.MakeArgPtr(*ptr_iter, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k.value_or(1));
+    // auto ck_kern_args = arg_ptr.get();
 
     origami::config_t ori_cfg;
-    ori_cfg.mt.m = ck_kern_args.M; // Macro tile M
-    ori_cfg.mt.n = ck_kern_args.N; // Macro tile N
-    ori_cfg.mt.k = ck_kern_args.K; // Macro tile K
-    ori_cfg.mi.m = 16;             // Matrix instruction M
-    ori_cfg.mi.n = 16;             // Matrix instruction N
-    ori_cfg.mi.k = 32;             // Matrix instruction K
+    // ori_cfg.mt.m = ck_kern_args.M; // Macro tile M
+    // ori_cfg.mt.n = ck_kern_args.N; // Macro tile N
+    // ori_cfg.mt.k = ck_kern_args.K; // Macro tile K
+    ori_cfg.mi.m      = 16; // Matrix instruction M
+    ori_cfg.mi.n      = 16; // Matrix instruction N
+    ori_cfg.mi.k      = 32; // Matrix instruction K
     ori_cfg.occupancy = 4;
 
     MIOPEN_LOG_I2("CK id string: " << id_string << ", MT.M(" << ori_cfg.mt.m << ") MT.N("

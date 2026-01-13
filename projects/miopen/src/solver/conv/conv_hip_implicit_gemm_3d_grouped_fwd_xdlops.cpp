@@ -701,19 +701,24 @@ ConvHipImplicitGemm3DGroupFwdXdlops::GetDefaultPerformanceConfig(
 }
 
 template <typename DataType>
-origami::config_t ConvHipImplicitGemm3DGroupFwdXdlops::GetOrigamiConfigByType(
-    const ::miopen::conv::ProblemDescription& problem,
-    const PerformanceConfigHipImplicitGemm3DGroupFwdXdlops& perf_cfg) const
+origami::config_t
+GetOrigamiConfigByType(const ::miopen::conv::ProblemDescription& problem,
+                       const PerformanceConfigHipImplicitGemm3DGroupFwdXdlops& perf_cfg)
 {
-    return miopen::solver::GetOrigamiConfig(perf_cfg);
     switch(problem.GetAlphaBetaCase())
     {
     case BILINEAR:
-        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdBilinearPtrs<DataType>>(perf_cfg);
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdBilinearPtrs<DataType>,
+                                                CKArgs<DataType>,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
     case SCALE:
-        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdScalePtrs<DataType>>(perf_cfg);
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdScalePtrs<DataType>,
+                                                CKArgs<DataType>,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
     default:
-        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdDefaultPtrs<DataType>>(perf_cfg);
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdDefaultPtrs<DataType>,
+                                                CKArgs<DataType>,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
     }
 }
 

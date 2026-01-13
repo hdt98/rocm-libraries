@@ -4296,6 +4296,9 @@ struct ConvHipImplicitGemmFwdXdlops final
 
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmFwdXdlops GetDefaultPerformanceConfig(
         const ExecutionContext&, const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemmFwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool
     IsValidPerformanceConfig(const ExecutionContext&,
                              const miopen::conv::ProblemDescription&,
@@ -4378,6 +4381,9 @@ struct ConvHipImplicitGemmBwdXdlops final
 
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmBwdXdlops GetDefaultPerformanceConfig(
         const ExecutionContext&, const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemmBwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool
     IsValidPerformanceConfig(const ExecutionContext&,
                              const miopen::conv::ProblemDescription&,
@@ -4464,6 +4470,9 @@ struct ConvHipImplicitGemmGroupFwdXdlops final
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmGroupFwdXdlops
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemmGroupFwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool
     IsValidPerformanceConfig(const ExecutionContext&,
                              const miopen::conv::ProblemDescription&,
@@ -4544,6 +4553,9 @@ struct ConvHipImplicitGemm3DGroupFwdXdlops final
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemm3DGroupFwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool IsValidPerformanceConfig(
         const ExecutionContext&,
         const miopen::conv::ProblemDescription&,
@@ -4621,6 +4633,9 @@ struct ConvHipImplicitGemm3DGroupWrwXdlops final
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemm3DGroupWrwXdlops
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemm3DGroupWrwXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool IsValidPerformanceConfig(
         const ExecutionContext&,
         const miopen::conv::ProblemDescription&,
@@ -4705,6 +4720,9 @@ struct ConvHipImplicitGemm3DGroupBwdXdlops final
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemm3DGroupBwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool IsValidPerformanceConfig(
         const ExecutionContext&,
         const miopen::conv::ProblemDescription&,
@@ -4800,6 +4818,9 @@ struct ConvHipImplicitGemmGroupBwdXdlops final
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmGroupBwdXdlops
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemmGroupBwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool
     IsValidPerformanceConfig(const ExecutionContext&,
                              const miopen::conv::ProblemDescription&,
@@ -4896,6 +4917,9 @@ struct ConvHipImplicitGemmGroupWrwXdlops final
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmGroupWrwXdlops
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
+    MIOPEN_INTERNALS_EXPORT origami::config_t
+    GetOrigamiConfig(const ::miopen::conv::ProblemDescription&,
+                     const PerformanceConfigHipImplicitGemmGroupWrwXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT bool
     IsValidPerformanceConfig(const ExecutionContext&,
                              const miopen::conv::ProblemDescription&,

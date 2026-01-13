@@ -481,33 +481,28 @@ ConvHipImplicitGemmGroupFwdXdlops::GetDefaultPerformanceConfig(
     return pp;
 }
 
-template <typename DataType>
-origami::config_t ConvHipImplicitGemmGroupFwdXdlops::GetOrigamiConfigByType(
-    const ::miopen::conv::ProblemDescription& problem,
-    const PerformanceConfigHipImplicitGemmGroupFwdXdlops& perf_cfg) const
-{
-    return miopen::solver::GetOrigamiConfig(perf_cfg);
-    switch(problem.GetAlphaBetaCase())
-    {
-    case BILINEAR:
-        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdBilinearPtrs<DataType>>(perf_cfg);
-    case SCALE:
-        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdScalePtrs<DataType>>(perf_cfg);
-    default:
-        return miopen::solver::GetOrigamiConfig<decltype(perf_cfg), DeviceOpGBwdDefaultPtrs<DataType>>(perf_cfg);
-    }
-}
-
 origami::config_t ConvHipImplicitGemmGroupFwdXdlops::GetOrigamiConfig(
     const ::miopen::conv::ProblemDescription& problem,
     const PerformanceConfigHipImplicitGemmGroupFwdXdlops& perf_cfg) const
 {
     switch(problem.GetInDataType())
     {
-    case miopenHalf: return GetOrigamiConfigByType<ck::half_t>(problem, perf_cfg);
-    case miopenFloat: return GetOrigamiConfigByType<float>(problem, perf_cfg);
-    case miopenInt8: return GetOrigamiConfigByType<int8_t>(problem, perf_cfg);
-    case miopenBFloat16: return GetOrigamiConfigByType<ck::bhalf_t>(problem, perf_cfg);
+    case miopenHalf:
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdPtrs<ck::half_t>,
+                                                CKArgs,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
+    case miopenFloat:
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdPtrs<float>,
+                                                CKArgs,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
+    case miopenInt8:
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdPtrs<int8_t>,
+                                                CKArgs,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
+    case miopenBFloat16:
+        return miopen::solver::GetOrigamiConfig<DeviceOpGFwdPtrs<ck::bhalf_t>,
+                                                CKArgs,
+                                                decltype(perf_cfg)>(problem, perf_cfg);
     default: break; // Unsupported data types
     }
 }

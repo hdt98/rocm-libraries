@@ -34,7 +34,7 @@
 #include <miopen/find_controls.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/mlo_internal.hpp>
-//#include <miopen/origami_search.hpp>
+#include <miopen/origami_search.hpp>
 #include <miopen/generic_search.hpp>
 #include <miopen/search_options.hpp>
 #include <miopen/solver_id.hpp>
@@ -59,10 +59,10 @@ namespace solver {
 
 template <class Solver, class Context, class PerformanceConfig>
 auto FindOrigamiSolution(const Solver& s,
-                      const Context& context,
-                      const miopen::conv::ProblemDescription& problem,
-                      const AnyInvokeParams& invoke_ctx,
-                      const PerformanceConfig& default_cfg)
+                         const Context& context,
+                         const miopen::conv::ProblemDescription& problem,
+                         const AnyInvokeParams& invoke_ctx,
+                         const PerformanceConfig& default_cfg)
     -> decltype(s.GetSolution(context, problem, s.Search(context, problem, invoke_ctx)))
 {
     PerformanceConfig config{};
@@ -84,10 +84,10 @@ auto FindOrigamiSolution(const Solver& s,
 
 template <class Solver, class Context>
 auto FindOrigamiSolution(const Solver& s,
-                      const Context& context,
-                      const miopen::conv::ProblemDescription& problem,
-                      const AnyInvokeParams& invoke_ctx,
-                      const LegacyPerformanceConfig& config)
+                         const Context& context,
+                         const miopen::conv::ProblemDescription& problem,
+                         const AnyInvokeParams& invoke_ctx,
+                         const LegacyPerformanceConfig& config)
     -> decltype(s.GetSolution(context, problem, s.Search(context, problem, invoke_ctx)))
 {
     MIOPEN_LOG_I("Default config selected: " << s.SolverDbId() << ": " << config);
@@ -96,16 +96,15 @@ auto FindOrigamiSolution(const Solver& s,
 
 template <class Solver, class Context, class Problem, class PerformanceConfig>
 auto FindOrigamiSolution(const Solver& s,
-                      const Context& context,
-                      const Problem& problem,
-                      const AnyInvokeParams& invoke_ctx,
-                      const PerformanceConfig& config)
+                         const Context& context,
+                         const Problem& problem,
+                         const AnyInvokeParams& invoke_ctx,
+                         const PerformanceConfig& config)
     -> decltype(s.GetSolution(context, problem, s.Search(context, problem, invoke_ctx)))
 {
     MIOPEN_LOG_I("Default config selected: " << s.SolverDbId() << ": " << config);
     return s.GetSolution(context, problem, config);
 }
-
 
 template <class Solver, class Context, class Problem, class Db>
 auto FindSolutionImpl(rank<1>,
@@ -133,7 +132,7 @@ auto FindSolutionImpl(rank<1>,
         return FindEnforce{};
     }();
 
-    using PerformanceConfig = decltype(s.GetDefaultPerformanceConfig(context, problem));
+    using PerformanceConfig          = decltype(s.GetDefaultPerformanceConfig(context, problem));
     PerformanceConfig default_config = s.GetDefaultPerformanceConfig(context, problem);
     PerformanceConfig config{};
 
