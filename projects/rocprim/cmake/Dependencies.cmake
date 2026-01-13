@@ -193,7 +193,7 @@ macro(fetch_googlebench)
   endif()
   # Otherwise fetch from source.
   if(NOT benchmark_FOUND)
-    message(STATUS "Google Test not found. Fetching...")
+    message(STATUS "Google Benchmark not found. Fetching...")
     FetchContent_Declare(
       googlebench
       GIT_REPOSITORY https://github.com/google/benchmark.git
