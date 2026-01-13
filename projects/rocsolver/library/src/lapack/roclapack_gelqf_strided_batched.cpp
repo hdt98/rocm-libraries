@@ -63,34 +63,66 @@ rocblas_status rocsolver_gelqf_strided_batched_impl(rocblas_handle handle,
     size_t size_Abyx_norms_trfact;
     // extra requirements for calling GELQ2 and LARFB
     size_t size_diag_tmptr;
-    rocsolver_gelqf_getMemorySize<false, T>(m, n, batch_count, &size_scalars, &size_work_workArr,
-                                            &size_Abyx_norms_trfact, &size_diag_tmptr, &size_workArr);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work_workArr,
-                                                      size_Abyx_norms_trfact, size_diag_tmptr,
-                                                      size_workArr);
+    if(USE_ORIGINAL)
+    {
+        rocsolver_gelqf_getMemorySize<false, T>(m, n, batch_count, &size_scalars,
+                                                &size_work_workArr, &size_Abyx_norms_trfact,
+                                                &size_diag_tmptr, &size_workArr);
 
-    // memory workspace allocation
-    void *scalars, *work_workArr, *Abyx_norms_trfact, *diag_tmptr, *workArr;
-    rocblas_device_malloc mem(handle, size_scalars, size_work_workArr, size_Abyx_norms_trfact,
-                              size_diag_tmptr, size_workArr);
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work_workArr,
+                                                          size_Abyx_norms_trfact, size_diag_tmptr,
+                                                          size_workArr);
 
-    if(!mem)
-        return rocblas_status_memory_error;
+        // memory workspace allocation
+        void *scalars, *work_workArr, *Abyx_norms_trfact, *diag_tmptr, *workArr;
+        rocblas_device_malloc mem(handle, size_scalars, size_work_workArr, size_Abyx_norms_trfact,
+                                  size_diag_tmptr, size_workArr);
 
-    scalars = mem[0];
-    work_workArr = mem[1];
-    Abyx_norms_trfact = mem[2];
-    diag_tmptr = mem[3];
-    workArr = mem[4];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    // execution
-    return rocsolver_gelqf_template<false, true, T>(
-        handle, m, n, A, shiftA, lda, strideA, ipiv, stridep, batch_count, (T*)scalars,
-        work_workArr, (T*)Abyx_norms_trfact, (T*)diag_tmptr, (T**)workArr);
+        scalars = mem[0];
+        work_workArr = mem[1];
+        Abyx_norms_trfact = mem[2];
+        diag_tmptr = mem[3];
+        workArr = mem[4];
+        if(size_scalars > 0)
+            init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_gelqf_template<false, true, T>(
+            handle, m, n, A, shiftA, lda, strideA, ipiv, stridep, batch_count, (T*)scalars,
+            work_workArr, (T*)Abyx_norms_trfact, (T*)diag_tmptr, (T**)workArr);
+    }
+    else
+    {
+        size_t size_work = 0;
+        rocsolver_gelqf_getMemorySize_alt<false, T>(m, n, batch_count, &size_work);
+
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_work);
+
+        // memory workspace allocation
+        rocblas_device_malloc mem(handle, size_work);
+
+        if(!mem)
+            return rocblas_status_memory_error;
+
+        void* const work = (void*)mem[0];
+
+        // --------------------------------------------------
+        // note: scalars[] initialized in roclapack_gelqf.hpp
+        // --------------------------------------------------
+        // if(size_scalars > 0) init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_gelqf_template_alt<false, true, T>(handle, m, n, A, shiftA, lda, strideA,
+                                                            ipiv, stridep, batch_count,
+
+                                                            work, size_work);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE
