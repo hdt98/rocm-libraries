@@ -1123,15 +1123,7 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
     T** const workArr = (T**)pfree;
     pfree += size_workArr;
 
-    {
-        bool const is_mem_ok_ = (pfree <= (pwork + size_work));
-        if(!is_mem_ok_)
-        {
-            printf("size_work = %ld, m = %d, n = %d, batch_count = %d\n", size_work, (int)m, (int)n,
-                   (int)batch_count);
-            return (rocblas_status_memory_error);
-        }
-    }
+    MEM_CHECK(pfree);
 
     rocblas_status istat = rocsolver_gesvd_template<BATCHED, STRIDED, T, TT, W>(
         handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
