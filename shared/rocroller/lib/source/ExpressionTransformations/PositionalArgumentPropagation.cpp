@@ -112,7 +112,11 @@ namespace rocRoller
                                toString(regType),
                                toString(varType));
 
-                return call(replacement);
+                // Don't recursively call, just return the replacement.
+                //
+		// This avoids unbounded recursion if the replacement
+		// contains another PositionalArgument (eventually).
+                return replacement;
             }
 
             template <CValue Value>
