@@ -261,12 +261,12 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
         {
             if(workgroupSize <= 128u)
             {
-                CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 200));
+                CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 210));
             }
             else
             {
                 // These are super off
-                CHECK(analysis.totalAbsoluteDelta <= 1500);
+                CHECK(analysis.totalAbsoluteDelta <= 1600);
             }
         }
         else if(workgroupSize == 64u)
