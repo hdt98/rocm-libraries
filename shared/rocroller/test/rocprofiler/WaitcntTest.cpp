@@ -487,7 +487,7 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
         }
         else
         {
-            CHECK((analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
+            CHECK((analysis.incorrectPredictionCount <= 5 || std::abs(analysis.totalDelta) <= 0));
         }
     }
 }

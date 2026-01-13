@@ -78,15 +78,12 @@ namespace rocRoller::Scheduling::LDSBankModel
     LDSScheduler::LDSScheduler(GPUArchitectureGFX gfx, int waveCount)
         : m_gfx(gfx)
         , m_programCycle(0)
-        // TODO: update these comments
-        // TODO: figure out if all of these are used?
         // With 3 or more waves, two SIMDs will be active on at least one SP
         // so two SIMDs share the same LDS queues
         , m_multiplierQueueSlots(waveCount > 2 ? 2 : 1)
-        // Both SPs share the same LDS, so if more than one wave is active,
-        // conflicts double (assuming waves perfectly interleave)
         , m_multiplierWaveCount(waveCount)
         , m_multiplierLdsIo(waveCount > 1 ? 2 : 1)
+
     {
         AssertFatal(waveCount >= 1, ShowValue(waveCount));
         AssertFatal(waveCount != 3, "wave count of 3 is untested");
@@ -186,6 +183,8 @@ namespace rocRoller::Scheduling::LDSBankModel
 
         int dataCycles = getInstructionDataCycles(instr, m_gfx);
 
+        // In general, this reduction in cycles as soon as waves go out-of-sync
+        // However, the model has no real way of predicting that
         if(m_multiplierWaveCount > 1 && hasNonOverlappingBankAccess(instr, m_gfx))
         {
             Log::debug("Non-overlapping bank access detected, reducing data cycles");
@@ -200,7 +199,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                     ShowValue(requiredSlots));
 
         const auto roundtripLatency = 40;
-        auto waitcntBase = m_programCycle + roundtripLatency + dataCycles / m_multiplierWaveCount;
+        auto       waitcntBase      = m_programCycle + roundtripLatency + dataCycles;
         Log::debug("dataCycles {}", dataCycles);
         for(int i = 0; i < m_multiplierQueueSlots; ++i)
         {
