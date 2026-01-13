@@ -224,6 +224,20 @@ void add_device_gemm_mx_xdl_f4_f4_f16_mk_mfma_mn_default_instances(
                                              PassThrough,
                                              PassThrough>>>& instances);
 
+void add_device_gemm_mx_xdl_f8_f8_f16_mk_mfma_mn_default_instances(
+    std::vector<std::unique_ptr<DeviceGemmMX<Row,
+                                             MFMA,
+                                             Row,
+                                             F8,
+                                             E8M0PK,
+                                             F8,
+                                             E8M0PK,
+                                             F16,
+                                             32,
+                                             PassThrough,
+                                             PassThrough,
+                                             PassThrough>>>& instances);
+
 template <typename ADataType,
           typename AScaleDataType,
           typename BDataType,
@@ -271,6 +285,12 @@ struct DeviceOperationInstanceFactory<
                          is_same_v<CDataType, F16>)
             {
                 add_device_gemm_mx_xdl_f4_f4_f16_mk_mfma_mn_default_instances(op_ptrs);
+            }
+
+            if constexpr(is_same_v<ADataType, F8> && is_same_v<BDataType, F8> &&
+                         is_same_v<CDataType, F16>)
+            {
+                add_device_gemm_mx_xdl_f8_f8_f16_mk_mfma_mn_default_instances(op_ptrs);
             }
         }
 
