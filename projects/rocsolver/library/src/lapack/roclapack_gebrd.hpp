@@ -62,6 +62,7 @@ void rocsolver_gebrd_getMemorySize(const rocblas_int m,
     *size_Abyx_norms = 0;
     *size_X = 0;
     *size_Y = 0;
+
     if(m == 0 || n == 0 || batch_count == 0)
     {
         return;
@@ -96,6 +97,12 @@ void rocsolver_gebrd_getMemorySize(const rocblas_int m,
         *size_Y = n * k;
         *size_Y *= sizeof(T) * batch_count;
     }
+
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work_workArr);
+    adjust_for_alignment(size_Abyx_norms);
+    adjust_for_alignment(size_X);
+    adjust_for_alignment(size_Y);
 }
 
 template <bool BATCHED, typename T>

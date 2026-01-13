@@ -78,34 +78,80 @@ rocblas_status rocsolver_gebrd_batched_impl(rocblas_handle handle,
     // size for temporary resulting orthogonal matrices when calling LABRD
     size_t size_X;
     size_t size_Y;
-    rocsolver_gebrd_getMemorySize<true, T>(m, n, batch_count, &size_scalars, &size_work_workArr,
-                                           &size_Abyx_norms, &size_X, &size_Y);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work_workArr,
-                                                      size_Abyx_norms, size_X, size_Y);
+    if(USE_ORIGINAL)
+    {
+        rocsolver_gebrd_getMemorySize<true, T>(m, n, batch_count, &size_scalars, &size_work_workArr,
+                                               &size_Abyx_norms, &size_X, &size_Y);
 
-    // memory workspace allocation
-    void *scalars, *work_workArr, *Abyx_norms, *X, *Y;
-    rocblas_device_malloc mem(handle, size_scalars, size_work_workArr, size_Abyx_norms, size_X,
-                              size_Y);
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work_workArr,
+                                                          size_Abyx_norms, size_X, size_Y);
 
-    if(!mem)
-        return rocblas_status_memory_error;
+        // memory workspace allocation
+        void *scalars, *work_workArr, *Abyx_norms, *X, *Y;
+        rocblas_device_malloc mem(handle, size_scalars, size_work_workArr, size_Abyx_norms, size_X,
+                                  size_Y);
 
-    scalars = mem[0];
-    work_workArr = mem[1];
-    Abyx_norms = mem[2];
-    X = mem[3];
-    Y = mem[4];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    // execution
-    return rocsolver_gebrd_template<true, false, T>(
-        handle, m, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tauq, strideQ, taup, strideP,
-        (T*)X, shiftX, m, strideX, (T*)Y, shiftY, n, strideY, batch_count, (T*)scalars,
-        work_workArr, (T*)Abyx_norms);
+        scalars = mem[0];
+        work_workArr = mem[1];
+        Abyx_norms = mem[2];
+        X = mem[3];
+        Y = mem[4];
+        if(size_scalars > 0)
+            init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_gebrd_template<true, false, T>(
+            handle, m, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tauq, strideQ, taup,
+            strideP, (T*)X, shiftX, m, strideX, (T*)Y, shiftY, n, strideY, batch_count, (T*)scalars,
+            work_workArr, (T*)Abyx_norms);
+    }
+    else
+    {
+        size_t size_work = 0;
+        rocsolver_gebrd_getMemorySize_alt<true, T>(m, n, batch_count, &size_work);
+
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_work);
+
+        // memory workspace allocation
+        rocblas_device_malloc mem(handle, size_work);
+
+        if(!mem)
+            return rocblas_status_memory_error;
+
+        void* const work = (void*)mem[0];
+
+        //  --------------------------------------------------
+        //  note: scalars[] initialized in roclapack_gebrd.hpp
+        //  --------------------------------------------------
+        //  if(size_scalars > 0) init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_gebrd_template_alt<true, false, T>(handle, m, n,
+
+                                                            A, shiftA, lda, strideA,
+
+                                                            D, strideD,
+
+                                                            E, strideE,
+
+                                                            tauq, strideQ, taup, strideP,
+
+                                                            // (T*)X,
+                                                            shiftX, m, strideX,
+
+                                                            // (T*)Y,
+                                                            shiftY, n, strideY,
+
+                                                            batch_count,
+
+                                                            work, size_work);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE
