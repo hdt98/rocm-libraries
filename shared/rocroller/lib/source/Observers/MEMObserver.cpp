@@ -41,6 +41,7 @@ namespace rocRoller
 {
     namespace Scheduling
     {
+        // Determines whether valid to use WeightlessDSMemObserver for given instruction
         bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
             AssertFatal(context != nullptr);
@@ -50,7 +51,7 @@ namespace rocRoller
             if(observerType == DSObserverType::WeightlessDSMemObserver)
             {
                 const auto addrs = inst.getAddresses();
-                return addrs.has_value() && (*addrs).size() % 64 == 0
+                return addrs.has_value() && addrs->size() % 64 == 0
                        && LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode()).has_value()
                        && context->targetArchitecture().target().isGFX9GPU();
             }
@@ -141,9 +142,6 @@ namespace rocRoller
             if(waitcnt >= 0
                && Settings::Get(Settings::DSObserver) == DSObserverType::WeightlessDSMemObserver)
             {
-                AssertFatal(status.stallCycles == 0,
-                            "No logic to handle both waitcnt stalls and instruction stalls yet");
-
                 auto stallCycles   = m_scheduler.value().predictWaitcntStall(waitcnt);
                 status.stallCycles = stallCycles / 4;
             }
