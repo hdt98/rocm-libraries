@@ -23,6 +23,7 @@
 
 #include <hip/hip_runtime.h>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #ifdef ROCFFT_RCCL_ENABLE
@@ -35,17 +36,17 @@ namespace rocfft_rccl
     class Communicator
     {
     public:
+        // default ctor does not actually initialize rccl - call
+        // create to init and check success, returning an optional.
         Communicator();
-        ~Communicator() = default;
+        ~Communicator();
 
-        // singleton allocated in rocfft_setup and freed in rocfft_cleanup
-        static std::unique_ptr<Communicator> single;
+        // allow moves
+        Communicator(Communicator&&);
+        Communicator& operator=(Communicator&&);
 
-        // check if RCCL is available and initialized
-        bool is_available() const;
-
-        // initialize RCCL for given devices (call once per process)
-        bool initialize(const std::vector<int>& devices);
+        // initialize RCCL for given devices
+        static std::optional<Communicator> create(const std::vector<int>& devices);
 
         // get the RCCL communicator for a specific device
         void* get_comm(int device_id) const;
@@ -56,32 +57,6 @@ namespace rocfft_rccl
         // check if a specific device is managed
         bool has_device(int device_id) const;
 
-    private:
-        // non-copyable
-        Communicator(const Communicator&) = delete;
-        Communicator& operator=(const Communicator&) = delete;
-
-        struct Impl;
-        std::unique_ptr<Impl> pimpl;
-    };
-
-    // RAII wrapper for RCCL group operations
-    class Group
-    {
-    public:
-        Group();
-        ~Group();
-
-        // non-copyable, non-movable
-        Group(const Group&) = delete;
-        Group& operator=(const Group&) = delete;
-        Group(Group&&)                 = delete;
-        Group& operator=(Group&&) = delete;
-    };
-
-    // helper functions for RCCL operations
-    namespace ops
-    {
         // all-to-all with uniform counts
         bool alltoall(const void* sendbuf,
                       void*       recvbuf,
@@ -116,7 +91,31 @@ namespace rocfft_rccl
                   int         device_id,
                   hipStream_t stream,
                   size_t      elem_size);
-    } // namespace ops
+
+    private:
+        // non-copyable
+        Communicator(const Communicator&) = delete;
+        Communicator& operator=(const Communicator&) = delete;
+
+#ifdef ROCFFT_RCCL_ENABLE
+        struct Impl;
+        std::unique_ptr<Impl> pimpl;
+#endif
+    };
+
+    // RAII wrapper for RCCL group operations
+    class Group
+    {
+    public:
+        Group();
+        ~Group();
+
+        // non-copyable, non-movable
+        Group(const Group&) = delete;
+        Group& operator=(const Group&) = delete;
+        Group(Group&&)                 = delete;
+        Group& operator=(Group&&) = delete;
+    };
 
 } // namespace rocfft_rccl
 

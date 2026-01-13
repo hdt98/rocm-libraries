@@ -28,10 +28,6 @@
 #include "rocfft_mpi.h"
 #include "twiddles.h"
 
-#ifdef ROCFFT_RCCL_ENABLE
-#include "rccl_wrapper.h"
-#endif
-
 #include <limits>
 #include <sstream>
 
@@ -706,12 +702,12 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
                 rocfft_scoped_device dev(loc.device);
 
                 // call alltoall for this device (grouped with other devices)
-                bool success = rocfft_rccl::ops::alltoall(data_ptrs[i],
-                                                          data_ptrs[i],
-                                                          count_per_rank,
-                                                          loc.device,
-                                                          streams[stream_idx],
-                                                          elem_size);
+                bool success = rccl.alltoall(data_ptrs[i],
+                                             data_ptrs[i],
+                                             count_per_rank,
+                                             loc.device,
+                                             streams[stream_idx],
+                                             elem_size);
 
                 if(!success)
                 {
@@ -787,12 +783,12 @@ void CommRCCLGrouped::ExecuteAsync(const rocfft_plan     plan,
             bool success;
             if(t.is_send)
             {
-                success = rocfft_rccl::ops::send(
+                success = rccl.send(
                     data_ptr, t.count, t.peer_rank, t.local_location.device, t.stream, elem_size);
             }
             else
             {
-                success = rocfft_rccl::ops::recv(
+                success = rccl.recv(
                     data_ptr, t.count, t.peer_rank, t.local_location.device, t.stream, elem_size);
             }
 

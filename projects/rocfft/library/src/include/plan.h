@@ -25,11 +25,13 @@
 #include <complex>
 #include <cstring>
 #include <list>
+#include <optional>
 #include <vector>
 
 #include "../../../shared/array_predicate.h"
 #include "function_pool.h"
 #include "load_store_ops.h"
+#include "rccl_wrapper.h"
 #include "rocfft_mpi.h"
 #include "tree_node.h"
 
@@ -213,6 +215,11 @@ struct rocfft_plan_t
     rocfft_precision        precision     = rocfft_precision_single;
 
     rocfft_plan_description_t desc;
+
+#ifdef ROCFFT_RCCL_ENABLE
+    // rccl communicator used for single-proc multi-GPU transforms
+    std::optional<rocfft_rccl::Communicator> rccl;
+#endif
 
     rocfft_plan_t() = default;
 

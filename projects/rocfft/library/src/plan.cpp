@@ -2040,12 +2040,6 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
     bool use_p2p = rocfft_plan_description_t::multiple_devices_in_rank(inField)
                    || rocfft_plan_description_t::multiple_devices_in_rank(outField);
 
-    // check if RCCL is available for single-process multi-GPU
-#ifdef ROCFFT_RCCL_ENABLE
-    const bool rccl_available = use_p2p && rocfft_rccl::Communicator::single
-                                && rocfft_rccl::Communicator::single->is_available();
-#endif
-
     // All-to-all transpose is preferred as it's faster. This requires
     // that each rank have a single base pointer to send/receive with
     // offsets for every other rank.
@@ -2058,7 +2052,7 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
     std::string itemGroup = "transpose_" + std::to_string(transposeNumber);
 
 #ifdef ROCFFT_RCCL_ENABLE
-    if(rccl_available)
+    if(rccl)
     {
         // use RCCL for single-process multi-GPU
         GlobalTransposeRCCL(
@@ -2095,13 +2089,12 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     // for better performance
 
     const auto local_comm_rank = get_local_comm_rank();
-    auto&      rccl            = *rocfft_rccl::Communicator::single;
 
     std::vector<TempBufferLease> packBufs;
 
     // create a grouped RCCL operation for all sends
     auto rcclGrouped
-        = std::make_unique<CommRCCLGrouped>(local_comm_rank, precision, desc.inArrayType);
+        = std::make_unique<CommRCCLGrouped>(*rccl, local_comm_rank, precision, desc.inArrayType);
     rcclGrouped->group       = itemGroup;
     rcclGrouped->description = "RCCL grouped send/recv";
 
@@ -2182,7 +2175,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             packItems.push_back(packIdx);
 
             // add RCCL send operation
-            int dst_rank = rccl.get_rank_for_device(outBrick.location.device);
+            int dst_rank = rccl->get_rank_for_device(outBrick.location.device);
             if(dst_rank >= 0)
             {
                 rcclGrouped->AddTransfer(true,
@@ -2195,7 +2188,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             }
 
             // add RCCL recv operation
-            int src_rank = rccl.get_rank_for_device(inBrick.location.device);
+            int src_rank = rccl->get_rank_for_device(inBrick.location.device);
             if(src_rank >= 0)
             {
                 rcclGrouped->AddTransfer(false,
@@ -2864,27 +2857,24 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
     if(rocfft_plan_description_t::multiple_devices_in_rank(desc.inFields.front())
        || rocfft_plan_description_t::multiple_devices_in_rank(desc.outFields.front()))
     {
-        if(rocfft_rccl::Communicator::single && rocfft_rccl::Communicator::single->is_available())
+        // collect all unique device IDs from bricks
+        std::set<int> device_set;
+        for(const auto& brick : desc.inFields.front().bricks)
         {
-            // collect all unique device IDs from bricks
-            std::set<int> device_set;
-            for(const auto& brick : desc.inFields.front().bricks)
-            {
-                if(brick.location.comm_rank == local_comm_rank)
-                    device_set.insert(brick.location.device);
-            }
-            for(const auto& brick : desc.outFields.front().bricks)
-            {
-                if(brick.location.comm_rank == local_comm_rank)
-                    device_set.insert(brick.location.device);
-            }
+            if(brick.location.comm_rank == local_comm_rank)
+                device_set.insert(brick.location.device);
+        }
+        for(const auto& brick : desc.outFields.front().bricks)
+        {
+            if(brick.location.comm_rank == local_comm_rank)
+                device_set.insert(brick.location.device);
+        }
 
-            // initialize RCCL with these devices
-            if(!device_set.empty())
-            {
-                std::vector<int> devices(device_set.begin(), device_set.end());
-                rocfft_rccl::Communicator::single->initialize(devices);
-            }
+        // initialize RCCL with these devices
+        if(!device_set.empty())
+        {
+            std::vector<int> devices(device_set.begin(), device_set.end());
+            rccl = rocfft_rccl::Communicator::create(devices);
         }
     }
 #endif

@@ -19,6 +19,7 @@
 // THE SOFTWARE.
 
 #include "rccl_wrapper.h"
+#include "logging.h"
 #include <algorithm>
 #include <iostream>
 #include <map>
@@ -26,7 +27,6 @@
 
 namespace rocfft_rccl
 {
-    std::unique_ptr<Communicator> Communicator::single;
 #ifdef ROCFFT_RCCL_ENABLE
 
     // RCCL data type mapping - returns base NCCL type for given element size.
@@ -59,113 +59,101 @@ namespace rocfft_rccl
         std::vector<int>        devices; // device IDs
         std::map<int, int>      device_to_rank;
         std::map<int, int>      rank_to_device;
-        bool                    initialized = false;
 
         ~Impl()
         {
-            if(initialized)
+            for(auto comm : comms)
             {
-                for(auto comm : comms)
+                if(comm)
                 {
-                    if(comm)
-                    {
-                        ncclCommFinalize(comm);
-                        ncclCommDestroy(comm);
-                    }
+                    ncclCommFinalize(comm);
+                    ncclCommDestroy(comm);
                 }
             }
         }
     };
-
-#else
-    // dummy implementation when RCCL is disabled
-    struct Communicator::Impl
-    {
-        bool initialized = false;
-    };
 #endif
 
     Communicator::Communicator()
+#ifdef ROCFFT_RCCL_ENABLE
+        : pimpl(std::make_unique<Impl>())
+#endif
     {
-        pimpl = std::make_unique<Impl>();
     }
 
-    bool Communicator::is_available() const
+    Communicator::~Communicator() {}
+
+    Communicator::Communicator(Communicator&& other)
+#ifdef ROCFFT_RCCL_ENABLE
+        : pimpl(std::move(other.pimpl))
+#endif
+    {
+    }
+
+    Communicator& Communicator::operator=(Communicator&& other)
     {
 #ifdef ROCFFT_RCCL_ENABLE
-        return pimpl && pimpl->initialized;
-#else
-        return false;
+        pimpl = std::move(other.pimpl);
 #endif
+        return *this;
     }
 
-    bool Communicator::initialize(const std::vector<int>& devices)
+    std::optional<Communicator> Communicator::create(const std::vector<int>& devices)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         // check if RCCL is disabled via environment variable
         const char* disable_rccl = std::getenv("ROCFFT_DISABLE_RCCL");
         if(disable_rccl && std::string(disable_rccl) == "1")
         {
-            return false;
-        }
-
-        if(!pimpl)
-        {
-            pimpl = std::make_unique<Impl>();
-        }
-
-        if(pimpl->initialized)
-        {
-            return true;
+            return {};
         }
 
         if(devices.empty())
         {
-            std::cerr << "[rocFFT-RCCL] Error: No devices specified\n";
-            return false;
+            return {};
         }
 
         try
         {
-            int ndevices   = static_cast<int>(devices.size());
-            pimpl->devices = devices;
-            pimpl->comms.resize(ndevices);
+            auto ret   = std::make_optional<Communicator>();
+            ret->pimpl = std::make_unique<Impl>();
+
+            int ndevices        = static_cast<int>(devices.size());
+            ret->pimpl->devices = devices;
+            ret->pimpl->comms.resize(ndevices);
 
             // use ncclCommInitAll for single-process multi-GPU
-            ncclResult_t result = ncclCommInitAll(pimpl->comms.data(), ndevices, devices.data());
+            ncclResult_t result
+                = ncclCommInitAll(ret->pimpl->comms.data(), ndevices, devices.data());
 
             if(result != ncclSuccess)
             {
-                return false;
+                return {};
             }
 
             // build device-rank mappings
             for(int rank = 0; rank < ndevices; ++rank)
             {
-                int dev_id                    = devices[rank];
-                pimpl->device_to_rank[dev_id] = rank;
-                pimpl->rank_to_device[rank]   = dev_id;
+                int dev_id                         = devices[rank];
+                ret->pimpl->device_to_rank[dev_id] = rank;
+                ret->pimpl->rank_to_device[rank]   = dev_id;
             }
 
-            pimpl->initialized = true;
-            return true;
+            return ret;
         }
         catch(const std::exception& e)
         {
-            std::cerr << "[rocFFT-RCCL] Initialization failed: " << e.what() << "\n";
-            return false;
+            log_trace(__func__, "rccl initialization failed", e.what());
+            return {};
         }
 #else
-        return false;
+        return {};
 #endif
     }
 
     void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
-        if(!pimpl || !pimpl->initialized)
-            return nullptr;
-
         auto it = pimpl->device_to_rank.find(device_id);
         if(it == pimpl->device_to_rank.end())
             return nullptr;
@@ -183,9 +171,6 @@ namespace rocfft_rccl
     int Communicator::get_rank_for_device(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
-        if(!pimpl || !pimpl->initialized)
-            return -1;
-
         auto it = pimpl->device_to_rank.find(device_id);
         return (it != pimpl->device_to_rank.end()) ? it->second : -1;
 #else
@@ -196,8 +181,6 @@ namespace rocfft_rccl
     bool Communicator::has_device(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
-        if(!pimpl || !pimpl->initialized)
-            return false;
         return pimpl->device_to_rank.find(device_id) != pimpl->device_to_rank.end();
 #else
         return false;
@@ -219,223 +202,199 @@ namespace rocfft_rccl
 #endif
     }
 
-    // helper operations
-    namespace ops
+    bool Communicator::alltoall(const void* sendbuf,
+                                void*       recvbuf,
+                                size_t      count,
+                                int         device_id,
+                                hipStream_t stream,
+                                size_t      elem_size)
     {
-        bool alltoall(const void* sendbuf,
-                      void*       recvbuf,
-                      size_t      count,
-                      int         device_id,
-                      hipStream_t stream,
-                      size_t      elem_size)
-        {
 #ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *Communicator::single;
-            if(!rccl.is_available() || !rccl.has_device(device_id))
-                return false;
-
-            ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(rccl.get_comm(device_id));
-            if(!comm_ptr)
-                return false;
-
-            ncclDataType_t dtype = get_nccl_datatype(elem_size);
-
-            // for complex types, adjust count
-            size_t nccl_count = count;
-            if(elem_size == 8)
-            {
-                // complex float: treat as 2x float
-                nccl_count = count * 2;
-                dtype      = ncclFloat32;
-            }
-            else if(elem_size == 16)
-            {
-                // complex double: treat as 2x double
-                nccl_count = count * 2;
-                dtype      = ncclFloat64;
-            }
-
-            ncclResult_t result
-                = ncclAllToAll(sendbuf, recvbuf, nccl_count, dtype, *comm_ptr, stream);
-
-            if(result != ncclSuccess)
-            {
-                std::cerr << "[rocFFT-RCCL] ncclAllToAll failed with code " << result << "\n";
-                return false;
-            }
-
-            return true;
-#else
+        ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
+        if(!comm_ptr)
             return false;
-#endif
+
+        ncclDataType_t dtype = get_nccl_datatype(elem_size);
+
+        // for complex types, adjust count
+        size_t nccl_count = count;
+        if(elem_size == 8)
+        {
+            // complex float: treat as 2x float
+            nccl_count = count * 2;
+            dtype      = ncclFloat32;
+        }
+        else if(elem_size == 16)
+        {
+            // complex double: treat as 2x double
+            nccl_count = count * 2;
+            dtype      = ncclFloat64;
         }
 
-        bool alltoallv(const void*                sendbuf,
-                       void*                      recvbuf,
-                       const std::vector<size_t>& sendcounts,
-                       const std::vector<size_t>& recvcounts,
-                       const std::vector<size_t>& sdispls,
-                       const std::vector<size_t>& rdispls,
-                       int                        device_id,
-                       hipStream_t                stream,
-                       size_t                     elem_size)
+        ncclResult_t result = ncclAllToAll(sendbuf, recvbuf, nccl_count, dtype, *comm_ptr, stream);
+
+        if(result != ncclSuccess)
         {
-#ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *Communicator::single;
-            if(!rccl.is_available() || !rccl.has_device(device_id))
-                return false;
-
-            ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(rccl.get_comm(device_id));
-            if(!comm_ptr)
-                return false;
-
-            ncclDataType_t dtype = get_nccl_datatype(elem_size);
-
-            // for complex types, adjust counts and displacements
-            std::vector<size_t> adj_sendcounts = sendcounts;
-            std::vector<size_t> adj_recvcounts = recvcounts;
-            std::vector<size_t> adj_sdispls    = sdispls;
-            std::vector<size_t> adj_rdispls    = rdispls;
-
-            if(elem_size == 8)
-            {
-                // complex float
-                dtype = ncclFloat32;
-                for(auto& c : adj_sendcounts)
-                    c *= 2;
-                for(auto& c : adj_recvcounts)
-                    c *= 2;
-                for(auto& d : adj_sdispls)
-                    d *= 2;
-                for(auto& d : adj_rdispls)
-                    d *= 2;
-            }
-            else if(elem_size == 16)
-            {
-                // complex double
-                dtype = ncclFloat64;
-                for(auto& c : adj_sendcounts)
-                    c *= 2;
-                for(auto& c : adj_recvcounts)
-                    c *= 2;
-                for(auto& d : adj_sdispls)
-                    d *= 2;
-                for(auto& d : adj_rdispls)
-                    d *= 2;
-            }
-
-            ncclResult_t result = ncclAllToAllv(sendbuf,
-                                                adj_sendcounts.data(),
-                                                adj_sdispls.data(),
-                                                recvbuf,
-                                                adj_recvcounts.data(),
-                                                adj_rdispls.data(),
-                                                dtype,
-                                                *comm_ptr,
-                                                stream);
-
-            if(result != ncclSuccess)
-            {
-                std::cerr << "[rocFFT-RCCL] ncclAllToAllv failed with code " << result << "\n";
-                return false;
-            }
-
-            return true;
-#else
+            log_trace(__func__, "ncclAllToAll failed", result);
             return false;
-#endif
         }
 
-        bool send(const void* sendbuf,
-                  size_t      count,
-                  int         peer_rank,
-                  int         device_id,
-                  hipStream_t stream,
-                  size_t      elem_size)
-        {
-#ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *Communicator::single;
-            if(!rccl.is_available() || !rccl.has_device(device_id))
-                return false;
-
-            ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(rccl.get_comm(device_id));
-            if(!comm_ptr)
-                return false;
-
-            ncclDataType_t dtype      = get_nccl_datatype(elem_size);
-            size_t         nccl_count = count;
-
-            if(elem_size == 8)
-            {
-                nccl_count = count * 2;
-                dtype      = ncclFloat32;
-            }
-            else if(elem_size == 16)
-            {
-                nccl_count = count * 2;
-                dtype      = ncclFloat64;
-            }
-
-            ncclResult_t result
-                = ncclSend(sendbuf, nccl_count, dtype, peer_rank, *comm_ptr, stream);
-
-            if(result != ncclSuccess)
-            {
-                std::cerr << "[rocFFT-RCCL] ncclSend failed with code " << result << "\n";
-                return false;
-            }
-
-            return true;
+        return true;
 #else
-            return false;
+        return false;
 #endif
+    }
+
+    bool Communicator::alltoallv(const void*                sendbuf,
+                                 void*                      recvbuf,
+                                 const std::vector<size_t>& sendcounts,
+                                 const std::vector<size_t>& recvcounts,
+                                 const std::vector<size_t>& sdispls,
+                                 const std::vector<size_t>& rdispls,
+                                 int                        device_id,
+                                 hipStream_t                stream,
+                                 size_t                     elem_size)
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
+        if(!comm_ptr)
+            return false;
+
+        ncclDataType_t dtype = get_nccl_datatype(elem_size);
+
+        // for complex types, adjust counts and displacements
+        std::vector<size_t> adj_sendcounts = sendcounts;
+        std::vector<size_t> adj_recvcounts = recvcounts;
+        std::vector<size_t> adj_sdispls    = sdispls;
+        std::vector<size_t> adj_rdispls    = rdispls;
+
+        if(elem_size == 8)
+        {
+            // complex float
+            dtype = ncclFloat32;
+            for(auto& c : adj_sendcounts)
+                c *= 2;
+            for(auto& c : adj_recvcounts)
+                c *= 2;
+            for(auto& d : adj_sdispls)
+                d *= 2;
+            for(auto& d : adj_rdispls)
+                d *= 2;
+        }
+        else if(elem_size == 16)
+        {
+            // complex double
+            dtype = ncclFloat64;
+            for(auto& c : adj_sendcounts)
+                c *= 2;
+            for(auto& c : adj_recvcounts)
+                c *= 2;
+            for(auto& d : adj_sdispls)
+                d *= 2;
+            for(auto& d : adj_rdispls)
+                d *= 2;
         }
 
-        bool recv(void*       recvbuf,
-                  size_t      count,
-                  int         peer_rank,
-                  int         device_id,
-                  hipStream_t stream,
-                  size_t      elem_size)
+        ncclResult_t result = ncclAllToAllv(sendbuf,
+                                            adj_sendcounts.data(),
+                                            adj_sdispls.data(),
+                                            recvbuf,
+                                            adj_recvcounts.data(),
+                                            adj_rdispls.data(),
+                                            dtype,
+                                            *comm_ptr,
+                                            stream);
+
+        if(result != ncclSuccess)
         {
-#ifdef ROCFFT_RCCL_ENABLE
-            auto& rccl = *Communicator::single;
-            if(!rccl.is_available() || !rccl.has_device(device_id))
-                return false;
-
-            ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(rccl.get_comm(device_id));
-            if(!comm_ptr)
-                return false;
-
-            ncclDataType_t dtype      = get_nccl_datatype(elem_size);
-            size_t         nccl_count = count;
-
-            if(elem_size == 8)
-            {
-                nccl_count = count * 2;
-                dtype      = ncclFloat32;
-            }
-            else if(elem_size == 16)
-            {
-                nccl_count = count * 2;
-                dtype      = ncclFloat64;
-            }
-
-            ncclResult_t result
-                = ncclRecv(recvbuf, nccl_count, dtype, peer_rank, *comm_ptr, stream);
-
-            if(result != ncclSuccess)
-            {
-                std::cerr << "[rocFFT-RCCL] ncclRecv failed with code " << result << "\n";
-                return false;
-            }
-
-            return true;
-#else
+            log_trace(__func__, "ncclAllToAllv failed", result);
             return false;
-#endif
         }
 
-    } // namespace ops
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    bool Communicator::send(const void* sendbuf,
+                            size_t      count,
+                            int         peer_rank,
+                            int         device_id,
+                            hipStream_t stream,
+                            size_t      elem_size)
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
+        if(!comm_ptr)
+            return false;
+
+        ncclDataType_t dtype      = get_nccl_datatype(elem_size);
+        size_t         nccl_count = count;
+
+        if(elem_size == 8)
+        {
+            nccl_count = count * 2;
+            dtype      = ncclFloat32;
+        }
+        else if(elem_size == 16)
+        {
+            nccl_count = count * 2;
+            dtype      = ncclFloat64;
+        }
+
+        ncclResult_t result = ncclSend(sendbuf, nccl_count, dtype, peer_rank, *comm_ptr, stream);
+
+        if(result != ncclSuccess)
+        {
+            log_trace(__func__, "ncclSend failed", result);
+            return false;
+        }
+
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    bool Communicator::recv(void*       recvbuf,
+                            size_t      count,
+                            int         peer_rank,
+                            int         device_id,
+                            hipStream_t stream,
+                            size_t      elem_size)
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
+        if(!comm_ptr)
+            return false;
+
+        ncclDataType_t dtype      = get_nccl_datatype(elem_size);
+        size_t         nccl_count = count;
+
+        if(elem_size == 8)
+        {
+            nccl_count = count * 2;
+            dtype      = ncclFloat32;
+        }
+        else if(elem_size == 16)
+        {
+            nccl_count = count * 2;
+            dtype      = ncclFloat64;
+        }
+
+        ncclResult_t result = ncclRecv(recvbuf, nccl_count, dtype, peer_rank, *comm_ptr, stream);
+
+        if(result != ncclSuccess)
+        {
+            log_trace(__func__, "ncclRecv failed", result);
+            return false;
+        }
+
+        return true;
+#else
+        return false;
+#endif
+    }
 
 } // namespace rocfft_rccl

@@ -47,6 +47,10 @@
 #include "rtc_kernel.h"
 #include <hip/hip_runtime_api.h>
 
+#ifdef ROCFFT_RCCL_ENABLE
+#include "rccl_wrapper.h"
+#endif
+
 enum NodeType
 {
     NT_UNDEFINED, // un init
@@ -1184,14 +1188,16 @@ private:
 // RCCL-based all-to-all communication for multi-GPU transpose
 struct CommRCCLAllToAll : public MultiPlanItem
 {
-    CommRCCLAllToAll(int                                   local_comm_rank,
+    CommRCCLAllToAll(rocfft_rccl::Communicator&            _rccl,
+                     int                                   local_comm_rank,
                      rocfft_precision                      _precision,
                      rocfft_array_type                     _arrayType,
                      size_t                                _count_per_rank,
                      const std::vector<rocfft_location_t>& _locations,
                      const std::vector<BufferPtr>&         _buffers,
                      const std::vector<size_t>&            _offsets)
-        : precision(_precision)
+        : rccl(_rccl)
+        , precision(_precision)
         , arrayType(_arrayType)
         , count_per_rank(_count_per_rank)
         , locations(_locations)
@@ -1241,6 +1247,8 @@ struct CommRCCLAllToAll : public MultiPlanItem
     }
 
 private:
+    rocfft_rccl::Communicator& rccl;
+
     const rocfft_precision  precision;
     const rocfft_array_type arrayType;
     const size_t            count_per_rank; // elements per rank (uniform)
@@ -1268,8 +1276,12 @@ struct CommRCCLGrouped : public MultiPlanItem
         hipStream_wrapper_t stream; // each transfer has its own stream
     };
 
-    CommRCCLGrouped(int _local_comm_rank, rocfft_precision _precision, rocfft_array_type _arrayType)
-        : local_comm_rank(_local_comm_rank)
+    CommRCCLGrouped(rocfft_rccl::Communicator& _rccl,
+                    int                        _local_comm_rank,
+                    rocfft_precision           _precision,
+                    rocfft_array_type          _arrayType)
+        : rccl(_rccl)
+        , local_comm_rank(_local_comm_rank)
         , precision(_precision)
         , arrayType(_arrayType)
     {
@@ -1336,9 +1348,10 @@ struct CommRCCLGrouped : public MultiPlanItem
     }
 
 private:
-    const int               local_comm_rank;
-    const rocfft_precision  precision;
-    const rocfft_array_type arrayType;
+    rocfft_rccl::Communicator& rccl;
+    const int                  local_comm_rank;
+    const rocfft_precision     precision;
+    const rocfft_array_type    arrayType;
 
 public:
     std::vector<Transfer> transfers;
