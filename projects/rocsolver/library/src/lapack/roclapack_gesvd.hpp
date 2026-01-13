@@ -44,7 +44,9 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-static bool constexpr use_original = false;
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL true
+#endif
 
 static inline void adjust_for_alignment(size_t& size_work)
 {
@@ -67,6 +69,7 @@ static inline void adjust_for_alignment(size_t* p_size_work)
 #define IS_POINTER_BATCHED(A, T) \
     (std::is_pointer_v<std::remove_cv_t<std::remove_cv_t<std::remove_reference_t<decltype((A)[0])>>>>)
 
+#ifndef MEM_CHECK
 #define MEM_CHECK(pfree)                                        \
     {                                                           \
         bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
@@ -75,7 +78,9 @@ static inline void adjust_for_alignment(size_t* p_size_work)
             return (rocblas_status_memory_error);               \
         }                                                       \
     }
+#endif
 
+#ifndef MEM_CHECK_THROW
 #define MEM_CHECK_THROW(pfree)                                  \
     {                                                           \
         bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
@@ -85,6 +90,7 @@ static inline void adjust_for_alignment(size_t* p_size_work)
             throw(istat);                                       \
         }                                                       \
     }
+#endif
 /** wrapper to xxGQR/xxGLQ_TEMPLATE **/
 template <bool BATCHED, bool STRIDED, typename T, typename U>
 void local_orgqrlq_ungqrlq_template(rocblas_handle handle,
@@ -144,6 +150,39 @@ void local_geqrlq_template(rocblas_handle handle,
                                                    strideP, batch_count, scalars, work_workArr,
                                                    Abyx_norms_trfact, diag_tmptr, workArr);
 }
+#if(0)
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+void local_geqrlq_template_alt(rocblas_handle handle,
+                               const rocblas_int m,
+                               const rocblas_int n,
+                               U A,
+                               const rocblas_int shiftA,
+                               const rocblas_int lda,
+                               const rocblas_stride strideA,
+                               T* ipiv,
+                               const rocblas_stride strideP,
+                               const rocblas_int batch_count,
+                               const bool row,
+
+                               void* const work,
+                               size_t const size_work)
+{
+    if(row)
+    {
+        rocsolver_geqrf_template_alt<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda, strideA, ipiv,
+                                                       strideP, batch_count,
+
+                                                       work, size_work);
+    }
+    else
+    {
+        rocsolver_gelqf_template_alt<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda, strideA, ipiv,
+                                                       strideP, batch_count,
+
+                                                       work, size_work);
+    }
+}
+#endif
 
 /** Argument checking **/
 template <typename T, typename TT, typename W>

@@ -83,7 +83,7 @@ rocblas_status rocsolver_gesvd_strided_batched_impl(rocblas_handle handle,
     size_t size_tempArrayT, size_tempArrayC;
     // size of array of pointers (only for batched case)
     size_t size_workArr;
-    if(use_original)
+    if(USE_ORIGINAL)
     {
         rocsolver_gesvd_getMemorySize<false, T, TT>(
             left_svect, right_svect, m, n, batch_count, fast_alg, &size_scalars, &size_work_workArr,

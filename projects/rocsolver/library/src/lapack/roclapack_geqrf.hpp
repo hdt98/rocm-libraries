@@ -40,6 +40,33 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL true
+#endif
+
+#ifndef MEM_CHECK
+#define MEM_CHECK(pfree)                                        \
+    {                                                           \
+        bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
+        if(!is_mem_ok_)                                         \
+        {                                                       \
+            return (rocblas_status_memory_error);               \
+        }                                                       \
+    }
+#endif
+
+#ifndef MEM_CHECK_THROW
+#define MEM_CHECK_THROW(pfree)                                  \
+    {                                                           \
+        bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
+        if(!is_mem_ok_)                                         \
+        {                                                       \
+            istat = rocblas_status_memory_error;                \
+            throw(istat);                                       \
+        }                                                       \
+    }
+#endif
+
 template <bool BATCHED, typename T, typename I>
 void rocsolver_geqrf_getMemorySize(const I m,
                                    const I n,
@@ -51,13 +78,13 @@ void rocsolver_geqrf_getMemorySize(const I m,
                                    size_t* size_workArr)
 {
     // if quick return no workspace needed
+    *size_scalars = 0;
+    *size_work_workArr = 0;
+    *size_Abyx_norms_trfact = 0;
+    *size_diag_tmptr = 0;
+    *size_workArr = 0;
     if(m == 0 || n == 0 || batch_count == 0)
     {
-        *size_scalars = 0;
-        *size_work_workArr = 0;
-        *size_Abyx_norms_trfact = 0;
-        *size_diag_tmptr = 0;
-        *size_workArr = 0;
         return;
     }
 
@@ -95,6 +122,36 @@ void rocsolver_geqrf_getMemorySize(const I m,
         if(BATCHED)
             *size_workArr *= 2;
     }
+}
+
+template <bool BATCHED, typename T, typename I>
+void rocsolver_geqrf_getMemorySize_alts(const I m,
+                                        const I n,
+                                        const I batch_count,
+
+                                        size_t* p_size_geqrf)
+{
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_trfact = 0;
+    size_t size_diag_tmptr = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_geqrf_getMemorySize<BATCHED, T, I>(m, n, batch_count,
+
+                                                 &size_scalars, &size_work_workArr,
+                                                 &size_Abyx_norms_trfact, &size_diag_tmptr,
+                                                 &size_workArr);
+
+    size_t size_geqrf = 0;
+
+    size_geqrf += size_scalars;
+    size_geqrf += size_work_workArr;
+    size_geqrf += size_Abyx_norms_trfact;
+    size_geqrf += size_diag_tmptr;
+    size_geqrf += size_workArr;
+
+    *p_size_geqrf = size_geqrf;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
@@ -175,6 +232,64 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
+rocblas_status rocsolver_geqrf_template_alts(rocblas_handle handle,
+                                             const I m,
+                                             const I n,
+                                             U A,
+                                             const rocblas_stride shiftA,
+                                             const I lda,
+                                             const rocblas_stride strideA,
+                                             T* ipiv,
+                                             const rocblas_stride strideP,
+                                             const I batch_count,
+
+                                             void* const work,
+                                             size_t const size_work)
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_trfact = 0;
+    size_t size_diag_tmptr = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_geqrf_getMemorySize<BATCHED, T, I>(m, n, batch_count,
+
+                                                 &size_scalars, &size_work_workArr,
+                                                 &size_Abyx_norms_trfact, &size_diag_tmptr,
+                                                 &size_workArr);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    void* const work_workArr = (void*)pfree;
+    pfree += size_work_workArr;
+
+    T* const Abyx_norms_trfact = (T*)pfree;
+    pfree += size_Abyx_norms_trfact;
+
+    T* const diag_tmptr = (T*)pfree;
+    pfree += size_diag_tmptr;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_geqrf_template<BATCHED, STRIDED, T, I, U>(
+        handle, m, n, A, shiftA, lda, strideA, ipiv, strideP, batch_count,
+
+        scalars, work_workArr, Abyx_norms_trfact, diag_tmptr, workArr);
+    return (istat);
+}
+
 template <bool BATCHED, bool STRIDED, typename T, typename I>
 void rocsolver_geqrf_getMemorySize(const I m,
                                    const I n,
@@ -242,6 +357,49 @@ void rocsolver_geqrf_getMemorySize(const I m,
         if(BATCHED)
             *size_workArr *= 2;
     }
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename I>
+void rocsolver_geqrf_getMemorySize_alt(const I m,
+                                       const I n,
+                                       const I batch_count,
+
+                                       size_t* p_size_geqrf)
+{
+    bool optim_mem = true;
+
+    size_t size_scalars = 0;
+    size_t size_work_workArr_work1 = 0;
+    size_t size_work2 = 0;
+    size_t size_work3 = 0;
+    size_t size_work4 = 0;
+
+    size_t size_Abyx_norms_trfact = 0;
+    size_t size_diag_tmptr = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_geqrf_getMemorySize<BATCHED, STRIDED, T, I>(
+        m, n, batch_count,
+
+        &size_scalars, &size_work_workArr_work1, &size_work2, &size_work3, &size_work4,
+
+        &size_Abyx_norms_trfact, &size_diag_tmptr, &size_workArr,
+
+        &optim_mem);
+
+    size_t size_geqrf = 0;
+
+    size_geqrf += size_scalars;
+    size_geqrf += size_work_workArr_work1;
+    size_geqrf += size_work2;
+    size_geqrf += size_work3;
+    size_geqrf += size_work4;
+
+    size_geqrf += size_Abyx_norms_trfact;
+    size_geqrf += size_diag_tmptr;
+    size_geqrf += size_workArr;
+
+    *p_size_geqrf = size_geqrf;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
@@ -324,6 +482,82 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
                                     work_workArr_work1, Abyx_norms_trfact, diag_tmptr);
 
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
+rocblas_status rocsolver_geqrf_template_alt(rocblas_handle handle,
+                                            const I m,
+                                            const I n,
+                                            U A,
+                                            const rocblas_stride shiftA,
+                                            const I lda,
+                                            const rocblas_stride strideA,
+                                            T* ipiv,
+                                            const rocblas_stride strideP,
+                                            const I batch_count,
+
+                                            void* const work,
+                                            size_t const size_work)
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_work_workArr_work1 = 0;
+    size_t size_work2 = 0;
+    size_t size_work3 = 0;
+    size_t size_work4 = 0;
+
+    size_t size_Abyx_norms_trfact = 0;
+    size_t size_diag_tmptr = 0;
+    size_t size_workArr = 0;
+
+    bool optim_mem = true;
+
+    rocsolver_geqrf_getMemorySize<BATCHED, STRIDED, T, I>(
+        m, n, batch_count,
+
+        &size_scalars, &size_work_workArr_work1, &size_work2, &size_work3, &size_work4,
+
+        &size_Abyx_norms_trfact, &size_diag_tmptr, &size_workArr, &optim_mem);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    void* const work_workArr_work1 = (void*)pfree;
+    pfree += size_work_workArr_work1;
+
+    void* const work2 = (void*)pfree;
+    pfree += size_work2;
+
+    void* const work3 = (void*)pfree;
+    pfree += size_work3;
+
+    void* const work4 = (void*)pfree;
+    pfree += size_work4;
+
+    T* const Abyx_norms_trfact = (T*)pfree;
+    pfree += size_Abyx_norms_trfact;
+
+    T* const diag_tmptr = (T*)pfree;
+    pfree += size_diag_tmptr;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_geqrf_template<BATCHED, STRIDED, T, I, U>(
+        handle, m, n, A, shiftA, lda, strideA, ipiv, strideP, batch_count,
+
+        scalars, work_workArr_work1, work2, work3, work4, Abyx_norms_trfact, diag_tmptr, workArr,
+        optim_mem);
+
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE

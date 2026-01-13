@@ -64,40 +64,75 @@ rocblas_status rocsolver_geqrf_strided_batched_impl(rocblas_handle handle,
     size_t size_Abyx_norms_trfact;
     // extra requirements for calling GEQR2 and LARFB
     size_t size_diag_tmptr;
-    rocsolver_geqrf_getMemorySize<false, true, T>(
-        m, n, batch_count, &size_scalars, &size_work_workArr_work1, &size_work2, &size_work3,
-        &size_work4, &size_Abyx_norms_trfact, &size_diag_tmptr, &size_workArr, &optim_mem);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(
-            handle, size_scalars, size_work_workArr_work1, size_work2, size_work3, size_work4,
-            size_Abyx_norms_trfact, size_diag_tmptr, size_workArr);
+    if(USE_ORIGINAL)
+    {
+        rocsolver_geqrf_getMemorySize<false, true, T>(
+            m, n, batch_count, &size_scalars, &size_work_workArr_work1, &size_work2, &size_work3,
+            &size_work4, &size_Abyx_norms_trfact, &size_diag_tmptr, &size_workArr, &optim_mem);
 
-    // memory workspace allocation
-    void *scalars, *work_workArr_work1, *work2, *work3, *work4, *Abyx_norms_trfact, *diag_tmptr,
-        *workArr;
-    rocblas_device_malloc mem(handle, size_scalars, size_work_workArr_work1, size_work2, size_work3,
-                              size_work4, size_Abyx_norms_trfact, size_diag_tmptr, size_workArr);
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(
+                handle, size_scalars, size_work_workArr_work1, size_work2, size_work3, size_work4,
+                size_Abyx_norms_trfact, size_diag_tmptr, size_workArr);
 
-    if(!mem)
-        return rocblas_status_memory_error;
+        // memory workspace allocation
+        void *scalars, *work_workArr_work1, *work2, *work3, *work4, *Abyx_norms_trfact, *diag_tmptr,
+            *workArr;
+        rocblas_device_malloc mem(handle, size_scalars, size_work_workArr_work1, size_work2,
+                                  size_work3, size_work4, size_Abyx_norms_trfact, size_diag_tmptr,
+                                  size_workArr);
 
-    scalars = mem[0];
-    work_workArr_work1 = mem[1];
-    work2 = mem[2];
-    work3 = mem[3];
-    work4 = mem[4];
-    Abyx_norms_trfact = mem[5];
-    diag_tmptr = mem[6];
-    workArr = mem[7];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    // execution
-    return rocsolver_geqrf_template<false, true, T>(
-        handle, m, n, A, shiftA, lda, strideA, ipiv, stridep, batch_count, (T*)scalars,
-        work_workArr_work1, work2, work3, work4, (T*)Abyx_norms_trfact, (T*)diag_tmptr,
-        (T**)workArr, optim_mem);
+        scalars = mem[0];
+        work_workArr_work1 = mem[1];
+        work2 = mem[2];
+        work3 = mem[3];
+        work4 = mem[4];
+        Abyx_norms_trfact = mem[5];
+        diag_tmptr = mem[6];
+        workArr = mem[7];
+        if(size_scalars > 0)
+            init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_geqrf_template<false, true, T>(
+            handle, m, n, A, shiftA, lda, strideA, ipiv, stridep, batch_count, (T*)scalars,
+            work_workArr_work1, work2, work3, work4, (T*)Abyx_norms_trfact, (T*)diag_tmptr,
+            (T**)workArr, optim_mem);
+    }
+    else
+    {
+        size_t size_work = 0;
+        rocsolver_geqrf_getMemorySize_alt<false, true, T>(m, n, batch_count,
+
+                                                          &size_work);
+
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_work);
+
+        // memory workspace allocation
+
+        rocblas_device_malloc mem(handle, size_work);
+
+        if(!mem)
+            return rocblas_status_memory_error;
+
+        void* const work = (void*)mem[0];
+
+        // --------------------------------------------------
+        // note: scalars[] initialized in roclapack_geqrf.hpp
+        // --------------------------------------------------
+        // if(size_scalars > 0) init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_geqrf_template_alt<false, true, T>(handle, m, n, A, shiftA, lda, strideA,
+                                                            ipiv, stridep, batch_count,
+
+                                                            work, size_work);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE
