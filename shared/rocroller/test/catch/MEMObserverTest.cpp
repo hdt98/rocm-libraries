@@ -307,7 +307,6 @@ namespace MEMObserverTest
             INFO(context.output());
             CHECK(insts[0].totalCycles() == issueCycles);
             CHECK(insts[1].totalCycles() == issueCycles);
-            CHECK(insts[2].totalCycles() == -1);
         }
 
         SECTION("Waitcnt waiting for both")

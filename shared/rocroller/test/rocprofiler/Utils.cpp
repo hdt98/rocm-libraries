@@ -219,8 +219,6 @@ namespace rocRoller
     KernelLatencyResults runKernelAndCollectLatencies(TestContext&       context,
                                                       LDSTestKernelBase& kernel)
     {
-        constexpr int NUM_RUNS = 5; // Should be odd, as median is used
-
         std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
 
         for(int run = 0; run < NUM_RUNS; ++run)

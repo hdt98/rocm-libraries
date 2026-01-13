@@ -78,13 +78,13 @@ namespace rocRoller::Scheduling::LDSBankModel
     LDSScheduler::LDSScheduler(GPUArchitectureGFX gfx, int waveCount)
         : m_gfx(gfx)
         , m_programCycle(0)
+        // TODO: update these comments
+        // TODO: figure out if all of these are used?
         // With 3 or more waves, two SIMDs will be active on at least one SP
         // so two SIMDs share the same LDS queues
-        // , m_multiplierQueueSlots(std::atoi(std::getenv("INTER")))
         , m_multiplierQueueSlots(waveCount > 2 ? 2 : 1)
         // Both SPs share the same LDS, so if more than one wave is active,
         // conflicts double (assuming waves perfectly interleave)
-        // , m_multiplierWaveCount(std::atoi(std::getenv("INTRA")))
         , m_multiplierWaveCount(waveCount)
         , m_multiplierLdsIo(waveCount > 1 ? 2 : 1)
     {
@@ -168,19 +168,6 @@ namespace rocRoller::Scheduling::LDSBankModel
         }
 
         return stallCycles;
-    }
-
-    // TODO: this is a copypaste from test/common
-    std::vector<size_t>
-        generateLDSAddresses(size_t count, size_t strideMultiplier, size_t instrDwords)
-    {
-        std::vector<size_t> addresses;
-        for(size_t workitemId = 0; workitemId < count; ++workitemId)
-        {
-            size_t address = workitemId * (4 * strideMultiplier * instrDwords);
-            addresses.push_back(address);
-        }
-        return addresses;
     }
 
     void LDSScheduler::scheduleInstruction(const RuntimeLDSInstruction& origInstr)
