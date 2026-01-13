@@ -103,9 +103,9 @@ TYPED_TEST_SUITE(TestGemmMX_KM_NK, KernelTypes_KM_NK);
 
 TYPED_TEST(TestGemmMX_MK_MFMA, SmallM)
 {
-    std::vector<int> Ms{1, 2, 3, 4, 5, 6};
-    constexpr int N = 256;
-    constexpr int K = 512;
+    std::vector<int> Ms{140, 300, 552};
+    constexpr int N = 128;
+    constexpr int K = 768;
 
     constexpr int StrideA = K;
     constexpr int StrideB = K;
@@ -117,9 +117,9 @@ TYPED_TEST(TestGemmMX_MK_MFMA, SmallM)
 
 TYPED_TEST(TestGemmMX_MK_MFMA, MidLargeM)
 {
-    std::vector<int> Ms{127, 255, 312, 799, 1573};
-    constexpr int N = 256;
-    constexpr int K = 512;
+    std::vector<int> Ms{799, 1573, 2048};
+    constexpr int N = 768;
+    constexpr int K = 1024;
 
     constexpr int StrideA = K;
     constexpr int StrideB = K;
@@ -131,9 +131,9 @@ TYPED_TEST(TestGemmMX_MK_MFMA, MidLargeM)
 
 TYPED_TEST(TestGemmMX_MK_MFMA, Regular)
 {
-    std::vector<int> Ms{3840};
-    constexpr int N = 512;
-    constexpr int K = 1024;
+    std::vector<int> Ms{1024};
+    constexpr int N = 2048;
+    constexpr int K = 3840;
 
     constexpr int StrideA = K;
     constexpr int StrideB = K;
