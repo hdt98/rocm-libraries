@@ -46,7 +46,7 @@ namespace TensileLite
             std::vector<std::vector<hipEvent_t>> const& operator*() const;
             std::vector<std::vector<hipEvent_t>> const* operator->() const;
 
-        private:
+        // private:
             std::vector<std::vector<hipEvent_t>> m_events;
         };
     } // namespace Client

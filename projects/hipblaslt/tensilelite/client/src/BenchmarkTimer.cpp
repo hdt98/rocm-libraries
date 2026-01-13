@@ -354,17 +354,18 @@ namespace TensileLite
 
             if(m_useGPUTimer)
             {
-                if((start == nullptr) && (stop == nullptr))
+                if((start == nullptr) || (stop == nullptr))
                 {
-                    float enqTime = 0.0f;
-                    HIP_CHECK_EXC(hipEventSynchronize(stopEvents->back().back()));
-                    for(size_t i = 0; i < startEvents->size(); i++)
-                    {
-                        HIP_CHECK_EXC(hipEventElapsedTime(
-                            &enqTime, startEvents->at(i).front(), stopEvents->at(i).back()));
+                    // float enqTime = 0.0f;
+                    // HIP_CHECK_EXC(hipEventSynchronize(stopEvents->back().back()));
+                    // for(size_t i = 0; i < startEvents->size(); i++)
+                    // {
+                    //     HIP_CHECK_EXC(hipEventElapsedTime(
+                    //         &enqTime, startEvents->at(i).front(), stopEvents->at(i).back()));
 
-                        totalTime += double_millis(enqTime);
-                    }
+                    //     totalTime += double_millis(enqTime);
+                    // }
+                    assert(false && "no this should not happen");
                 }
                 else
                 {

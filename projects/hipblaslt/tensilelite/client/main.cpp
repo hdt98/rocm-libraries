@@ -834,6 +834,7 @@ int main(int argc, const char* argv[])
                                 size_t enq        = listeners.numEnqueuesPerSync();
                                 size_t eventCount = gpuTimer ? kernels[0].size() : 0;
 
+                                std::cout << "per-run-timer,gimer-" << gpuTimer << "," << solution->name() << ",";
                                 listeners.preSyncs();
                                 if(enq)
                                     for(int i = 0; i < syncs; i++)
@@ -857,8 +858,15 @@ int main(int argc, const char* argv[])
                                         }
 
                                         listeners.postEnqueues(startEvents, stopEvents, stream);
+
+                                        float eventMs = -0.1f;
+                                        HIP_CHECK_EXC(hipEventElapsedTime(&eventMs, benchmarkTimer->start, benchmarkTimer->stop));
+                                        auto totalTime = TensileLite::Client::BenchmarkTimer::double_millis(eventMs);
+                                        std::cout << TensileLite::Client::BenchmarkTimer::double_micros(totalTime).count()/enq << ",";
+
                                         listeners.validateEnqueues(inputs, startEvents, stopEvents);
                                     }
+                                std::cout << std::endl;
 
                                 listeners.postSyncs();
 

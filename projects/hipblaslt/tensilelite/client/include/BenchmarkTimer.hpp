@@ -95,7 +95,7 @@ namespace TensileLite
                 m_flushTimeUs = timeUs;
             }
 
-        private:
+        // private:
             const int    m_numWarmups;
             const int    m_numBenchmarks;
             const int    m_numEnqueuesPerSync;
