@@ -99,10 +99,101 @@ def run_cmd(cmd):
     return proc.returncode
 
 
+def build_aocl_windows():
+    """Build AOCL 5.2 from source on Windows (similar to install.sh on Linux)"""
+    print('***\n*** Building AOCL 5.2 from source\n***')
+    
+    cwd = pathlib.Path.cwd()
+    
+    try:
+        build_dir = pathlib.Path('build/deps').absolute()
+        aocl_dir = build_dir / 'aocl'
+        
+        # Skip if already built
+        if (aocl_dir / 'install_package' / 'lib' / 'libaocl.lib').exists():
+            print(f'AOCL 5.2 already built at: {aocl_dir}')
+            print('(use --clean-deps or delete build/deps/aocl to rebuild)')
+            return True
+        
+        # Create build directory
+        build_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Clone AOCL 5.2 from GitHub
+        if not aocl_dir.exists():
+            print('Cloning AOCL 5.2 from GitHub (branch AOCL-5.2)...')
+            os.chdir(build_dir)
+            cmd = 'git clone --quiet --depth 1 --branch AOCL-5.2 https://github.com/amd/aocl.git'
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f'Error cloning AOCL: {result.stderr}')
+                return False
+            print('Clone complete')
+        
+        # Build AOCL with CMake (using Clang from ROCm)
+        os.chdir(aocl_dir)
+        install_prefix = aocl_dir / 'install_package'
+        
+        # AOCL requires GCC/ICC/Clang - use Clang from ROCm
+        rocm_path = os.getenv('ROCM_PATH', 'C:/Program Files/AMD/ROCm/6.4')
+        clang_exe = os.path.join(rocm_path, 'bin', 'clang.exe')
+        clangxx_exe = os.path.join(rocm_path, 'bin', 'clang++.exe')
+        
+        print(f'Configuring AOCL build with CMake (using Clang from {rocm_path})...')
+        cmake_cmd = [
+            'cmake',
+            '-S', '.',
+            '-B', 'build',
+            '-G', 'Ninja',
+            '-DCMAKE_BUILD_TYPE=Release',
+            f'-DCMAKE_C_COMPILER={clang_exe}',
+            f'-DCMAKE_CXX_COMPILER={clangxx_exe}',
+            '-DBUILD_SHARED_LIBS=OFF',
+            '-DENABLE_ILP64=ON',
+            '-DENABLE_AOCL_BLAS=ON',
+            '-DENABLE_AOCL_UTILS=OFF',  # Disable Utils - not needed for BLAS
+            '-DENABLE_AOCL_LAPACK=OFF',
+            '-DENABLE_MULTITHREADING=OFF',  # Single-threaded (no OpenMP dependency)
+            '-DOpenMP_libomp_LIBRARY=',  # Tell CMake not to search for OpenMP
+            '-DAOCL_BLIS_ENABLE_TESTS=OFF',  # Skip tests for faster build
+            f'-DCMAKE_INSTALL_PREFIX={install_prefix}'
+        ]
+        
+        result = subprocess.run(cmake_cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f'Error configuring AOCL:')
+            print(result.stdout)
+            print(result.stderr)
+            return False
+        
+        print('Building AOCL (this may take 5-10 minutes)...')
+        build_cmd = ['cmake', '--build', 'build', '--config', 'release', '-j', '--target', 'install']
+        result = subprocess.run(build_cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f'Error building AOCL:')
+            print(result.stdout)
+            print(result.stderr)
+            return False
+        
+        print(f'✓ AOCL 5.2 successfully built with ILP64 support (static)')
+        print(f'  Location: {install_prefix / "lib" / "libaocl.lib"}')
+        return True
+        
+    finally:
+        # Always return to original directory
+        os.chdir(cwd)
+
 def install_deps( os_node ):
     global var_subs
 
     cwd = pathlib.Path.absolute(pathlib.Path(os.curdir))
+
+    # Handle AOCL build (Windows only, similar to install.sh on Linux)
+    if os.name == "nt":
+        aocl_node = os_node.getElementsByTagName('aocl')
+        if aocl_node:
+            for a in aocl_node[0].getElementsByTagName('build'):
+                if a.getAttribute('enabled') == 'true':
+                    build_aocl_windows()
 
     if os.name == "nt":
         vc_node = os_node.getElementsByTagName('vcpkg')

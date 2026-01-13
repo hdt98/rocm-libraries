@@ -204,7 +204,9 @@ def gpu_detect():
     global OS_info
     OS_info["GPU"] = ""
     if os.name == "nt":
-        cmd = "hipinfo.exe"
+        # Use full path to hipinfo.exe on Windows
+        rocm_path = os.getenv('HIP_PATH', "C:/Program Files/AMD/ROCm/6.4")
+        cmd = os.path.join(rocm_path, "bin", "hipinfo.exe")
     else:
         cmd = "rocminfo"
     process = subprocess.run([cmd], stdout=subprocess.PIPE)

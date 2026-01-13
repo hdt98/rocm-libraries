@@ -2,6 +2,14 @@
 <dependencies>
   <fileversion>0.1</fileversion>
   <os names="Windows">
+    <aocl>
+      <!-- Build AOCL 5.2 from source (similar to Linux install.sh) -->
+      <!-- Clones from: https://github.com/amd/aocl.git (branch AOCL-5.2) -->
+      <!-- Builds to: build/deps/aocl/install_package/lib/aocl.lib -->
+      <!-- Build time: ~5-10 minutes -->
+      <!-- Note: Single-threaded build (no OpenMP dependency) for simplicity and reliability -->
+      <build enabled="true"/>
+    </aocl>
     <vcpkg>
       <pkg name="google test">gtest:x64-windows</pkg>
       <pkg name="msgpackc">msgpack:x64-windows</pkg>
