@@ -1081,7 +1081,8 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
     size_t size_workArr = 0;
 
     {
-        rocsolver_gesvd_getMemorySize<BATCHED, T, T>(
+        using S = decltype(std::real(T{}));
+        rocsolver_gesvd_getMemorySize<BATCHED, T, S>(
             left_svect, right_svect, m, n, batch_count, fast_alg,
 
             &size_scalars, &size_work_workArr, &size_Abyx_norms_tmptr_cmplt,
@@ -1123,9 +1124,11 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
     pfree += size_workArr;
 
     {
-        bool const is_mem_ok = (pfree <= (pwork + size_work));
-        if(!is_mem_ok)
+        bool const is_mem_ok_ = (pfree <= (pwork + size_work));
+        if(!is_mem_ok_)
         {
+            printf("size_work = %ld, m = %d, n = %d, batch_count = %d\n", size_work, (int)m, (int)n,
+                   (int)batch_count);
             return (rocblas_status_memory_error);
         }
     }
