@@ -43,7 +43,7 @@ set(CMAKE_INSTALL_PREFIX ${ROCM_PATH} CACHE PATH "Install path prefix, prepended
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker search and installed rpath")
 
 # Use HIP language features if available in CMake.
-# TODO: simplify if cmake veresion is >= 3.19
+# TODO: simplify if cmake version is >= 3.19
 check_language(HIP)
 if(CMAKE_HIP_COMPILER)
   enable_language(HIP)
@@ -62,8 +62,8 @@ set(VERSION_STRING "4.2.0")
 
 include(cmake/ConfigUtils.cmake)
 
-register_option(ONLY_INSTALL "Only install package. Skips building depedencies and tests." OFF)
-register_option(ROCPRIM_INSTALL "Enable installation of rocPRIM. Projects embedding rocPRIM may want to turn this off." ON)
+register_option(ONLY_INSTALL "Only install package. Skips building dependencies and tests." OFF)
+register_option(ROCPRIM_INSTALL "Enable installation of rocPRIM, projects embedding rocPRIM may want to turn this off." ON)
 
 register_dep_option(BUILD_TEST             "Build tests." OFF "NOT ONLY_INSTALL" OFF)
 register_dep_option(BUILD_EXAMPLE          "Build examples." OFF "NOT ONLY_INSTALL" OFF)
@@ -77,7 +77,7 @@ register_dep_option(BUILD_OFFLOAD_COMPRESS "Build rocPRIM with offload compressi
 register_dep_option(ROCPRIM_ENABLE_ASSERTS "Enable asserts in release build." OFF "NOT ONLY_INSTALL" OFF)
 
 register_set(DEPS_ALLOW_DOWNLOADS OFF     BOOL   "Allow downloads during configuration.")
-register_set(ROCRAND_FETCH_METHOD PACKAGE STRING "Method to fetch rocRAND depedency.")
+register_set(ROCRAND_FETCH_METHOD PACKAGE STRING "Method to fetch rocRAND dependency.")
 register_set(ROCRAND_FETCH_BRANCH develop STRING "Branch to fetch rocRAND from.")
 
 ###########
@@ -102,7 +102,7 @@ if(NOT CMAKE_HIP_STANDARD EQUAL 17)
 endif()
 
 ###############
-# Depedencies #
+# dependencies #
 ###############
 
 include(cmake/Dependencies.cmake)
@@ -114,14 +114,14 @@ include(cmake/Dependencies.cmake)
 override_cache_variable(BUILD_SHARED_LIBS OFF BOOL)
 
 # We disable the ROCMChecks.cmake warning noting that we meddle with
-# global state. This is consequence of abusing the CMake CXX language
+# global state. This is a consequence of abusing the CMake CXX language
 # which HIP piggybacks on top of. This kind of HIP support has one chance
-# at observing the global flags, at the find_package(HIP) invocation.
+# at observing the global flags: at the find_package(HIP) invocation.
 # The device compiler won't be able to pick up changes after that, hence
 # the warning.
 override_cache_variable(ROCM_WARN_TOOLCHAIN_VAR OFF BOOL)
 
-# We ignore warning-as-errors when building depedencies.
+# We ignore warning-as-errors when building dependencies.
 remove_warning_flags(CMAKE_CXX_FLAGS CXX_FLAGS_FILTERED)
 remove_warning_flags(CMAKE_HIP_FLAGS HIP_FLAGS_FILTERED)
 override_cache_variable(CMAKE_CXX_FLAGS CXX_FLAGS_FILTERED STRING)
@@ -214,8 +214,8 @@ endif()
 
 # Derive the device architecture we need to compile for. We prioritize the
 # the following:
-# 0. GPU_TARGETS (user defined, used by hip-config)
-# 1. HIP_ARCHITECTURES (user defined)
+# 1. GPU_TARGETS (user defined, used by hip-config)
+# 2. HIP_ARCHITECTURES (user defined)
 # 3. CMAKE_HIP_ARCHITECTURES (inferred, requires CMake HIP support)
 # 4. 'all' (default, no CMake HIP support)
 if (NOT DEFINED GPU_TARGETS)

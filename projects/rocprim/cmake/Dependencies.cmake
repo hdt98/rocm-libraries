@@ -273,7 +273,7 @@ macro(fetch_monorepo _method _project _version _path _branch)
       # TODO: Remove fallback behavior. This simplifies the code and makes sure we don't download code
       # without the user's explicit perm
       message(STATUS "No existing ${_project} package meeting the minimum version requirement (${_version}) was found. Falling back to downloading it.")
-      # update local and parent variable values
+      # Update local and parent variable values
       set(${_method} "DOWNLOAD")
     else()
       message(STATUS "Package found (${${_project}_DIR})")
@@ -287,7 +287,7 @@ macro(fetch_monorepo _method _project _version _path _branch)
 
     # If not, see if the local monorepo is a sparse-checkout.
     # If it is a sparse-checkout, try to add the dependency to the sparse-checkout list.
-    # If it's not a sparse-checkout (or adding to the sparse-checkout list fails), fallback to downloading the dependency.
+    # If it's not a sparse-checkout (or adding to the sparse-checkout list fails), fall back to downloading the dependency.
     if(${found_path} STREQUAL "found_path-NOTFOUND")
       set(FALLBACK_TO_DOWNLOAD ON)
       message(WARNING "Unable to locate ${_project} in parent monorepo (it's not at \"${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/\").")
@@ -334,7 +334,7 @@ macro(fetch_monorepo _method _project _version _path _branch)
 
       if (FALLBACK_TO_DOWNLOAD)
         message(WARNING "Unable to locate/fetch dependency ${_project} from monorepo. Falling back to downloading it.")
-        # update local and parent variable values
+        # Update local and parent variable values
         set(${_method} "DOWNLOAD")
       endif()
 
