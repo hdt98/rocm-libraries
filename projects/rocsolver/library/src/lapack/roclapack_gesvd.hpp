@@ -44,6 +44,47 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+static bool constexpr use_original = false;
+
+static inline void adjust_for_alignment(size_t& size_work)
+{
+    constexpr int ialign = 256;
+
+    auto ceil = [](auto n, auto base) { return ((n - 1) / base + 1); };
+
+    size_work = ceil(size_work, ialign) * ialign;
+}
+
+static inline void adjust_for_alignment(size_t* p_size_work)
+{
+    size_t size_work = *p_size_work;
+
+    adjust_for_alignment(size_work);
+
+    *p_size_work = size_work;
+}
+
+#define IS_POINTER_BATCHED(A, T) \
+    (std::is_pointer_v<std::remove_cv_t<std::remove_cv_t<std::remove_reference_t<decltype((A)[0])>>>>)
+
+#define MEM_CHECK(pfree)                                        \
+    {                                                           \
+        bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
+        if(!is_mem_ok_)                                         \
+        {                                                       \
+            return (rocblas_status_memory_error);               \
+        }                                                       \
+    }
+
+#define MEM_CHECK_THROW(pfree)                                  \
+    {                                                           \
+        bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
+        if(!is_mem_ok_)                                         \
+        {                                                       \
+            istat = rocblas_status_memory_error;                \
+            throw(istat);                                       \
+        }                                                       \
+    }
 /** wrapper to xxGQR/xxGLQ_TEMPLATE **/
 template <bool BATCHED, bool STRIDED, typename T, typename U>
 void local_orgqrlq_ungqrlq_template(rocblas_handle handle,
@@ -177,17 +218,17 @@ void rocsolver_gesvd_getMemorySize(const rocblas_svect left_svect,
                                    size_t* size_workArr)
 {
     // if quick return, set workspace to zero
+    *size_scalars = 0;
+    *size_work_workArr = 0;
+    *size_Abyx_norms_tmptr_cmplt = 0;
+    *size_Abyx_norms_trfact_X = 0;
+    *size_diag_tmptr_Y = 0;
+    *size_tau_splits = 0;
+    *size_tempArrayT = 0;
+    *size_tempArrayC = 0;
+    *size_workArr = 0;
     if(n == 0 || m == 0 || batch_count == 0)
     {
-        *size_scalars = 0;
-        *size_work_workArr = 0;
-        *size_Abyx_norms_tmptr_cmplt = 0;
-        *size_Abyx_norms_trfact_X = 0;
-        *size_diag_tmptr_Y = 0;
-        *size_tau_splits = 0;
-        *size_tempArrayT = 0;
-        *size_tempArrayC = 0;
-        *size_workArr = 0;
         return;
     }
 
@@ -328,6 +369,63 @@ void rocsolver_gesvd_getMemorySize(const rocblas_svect left_svect,
     *size_Abyx_norms_tmptr_cmplt = *std::max_element(std::begin(a), std::end(a));
     *size_Abyx_norms_trfact_X = *std::max_element(std::begin(x), std::end(x));
     *size_diag_tmptr_Y = *std::max_element(std::begin(y), std::end(y));
+}
+
+template <bool BATCHED, typename T, typename S>
+void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
+                                       const rocblas_svect right_svect,
+                                       const rocblas_int m,
+                                       const rocblas_int n,
+                                       const rocblas_int batch_count,
+                                       const rocblas_workmode fast_alg,
+
+                                       size_t* p_size_gesvd)
+{
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_tmptr_cmplt = 0;
+    size_t size_Abyx_norms_trfact_X = 0;
+
+    size_t size_diag_tmptr_Y = 0;
+    size_t size_tau_splits = 0;
+    size_t size_tempArrayT = 0;
+    size_t size_tempArrayC = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_gesvd_getMemorySize<BATCHED, T, S>(
+        left_svect, right_svect, m, n, batch_count, fast_alg,
+
+        &size_scalars, &size_work_workArr, &size_Abyx_norms_tmptr_cmplt, &size_Abyx_norms_trfact_X,
+
+        &size_diag_tmptr_Y, &size_tau_splits, &size_tempArrayT, &size_tempArrayC, &size_workArr);
+
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work_workArr);
+    adjust_for_alignment(size_Abyx_norms_tmptr_cmplt);
+    adjust_for_alignment(size_Abyx_norms_trfact_X);
+
+    adjust_for_alignment(size_diag_tmptr_Y);
+    adjust_for_alignment(size_tau_splits);
+    adjust_for_alignment(size_tempArrayT);
+    adjust_for_alignment(size_tempArrayC);
+    adjust_for_alignment(size_workArr);
+
+    size_t size_gesvd = 0;
+
+    size_gesvd += size_scalars;
+    size_gesvd += size_work_workArr;
+    size_gesvd += size_Abyx_norms_tmptr_cmplt;
+    size_gesvd += size_Abyx_norms_trfact_X;
+
+    size_gesvd += size_diag_tmptr_Y;
+    size_gesvd += size_tau_splits;
+    size_gesvd += size_tempArrayT;
+    size_gesvd += size_tempArrayC;
+    size_gesvd += size_workArr;
+
+    adjust_for_alignment(size_gesvd);
+
+    *p_size_gesvd = size_gesvd;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename TT, typename W>
@@ -941,6 +1039,106 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
 
     rocblas_set_pointer_mode(handle, old_mode);
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename TT, typename W>
+rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
+                                            const rocblas_svect left_svect,
+                                            const rocblas_svect right_svect,
+                                            const rocblas_int m,
+                                            const rocblas_int n,
+                                            W A,
+                                            const rocblas_int shiftA,
+                                            const rocblas_int lda,
+                                            const rocblas_stride strideA,
+                                            TT* S,
+                                            const rocblas_stride strideS,
+                                            T* U,
+                                            const rocblas_int ldu,
+                                            const rocblas_stride strideU,
+                                            T* V,
+                                            const rocblas_int ldv,
+                                            const rocblas_stride strideV,
+                                            TT* E,
+                                            const rocblas_stride strideE,
+                                            const rocblas_workmode fast_alg,
+                                            rocblas_int* info,
+                                            const rocblas_int batch_count,
+
+                                            void* work,
+                                            size_t const size_work)
+
+{
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_tmptr_cmplt = 0;
+    size_t size_Abyx_norms_trfact_X = 0;
+
+    size_t size_diag_tmptr_Y = 0;
+    size_t size_tau_splits = 0;
+    size_t size_tempArrayT = 0;
+    size_t size_tempArrayC = 0;
+    size_t size_workArr = 0;
+
+    {
+        rocsolver_gesvd_getMemorySize<BATCHED, T, T>(
+            left_svect, right_svect, m, n, batch_count, fast_alg,
+
+            &size_scalars, &size_work_workArr, &size_Abyx_norms_tmptr_cmplt,
+            &size_Abyx_norms_trfact_X,
+
+            &size_diag_tmptr_Y, &size_tau_splits, &size_tempArrayT, &size_tempArrayC, &size_workArr);
+    }
+
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+        init_scalars(handle, (T*)scalars);
+
+    void* const work_workArr = (void*)pfree;
+    pfree += size_work_workArr;
+
+    T* const Abyx_norms_tmptr_cmplt = (T*)pfree;
+    pfree += size_Abyx_norms_tmptr_cmplt;
+
+    T* const Abyx_norms_trfact_X = (T*)pfree;
+    pfree += size_Abyx_norms_trfact_X;
+
+    T* const diag_tmptr_Y = (T*)pfree;
+    pfree += size_diag_tmptr_Y;
+
+    T* const tau_splits = (T*)pfree;
+    pfree += size_tau_splits;
+
+    T* const tempArrayT = (T*)pfree;
+    pfree += size_tempArrayT;
+
+    T* const tempArrayC = (T*)pfree;
+    pfree += size_tempArrayC;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    {
+        bool const is_mem_ok = (pfree <= (pwork + size_work));
+        if(!is_mem_ok)
+        {
+            return (rocblas_status_memory_error);
+        }
+    }
+
+    rocblas_status istat = rocsolver_gesvd_template<BATCHED, STRIDED, T, TT, W>(
+        handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
+        V, ldv, strideV, E, strideE, fast_alg, info, batch_count,
+
+        scalars, work_workArr, Abyx_norms_tmptr_cmplt, Abyx_norms_trfact_X,
+
+        diag_tmptr_Y, tau_splits, tempArrayT, tempArrayC, workArr);
+
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE
