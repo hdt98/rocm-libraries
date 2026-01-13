@@ -38,7 +38,13 @@
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
 
+#include "mem_utils.hpp"
+
 ROCSOLVER_BEGIN_NAMESPACE
+
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL false
+#endif
 
 template <bool BATCHED, typename T>
 void rocsolver_gebrd_getMemorySize(const rocblas_int m,
@@ -51,13 +57,13 @@ void rocsolver_gebrd_getMemorySize(const rocblas_int m,
                                    size_t* size_Y)
 {
     // if quick return no workspace needed
+    *size_scalars = 0;
+    *size_work_workArr = 0;
+    *size_Abyx_norms = 0;
+    *size_X = 0;
+    *size_Y = 0;
     if(m == 0 || n == 0 || batch_count == 0)
     {
-        *size_scalars = 0;
-        *size_work_workArr = 0;
-        *size_Abyx_norms = 0;
-        *size_X = 0;
-        *size_Y = 0;
         return;
     }
 
@@ -90,6 +96,36 @@ void rocsolver_gebrd_getMemorySize(const rocblas_int m,
         *size_Y = n * k;
         *size_Y *= sizeof(T) * batch_count;
     }
+}
+
+template <bool BATCHED, typename T>
+void rocsolver_gebrd_getMemorySize_alt(const rocblas_int m,
+                                       const rocblas_int n,
+                                       const rocblas_int batch_count,
+
+                                       size_t* p_size_gebrd)
+
+{
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms = 0;
+    size_t size_X = 0;
+    size_t size_Y = 0;
+
+    rocsolver_gebrd_getMemorySize<BATCHED, T>(m, n, batch_count,
+
+                                              &size_scalars, &size_work_workArr, &size_Abyx_norms,
+                                              &size_X, &size_Y);
+
+    size_t size_gebrd = 0;
+
+    size_gebrd += size_scalars;
+    size_gebrd += size_work_workArr;
+    size_gebrd += size_Abyx_norms;
+    size_gebrd += size_X;
+    size_gebrd += size_Y;
+
+    *p_size_gebrd = size_gebrd;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename S, typename U>
@@ -201,6 +237,87 @@ rocblas_status rocsolver_gebrd_template(rocblas_handle handle,
 
     rocblas_set_pointer_mode(handle, old_mode);
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename S, typename U>
+rocblas_status rocsolver_gebrd_template_alt(rocblas_handle handle,
+                                            const rocblas_int m,
+                                            const rocblas_int n,
+                                            U A,
+                                            const rocblas_int shiftA,
+                                            const rocblas_int lda,
+                                            const rocblas_stride strideA,
+                                            S* D,
+                                            const rocblas_stride strideD,
+                                            S* E,
+                                            const rocblas_stride strideE,
+                                            T* tauq,
+                                            const rocblas_stride strideQ,
+                                            T* taup,
+                                            const rocblas_stride strideP,
+                                            // T* X,
+                                            const rocblas_int shiftX,
+                                            const rocblas_int ldx,
+                                            const rocblas_stride strideX,
+                                            // T* Y,
+                                            const rocblas_int shiftY,
+                                            const rocblas_int ldy,
+                                            const rocblas_stride strideY,
+                                            const rocblas_int batch_count,
+
+                                            void* const work,
+                                            size_t const size_work)
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms = 0;
+
+    size_t size_X = 0;
+    size_t size_Y = 0;
+
+    rocsolver_gebrd_getMemorySize<BATCHED, T>(m, n, batch_count,
+
+                                              &size_scalars, &size_work_workArr, &size_Abyx_norms,
+                                              &size_X, &size_Y);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    void* const work_workArr = (void*)pfree;
+    pfree += size_work_workArr;
+
+    T* const Abyx_norms = (T*)pfree;
+    pfree += size_Abyx_norms;
+
+    T* const X = (T*)pfree;
+    pfree += size_X;
+
+    T* const Y = (T*)pfree;
+    pfree += size_Y;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_gebrd_template<BATCHED, STRIDED, T, S, U>(
+        handle, m, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tauq, strideQ, taup, strideP,
+
+        X, // note X is temporary array
+        shiftX, ldx, strideX,
+
+        Y, // note Y is temporary array
+        shiftY, ldy, strideY,
+
+        batch_count,
+
+        scalars, work_workArr, Abyx_norms);
+
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE

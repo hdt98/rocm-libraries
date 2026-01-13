@@ -47,7 +47,7 @@
 ROCSOLVER_BEGIN_NAMESPACE
 
 #ifndef USE_ORIGINAL
-#define USE_ORIGINAL true
+#define USE_ORIGINAL false
 #endif
 
 /** wrapper to xxGQR/xxGLQ_TEMPLATE **/

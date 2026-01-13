@@ -42,7 +42,7 @@
 ROCSOLVER_BEGIN_NAMESPACE
 
 #ifndef USE_ORIGINAL
-#define USE_ORIGINAL true
+#define USE_ORIGINAL false
 #endif
 
 template <bool BATCHED, typename T, typename I>
