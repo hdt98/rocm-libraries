@@ -155,7 +155,7 @@ macro(fetch_googletest)
     endif()
   endif()
   # Otherwise fetch from source.
-  if(NOT GTest_FOUND)
+  if(NOT TARGET GTest::GTest AND NOT TARGET GTest::gtest)
     if(EXISTS /usr/src/googletest AND NOT DEPENDENCIES_FORCE_DOWNLOAD)
       # TODO: do we still want this behaviour?
       FetchContent_Declare(
@@ -189,7 +189,7 @@ endmacro(fetch_googletest)
 macro(fetch_googlebench)
   # Try to find package first.
   if(NOT DEPENDENCIES_FORCE_DOWNLOAD)
-    find_package(benchmark 1.8.0 REQUIRED)
+    find_package(benchmark 1.8.0 CONFIG QUIET)
   endif()
   # Otherwise fetch from source.
   if(NOT benchmark_FOUND)
@@ -219,7 +219,7 @@ endmacro(fetch_googlebench)
 # It does not build the repo.
 macro(fetch_monorepo _method _project _version _path _branch)
   set(FETCH_METHOD_OPTIONS "PACKAGE" "MONOREPO" "DOWNLOAD")
-  if (DEFINED ${_method} AND NOT ${${_method}} IN_LIST FETCH_METHOD_OPTIONS)
+  if (DEFINED ${_method} AND NOT "${${_method}}" IN_LIST FETCH_METHOD_OPTIONS)
     message(FATAL_ERROR "Unrecognized ${_method}: \"${${_method}}\". Valid options are: ${FETCH_METHOD_OPTIONS}.")
   endif()
 
