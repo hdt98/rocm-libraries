@@ -161,7 +161,7 @@ protected:
     }
 
 private:
-    static constexpr int ITERS = 32;
+    static constexpr int ITERS = 16;
 
     uint32_t m_workgroupSize;
     size_t   m_instrDwords;
@@ -175,9 +175,9 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu][lds-model]")
 
     constexpr auto workgroupSize = 64u;
 
-    const std::vector<int>  instrSizes      = {4}; // b32, b64, b128
-    const std::vector<int>  strides         = {1}; // between threads
-    const std::vector<bool> writeOperations = {false};
+    const std::vector<int>  instrSizes      = {1, 2, 4}; // b32, b64, b128
+    const std::vector<int>  strides         = {1, 2, 4, 8, 16, 32, 64, 128}; // between threads
+    const std::vector<bool> writeOperations = {false, true};
 
     for(auto instrDwords : instrSizes)
     {
@@ -214,7 +214,7 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu][lds-model]")
                         INFO("Run " << (run + 1) << ": " << toString(latencies));
                         Log::debug("Run " + std::to_string(run + 1) + ": " + toString(latencies));
 
-                        REQUIRE(latencies.size() == 37);
+                        REQUIRE(latencies.size() == 21);
                     }
 
                     GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
