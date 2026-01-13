@@ -360,8 +360,11 @@ bool profile_gemm_mx_impl(int do_verification,
                                                   a_element_op,
                                                   b_element_op,
                                                   c_element_op);
-
+        if(do_log > 0)
+            std::cout << "Run reference GEMM..." << std::endl;
         ref_invoker.Run(ref_argument);
+        if(do_log > 0)
+            std::cout << "Done." << std::endl;
     }
 
     std::string best_op_name;
@@ -413,8 +416,12 @@ bool profile_gemm_mx_impl(int do_verification,
                 // re-init C to zero before profiling next kernel
                 c_device_buf.SetZero();
 
+                if(do_log > 0)
+                    std::cout << "Run device GEMM..." << std::endl;
                 invoker_ptr->Run(argument_ptr.get(),
                                  StreamConfig{nullptr, false, 0, n_warmup, n_iter});
+                if(do_log > 0)
+                    std::cout << "Done." << std::endl;
 
                 if(do_verification)
                 {
@@ -436,32 +443,37 @@ bool profile_gemm_mx_impl(int do_verification,
                         }
                         else
                         {
-                            if constexpr(is_same_v<ADataType, ck::f8_t> ||
-                                         is_same_v<ADataType, ck::bf8_t>)
-                                LogRangeAsType<float>(std::cout << "a : ", a_m_k.mData, ",")
-                                    << "\n";
-                            else
-                                std::cout << "A: WIP PRINT PACKED TYPE\n";
-                            LogRangeAsType<float>(std::cout << "a_scale : ", a_m_k_scale.mData, ",")
-                                << "\n";
-                            if constexpr(is_same_v<BDataType, ck::f8_t> ||
-                                         is_same_v<BDataType, ck::bf8_t>)
-                                LogRangeAsType<float>(std::cout << "b : ", b_k_n->mData, ",")
-                                    << "\n";
-                            else
-                                std::cout << "B: WIP PRINT PACKED TYPE\n";
-                            LogRangeAsType<float>(std::cout << "b_scale: ", b_k_n_scale.mData, ",")
-                                << "\n";
-                            LogRangeAsType<float>(
-                                std::cout << "c_host  : ", c_m_n_host_result.mData, ",")
-                                << "\n";
-                            LogRangeAsType<float>(
-                                std::cout << "c_device: ", c_m_n_device_result.mData, ",")
-                                << std::endl;
+                            // if constexpr(is_same_v<ADataType, ck::f8_t> ||
+                            //              is_same_v<ADataType, ck::bf8_t>)
+                            //     LogRangeAsType<float>(std::cout << "a : ", a_m_k.mData, ",")
+                            //         << "\n";
+                            // else
+                            //     std::cout << "A: WIP PRINT PACKED TYPE\n";
+                            // LogRangeAsType<float>(std::cout << "a_scale : ", a_m_k_scale.mData,
+                            // ",")
+                            //     << "\n";
+                            // if constexpr(is_same_v<BDataType, ck::f8_t> ||
+                            //              is_same_v<BDataType, ck::bf8_t>)
+                            //     LogRangeAsType<float>(std::cout << "b : ", b_k_n->mData, ",")
+                            //         << "\n";
+                            // else
+                            //     std::cout << "B: WIP PRINT PACKED TYPE\n";
+                            // LogRangeAsType<float>(std::cout << "b_scale: ", b_k_n_scale.mData,
+                            // ",")
+                            //     << "\n";
+                            // LogRangeAsType<float>(
+                            //     std::cout << "c_host  : ", c_m_n_host_result.mData, ",")
+                            //     << "\n";
+                            // LogRangeAsType<float>(
+                            //     std::cout << "c_device: ", c_m_n_device_result.mData, ",")
+                            //     << std::endl;
                         }
                     }
-
+                    if(do_log > 0)
+                        std::cout << "Check error..." << std::endl;
                     pass = pass & ck::utils::check_err(c_m_n_device_result, c_m_n_host_result);
+                    if(do_log > 0)
+                        std::cout << "Pass: " << pass << std::endl;
                 }
 
                 std::string op_name                    = op_ptr->GetTypeString();
