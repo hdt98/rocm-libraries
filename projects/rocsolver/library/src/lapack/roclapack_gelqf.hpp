@@ -38,7 +38,13 @@
 #include "roclapack_gelq2.hpp"
 #include "rocsolver/rocsolver.h"
 
+#include "mem_utils.hpp"
+
 ROCSOLVER_BEGIN_NAMESPACE
+
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL true
+#endif
 
 template <bool BATCHED, typename T>
 void rocsolver_gelqf_getMemorySize(const rocblas_int m,
@@ -51,13 +57,13 @@ void rocsolver_gelqf_getMemorySize(const rocblas_int m,
                                    size_t* size_workArr)
 {
     // if quick return no workspace needed
+    *size_scalars = 0;
+    *size_work_workArr = 0;
+    *size_Abyx_norms_trfact = 0;
+    *size_diag_tmptr = 0;
+    *size_workArr = 0;
     if(m == 0 || n == 0 || batch_count == 0)
     {
-        *size_scalars = 0;
-        *size_work_workArr = 0;
-        *size_Abyx_norms_trfact = 0;
-        *size_diag_tmptr = 0;
-        *size_workArr = 0;
         return;
     }
 
@@ -95,6 +101,41 @@ void rocsolver_gelqf_getMemorySize(const rocblas_int m,
         if(BATCHED)
             *size_workArr *= 2;
     }
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work_workArr);
+    adjust_for_alignment(size_Abyx_norms_trfact);
+    adjust_for_alignment(size_diag_tmptr);
+    adjust_for_alignment(size_workArr);
+}
+
+template <bool BATCHED, typename T>
+void rocsolver_gelqf_getMemorySize_alt(const rocblas_int m,
+                                       const rocblas_int n,
+                                       const rocblas_int batch_count,
+
+                                       size_t* p_size_gelqf)
+{
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_trfact = 0;
+    size_t size_diag_tmptr = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_gelqf_getMemorySize<BATCHED, T>(m, n, batch_count,
+
+                                              &size_scalars, &size_work_workArr,
+                                              &size_Abyx_norms_trfact, &size_diag_tmptr,
+                                              &size_workArr);
+
+    size_t size_gelqf = 0;
+
+    size_gelqf += size_scalars;
+    size_gelqf += size_work_workArr;
+    size_gelqf += size_Abyx_norms_trfact;
+    size_gelqf += size_diag_tmptr;
+    size_gelqf += size_workArr;
+
+    *p_size_gelqf = size_gelqf;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U>
@@ -171,6 +212,65 @@ rocblas_status rocsolver_gelqf_template(rocblas_handle handle,
                                     work_workArr, Abyx_norms_trfact, diag_tmptr);
 
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+rocblas_status rocsolver_gelqf_template_alt(rocblas_handle handle,
+                                            const rocblas_int m,
+                                            const rocblas_int n,
+                                            U A,
+                                            const rocblas_int shiftA,
+                                            const rocblas_int lda,
+                                            const rocblas_stride strideA,
+                                            T* ipiv,
+                                            const rocblas_stride strideP,
+                                            const rocblas_int batch_count,
+
+                                            void* const work,
+                                            size_t const size_work)
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_trfact = 0;
+    size_t size_diag_tmptr = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_gelqf_getMemorySize<BATCHED, T>(m, n, batch_count,
+
+                                              &size_scalars, &size_work_workArr,
+                                              &size_Abyx_norms_trfact, &size_diag_tmptr,
+                                              &size_workArr);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    void* const work_workArr = (void*)pfree;
+    pfree += size_work_workArr;
+
+    T* const Abyx_norms_trfact = (T*)pfree;
+    pfree += size_Abyx_norms_trfact;
+
+    T* const diag_tmptr = (T*)pfree;
+    pfree += size_diag_tmptr;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_gelqf_template<BATCHED, STRIDED, T, U>(
+        handle, m, n, A, shiftA, lda, strideA, ipiv, strideP, batch_count,
+
+        scalars, work_workArr, Abyx_norms_trfact, diag_tmptr, workArr);
+
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE

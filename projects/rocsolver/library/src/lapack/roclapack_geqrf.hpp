@@ -38,33 +38,11 @@
 #include "roclapack_geqr2.hpp"
 #include "rocsolver/rocsolver.h"
 
+#include "mem_utils.hpp"
 ROCSOLVER_BEGIN_NAMESPACE
 
 #ifndef USE_ORIGINAL
 #define USE_ORIGINAL true
-#endif
-
-#ifndef MEM_CHECK
-#define MEM_CHECK(pfree)                                        \
-    {                                                           \
-        bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
-        if(!is_mem_ok_)                                         \
-        {                                                       \
-            return (rocblas_status_memory_error);               \
-        }                                                       \
-    }
-#endif
-
-#ifndef MEM_CHECK_THROW
-#define MEM_CHECK_THROW(pfree)                                  \
-    {                                                           \
-        bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
-        if(!is_mem_ok_)                                         \
-        {                                                       \
-            istat = rocblas_status_memory_error;                \
-            throw(istat);                                       \
-        }                                                       \
-    }
 #endif
 
 template <bool BATCHED, typename T, typename I>
@@ -83,6 +61,7 @@ void rocsolver_geqrf_getMemorySize(const I m,
     *size_Abyx_norms_trfact = 0;
     *size_diag_tmptr = 0;
     *size_workArr = 0;
+
     if(m == 0 || n == 0 || batch_count == 0)
     {
         return;
@@ -122,6 +101,12 @@ void rocsolver_geqrf_getMemorySize(const I m,
         if(BATCHED)
             *size_workArr *= 2;
     }
+
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work_workArr);
+    adjust_for_alignment(size_Abyx_norms_trfact);
+    adjust_for_alignment(size_diag_tmptr);
+    adjust_for_alignment(size_workArr);
 }
 
 template <bool BATCHED, typename T, typename I>
@@ -308,10 +293,12 @@ void rocsolver_geqrf_getMemorySize(const I m,
     *size_work_workArr_work1 = 0;
     *size_Abyx_norms_trfact = 0;
     *size_diag_tmptr = 0;
+
     *size_workArr = 0;
     *size_work2 = 0;
     *size_work3 = 0;
     *size_work4 = 0;
+
     *optim_mem = true;
 
     // if quick return no workspace needed
@@ -357,6 +344,15 @@ void rocsolver_geqrf_getMemorySize(const I m,
         if(BATCHED)
             *size_workArr *= 2;
     }
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work_workArr_work1);
+    adjust_for_alignment(size_Abyx_norms_trfact);
+    adjust_for_alignment(size_diag_tmptr);
+
+    adjust_for_alignment(size_workArr);
+    adjust_for_alignment(size_work2);
+    adjust_for_alignment(size_work3);
+    adjust_for_alignment(size_work4);
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I>
