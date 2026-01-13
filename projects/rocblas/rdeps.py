@@ -134,7 +134,12 @@ def build_aocl_windows():
         install_prefix = aocl_dir / 'install_package'
         
         # AOCL requires GCC/ICC/Clang - use Clang from ROCm
-        rocm_path = os.getenv('ROCM_PATH', 'C:/Program Files/AMD/ROCm/6.4')
+        # Prefer ROCM_PATH (modern), fall back to HIP_PATH (historical)
+        rocm_path = os.getenv('ROCM_PATH') or os.getenv('HIP_PATH')
+        if not rocm_path:
+            print('ERROR: ROCM_PATH or HIP_PATH environment variable not set.')
+            print('Please ensure ROCm is properly installed and the environment is configured.')
+            return False
         clang_exe = os.path.join(rocm_path, 'bin', 'clang.exe')
         clangxx_exe = os.path.join(rocm_path, 'bin', 'clang++.exe')
         

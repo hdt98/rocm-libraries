@@ -205,7 +205,12 @@ def gpu_detect():
     OS_info["GPU"] = ""
     if os.name == "nt":
         # Use full path to hipinfo.exe on Windows
-        rocm_path = os.getenv('HIP_PATH', "C:/Program Files/AMD/ROCm/6.4")
+        # Prefer ROCM_PATH (modern), fall back to HIP_PATH (historical)
+        rocm_path = os.getenv('ROCM_PATH') or os.getenv('HIP_PATH')
+        if not rocm_path:
+            print("ERROR: ROCM_PATH or HIP_PATH environment variable not set.")
+            print("Please ensure ROCm is properly installed and the environment is configured.")
+            sys.exit(1)
         cmd = os.path.join(rocm_path, "bin", "hipinfo.exe")
     else:
         cmd = "rocminfo"
@@ -349,8 +354,13 @@ def config_cmd():
         generator = f"-G Ninja"
         cmake_options.append(generator)
 
-        # CMAKE_PREFIX_PATH set to rocm_path and HIP_PATH set BY SDK Installer
-        raw_rocm_path = cmake_path(os.getenv('HIP_PATH', "C:/hip"))
+        # CMAKE_PREFIX_PATH set to rocm_path (prefer ROCM_PATH, fall back to HIP_PATH)
+        raw_rocm_path_env = os.getenv('ROCM_PATH') or os.getenv('HIP_PATH')
+        if not raw_rocm_path_env:
+            print("ERROR: ROCM_PATH or HIP_PATH environment variable not set.")
+            print("Please ensure ROCm is properly installed and the environment is configured.")
+            sys.exit(1)
+        raw_rocm_path = cmake_path(raw_rocm_path_env)
         rocm_path = f'"{raw_rocm_path}"' # guard against spaces in path
         # CPACK_PACKAGING_INSTALL_PREFIX= defined as blank as it is appended to end of path for archive creation
         cmake_platform_opts.append(f"-DCPACK_PACKAGING_INSTALL_PREFIX=")
