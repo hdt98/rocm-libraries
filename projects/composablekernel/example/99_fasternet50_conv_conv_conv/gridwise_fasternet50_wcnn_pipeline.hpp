@@ -83,6 +83,8 @@ struct GridwiseFasternet50Pipeline_v1
         constexpr auto wei_1_block_copy_step = to_multi_index(WeiDataBlockTransferStep{}[I1]);
         constexpr auto wei_2_block_copy_step = to_multi_index(WeiDataBlockTransferStep{}[I2]);
 
+        (void)num_loop;
+
         constexpr index_t NumTap_0 =
             remove_cvref_t<tuple_element_t<0, WeiDataBlockTransfer>>::Size();
         constexpr index_t NumTap_1 =

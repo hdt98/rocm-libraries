@@ -23,6 +23,11 @@
 #include "ck/library/utility/convolution_parameter.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
 
+using ::ck::DeviceMem;
+using ::ck::hip_check_error;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 using half_t  = ck::half_t;
 using bhalf_t = ck::bhalf_t;
 using f8_t    = ck::f8_t;

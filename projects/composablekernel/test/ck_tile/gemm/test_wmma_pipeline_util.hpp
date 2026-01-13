@@ -30,8 +30,7 @@ class TestCkTileWmmaPipeline : public ::testing::Test
     // TODO: expose tile size through test t-param ?
 
     template <bool PadM, bool PadN, bool PadK>
-    void invoke_gemm(const ck_tile::GemmHostArgs</*NumDTensor = 0*/>& args,
-                     const ck_tile::stream_config& s)
+    void invoke_gemm(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config& s)
     {
         constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, Tuple>{};
         constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, Tuple>{};
@@ -89,11 +88,14 @@ class TestCkTileWmmaPipeline : public ::testing::Test
         const bool has_hot_loop            = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
 
+        // Todo OOXX
         const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {
-            constexpr bool has_hot_loop_v = has_hot_loop_.value;
-            constexpr auto tail_number_v  = tail_number_.value;
-            // if trans load policy is used, use GemmPipelineWmmaTrLoadPolicy policy, otherwise use
-            // the default Policy
+            (void)has_hot_loop_;
+            (void)tail_number_;
+            // constexpr bool has_hot_loop_v = has_hot_loop_.value;
+            // constexpr auto tail_number_v  = tail_number_.value;
+            //  if trans load policy is used, use GemmPipelineWmmaTrLoadPolicy policy, otherwise use
+            //  the default Policy
             using GemmPipeline = std::conditional_t<
                 PipelineType == WmmaPipelineType::Default,
                 ck_tile::GemmWmmaPipeline<
@@ -102,18 +104,14 @@ class TestCkTileWmmaPipeline : public ::testing::Test
                                                           AccDataType,
                                                           GemmShape,
                                                           Traits,
-                                                          ck_tile::GemmPipelineScheduler::Default,
-                                                          has_hot_loop_v,
-                                                          tail_number_v>>,
+                                                          ck_tile::GemmPipelineScheduler::Default>>,
                 ck_tile::GemmWmmaPipelineAsync<
                     ck_tile::UniversalGemmPipelineProblem<ADataType,
                                                           BDataType,
                                                           AccDataType,
                                                           GemmShape,
                                                           Traits,
-                                                          ck_tile::GemmPipelineScheduler::Default,
-                                                          has_hot_loop_v,
-                                                          tail_number_v>,
+                                                          ck_tile::GemmPipelineScheduler::Default>,
                     ck_tile::GemmPipelineWmmaTrLoadAsyncCopyPolicy>>;
             using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
             auto kargs   = Kernel::MakeKernelArgs(args);
@@ -364,7 +362,7 @@ class TestCkTileWmmaPipeline : public ::testing::Test
         // c_m_n_dev_buf.SetZero();
         // c_m_n_dev_result.SetZero();
 
-        ck_tile::GemmHostArgs<> args;
+        ck_tile::GemmHostArgs args;
         args.a_ptr    = a_m_k_dev_buf.GetDeviceBuffer();
         args.b_ptr    = b_k_n_dev_buf.GetDeviceBuffer();
         args.e_ptr    = c_m_n_dev_buf.GetDeviceBuffer();

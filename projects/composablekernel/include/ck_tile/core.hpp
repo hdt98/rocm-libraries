@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2026, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -26,6 +26,7 @@
 #include "ck_tile/core/arch/mma/wmma/wmma.hpp"
 #include "ck_tile/core/arch/mma/wmma/wmma_gfx11.hpp"
 #include "ck_tile/core/arch/mma/wmma/wmma_gfx12.hpp"
+#include "ck_tile/core/arch/mma/wmma/wmma_gfx13.hpp"
 #include "ck_tile/core/arch/mma/wmma/wmma_selector.hpp"
 #include "ck_tile/core/arch/mma/wmma/wmma_traits.hpp"
 #include "ck_tile/core/arch/mma/wmma/wmma_transforms.hpp"

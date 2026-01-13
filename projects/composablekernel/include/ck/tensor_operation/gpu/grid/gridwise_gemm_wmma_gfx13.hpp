@@ -1944,6 +1944,7 @@ struct GridwiseGemm_Wmma_GFX13
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
 
+#if(defined(__gfx13__))
         auto blockwise_gemm =
             BlockwiseMXGemmWMMA<ThisThreadBlockGrid,
                                 ADataType,
@@ -1964,6 +1965,24 @@ struct GridwiseGemm_Wmma_GFX13
                                 KPack,
                                 AEnableLds,
                                 BEnableLds>{};
+#else
+        auto blockwise_gemm = BlockwiseGemmWMMA<BlockSize,
+                                                ADataType,
+                                                BDataType,
+                                                AccDataType,
+                                                decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
+                                                decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
+                                                MPerBlock,
+                                                NPerBlock,
+                                                KPerBlock,
+                                                MPerWmma,
+                                                NPerWmma,
+                                                MRepeat,
+                                                NRepeat,
+                                                KPack,
+                                                AEnableLds,
+                                                BEnableLds>{};
+#endif
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
@@ -2764,7 +2783,7 @@ struct GridwiseGemm_Wmma_GFX13
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
 #if(defined(__gfx13__))
-        auto blockwise_gemm = BlockwiseGemmWMMA<BlockSize,
+        auto blockwise_gemm = BlockwiseGemmWMMA<ThisThreadBlockGrid,
                                                 ADataType,
                                                 BDataType,
                                                 AccDataType,

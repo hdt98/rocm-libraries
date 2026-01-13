@@ -859,7 +859,7 @@ struct GridwiseFpAintBGemm_Wmma
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
 #if (defined(__gfx13__))
         auto blockwise_gemm =
-            BlockwiseGemmWMMA<BlockSize,
+            BlockwiseGemmWMMA<ThisThreadBlock,
                               ADataType,
                               ADataType, //Dequantized
                               AccDataType,

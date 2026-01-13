@@ -121,6 +121,10 @@ conv_fwd_spec_name(ck::tensor_operation::device::ConvolutionForwardSpecializatio
     case Filter1x1Pad0: return "Filter1x1Pad0";
     case Filter3x3: return "Filter3x3";
     case OddC: return "OddC";
+    case Filter3x3Stride1Pad0: return "Filter3x3Stride1Pad0";
+    case Filter3x3Stride1MultiLayerPad0: return "Filter3x3Stride1MultiLayerPad0";
+    case Filter2x2Stride2Pad0: return "Filter2x2Stride2Pad0";
+    case Filter2x2Stride2OddHWPad0: return "Filter2x2Stride2OddHWPad0";
     }
 }
 

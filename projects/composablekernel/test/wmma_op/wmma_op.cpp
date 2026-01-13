@@ -28,6 +28,20 @@ bool run_test()
     if(ck::is_gfx13_supported()) // gfx13 uses another test
         return true;
 
+    if constexpr(ck::is_same_v<GPUAccType, ck::half_t> || ck::is_same_v<GPUAccType, ck::bhalf_t>)
+    {
+        if constexpr(AccNum == 8)
+        {
+            if(ck::is_gfx11_supported())
+                return true;
+        }
+        else
+        {
+            if(ck::is_gfx12_supported())
+                return true;
+        }
+    }
+
     case_id++;
 
     if(test_case_id != -1 && (test_case_id + 1) != case_id)
@@ -84,14 +98,14 @@ bool run_test()
         return true;
     }
 
-    using Row         = ck::tensor_layout::gemm::RowMajor;
-    using Col         = ck::tensor_layout::gemm::ColumnMajor;
-    using PassThrough = ck::tensor_operation::element_wise::PassThrough;
-    bool pass         = true;
-    const auto matmul_default =
-        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
-    const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+    using Row                 = ck::tensor_layout::gemm::RowMajor;
+    using Col                 = ck::tensor_layout::gemm::ColumnMajor;
+    using PassThrough         = ck::tensor_operation::element_wise::PassThrough;
+    bool pass                 = true;
+    const auto matmul_default = ck::wmma_op_util::
+        matmul_with_kMultiplier<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+    const auto matmul_swizzle_a = ck::wmma_op_util::
+        matmul_swizzle_a_with_kMultiplier<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
@@ -178,12 +192,17 @@ int main(int argc, char* argv[])
     {
         test_case_id = atoi(argv[1]);
     }
+
     // clang-format off
     //              |SrcType     |DstType     |GPUAccType  |CPUAccType |AccNum
     pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8     >();
     pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
+    // for gfx11
     pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
     pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();
+    // for gfx12 AccType = half_t/bhalf_t the accNum should be 8 not 16 which is incorrect in dev branch
+    pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 8    >();
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      8    >();
     pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
     // the below are gfx13 only
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
