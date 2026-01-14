@@ -478,7 +478,8 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
               typename CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
               bool HasMainKBlockLoop,
               InMemoryDataOperationEnum CGlobalMemoryDataOperation,
-              TailNumber TailNum = TailNumber::Odd>
+              TailNumber TailNum    = TailNumber::Odd,
+              bool SplitKOffsetHack = false>
     __device__ static void Run(const ADataType* p_a_grid,
                                const BDataType* p_b_grid,
                                CDataType* p_c_grid,
@@ -488,12 +489,22 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                const BGridDesc_BK0_N_K1& b_grid_desc_bk0_n_bk1,
                                const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock&
                                    c_grid_desc_mblock_mperblock_nblock_nperblock,
-                               const index_t k_id = 0)
+                               const index_t k_id    = 0,
+                               const index_t k_batch = 1)
     {
+        const long_index_t a_space_size_divisor = SplitKOffsetHack ? k_batch : 1;
+        const long_index_t b_space_size_divisor = SplitKOffsetHack ? k_batch : 1;
+
         const auto a_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-            p_a_grid, a_grid_desc_ak0_m_ak1.GetElementSpaceSize());
+            p_a_grid, a_grid_desc_ak0_m_ak1.GetElementSpaceSize() / a_space_size_divisor);
         const auto b_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
+<<<<<<< HEAD
             p_b_grid, b_grid_desc_bk0_n_bk1.GetElementSpaceSize());
+=======
+            p_b_grid, b_grid_desc_bk0_n_bk1.GetElementSpaceSize() / b_space_size_divisor);
+        auto c_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
+            p_c_grid, c_grid_desc_mblock_mperblock_nblock_nperblock.GetElementSpaceSize());
+>>>>>>> develop
 
         const AElementwiseOperation a_element_op{};
         const BElementwiseOperation b_element_op{};
@@ -559,7 +570,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                                 true,
                                                 BlockwiseGemmPipe::GlobalBufferNum>(
                 a_grid_desc_ak0_m_ak1,
-                make_multi_index(k_id, m_block_data_idx_on_grid, 0),
+                make_multi_index(SplitKOffsetHack ? 0 : k_id, m_block_data_idx_on_grid, 0),
                 a_element_op,
                 a_block_desc_ak0_m_ak1,
                 make_multi_index(0, 0, 0),
@@ -590,7 +601,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                                 true,
                                                 BlockwiseGemmPipe::GlobalBufferNum>(
                 b_grid_desc_bk0_n_bk1,
-                make_multi_index(k_id, n_block_data_idx_on_grid, 0),
+                make_multi_index(SplitKOffsetHack ? 0 : k_id, n_block_data_idx_on_grid, 0),
                 b_element_op,
                 b_block_desc_bk0_n_bk1,
                 make_multi_index(0, 0, 0),
@@ -653,7 +664,8 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
               typename CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
               bool HasMainKBlockLoop,
               InMemoryDataOperationEnum CGlobalMemoryDataOperation,
-              TailNumber TailNum = TailNumber::Odd>
+              TailNumber TailNum    = TailNumber::Odd,
+              bool SplitKOffsetHack = false>
     __device__ static void Run_2Lds(const ADataType* p_a_grid,
                                     const BDataType* p_b_grid,
                                     CDataType* p_c_grid,
@@ -664,12 +676,16 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                     const BGridDesc_BK0_N_K1& b_grid_desc_bk0_n_bk1,
                                     const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock&
                                         c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                    const index_t k_id = 0)
+                                    const index_t k_id    = 0,
+                                    const index_t k_batch = 1)
     {
+        const long_index_t a_space_size_divisor = SplitKOffsetHack ? k_batch : 1;
+        const long_index_t b_space_size_divisor = SplitKOffsetHack ? k_batch : 1;
+
         const auto a_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-            p_a_grid, a_grid_desc_ak0_m_ak1.GetElementSpaceSize());
+            p_a_grid, a_grid_desc_ak0_m_ak1.GetElementSpaceSize() / a_space_size_divisor);
         const auto b_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-            p_b_grid, b_grid_desc_bk0_n_bk1.GetElementSpaceSize());
+            p_b_grid, b_grid_desc_bk0_n_bk1.GetElementSpaceSize() / b_space_size_divisor);
         auto c_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
             p_c_grid, c_grid_desc_mblock_mperblock_nblock_nperblock.GetElementSpaceSize());
 
@@ -737,7 +753,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                                 true,
                                                 BlockwiseGemmPipe::GlobalBufferNum>(
                 a_grid_desc_ak0_m_ak1,
-                make_multi_index(k_id, m_block_data_idx_on_grid, 0),
+                make_multi_index(SplitKOffsetHack ? 0 : k_id, m_block_data_idx_on_grid, 0),
                 a_element_op,
                 a_block_desc_ak0_m_ak1,
                 make_multi_index(0, 0, 0),
@@ -768,7 +784,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                                 true,
                                                 BlockwiseGemmPipe::GlobalBufferNum>(
                 b_grid_desc_bk0_n_bk1,
-                make_multi_index(k_id, n_block_data_idx_on_grid, 0),
+                make_multi_index(SplitKOffsetHack ? 0 : k_id, n_block_data_idx_on_grid, 0),
                 b_element_op,
                 b_block_desc_bk0_n_bk1,
                 make_multi_index(0, 0, 0),
