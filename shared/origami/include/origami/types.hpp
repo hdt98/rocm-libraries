@@ -276,6 +276,10 @@ struct runtime_options {
   /// Heuristics variance threshold (reads from ANALYTICAL_GEMM_HEURISTICS_VARIANCE env var)
   double heuristics_variance;
 
+  /// Cache some quantities that depend on config and problem type.
+  /// This can be enabled if configs do not change between calls to origami.
+  bool cache_kernel_info;
+
   /**
    * @brief Default constructor that reads from environment variables.
    */
@@ -363,6 +367,8 @@ struct origami_cache_t {
   std::size_t num_active_cus;
   std::size_t splitting_factor;
 
+  double achievable_mem_bandwidth;
+
   kernel_cache_t kernel_cache;
 };
 
@@ -407,7 +413,7 @@ struct config_t {
   /// Grid selection algorithm.
   grid_selection_t grid_selection = grid_selection_t::k_split_aware;
 
-  /// Index of corresponding kernel
+  /// Index of corresponding kernel (not used by Origami)
   int index = 0;
 
   constexpr bool operator==(const config_t& o) const noexcept {
@@ -518,6 +524,15 @@ struct workgroup_mapping_t {
  */
 inline const runtime_options& get_runtime_options(const config_t& config) {
   (void)config;  // Unused parameter - kept for API compatibility
+  return runtime_options::get();
+}
+
+/**
+ * @brief Get runtime options (always uses global singleton).
+ *
+ * @return runtime_options& Reference to runtime options singleton
+ */
+inline runtime_options& get_runtime_options() {
   return runtime_options::get();
 }
 
