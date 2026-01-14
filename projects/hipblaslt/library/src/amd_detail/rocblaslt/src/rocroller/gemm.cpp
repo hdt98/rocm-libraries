@@ -92,86 +92,153 @@ void setPredicates(std::shared_ptr<GemmKernel> gemmKernel)
     ss.str("");
 }
 
-std::string genScaleModeString(Operations::ScaleMode mode)
-{
-    if(mode == Operations::ScaleMode::Separate)
-        return "B";
-    if(mode == Operations::ScaleMode::SingleScale)
-        return "S";
-    return "";
-}
-
+/**
+ * @brief Generate kernel name matching rocRoller client naming convention
+ *
+ * Format: RRGEMM_<types>_WGTS<m>x<n>x<k>_WGS<x>x<y>_[WGM<dim>]_WGMXCC<flag>_LA<loadA>_LB<loadB>
+ *         _SD<storeLDS>_LSA<loadScaleA>_LSB<loadScaleB>_UNROLL<x>x<y>_SwizzleScale<flag><prefetch>
+ *         _SwizzleTileSize<m>x<k>X<n>x<l>_[PF<inFlight>x<factor>m<mix>]_MI<m>x<n>x<k>x<b>_<scheduler>[_SK...]
+ */
 std::string genKernelName(std::shared_ptr<SolutionParameters> gemm)
 {
-    std::ostringstream rv;
-    rv << "RR_GEMM_" << (gemm->kernelType.transA ? "T" : "N")
-       << (gemm->kernelType.transB ? "T" : "N");
+    auto constexpr maxLength = 196;
 
-    rv << "_";
-    for(auto const& t : {gemm->kernelType.typeA,
-                         gemm->kernelType.typeB,
-                         gemm->kernelType.typeC,
-                         gemm->kernelType.typeD,
-                         gemm->kernelType.typeAcc})
-        rv << toString(t) << "_";
+    std::ostringstream fullName;
 
+    // Prefix
+    fullName << "RRGEMM_";
+
+    // Type parameters part: TransA + TransB
+    fullName << (gemm->kernelType.transA ? "T" : "N") << (gemm->kernelType.transB ? "T" : "N");
+
+    // Type A with optional scaling info
     if(gemm->kernelType.scaleTypeA.mode != Operations::ScaleMode::None)
     {
-        rv << "SA_" << genScaleModeString(gemm->kernelType.scaleTypeA.mode);
-        rv << toString(gemm->kernelType.scaleTypeA.type) << "_";
+        fullName << "_mx" << toString(gemm->kernelType.typeA);
+        fullName << "_st" << toString(gemm->kernelType.scaleTypeA.type);
         if(gemm->kernelType.scaleTypeA.mode == Operations::ScaleMode::Separate)
         {
-            rv << gemm->kernelType.scaleTypeA.blockRowSize;
-            if(gemm->kernelType.scaleTypeA.blockColSize != 1)
-                rv << "x" << gemm->kernelType.scaleTypeA.blockColSize;
-            rv << "_";
-            if(gemm->kernelType.scaleTypeA.preSwizzleTile.size() == 3)
-            {
-                rv << "PSTA_" << gemm->kernelType.scaleTypeA.preSwizzleTile[0];
-                rv << "x" << gemm->kernelType.scaleTypeA.preSwizzleTile[1];
-                rv << "x" << gemm->kernelType.scaleTypeA.preSwizzleTile[2];
-                rv << "_";
-            }
+            auto scaleBlockSize
+                = gemm->kernelType.scaleTypeA.blockRowSize * gemm->kernelType.scaleTypeA.blockColSize;
+            fullName << "_bs" << scaleBlockSize;
         }
     }
+    else
+    {
+        fullName << "_" << toString(gemm->kernelType.typeA);
+    }
 
+    // Type B with optional scaling info
     if(gemm->kernelType.scaleTypeB.mode != Operations::ScaleMode::None)
     {
-        rv << "SB_" << genScaleModeString(gemm->kernelType.scaleTypeB.mode);
-        rv << toString(gemm->kernelType.scaleTypeB.type) << "_";
+        fullName << "_mx" << toString(gemm->kernelType.typeB);
+        fullName << "_st" << toString(gemm->kernelType.scaleTypeB.type);
         if(gemm->kernelType.scaleTypeB.mode == Operations::ScaleMode::Separate)
         {
-            rv << gemm->kernelType.scaleTypeB.blockColSize;
-            if(gemm->kernelType.scaleTypeB.blockRowSize != 1)
-                rv << "x" << gemm->kernelType.scaleTypeB.blockRowSize;
-            rv << "_";
-
-            if(gemm->kernelType.scaleTypeB.preSwizzleTile.size() == 3)
-            {
-                rv << "PSTB_" << gemm->kernelType.scaleTypeB.preSwizzleTile[0];
-                rv << "x" << gemm->kernelType.scaleTypeB.preSwizzleTile[1];
-                rv << "x" << gemm->kernelType.scaleTypeB.preSwizzleTile[2];
-                rv << "_";
-            }
+            auto scaleBlockSize
+                = gemm->kernelType.scaleTypeB.blockRowSize * gemm->kernelType.scaleTypeB.blockColSize;
+            fullName << "_bs" << scaleBlockSize;
         }
     }
-
-    if(gemm->streamK)
+    else
     {
-        rv << "SK_";
+        fullName << "_" << toString(gemm->kernelType.typeB);
     }
-    rv << "WGT_";
+
+    // Types C, D, Acc
+    fullName << "_" << toString(gemm->kernelType.typeC);
+    fullName << "_" << toString(gemm->kernelType.typeD);
+    fullName << "_" << toString(gemm->kernelType.typeAcc);
+
+    // PreSwizzle flag (scaleSkipPermlane equivalent)
+    if(gemm->kernelType.scaleTypeA.preSwizzleTile.size() == 3
+       && gemm->kernelType.scaleTypeB.preSwizzleTile.size() == 3)
+    {
+        fullName << "_PreSW";
+    }
+
+    // Workgroup tile size
+    fullName << "_WGTS";
     rocRoller::streamJoin(
-        rv, std::vector{gemm->workgroupTile.m, gemm->workgroupTile.n, gemm->workgroupTile.k}, "x");
+        fullName,
+        std::vector{gemm->workgroupTile.m, gemm->workgroupTile.n, gemm->workgroupTile.k},
+        "x");
 
-    rv << "_UR_" << gemm->prefetchInFlight;
+    // Workgroup size
+    fullName << "_WGS";
+    rocRoller::streamJoin(fullName, std::vector{gemm->workgroupSizeX, gemm->workgroupSizeY}, "x");
 
+    // Workgroup mapping dimension
     if(gemm->workgroupMappingDim != -1)
     {
-        rv << "_WGM_";
+        fullName << "_WGM" << gemm->workgroupMappingDim;
     }
 
-    return rv.str();
+    // Workgroup XCC remap
+    fullName << "_WGMXCC" << (gemm->workgroupRemapXCC ? 1 : 0);
+
+    // Load paths
+    fullName << "_LA" << gemm->loadPathA;
+    fullName << "_LB" << gemm->loadPathB;
+
+    // Store LDS D
+    fullName << "_SD" << gemm->storeLDSD;
+
+    // Scale load paths
+    fullName << "_LSA" << gemm->loadPathAScale;
+    fullName << "_LSB" << gemm->loadPathBScale;
+
+    // Unroll options
+    fullName << "_UNROLL";
+    rocRoller::streamJoin(fullName, std::vector{gemm->unrollX, gemm->unrollY}, "x");
+
+    // Swizzle scale options
+    fullName << "_SwizzleScale" << gemm->swizzleScale << gemm->prefetchScale;
+    fullName << "_SwizzleTileSize" << gemm->swizzleTileSize.m << "x" << gemm->swizzleTileSize.k
+             << "X" << gemm->swizzleTileSize.n << "x" << gemm->swizzleTileSize.l;
+
+    // Prefetch options
+    if(gemm->prefetch)
+    {
+        fullName << "_PF";
+        rocRoller::streamJoin(
+            fullName, std::vector{gemm->prefetchInFlight, gemm->prefetchLDSFactor}, "x");
+        fullName << "m" << gemm->prefetchMixMemOps;
+    }
+
+    // Machine instruction size
+    fullName << "_MI";
+    rocRoller::streamJoin(fullName,
+                          std::vector{gemm->machineInstruction.m,
+                                      gemm->machineInstruction.n,
+                                      gemm->machineInstruction.k,
+                                      std::abs(gemm->machineInstruction.b)},
+                          "x");
+
+    // Scheduler (use "Priority" as default if empty, matching rocRoller client)
+    fullName << "_" << (gemm->scheduler.empty() ? "Priority" : gemm->scheduler);
+
+    // StreamK options
+    if(gemm->streamK)
+    {
+        fullName << "_SK";
+        if(gemm->streamKTwoTile)
+            fullName << "2T";
+    }
+
+    auto fullNameStr  = fullName.str();
+    auto shortNameStr = fullNameStr;
+
+    // Truncate and append hash if necessary (matching rocRoller client)
+    if(shortNameStr.length() > maxLength)
+    {
+        auto hashedValue = std::hash<std::string>{}(fullNameStr);
+        char hashStr[9];
+        std::snprintf(hashStr, sizeof(hashStr), "%08zx", hashedValue);
+        shortNameStr = shortNameStr.substr(0, maxLength - 9) + "_" + hashStr;
+    }
+
+    return shortNameStr;
 }
 
 std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> gemm)

@@ -42,6 +42,23 @@
 
 using namespace rocRoller;
 
+inline std::string scaleModeToString(rocRoller::Operations::ScaleMode mode)
+{
+    switch(mode)
+    {
+    case rocRoller::Operations::ScaleMode::None:
+        return "None";
+    case rocRoller::Operations::ScaleMode::SingleScale:
+        return "SingleScale";
+    case rocRoller::Operations::ScaleMode::Separate:
+        return "Separate";
+    case rocRoller::Operations::ScaleMode::Inline:
+        return "Inline";
+    default:
+        return "Unknown";
+    }
+}
+
 /**
  * @brief RocRollerHandle
  *
@@ -234,15 +251,135 @@ inline void logProfile(const RocblasltContractionProblem& prob,
                 hotIterations);
 }
 
-inline void logExtendedProfile(const RocblasltContractionProblem& prob,
-                               const int&                         solutionIndex,
-                               const std::string&                 kernelName,
-                               bool                               flush,
-                               const int32_t&                     rotatingBufferSize,
-                               const int32_t&                     coldIterations,
-                               const int32_t&                     hotIterations)
+inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
+                               const int&                                solutionIndex,
+                               const std::string&                        kernelName,
+                               const std::shared_ptr<SolutionParameters> solutionParams,
+                               bool                                      flush,
+                               const int32_t&                            rotatingBufferSize,
+                               const int32_t&                            coldIterations,
+                               const int32_t&                            hotIterations)
 {
-    log_profile("matmul",
+    // Part 1: Kernel Name
+    log_profile("Kernel", "kernel_name", kernelName);
+
+    // Part 2: Solution
+    log_profile("Solution",
+                "solution_index",
+                solutionIndex,
+                "workgroup_tile",
+                std::to_string(solutionParams->workgroupTile.m) + "x"
+                    + std::to_string(solutionParams->workgroupTile.n) + "x"
+                    + std::to_string(solutionParams->workgroupTile.k),
+                "machine_instruction",
+                std::to_string(solutionParams->machineInstruction.m) + "x"
+                    + std::to_string(solutionParams->machineInstruction.n) + "x"
+                    + std::to_string(solutionParams->machineInstruction.k) + "x"
+                    + std::to_string(solutionParams->machineInstruction.b),
+                "workgroup_size",
+                std::to_string(solutionParams->workgroupSizeX) + "x"
+                    + std::to_string(solutionParams->workgroupSizeY),
+                "load_path_A",
+                rocRoller::Parameters::Solution::toString(solutionParams->loadPathA),
+                "load_path_B",
+                rocRoller::Parameters::Solution::toString(solutionParams->loadPathB),
+                "store_LDS_D",
+                solutionParams->storeLDSD,
+                "prefetch",
+                solutionParams->prefetch,
+                "prefetch_in_flight",
+                solutionParams->prefetchInFlight,
+                "prefetch_LDS_factor",
+                solutionParams->prefetchLDSFactor,
+                "prefetch_mix_mem_ops",
+                solutionParams->prefetchMixMemOps,
+                "stream_K",
+                solutionParams->streamK,
+                "stream_K_two_tile",
+                solutionParams->streamKTwoTile,
+                "workgroup_mapping_dim",
+                solutionParams->workgroupMappingDim,
+                "workgroup_remap_XCC",
+                solutionParams->workgroupRemapXCC,
+                "load_path_A_scale",
+                rocRoller::Parameters::Solution::toString(solutionParams->loadPathAScale),
+                "load_path_B_scale",
+                rocRoller::Parameters::Solution::toString(solutionParams->loadPathBScale),
+                "swizzle_scale",
+                solutionParams->swizzleScale,
+                "prefetch_scale",
+                solutionParams->prefetchScale,
+                "swizzle_tile_size",
+                std::to_string(solutionParams->swizzleTileSize.m) + "x"
+                    + std::to_string(solutionParams->swizzleTileSize.k) + "x"
+                    + std::to_string(solutionParams->swizzleTileSize.n) + "x"
+                    + std::to_string(solutionParams->swizzleTileSize.l),
+                "unroll",
+                std::to_string(solutionParams->unrollX) + "x"
+                    + std::to_string(solutionParams->unrollY),
+                "scheduler",
+                solutionParams->scheduler.empty() ? "Priority" : solutionParams->scheduler);
+
+    // Part 3: Type (KernelType parameters)
+    auto& kt = solutionParams->kernelType;
+
+    // Format preSwizzleTile vectors as strings
+    std::string preSwizzleA;
+    for(size_t i = 0; i < kt.scaleTypeA.preSwizzleTile.size(); ++i)
+    {
+        if(i > 0)
+            preSwizzleA += "x";
+        preSwizzleA += std::to_string(kt.scaleTypeA.preSwizzleTile[i]);
+    }
+    if(preSwizzleA.empty())
+        preSwizzleA = "none";
+
+    std::string preSwizzleB;
+    for(size_t i = 0; i < kt.scaleTypeB.preSwizzleTile.size(); ++i)
+    {
+        if(i > 0)
+            preSwizzleB += "x";
+        preSwizzleB += std::to_string(kt.scaleTypeB.preSwizzleTile[i]);
+    }
+    if(preSwizzleB.empty())
+        preSwizzleB = "none";
+
+    log_profile("Type",
+                "transA",
+                kt.transA ? "T" : "N",
+                "transB",
+                kt.transB ? "T" : "N",
+                "typeA",
+                rocRoller::toString(kt.typeA),
+                "typeB",
+                rocRoller::toString(kt.typeB),
+                "typeC",
+                rocRoller::toString(kt.typeC),
+                "typeD",
+                rocRoller::toString(kt.typeD),
+                "typeAcc",
+                rocRoller::toString(kt.typeAcc),
+                "scaleA_mode",
+                scaleModeToString(kt.scaleTypeA.mode),
+                "scaleA_type",
+                rocRoller::toString(kt.scaleTypeA.type),
+                "scaleA_blockSize",
+                std::to_string(kt.scaleTypeA.blockRowSize) + "x"
+                    + std::to_string(kt.scaleTypeA.blockColSize),
+                "scaleA_preSwizzle",
+                preSwizzleA,
+                "scaleB_mode",
+                scaleModeToString(kt.scaleTypeB.mode),
+                "scaleB_type",
+                rocRoller::toString(kt.scaleTypeB.type),
+                "scaleB_blockSize",
+                std::to_string(kt.scaleTypeB.blockRowSize) + "x"
+                    + std::to_string(kt.scaleTypeB.blockColSize),
+                "scaleB_preSwizzle",
+                preSwizzleB);
+
+    // Part 4: Problem
+    log_profile("Problem",
                 "M",
                 prob.m,
                 "N",
@@ -296,11 +433,7 @@ inline void logExtendedProfile(const RocblasltContractionProblem& prob,
                 "cold_iters",
                 coldIterations,
                 "iters",
-                hotIterations,
-                "solution_index",
-                solutionIndex,
-                "kernel_name",
-                kernelName);
+                hotIterations);
 }
 
 /**
@@ -725,6 +858,7 @@ rocblaslt_status runRocRollerContractionProblem(rocblaslt_handle                
         logExtendedProfile(prob,
                            *solutionIndex,
                            kernelName,
+                           kernel->params,
                            flush,
                            rotatingBufferSize,
                            coldIterations,
