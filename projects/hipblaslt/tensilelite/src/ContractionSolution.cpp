@@ -1912,7 +1912,7 @@ namespace TensileLite
         if(sizeMapping.streamK > 0)
         {
             auto tiles = problem.getNumTiles(sizeMapping, 1);
-            gsu        = sk.grid / tiles;
+            gsu = (tiles > 0) ? (sk.grid / tiles) : 0;        
         }
 
         args.template append<uint32_t>(concatenate_if<T_Debug>("gsu"), gsu);

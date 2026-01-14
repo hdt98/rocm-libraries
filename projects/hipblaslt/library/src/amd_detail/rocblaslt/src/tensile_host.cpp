@@ -586,6 +586,11 @@ namespace
         if(opB == HIPBLAS_OP_C)
             bOps = {TensileLite::TensorOp::ComplexConjugate()};
 
+        bool isComplexInput = (typeATensile == rocisa::DataType::ComplexFloat || 
+                           typeATensile == rocisa::DataType::ComplexDouble);
+
+        auto alphaBetaType = isComplexInput ? typeATensile : roc2TensileType(typeCompute);
+
         return TensileLite::ContractionProblemGemm::createDefaultProblem(
             (opA != HIPBLAS_OP_N),
             (opB != HIPBLAS_OP_N),
@@ -593,8 +598,8 @@ namespace
             typeBTensile,
             hip2TensileType(typeC),
             hip2TensileType(typeD),
-            typeATensile,
-            typeATensile,
+            alphaBetaType,
+            alphaBetaType,
             roc2TensileComputeInputType(typeATensile, typeBTensile, typeCompute),
             roc2TensileType(typeCompute),
             alpha,
@@ -1625,10 +1630,14 @@ namespace
 
         tensileProblem.setComputeInputType(
             roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
-        tensileProblem.setAlphaType(a_type);
-        tensileProblem.setBetaType(a_type);
 
-        std::cout<<"RK: alphaType : " << tensileProblem.alphaType() << ", betaType: "<< tensileProblem.betaType() << std::endl;
+        bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat || 
+                               a_type == rocisa::DataType::ComplexDouble);
+
+        auto alphaBetaType = isComplexInput ? a_type : compute_type;
+        
+        tensileProblem.setAlphaType(alphaBetaType);
+        tensileProblem.setBetaType(alphaBetaType);
 
         // HPA is active iff sizeof(compute type) > sizeof(input type)
         tensileProblem.setHighPrecisionAccumulate(
@@ -1813,8 +1822,14 @@ namespace
 
         tensileProblem.setComputeInputType(
             roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
-        tensileProblem.setAlphaType(a_type);
-        tensileProblem.setBetaType(a_type);
+        
+        bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat || 
+                               a_type == rocisa::DataType::ComplexDouble);
+
+        auto alphaBetaType = isComplexInput ? a_type : compute_type;
+
+        tensileProblem.setAlphaType(alphaBetaType);
+        tensileProblem.setBetaType(alphaBetaType);
 
         // HPA is active iff sizeof(compute type) > sizeof(input type)
         tensileProblem.setHighPrecisionAccumulate(
