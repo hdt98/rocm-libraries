@@ -23,7 +23,7 @@ def runCI =
     }
     prj.libraryDependencies = ['rocPRIM', 'hipBLAS-common', 'hipBLASLt', 'rocBLAS']
     prj.defaults.ccache = false
-
+    prj.timeout.test = 600
     // Define test architectures, optional rocm version argument is available
     def nodes = new dockerNodes(nodeDetails, jobName, prj)
 
