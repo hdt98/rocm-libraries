@@ -13,6 +13,8 @@
     <vcpkg>
       <pkg name="google test">gtest:x64-windows</pkg>
       <pkg name="msgpackc">msgpack:x64-windows</pkg>
+      <pkg name="boost-assert">boost-assert:x64-windows</pkg>
+      <pkg name="boost-predef">boost-predef:x64-windows</pkg>
       <pkg name="OpenBLAS">openblas:x64-windows</pkg>
     </vcpkg>
   </os>
