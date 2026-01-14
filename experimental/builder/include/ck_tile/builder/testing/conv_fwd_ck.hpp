@@ -116,7 +116,7 @@ void run(CkConvInstance<SIGNATURE> auto& conv,
         return result;
     };
 
-    const auto param = args.to_ck_conv_param();
+    const auto problem = args.make_conv_problem();
 
     const auto input_desc  = args.make_input_descriptor();
     const auto weight_desc = args.make_weight_descriptor();
@@ -134,10 +134,10 @@ void run(CkConvInstance<SIGNATURE> auto& conv,
                                      {},
                                      to_ck_lengths(output_desc.get_lengths()),
                                      to_ck_lengths(output_desc.get_strides()),
-                                     to_ck_extent(param.conv_filter_strides_),
-                                     to_ck_extent(param.conv_filter_dilations_),
-                                     to_ck_extent(param.input_left_pads_),
-                                     to_ck_extent(param.input_right_pads_),
+                                     to_ck_extent(problem.conv_strides),
+                                     to_ck_extent(problem.conv_dilations),
+                                     to_ck_extent(problem.left_pads),
+                                     to_ck_extent(problem.right_pads),
                                      args.a_elementwise_op,
                                      args.b_elementwise_op,
                                      args.cde_elementwise_op);

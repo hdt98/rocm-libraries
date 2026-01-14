@@ -74,16 +74,14 @@ void run(RefConvInstance<SIGNATURE> auto& conv,
          const Inputs<SIGNATURE>& inputs,
          const Outputs<SIGNATURE>& outputs)
 {
-    // We don't want to compute the output dims manually, just get
-    // them via the existing infrastructure
-    const auto param = args.to_ck_conv_param();
+    const auto problem = args.make_conv_problem();
 
     // TODO: The reference convolution is currently missing a few features.
     // Just throw for now, but regard these as TODO items that should be resolved
     // eventually.
 
     // Right pads are not supported right now for some reason.
-    for(auto right_pad : param.input_right_pads_)
+    for(auto right_pad : problem.right_pads)
     {
         if(right_pad != 0)
             throw std::runtime_error("TODO: Support right pad in reference conv");
@@ -96,19 +94,31 @@ void run(RefConvInstance<SIGNATURE> auto& conv,
     if(!args.make_output_descriptor().is_packed())
         throw std::runtime_error("TODO: Support non-packed output tensor in reference conv");
 
+    const std::vector<long_index_t> input_spatial(problem.input_spatial.begin(),
+                                                  problem.input_spatial.end());
+    const std::vector<long_index_t> filter_spatial(problem.filter_spatial.begin(),
+                                                   problem.filter_spatial.end());
+    const std::vector<long_index_t> output_spatial(problem.output_spatial.begin(),
+                                                   problem.output_spatial.end());
+    const std::vector<long_index_t> conv_strides(problem.conv_strides.begin(),
+                                                 problem.conv_strides.end());
+    const std::vector<long_index_t> conv_dilations(problem.conv_dilations.begin(),
+                                                   problem.conv_dilations.end());
+    const std::vector<long_index_t> left_pads(problem.left_pads.begin(), problem.left_pads.end());
+
     conv.Run(inputs.input,
              inputs.weight,
              outputs.output,
-             param.G_,
-             param.N_,
-             param.K_,
-             param.C_,
-             param.input_spatial_lengths_,
-             param.filter_spatial_lengths_,
-             param.output_spatial_lengths_,
-             param.conv_filter_strides_,
-             param.conv_filter_dilations_,
-             param.input_left_pads_);
+             problem.G,
+             problem.N,
+             problem.K,
+             problem.C,
+             input_spatial,
+             filter_spatial,
+             output_spatial,
+             conv_strides,
+             conv_dilations,
+             left_pads);
 }
 
 } // namespace ck_tile::builder::test

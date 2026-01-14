@@ -142,10 +142,12 @@ TEST(ValidationReportTests, MultipleSomeIncorrect)
         auto a = ckt::alloc_tensor_buffer(desc);
         auto b = ckt::alloc_tensor_buffer(desc);
 
-        ckt::fill_tensor_buffer(
-            desc, a.get(), [](size_t i) { return ck::type_convert<ck::bhalf_t>(i % 100); });
-        ckt::fill_tensor_buffer(
-            desc, b.get(), [](size_t i) { return ck::type_convert<ck::bhalf_t>(i % 101); });
+        ckt::fill_tensor_buffer(desc, a.get(), [](size_t i) {
+            return ck::type_convert<ck::bhalf_t>(static_cast<float>(i % 100));
+        });
+        ckt::fill_tensor_buffer(desc, b.get(), [](size_t i) {
+            return ck::type_convert<ck::bhalf_t>(static_cast<float>(i % 101));
+        });
 
         report.check("incorrect 1", desc, b.get(), a.get());
     }
