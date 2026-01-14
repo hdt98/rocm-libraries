@@ -834,7 +834,10 @@ int main(int argc, const char* argv[])
                                 size_t enq        = listeners.numEnqueuesPerSync();
                                 size_t eventCount = gpuTimer ? kernels[0].size() : 0;
 
-                                std::cout << "per-run-timer,gimer-" << gpuTimer << "," << solution->name() << ",";
+                                auto size = static_cast<ContractionProblemGemm*>(problem)->problemSizes();
+                                std::cout << "per-run-timer,"
+                                    << size[0] << "-" << size[1] << "-" << size[2] << "-" << size[3]
+                                    << "," << solution->name() << ",";
                                 listeners.preSyncs();
                                 if(enq)
                                     for(int i = 0; i < syncs; i++)
