@@ -617,7 +617,7 @@ origami::config_t ConvHipImplicitGemm3DGroupWrwXdlops::GetOrigamiConfig(
     case miopenFloat: return GetOrigamiConfigByType<float>(problem, perf_cfg);
     case miopenInt8: return GetOrigamiConfigByType<int8_t>(problem, perf_cfg);
     case miopenBFloat16: return GetOrigamiConfigByType<ck::bhalf_t>(problem, perf_cfg);
-    default: break; // Unsupported data types
+    default: return {}; // Unsupported data types
     }
 }
 

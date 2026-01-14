@@ -547,7 +547,7 @@ origami::config_t ConvHipImplicitGemmGroupBwdXdlops::GetOrigamiConfig(
         return miopen::solver::GetOrigamiConfig<DeviceOpGBwdPtrs<ck::bhalf_t>,
                                                 CKArgs,
                                                 decltype(perf_cfg)>(problem, perf_cfg);
-    default: break; // Unsupported data types
+    default: return {}; // Unsupported data types
     }
 }
 

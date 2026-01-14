@@ -35,8 +35,6 @@
 #include <miopen/fusion/fusion_invoke_params.hpp>
 #include <miopen/solver/implicitgemm_util.hpp>
 
-#include <origami/types.hpp>
-
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 #include <ck/utility/data_type.hpp>
 #include <ck/utility/numeric_limits.hpp>
@@ -1535,120 +1533,6 @@ static inline bool IsIndexRangeLargeEnough(const miopen::conv::ProblemDescriptio
            problem.GetOutSize() < max_index_range;
 }
 
-// Helper function to trim whitespace from both ends of a string
-std::string trim(const std::string& str)
-{
-    size_t first = str.find_first_not_of(" \t\n\r");
-    if(first == std::string::npos)
-        return "";
-    size_t last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, (last - first + 1));
-}
-
-/**
- * Parse template arguments from a device instance definition string.
- *
- * This function extracts and parses the template arguments from a device instance
- * definition, properly handling nested angle brackets (e.g., S<4, 8, 1>).
- *
- * @param instance_str A string containing a device instance definition
- *
- * Example input formats:
- *   "DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1< NDimSpatial, ALayout, BLayout, S<4, 8, 1>,
- * 64, 16, ...>" "DeviceGroupedGemmXdlSplitKCShuffle<Row, Row, Row, Row, F16, F16, F32, F16,
- * PassThrough, PassThrough, ...>"
- *
- * @return Vector of strings, each containing one template argument (trimmed of whitespace)
- *
- * Example usage:
- *   std::string inst = "DeviceKernel< int, float, S<1, 2, 3>, true>";
- *   auto args = parseDeviceInstanceArguments(inst);
- *   // args[0] = "DeviceKernel"
- *   // args[1] = "int"
- *   // args[2] = "float"
- *   // args[3] = "S<1, 2, 3>"
- *   // args[4] = "true"
- */
-std::vector<std::string> parseDeviceInstanceArguments(const std::string& instance_str)
-{
-    std::vector<std::string> arguments;
-
-    // Find the first '<' which starts the template arguments
-    size_t start_pos = instance_str.find('<');
-    if(start_pos == std::string::npos)
-    {
-        return arguments; // No template arguments found
-    }
-
-    std::string kernel_name = trim(instance_str.substr(0, start_pos));
-    arguments.push_back(kernel_name);
-
-    // Find the matching '>' for the outermost template
-    int bracket_depth = 0;
-    size_t end_pos    = start_pos;
-    for(size_t i = start_pos; i < instance_str.length(); ++i)
-    {
-        if(instance_str[i] == '<')
-        {
-            bracket_depth++;
-        }
-        else if(instance_str[i] == '>')
-        {
-            bracket_depth--;
-            if(bracket_depth == 0)
-            {
-                end_pos = i;
-                break;
-            }
-        }
-    }
-
-    if(bracket_depth != 0 || end_pos == start_pos)
-    {
-        return arguments; // Malformed template arguments
-    }
-
-    // Extract the template arguments substring (between < and >)
-    std::string args_str = instance_str.substr(start_pos + 1, end_pos - start_pos - 1);
-
-    // Parse arguments, respecting nested angle brackets
-    bracket_depth    = 0;
-    size_t arg_start = 0;
-
-    for(size_t i = 0; i < args_str.length(); ++i)
-    {
-        char c = args_str[i];
-
-        if(c == '<')
-        {
-            bracket_depth++;
-        }
-        else if(c == '>')
-        {
-            bracket_depth--;
-        }
-        else if(c == ',' && bracket_depth == 0)
-        {
-            // Found a comma at the top level - this separates arguments
-            std::string arg = trim(args_str.substr(arg_start, i - arg_start));
-            if(!arg.empty())
-            {
-                arguments.push_back(arg);
-            }
-            arg_start = i + 1;
-        }
-    }
-
-    // Don't forget the last argument
-    std::string last_arg = trim(args_str.substr(arg_start));
-    if(!last_arg.empty())
-    {
-        arguments.push_back(last_arg);
-    }
-
-    return arguments;
-}
-
 // Map of kernel name to field list
 static const std::map<std::string, std::vector<std::string>> device_instance_field_map = {
     // ============ GROUPED_CONV_BWD_DATA KERNELS ============
@@ -2405,16 +2289,9 @@ static const std::map<std::string, std::vector<std::string>> device_instance_fie
       "BlkGemmPipeSched",
       "BlkGemmPipelineVer"}}};
 
-// template<typename TYPE>
-int IndexOf(std::vector<std::string> vec, std::string val)
-{
-    auto it = std::find(vec.begin(), vec.end(), val);
-    if(it != vec.end())
-    {
-        return std::distance(vec.begin(), it);
-    }
-    return -1;
-}
+std::vector<std::string> parseDeviceInstanceArguments(const std::string& instance_str);
+
+int IndexOf(std::vector<std::string> vec, std::string val);
 
 template <typename DeviceOpType, typename CKArgsType, typename PerformanceConfig>
 origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& problem,
