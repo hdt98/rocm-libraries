@@ -74,28 +74,55 @@ rocblas_status rocsolver_bdsqr_impl(rocblas_handle handle,
     // memory workspace sizes:
     // size of re-usable workspace
     size_t size_splits_map, size_work, size_completed;
-    rocsolver_bdsqr_getMemorySize<S>(n, nv, nu, nc, batch_count, &size_splits_map, &size_work,
-                                     &size_completed);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_splits_map, size_work,
-                                                      size_completed);
+    if(USE_ORIGINAL)
+    {
+        rocsolver_bdsqr_getMemorySize<S>(n, nv, nu, nc, batch_count, &size_splits_map, &size_work,
+                                         &size_completed);
 
-    // memory workspace allocation
-    void *splits_map, *work, *completed;
-    rocblas_device_malloc mem(handle, size_splits_map, size_work, size_completed);
-    if(!mem)
-        return rocblas_status_memory_error;
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_splits_map, size_work,
+                                                          size_completed);
 
-    splits_map = mem[0];
-    work = mem[1];
-    completed = mem[2];
+        // memory workspace allocation
+        void *splits_map, *work, *completed;
+        rocblas_device_malloc mem(handle, size_splits_map, size_work, size_completed);
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    // execution
-    return rocsolver_bdsqr_template<T>(handle, uplo, n, nv, nu, nc, D, strideD, E, strideE, V,
-                                       shiftV, ldv, strideV, U, shiftU, ldu, strideU, C, shiftC,
-                                       ldc, strideC, info, batch_count, (rocblas_int*)splits_map,
-                                       (S*)work, (rocblas_int*)completed);
+        splits_map = mem[0];
+        work = mem[1];
+        completed = mem[2];
+
+        // execution
+        return rocsolver_bdsqr_template<T>(handle, uplo, n, nv, nu, nc, D, strideD, E, strideE, V,
+                                           shiftV, ldv, strideV, U, shiftU, ldu, strideU, C, shiftC,
+                                           ldc, strideC, info, batch_count, (rocblas_int*)splits_map,
+                                           (S*)work, (rocblas_int*)completed);
+    }
+    else
+    {
+        size_t size_work_bdsqr = 0;
+        rocsolver_bdsqr_getMemorySize_alt<S>(n, nv, nu, nc, batch_count, &size_work_bdsqr);
+
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_work_bdsqr);
+
+        // memory workspace allocation
+        rocblas_device_malloc mem(handle, size_work_bdsqr);
+
+        if(!mem)
+            return rocblas_status_memory_error;
+
+        void* const work_bdsqr = (void*)mem[0];
+
+        // execution
+        return rocsolver_bdsqr_template_alt<T, S>(handle, uplo, n, nv, nu, nc, D, strideD, E,
+                                                  strideE, V, shiftV, ldv, strideV, U, shiftU, ldu,
+                                                  strideU, C, shiftC, ldc, strideC, info, batch_count,
+
+                                                  work_bdsqr, size_work_bdsqr);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE

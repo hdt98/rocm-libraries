@@ -40,7 +40,13 @@
 
 #include "rocauxiliary_bdsqr_hybrid.hpp"
 
+#include "rocsolver_mem_utils.hpp"
+
 ROCSOLVER_BEGIN_NAMESPACE
+
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL false
+#endif
 
 /******************** Device functions *************************/
 /***************************************************************/
@@ -1122,11 +1128,12 @@ void rocsolver_bdsqr_getMemorySize(const rocblas_int n,
                                    size_t* size_completed)
 {
     // if quick return, no workspace is needed
+    *size_splits_map = 0;
+    *size_work = 0;
+    *size_completed = 0;
+
     if(n == 0 || batch_count == 0)
     {
-        *size_splits_map = 0;
-        *size_work = 0;
-        *size_completed = 0;
         return;
     }
 
@@ -1143,6 +1150,36 @@ void rocsolver_bdsqr_getMemorySize(const rocblas_int n,
 
     // size of temporary workspace to indicate problem completion
     *size_completed = sizeof(rocblas_int) * (batch_count + 2);
+
+    adjust_for_alignment(size_splits_map);
+    adjust_for_alignment(size_work);
+    adjust_for_alignment(size_completed);
+}
+
+template <typename T>
+void rocsolver_bdsqr_getMemorySize_alt(const rocblas_int n,
+                                       const rocblas_int nv,
+                                       const rocblas_int nu,
+                                       const rocblas_int nc,
+                                       const rocblas_int batch_count,
+
+                                       size_t* p_size_bdsqr)
+{
+    size_t size_splits_map = 0;
+    size_t size_work1 = 0;
+    size_t size_completed = 0;
+
+    rocsolver_bdsqr_getMemorySize<T>(n, nv, nu, nc, batch_count,
+
+                                     &size_splits_map, &size_work1, &size_completed);
+
+    size_t size_bdsqr = 0;
+
+    size_bdsqr += size_splits_map;
+    size_bdsqr += size_work1;
+    size_bdsqr += size_completed;
+
+    *p_size_bdsqr = size_bdsqr;
 }
 
 template <typename S, typename W>
@@ -1357,6 +1394,69 @@ rocblas_status rocsolver_bdsqr_template(rocblas_handle handle,
                             C, shiftC, ldc, strideC, info, splits_map, completed);
 
     return rocblas_status_success;
+}
+
+template <typename T, typename S, typename W1, typename W2, typename W3>
+rocblas_status rocsolver_bdsqr_template_alt(rocblas_handle handle,
+                                            const rocblas_fill uplo,
+                                            const rocblas_int n,
+                                            const rocblas_int nv,
+                                            const rocblas_int nu,
+                                            const rocblas_int nc,
+                                            S* D,
+                                            const rocblas_stride strideD,
+                                            S* E,
+                                            const rocblas_stride strideE,
+                                            W1 V,
+                                            const rocblas_int shiftV,
+                                            const rocblas_int ldv,
+                                            const rocblas_stride strideV,
+                                            W2 U,
+                                            const rocblas_int shiftU,
+                                            const rocblas_int ldu,
+                                            const rocblas_stride strideU,
+                                            W3 C,
+                                            const rocblas_int shiftC,
+                                            const rocblas_int ldc,
+                                            const rocblas_stride strideC,
+                                            rocblas_int* info,
+                                            const rocblas_int batch_count,
+
+                                            void* const work,
+                                            size_t const size_work)
+
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_splits_map = 0;
+    size_t size_work1 = 0;
+    size_t size_completed = 0;
+
+    // ---------------------------------------------
+    // !! NOTE: using type S in template argument for  getMemory
+    // ---------------------------------------------
+    rocsolver_bdsqr_getMemorySize<S>(n, nv, nu, nc, batch_count,
+
+                                     &size_splits_map, &size_work1, &size_completed);
+
+    rocblas_int* const splits_map = (rocblas_int*)pfree;
+    pfree += size_splits_map;
+
+    S* const work1 = (S*)pfree;
+    pfree += size_work1;
+
+    rocblas_int* completed = (rocblas_int*)pfree;
+    pfree += size_completed;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_bdsqr_template<T, S, W1, W2, W3>(
+        handle, uplo, n, nv, nu, nc, D, strideD, E, strideE, V, shiftV, ldv, strideV, U, shiftU,
+        ldu, strideU, C, shiftC, ldc, strideC, info, batch_count,
+
+        splits_map, work1, completed);
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE
