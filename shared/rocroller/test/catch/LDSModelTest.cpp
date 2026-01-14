@@ -29,7 +29,7 @@
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/All.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 
 #include <common/CommonGraphs.hpp>
 #include <common/Scheduling.hpp>
@@ -37,10 +37,10 @@
 #include "CustomSections.hpp"
 #include "TestContext.hpp"
 
-namespace LDSBankModelTest
+namespace LDSModelTest
 {
     using namespace rocRoller;
-    using namespace rocRoller::Scheduling::LDSBankModel;
+    using namespace rocRoller::Scheduling::LDSModel;
 
     TEST_CASE("LDS model get threads per clock", "[lds-bank-model]")
     {

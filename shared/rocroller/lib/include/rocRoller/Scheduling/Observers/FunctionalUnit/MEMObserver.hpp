@@ -31,7 +31,7 @@
 #include <vector>
 
 #include <rocRoller/Scheduling/Costs/LinearWeightedCost.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Scheduling.hpp>
 
 namespace rocRoller
@@ -130,8 +130,8 @@ namespace rocRoller
             }
 
         private:
-            std::weak_ptr<Context>                            m_context;
-            mutable std::optional<LDSBankModel::LDSScheduler> m_scheduler;
+            std::weak_ptr<Context>                     m_context;
+            mutable std::optional<LDSModel::LDSModule> m_scheduler;
         };
     }
 }

@@ -32,7 +32,7 @@
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitecture.hpp>
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
@@ -52,7 +52,7 @@ namespace rocRoller
             {
                 const auto addrs = inst.getAddresses();
                 return addrs.has_value() && addrs->size() % 64 == 0
-                       && LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode()).has_value()
+                       && LDSModel::getLdsInfoFromOpcode(inst.getOpCode()).has_value()
                        && context->targetArchitecture().target().isGFX9GPU();
             }
 
@@ -118,7 +118,7 @@ namespace rocRoller
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                const auto ldsInfo = LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode());
+                const auto ldsInfo = LDSModel::getLdsInfoFromOpcode(inst.getOpCode());
                 if(ldsInfo.has_value())
                 {
                     const auto [direction, dwords] = ldsInfo.value();
@@ -126,9 +126,9 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
-                    std::vector<size_t>                 addresses = inst.getAddresses().value();
-                    LDSBankModel::MemoryOpLDS           memOp{direction};
-                    LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
+                    std::vector<size_t>             addresses = inst.getAddresses().value();
+                    LDSModel::MemoryOpLDS           memOp{direction};
+                    LDSModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
 
                     auto [stallCycles, additionalCycles]
                         = m_scheduler.value().predictStallCycles(ldsInst);
@@ -170,14 +170,14 @@ namespace rocRoller
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                auto ldsInfo = LDSBankModel::getLdsInfoFromOpcode(inst.getOpCode());
+                auto ldsInfo = LDSModel::getLdsInfoFromOpcode(inst.getOpCode());
                 if(ldsInfo.has_value())
                 {
                     auto [direction, dwords] = ldsInfo.value();
 
-                    LDSBankModel::MemoryOpLDS           memOp{direction};
-                    std::vector<size_t>                 addresses = inst.getAddresses().value();
-                    LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
+                    LDSModel::MemoryOpLDS           memOp{direction};
+                    std::vector<size_t>             addresses = inst.getAddresses().value();
+                    LDSModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
 
                     m_scheduler.value().scheduleInstruction(ldsInst);
                 }

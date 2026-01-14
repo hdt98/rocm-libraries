@@ -37,7 +37,7 @@
 #include <rocRoller/DataTypes/DataTypes.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 
-namespace rocRoller::Scheduling::LDSBankModel
+namespace rocRoller::Scheduling::LDSModel
 {
     enum class LdsDirection
     {
@@ -228,7 +228,7 @@ namespace rocRoller::Scheduling::LDSBankModel
      * @brief Check if an instruction's wave accesses non-overlapping banks across cycles
      * 
      * The hardware will optimize this by having the waves access out-of-phase,
-     * resulting in no penalty from bank conflicts in cases where > 1 active SIMD.
+     * resulting in no penalty from bank conflicts in cases with more than 1 active SIMD.
      * 
      * @param instr The LDS instruction containing memory operation details and addresses
      * @param gfx The GPU architecture
@@ -262,10 +262,10 @@ namespace rocRoller::Scheduling::LDSBankModel
      * 
      * Note: This scheduler works in hardware cycles, not quadcycles.
      */
-    class LDSScheduler
+    class LDSModule
     {
     public:
-        LDSScheduler(GPUArchitectureGFX gfx, int waveCount);
+        LDSModule(GPUArchitectureGFX gfx, int waveCount);
 
         void incrementProgramCycle(int cycles);
         int  getProgramCycle() const

@@ -40,7 +40,7 @@
 #include <rocRoller/InstructionValues/LabelAllocator.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Scheduling/RoundRobinScheduler.hpp>
 #include <rocRoller/Utilities/Component.hpp>
@@ -124,7 +124,7 @@ protected:
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 {
     // Expect 545 passed : 0 failed
-    using namespace Scheduling::LDSBankModel;
+    using namespace Scheduling::LDSModel;
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
@@ -217,7 +217,7 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
     ds_read_b128 v[8:11], v1, model 4, profiler 4, delta 0
     ... 32 times
     */
-    using namespace Scheduling::LDSBankModel;
+    using namespace Scheduling::LDSModel;
 
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 

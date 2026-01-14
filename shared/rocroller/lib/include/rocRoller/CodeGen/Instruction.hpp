@@ -243,7 +243,7 @@ namespace rocRoller
          */
         const std::optional<std::vector<size_t>>& getAddresses() const
         {
-            return m_ldsAddresses;
+            return m_addresses;
         }
 
         /**
@@ -251,7 +251,7 @@ namespace rocRoller
          */
         void setAddresses(const std::vector<size_t>& addresses)
         {
-            m_ldsAddresses = addresses;
+            m_addresses = addresses;
         }
 
     private:
@@ -323,7 +323,7 @@ namespace rocRoller
 
         Scheduling::InstructionStatus m_peekedStatus;
 
-        std::optional<std::vector<size_t>> m_ldsAddresses;
+        std::optional<std::vector<size_t>> m_addresses;
     };
 }
 

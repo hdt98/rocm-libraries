@@ -47,7 +47,7 @@
 #include <rocRoller/GPUArchitecture/GPUCapability.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Operations/CommandArguments.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 

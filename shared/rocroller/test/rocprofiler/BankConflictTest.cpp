@@ -40,7 +40,7 @@
 #include <rocRoller/InstructionValues/LabelAllocator.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Scheduling/RoundRobinScheduler.hpp>
 #include <rocRoller/Utilities/Component.hpp>
@@ -171,7 +171,7 @@ private:
 
 TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu][lds-model]")
 {
-    using namespace Scheduling::LDSBankModel;
+    using namespace Scheduling::LDSModel;
 
     constexpr auto workgroupSize = 64u;
 

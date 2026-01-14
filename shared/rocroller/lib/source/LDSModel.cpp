@@ -33,12 +33,12 @@
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Utilities/Error.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
-namespace rocRoller::Scheduling::LDSBankModel
+namespace rocRoller::Scheduling::LDSModel
 {
     std::optional<std::pair<LdsDirection, int>> getLdsInfoFromOpcode(const std::string& opCode)
     {
@@ -75,7 +75,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         return 1;
     }
 
-    LDSScheduler::LDSScheduler(GPUArchitectureGFX gfx, int waveCount)
+    LDSModule::LDSModule(GPUArchitectureGFX gfx, int waveCount)
         : m_gfx(gfx)
         , m_programCycle(0)
         // With 3 or more waves, two SIMDs will be active on at least one SP
@@ -88,12 +88,12 @@ namespace rocRoller::Scheduling::LDSBankModel
     }
 
     // Advance program cycle by delta cycles
-    void LDSScheduler::incrementProgramCycle(int cycles)
+    void LDSModule::incrementProgramCycle(int cycles)
     {
         m_programCycle += cycles;
     }
 
-    void LDSScheduler::reset()
+    void LDSModule::reset()
     {
         m_programCycle = 0;
         m_commandQueue.clear();
@@ -101,7 +101,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         m_dataQueue.clear();
     }
 
-    int LDSScheduler::getRemainingDataSlots() const
+    int LDSModule::getRemainingDataSlots() const
     {
         int usedSlots = 0;
         for(const auto& slotFreedCycle : m_dataQueue)
@@ -114,7 +114,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         return dataQueueSize - usedSlots;
     }
 
-    std::tuple<int, int> LDSScheduler::predictStallCycles(const RuntimeLDSInstruction& instr) const
+    std::tuple<int, int> LDSModule::predictStallCycles(const RuntimeLDSInstruction& instr) const
     {
         int stallCycles = 0;
 
@@ -145,7 +145,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         return std::make_tuple(stallCycles, additionalCycles);
     }
 
-    int LDSScheduler::predictWaitcntStall(int waitcnt) const
+    int LDSModule::predictWaitcntStall(int waitcnt) const
     {
         int stallCycles = 0;
         AssertFatal(m_waitcntQueue.size() <= std::numeric_limits<int>::max(),
@@ -165,7 +165,7 @@ namespace rocRoller::Scheduling::LDSBankModel
         return stallCycles;
     }
 
-    void LDSScheduler::scheduleInstruction(const RuntimeLDSInstruction& origInstr)
+    void LDSModule::scheduleInstruction(const RuntimeLDSInstruction& origInstr)
     {
         auto instr = origInstr;
         updateQueues();
@@ -273,7 +273,7 @@ namespace rocRoller::Scheduling::LDSBankModel
                    waitcntQueueStr);
     }
 
-    void LDSScheduler::updateQueues()
+    void LDSModule::updateQueues()
     {
         while(!m_commandQueue.empty() && static_cast<int>(m_commandQueue.front()) <= m_programCycle)
         {

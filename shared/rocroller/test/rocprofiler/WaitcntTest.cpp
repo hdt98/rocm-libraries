@@ -40,7 +40,7 @@
 #include <rocRoller/InstructionValues/LabelAllocator.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
-#include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Scheduling/Observers/WaitcntObserver.hpp>
 #include <rocRoller/Scheduling/RoundRobinScheduler.hpp>
@@ -128,7 +128,7 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
     ds_read_b128 v[116:119], v1, model 4, profiler 4, delta 0
     s_waitcnt lgkmcnt(0), model 108, profiler 108, delta 0
     */
-    using namespace Scheduling::LDSBankModel;
+    using namespace Scheduling::LDSModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = GENERATE(64u, 128u, 256u);
@@ -261,7 +261,7 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
     s_waitcnt lgkmcnt(4), model 104, profiler 100, delta -4
     ...
     */
-    using namespace Scheduling::LDSBankModel;
+    using namespace Scheduling::LDSModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = 64u;
@@ -425,7 +425,7 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
   * s_waitcnt lgkmcnt(1), model 16, profiler 8, delta -8
   * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
     */
-    using namespace Scheduling::LDSBankModel;
+    using namespace Scheduling::LDSModel;
     Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = 64u;
