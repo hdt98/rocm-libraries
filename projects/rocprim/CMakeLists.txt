@@ -24,11 +24,7 @@
 # CMake Preamble #
 ##################
 
-cmake_minimum_required(VERSION 3.16...3.25 FATAL_ERROR)
-
-if(CMAKE_VERSION VERSION_LESS 3.21)
-  message(DEPRECATION "CMake 3.20 and older are deprecated. Consider upgrading to CMake 3.21 or later.")
-endif()
+cmake_minimum_required(VERSION 3.21...3.25 FATAL_ERROR)
 
 include(CheckLanguage)
 
@@ -43,17 +39,11 @@ set(CMAKE_INSTALL_PREFIX ${ROCM_PATH} CACHE PATH "Install path prefix, prepended
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker search and installed rpath")
 
 # Use HIP language features if available in CMake.
-# TODO: simplify if cmake version is >= 3.19
 check_language(HIP)
-if(CMAKE_HIP_COMPILER)
-  enable_language(HIP)
-  set(PROJECT_LANG CXX HIP)
-else()
-  set(PROJECT_LANG CXX)
-endif()
+enable_language(HIP)
 
 # Declare project.
-project(rocprim LANGUAGES ${PROJECT_LANG})
+project(rocprim LANGUAGES CXX HIP)
 set(VERSION_STRING "4.2.0")
 
 ###########
@@ -156,35 +146,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "" "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# TODO: simplify this if cmake version is >= 3.19, see below.
-if(CMAKE_HIP_COMPILER)
-  include(CheckCompilerFlag)
-else()
-  include(CheckCXXCompilerFlag)
-endif()
-
-# Function that checks if a HIP compiler function exists.
-function(hip_check_compiler_flag _flag _var)
-  if(CMAKE_HIP_COMPILER)
-    cmake_check_compiler_flag(HIP "${_flag}" ${_var})
-  else()
-    # On older cmake, we do not have HIP language support
-    # so we manually tell the compiler to use HIP.
-    # TODO: remove if minimum cmake version is >= 3.21.
-
-    # On cmake < 3.19 this is not supported:
-    #   cmake_check_compiler_flag(CXX "-xhip ${_flag}" ${_var})
-    # Instead we use older CXX check here.
-    check_cxx_compiler_flag("-xhip ${_flag}" ${_var})
-  endif()
-endfunction(hip_check_compiler_flag)
-
-# Check if HIP language is supported.
-# TODO: remove this if cmake version is >= 3.19
-hip_check_compiler_flag("-xhip" HIP_COMPILER_SUPPORTS_HIP)
-if (NOT HIP_COMPILER_SUPPORTS_HIP)
-  message(FATAL_ERROR "Device compiler must support the HIP language (e.g. '-xhip' on clang).")
-endif()
+include(CheckCompilerFlag)
 
 # Enable offload compress.
 if(BUILD_OFFLOAD_COMPRESS)
@@ -194,7 +156,7 @@ if(BUILD_OFFLOAD_COMPRESS)
   endif()
 
   # Detect capability and add flag.
-  hip_check_compiler_flag("--offload-compress" HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
+  cmake_check_compiler_flag(HIP "--offload-compress" HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
   if(HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
     add_compile_options("--offload-compress")
   else()
