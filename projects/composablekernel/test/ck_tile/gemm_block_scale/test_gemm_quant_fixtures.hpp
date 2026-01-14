@@ -315,6 +315,7 @@ class TestCkTileGemmAQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGem
                                                                      AccDataType,
                                                                      CodegenGemmShape,
                                                                      CodegenGemmTraits,
+                                                                     ComputeDataType,
                                                                      ComputeDataType>;
 
         using BaseGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>;
@@ -589,6 +590,7 @@ class TestCkTileGemmBQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGem
                                                                      AccDataType,
                                                                      CodegenGemmShape,
                                                                      CodegenGemmTraits,
+                                                                     ComputeDataType,
                                                                      ComputeDataType>;
 
         using BaseGemmPipeline = std::conditional_t<
@@ -896,6 +898,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                                                      AccDataType,
                                                                      CodegenGemmShape,
                                                                      CodegenGemmTraits,
+                                                                     ComputeDataType,
                                                                      ComputeDataType>;
 
         using BaseGemmPipeline = std::conditional_t<
@@ -1131,6 +1134,7 @@ class TestCkTileGemmRowColQuant
                                                                      AccDataType,
                                                                      CodegenGemmShape,
                                                                      CodegenGemmTraits,
+                                                                     ComputeDataType,
                                                                      ComputeDataType>;
 
         using BaseGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>;
@@ -1345,6 +1349,7 @@ class TestCkTileGemmTensorQuant
                                                                      AccDataType,
                                                                      CodegenGemmShape,
                                                                      CodegenGemmTraits,
+                                                                     ComputeDataType,
                                                                      ComputeDataType>;
 
         using BaseGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>;

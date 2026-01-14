@@ -63,11 +63,20 @@ struct BasicInvoker
                                                           BLayout,
                                                           CLayout>;
 
+        using AComputeDataType =
+            std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>;
+        using BComputeDataType =
+            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
+                                   std::is_same_v<BDataType, ck_tile::pk_fp4_raw_t>,
+                               ADataType,
+                               BDataType>;
         using CodegenPipelineProblem = ck_tile::GemmPipelineProblem<ADataType,
                                                                     BDataType,
                                                                     AccDataType,
                                                                     CodegenGemmShape,
-                                                                    CodegenGemmTraits>;
+                                                                    CodegenGemmTraits,
+                                                                    AComputeDataType,
+                                                                    BComputeDataType>;
 
         using CodegenGemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
 

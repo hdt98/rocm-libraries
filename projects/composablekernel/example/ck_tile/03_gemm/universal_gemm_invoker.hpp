@@ -17,8 +17,7 @@ struct UniversalInvoker
               typename DsLayout,
               typename ELayout,
               bool Persistent,
-              typename CDEElementWise,
-              typename ComputeDataType = ADataType>
+              typename CDEElementWise>
     static float gemm(const ck_tile::GemmHostArgs& args,
                       const ck_tile::stream_config& s,
                       bool check_arg_only = false)
@@ -69,6 +68,11 @@ struct UniversalInvoker
 
         constexpr auto scheduler = GemmConfig::Scheduler;
 
+        using AComputeDataType =
+            std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>;
+        using BComputeDataType =
+            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>;
+
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataType,
                                                   BDataType,
@@ -78,7 +82,8 @@ struct UniversalInvoker
                                                   scheduler,
                                                   ck_tile::element_wise::PassThrough,
                                                   ck_tile::element_wise::PassThrough,
-                                                  ComputeDataType>;
+                                                  AComputeDataType,
+                                                  BComputeDataType>;
 
         using GemmPipeline = typename PipelineTypeTraits<
             GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
@@ -102,12 +107,13 @@ struct UniversalInvoker
                                              GemmConfig::K_Warp_Tile,
                                              UniversalGemmProblem::TransposeC,
                                              GemmConfig::NumWaveGroups,
-                                             false, /*FixedVectorSize_*/
-                                             1,     /*VectorSizeC_*/
-                                             false, /*TiledMMAPermuteN_*/
-                                             1,     /*BlockedXDLN_PerWarp_*/
-                                             GemmConfig::DoubleSmemBuffer,
-                                             /*DoubleSmemBuffer*/ ComputeDataType>>::Epilogue;
+                                             false,                        /*FixedVectorSize_*/
+                                             1,                            /*VectorSizeC_*/
+                                             false,                        /*TiledMMAPermuteN_*/
+                                             1,                            /*BlockedXDLN_PerWarp_*/
+                                             GemmConfig::DoubleSmemBuffer, /*DoubleSmemBuffer*/
+                                             AComputeDataType,
+                                             BComputeDataType>>::Epilogue;
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 

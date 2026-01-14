@@ -19,7 +19,8 @@ struct TdmEpilogue
     using ODataType                        = remove_cvref_t<typename Problem::ODataType>;
     using DsDataType                       = remove_cvref_t<typename Problem::DsDataType>;
     using DsLayout                         = remove_cvref_t<typename Problem::DsLayout>;
-    using ComputeDataType                  = remove_cvref_t<typename Problem::ComputeDataType>;
+    using AComputeDataType                 = remove_cvref_t<typename Problem::AComputeDataType>;
+    using BComputeDataType                 = remove_cvref_t<typename Problem::BComputeDataType>;
     static constexpr bool ADataTypeIsTuple = is_detected<is_tuple, AsDataType>::value;
     static constexpr bool BDataTypeIsTuple = is_detected<is_tuple, BsDataType>::value;
 
@@ -34,14 +35,14 @@ struct TdmEpilogue
     using ADataType  = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
     using BDataType  = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
     using ATypeToUse = std::conditional_t<
-        std::is_same_v<ComputeDataType, void>,
+        std::is_same_v<AComputeDataType, void>,
         std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>,
-        ComputeDataType>;
+        AComputeDataType>;
     // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
     using BTypeToUse = std::conditional_t<
-        std::is_same_v<ComputeDataType, void>,
+        std::is_same_v<BComputeDataType, void>,
         std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>,
-        ComputeDataType>;
+        BComputeDataType>;
     using ELayout       = remove_cvref_t<typename Problem::ELayout>;
     using CDElementwise = remove_cvref_t<typename Problem::CDElementwise>;
     static constexpr memory_operation_enum MemoryOperation = Problem::MemoryOperation;

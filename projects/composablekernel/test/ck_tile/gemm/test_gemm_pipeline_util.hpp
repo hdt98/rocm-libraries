@@ -194,6 +194,10 @@ class TestCkTileGemmPipeline : public ::testing::Test
     static constexpr ck_tile::index_t N_Warp_Tile = std::tuple_element_t<11, Tuple>{};
     static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<ADataType, M_Warp_Tile>();
 
+    using AComputeDataType = ADataType;
+    using BComputeDataType =
+        std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>;
+
     using DsLayout   = ck_tile::tuple<>;
     using DsDataType = ck_tile::tuple<>;
 
@@ -278,12 +282,17 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                                                      NumWaveGroup,
                                                                      preshuffle>;
 
-        using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                           BDataType,
-                                                                           AccDataType,
-                                                                           GemmShape,
-                                                                           GemmUniversalTraits,
-                                                                           Scheduler>;
+        using UniversalGemmProblem =
+            ck_tile::UniversalGemmPipelineProblem<ADataType,
+                                                  BDataType,
+                                                  AccDataType,
+                                                  GemmShape,
+                                                  GemmUniversalTraits,
+                                                  Scheduler,
+                                                  ck_tile::element_wise::PassThrough,
+                                                  ck_tile::element_wise::PassThrough,
+                                                  AComputeDataType,
+                                                  BComputeDataType>;
 
         using GemmPipeline =
             typename GemmPipelineTypeSelector<PipelineType, UniversalGemmProblem>::pipeline;
@@ -306,12 +315,14 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                              N_Warp_Tile,
                                              K_Warp_Tile,
                                              UniversalGemmProblem::TransposeC,
-                                             1,     /*kNumWaveGroups_*/
-                                             false, /*FixedVectorSize_*/
-                                             1,     /*VectorSizeC_*/
-                                             false, /*TiledMMAPermuteN_*/
-                                             1,     /*BlockedXDLN_PerWarp_*/
-                                             DoubleSmemBuffer /*DoubleSmemBuffer*/>>::epilogue;
+                                             1,                /*kNumWaveGroups_*/
+                                             false,            /*FixedVectorSize_*/
+                                             1,                /*VectorSizeC_*/
+                                             false,            /*TiledMMAPermuteN_*/
+                                             1,                /*BlockedXDLN_PerWarp_*/
+                                             DoubleSmemBuffer, /*DoubleSmemBuffer*/
+                                             AComputeDataType, /*AComputeDataType_*/
+                                             BComputeDataType /*BComputeDataType_*/>>::epilogue;
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
         auto kargs   = Kernel::MakeKernelArgs(args);

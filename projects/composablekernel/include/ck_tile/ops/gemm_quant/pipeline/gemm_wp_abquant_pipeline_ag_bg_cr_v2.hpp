@@ -18,16 +18,17 @@ namespace ck_tile {
 template <typename Problem, typename PipelinePolicy = GemmWPABQuantPipelineAgBgCrPolicy>
 struct WPABQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV2<Problem>
 {
-    using Base            = WeightPreshufflePipelineAGmemBGmemCRegV2<Problem>;
-    using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-    using AQDataType      = remove_cvref_t<typename Problem::AQDataType>;
-    using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-    using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
-    using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-    using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-    using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>;
-    using AQuantGroupSize = remove_cvref_t<typename Problem::AQuantGroupSize>;
-    using BQuantGroupSize = remove_cvref_t<typename Problem::BQuantGroupSize>;
+    using Base             = WeightPreshufflePipelineAGmemBGmemCRegV2<Problem>;
+    using ADataType        = remove_cvref_t<typename Problem::ADataType>;
+    using AQDataType       = remove_cvref_t<typename Problem::AQDataType>;
+    using BDataType        = remove_cvref_t<typename Problem::BDataType>;
+    using BQDataType       = remove_cvref_t<typename Problem::BQDataType>;
+    using CDataType        = remove_cvref_t<typename Problem::CDataType>;
+    using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
+    using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
+    using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
+    using AQuantGroupSize  = remove_cvref_t<typename Problem::AQuantGroupSize>;
+    using BQuantGroupSize  = remove_cvref_t<typename Problem::BQuantGroupSize>;
 
     using ALayout  = remove_cvref_t<typename Problem::ALayout>;
     using BLayout  = remove_cvref_t<typename Problem::BLayout>;

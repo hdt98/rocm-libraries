@@ -151,21 +151,24 @@ struct GemmPipelineAgBgCrImplBase
             load_tile(dst_block_tile, lds_tile_window);
     }
 
-    template <typename OverrideADataType = ADataType, typename OverrideBDataType = BDataType>
     CK_TILE_DEVICE auto GetABLdsTensorViews(void* p_smem) const
     {
+        using ALdsType = typename Policy::template ALdsDataType_<Problem>;
+        using BLdsType = typename Policy::template BLdsDataType_<Problem>;
         // A tile in LDS
-        OverrideADataType* __restrict__ p_a_lds = static_cast<OverrideADataType*>(p_smem);
-        constexpr auto a_lds_block_desc =
-            Policy::template MakeALdsBlockDescriptor<Problem, OverrideADataType>();
+        ALdsType* __restrict__ p_a_lds  = static_cast<ALdsType*>(p_smem);
+        constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
         auto a_lds_block = make_tensor_view<address_space_enum::lds>(p_a_lds, a_lds_block_desc);
+
+        constexpr index_t APackedSize =
+            ck_tile::numeric_traits<remove_cvref_t<ALdsType>>::PackedSize;
 
         // TODO: LDS alignment should come from Policy!
         constexpr index_t a_lds_block_space_size_aligned = integer_least_multiple(
-            sizeof(OverrideADataType) * a_lds_block_desc.get_element_space_size(), 16);
+            sizeof(ALdsType) * a_lds_block_desc.get_element_space_size() / APackedSize, 16);
 
         // B tile in LDS
-        OverrideBDataType* __restrict__ p_b_lds = static_cast<OverrideBDataType*>(
+        BLdsType* __restrict__ p_b_lds = static_cast<BLdsType*>(
             static_cast<void*>(static_cast<char*>(p_smem) + a_lds_block_space_size_aligned));
         constexpr auto b_lds_block_desc = Policy::template MakeBLdsBlockDescriptor<Problem>();
         auto b_lds_block = make_tensor_view<address_space_enum::lds>(p_b_lds, b_lds_block_desc);
@@ -177,21 +180,27 @@ struct GemmPipelineAgBgCrImplBase
     template <index_t num_lds_buffers>
     CK_TILE_DEVICE auto GetABLdsTensorViews(void* p_smem) const
     {
-
+        using ALdsType                  = typename Policy::template ALdsDataType_<Problem>;
+        using BLdsType                  = typename Policy::template BLdsDataType_<Problem>;
         constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
         constexpr auto b_lds_block_desc = Policy::template MakeBLdsBlockDescriptor<Problem>();
 
+        constexpr index_t APackedSize =
+            ck_tile::numeric_traits<remove_cvref_t<ALdsType>>::PackedSize;
+        constexpr index_t BPackedSize =
+            ck_tile::numeric_traits<remove_cvref_t<BLdsType>>::PackedSize;
+
         constexpr index_t a_lds_block_space_size_aligned = integer_least_multiple(
-            sizeof(ADataType) * a_lds_block_desc.get_element_space_size(), 16);
+            sizeof(ALdsType) * a_lds_block_desc.get_element_space_size() / APackedSize, 16);
         constexpr index_t b_lds_block_space_size_aligned = integer_least_multiple(
-            sizeof(BDataType) * b_lds_block_desc.get_element_space_size(), 16);
+            sizeof(BLdsType) * b_lds_block_desc.get_element_space_size() / BPackedSize, 16);
 
         constexpr index_t all_a_buffers_size = a_lds_block_space_size_aligned * num_lds_buffers;
 
         // num_lds_buffers a_lds_block: [A_0][A_1]
         auto a_lds_blocks = generate_tuple(
             [&](auto i) {
-                ADataType* __restrict__ p_a_lds = static_cast<ADataType*>(static_cast<void*>(
+                ALdsType* __restrict__ p_a_lds = static_cast<ALdsType*>(static_cast<void*>(
                     static_cast<char*>(p_smem) + a_lds_block_space_size_aligned * i.value));
                 return make_tensor_view<address_space_enum::lds>(p_a_lds, a_lds_block_desc);
             },
@@ -200,7 +209,7 @@ struct GemmPipelineAgBgCrImplBase
         // num_lds_buffers b_lds_block: [B_0][B_1]
         auto b_lds_blocks = generate_tuple(
             [&](auto i) {
-                BDataType* __restrict__ p_b_lds = static_cast<BDataType*>(
+                BLdsType* __restrict__ p_b_lds = static_cast<BLdsType*>(
                     static_cast<void*>(static_cast<char*>(p_smem) + all_a_buffers_size +
                                        b_lds_block_space_size_aligned * i.value));
                 return make_tensor_view<address_space_enum::lds>(p_b_lds, b_lds_block_desc);

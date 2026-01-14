@@ -259,6 +259,9 @@ struct UniversalGemmKernel
     using ADataType = remove_cvref_t<std::tuple_element_t<I0, AsDataType>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<I0, BsDataType>>;
 
+    static constexpr index_t APackedSize = numeric_traits<ADataType>::PackedSize;
+    static constexpr index_t BPackedSize = numeric_traits<BDataType>::PackedSize;
+
     static_assert(AsLayout::size() == AsDataType::size(),
                   "The size of AsLayout and AsDataType should be the same");
 
@@ -492,9 +495,7 @@ struct UniversalGemmKernel
                 }
                 if(kargs.K % vectorSizeA != 0)
                 {
-                    const auto remainder = kargs.K % vectorSizeA;
-                    constexpr ck_tile::index_t APackedSize =
-                        ck_tile::numeric_traits<ADataType>::PackedSize;
+                    const auto remainder          = kargs.K % vectorSizeA;
                     const auto remainder_in_bytes = remainder * sizeof(ADataType) / APackedSize;
                     // oob can support to dword level
                     if(remainder_in_bytes % 4 == 0)
@@ -524,9 +525,7 @@ struct UniversalGemmKernel
                 }
                 if(kargs.M % vectorSizeA != 0)
                 {
-                    const auto remainder = kargs.M % vectorSizeA;
-                    constexpr ck_tile::index_t APackedSize =
-                        ck_tile::numeric_traits<ADataType>::PackedSize;
+                    const auto remainder          = kargs.M % vectorSizeA;
                     const auto remainder_in_bytes = remainder * sizeof(ADataType) / APackedSize;
                     // oob can support to dword level
                     if(remainder_in_bytes % 4 == 0)
@@ -563,9 +562,7 @@ struct UniversalGemmKernel
                 }
                 if(kargs.N % vectorSizeB != 0)
                 {
-                    const auto remainder = kargs.N % vectorSizeB;
-                    constexpr ck_tile::index_t BPackedSize =
-                        ck_tile::numeric_traits<BDataType>::PackedSize;
+                    const auto remainder          = kargs.N % vectorSizeB;
                     const auto remainder_in_bytes = remainder * sizeof(BDataType) / BPackedSize;
                     // oob can support to dword level
                     if(remainder_in_bytes % 4 == 0)
@@ -581,40 +578,36 @@ struct UniversalGemmKernel
                         BsTensorIsValid = false;
                     }
                 }
-                else
+            }
+            else
+            {
+                if(kargs.K % (TilePartitioner::KPerBlock * kargs.k_batch) != 0 &&
+                   GemmPipeline::kPadK == false)
                 {
-                    if(kargs.K % (TilePartitioner::KPerBlock * kargs.k_batch) != 0 &&
-                       GemmPipeline::kPadK == false)
+                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                    {
+                        CK_TILE_ERROR(
+                            "Can't support K that is not a multiple of k_batch * KPerBlock "
+                            "without padding!");
+                    }
+                    BsTensorIsValid = false;
+                }
+                if(kargs.K % vectorSizeB != 0)
+                {
+                    const auto remainder          = kargs.K % vectorSizeB;
+                    const auto remainder_in_bytes = remainder * sizeof(BDataType) / BPackedSize;
+                    // oob can support to dword level
+                    if(remainder_in_bytes % 4 == 0)
+                    {
+                        BsTensorIsValid = true;
+                    }
+                    else
                     {
                         if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
                         {
-                            CK_TILE_ERROR(
-                                "Can't support K that is not a multiple of k_batch * KPerBlock "
-                                "without padding!");
+                            CK_TILE_ERROR("K is not a multiple of vector load size for B tensor!");
                         }
                         BsTensorIsValid = false;
-                    }
-
-                    if(kargs.K % vectorSizeB != 0)
-                    {
-                        const auto remainder = kargs.K % vectorSizeB;
-                        constexpr ck_tile::index_t BPackedSize =
-                            ck_tile::numeric_traits<BDataType>::PackedSize;
-                        const auto remainder_in_bytes = remainder * sizeof(BDataType) / BPackedSize;
-                        // oob can support to dword level
-                        if(remainder_in_bytes % 4 == 0)
-                        {
-                            BsTensorIsValid = true;
-                        }
-                        else
-                        {
-                            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                            {
-                                CK_TILE_ERROR(
-                                    "K is not a multiple of vector load size for B tensor!");
-                            }
-                            BsTensorIsValid = false;
-                        }
                     }
                 }
             }
@@ -1232,13 +1225,13 @@ struct UniversalGemmKernel
         std::array<const ADataType*, NumATensor> as_ptr;
         static_for<0, NumATensor, 1>{}([&](auto i) {
             as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) +
-                        splitk_batch_offset.as_k_split_offset[i];
+                        splitk_batch_offset.as_k_split_offset[i] / APackedSize;
         });
 
         std::array<const BDataType*, NumBTensor> bs_ptr;
         static_for<0, NumBTensor, 1>{}([&](auto i) {
             bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) +
-                        splitk_batch_offset.bs_k_split_offset[i];
+                        splitk_batch_offset.bs_k_split_offset[i] / BPackedSize;
         });
 
         // Calculate output offset from tile partitioner and apply to output pointer
@@ -1283,13 +1276,13 @@ struct UniversalGemmKernel
             std::array<const ADataType*, NumATensor> as_ptr;
             static_for<0, NumATensor, 1>{}([&](auto i) {
                 as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) +
-                            splitk_batch_offset.as_k_split_offset[i];
+                            splitk_batch_offset.as_k_split_offset[i] / APackedSize;
             });
 
             std::array<const BDataType*, NumBTensor> bs_ptr;
             static_for<0, NumBTensor, 1>{}([&](auto i) {
                 bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) +
-                            splitk_batch_offset.bs_k_split_offset[i];
+                            splitk_batch_offset.bs_k_split_offset[i] / BPackedSize;
             });
 
             // Calculate output offset from tile partitioner and apply to output pointer

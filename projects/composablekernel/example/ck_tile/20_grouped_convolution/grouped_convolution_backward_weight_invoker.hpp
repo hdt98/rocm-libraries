@@ -69,6 +69,7 @@ struct GroupedConvolutionBackwardWeightInvoker
             ck_tile::element_wise::PassThrough,
             ck_tile::element_wise::PassThrough,
             WeiDataType,
+            WeiDataType, // TODO: need to double check
             GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
             GroupedConvTraitsType::VectorSizeA,
             GroupedConvTraitsType::VectorSizeB>;
