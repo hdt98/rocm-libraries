@@ -484,11 +484,10 @@ rocsparse_status rocsparse::csrmv_nnzsplit_template_dispatch(rocsparse_handle   
     // Check if pre-extracted arrays are available in spmv descriptor
     if(num_extra > 0)
     {
-        if(handle && handle->temp_spmv_descr
-           && rocsparse_spmv_has_device_arrays(handle->temp_spmv_descr))
+        if(handle && handle->temp_spmv_descr && spmv_has_device_arrays(handle->temp_spmv_descr))
         {
-            gamma_device_array = rocsparse::get_gamma_array_helper<T>(handle->temp_spmv_descr);
-            z_array            = rocsparse::get_z_array_helper<Z>(handle->temp_spmv_descr);
+            gamma_device_array = rocsparse::spmv_get_gamma_device_array<T>(handle->temp_spmv_descr);
+            z_array            = rocsparse::spmv_get_z_array<Z>(handle->temp_spmv_descr);
         }
         else
         {
@@ -587,9 +586,15 @@ INSTANTIATE(int64_t, int64_t, int8_t);
 INSTANTIATE(float, int32_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, float);
 INSTANTIATE(float, int64_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, float);
 INSTANTIATE(float, int64_t, int64_t, rocsparse_bfloat16, rocsparse_bfloat16, float);
+INSTANTIATE(float, int32_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, rocsparse_bfloat16);
+INSTANTIATE(float, int64_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, rocsparse_bfloat16);
+INSTANTIATE(float, int64_t, int64_t, rocsparse_bfloat16, rocsparse_bfloat16, rocsparse_bfloat16);
 INSTANTIATE(float, int32_t, int32_t, _Float16, _Float16, float);
 INSTANTIATE(float, int64_t, int32_t, _Float16, _Float16, float);
 INSTANTIATE(float, int64_t, int64_t, _Float16, _Float16, float);
+INSTANTIATE(float, int32_t, int32_t, _Float16, _Float16, _Float16);
+INSTANTIATE(float, int64_t, int32_t, _Float16, _Float16, _Float16);
+INSTANTIATE(float, int64_t, int64_t, _Float16, _Float16, _Float16);
 INSTANTIATE(float, int32_t, int32_t, float, float, float);
 INSTANTIATE(float, int64_t, int32_t, float, float, float);
 INSTANTIATE(float, int64_t, int64_t, float, float, float);
