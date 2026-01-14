@@ -2329,6 +2329,50 @@ struct XdlopsGemm
                        Sequence<5, 6, 7>{}));
     }
 
+    // transposed XDL output supporting C' = B' * A'
+    // M3_N3 -> M3_N3_N4_N5
+    template <typename CDesc_M0_N0_M1_N1_M2_N2>
+    __host__ __device__ static constexpr auto MakeCDescriptor_M0_N0_M1_N1_M2_N2_M3_N3_N4_N5(
+        const CDesc_M0_N0_M1_N1_M2_N2& c_desc_m0_n0_m1_n1_m2_n2)
+    {
+        const auto M0           = c_desc_m0_n0_m1_n1_m2_n2.GetLength(I0);
+        const auto N0           = c_desc_m0_n0_m1_n1_m2_n2.GetLength(I1);
+        const auto M1           = c_desc_m0_n0_m1_n1_m2_n2.GetLength(I2);
+        const auto N1           = c_desc_m0_n0_m1_n1_m2_n2.GetLength(I3);
+        const auto M2           = c_desc_m0_n0_m1_n1_m2_n2.GetLength(I4);
+        const auto N2           = c_desc_m0_n0_m1_n1_m2_n2.GetLength(I5);
+        constexpr auto num_blks = mfma_instr.m_per_blk / mfma_instr.num_regs_per_blk;
+
+        return transform_tensor_descriptor(
+            c_desc_m0_n0_m1_n1_m2_n2,
+            make_tuple(make_pass_through_transform(M0),
+                       make_pass_through_transform(N0),
+                       make_pass_through_transform(M1),
+                       make_pass_through_transform(N1),
+                       make_pass_through_transform(M2),
+                       make_pass_through_transform(N2),
+                       make_pass_through_transform(Number<mfma_instr.num_threads_per_blk>{}),
+                       make_unmerge_transform(make_tuple(Number<mfma_instr.num_groups_per_blk>{},
+                                                         Number<num_blks>{},
+                                                         Number<mfma_instr.group_size>{}))),
+            make_tuple(Sequence<0>{},
+                       Sequence<1>{},
+                       Sequence<2>{},
+                       Sequence<3>{},
+                       Sequence<4>{},
+                       Sequence<5>{},
+                       Sequence<6>{},
+                       Sequence<7>{}),
+            make_tuple(Sequence<0>{},
+                       Sequence<1>{},
+                       Sequence<2>{},
+                       Sequence<3>{},
+                       Sequence<4>{},
+                       Sequence<5>{},
+                       Sequence<6>{},
+                       Sequence<7, 8, 9>{}));
+    }
+
     template <typename CDesc_G_M0_N0_M1_N1_M2_N2>
     __host__ __device__ static constexpr auto MakeCDescriptor_G_M0_N0_M1_N1_M2_M3_M4_N2(
         const CDesc_G_M0_N0_M1_N1_M2_N2& c_desc_g_m0_n0_m1_n1_m2_n2)
