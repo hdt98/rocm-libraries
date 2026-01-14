@@ -1440,9 +1440,9 @@ class Solution(collections.abc.Mapping):
       
     # Complex datatype restrictions.
     if state["ProblemType"]["DataType"].isComplex():
-      if state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1:
-        reject(state, printRejectionReason, "Complex datatype kernel does not support GSU yet.")
-        return
+      # if state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1:
+      #   reject(state, printRejectionReason, "Complex datatype kernel does not support GSU yet.")
+      #   return
       if state["MIArchVgpr"]:
         reject(state, printRejectionReason, "Complex datatype kernel does not support MIArchVgpr yet.")
         return

@@ -1,0 +1,197 @@
+1887198
+
+################################################################################
+#
+#  Tensile v5.0.0
+#  OutputPath: /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext
+#  Config: /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/zgemm_asm.yaml
+#  Date & Time: 19/09/2025 14:48:44
+#
+################################################################################
+
+# Restoring default globalParameters
+# Code Object Version: 4
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+Tensile::WARNING: HardwareMonitor currently disabled for gfx950
+Capability         gfx950
+HasMFMA_bf16_1k    1     
+HasAddLshl         1     
+HasAtomicAdd       1     
+HasBF16CVT         1     
+HasDirectToLds     1     
+HasDirectToLdsx4   1     
+HasExplicitCO      1     
+HasExplicitNC      -     
+HasGLCModifier     -     
+HasLDSTr           1     
+HasLshlOr          1     
+HasMFMA            1     
+HasMUBUFConst      1     
+HasNTModifier      1     
+HasNewBarrier      -     
+HasSCMPK           1     
+HasSMFMA           1     
+HasSMulHi          1     
+HasWMMA            -     
+MaxLgkmcnt         1     
+MaxVmcnt           1     
+SeparateLGKMcnt    -     
+SeparateVMcnt      -     
+SeparateVscnt      -     
+SupportedISA       1     
+SupportedSource    1     
+HasWMMA_V1         -     
+HasWMMA_V2         -     
+s_delay_alu        -     
+v_prng_b32         1     
+v_mov_b64          1     
+HasMFMA_b8         1     
+v_dot2_f32_bf16    1     
+v_dot2c_f32_bf16   1     
+HasMFMA_explictB   1     
+Hascvtfp8_f16      1     
+v_dot2_f32_f16     1     
+v_dot2c_f32_f16    1     
+v_fma_f16          1     
+v_fmac_f16         -     
+v_mac_f16          1     
+v_pk_fma_f16       1     
+v_pk_fmac_f16      -     
+v_fma_f32          1     
+v_fma_mix_f32      1     
+v_fmac_f32         1     
+v_mac_f32          -     
+v_mad_mix_f32      -     
+v_pk_add_f32       1     
+v_pk_mul_f32       1     
+HasMFMA_f64        1     
+v_fma_f64          1     
+HasMFMA_f8         1     
+HasMFMA_f8f6f4     1     
+Hascvtf16_fp8      1     
+VOP3v_dot4_i32_i8  1     
+v_dot4_i32_i8      -     
+v_dot4c_i32_i8     1     
+HasMFMA_xf32       -     
+ArchAccUnifiedRegs 1     
+CMPXWritesSGPR     1     
+CrosslaneWait      1     
+DSLow16NotPreserve -     
+DeviceLDS          1     
+HasAccCD           1     
+HasEccHalf         1     
+HasF32XEmulation   1     
+HasFP8_OCP         -     
+HasSchedMode       -     
+HasWave32          -     
+NoSDWA             -     
+SDWAWait           1     
+TransOpWait        1     
+VOP3ByteSel        -     
+VgprBank           -     
+Waitcnt0Disabled   1     
+WorkGroupIdFromTTM -     
+# Found hipcc version 7.0.51831-a3e329ad8
+Tensile::WARNING: Global parameter PrintSolutionRejectionReason = True unrecognised.
+# Command-line override: CodeObjectVersion
+Overriding CodeObjectVersion=4
+Overriding PrebuiltClient=/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp/tensilelite/client/tensilelite-client
+
+################################################################################
+# Converting Config to BenchmarkProcess Object
+################################################################################
+
+# Filling in Parameters With Defaults
+# Convert Parameters to Benchmark Step(s)
+# Benchmark Final
+# NumBenchmarkSteps: 1
+
+################################################################################
+# Done Creating BenchmarkProcess Object
+################################################################################
+
+
+################################################################################
+# Benchmark Step: Cijk_Ailk_Bljk_Z_B_UserArgs_00 - 00_Final 0.765s
+# Num Sizes: 1
+# Factor Dim steps: 0
+# Bias Type steps: 0
+# Activation steps: 0
+# ICacheFlush steps: 1
+# Fork Parameters:
+#     DepthU: [8, 16, 32]
+# Enumerating Solutions
+
+reject: Kernel Uses 198656 > 163840 bytes of LDS
+# Actual Solutions: 2 / 3 after SolutionStructs
+
+[||||||||||||||||||||||||||||||||||||                                     ]  50%[|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||] 100% (0.0 secs elapsed)
+Number of duplicate kernels: 0
+Generating assembly kernels: Launching 256 threads...
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/externals/loky/process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/externals/loky/process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 607, in <listcomp>
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Common/Parallel.py", line 66, in pcallWithGlobalParamsMultiArg
+    return f(*args)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/TensileCreateLibrary/Run.py", line 107, in processKernelSource
+    err, src = kernelWriter.getSourceFileString(kernel)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/KernelWriterAssembly.py", line 165, in getSourceFileString
+    code = self._getCustomKernelSource(kernel, CUSTOM_KERNEL_PATH) if isCustomKernelConfig(kernel) else self._getKernelSource(kernel)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/KernelWriter.py", line 5539, in _getKernelSource
+    (error, kb) = self.kernelBody(kernel, tensorParametersA, tensorParametersB)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/KernelWriter.py", line 2719, in kernelBody
+    module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB, tPM))
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/KernelWriterAssembly.py", line 2162, in defineAndResources
+    module.add(BranchIfNotZero("Alpha", kernel["ProblemType"]["ComputeDataType"].toEnum(), endCheckLabel))
+ValueError: stoi
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/../Tensile/bin/Tensile", line 39, in <module>
+    Tensile.main()
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tensile.py", line 658, in main
+    Tensile(sys.argv[1:])
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tensile.py", line 615, in Tensile
+    executeStepsInConfig(config, outputPath, asmToolchain, srcToolchain, isaInfoMap, cCompiler, debugConfig, device_id, prob_sol_map)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tensile.py", line 103, in executeStepsInConfig
+    BenchmarkProblems.main(
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/BenchmarkProblems.py", line 548, in main
+    _benchmarkProblemType(
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/BenchmarkProblems.py", line 428, in _benchmarkProblemType
+    codeObjectFiles = writeBenchmarkFiles(stepBaseDir, solutions, \
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/BenchmarkProblems.py", line 242, in writeBenchmarkFiles
+    codeObjectFiles, _= writeSolutionsAndKernels( \
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/TensileCreateLibrary/Run.py", line 277, in writeSolutionsAndKernels
+    asmResults = ParallelMap2(processKernelSource, asmIter, "Generating assembly kernels", return_as="list")
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Common/Parallel.py", line 240, in ParallelMap2
+    rv = Parallel(n_jobs=threadCount, timeout=99999, return_as=return_as)(
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 758, in get_result
+    return self._return_or_raise()
+  File "/home/mchirila/.local/lib/python3.10/site-packages/joblib/parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: stoi

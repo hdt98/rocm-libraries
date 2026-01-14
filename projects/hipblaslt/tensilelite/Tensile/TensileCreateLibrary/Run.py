@@ -327,7 +327,7 @@ def writeSolutionsAndKernels(
             assemblyTmpPath,
             compress,
         )
-        if not complexKernel:
+        if complexKernel:#not complexKernel:
             buildSourceCodeObjectFiles(
                 srcToolchain.compiler,
                 srcToolchain.bundler,
@@ -433,7 +433,7 @@ def writeSolutionsAndKernelsTCL(
     for ko in kernelHelperObjs:
         if ko.state["ProblemType"]["DataType"].isComplex(): complexKernel = True
 
-    if not complexKernel:
+    if complexKernel:#not complexKernel:
         buildSourceCodeObjectFiles(
             srcToolchain.compiler,
             srcToolchain.bundler,
@@ -646,6 +646,9 @@ def run():
     print1("# Tensile Create Library")
     print2(HR)
     print2("")
+
+    # import debugpy
+    # (debugpy.listen(("0.0.0.0", 5678)), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
 
     arguments = parseArguments()
     setVerbosity(arguments["PrintLevel"])

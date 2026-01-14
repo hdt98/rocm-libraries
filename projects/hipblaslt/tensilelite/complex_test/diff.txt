@@ -1,0 +1,91 @@
+diff --git a/projects/hipblaslt/tensilelite/Tensile/KernelWriter.py b/projects/hipblaslt/tensilelite/Tensile/KernelWriter.py
+index 25f1631b06..a0facd6bb9 100644
+--- a/projects/hipblaslt/tensilelite/Tensile/KernelWriter.py
++++ b/projects/hipblaslt/tensilelite/Tensile/KernelWriter.py
+@@ -4438,8 +4438,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
+ 
+     # for zgemm + (SCIU or MIAV) case, allocate 4 vgpr for alpha calculation (cannot use tmp vgpr in unroll loop or write batch)
+     if kernel["ProblemType"]["DataType"].isComplex() \
+-        and (kernel["StoreCInUnroll"] or kernel["MIArchVgpr"]) \
+-        and (kernel["_GlobalAccumulation"] != 'MultipleBuffer'):
++      and (kernel["_GlobalAccumulation"] != 'MultipleBuffer'):
++      # and (kernel["StoreCInUnroll"] or kernel["MIArchVgpr"]) \
+       # need proper alignment
+       vgprIdx = ((vgprIdx+2 - 1)//2)*2
+       self.states.startVgprAlphaTmp = vgprIdx
+diff --git a/projects/hipblaslt/tensilelite/Tensile/KernelWriterConversion.py b/projects/hipblaslt/tensilelite/Tensile/KernelWriterConversion.py
+index 2b348cf347..e7dcc386c2 100644
+--- a/projects/hipblaslt/tensilelite/Tensile/KernelWriterConversion.py
++++ b/projects/hipblaslt/tensilelite/Tensile/KernelWriterConversion.py
+@@ -465,8 +465,10 @@ class KernelWriterConversion(KernelWriterBase):
+     #TODO: workspace type is half precision
+     if self.state["ProblemType"]["UseBias"] and self.state["ProblemType"]["Gradient"] and self.state["ProblemType"]["BiasSrc"] == "D":
+       kStr += "  auto idxW_ori = idxW;%s"%self.endLine
+-
++    #TODO: check if complex, if so, don't generate anything, return
+     typeStr = "int" if self.state["ProblemType"]["DataType"].isInt8() or self.state["ProblemType"]["DataType"].isInt32() else ("double" if self.state["ProblemType"]["DataType"].isDouble() else "float")
++    if typeStr == "float":
++      return kStr
+     typeStr2 = "int16_t" if self.state["ProblemType"]["DestDataType"].isInt8() else ("tensile_half" if self.state["ProblemType"]["DestDataType"].isAnyFloat8() else "tensile_bfloat16")
+     loadTypeStr = "%s%s" % (typeStr, "" if self.num_dword_load == 1 else self.num_dword_load)
+     storeTypeStr = "%s%s" % (typeStr, self.num_dword_store) if self.num_dword_store >= 1 else typeStr2 if self.num_dword_store == 0.5 else destTypeStr
+diff --git a/projects/hipblaslt/tensilelite/Tensile/Tensile.py b/projects/hipblaslt/tensilelite/Tensile/Tensile.py
+index 80b05c8010..b579b690f7 100644
+--- a/projects/hipblaslt/tensilelite/Tensile/Tensile.py
++++ b/projects/hipblaslt/tensilelite/Tensile/Tensile.py
+@@ -451,7 +451,12 @@ def restore_prob_sol_map(logfile):
+ ################################################################################
+ def Tensile(userArgs):
+     global globalParameters
+-
++    # # region dbpy_attach
++    # import debugpy
++    # (debugpy.listen(("0.0.0.0", 5678)), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
++    # endregion
++    print(os.getpid())
++    
+     print1("")
+     print1(HR)
+     print1("#")
+diff --git a/projects/hipblaslt/tensilelite/rocisa/rocisa/src/code.cpp b/projects/hipblaslt/tensilelite/rocisa/rocisa/src/code.cpp
+index 1de3d8aeb1..81bea60bfa 100644
+--- a/projects/hipblaslt/tensilelite/rocisa/rocisa/src/code.cpp
++++ b/projects/hipblaslt/tensilelite/rocisa/rocisa/src/code.cpp
+@@ -92,6 +92,7 @@ namespace rocisa
+            {"f16", 2},
+            {"f32", 4},
+            {"f64", 8},
++           {"f64c", 16},
+            {"pkf16", 4},
+            {"struct", 8}};
+ } // namespace rocisa
+diff --git a/shared/tensile/Tensile/BenchmarkProblems.py b/shared/tensile/Tensile/BenchmarkProblems.py
+index bdcd614725..ffe93c4d34 100644
+--- a/shared/tensile/Tensile/BenchmarkProblems.py
++++ b/shared/tensile/Tensile/BenchmarkProblems.py
+@@ -261,7 +261,8 @@ def benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSizeG
+                     c["ParamGroups"] == benchmarkStep.paramGroups and \
+                     c["CustomKernels"] == benchmarkStep.customKernels and \
+                     c["CustomKernelWildcard"] == benchmarkStep.customKernelWildcard:
+-                cacheValid = True
++                # mchirila: commenting out cacheValid
++                # cacheValid = True
+                 codeObjectFiles = c["CodeObjectFiles"]
+             else:
+                 printWarning("Cache data does not match config: redoing solution generation")
+diff --git a/shared/tensile/Tensile/Tensile.py b/shared/tensile/Tensile/Tensile.py
+index a6e16b2364..f9496a5dbe 100644
+--- a/shared/tensile/Tensile/Tensile.py
++++ b/shared/tensile/Tensile/Tensile.py
+@@ -217,6 +217,11 @@ def argUpdatedGlobalParameters(args):
+ @profile
+ def Tensile(userArgs):
+     global globalParameters
++    # region dbpy_attach
++    import debugpy
++    (debugpy.listen(("0.0.0.0", 5678)), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
++    # endregion
++
+ 
+     # 1st half of splash
+     tPrint(1, "")

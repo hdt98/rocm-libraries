@@ -1,0 +1,240 @@
+---
+CodeObjectFiles: [library/Kernels.so-000-gfx1030.hsaco, library/Kernels.so-000-gfx1150.hsaco,
+  library/Kernels.so-000-gfx1201.hsaco, library/Kernels.so-000-gfx900.hsaco, library/Kernels.so-000-gfx942.hsaco,
+  library/Kernels.so-000-gfx1010.hsaco, library/Kernels.so-000-gfx1031.hsaco, library/Kernels.so-000-gfx1012.hsaco,
+  library/Kernels.so-000-gfx906-xnack-.hsaco, library/Kernels.so-000-gfx1101.hsaco,
+  library/Kernels.so-000-gfx1102.hsaco, library/Kernels.so-000-gfx803.hsaco, library/Kernels.so-000-gfx1103.hsaco,
+  library/Kernels.so-000-gfx1200.hsaco, library/Kernels.so-000-gfx90a-xnack+.hsaco,
+  library/Kernels.so-000-gfx950.hsaco, library/Kernels.so-000-gfx908-xnack-.hsaco,
+  library/Kernels.so-000-gfx1100.hsaco, library/Kernels.so-000-gfx1011.hsaco, library/Kernels.so-000-gfx90a-xnack-.hsaco,
+  library/Kernels.so-000-gfx1151.hsaco, library/TensileLibrary_gfx950.co]
+ConstantParams:
+  1LDSBuffer: 0
+  AggressivePerfMode: 1
+  AssertAIGreaterThanEqual: -1
+  AssertAILessThanEqual: -1
+  AssertAlphaValue: false
+  AssertBetaValue: false
+  AssertCEqualsD: false
+  AssertFree0ElementMultiple: 1
+  AssertFree1ElementMultiple: 1
+  AssertMinApproxSize: -1
+  AssertSizeEqual: {}
+  AssertSizeGreaterThan: {}
+  AssertSizeLessThan: {}
+  AssertSizeMultiple: {}
+  AssertStrideAEqual: {}
+  AssertStrideBEqual: {}
+  AssertStrideCEqual: {}
+  AssertStrideDEqual: {}
+  AssertSummationElementMultiple: 1
+  AtomicAddC: false
+  BufferLoad: true
+  BufferStore: true
+  CheckDimOverflow: 0
+  CheckTensorDimAsserts: false
+  ClusterLocalRead: false
+  CustomKernelName: ''
+  DebugStreamK: 0
+<<<<<<< HEAD
+<<<<<<< HEAD
+  DepthU: 8
+=======
+  DepthU: -4
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  DepthU: 8
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  DepthULdsDivisor: 1
+  DirectToLdsA: false
+  DirectToLdsB: false
+  DirectToVgprA: false
+  DirectToVgprB: false
+  DisableAtomicFail: 0
+  DisableKernelPieces: 0
+  DisableVgprOverlapping: false
+<<<<<<< HEAD
+<<<<<<< HEAD
+  EdgeType: Branch
+=======
+  EdgeType: ShiftPtr
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  EdgeType: Branch
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  ExpandPointerSwap: true
+  ExtraLatencyForLR: 0
+  ExtraMiLatencyLeft: 0
+  ForceStoreSC1: Auto
+  Fp16AltImpl: false
+  Fp16AltImplRound: false
+  FractionalLoad: 0
+  GlobalLoadVectorWidthA: -1
+  GlobalLoadVectorWidthB: -1
+  GlobalRead2A: true
+  GlobalRead2B: true
+  GlobalReadCoalesceGroupA: true
+  GlobalReadCoalesceGroupB: true
+  GlobalReadCoalesceVectorA: true
+  GlobalReadCoalesceVectorB: true
+  GlobalReadPerMfma: 1
+  GlobalReadVectorWidth: -1
+<<<<<<< HEAD
+<<<<<<< HEAD
+  GlobalSplitU: 1
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  GlobalSplitU: 1
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  GlobalSplitUAlgorithm: SingleBuffer
+  GlobalSplitUAtomicAdd: false
+  GlobalSplitUSummationAssignmentRoundRobin: true
+  GlobalSplitUWorkGroupMappingRoundRobin: false
+  GroupLoadStore: false
+  InnerUnroll: 1
+  InterleaveAlpha: 0
+  KernelLanguage: Assembly
+  LdcEqualsLdd: false
+  LdsBlockSizePerPadA: -1
+  LdsBlockSizePerPadB: -1
+  LdsPadA: -1
+  LdsPadB: -1
+  LocalDotLayout: 1
+  LocalRead2A: true
+  LocalRead2B: true
+  LocalReadVectorWidth: -1
+  LocalWrite2A: true
+  LocalWrite2B: true
+  LocalWritePerMfma: -1
+  LoopDoWhile: false
+  LoopTail: true
+  MACInstruction: FMA
+  MIArchVgpr: false
+  MacroTileShapeMax: 64
+  MacroTileShapeMin: 1
+  MagicDivAlg: 2
+<<<<<<< HEAD
+<<<<<<< HEAD
+  MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
+=======
+  MatrixInstruction: []
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  MaxOccupancy: 40
+  MaxVgprNumber: 256
+  MemoryModifierFormat: ''
+  MinKForGSU: 256
+  MinVgprNumber: 0
+  NoReject: false
+  NonTemporalA: 0
+  NonTemporalB: 0
+  NonTemporalC: 0
+  NonTemporalD: 0
+  NumElementsPerBatchStore: 0
+  NumLoadsCoalescedA: 1
+  NumLoadsCoalescedB: 1
+  OptNoLoadLoop: 1
+  OptPreLoopVmcnt: true
+  PackBatchDims: 0
+  PackFreeDims: 1
+  PackGranularity: 2
+  PackSummationDims: 0
+  PerformanceSyncLocation: -1
+  PerformanceWaitCount: -1
+  PerformanceWaitLocation: -1
+  PersistentKernel: 0
+  PersistentKernelAlongBatch: false
+  PrefetchAcrossPersistent: 0
+  PrefetchAcrossPersistentMode: 0
+<<<<<<< HEAD
+<<<<<<< HEAD
+  PrefetchGlobalRead: true
+  PrefetchLocalRead: false
+=======
+  PrefetchGlobalRead: false
+  PrefetchLocalRead: true
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  PrefetchGlobalRead: true
+  PrefetchLocalRead: false
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  PreloadKernelArguments: 0
+  ReplacementKernel: false
+  ScheduleGlobalRead: 1
+  ScheduleIterAlg: 1
+  ScheduleLocalWrite: 1
+  SourceSwap: false
+  StaggerU: 32
+  StaggerUMapping: 0
+  StaggerUStride: 256
+  StoreCInUnroll: false
+  StoreCInUnrollExact: false
+  StoreCInUnrollInterval: 1
+  StoreCInUnrollPostLoop: false
+  StorePriorityOpt: false
+  StoreRemapVectorWidth: 0
+  StoreSyncOpt: 0
+  StoreVectorWidth: -1
+  StreamK: 0
+  StreamKAtomic: 0
+  StreamKXCCMapping: 0
+  SuppressNoLoadLoop: false
+  ThreadSeparateGlobalReadA: 0
+  ThreadSeparateGlobalReadB: 0
+<<<<<<< HEAD
+<<<<<<< HEAD
+  ThreadTile: [4, 4]
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  ThreadTile: [4, 4]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  TransposeLDS: 0
+  UnrollIncIsDepthU: 0
+  UnrollMajorLDSA: false
+  UnrollMajorLDSB: false
+  UnrollMemFence: false
+  Use64bShadowLimit: 1
+  UseInstOffsetForGRO: 0
+  UseSgprForGRO: -1
+  VectorAtomicWidth: -1
+  VectorStore: -1
+  VectorWidth: -1
+  VectorWidthB: -1
+  VgprForLocalReadPacking: false
+  WaveSeparateGlobalReadA: 0
+  WaveSeparateGlobalReadB: 0
+  WavefrontSize: 64
+<<<<<<< HEAD
+<<<<<<< HEAD
+  WorkGroup: [16, 16, 1]
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  WorkGroup: [16, 16, 1]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+  WorkGroupMapping: 8
+  WorkGroupMappingType: B
+CustomKernelWildcard: false
+CustomKernels: []
+<<<<<<< HEAD
+<<<<<<< HEAD
+ForkParams: {}
+=======
+ForkParams:
+  GlobalSplitU: [1, 3]
+  ThreadTile:
+  - [4, 8]
+  - [8, 8]
+  WorkGroup:
+  - [16, 16, 1]
+  - [32, 4, 1]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+ForkParams: {}
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
+ParamGroups: []
+...

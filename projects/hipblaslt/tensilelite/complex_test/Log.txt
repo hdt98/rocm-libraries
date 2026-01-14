@@ -1,0 +1,177 @@
+
+################################################################################
+#
+#  Tensile v5.0.0
+#  OutputPath: /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext
+#  Config: /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/zgemm_asm.yaml
+#  Date & Time: 05/09/2025 11:29:49
+#
+################################################################################
+
+# Restoring default globalParameters
+# Code Object Version: 4
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+# Detected GPU 0 with ISA: gfx950
+Tensile::WARNING: HardwareMonitor currently disabled for gfx950
+Capability         gfx950
+HasMFMA_bf16_1k    1     
+HasAddLshl         1     
+HasAtomicAdd       1     
+HasBF16CVT         1     
+HasDirectToLds     1     
+HasDirectToLdsx4   1     
+HasExplicitCO      1     
+HasExplicitNC      -     
+HasGLCModifier     -     
+HasLDSTr           1     
+HasLshlOr          1     
+HasMFMA            1     
+HasMUBUFConst      1     
+HasNTModifier      1     
+HasNewBarrier      -     
+HasSCMPK           1     
+HasSMFMA           1     
+HasSMulHi          1     
+HasWMMA            -     
+MaxLgkmcnt         1     
+MaxVmcnt           1     
+SeparateLGKMcnt    -     
+SeparateVMcnt      -     
+SeparateVscnt      -     
+SupportedISA       1     
+SupportedSource    1     
+HasWMMA_V1         -     
+HasWMMA_V2         -     
+s_delay_alu        -     
+v_prng_b32         1     
+v_mov_b64          1     
+HasMFMA_b8         1     
+v_dot2_f32_bf16    1     
+v_dot2c_f32_bf16   1     
+HasMFMA_explictB   1     
+Hascvtfp8_f16      1     
+v_dot2_f32_f16     1     
+v_dot2c_f32_f16    1     
+v_fma_f16          1     
+v_fmac_f16         -     
+v_mac_f16          1     
+v_pk_fma_f16       1     
+v_pk_fmac_f16      -     
+v_fma_f32          1     
+v_fma_mix_f32      1     
+v_fmac_f32         1     
+v_mac_f32          -     
+v_mad_mix_f32      -     
+v_pk_add_f32       1     
+v_pk_mul_f32       1     
+HasMFMA_f64        1     
+v_fma_f64          1     
+HasMFMA_f8         1     
+HasMFMA_f8f6f4     1     
+Hascvtf16_fp8      1     
+VOP3v_dot4_i32_i8  1     
+v_dot4_i32_i8      -     
+v_dot4c_i32_i8     1     
+HasMFMA_xf32       -     
+ArchAccUnifiedRegs 1     
+CMPXWritesSGPR     1     
+CrosslaneWait      1     
+DSLow16NotPreserve -     
+DeviceLDS          1     
+HasAccCD           1     
+HasEccHalf         1     
+HasF32XEmulation   1     
+HasFP8_OCP         -     
+HasSchedMode       -     
+HasWave32          -     
+NoSDWA             -     
+SDWAWait           1     
+TransOpWait        1     
+VOP3ByteSel        -     
+VgprBank           -     
+Waitcnt0Disabled   1     
+WorkGroupIdFromTTM -     
+# Found hipcc version 7.0.51831-7f77ceeaf
+Tensile::WARNING: Global parameter PrintSolutionRejectionReason = True unrecognised.
+# Command-line override: CodeObjectVersion
+Overriding CodeObjectVersion=4
+Overriding PrebuiltClient=/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp/tensilelite/client/tensilelite-client
+
+################################################################################
+# Converting Config to BenchmarkProcess Object
+################################################################################
+
+# Filling in Parameters With Defaults
+# Convert Parameters to Benchmark Step(s)
+# Benchmark Final
+# NumBenchmarkSteps: 1
+
+################################################################################
+# Done Creating BenchmarkProcess Object
+################################################################################
+
+
+################################################################################
+# Benchmark Step: Cijk_Ailk_Bljk_Z_B_UserArgs_00 - 00_Final 1.135s
+# Num Sizes: 1
+# Factor Dim steps: 0
+# Bias Type steps: 0
+# Activation steps: 0
+# ICacheFlush steps: 1
+# Fork Parameters:
+#     DepthU: [8, 16, 32]
+# Enumerating Solutions
+
+reject: Kernel Uses 198656 > 163840 bytes of LDS
+# Actual Solutions: 2 / 3 after SolutionStructs
+
+[||||||||||||||||||||||||||||||||||||                                     ]  50%[|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||] 100% (0.0 secs elapsed)
+Number of duplicate kernels: 0
+Generating assembly kernels: Launching 256 threads...
+Tensile::WARNING: Failed to generate assembly source code for Cijk_Ailk_Bljk_Z_B_UserArgs_MT64x64x16_MI16x16x1_SN_LDSB0_AA0_AFC0_AF1_AAIGTEn1_AAILTEn1_AFEM1_AFEM1_ASEM1_BL1_BS1_CLR1_CADS0_DSK0_DU16_DTL0_DTVA0_DTVB0_DTVSM0_EPS1_FDSI0_GRPM1_GRVWA1_GRVWB1_GSU1_GSUAMB_GSUC0_GSUWGMRR0_GLS0_ISA950_IU1_IA0_KLA_LDSTI0_LBSPPA1024_LBSPPB256_LBSPPM0_LPA0_LPB2_LPM0_LRVW1_LWPMn1_MIAV0_MIWT2_2_MDA2_MI16_16_4_1_MLDS163840_MO40_MPM0_NR0_NTn1_NTA0_NTB0_NTC0_NTD0_NTE0_NTM0_NTWS0_NEPBS0_NLCA1_NLCB1_ONLL1_PGR1_PLR0_PKA1_SGR1_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SPO0_SRVW0_SSO0_SVW1_SK0_SKA0_SKXCCM0_SNLL0_TT1_1_TLDS1_ULSGRO0_USL1_UIOFGRO0_USFGROn1_VSn1_VWA1_VWB1_WSGRA0_WSGRB0_WSK0_WS64_WG32_8_1_WGM8_WGMXCC1_WGMXCCGn1_WGR0: Unknown value type: f64c
+Tensile::WARNING: Failed to generate assembly source code for Cijk_Ailk_Bljk_Z_B_UserArgs_MT64x64x8_MI16x16x1_SN_LDSB0_AA0_AFC0_AF1_AAIGTEn1_AAILTEn1_AFEM1_AFEM1_ASEM1_BL1_BS1_CLR1_CADS0_DSK0_DU8_DTL0_DTVA0_DTVB0_DTVSM0_EPS1_FDSI0_GRPM1_GRVWA1_GRVWB1_GSU1_GSUAMB_GSUC0_GSUWGMRR0_GLS0_ISA950_IU1_IA0_KLA_LDSTI0_LBSPPA1024_LBSPPB128_LBSPPM0_LPA0_LPB2_LPM0_LRVW1_LWPMn1_MIAV0_MIWT2_2_MDA2_MI16_16_4_1_MLDS163840_MO40_MPM0_NR0_NTn1_NTA0_NTB0_NTC0_NTD0_NTE0_NTM0_NTWS0_NEPBS0_NLCA1_NLCB1_ONLL1_PGR1_PLR0_PKA1_SGR1_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SPO0_SRVW0_SSO0_SVW1_SK0_SKA0_SKXCCM0_SNLL0_TT1_1_TLDS1_ULSGRO0_USL1_UIOFGRO0_USFGROn1_VSn1_VWA1_VWB1_WSGRA0_WSGRB0_WSK0_WS64_WG32_8_1_WGM8_WGMXCC1_WGMXCCGn1_WGR0: Unknown value type: f64c
+Generating assembly kernels: Done. (0.2 secs elapsed)
+Writing assembly kernels: Launching 256 threads for 0 tasks...
+Writing assembly kernels: Done. (0.0 secs elapsed)
+Traceback (most recent call last):
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Toolchain/Component.py", line 48, in _invoke
+    out = check_output(args, stderr=STDOUT)
+  File "/usr/lib/python3.10/subprocess.py", line 421, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/opt/rocm/bin/amdclang++', '-D__HIP_HCC_COMPAT_MODE__=1', '--offload-device-only', '-x', 'hip', '-O3', '-Xoffload-linker', '--build-id=sha1', '-std=c++17', '-I', '/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source', '--offload-arch=gfx950:xnack+', '--offload-arch=gfx950:xnack-', '/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp', '-c', '-o', '/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/build_tmp/SOURCE/code_object_tmp/Kernels.o']' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/../Tensile/bin/Tensile", line 39, in <module>
+    Tensile.main()
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tensile.py", line 653, in main
+    Tensile(sys.argv[1:])
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tensile.py", line 610, in Tensile
+    executeStepsInConfig(config, outputPath, asmToolchain, srcToolchain, isaInfoMap, cCompiler, debugConfig, device_id, prob_sol_map)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tensile.py", line 103, in executeStepsInConfig
+    BenchmarkProblems.main(
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/BenchmarkProblems.py", line 548, in main
+    _benchmarkProblemType(
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/BenchmarkProblems.py", line 428, in _benchmarkProblemType
+    codeObjectFiles = writeBenchmarkFiles(stepBaseDir, solutions, \
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/BenchmarkProblems.py", line 242, in writeBenchmarkFiles
+    codeObjectFiles, _= writeSolutionsAndKernels( \
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/TensileCreateLibrary/Run.py", line 320, in writeSolutionsAndKernels
+    buildSourceCodeObjectFiles(
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Toolchain/Source.py", line 105, in buildSourceCodeObjectFiles
+    compiler(str(includeDir), cmdlineArchs, str(kernelPath), objPath)
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Toolchain/Component.py", line 244, in __call__
+    return _invoke(args, f"Compiling HIP source kernels into objects (.cpp -> .o)")
+  File "/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Toolchain/Component.py", line 50, in _invoke
+    raise RuntimeError(
+RuntimeError: Error with Compiling HIP source kernels into objects (.cpp -> .o): b"/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:91:3: error: unknown type name 'float16'; did you mean 'float1'?\n   91 |   float16 temp[NUM_GSU];\n      |   ^~~~~~~\n      |   float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:92:15: error: unknown type name 'float16'; did you mean 'float1'?\n   92 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[0], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:92:31: error: unknown type name 'float16'; did you mean 'float1'?\n   92 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[0], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:94:15: error: unknown type name 'float16'; did you mean 'float1'?\n   94 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[1], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:94:31: error: unknown type name 'float16'; did you mean 'float1'?\n   94 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[1], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:96:15: error: unknown type name 'float16'; did you mean 'float1'?\n   96 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[2], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:96:31: error: unknown type name 'float16'; did you mean 'float1'?\n   96 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[2], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:98:15: error: unknown type name 'float16'; did you mean 'float1'?\n   98 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[3], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:98:31: error: unknown type name 'float16'; did you mean 'float1'?\n   98 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[3], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:100:15: error: unknown type name 'float16'; did you mean 'float1'?\n  100 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[4], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:100:31: error: unknown type name 'float16'; did you mean 'float1'?\n  100 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[4], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:102:15: error: unknown type name 'float16'; did you mean 'float1'?\n  102 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[5], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:102:31: error: unknown type name 'float16'; did you mean 'float1'?\n  102 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[5], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:104:15: error: unknown type name 'float16'; did you mean 'float1'?\n  104 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[6], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:104:31: error: unknown type name 'float16'; did you mean 'float1'?\n  104 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[6], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:106:15: error: unknown type name 'float16'; did you mean 'float1'?\n  106 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[7], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:106:31: error: unknown type name 'float16'; did you mean 'float1'?\n  106 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[7], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:108:15: error: unknown type name 'float16'; did you mean 'float1'?\n  108 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[8], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |               ^~~~~~~\n      |               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\n/home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp:108:31: error: unknown type name 'float16'; did you mean 'float1'?\n  108 |   buffer_load<float16, sizeof(float16), CacheOperation::Kind::Always>(temp[8], arg.W, idxW * sizeof(TensileComplexDouble), 0, strideWLimit);\n      |                               ^~~~~~~\n      |                               float1\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1039:1: note: 'float1' declared here\n 1039 | __MAKE_VECTOR_TYPE__(float, float);\n      | ^\n/opt/rocm-7.0.0/lib/llvm/bin/../../../include/hip/amd_detail/amd_hip_vector_types.h:1003:15: note: expanded from macro '__MAKE_VECTOR_TYPE__'\n 1003 |         using CUDA_name##1 = HIP_vector_type<T, 1>;\\\n      |               ^\n<scratch space>:345:1: note: expanded from here\n  345 | float1\n      | ^\nfatal error: too many errors emitted, stopping now [-ferror-limit=]\n20 errors generated when compiling for gfx950.\n"
+Failed command: /opt/rocm/bin/amdclang++ -D__HIP_HCC_COMPAT_MODE__=1 --offload-device-only -x hip -O3 -Xoffload-linker --build-id=sha1 -std=c++17 -I /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source --offload-arch=gfx950:xnack+ --offload-arch=gfx950:xnack- /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/Kernels.cpp -c -o /home/mchirila/rocm-libraries/projects/hipblaslt/tensilelite/build_complext/1_BenchmarkProblems/Cijk_Ailk_Bljk_Z_B_UserArgs_00/00_Final/source/build_tmp/SOURCE/code_object_tmp/Kernels.o
