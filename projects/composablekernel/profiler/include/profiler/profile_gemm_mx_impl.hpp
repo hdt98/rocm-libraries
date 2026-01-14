@@ -24,9 +24,8 @@
 namespace ck {
 namespace profiler {
 
-#if 1
 template <bool KLast>
-void preShuffleScaleBuffer(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, int K)
+void preShuffleScaleBuffer_gfx950(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, int K)
 {
     int MNXdlPack = 2;
     int KXdlPack  = 2;
@@ -36,8 +35,9 @@ void preShuffleScaleBuffer(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, i
 
     int K0 = K / KXdlPack / XdlKThread; // KRepeat
 
-    // The 4 16x128 building blocks will be packed into 1 32x256 for F4
-    // The 8 16x16x128 mfma will be packed into 1 32x32x256 for F4
+    // On gfx950, WarpSize=64:
+    // The 4 16x128 building blocks will be packed into 1 32x256
+    // The 8 16x16x128 mfma will be packed into 1 32x32x256
 
     // unfold the MN32xK(256/32) scale buffer
     //    4            16             2           2
@@ -62,12 +62,72 @@ void preShuffleScaleBuffer(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, i
                               k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
                               k1 * MNXdlPack * KXdlPack * XdlMNThread + n1 * MNXdlPack * KXdlPack +
                               k2 * MNXdlPack + n2;
-            // src[n * K + k] = ck::type_convert<ck::e8m0_bexp_t>(static_cast<float>(powf(2.0f, n2 +
-            // k2 * MNXdlPack)));
+            // src[n * K + k] = ck::type_convert<ck::e8m0_bexp_t>(static_cast<float>(powf(2.0f,
+            // 2-k)));
+
             if constexpr(KLast)
                 dst[outputIndex] = src[n * K + k];
             else
                 dst[outputIndex] = src[k * MN + n];
+        }
+    }
+}
+
+/**
+ * Pre-shuffle scale buffer for gfx1250 16x16x128 wmma scale instruction
+ *
+ * @tparam ScaleType Scale data type
+ * @tparam KStride Whether K is the leading dimension of the scale buffer
+ */
+template <typename ScaleType, ck::index_t ScaleBlockSize, bool KStride>
+void preShuffleScaleBuffer_gfx1250(const ScaleType* src,
+                                   ScaleType* dst,
+                                   ck::index_t MN,
+                                   ck::index_t K)
+{
+
+    static_assert(ScaleBlockSize == 32 && sizeof(ScaleType) == 1,
+                  "wrong! only support 8-bit scale with ScaleBlockSize=32");
+
+    constexpr ck::index_t MPerXdlops = 16;
+    constexpr ck::index_t KPerXdlops = 128;
+
+    int MNPack = 2; // 2 sets of scales in M/N direction
+    int KPack  = 1; // 1 set of scales in K direction
+
+    int MNStep = MPerXdlops;
+    int KStep  = KPerXdlops / ScaleBlockSize; // scales per thread
+
+    int K0 = K / KPack / KStep; // KRepeat - how many KStep blocks
+
+    // On gfx1250, WarpSize=32:
+    // -- The 2 16x128 building blocks will be packed into 1 32x128
+    // -- The 4 16x16x128 wmma will be packed into 1 32x32x128
+
+    // unfold the MN32xK(128/32) scale buffer
+    //    4            16        1        2
+    // To KStep  ->  MNStep -> KPack -> MNPack
+    // or ???
+    //    2         16        1        4
+    //  MNPack -> MNStep -> KPack -> KStep
+    for(int mn = 0; mn < MN; ++mn)
+    {
+        int iMNRepeat = mn / (MNStep * MNPack); // i MNRepeat (MN block id)
+        int tempmn    = mn % (MNStep * MNPack); // position in MN block
+
+        for(int k = 0; k < K; ++k)
+        {
+            int iKRepeat = k / (KStep * KPack); // i KRepeat
+            int tempk    = k % (KStep * KPack); // position in KStep block
+
+            int outputIndex = (iMNRepeat * MNPack * MNStep) * (KStep * KPack * K0) +
+                              (iKRepeat * KStep * KPack) * (MNStep * MNPack) +
+                              tempmn * (KStep * KPack) + tempk;
+
+            if constexpr(KStride)
+                dst[outputIndex] = src[mn * K + k];
+            else
+                dst[outputIndex] = src[k * MN + mn];
         }
     }
 }
@@ -103,7 +163,6 @@ void preShuffleBuffer(const T* src, T* dst, int N, int K, int NXdl)
         }
     }
 }
-#endif
 
 template <typename ADataType,
           typename BDataType,
@@ -274,19 +333,39 @@ bool profile_gemm_mx_impl(int do_verification,
         break;
     }
 
-#if 1
-    preShuffleScaleBuffer<ck::is_same_v<ALayout, Row>>(a_m_k_scale.mData.data(),
-                                                       a_shuffled_scale.mData.data(),
-                                                       Scale_Padded_M,
-                                                       K / ScaleBlockSize);
-    preShuffleScaleBuffer<ck::is_same_v<BRefLayout, Col>>(
-        b_k_n_scale.mData.data(), b_shuffled_scale.mData.data(), N, K / ScaleBlockSize);
+    if(ck::get_warp_size() == 64)
+    {
+        preShuffleScaleBuffer_gfx950<ck::is_same_v<ALayout, Row>>(a_m_k_scale.mData.data(),
+                                                                  a_shuffled_scale.mData.data(),
+                                                                  Scale_Padded_M,
+                                                                  K / ScaleBlockSize);
+
+        preShuffleScaleBuffer_gfx950<ck::is_same_v<BRefLayout, Col>>(
+            b_k_n_scale.mData.data(), b_shuffled_scale.mData.data(), N, K / ScaleBlockSize);
+    }
+    else if(ck::get_warp_size() == 32)
+    {
+        preShuffleScaleBuffer_gfx1250<ck::e8m0_bexp_t, ScaleBlockSize, ck::is_same_v<ALayout, Row>>(
+            a_m_k_scale.mData.data(),
+            a_shuffled_scale.mData.data(),
+            Scale_Padded_M,
+            K / ScaleBlockSize);
+
+        preShuffleScaleBuffer_gfx1250<ck::e8m0_bexp_t,
+                                      ScaleBlockSize,
+                                      ck::is_same_v<BRefLayout, Col>>(
+            b_k_n_scale.mData.data(), b_shuffled_scale.mData.data(), N, K / ScaleBlockSize);
+    }
+    else
+    {
+        throw std::runtime_error("wrong! Scale pre-shuffle unsupported warp size");
+    }
+
     if constexpr(BPreShuffle)
     {
         int NPerXdl = 16; // Fixed 16
         preShuffleBuffer(b_k_n->mData.data(), b_input->mData.data(), N, K, NPerXdl);
     }
-#endif
 
     using AElementOp = ck::tensor_operation::element_wise::PassThrough;
     using BElementOp = ck::tensor_operation::element_wise::PassThrough;
