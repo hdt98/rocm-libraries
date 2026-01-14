@@ -272,7 +272,8 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
   static std::unordered_map<problem_t, std::vector<kernel_cache_t>> kernel_cache_map;
   static std::mutex mut;
   std::unique_lock<std::mutex> lock(mut);
-  auto p_cache_entry = kernel_cache_map.find(problem_type);
+  bool use_cache = get_runtime_options().cache_kernel_info;
+  auto p_cache_entry = use_cache ? kernel_cache_map.find(problem_type) : kernel_cache_map.end();
   if (p_cache_entry == kernel_cache_map.end()) {
     std::vector<kernel_cache_t> caches;
     caches.reserve(configs.size());
@@ -297,6 +298,7 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
     if (latency != std::numeric_limits<double>::max())
       latencies_configs.push_back({latency, std::cref(configs[i])});
   }
+  if(!use_cache) kernel_cache_map.clear();
   lock.unlock();
 
   if (latencies_configs.empty()) { throw std::runtime_error("No valid configs found."); }

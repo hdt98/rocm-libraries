@@ -612,7 +612,7 @@ double compute_memory_latency(const problem_t& problem,
   double L_mem_mem1 = (limited_mem1_bw > 0) ? (total_Ld / (limited_mem1_bw)) : 0.0;
 
   // 7) mem2‐limited from occupancy (Can't Issue enough load/stores)
-  double bw_limited = compute_mem_bw_from_occupancy(hardware, num_active_cus);
+  double bw_limited = cache.achievable_mem_bandwidth;
 
   // 8) loads that reach each level
   double Ld_mem2 =
@@ -707,7 +707,7 @@ double compute_tile_latency(const problem_t& problem,
   // L_compute *= std::max(L_compute, L_LDS);
 
   // 4) Epilogue: writes from all active CUs with limited bandwidth
-  double mem_bw_occ            = compute_mem_bw_from_occupancy(hardware, num_active_cus);
+  double mem_bw_occ            = cache.achievable_mem_bandwidth;
   double mem_bw_occ_limited    = hardware.mem3_perf_ratio * mem_bw_occ;
   size_t MT_M_rounded_128bytes = round_elements_to_128B(MT_M, datatype_to_bits(problem.a_dtype));
 
@@ -885,6 +885,7 @@ origami_cache_t create_origami_cache(const problem_t& problem,
     .num_waves = numWaves,
     .num_active_cus = num_active_cus,
     .splitting_factor = splitting_factor,
+    .achievable_mem_bandwidth = compute_mem_bw_from_occupancy(hardware, num_active_cus),
   };
 }
 

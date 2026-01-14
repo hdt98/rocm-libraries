@@ -68,6 +68,8 @@ namespace TensileLite
                                       "ProblemPredictionLibrary requires non empty "
                                       "mapping index set.");
 
+                    origami::get_runtime_options().cache_kernel_info = true;
+
                     for(std::size_t local_index = 0; local_index < mappingIndices.size(); local_index++)
                     {
                         int index = mappingIndices[local_index];
