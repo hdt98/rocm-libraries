@@ -952,7 +952,7 @@ CK_TILE_DEVICE index_t get_block_id() { return blockIdx.x; }
 
 CK_TILE_DEVICE void block_sync_load_raw(index_t cnt = 0)
 {
-#ifdef __gfx12__
+#if defined(__gfx12__) || defined(__gfx13__)
     asm volatile("s_wait_loadcnt %0 \n"
                  "s_barrier_signal -1 \n"
                  "s_barrier_wait -1"
@@ -1250,6 +1250,8 @@ CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx11_t) { return 32; }
 
 CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx12_t) { return 32; }
 
+CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx13_t) { return 32; }
+
 CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx950_t) { return 64; }
 
 CK_TILE_DEVICE static constexpr auto get_n_lds_banks(gfx_invalid_t) { return 0; }
@@ -1262,6 +1264,8 @@ CK_TILE_DEVICE static constexpr auto arch_tag_dispatch()
     return gfx11_t{};
 #elif defined(__gfx12__)
     return gfx12_t{};
+#elif defined(__gfx13__)
+    return gfx13_t{};
 #elif defined(__gfx950__)
     return gfx950_t{};
 #elif defined(__gfx9__)

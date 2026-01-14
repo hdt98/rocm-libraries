@@ -522,8 +522,12 @@ struct GridwiseGemmPipeline_v1<1, true, false>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+#else
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        auto b_block_buf_switch           = b_block_buf;
+#endif
+        auto b_block_buf_switch = b_block_buf;
 
         // preload data into LDS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
@@ -1009,8 +1013,12 @@ struct GridwiseGemmPipeline_v1<1, true, false, ALoadOption, BLoadOption>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
-        auto b_block_buf_switch           = b_block_buf;
+#else
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+#endif
+        auto b_block_buf_switch = b_block_buf;
 
         // preload data into LDS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
@@ -1116,7 +1124,11 @@ struct GridwiseGemmPipeline_v1<1,
                                index_t a_cluster_size,
                                index_t b_cluster_size)
     {
+#if defined(__gfx13__)
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+#else
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+#endif
         // Initialize C
         c_thread_buf.Clear();
 

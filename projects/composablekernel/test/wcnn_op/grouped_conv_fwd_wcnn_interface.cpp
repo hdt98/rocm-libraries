@@ -47,6 +47,9 @@ struct StridedLayout;
 template <ck::index_t NDimSpatial>
 struct GCPackedLayout;
 
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 namespace ctl = ck::tensor_layout::convolution;
 
 // Packed layout
