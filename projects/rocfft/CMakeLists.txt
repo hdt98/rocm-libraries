@@ -212,7 +212,7 @@ if( ROCFFT_MPI_ENABLE )
 endif()
 
 # Enable RCCL support for single-node multi-GPU:
-option(ROCFFT_RCCL_ENABLE "Enable RCCL for optimized single-node multi-GPU communication" ON)
+option(ROCFFT_RCCL_ENABLE "Enable RCCL for optimized single-node multi-GPU communication" OFF)
 
 add_subdirectory( library )
 
