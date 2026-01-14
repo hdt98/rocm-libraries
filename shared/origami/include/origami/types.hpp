@@ -407,8 +407,8 @@ struct config_t {
   /// Grid selection algorithm.
   grid_selection_t grid_selection = grid_selection_t::k_split_aware;
 
-  /// CMS kernel flag
-  bool cms_kernel = false;
+  /// Index of corresponding kernel
+  int index = 0;
 
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && 
@@ -424,7 +424,8 @@ struct config_t {
     return math::hash_combine(mt.m, mt.n, mt.k, mi.m, mi.n, mi.k,
                               custom_mainloop_scheduling,
                               cache_hints_a, cache_hints_b,
-                              workgroup_mapping, static_cast<std::uint32_t>(prediction_mode),
+                              workgroup_mapping, 
+                              static_cast<std::uint32_t>(prediction_mode),
                               static_cast<std::uint32_t>(target));
   }
 
