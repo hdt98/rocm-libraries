@@ -1,3 +1,6 @@
+/* ************************************************************************
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc.
+ * ************************************************************************/
 #pragma once
 static inline void adjust_for_alignment(size_t& size_work)
 {
@@ -17,8 +20,10 @@ static inline void adjust_for_alignment(size_t* p_size_work)
     *p_size_work = size_work;
 }
 
+#ifndef IS_POINTER_BATCHED
 #define IS_POINTER_BATCHED(A, T) \
     (std::is_pointer_v<std::remove_cv_t<std::remove_cv_t<std::remove_reference_t<decltype((A)[0])>>>>)
+#endif
 
 #ifndef MEM_CHECK
 #define MEM_CHECK(pfree)                                        \
