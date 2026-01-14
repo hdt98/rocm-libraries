@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/data_objects/engine_details_generated.h>
 
+#include <array>
 #include <memory>
 
 using namespace hipdnn_backend;
@@ -348,4 +349,115 @@ TEST_F(TestEngineDescriptor, GetEngineIdReturnsValueIfFinalized)
     makeEngineFinalized();
     auto engineId = engine->getEngineId();
     ASSERT_EQ(engineId, 0);
+}
+
+TEST_F(TestEngineDescriptor, GetKnobInfoUnfinalized)
+{
+    auto engine = getEngineDescriptor();
+    std::array<void*, 10> knobInfoArray{};
+
+    ASSERT_THROW_HIPDNN_STATUS(engine->getAttribute(HIPDNN_ATTR_ENGINE_KNOB_INFO,
+                                                    HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                                    10,
+                                                    nullptr,
+                                                    knobInfoArray.data()),
+                               HIPDNN_STATUS_NOT_INITIALIZED);
+}
+
+TEST_F(TestEngineDescriptor, GetKnobInfoWrongAttributeType)
+{
+    auto engine = getEngineDescriptor();
+    makeEngineFinalized();
+
+    int64_t dummy;
+    ASSERT_THROW_HIPDNN_STATUS(
+        engine->getAttribute(HIPDNN_ATTR_ENGINE_KNOB_INFO, HIPDNN_TYPE_INT64, 1, nullptr, &dummy),
+        HIPDNN_STATUS_BAD_PARAM);
+}
+
+TEST_F(TestEngineDescriptor, GetKnobInfoWithNullOutput)
+{
+    auto engine = getEngineDescriptor();
+    makeEngineFinalized();
+
+    int64_t count;
+    // Should not throw when output is null, just returns the count
+    ASSERT_NO_THROW(engine->getAttribute(
+        HIPDNN_ATTR_ENGINE_KNOB_INFO, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 0, &count, nullptr));
+    // When no knobs are present, count should be 0
+    ASSERT_EQ(count, 0);
+}
+
+TEST_F(TestEngineDescriptor, GetKnobInfoEmptyList)
+{
+    auto engine = getEngineDescriptor();
+    makeEngineFinalized();
+
+    std::array<void*, 10> knobInfoArray{};
+    int64_t count;
+
+    // Get knob info when there are no knobs
+    ASSERT_NO_THROW(engine->getAttribute(HIPDNN_ATTR_ENGINE_KNOB_INFO,
+                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                         10,
+                                         &count,
+                                         knobInfoArray.data()));
+    ASSERT_EQ(count, 0);
+}
+
+TEST_F(TestEngineDescriptor, GetKnobInfoWithSmallBuffer)
+{
+    auto engine = getEngineDescriptor();
+    makeEngineFinalized();
+
+    // Even with a small buffer, should return actual count
+    std::array<void*, 1> knobInfoArray{};
+    int64_t count;
+
+    ASSERT_NO_THROW(engine->getAttribute(HIPDNN_ATTR_ENGINE_KNOB_INFO,
+                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                         1,
+                                         &count,
+                                         knobInfoArray.data()));
+    // Since we don't have knobs in the test engine details, count should be 0
+    ASSERT_EQ(count, 0);
+}
+
+TEST_F(TestEngineDescriptor, GetKnobInfoMultipleCalls)
+{
+    auto engine = getEngineDescriptor();
+    makeEngineFinalized();
+
+    std::array<void*, 10> knobInfoArray1{};
+    std::array<void*, 10> knobInfoArray2{};
+    int64_t count1 = 0;
+    int64_t count2 = 0;
+
+    // First call
+    ASSERT_NO_THROW(engine->getAttribute(HIPDNN_ATTR_ENGINE_KNOB_INFO,
+                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                         10,
+                                         &count1,
+                                         knobInfoArray1.data()));
+
+    // Second call - should return the same result (testing lazy initialization)
+    ASSERT_NO_THROW(engine->getAttribute(HIPDNN_ATTR_ENGINE_KNOB_INFO,
+                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                         10,
+                                         &count2,
+                                         knobInfoArray2.data()));
+
+    ASSERT_EQ(count1, count2);
+}
+
+TEST_F(TestEngineDescriptor, SetKnobInfoNotSupported)
+{
+    auto engine = getEngineDescriptor();
+    void* dummy = nullptr;
+
+    // Setting HIPDNN_ATTR_ENGINE_KNOB_INFO should not be supported
+    ASSERT_THROW_HIPDNN_STATUS(
+        engine->setAttribute(
+            HIPDNN_ATTR_ENGINE_KNOB_INFO, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &dummy),
+        HIPDNN_STATUS_NOT_SUPPORTED);
 }

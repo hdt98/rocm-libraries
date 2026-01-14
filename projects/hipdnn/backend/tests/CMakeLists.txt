@@ -30,6 +30,7 @@ add_executable(
     descriptors/TestEngineHeuristicDescriptor.cpp
     descriptors/TestExecutionPlanDescriptor.cpp
     descriptors/TestGraphDescriptor.cpp
+    descriptors/TestKnobInfoDescriptor.cpp
     descriptors/TestVariantPackDescriptor.cpp
     main.cpp
     TestEnginePluginResourceManager.cpp

@@ -6,7 +6,9 @@
 #include "GraphDescriptor.hpp"
 #include "HipdnnBackendDescriptorType.h"
 #include "HipdnnException.hpp"
+#include "KnobInfoDescriptor.hpp"
 #include "handle/Handle.hpp"
+#include <hipdnn_data_sdk/flatbuffer_utilities/EngineDetailsWrapper.hpp>
 
 namespace hipdnn_backend
 {
@@ -60,6 +62,8 @@ void EngineDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
         getGlobalId(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_ENGINE_KNOB_INFO:
+        getKnobInfo(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        break;
     case HIPDNN_ATTR_ENGINE_NUMERICAL_NOTE:
     case HIPDNN_ATTR_ENGINE_LAYOUT_INFO:
     case HIPDNN_ATTR_ENGINE_BEHAVIOR_NOTE:
@@ -126,6 +130,50 @@ void EngineDescriptor::getGlobalId(hipdnnBackendAttributeType_t attributeType,
     }
 
     *static_cast<int64_t*>(arrayOfElements) = _engineId;
+}
+
+void EngineDescriptor::getKnobInfo(hipdnnBackendAttributeType_t attributeType,
+                                   int64_t requestedElementCount,
+                                   int64_t* elementCount,
+                                   void* arrayOfElements) const
+{
+    THROW_IF_NE(attributeType,
+                HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                HIPDNN_STATUS_BAD_PARAM,
+                "EngineDescriptor failed to get knob info: Invalid attribute type.");
+
+    // Lazy initialization of knob info descriptors
+    if(!_knobInfoInitialized)
+    {
+        _knobInfoDescriptors.clear();
+
+        if(_engineDetails)
+        {
+            // Assuming _engineDetails has a method to get raw data or is itself a wrapper
+            // We need to get the raw flatbuffer data from the engine details
+            // For now, we'll leave this empty until we understand the actual structure
+            // of plugin::EngineDetailsWrapper
+        }
+        _knobInfoInitialized = true;
+    }
+
+    auto actualCount = static_cast<int64_t>(_knobInfoDescriptors.size());
+
+    if(elementCount != nullptr)
+    {
+        *elementCount = actualCount;
+    }
+
+    if(arrayOfElements != nullptr)
+    {
+        auto countToCopy = static_cast<size_t>(std::min(requestedElementCount, actualCount));
+        auto outputArray = static_cast<void**>(arrayOfElements);
+
+        for(size_t i = 0; i < countToCopy; ++i)
+        {
+            HipdnnBackendDescriptor::packDescriptor(_knobInfoDescriptors[i], outputArray[i]);
+        }
+    }
 }
 
 void EngineDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,

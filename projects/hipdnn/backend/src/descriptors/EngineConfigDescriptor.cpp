@@ -10,6 +10,7 @@
 #include "handle/Handle.hpp"
 
 #include <hipdnn_data_sdk/data_objects/engine_config_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/KnobSettingWrapper.hpp>
 
 namespace hipdnn_backend
 {
@@ -148,6 +149,9 @@ void EngineConfigDescriptor::setAttribute(hipdnnBackendAttributeName_t attribute
     case HIPDNN_ATTR_ENGINECFG_ENGINE:
         setEngine(attributeType, elementCount, arrayOfElements);
         break;
+    case HIPDNN_ATTR_KNOB_CHOICE_SERIALIZED_VALUE_EXT:
+        setKnobChoice(attributeType, elementCount, arrayOfElements);
+        break;
     case HIPDNN_ATTR_ENGINECFG_INTERMEDIATE_INFO:
     case HIPDNN_ATTR_ENGINECFG_KNOB_CHOICES:
     case HIPDNN_ATTR_ENGINECFG_WORKSPACE_SIZE:
@@ -190,6 +194,83 @@ void EngineConfigDescriptor::setEngine(hipdnnBackendAttributeType_t attributeTyp
 
     _engine = engine;
     _engineConfigData->engine_id = _engine->getEngineId();
+}
+
+void EngineConfigDescriptor::setKnobChoice(hipdnnBackendAttributeType_t attributeType,
+                                           int64_t elementCount,
+                                           const void* arrayOfElements)
+{
+    THROW_IF_NE(attributeType,
+                HIPDNN_TYPE_FLATBUFFER_PTR_EXT,
+                HIPDNN_STATUS_BAD_PARAM,
+                "EngineConfigDescriptor failed to set knob choice: "
+                "Invalid attribute type. Expected HIPDNN_TYPE_FLATBUFFER_PTR_EXT.");
+
+    THROW_IF_NE(elementCount,
+                1,
+                HIPDNN_STATUS_BAD_PARAM,
+                "EngineConfigDescriptor failed to set knob choice: "
+                "Invalid element count. Expected 1.");
+
+    THROW_IF_NULL(arrayOfElements,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "EngineConfigDescriptor failed to set knob choice: "
+                  "Null pointer.");
+
+    // The array of elements should contain a pointer to the serialized KnobSetting flatbuffer
+    auto serializedData = static_cast<const hipdnnPluginConstData_t*>(arrayOfElements);
+
+    THROW_IF_NULL(serializedData->ptr,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "EngineConfigDescriptor failed to set knob choice: "
+                  "Serialized data is null.");
+
+    THROW_IF_EQ(serializedData->size,
+                0,
+                HIPDNN_STATUS_BAD_PARAM,
+                "EngineConfigDescriptor failed to set knob choice: "
+                "Serialized data size is zero.");
+
+    // Deserialize the KnobSetting flatbuffer
+    hipdnn_plugin_sdk::KnobSettingWrapper wrapper(static_cast<const uint8_t*>(serializedData->ptr),
+                                                  serializedData->size);
+
+    if(!wrapper.isValid())
+    {
+        throw HipdnnException(HIPDNN_STATUS_BAD_PARAM,
+                              "EngineConfigDescriptor failed to set knob choice: "
+                              "Invalid KnobSetting flatbuffer.");
+    }
+
+    // Create a KnobSettingT object from the wrapper
+    auto knobSetting = std::make_unique<hipdnn_data_sdk::data_objects::KnobSettingT>();
+    knobSetting->knob_id = wrapper.knobId();
+
+    // Get the knob value from the wrapper and convert it
+    auto valueType = wrapper.valueType();
+    auto valuePtr = wrapper.value();
+
+    if(valuePtr != nullptr)
+    {
+        knobSetting->value.type = valueType;
+
+        // Unpack the value based on its type
+        knobSetting->value.value
+            = hipdnn_data_sdk::data_objects::KnobValueUnion::UnPack(valuePtr, valueType, nullptr);
+    }
+
+    // Add or update the knob setting in the engine config
+    // Remove any existing knob setting with the same knob_id
+    _engineConfigData->knobs.erase(
+        std::remove_if(_engineConfigData->knobs.begin(),
+                       _engineConfigData->knobs.end(),
+                       [&knobSetting](const auto& existingKnob) {
+                           return existingKnob && existingKnob->knob_id == knobSetting->knob_id;
+                       }),
+        _engineConfigData->knobs.end());
+
+    // Add the new knob setting
+    _engineConfigData->knobs.push_back(std::move(knobSetting));
 }
 
 std::shared_ptr<const EngineDescriptor> EngineConfigDescriptor::getEngine() const

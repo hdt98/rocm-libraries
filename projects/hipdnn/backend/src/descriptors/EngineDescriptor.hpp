@@ -4,11 +4,14 @@
 #pragma once
 
 #include "BackendDescriptor.hpp"
+#include <memory>
+#include <vector>
 
 namespace hipdnn_backend
 {
 
 class GraphDescriptor;
+class KnobInfoDescriptor;
 
 namespace plugin
 {
@@ -40,6 +43,15 @@ private:
                      int64_t requestedElementCount,
                      int64_t* elementCount,
                      void* arrayOfElements) const;
+
+    void getKnobInfo(hipdnnBackendAttributeType_t attributeType,
+                     int64_t requestedElementCount,
+                     int64_t* elementCount,
+                     void* arrayOfElements) const;
+
+    // Mutable cache for knob info descriptors (lazy initialized)
+    mutable std::vector<std::shared_ptr<KnobInfoDescriptor>> _knobInfoDescriptors;
+    mutable bool _knobInfoInitialized = false;
 
 public:
     void finalize() override;

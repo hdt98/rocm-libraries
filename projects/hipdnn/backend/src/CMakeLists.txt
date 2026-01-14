@@ -15,6 +15,7 @@ add_library(
     descriptors/EngineHeuristicDescriptor.cpp
     descriptors/ExecutionPlanDescriptor.cpp
     descriptors/GraphDescriptor.cpp
+    descriptors/KnobInfoDescriptor.cpp
     descriptors/VariantDescriptor.cpp
     descriptors/DescriptorFactory.cpp
     handle/HandleFactory.cpp
