@@ -129,7 +129,6 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
     s_waitcnt lgkmcnt(0), model 108, profiler 108, delta 0
     */
     using namespace Scheduling::LDSModel;
-    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = GENERATE(64u, 128u, 256u);
 
@@ -141,7 +140,9 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
 
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, "");
+    rocRoller::KernelOptions kernelOpts;
+    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+    auto context           = TestContext::ForTestDevice(kernelOpts, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
@@ -262,7 +263,6 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
     ...
     */
     using namespace Scheduling::LDSModel;
-    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = 64u;
 
@@ -274,7 +274,9 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
 
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, "");
+    rocRoller::KernelOptions kernelOpts;
+    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+    auto context           = TestContext::ForTestDevice(kernelOpts, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
@@ -426,7 +428,6 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
   * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
     */
     using namespace Scheduling::LDSModel;
-    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
 
     const auto workgroupSize = 64u;
 
@@ -438,7 +439,9 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
 
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, "");
+    rocRoller::KernelOptions kernelOpts;
+    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+    auto context           = TestContext::ForTestDevice(kernelOpts, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {

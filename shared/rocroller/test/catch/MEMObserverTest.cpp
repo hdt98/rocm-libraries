@@ -32,7 +32,6 @@
 #include "TestContext.hpp"
 #include "TestKernels.hpp"
 
-#include <common/Scheduling.hpp>
 #include <common/SourceMatcher.hpp>
 #include <common/TestValues.hpp>
 
@@ -41,15 +40,10 @@
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/CodeGen/MemoryInstructions.hpp>
-#include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/ExpressionTransformations.hpp>
 #include <rocRoller/GPUArchitecture/GPUCapability.hpp>
-#include <rocRoller/Operations/Command.hpp>
-#include <rocRoller/Operations/CommandArguments.hpp>
-#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
-#include <rocRoller/Utilities/Settings.hpp>
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>

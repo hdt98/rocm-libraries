@@ -174,26 +174,6 @@ namespace rocRoller
         return os << toString(input);
     }
 
-    inline std::string toString(DSObserverType dsObserverType)
-    {
-        switch(dsObserverType)
-        {
-        case DSObserverType::DSMEMObserver:
-            return "DSMEMObserver";
-        case DSObserverType::WeightlessDSMemObserver:
-            return "WeightlessDSMemObserver";
-        case DSObserverType::Count:
-            return "Count";
-        }
-
-        Throw<FatalError>("Unexpected DSObserverType.");
-    }
-
-    inline std::ostream& operator<<(std::ostream& os, const DSObserverType& input)
-    {
-        return os << toString(input);
-    }
-
     inline Settings::Settings()
     {
         const char* bitfieldChars = std::getenv(Settings::BitfieldName.c_str());

@@ -245,8 +245,6 @@ namespace rocRoller
             getDefaultValueForKernelGraphDOTSerialization,
             -1};
 
-        static const SettingsOption<DSObserverType> DSObserver;
-
         static inline const SettingsOption<std::size_t> GraphNodeLabelMaxLength{
             "ROCROLLER_KGRAPH_NODE_LABEL_MAX_LENGTH",
             "Maximum length of KernelGraph node expression when emitting DOT",

@@ -126,8 +126,6 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
     // Expect 545 passed : 0 failed
     using namespace Scheduling::LDSModel;
 
-    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
-
     const auto workgroupSize = 64u;
 
     int instrDwords      = GENERATE(1, 2, 4);
@@ -138,7 +136,9 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, "");
+    rocRoller::KernelOptions kernelOpts;
+    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+    auto context           = TestContext::ForTestDevice(kernelOpts, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {
@@ -219,8 +219,6 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
     */
     using namespace Scheduling::LDSModel;
 
-    Settings::getInstance()->set(Settings::DSObserver, DSObserverType::WeightlessDSMemObserver);
-
     const auto workgroupSize = GENERATE(64u, 128u, 256u);
 
     int instrDwords      = GENERATE(1, 2, 4);
@@ -231,7 +229,9 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
 
     rocRoller::profiler::reset();
 
-    auto context = TestContext::ForTestDevice({}, "");
+    rocRoller::KernelOptions kernelOpts;
+    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+    auto context           = TestContext::ForTestDevice(kernelOpts, "");
 
     if(not context->targetArchitecture().target().isCDNA35GPU())
     {

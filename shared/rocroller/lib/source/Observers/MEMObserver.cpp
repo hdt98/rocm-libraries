@@ -32,9 +32,9 @@
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitecture.hpp>
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
-#include <rocRoller/Utilities/Settings.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
 namespace rocRoller
@@ -46,7 +46,7 @@ namespace rocRoller
         {
             AssertFatal(context != nullptr);
 
-            const DSObserverType observerType = Settings::Get(Settings::DSObserver);
+            const DSObserverType observerType = context->kernelOptions()->dsObserver;
 
             if(observerType == DSObserverType::WeightlessDSMemObserver)
             {
@@ -139,11 +139,15 @@ namespace rocRoller
             }
 
             const auto waitcnt = inst.getWaitCount().dscnt();
-            if(waitcnt >= 0
-               && Settings::Get(Settings::DSObserver) == DSObserverType::WeightlessDSMemObserver)
+            if(waitcnt >= 0)
             {
-                auto stallCycles   = m_scheduler.value().predictWaitcntStall(waitcnt);
-                status.stallCycles = stallCycles / 4;
+                auto ctx = m_context.lock();
+                AssertFatal(ctx != nullptr);
+                if(ctx->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver)
+                {
+                    auto stallCycles   = m_scheduler.value().predictWaitcntStall(waitcnt);
+                    status.stallCycles = stallCycles / 4;
+                }
             }
 
             return status;

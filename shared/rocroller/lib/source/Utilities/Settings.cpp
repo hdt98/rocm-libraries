@@ -40,9 +40,4 @@ namespace rocRoller
         return Settings::getInstance()->get(Settings::SaveAssembly);
     }
 
-    const SettingsOption<DSObserverType> Settings::DSObserver
-        = {"ROCROLLER_DS_OBSERVER",
-           "DS Memory Observer type: DSMEMObserver (default) or WeightlessDSMemObserver",
-           DSObserverType::DSMEMObserver,
-           -1};
 }
