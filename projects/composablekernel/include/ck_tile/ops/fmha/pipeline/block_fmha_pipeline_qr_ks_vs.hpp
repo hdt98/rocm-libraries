@@ -834,6 +834,8 @@ struct BlockFmhaPipelineQRKSVS
                         make_static_distributed_tensor<PDataType>(p_.get_tile_distribution());
                     auto p_scale_result = make_static_distributed_tensor<PScaleDataType>(
                         Policy::template MakePScaleRegTileDistribution<Problem>());
+                    static_assert(p_result.get_thread_buffer().size() ==
+                                  p_scale_result.get_thread_buffer().size() * kVScaleGranularity);
 
                     const index_t lane = __lane_id();
                     SMPLComputeDataType scale_result{0};
