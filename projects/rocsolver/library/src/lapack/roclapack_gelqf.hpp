@@ -38,7 +38,7 @@
 #include "roclapack_gelq2.hpp"
 #include "rocsolver/rocsolver.h"
 
-#include "mem_utils.hpp"
+#include "rocsolver_mem_utils.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 

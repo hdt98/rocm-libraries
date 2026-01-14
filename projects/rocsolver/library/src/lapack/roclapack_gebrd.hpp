@@ -38,7 +38,7 @@
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
 
-#include "mem_utils.hpp"
+#include "rocsolver_mem_utils.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
