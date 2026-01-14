@@ -1137,22 +1137,45 @@ namespace TensileLite
         for(int dUse : dUseCount)
             TENSILE_ASSERT_EXC(dUse == 1);
 
-        /* RK Debug 
-        for(auto const& op : m_aOps)
+        for(auto& a_op : m_aOps)
+        {
+            auto& op = const_cast<TensileLite::TensorOp&>(a_op);
             if(op.type == TensorOp::Type::ComplexConjugate)
-                TENSILE_ASSERT_EXC(DataTypeInfo::Get(aTensor.dataType()).isComplex);
+            {
+                if(!(DataTypeInfo::Get(aTensor.dataType()).isComplex))
+                    op.type = TensorOp::Type::None;
+            }
+        }
 
-        for(auto const& op : m_bOps)
+        for(auto& b_op : m_bOps)
+        {
+            auto& op = const_cast<TensileLite::TensorOp&>(b_op);
             if(op.type == TensorOp::Type::ComplexConjugate)
-                TENSILE_ASSERT_EXC(DataTypeInfo::Get(bTensor.dataType()).isComplex);
+            {
+                if(!(DataTypeInfo::Get(bTensor.dataType()).isComplex))
+                    op.type = TensorOp::Type::None;
+            }
+        }
 
-        for(auto const& op : m_cOps)
+        for(auto& c_op : m_cOps)
+        {
+            auto& op = const_cast<TensileLite::TensorOp&>(c_op);
             if(op.type == TensorOp::Type::ComplexConjugate)
-                TENSILE_ASSERT_EXC(DataTypeInfo::Get(cTensor.dataType()).isComplex);
+            {
+                if(!(DataTypeInfo::Get(cTensor.dataType()).isComplex))
+                    op.type = TensorOp::Type::None;
+            }
+        }
 
-        for(auto const& op : m_dOps)
+        for(auto& d_op : m_dOps)
+        {
+            auto& op = const_cast<TensileLite::TensorOp&>(d_op);
             if(op.type == TensorOp::Type::ComplexConjugate)
-                TENSILE_ASSERT_EXC(DataTypeInfo::Get(dTensor.dataType()).isComplex); */
+            {
+                if(!(DataTypeInfo::Get(dTensor.dataType()).isComplex))
+                    op.type = TensorOp::Type::None;
+            }
+        }
     }
 
     void ContractionProblemGemm::calcArithmeticIntensity()
@@ -1411,7 +1434,6 @@ namespace TensileLite
         TensorOps const&               dOps)
     {
 
-        assert(typeBeta == typeA);
         // Tensor descriptors for a, b
         TensorDescriptor a, b;
 
