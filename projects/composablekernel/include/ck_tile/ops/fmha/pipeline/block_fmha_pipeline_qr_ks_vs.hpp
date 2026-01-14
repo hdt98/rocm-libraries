@@ -837,6 +837,15 @@ struct BlockFmhaPipelineQRKSVS
                     static_assert(p_result.get_thread_buffer().size() ==
                                   p_scale_result.get_thread_buffer().size() * kVScaleGranularity);
 
+                    using BlockGemm =
+                        remove_cvref_t<decltype(Policy::template GetQKBlockGemm<Problem>())>;
+                    constexpr auto config =
+                        BlockGemm::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+                    using WG = remove_cvref_t<decltype(config.template at<0>())>;
+
+                    constexpr index_t kABKLane = WG::WarpGemmAttribute::Impl::kABKLane;
+                    constexpr index_t kAMLane  = WG::WarpGemmAttribute::Impl::kAMLane;
+
                     const index_t lane = __lane_id();
                     SMPLComputeDataType scale_result{0};
                     static_for<0, p_.get_thread_buffer().size() / 16, 1>{}([&](auto i) {
@@ -846,8 +855,8 @@ struct BlockFmhaPipelineQRKSVS
                         static_for<0, 16, 1>{}([&](auto j) {
                             p_max = max(p_max, p_compute.get_thread_buffer()[i * 16 + j]);
                         });
-                        p_max =
-                            min(SMPLComputeDataType{1}, max(p_max, warp_shuffle(p_max, lane ^ 16)));
+                        p_max = min(SMPLComputeDataType{1},
+                                    max(p_max, warp_shuffle(p_max, lane ^ kAMLane)));
 
                         static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
                         // For e8m0 round up to the next power of 2
@@ -883,7 +892,10 @@ struct BlockFmhaPipelineQRKSVS
                         });
 
                         // Save scale for the corresponding lane
-                        scale = warp_shuffle(scale, (lane % 16) | ((lane & 16) << 1));
+                        if constexpr(kABKLane == 4)
+                        {
+                            scale = warp_shuffle(scale, (lane % kAMLane) | ((lane & kAMLane) << 1));
+                        }
                         if((i % 2 == 0) == (lane < 32))
                         {
                             scale_result = scale;

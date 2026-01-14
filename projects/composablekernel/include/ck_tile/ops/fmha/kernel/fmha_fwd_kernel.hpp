@@ -1551,14 +1551,27 @@ struct FmhaFwdKernel
                     // Shuffle N dim of K in such a way that C of the first GEMM can be used as
                     // A for the second GEMM
                     // TODO: hardcoded, make it generic somehow. See also k_scale_dram
-                    static_assert(FmhaPipeline::kN0 % (4 * 4 * 4) == 0);
+                    const index_t padded_seqlen_k =
+                        k_dram_pad.get_tensor_descriptor().get_lengths()[number<0>{}];
+
+                    using BlockGemm =
+                        remove_cvref_t<decltype(FmhaPipeline::Policy::template GetQKBlockGemm<
+                                                typename FmhaPipeline::Problem>())>;
+                    constexpr auto config = BlockGemm::Policy::template GetWarpGemmMWarpNWarp<
+                        typename FmhaPipeline::Problem>();
+                    using WG = remove_cvref_t<decltype(config.template at<0>())>;
+
+                    constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
+                    // fp8: 16 = kABKPerLane / WGAttrNumAccessEnum::Double
+                    constexpr index_t N2 = 16 / WG::WarpGemmAttribute::Impl::kCM1PerLane;
+                    constexpr index_t N3 = WG::WarpGemmAttribute::Impl::kCM1PerLane;
+
+                    const index_t N0 = padded_seqlen_k / (N1 * N2 * N3);
+
                     const auto k_dram_unmerged = transform_tensor_view(
                         k_dram_pad,
                         make_tuple(make_unmerge_transform(
-                                       make_tuple(number<FmhaPipeline::kN0 / (4 * 4 * 4)>{},
-                                                  number<4>{},
-                                                  number<4>{},
-                                                  number<4>{})),
+                                       make_tuple(N0, number<N1>{}, number<N2>{}, number<N3>{})),
                                    make_pass_through_transform(number<FmhaPipeline::kK0>{})),
                         make_tuple(sequence<0>{}, sequence<1>{}),
                         make_tuple(sequence<0, 2, 1, 3>{}, sequence<4>{}));
@@ -1566,10 +1579,7 @@ struct FmhaFwdKernel
                     return transform_tensor_view(
                         k_dram_unmerged,
                         make_tuple(make_merge_transform(
-                                       make_tuple(number<FmhaPipeline::kN0 / (4 * 4 * 4)>{},
-                                                  number<4>{},
-                                                  number<4>{},
-                                                  number<4>{})),
+                                       make_tuple(N0, number<N2>{}, number<N1>{}, number<N3>{})),
                                    make_pass_through_transform(number<FmhaPipeline::kK0>{})),
                         make_tuple(sequence<0, 1, 2, 3>{}, sequence<4>{}),
                         make_tuple(sequence<0>{}, sequence<1>{}));
@@ -1961,7 +1971,6 @@ struct FmhaFwdKernel
                                 number<1>{});
                         if constexpr(FmhaPipeline::kQLoadOnce)
                         {
-                            static_assert(FmhaPipeline::kSubQKHeaddim % kQKScaleGranularity == 0);
                             return pad_tensor_view(
                                 q_scale_dram_naive,
                                 make_tuple(
@@ -1972,7 +1981,6 @@ struct FmhaFwdKernel
                         else
                         {
                             static_assert(false);
-                            static_assert(FmhaPipeline::kK0 % kQKScaleGranularity == 0);
                             return pad_tensor_view(
                                 q_scale_dram_naive,
                                 make_tuple(number<FmhaPipeline::kM0>{},
@@ -1988,25 +1996,36 @@ struct FmhaFwdKernel
                                 make_tuple(kargs.stride_k_descale, 1),
                                 number<1>{}, // FIX
                                 number<1>{});
-                        static_assert(FmhaPipeline::kK0 % kQKScaleGranularity == 0);
-                        constexpr bool kPadSeqLenK_ = kUseAsyncCopy ? kPadSeqLenK : false;
                         const auto k_scale_dram_pad = pad_tensor_view(
                             k_scale_dram_naive,
                             make_tuple(number<FmhaPipeline::kN0>{},
                                        number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
-                            sequence<kPadSeqLenK_, kPadHeadDimQ>{});
+                            sequence<false, kPadHeadDimQ>{});
 
                         // Shuffle N dim of K in such a way that C of the first GEMM can be used as
                         // A for the second GEMM
                         // TODO: hardcoded, make it generic somehow. See also k_dram
-                        static_assert(FmhaPipeline::kN0 % (4 * 4 * 4) == 0);
+                        const index_t padded_seqlen_k =
+                            k_scale_dram_pad.get_tensor_descriptor().get_lengths()[number<0>{}];
+
+                        using BlockGemm =
+                            remove_cvref_t<decltype(FmhaPipeline::Policy::template GetQKBlockGemm<
+                                                    typename FmhaPipeline::Problem>())>;
+                        constexpr auto config = BlockGemm::Policy::template GetWarpGemmMWarpNWarp<
+                            typename FmhaPipeline::Problem>();
+                        using WG = remove_cvref_t<decltype(config.template at<0>())>;
+
+                        constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
+                        // fp8: 16 = kABKPerLane / WGAttrNumAccessEnum::Double
+                        constexpr index_t N2 = 16 / WG::WarpGemmAttribute::Impl::kCM1PerLane;
+                        constexpr index_t N3 = WG::WarpGemmAttribute::Impl::kCM1PerLane;
+
+                        const index_t N0 = padded_seqlen_k / (N1 * N2 * N3);
+
                         const auto k_scale_dram_unmerged = transform_tensor_view(
                             k_scale_dram_pad,
-                            make_tuple(make_unmerge_transform(
-                                           make_tuple(number<FmhaPipeline::kN0 / (4 * 4 * 4)>{},
-                                                      number<4>{},
-                                                      number<4>{},
-                                                      number<4>{})),
+                            make_tuple(make_unmerge_transform(make_tuple(
+                                           N0, number<N1>{}, number<N2>{}, number<N3>{})),
                                        make_pass_through_transform(
                                            number<FmhaPipeline::kK0 / kQKScaleGranularity>{})),
                             make_tuple(sequence<0>{}, sequence<1>{}),
@@ -2014,11 +2033,8 @@ struct FmhaFwdKernel
 
                         return transform_tensor_view(
                             k_scale_dram_unmerged,
-                            make_tuple(make_merge_transform(
-                                           make_tuple(number<FmhaPipeline::kN0 / (4 * 4 * 4)>{},
-                                                      number<4>{},
-                                                      number<4>{},
-                                                      number<4>{})),
+                            make_tuple(make_merge_transform(make_tuple(
+                                           N0, number<N2>{}, number<N1>{}, number<N3>{})),
                                        make_pass_through_transform(
                                            number<FmhaPipeline::kK0 / kQKScaleGranularity>{})),
                             make_tuple(sequence<0, 1, 2, 3>{}, sequence<4>{}),
@@ -2034,13 +2050,11 @@ struct FmhaFwdKernel
                                 make_tuple(kargs.stride_v_descale, 1),
                                 number<1>{}, // FIX
                                 number<1>{});
-                        static_assert(FmhaPipeline::kK1 % kVScaleGranularity == 0);
-                        constexpr bool kPadHeadDimV_ = kUseAsyncCopy ? kPadHeadDimV : false;
                         return pad_tensor_view(
                             v_scale_dram_naive,
                             make_tuple(number<FmhaPipeline::kN1>{},
                                        number<FmhaPipeline::kK1 / kVScaleGranularity>{}),
-                            sequence<kPadHeadDimV_, kPadSeqLenK>{});
+                            sequence<false, kPadSeqLenK>{});
                     }();
 
                     auto q_scale_dram_window = make_tile_window(

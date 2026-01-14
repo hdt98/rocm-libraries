@@ -106,16 +106,13 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
             }
             else
             {
-                // TODO: add swizzling? It is required for the second 32x32x64 GEMM!
                 constexpr bool SwizzleA =
                     Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32 &&
-                    Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) != 64;
+                    Problem::QScaleEnum != BlockAttentionQuantScaleEnum::MX;
                 // TODO: For fp8 only, support fp4
                 constexpr auto AttrNumAccess =
-                    Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 128
-                        ? WGAttrNumAccessEnum::Double // 16x16x128 fp8
-                    : Problem::BlockFmhaShape::Gemm0WarpTile::at(number<2>{}) == 64
-                        ? WGAttrNumAccessEnum::Double // 32x32x64 fp8
+                    Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX
+                        ? WGAttrNumAccessEnum::Double
                         : WGAttrNumAccessEnum::Single;
                 return WarpGemmDispatcher<typename Problem::QDataType,
                                           typename Problem::KDataType,
@@ -1045,11 +1042,10 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             }
             else
             {
+                // TODO: For fp8 only, support fp4
                 constexpr auto AttrNumAccess =
-                    Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 128
-                        ? WGAttrNumAccessEnum::Double // 16x16x128 fp8
-                    : Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}) == 64
-                        ? WGAttrNumAccessEnum::Double // 32x32x64 fp8
+                    Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX
+                        ? WGAttrNumAccessEnum::Double
                         : WGAttrNumAccessEnum::Single;
                 return WarpGemmDispatcher<typename Problem::PDataType,
                                           typename Problem::VDataType,
