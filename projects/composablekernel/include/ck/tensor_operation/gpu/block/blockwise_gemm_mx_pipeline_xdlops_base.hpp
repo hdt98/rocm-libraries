@@ -286,6 +286,27 @@ struct BlockwiseGemmXdlops_mx_pipeline_base
                                                               M2,
                                                               N));
     }
+    // transposed XDL output supporting C_xdl' = B_xdl' * A_xdl' packed mfma
+    __host__ __device__ static constexpr auto GetCThreadDescriptor_M0_N0_M1_N1_M2_N2_M3_N3_N4_N5()
+    {
+        constexpr auto c_m0_m1_m2_n_tblk_lens = xdlops_gemm.GetCM0M1M2NThreadBlkLengths();
+
+        constexpr auto M0 = c_m0_m1_m2_n_tblk_lens[I0];
+        constexpr auto M1 = c_m0_m1_m2_n_tblk_lens[I1];
+        constexpr auto M2 = c_m0_m1_m2_n_tblk_lens[I2];
+        constexpr auto N  = c_m0_m1_m2_n_tblk_lens[I3];
+
+        return make_naive_tensor_descriptor_packed(make_tuple(Number<MRepeat / MXdlPack>{},
+                                                              Number<NRepeat / NXdlPack>{},
+                                                              I1,
+                                                              I1,
+                                                              Number<MXdlPack>{},
+                                                              Number<NXdlPack>{},
+                                                              N,
+                                                              M0,
+                                                              M1,
+                                                              M2));
+    }
 
     __host__ __device__ static constexpr auto GetCThreadDescriptor_G_M0_N0_M1_N1_M2_M3_M4_N2()
     {
@@ -342,6 +363,23 @@ struct BlockwiseGemmXdlops_mx_pipeline_base
                                                            Number<NPerXDL>{}));
 
         return xdlops_gemm.MakeCDescriptor_M0_N0_M1_N1_M2_N2_M3_M4_M5_N3(
+            c_block_desc_m0_n0_m1_n1_m2_n2);
+    }
+
+    // transposed XDL output supporting C_xdl' = B_xdl' * A_xdl'_packed mfma
+    __host__ __device__ static constexpr auto GetCBlockDescriptor_M0_N0_M1_N1_M2_N2_M3_N3_N4_N5()
+    {
+        constexpr auto c_block_desc_m0_n0_m1_n1_m2_n2 =
+            make_naive_tensor_descriptor_packed(make_tuple(Number<MRepeat / MXdlPack>{},
+                                                           Number<NRepeat / NXdlPack>{},
+                                                           Number<MWaves>{},
+                                                           Number<NWaves>{},
+                                                           Number<MXdlPack>{},
+                                                           Number<NXdlPack>{},
+                                                           Number<MPerXDL>{},
+                                                           Number<NPerXDL>{}));
+
+        return xdlops_gemm.MakeCDescriptor_M0_N0_M1_N1_M2_N2_M3_N3_N4_N5(
             c_block_desc_m0_n0_m1_n1_m2_n2);
     }
 

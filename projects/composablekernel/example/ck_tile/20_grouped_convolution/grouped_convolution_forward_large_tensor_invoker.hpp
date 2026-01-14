@@ -213,8 +213,7 @@ struct GroupedConvolutionForwardInvoker
         // =====================================================================
         // Kernel launch lambda: Uses EnableSplitImage based on layout support
         // =====================================================================
-        const auto Run = [&](const auto memory_operation_, const auto enable_split_image_) {
-            constexpr auto memory_operation = memory_operation_.value;
+        const auto Run = [&](const auto enable_split_image_) {
             constexpr bool EnableSplitImage = enable_split_image_.value;
 
             using GroupedConvTraitsType = std::conditional_t<EnableSplitImage,
@@ -231,6 +230,7 @@ struct GroupedConvolutionForwardInvoker
                 ck_tile::element_wise::PassThrough,
                 ck_tile::element_wise::PassThrough,
                 OutDataType,
+                OutDataType, // TODO: need to double check
                 GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
                 GroupedConvTraitsType::VectorSizeA,
                 GroupedConvTraitsType::VectorSizeB>;
@@ -255,7 +255,6 @@ struct GroupedConvolutionForwardInvoker
                 ConvConfig::N_Warp_Tile,
                 ConvConfig::K_Warp_Tile,
                 GroupedConvTraitsType::FixedGemmParams::TransposeC,
-                memory_operation,
                 ConvConfig::NumWaveGroups,
                 GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
                 GroupedConvTraitsType::VectorSizeC>>;
@@ -332,17 +331,11 @@ struct GroupedConvolutionForwardInvoker
         // =====================================================================
         if(use_split_image)
         {
-            if(args.k_batch == 1)
-                return Run(MemoryOpSet{}, ck_tile::bool_constant<true>{});
-            else
-                return Run(MemoryOpAtomicAdd{}, ck_tile::bool_constant<true>{});
+            return Run(ck_tile::bool_constant<true>{});
         }
         else
         {
-            if(args.k_batch == 1)
-                return Run(MemoryOpSet{}, ck_tile::bool_constant<false>{});
-            else
-                return Run(MemoryOpAtomicAdd{}, ck_tile::bool_constant<false>{});
+            return Run(ck_tile::bool_constant<false>{});
         }
     }
 };

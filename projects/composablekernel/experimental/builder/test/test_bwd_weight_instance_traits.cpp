@@ -161,6 +161,7 @@ TEST(InstanceTraits, TileInstanceStringReturnsCorrectFormat)
         ck_tile::element_wise::PassThrough /*AElementwiseOperation*/,
         ck_tile::element_wise::PassThrough /*BElementwiseOperation*/,
         ck_tile::bf16_t /*WeiDataType*/,
+        ck_tile::bf16_t /*WeiDataType*/,
         GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
         GroupedConvTraitsType::VectorSizeA,
         GroupedConvTraitsType::VectorSizeB>;
@@ -184,7 +185,6 @@ TEST(InstanceTraits, TileInstanceStringReturnsCorrectFormat)
                                          16 /*N_Warp_Tile*/,
                                          16 /*K_Warp_Tile*/,
                                          GroupedConvTraitsType::FixedGemmParams::TransposeC,
-                                         ck_tile::memory_operation_enum::set /*memory_operation*/,
                                          1 /*kNumWaveGroups*/,
                                          GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
                                          GroupedConvTraitsType::VectorSizeC>>;

@@ -30,6 +30,7 @@ struct GemmQuantPipelineProblemBase : public GemmPipelineProblemBase<ADataType_,
                                                                      CDataType_,
                                                                      BlockGemmShape_,
                                                                      Traits_,
+                                                                     ComputeDataType_,
                                                                      ComputeDataType_>
 {
     using Base = GemmPipelineProblemBase<ADataType_,
@@ -37,6 +38,7 @@ struct GemmQuantPipelineProblemBase : public GemmPipelineProblemBase<ADataType_,
                                          CDataType_,
                                          BlockGemmShape_,
                                          Traits_,
+                                         ComputeDataType_,
                                          ComputeDataType_>;
 
     using Traits = typename Base::Traits;
@@ -44,7 +46,7 @@ struct GemmQuantPipelineProblemBase : public GemmPipelineProblemBase<ADataType_,
     using typename Base::ADataType;
     using typename Base::BDataType;
     using typename Base::CDataType;
-    using typename Base::ComputeDataType;
+
     using AQDataType = remove_cvref_t<AQDataType_>;
     using BQDataType = remove_cvref_t<BQDataType_>;
 

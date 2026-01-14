@@ -33,7 +33,8 @@ template <BlockGemmPipelineScheduler BlkGemmPipelineVer,
           index_t NPerXDL,
           index_t MRepeat, // MXdlPerWave
           index_t NRepeat, // NXdlPerWave
-          index_t KPack>
+          index_t KPack,
+          bool TransposeC>
 struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3
 {
 };
@@ -57,7 +58,8 @@ template <index_t ThreadBlockSize,
           index_t NPerXDL,
           index_t MRepeat, // MXdlPerWave
           index_t NRepeat, // NXdlPerWave
-          index_t KPack>
+          index_t KPack,
+          bool TransposeC>
 struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineScheduler::Intrawave,
                                                           ThreadBlockSize,
                                                           ScaleBlockSize,
@@ -78,7 +80,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineSched
                                                           NPerXDL,
                                                           MRepeat,
                                                           NRepeat,
-                                                          KPack>
+                                                          KPack,
+                                                          TransposeC>
     : BlockwiseGemmXdlops_mx_pipeline_base<ThreadBlockSize,
                                            ScaleBlockSize,
                                            ADataType,
@@ -98,7 +101,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineSched
                                            NPerXDL,
                                            MRepeat,
                                            NRepeat,
-                                           KPack>
+                                           KPack,
+                                           TransposeC>
 
 {
 
@@ -121,7 +125,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineSched
                                                       NPerXDL,
                                                       MRepeat,
                                                       NRepeat,
-                                                      KPack>;
+                                                      KPack,
+                                                      TransposeC>;
     using Base::A_K1;
     using Base::I0;
     using Base::I1;

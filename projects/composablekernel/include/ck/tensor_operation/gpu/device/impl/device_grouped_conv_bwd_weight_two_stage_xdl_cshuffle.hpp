@@ -30,6 +30,11 @@
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/flush_cache.hpp"
 
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/description.hpp"
+#include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_weight_two_stage_xdl_cshuffle.hpp"
+#endif
+
 namespace ck {
 namespace tensor_operation {
 namespace device {
@@ -48,7 +53,7 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
 #endif
-    kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3(
+    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage(
         typename GridwiseGemm::Argument karg,
         [[maybe_unused]] const AGridDesc_AK0_M_K1 a_grid_desc_ak0_m_ak1,
         [[maybe_unused]] const BGridDesc_BK0_N_K1 b_grid_desc_bk0_n_bk1,
@@ -106,7 +111,7 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
 #endif
-    kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3_2lds(
+    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage_2lds(
         typename GridwiseGemm::Argument karg,
         [[maybe_unused]] const AGridDesc_AK0_M_K1 a_grid_desc_ak0_m_ak1,
         [[maybe_unused]] const BGridDesc_BK0_N_K1 b_grid_desc_bk0_n_bk1,
@@ -219,14 +224,30 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
     static_assert(is_same_v<WeiElementwiseOperation, element_wise::PassThrough>);
     static_assert(is_same_v<OutElementwiseOperation, element_wise::PassThrough>);
 
-    using DeviceOp = DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle;
-    GET_NXDL_PER_WAVE_IMPL
-    static constexpr auto NXdlPerWave64 = GetNXdlPerWave<true>();
-    static constexpr auto NXdlPerWave32 = GetNXdlPerWave<false>();
-
-    using ADataType = OutDataType;
-    using BDataType = InDataType;
-    using EDataType = WeiDataType;
+    using DeviceOp                         = DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle;
+    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               true>();
+    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               false>();
+    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
+    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
+    using ADataType                        = OutDataType;
+    using BDataType                        = InDataType;
+    using EDataType                        = WeiDataType;
 
     // If NGCHW then ADataType must be equal to BDataType
     static_assert(!(is_NGCHW_NGKHW<InLayout, WeiLayout, OutLayout>() ||
@@ -402,7 +423,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
     using CElementwiseGridDesc_M_N =
         remove_cvref_t<decltype(GetElementwiseCGridDesc<NDimSpatial>())>;
 
-    template <index_t NXdlPerWave_>
+    template <typename WarpTileConfig>
     using GridwiseGemmBase = GridwiseGemm_xdl_cshuffle_conv_v3<
         tensor_layout::gemm::RowMajor,
         tensor_layout::gemm::ColumnMajor,
@@ -422,10 +443,10 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         KPerBlock,
         K1,
         K1,
-        MPerXDL,
-        NPerXDL,
-        MXdlPerWave,
-        NXdlPerWave_,
+        WarpTileConfig::At(0),
+        WarpTileConfig::At(1),
+        WarpTileConfig::At(2),
+        WarpTileConfig::At(3),
         ABlockTransferThreadClusterLengths_K0_M_K1,
         ABlockTransferThreadClusterArrangeOrder,
         ABlockTransferSrcAccessOrder,
@@ -442,16 +463,16 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         BBlockTransferDstScalarPerVector_K1,
         false,
         BBlockLdsAddExtraN,
-        CShuffleMXdlPerWavePerShuffle,
-        CShuffleNXdlPerWavePerShuffle,
+        WarpTileConfig::At(4),
+        WarpTileConfig::At(5),
         CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CBlockTransferScalarPerVector_NWaveNPerXdl,
         BlkGemmPipeSched,
         BlkGemmPipelineVer,
         ComputeTypeA,
         ComputeTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
+    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
+    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     using Block2TileMapElementwise = BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock>;
 
@@ -532,7 +553,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             {
                 hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
                     &max_occupancy,
-                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3_2lds<
+                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage_2lds<
                         GridwiseGemm,
                         remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                         remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -549,7 +570,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             {
                 hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
                     &max_occupancy,
-                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                         GridwiseGemm,
                         remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                         remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -997,7 +1018,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 {
                     if(gemm_arg.KBatch > 1)
                     {
-                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                             GridwiseGemm,
                             remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                             remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -1012,7 +1033,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     }
                     else
                     {
-                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                             GridwiseGemm,
                             remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                             remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -1033,43 +1054,8 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::One)
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::AtomicAdd,
-                                minimum_occupancy,
-                                TailNumber::One>;
-                            Run(kernel);
-                        }
-                        else if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
-                                TailNumber::Full)
-                        {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::AtomicAdd,
-                                minimum_occupancy,
-                                TailNumber::Full>;
-                            Run(kernel);
-                        }
-
-                        if constexpr(GridwiseGemm::BlockwiseGemmPipe::PrefetchStages > 2)
-                        {
-                            if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Two)
-                            {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                                     GridwiseGemm,
                                     remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                                     remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -1080,7 +1066,45 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                                     true,
                                     InMemoryDataOperationEnum::AtomicAdd,
                                     minimum_occupancy,
-                                    TailNumber::Two>;
+                                    TailNumber::One>;
+                            Run(kernel);
+                        }
+                        else if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
+                                TailNumber::Full)
+                        {
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::AtomicAdd,
+                                    minimum_occupancy,
+                                    TailNumber::Full>;
+                            Run(kernel);
+                        }
+
+                        if constexpr(GridwiseGemm::BlockwiseGemmPipe::PrefetchStages > 2)
+                        {
+                            if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Two)
+                            {
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::AtomicAdd,
+                                        minimum_occupancy,
+                                        TailNumber::Two>;
                                 Run(kernel);
                             }
                         }
@@ -1090,18 +1114,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Three)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::AtomicAdd,
-                                    minimum_occupancy,
-                                    TailNumber::Three>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::AtomicAdd,
+                                        minimum_occupancy,
+                                        TailNumber::Three>;
                                 Run(kernel);
                             }
                         }
@@ -1111,18 +1136,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Four)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::AtomicAdd,
-                                    minimum_occupancy,
-                                    TailNumber::Four>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::AtomicAdd,
+                                        minimum_occupancy,
+                                        TailNumber::Four>;
                                 Run(kernel);
                             }
                         }
@@ -1132,18 +1158,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Five)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::AtomicAdd,
-                                    minimum_occupancy,
-                                    TailNumber::Five>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::AtomicAdd,
+                                        minimum_occupancy,
+                                        TailNumber::Five>;
                                 Run(kernel);
                             }
                         }
@@ -1152,18 +1179,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                         {
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Six)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::AtomicAdd,
-                                    minimum_occupancy,
-                                    TailNumber::Six>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::AtomicAdd,
+                                        minimum_occupancy,
+                                        TailNumber::Six>;
                                 Run(kernel);
                             }
                         }
@@ -1173,18 +1201,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Seven)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::AtomicAdd,
-                                    minimum_occupancy,
-                                    TailNumber::Seven>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::AtomicAdd,
+                                        minimum_occupancy,
+                                        TailNumber::Seven>;
                                 Run(kernel);
                             }
                         }
@@ -1193,43 +1222,8 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::One)
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::Set,
-                                minimum_occupancy,
-                                TailNumber::One>;
-                            Run(kernel);
-                        }
-                        else if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
-                                TailNumber::Full)
-                        {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::Set,
-                                minimum_occupancy,
-                                TailNumber::Full>;
-                            Run(kernel);
-                        }
-
-                        if constexpr(GridwiseGemm::BlockwiseGemmPipe::PrefetchStages > 2)
-                        {
-                            if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Two)
-                            {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                                     GridwiseGemm,
                                     remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                                     remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -1240,7 +1234,45 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                                     true,
                                     InMemoryDataOperationEnum::Set,
                                     minimum_occupancy,
-                                    TailNumber::Two>;
+                                    TailNumber::One>;
+                            Run(kernel);
+                        }
+                        else if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
+                                TailNumber::Full)
+                        {
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::Set,
+                                    minimum_occupancy,
+                                    TailNumber::Full>;
+                            Run(kernel);
+                        }
+
+                        if constexpr(GridwiseGemm::BlockwiseGemmPipe::PrefetchStages > 2)
+                        {
+                            if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Two)
+                            {
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::Set,
+                                        minimum_occupancy,
+                                        TailNumber::Two>;
                                 Run(kernel);
                             }
                         }
@@ -1250,18 +1282,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Three)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::Set,
-                                    minimum_occupancy,
-                                    TailNumber::Three>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::Set,
+                                        minimum_occupancy,
+                                        TailNumber::Three>;
                                 Run(kernel);
                             }
                         }
@@ -1271,18 +1304,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Four)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::Set,
-                                    minimum_occupancy,
-                                    TailNumber::Four>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::Set,
+                                        minimum_occupancy,
+                                        TailNumber::Four>;
                                 Run(kernel);
                             }
                         }
@@ -1292,18 +1326,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Five)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::Set,
-                                    minimum_occupancy,
-                                    TailNumber::Five>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::Set,
+                                        minimum_occupancy,
+                                        TailNumber::Five>;
                                 Run(kernel);
                             }
                         }
@@ -1312,18 +1347,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                         {
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Six)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::Set,
-                                    minimum_occupancy,
-                                    TailNumber::Six>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::Set,
+                                        minimum_occupancy,
+                                        TailNumber::Six>;
                                 Run(kernel);
                             }
                         }
@@ -1333,18 +1369,19 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                             if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) ==
                                TailNumber::Seven)
                             {
-                                const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                    GridwiseGemm,
-                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                    remove_reference_t<
-                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                    NumGroupsToMerge,
-                                    true,
-                                    InMemoryDataOperationEnum::Set,
-                                    minimum_occupancy,
-                                    TailNumber::Seven>;
+                                const auto kernel =
+                                    kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                        GridwiseGemm,
+                                        remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                        remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                        remove_reference_t<
+                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                        ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                        NumGroupsToMerge,
+                                        true,
+                                        InMemoryDataOperationEnum::Set,
+                                        minimum_occupancy,
+                                        TailNumber::Seven>;
                                 Run(kernel);
                             }
                         }
@@ -1357,34 +1394,36 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3_2lds<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::AtomicAdd,
-                                minimum_occupancy,
-                                TailNumber::Odd>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage_2lds<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::AtomicAdd,
+                                    minimum_occupancy,
+                                    TailNumber::Odd>;
                             Run(kernel);
                         }
                         else
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3_2lds<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::AtomicAdd,
-                                minimum_occupancy,
-                                TailNumber::Even>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage_2lds<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::AtomicAdd,
+                                    minimum_occupancy,
+                                    TailNumber::Even>;
                             Run(kernel);
                         }
                     }
@@ -1392,34 +1431,36 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3_2lds<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::Set,
-                                minimum_occupancy,
-                                TailNumber::Odd>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage_2lds<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::Set,
+                                    minimum_occupancy,
+                                    TailNumber::Odd>;
                             Run(kernel);
                         }
                         else
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3_2lds<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::Set,
-                                minimum_occupancy,
-                                TailNumber::Even>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage_2lds<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::Set,
+                                    minimum_occupancy,
+                                    TailNumber::Even>;
                             Run(kernel);
                         }
                     }
@@ -1430,34 +1471,36 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::AtomicAdd,
-                                minimum_occupancy,
-                                TailNumber::Odd>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::AtomicAdd,
+                                    minimum_occupancy,
+                                    TailNumber::Odd>;
                             Run(kernel);
                         }
                         else
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::AtomicAdd,
-                                minimum_occupancy,
-                                TailNumber::Even>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::AtomicAdd,
+                                    minimum_occupancy,
+                                    TailNumber::Even>;
                             Run(kernel);
                         }
                     }
@@ -1465,34 +1508,36 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::Set,
-                                minimum_occupancy,
-                                TailNumber::Odd>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::Set,
+                                    minimum_occupancy,
+                                    TailNumber::Odd>;
                             Run(kernel);
                         }
                         else
                         {
-                            const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
-                                GridwiseGemm,
-                                remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
-                                remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
-                                remove_reference_t<
-                                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
-                                ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
-                                NumGroupsToMerge,
-                                true,
-                                InMemoryDataOperationEnum::Set,
-                                minimum_occupancy,
-                                TailNumber::Even>;
+                            const auto kernel =
+                                kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
+                                    GridwiseGemm,
+                                    remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
+                                    remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
+                                    remove_reference_t<
+                                        DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                    ComputePtrOffsetOfStridedBatch<I1, I1, I0>,
+                                    NumGroupsToMerge,
+                                    true,
+                                    InMemoryDataOperationEnum::Set,
+                                    minimum_occupancy,
+                                    TailNumber::Even>;
                             Run(kernel);
                         }
                     }
@@ -1505,7 +1550,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 {
                     if(gemm_arg.KBatch > 1)
                     {
-                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                             GridwiseGemm,
                             remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                             remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -1520,7 +1565,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                     }
                     else
                     {
-                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_v3<
+                        const auto kernel = kernel_grouped_conv_bwd_weight_xdl_cshuffle_two_stage<
                             GridwiseGemm,
                             remove_reference_t<DeviceOp::AGridDesc_K0_M_K1>,
                             remove_reference_t<DeviceOp::BGridDesc_K0_N_K1>,
@@ -1765,7 +1810,12 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             }
             return false;
         }
-        if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
+        if(!ck::is_xdl_wmma_supported<ComputeTypeA,
+                                      ComputeTypeB,
+                                      MPerXDL,
+                                      NPerXDL,
+                                      WarpTileConfig32.At(0),
+                                      WarpTileConfig32.At(1)>())
         {
             return false;
         }
@@ -2084,6 +2134,24 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 "The argument pointer is not an object of "
                 "DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle::Argument structure!");
     }
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    std::string GetInstanceString() const override
+    {
+        static_assert(ck_tile::reflect::HasInstanceTraits<DeviceOp>,
+                      "Specialization of instance_traits not found. Please check that a "
+                      "specialization exists in file "
+                      "ck_tile/builder/reflect/"
+                      "instance_traits_device_grouped_conv_bwd_weight_two_stage_xdl_cshuffle.hpp "
+                      "for the given template parameters.");
+        return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+
+    std::unique_ptr<ck_tile::reflect::Description> describe() const override
+    {
+        return std::make_unique<ck_tile::reflect::InstanceStringDescription>(GetInstanceString());
+    }
+#endif
 };
 
 } // namespace device

@@ -903,6 +903,11 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         index_t c_reduce_offset;
     };
 
+#if defined(__gfx125__)
+    static constexpr index_t TransposeC = true;
+#else
+    static constexpr index_t TransposeC = false;
+#endif
     using BlockwiseGemmPipe = remove_cvref_t<
         decltype(BlockGemmMXPipeline_Selector<
                  BlkGemmPipelineVer,
@@ -930,7 +935,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                  NPerXdl,
                  MXdlPerWave,
                  NXdlPerWave,
-                 KPack>())>;
+                 KPack,
+                 TransposeC>())>;
 
     IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
 
@@ -1442,7 +1448,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,
@@ -1793,7 +1799,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,

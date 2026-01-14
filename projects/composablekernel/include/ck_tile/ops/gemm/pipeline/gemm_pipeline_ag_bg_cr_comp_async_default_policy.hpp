@@ -25,12 +25,11 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     using Base::is_a_load_tr;
     using Base::is_b_load_tr;
 
-    template <typename Problem,
-              typename OverrideADataType = remove_cvref_t<typename Problem::ADataType>>
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
 #if defined(__gfx125__)
-        return Base::template MakeALdsBlockDescriptor<Problem, OverrideADataType>();
+        return Base::template MakeALdsBlockDescriptor<Problem>();
 #else
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
@@ -170,7 +169,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
 
 #if defined(__gfx950__)
         constexpr index_t vector_size =
-            DS_READ_TR_SIZE() / sizeof(typename Problem::ComputeDataType);
+            DS_READ_TR_SIZE() / sizeof(typename Problem::AComputeDataType);
         constexpr index_t thread_elements = WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
         constexpr auto wg_attr_num_access =
             !(Base::template is_a_load_tr<Problem> || Base::template is_b_load_tr<Problem>)

@@ -228,7 +228,7 @@ struct AQuantGemmPipelineAgBgCrMem : public BaseGemmPipelineAgBgCrMem<Problem>
                           "B block window has incorrect lengths for defined BLayout!");
 
             // A/B tiles in LDS - using the same approach as regular gemm pipeline
-            auto ab_lds_blocks = Base::template GetABLdsTensorViews<BDataType, BDataType>(p_smem);
+            auto ab_lds_blocks = Base::GetABLdsTensorViews(p_smem);
             auto& a_lds_block  = ab_lds_blocks.at(I0{});
             auto& b_lds_block  = ab_lds_blocks.at(I1{});
 

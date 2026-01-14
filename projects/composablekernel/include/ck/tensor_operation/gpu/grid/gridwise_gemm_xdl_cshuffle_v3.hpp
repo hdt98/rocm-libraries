@@ -941,32 +941,35 @@ struct GridwiseGemm_xdl_cshuffle_v3
                  TransposeC,
                  UseDataCachePrefetch>())>;
 
+    template <bool IsGfx11>
     static constexpr index_t GetEstimateVgprCount()
     {
         constexpr index_t MWave    = MPerBlock / (MXdlPerWave * MPerXdl);
         constexpr index_t NWave    = NPerBlock / (NXdlPerWave * NPerXdl);
         constexpr index_t WaveSize = BlockSize / (MWave * NWave);
 
-        constexpr index_t AVgprSize = MPerBlock * KPerBlock / MWave / WaveSize * sizeof(ADataType) /
-                                      APackedSize / sizeof(uint32_t);
-        constexpr index_t BVgprSize = NPerBlock * KPerBlock / NWave / WaveSize * sizeof(BDataType) /
-                                      BPackedSize / sizeof(uint32_t);
-        constexpr index_t AccVgprSize =
+        // VGPR used in LDS loading and WMMA
+        constexpr index_t BaseInputVgprCount =
+            MPerBlock * KPerBlock / MWave / WaveSize * sizeof(ComputeTypeA) / sizeof(uint32_t) +
+            NPerBlock * KPerBlock / NWave / WaveSize * sizeof(ComputeTypeB) / sizeof(uint32_t);
+        // WMMA input is duplicated in GFX11
+        constexpr index_t InputVgprCount = IsGfx11 ? BaseInputVgprCount * 2 : BaseInputVgprCount;
+        // VGPR used in Accumulator
+        constexpr index_t AccVgprCount =
             MPerBlock * NPerBlock / BlockSize * sizeof(AccDataType) / sizeof(uint32_t);
-
         if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
         {
-            return AVgprSize + BVgprSize + AccVgprSize;
+            return InputVgprCount + AccVgprCount;
         }
         else if constexpr((BlkGemmPipelineVer == BlockGemmPipelineVersion::v2) ||
                           (BlkGemmPipelineVer == BlockGemmPipelineVersion::v3) ||
                           (BlkGemmPipelineVer == BlockGemmPipelineVersion::v5))
         {
-            return 2 * (AVgprSize + BVgprSize) + AccVgprSize;
+            return 2 * InputVgprCount + AccVgprCount;
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
         {
-            return 3 * (AVgprSize + BVgprSize) + AccVgprSize;
+            return 3 * InputVgprCount + AccVgprCount;
         }
         else
         {
@@ -978,7 +981,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
     template <InMemoryDataOperationEnum CGlobalMemoryDataOperation>
     __device__ static bool constexpr IsValidCompilationParameter()
     {
-
         // skip building the instances with K1>=32 && PackedSize != 2 on pre-gfx950
         if constexpr(is_same_v<decltype(get_device_arch()), gfx950_t> ||
                      (AK1Number < 32 && BK1Number < 32) || (AK1Number >= 32 && APackedSize == 2) ||
@@ -990,19 +992,26 @@ struct GridwiseGemm_xdl_cshuffle_v3
             return false;
         }
 
-        if constexpr(is_same_v<decltype(get_device_arch()), gfx125_t> && MinimumOccupancy != 0)
-        {
-            constexpr index_t WaveSize       = 32;
-            constexpr auto EstimateVgprCount = GetEstimateVgprCount();
-            constexpr auto AvailableVgprCount =
-                get_max_vgpr_count(get_device_arch()) / MinimumOccupancy /
-                (math::integer_divide_ceil(BlockSize, WaveSize * 4));
-            if constexpr(EstimateVgprCount > (AvailableVgprCount + AvailableVgprCount / 4))
+        constexpr bool IsGfx11            = is_same_v<decltype(get_device_arch()), gfx11_t>;
+        constexpr auto EstimateVgprCount  = GetEstimateVgprCount<IsGfx11>();
+        constexpr auto AvailableVgprCount = [&]() {
+            if constexpr(MinimumOccupancy != 0)
             {
-                return false;
+                constexpr index_t MWave    = MPerBlock / (MXdlPerWave * MPerXdl);
+                constexpr index_t NWave    = NPerBlock / (NXdlPerWave * NPerXdl);
+                constexpr index_t WaveSize = BlockSize / (MWave * NWave);
+                return get_max_vgpr_count(get_device_arch()) / MinimumOccupancy /
+                       (math::integer_divide_ceil(BlockSize, WaveSize * 4));
             }
+            else
+            {
+                return get_max_vgpr_count(get_device_arch());
+            }
+        }();
+        if constexpr(EstimateVgprCount > (AvailableVgprCount + AvailableVgprCount / 4))
+        {
+            return false;
         }
-
         constexpr index_t LdsSize = BlkGemmPipelineVer == BlockGemmPipelineVersion::v4
                                         ? GetSharedMemoryNumberOfByte(get_device_arch()) * 2
                                         : GetSharedMemoryNumberOfByte(get_device_arch());
@@ -1022,6 +1031,24 @@ struct GridwiseGemm_xdl_cshuffle_v3
             CDataType,
             CGlobalMemoryDataOperation>();
     }
+    __host__ static index_t GetSharedMemoryNumberOfByteOnHost()
+    {
+#if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
+        if(is_gfx125_supported())
+        {
+            return GetSharedMemoryNumberOfByte(gfx125_t{});
+        }
+        else if(ck::get_device_name() == "gfx950")
+        {
+            return GetSharedMemoryNumberOfByte(gfx950_t{});
+        }
+        else
+#endif
+        {
+            return GetSharedMemoryNumberOfByte(gfx_invalid_t{});
+        }
+    }
+
     // block_id to matrix tile idx (m0, n0) mapping are controlled by {M01, N01}
     __host__ static constexpr bool CheckValidity(const Argument& karg)
     {
@@ -1215,36 +1242,52 @@ struct GridwiseGemm_xdl_cshuffle_v3
             }
         }
 
-        index_t ldsSize = 0;
-
-        if(ck::is_gfx125_supported())
-        {
-            ldsSize = BlkGemmPipelineVer == BlockGemmPipelineVersion::v4
-                          ? GetSharedMemoryNumberOfByte(gfx125_t{}) * 2
-                          : GetSharedMemoryNumberOfByte(gfx125_t{});
-        }
-        else
-        {
-            ldsSize = BlkGemmPipelineVer == BlockGemmPipelineVersion::v4
-                          ? GetSharedMemoryNumberOfByte(gfx_invalid_t{}) * 2
-                          : GetSharedMemoryNumberOfByte(gfx_invalid_t{});
-        }
-        if(ldsSize > get_lds_size())
+        constexpr index_t ldsBufferCount =
+            BlkGemmPipelineVer == BlockGemmPipelineVersion::v4 ? 2 : 1;
+        if(GetSharedMemoryNumberOfByteOnHost() * ldsBufferCount > get_lds_size())
         {
             return false;
         }
 
-        if(ck::is_gfx125_supported() && MinimumOccupancy != 0)
-        {
-            index_t estimateVgprCount = GetEstimateVgprCount();
-            index_t availableVgprCount =
-                get_max_vgpr_count(gfx125_t{}) / MinimumOccupancy /
-                (math::integer_divide_ceil(BlockSize, ck::get_warp_size() * 4));
-            if(estimateVgprCount > (availableVgprCount + availableVgprCount / 4))
+        const auto maxVgprCount = []() {
+            if(ck::is_gfx125_supported())
             {
-                return false;
+                return get_max_vgpr_count(gfx125_t{});
             }
+            else if(ck::is_gfx120_supported())
+            {
+                return get_max_vgpr_count(gfx120_t{});
+            }
+            else if(ck::is_gfx11_supported())
+            {
+                return get_max_vgpr_count(gfx11_t{});
+            }
+            else
+            {
+                return get_max_vgpr_count(gfx9_t{});
+            }
+        }();
+
+        const index_t availableVgprCount = [&]() {
+            if constexpr(MinimumOccupancy != 0)
+            {
+                return maxVgprCount / math::max(MinimumOccupancy, 1) /
+                       (math::integer_divide_ceil(BlockSize, ck::get_warp_size() * 4));
+            }
+            else
+            {
+                return maxVgprCount;
+            }
+        }();
+
+        const auto estimateVgprCount =
+            ck::is_gfx11_supported() ? GetEstimateVgprCount<true>() : GetEstimateVgprCount<false>();
+
+        if(estimateVgprCount > (availableVgprCount + availableVgprCount / 4))
+        {
+            return false;
         }
+
         // TODO: also check validity of all components (blockwise-copy, threadwise-copy, etc)
         return true;
     }
@@ -1657,15 +1700,16 @@ struct GridwiseGemm_xdl_cshuffle_v3
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, DoElementwiseBeforeCShuffle, false>(
-            blockwise_gemm_pipeline,
-            c_grid_desc_mblock_mperblock_nblock_nperblock,
-            c_thread_buf,
-            block_m_id,
-            block_n_id,
-            p_shared_0,
-            p_c_grid,
-            problem.c_element_op_);
+        Base::template RunEpilogue<CGlobalMemoryDataOperation,
+                                   DoElementwiseBeforeCShuffle,
+                                   TransposeC>(blockwise_gemm_pipeline,
+                                               c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                               c_thread_buf,
+                                               block_m_id,
+                                               block_n_id,
+                                               p_shared_0,
+                                               p_c_grid,
+                                               problem.c_element_op_);
     }
 
     template <bool HasMainKBlockLoop,

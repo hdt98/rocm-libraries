@@ -1459,11 +1459,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             return false;
         }
-        if(!is_xdl_wmma_k_supported<AComputeDataType, KPerBlock, AK1>())
+        if(!is_xdl_wmma_k_supported<AComputeDataType, KPerBlock>())
         {
             return false;
         }
-        if(!is_xdl_wmma_k_supported<BComputeDataType, KPerBlock, BK1>())
+        if(!is_xdl_wmma_k_supported<BComputeDataType, KPerBlock>())
         {
             return false;
         }

@@ -302,6 +302,12 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
             return 1;
     }();
 
+#if defined(__gfx125__)
+    static constexpr index_t TransposeC = true;
+#else
+    static constexpr index_t TransposeC = false;
+#endif
+
     __host__ static auto CalculateGridSize(index_t M, index_t N, index_t KBatch)
     {
         return std::make_tuple(Block2CTileMap::CalculateGridSize(M, N), 1, KBatch);
@@ -829,7 +835,9 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                  NPerXdl,
                  MXdlPerWave,
                  NXdlPerWave,
-                 KPack>())>;
+                 KPack,
+                 false,
+                 TransposeC>())>;
 
     template <
         InMemoryDataOperationEnum CGlobalMemoryDataOperation_ = InMemoryDataOperationEnum::Set>
@@ -1247,7 +1255,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,
@@ -1448,7 +1456,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,
