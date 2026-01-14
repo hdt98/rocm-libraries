@@ -85,8 +85,6 @@ namespace rocRoller::Scheduling::LDSBankModel
         , m_multiplierLdsIo(waveCount > 1 ? 2 : 1)
 
     {
-        AssertFatal(waveCount >= 1, ShowValue(waveCount));
-        AssertFatal(waveCount != 3, "wave count of 3 is untested");
     }
 
     // Advance program cycle by delta cycles
