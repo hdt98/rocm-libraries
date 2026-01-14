@@ -47,6 +47,9 @@ struct StridedLayout;
 template <ck::index_t NDimSpatial>
 struct GCPackedLayout;
 
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 namespace ctl = ck::tensor_layout::convolution;
 
 // Packed layout
@@ -141,8 +144,28 @@ class TestGroupedConvFwdWcnnInterface : public ::testing::Test
                 {
                     in_strides[i + 3] *= 2;
                 }
-                in_g_n_c_wis_desc =
-                    HostTensorDescriptor(in_g_n_c_wis_desc.GetLengths(), in_strides);
+
+                if constexpr(NDimSpatial == 1)
+                {
+                    in_g_n_c_wis_desc =
+                        HostTensorDescriptor(in_g_n_c_wis_desc.GetLengths(),
+                                             in_strides,
+                                             ck::tensor_layout::convolution::GNCW{});
+                }
+                else if constexpr(NDimSpatial == 2)
+                {
+                    in_g_n_c_wis_desc =
+                        HostTensorDescriptor(in_g_n_c_wis_desc.GetLengths(),
+                                             in_strides,
+                                             ck::tensor_layout::convolution::GNCHW{});
+                }
+                else if constexpr(NDimSpatial == 3)
+                {
+                    in_g_n_c_wis_desc =
+                        HostTensorDescriptor(in_g_n_c_wis_desc.GetLengths(),
+                                             in_strides,
+                                             ck::tensor_layout::convolution::GNCDHW{});
+                }
 
                 auto wei_strides = wei_g_k_c_xs_desc.GetStrides();
                 wei_strides[0] *= 8; // G
@@ -151,8 +174,28 @@ class TestGroupedConvFwdWcnnInterface : public ::testing::Test
                 {
                     wei_strides[i + 3] *= 2;
                 }
-                wei_g_k_c_xs_desc =
-                    HostTensorDescriptor(wei_g_k_c_xs_desc.GetLengths(), wei_strides);
+
+                if constexpr(NDimSpatial == 1)
+                {
+                    wei_g_k_c_xs_desc =
+                        HostTensorDescriptor(wei_g_k_c_xs_desc.GetLengths(),
+                                             wei_strides,
+                                             ck::tensor_layout::convolution::GKCX{});
+                }
+                else if constexpr(NDimSpatial == 2)
+                {
+                    wei_g_k_c_xs_desc =
+                        HostTensorDescriptor(wei_g_k_c_xs_desc.GetLengths(),
+                                             wei_strides,
+                                             ck::tensor_layout::convolution::GKCYX{});
+                }
+                else if constexpr(NDimSpatial == 3)
+                {
+                    wei_g_k_c_xs_desc =
+                        HostTensorDescriptor(wei_g_k_c_xs_desc.GetLengths(),
+                                             wei_strides,
+                                             ck::tensor_layout::convolution::GKCZYX{});
+                }
 
                 auto out_strides = out_g_n_k_wos_desc.GetStrides();
                 out_strides[0] *= 4;
@@ -161,8 +204,28 @@ class TestGroupedConvFwdWcnnInterface : public ::testing::Test
                 {
                     out_strides[i + 3] *= 2;
                 }
-                out_g_n_k_wos_desc =
-                    HostTensorDescriptor(out_g_n_k_wos_desc.GetLengths(), out_strides);
+
+                if constexpr(NDimSpatial == 1)
+                {
+                    out_g_n_k_wos_desc =
+                        HostTensorDescriptor(out_g_n_k_wos_desc.GetLengths(),
+                                             out_strides,
+                                             ck::tensor_layout::convolution::GNKW{});
+                }
+                else if constexpr(NDimSpatial == 2)
+                {
+                    out_g_n_k_wos_desc =
+                        HostTensorDescriptor(out_g_n_k_wos_desc.GetLengths(),
+                                             out_strides,
+                                             ck::tensor_layout::convolution::GNKHW{});
+                }
+                else if constexpr(NDimSpatial == 3)
+                {
+                    out_g_n_k_wos_desc =
+                        HostTensorDescriptor(out_g_n_k_wos_desc.GetLengths(),
+                                             out_strides,
+                                             ck::tensor_layout::convolution::GNKDHW{});
+                }
             }
         }
         else if(desc_mode == 2)

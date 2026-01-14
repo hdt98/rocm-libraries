@@ -2636,6 +2636,18 @@ struct non_native_vector_base<
 
     __host__ __device__ constexpr operator data_v() const { return data_.dN; }
 
+    __host__ __device__ constexpr operator data_t() const
+    {
+        if constexpr(N == 1)
+        {
+            return data_.dxN[Number<0>{}];
+        }
+        else
+        {
+            return data_.dxN; // XXX this should cause an error
+        }
+    }
+
     __host__ __device__ constexpr operator T() const
     {
         if constexpr(N == 1)

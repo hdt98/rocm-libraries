@@ -124,20 +124,21 @@ inline bool is_gfx103_supported()
            ck::get_device_name() == "gfx1035" || ck::get_device_name() == "gfx1036";
 }
 
+inline bool is_gfx13_supported()
+{
+    return ck::get_device_name() == "gfx1310" || ck::get_device_name() == "gfx1370" ||
+           ck::get_device_name() == "gfx130F";
+}
+
 inline bool is_wmma_supported()
 {
-    return is_gfx103_supported() || is_gfx11_supported() || is_gfx12_supported();
+    return is_gfx103_supported() || is_gfx11_supported() || is_gfx12_supported() ||
+           is_gfx13_supported();
 }
 
 inline bool is_tf32_supported()
 {
     return ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950";
-}
-
-inline bool is_gfx13_supported()
-{
-    return ck::get_device_name() == "gfx1310" || ck::get_device_name() == "gfx1370" ||
-           ck::get_device_name() == "gfx130F";
 }
 
 } // namespace ck

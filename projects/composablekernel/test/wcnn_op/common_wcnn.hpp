@@ -56,6 +56,11 @@ using ScaleAddClampRevRelu    = ck::tensor_operation::element_wise::ScaleAddRevR
 using InElementOp  = ck::tensor_operation::element_wise::PassThrough;
 using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
 
+using ::ck::DeviceMem;
+using ::ck::hip_check_error;
+using ::ck::HostTensorDescriptor;
+using ::ck::Tensor;
+
 using half_t  = ck::half_t;
 using bhalf_t = ck::bhalf_t;
 using f8_t    = ck::f8_t;

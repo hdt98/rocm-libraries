@@ -16,7 +16,7 @@ list(APPEND EXAMPLE_GEMM_COMPILE_COMPUTE_V4_OPTIONS
 )
 set(EXAMPLE_GEMM_COMPILE_COMPUTE_ASYNC_OPTIONS ${EXAMPLE_GEMM_COMPILE_COMPUTE_V4_OPTIONS})
 
-if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx90a|gfx11|gfx12")
+if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx90a|gfx11|gfx12|gfx13")
     if(GPU_TARGETS MATCHES "gfx94|gfx95")
         add_gtest_executable(test_ck_tile_gemm_pipeline_mem test_gemm_pipeline_mem.cpp)
         add_gtest_executable(test_ck_tile_gemm_pipeline_compv3 test_gemm_pipeline_compv3.cpp)
@@ -36,10 +36,13 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx90a|gfx11|gfx12")
         target_compile_options(test_ck_tile_gemm_pipeline_comp_async PRIVATE ${EXAMPLE_GEMM_COMPILE_COMPUTE_ASYNC_OPTIONS})
     endif()
 
-    if(GPU_TARGETS MATCHES "gfx11|gfx12")
+    if(GPU_TARGETS MATCHES "gfx11|gfx12|gfx13")
         # On Radeon devices, build the WMMA version instead
         # Define architecture macros for compile-time detection
-        if(GPU_TARGETS MATCHES "gfx12")
+        if(GPU_TARGETS MATCHES "gfx13")
+            list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -DARCH_GFX13)
+            list(APPEND EXAMPLE_GEMM_COMPILE_COMPUTE_V4_OPTIONS -DARCH_GFX13)
+        elseif(GPU_TARGETS MATCHES "gfx12")
             list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -DARCH_GFX12)
             list(APPEND EXAMPLE_GEMM_COMPILE_COMPUTE_V4_OPTIONS -DARCH_GFX12)
         elseif(GPU_TARGETS MATCHES "gfx11")

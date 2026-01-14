@@ -33,6 +33,7 @@ set(REGRESSION_TESTS
     test_convnd_fwd
     test_convnd_bwd_data
     test_grouped_convnd_fwd
+    test_grouped_convnd_fwd_scaleadd_ab
     test_grouped_convnd_bwd_weight
     test_softmax_rank3
     test_softmax_rank4
@@ -102,7 +103,7 @@ function(add_test_executable TEST_NAME)
             message(DEBUG "removing dl test ${source} ")
             list(REMOVE_ITEM ARGN "${source}")
         endif()
-        if(NOT TEST_TARGETS MATCHES "gfx9|gfx11|gfx12" AND source_name MATCHES "xdl")
+        if(NOT TEST_TARGETS MATCHES "gfx9|gfx11|gfx12|gfx13" AND source_name MATCHES "xdl")
             message(DEBUG "removing xdl test ${source} ")
             list(REMOVE_ITEM ARGN "${source}")
         endif()
@@ -200,7 +201,7 @@ function(add_gtest_executable TEST_NAME)
             message(DEBUG "removing dl test ${source} ")
             list(REMOVE_ITEM ARGN "${source}")
         endif()
-        if(NOT TEST_TARGETS MATCHES "gfx9|gfx11|gfx12" AND source_name MATCHES "xdl")
+        if(NOT TEST_TARGETS MATCHES "gfx9|gfx11|gfx12|gfx13" AND source_name MATCHES "xdl")
             message(DEBUG "removing xdl test ${source} ")
             list(REMOVE_ITEM ARGN "${source}")
         endif()
@@ -312,7 +313,7 @@ add_subdirectory(transpose)
 add_subdirectory(permute_scale)
 add_subdirectory(wrapper)
 add_subdirectory(quantization)
-if(SUPPORTED_GPU_TARGETS MATCHES "gfx11")
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx11" OR SUPPORTED_GPU_TARGETS MATCHES "gfx12" OR SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_subdirectory(wmma_op)
 endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx13")
