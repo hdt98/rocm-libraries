@@ -1804,6 +1804,16 @@ int main(int argc, const char* argv[])
         "Overwrite types to: --type_A=half --type_B=half --type_C=half --type_D=half "
         "--type_acc=float.");
 
+    std::string preset = "legacy";
+    app.add_option(
+        "--preset",
+        preset,
+        "Solution parameter preset.\n"
+        "  legacy   - rocroller-gemm legacy defaults\n"
+        "  hipblaslt - hipblaslt production defaults\n"
+        "Default: legacy.")
+        ->check(CLI::IsMember({"legacy", "hipblaslt"}));
+
     app.add_flag("--visualize",
                  benchmarkParams.visualize,
                  "Dump out volumes describing memory access patterns.");
@@ -1893,6 +1903,46 @@ int main(int argc, const char* argv[])
     //
 
     CLI11_PARSE(app, argc, argv);
+
+    if(preset == "hipblaslt")
+    {
+        // All defaults from hipblaslt's SolutionParameters
+        solution.workgroupSizeX = -1; // Will be set to 2*wavefrontSize
+        solution.workgroupSizeY = 2;
+
+        solution.loadPathA = SolutionParams::LoadPath::BufferToLDS;
+        solution.loadPathB = SolutionParams::LoadPath::BufferToLDS;
+
+        solution.storeLDSD = false;
+
+        solution.prefetch          = true;
+        solution.prefetchInFlight  = 2;
+        solution.prefetchLDSFactor = 1;
+        solution.prefetchMixMemOps = true;
+
+        solution.betaInFma = true;
+
+        solution.unrollX = 0;
+        solution.unrollY = 0;
+
+        solution.streamK               = false;
+        solution.streamKTwoTile        = false;
+        solution.streamKTwoTileDPFirst = false;
+
+        solution.loadPathAScale = SolutionParams::LoadPath::BufferToVGPR;
+        solution.loadPathBScale = SolutionParams::LoadPath::BufferToVGPR;
+
+        solution.swizzleScale  = true;
+        solution.prefetchScale = true;
+
+        solution.swizzleTileSize = {0, 0, 0, 0};
+
+        solution.workgroupMappingDim    = 0;
+        solution.workgroupRemapXCC      = true;
+        solution.workgroupRemapXCCValue = -1;
+
+        solution.matchMemoryAccess = true;
+    }
 
     updateSolutionFromArguments(solution, app);
 
