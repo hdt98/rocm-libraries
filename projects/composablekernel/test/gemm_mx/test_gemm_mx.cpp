@@ -167,7 +167,7 @@ TYPED_TEST(TestGemmMX_MK_MFMA, Large)
 
 TYPED_TEST(TestGemmMX_MK_NK, SmallM)
 {
-    std::vector<int> Ms{1, 2, 3, 4, 5, 6};
+    std::vector<int> Ms{1, 16, 32, 44, 65, 106};
     constexpr int N = 256;
     constexpr int K = 512;
 
