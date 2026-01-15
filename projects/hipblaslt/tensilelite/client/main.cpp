@@ -400,7 +400,6 @@ namespace TensileLite
             LoadSolutionLibrary(po::variables_map const& args)
         {
             auto filename = args["library-file"];
-            std::cout << filename.as<std::string>() << std::endl;
             if(!filename.empty())
             {
                 return std::dynamic_pointer_cast<MasterSolutionLibrary<ContractionProblemGemm>>(
@@ -586,10 +585,6 @@ namespace TensileLite
                     po::store(po::parse_config_file(file, options), args);
                 }
             }
-
-            // for(auto a: args){
-            //     std::cout << args.at("a-type").value() << ", " << args.at("b-type").value() << ", " << args.at("c-type").value() << ", " <<  args.at("d-type").value() << ", "<< std::endl;
-            // }
 
             fix_data_types(args);
 

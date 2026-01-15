@@ -1341,7 +1341,6 @@ namespace TensileLite
                 virtual bool debugEval(ContractionProblemGemm const& problem,
                                        std::ostream&                 stream) const override
                 {
-                    std::cout << value << std::endl;
                     return debugEvalCmp(
                         problem, stream, "prob", problem.operationIdentifier(), "==", "sol", value);
                 }
