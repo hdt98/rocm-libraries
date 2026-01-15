@@ -425,7 +425,7 @@ macro(fetch_rocrand)
       # Only add -Wno-pass-failed on clang-based compilers.
       if(DEFINED CMAKE_HIP_COMPILER AND CMAKE_HIP_COMPILER MATCHES ".*(clang|hipcc).*")
         # If we're using a HIP compiler, we can even scope it to the HIP language.
-        target_compile_options(rocrand PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-Wno-pass-failed)
+        target_compile_options(rocrand PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-Wno-pass-failed>)
       elseif(CMAKE_CXX_COMPILER MATCHES ".*(clang|hipcc).*")
         target_compile_options(rocrand PRIVATE "-Wno-pass-failed")
       endif()
