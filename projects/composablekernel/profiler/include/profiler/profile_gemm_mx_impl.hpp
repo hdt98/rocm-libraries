@@ -413,7 +413,7 @@ bool profile_gemm_mx_impl(int do_verification,
     std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
 
     // Run reference GEMM
-    if(do_verification)
+    if(do_verification && op_ptrs.size() > 0)
     {
         using ReferenceGemmInstance = ck::tensor_operation::host::ReferenceMXGemm< //
             ADataType,
