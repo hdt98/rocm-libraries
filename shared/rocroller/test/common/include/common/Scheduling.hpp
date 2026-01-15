@@ -35,10 +35,15 @@
 namespace rocRoller
 {
     /**
-     * @brief Generates LDS addresses for a workgroup based on stride and instruction size
+     * @brief Generates LDS addresses simulating bank conflicts between workitems
+     * 
+     * Assumes bank entries are 4 bytes (1 dword) apart.
+     * 
+     * E.g. for workgroupSize=2, strideMultiplier=2, instrDwords=1, returns [0, 8];
+     * so workitem 0 accesses bank 0, workitem 1 accesses bank 2.
      * 
      * @param workgroupSize Number of work items in the workgroup
-     * @param strideMultiplier Stride multiplier for address calculation
+     * @param strideMultiplier The degree of bank conflict (1 = every bank is used, 2 = every other bank used, etc.)
      * @param instrDwords Instruction size in dwords
      * @return std::vector<size_t> Vector of calculated LDS addresses
      */
@@ -55,24 +60,14 @@ namespace rocRoller
     template <typename T>
     T median_of_odd_elements(std::vector<T> values)
     {
-        AssertFatal(!values.empty(), "median_of_odd_elements: vector must not be empty");
-        AssertFatal(values.size() % 2 == 1, "median_of_odd_elements: vector size must be odd");
-
+        AssertFatal(!values.empty(), "vector must not be empty");
+        AssertFatal(values.size() % 2 == 1, "vector size must be odd");
         std::sort(values.begin(), values.end());
-
         return values[values.size() / 2];
     }
 
     /**
-     * @brief Calculates differences between consecutive latency values
-     * 
-     * @param latencies Vector of latency values
-     * @return std::vector<int64_t> Vector of deltas between consecutive latencies
-     */
-    std::vector<int64_t> calculateLatencyDeltas(const std::vector<uint64_t>& latencies);
-
-    /**
-     * @brief Computes aligned register subset with wraparound
+     * @brief Returns aligned register subset [start, end) with wraparound
      * 
      * @param totalRegs Total number of registers available
      * @param requestedRegCount Number of registers requested

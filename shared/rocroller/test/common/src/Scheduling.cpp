@@ -39,18 +39,6 @@ namespace rocRoller
         return addresses;
     }
 
-    std::vector<int64_t> calculateLatencyDeltas(const std::vector<uint64_t>& latencies)
-    {
-        std::vector<int64_t> deltas;
-        for(size_t i = 1; i < latencies.size(); ++i)
-        {
-            int64_t delta
-                = static_cast<int64_t>(latencies[i]) - static_cast<int64_t>(latencies[i - 1]);
-            deltas.push_back(delta);
-        }
-        return deltas;
-    }
-
     std::pair<size_t, size_t>
         getAlignedSubset(size_t totalRegs, size_t requestedRegCount, size_t position)
     {

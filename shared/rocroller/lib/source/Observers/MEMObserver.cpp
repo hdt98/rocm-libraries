@@ -124,17 +124,14 @@ namespace rocRoller
                 const auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
                 if(ldsInfo.has_value())
                 {
-                    const auto [direction, dwords] = ldsInfo.value();
+                    const auto [direction, dwords] = *ldsInfo;
 
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
-                    std::vector<size_t>             addresses = inst.getAddresses().value();
-                    LDSModel::MemoryOpLDS           memOp{direction};
-                    LDSModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
-
+                    std::vector<size_t> addresses = inst.getAddresses().value();
                     auto [stallCycles, additionalCycles]
-                        = m_scheduler.value().predictStallCycles(ldsInst);
+                        = m_scheduler.value().predictStallCycles({{direction}, dwords, addresses});
 
                     status.stallCycles      = stallCycles / 4;
                     status.additionalCycles = additionalCycles / 4;
@@ -180,13 +177,10 @@ namespace rocRoller
                 auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
                 if(ldsInfo.has_value())
                 {
-                    auto [direction, dwords] = ldsInfo.value();
+                    auto [direction, dwords] = *ldsInfo;
 
-                    LDSModel::MemoryOpLDS           memOp{direction};
-                    std::vector<size_t>             addresses = inst.getAddresses().value();
-                    LDSModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
-
-                    m_scheduler.value().scheduleInstruction(ldsInst);
+                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    m_scheduler.value().scheduleInstruction({{direction}, dwords, addresses});
                 }
             }
         }
