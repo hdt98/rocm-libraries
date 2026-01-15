@@ -94,6 +94,71 @@ protected:
 
         return builder.Release();
     }
+
+    static flatbuffers::DetachedBuffer
+        createKnobWithFloatConstraint(int64_t knobId, double minValue, double maxValue)
+    {
+        flatbuffers::FlatBufferBuilder builder;
+
+        auto knobIdStrOffset = builder.CreateString("FLOAT_CONSTRAINT_KNOB");
+        auto descOffset = builder.CreateString("Knob with float constraint");
+
+        auto floatVal = hipdnn_data_sdk::data_objects::CreateFloatValue(builder, 1.0);
+        auto floatConstraint
+            = hipdnn_data_sdk::data_objects::CreateFloatConstraint(builder, minValue, maxValue);
+
+        hipdnn_data_sdk::data_objects::KnobBuilder knobBuilder(builder);
+        knobBuilder.add_knob_id(knobId);
+        knobBuilder.add_knob_id_str(knobIdStrOffset);
+        knobBuilder.add_description(descOffset);
+        knobBuilder.add_default_value_type(hipdnn_data_sdk::data_objects::KnobValue::FloatValue);
+        knobBuilder.add_default_value(floatVal.Union());
+        knobBuilder.add_constraint_type(
+            hipdnn_data_sdk::data_objects::KnobConstraint::FloatConstraint);
+        knobBuilder.add_constraint(floatConstraint.Union());
+
+        auto knob = knobBuilder.Finish();
+        builder.Finish(knob);
+
+        return builder.Release();
+    }
+
+    static flatbuffers::DetachedBuffer createKnobWithStringConstraint(
+        int64_t knobId, int32_t maxLength, const std::vector<std::string>& validValues)
+    {
+        flatbuffers::FlatBufferBuilder builder;
+
+        auto knobIdStrOffset = builder.CreateString("STRING_CONSTRAINT_KNOB");
+        auto descOffset = builder.CreateString("Knob with string constraint");
+
+        auto strVal = builder.CreateString("default_val");
+        auto stringValue = hipdnn_data_sdk::data_objects::CreateStringValue(builder, strVal);
+
+        std::vector<flatbuffers::Offset<flatbuffers::String>> validValOffsets;
+        validValOffsets.reserve(validValues.size());
+        for(const auto& val : validValues)
+        {
+            validValOffsets.push_back(builder.CreateString(val));
+        }
+        auto validValuesVector = builder.CreateVector(validValOffsets);
+        auto stringConstraint = hipdnn_data_sdk::data_objects::CreateStringConstraint(
+            builder, maxLength, validValuesVector);
+
+        hipdnn_data_sdk::data_objects::KnobBuilder knobBuilder(builder);
+        knobBuilder.add_knob_id(knobId);
+        knobBuilder.add_knob_id_str(knobIdStrOffset);
+        knobBuilder.add_description(descOffset);
+        knobBuilder.add_default_value_type(hipdnn_data_sdk::data_objects::KnobValue::StringValue);
+        knobBuilder.add_default_value(stringValue.Union());
+        knobBuilder.add_constraint_type(
+            hipdnn_data_sdk::data_objects::KnobConstraint::StringConstraint);
+        knobBuilder.add_constraint(stringConstraint.Union());
+
+        auto knob = knobBuilder.Finish();
+        builder.Finish(knob);
+
+        return builder.Release();
+    }
 };
 
 TEST_F(TestKnobWrapper, ConstructFromFlatbufferPointer)
@@ -323,4 +388,91 @@ TEST_F(TestKnobWrapper, MultipleDifferentKnobs)
     EXPECT_TRUE(wrapper3.hasDefaultValue());
     EXPECT_TRUE(wrapper3.hasConstraint());
     EXPECT_FALSE(wrapper3.isDeprecated());
+}
+
+TEST_F(TestKnobWrapper, HasFloatConstraint)
+{
+    auto buffer = createKnobWithFloatConstraint(42, 0.0, 100.0);
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    EXPECT_TRUE(wrapper.isValid());
+    EXPECT_TRUE(wrapper.hasConstraint());
+    EXPECT_EQ(wrapper.constraintType(),
+              hipdnn_data_sdk::data_objects::KnobConstraint::FloatConstraint);
+}
+
+TEST_F(TestKnobWrapper, ConstraintAsFloatConstraint)
+{
+    auto buffer = createKnobWithFloatConstraint(42, -10.5, 50.75);
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    EXPECT_TRUE(wrapper.hasConstraint());
+    const auto& floatConstraint
+        = wrapper.constraintAs<hipdnn_data_sdk::data_objects::FloatConstraint>();
+    EXPECT_DOUBLE_EQ(floatConstraint.min_value(), -10.5);
+    EXPECT_DOUBLE_EQ(floatConstraint.max_value(), 50.75);
+}
+
+TEST_F(TestKnobWrapper, FloatConstraintTypeMismatchThrows)
+{
+    auto buffer = createKnobWithFloatConstraint(42, 0.0, 100.0);
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    // Constraint is FloatConstraint, trying to get as IntConstraint should throw
+    EXPECT_THROW(wrapper.constraintAs<hipdnn_data_sdk::data_objects::IntConstraint>(),
+                 std::invalid_argument);
+    EXPECT_THROW(wrapper.constraintAs<hipdnn_data_sdk::data_objects::StringConstraint>(),
+                 std::invalid_argument);
+}
+
+TEST_F(TestKnobWrapper, HasStringConstraint)
+{
+    auto buffer = createKnobWithStringConstraint(42, 256, {"option1", "option2", "option3"});
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    EXPECT_TRUE(wrapper.isValid());
+    EXPECT_TRUE(wrapper.hasConstraint());
+    EXPECT_EQ(wrapper.constraintType(),
+              hipdnn_data_sdk::data_objects::KnobConstraint::StringConstraint);
+}
+
+TEST_F(TestKnobWrapper, ConstraintAsStringConstraint)
+{
+    auto buffer = createKnobWithStringConstraint(42, 128, {"alpha", "beta", "gamma"});
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    EXPECT_TRUE(wrapper.hasConstraint());
+    const auto& stringConstraint
+        = wrapper.constraintAs<hipdnn_data_sdk::data_objects::StringConstraint>();
+    EXPECT_EQ(stringConstraint.max_length(), 128);
+    ASSERT_NE(stringConstraint.valid_values(), nullptr);
+    ASSERT_EQ(stringConstraint.valid_values()->size(), 3u);
+    EXPECT_STREQ(stringConstraint.valid_values()->Get(0)->c_str(), "alpha");
+    EXPECT_STREQ(stringConstraint.valid_values()->Get(1)->c_str(), "beta");
+    EXPECT_STREQ(stringConstraint.valid_values()->Get(2)->c_str(), "gamma");
+}
+
+TEST_F(TestKnobWrapper, StringConstraintTypeMismatchThrows)
+{
+    auto buffer = createKnobWithStringConstraint(42, 100, {"opt1", "opt2"});
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    // Constraint is StringConstraint, trying to get as IntConstraint should throw
+    EXPECT_THROW(wrapper.constraintAs<hipdnn_data_sdk::data_objects::IntConstraint>(),
+                 std::invalid_argument);
+    EXPECT_THROW(wrapper.constraintAs<hipdnn_data_sdk::data_objects::FloatConstraint>(),
+                 std::invalid_argument);
+}
+
+TEST_F(TestKnobWrapper, StringConstraintEmptyValidValues)
+{
+    auto buffer = createKnobWithStringConstraint(42, 64, {});
+    KnobWrapper wrapper(buffer.data(), buffer.size());
+
+    EXPECT_TRUE(wrapper.hasConstraint());
+    const auto& stringConstraint
+        = wrapper.constraintAs<hipdnn_data_sdk::data_objects::StringConstraint>();
+    EXPECT_EQ(stringConstraint.max_length(), 64);
+    ASSERT_NE(stringConstraint.valid_values(), nullptr);
+    EXPECT_EQ(stringConstraint.valid_values()->size(), 0u);
 }
