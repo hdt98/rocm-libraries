@@ -104,7 +104,6 @@ protected:
 TEST_CASE("Weave multiple LDS and waitcnt 0",
           "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
 {
-    // Expect 391 passed : 4 failed
     // Mainly affected by waitcnt queue values
     /*
     ds_read_b128 v[60:63], v1, model 16, profiler 16, delta 0
@@ -248,7 +247,6 @@ protected:
 TEST_CASE("Weave LDS and waitcnt at steady state",
           "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
 {
-    // Expect 527 passed : 18 failed
     /*
     ...
     s_waitcnt lgkmcnt(2), model 136, profiler 132, delta -4
@@ -404,7 +402,6 @@ protected:
 TEST_CASE("Weave LDS and waitcnt not steady state",
           "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
 {
-    // Expect 541 passed : 4 failed
     /*
     ds_write_b32 v1, v2, model 8, profiler 8, delta 0
   * s_waitcnt lgkmcnt(0), model 60, profiler 52, delta -8

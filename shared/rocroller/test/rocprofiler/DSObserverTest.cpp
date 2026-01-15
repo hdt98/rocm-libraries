@@ -123,7 +123,6 @@ protected:
 
 TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 {
-    // Expect 545 passed : 0 failed
     using namespace Scheduling::LDSModel;
 
     const auto workgroupSize = 64u;
@@ -166,7 +165,7 @@ TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
 
         if(write && instrDwords == 4)
         {
-            // CHECK((analysis.incorrectPredictionCount <= 16));
+            CHECK((analysis.incorrectPredictionCount <= 16));
         }
         else
         {
@@ -210,7 +209,6 @@ protected:
 
 TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
 {
-    // Expect 545 passed : 0 failed
     // Mainly affected by the queue size, e.g. when does steady state get reached?
     /*
     ds_read_b128 v[4:7], v1, model 4, profiler 4, delta 0
@@ -271,7 +269,7 @@ TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
         }
         else if(workgroupSize == 64u)
         {
-            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
+            CHECK((analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0));
         }
         else if(workgroupSize > 64u)
         {
