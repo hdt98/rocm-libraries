@@ -48,17 +48,10 @@
 
 namespace test_utils {
 
-#if ROCPRIM_HAS_INT128_SUPPORT
 template<class T>
 using is_int128 = std::is_same<rocprim::int128_t, typename std::remove_cv<T>::type>;
 template<class T>
 using is_uint128 = std::is_same<rocprim::uint128_t, typename std::remove_cv<T>::type>;
-#else
-template<class T>
-using is_int128 = std::false_type;
-template<class T>
-using is_uint128 = std::false_type;
-#endif // ROCPRIM_HAS_INT128_SUPPORT
 
 template<class T>
 using is_double_custom_type = std::is_same<typename std::remove_cv<T>::type, common::custom_type<double,double,1>>;
@@ -90,12 +83,12 @@ void inline protected_assert_eq(T val, T expected, size_t index)
 {
     if constexpr (UseGTestAssert)
     {
-        const bool result = (val == expected);
-        ASSERT_TRUE(result) << "where index = " << index;
+        ASSERT_EQ(val, expected) << "where index = " << index;
     }
     else
     {
-        ASSERT_EQ(val, expected) << "where index = " << index;
+        const bool result = (val == expected);
+        ASSERT_TRUE(result) << "where index = " << index;
     }
 }
 
@@ -104,12 +97,12 @@ void inline protected_assert_eq(T val, T expected)
 {
     if constexpr (UseGTestAssert)
     {
-        const bool result = (val == expected);
-        ASSERT_TRUE(result);
+        ASSERT_EQ(val, expected);
     }
     else
     {
-        ASSERT_EQ(val, expected);
+        const bool result = (val == expected);
+        ASSERT_TRUE(result);
     }
 }
 
