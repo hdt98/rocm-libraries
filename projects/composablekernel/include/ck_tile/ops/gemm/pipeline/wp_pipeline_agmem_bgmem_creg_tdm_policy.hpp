@@ -60,40 +60,71 @@ struct UniversalWeightPreshufflePipelineAgBgCrTDMPolicy
 
         constexpr index_t PackedSize = numeric_traits<typename Problem::BDataType>::PackedSize;
 
-        constexpr index_t KBPerLoad     = GetKBPerLoad<Problem>();
-        constexpr index_t MaxVecSize    = 16 / sizeof(typename Problem::BDataType) * PackedSize;
-        constexpr index_t KItemsPerLoad = min(KBPerLoad, MaxVecSize);
-        constexpr index_t KFragment     = KBPerLoad / KItemsPerLoad;
+        constexpr index_t KBPerLoad = GetKBPerLoad<Problem>();
+        if constexpr(problem_is_flatmm_v<Problem>)
+        {
+            constexpr index_t MaxVecSize    = 16 / sizeof(typename Problem::BDataType) * PackedSize;
+            constexpr index_t KItemsPerLoad = min(KBPerLoad, MaxVecSize);
+            constexpr index_t KFragment     = KBPerLoad / KItemsPerLoad;
 
-        constexpr index_t KThdPerWave = WaveSize;
-        constexpr index_t KWavePerBlk = 1;
-        constexpr index_t KRepeat     = KIterPerWarp;
-        static_assert(TileShape::flatKPerWarp == KThdPerWave * KBPerLoad, "wrong");
+            constexpr index_t KThdPerWave = WaveSize;
+            constexpr index_t KWavePerBlk = 1;
+            constexpr index_t KRepeat     = KIterPerWarp;
+            static_assert(TileShape::flatKPerWarp == KThdPerWave * KBPerLoad, "wrong");
 
-        constexpr index_t NBPerLoad   = 1;
-        constexpr index_t NThdPerWave = 1;
-        constexpr index_t NWavePerBlk = TileShape::BlockWarps::at(number<1>{}); // N_Warp
-        constexpr index_t NRepeat     = NIterPerWarp;
+            constexpr index_t NBPerLoad   = 1;
+            constexpr index_t NThdPerWave = 1;
+            constexpr index_t NWavePerBlk = TileShape::BlockWarps::at(number<1>{}); // N_Warp
+            constexpr index_t NRepeat     = NIterPerWarp;
 
-        constexpr index_t WaveRepeat = WaveNum / TileShape::flatNPerWarp;
-        return make_static_tile_distribution(
-            tile_distribution_encoding<
-                sequence<WaveRepeat>,
-                tuple<sequence<NRepeat, NWavePerBlk, NThdPerWave, NBPerLoad>, // second
-                                                                              // direction
-                      sequence<KRepeat,
-                               KFragment,
-                               KWavePerBlk,
-                               KThdPerWave,
-                               KItemsPerLoad>>, // first
-                                                // direction
-                // wave in blk,     // thd in wave
-                // <M, K>           // <M, K>
-                tuple<sequence<0, 1, 2>, sequence<1, 2>>, // which direction
-                tuple<sequence<0, 1, 2>, sequence<2, 3>>, // which index
-                // <repeat, vec_load>
-                sequence<1, 2, 2, 2>,
-                sequence<0, 0, 1, 4>>{});
+            constexpr index_t WaveRepeat = WaveNum / TileShape::flatNPerWarp;
+            return make_static_tile_distribution(
+                tile_distribution_encoding<
+                    sequence<WaveRepeat>,
+                    tuple<sequence<NRepeat, NWavePerBlk, NThdPerWave, NBPerLoad>, // second
+                                                                                  // direction
+                          sequence<KRepeat,
+                                   KFragment,
+                                   KWavePerBlk,
+                                   KThdPerWave,
+                                   KItemsPerLoad>>, // first
+                                                    // direction
+                    // wave in blk,     // thd in wave
+                    // <M, K>           // <M, K>
+                    tuple<sequence<0, 1, 2>, sequence<1, 2>>, // which direction
+                    tuple<sequence<0, 1, 2>, sequence<2, 3>>, // which index
+                    // <repeat, vec_load>
+                    sequence<1, 2, 2, 2>,
+                    sequence<0, 0, 1, 4>>{});
+        }
+        else
+        {
+            constexpr index_t KRepeatInWave = 1;
+            constexpr index_t KThdPerWave   = WaveSize / KRepeatInWave; // threads cnt in K dim
+            constexpr index_t KWavePerBlk   = 1;
+            constexpr index_t KRepeat       = KIterPerWarp;
+            static_assert(TileShape::flatKPerWarp == KThdPerWave * KBPerLoad, "wrong");
+
+            constexpr index_t NBPerLoad   = 1;
+            constexpr index_t NThdPerWave = 1;
+            constexpr index_t NWavePerBlk = TileShape::BlockWarps::at(number<1>{}); // N_Warp
+            constexpr index_t NRepeat     = NIterPerWarp;
+            constexpr index_t WaveRepeat  = WaveNum / TileShape::flatNPerWarp;
+            return make_static_tile_distribution(
+                tile_distribution_encoding<
+                    sequence<WaveRepeat, KRepeatInWave>,                           // ?
+                    tuple<sequence<NRepeat, NWavePerBlk, NThdPerWave, NBPerLoad>,  // second
+                                                                                   // direction
+                          sequence<KRepeat, KWavePerBlk, KThdPerWave, KBPerLoad>>, // first
+                                                                                   // direction
+                    // wave in blk,     // thd in wave
+                    // <M, K>           // <M, K>
+                    tuple<sequence<0, 1, 2>, sequence<0, 1, 2>>, // which direction
+                    tuple<sequence<0, 1, 1>, sequence<1, 2, 2>>, // which index
+                    // <repeat, vec_load>
+                    sequence<1, 2, 1, 2>,
+                    sequence<0, 0, 3, 3>>{});
+        }
     }
 
     template <typename Problem>

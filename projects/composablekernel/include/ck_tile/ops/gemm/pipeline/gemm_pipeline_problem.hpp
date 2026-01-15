@@ -365,6 +365,8 @@ struct FlatmmPipelineProblem
     static constexpr bool kPadN = Traits::kPadN;
     static constexpr bool kPadK = Traits::kPadK;
 
+    static constexpr bool isFlatMM = true;
+
     static constexpr bool DoubleSmemBuffer = Traits::DoubleSmemBuffer;
 
     static constexpr auto Scheduler         = GemmPipelineScheduler::Default;

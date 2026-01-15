@@ -68,32 +68,36 @@ struct BlockWeightPreshuffleASmemBRegCReg
                                        tuple<sequence<1, 0>>,
                                        sequence<1, 2>,
                                        sequence<0, 0>>{};
-#if 0
-        constexpr auto a_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
-            a_block_outer_dstr_encoding, typename WarpGemm::AWarpDstrEncoding{});
-#else
-        constexpr index_t MPerXdl = WarpTile::at(I0);
-        constexpr index_t KPerXdl = WarpTile::at(I2);
+        if constexpr(problem_is_flatmm_v<Problem>)
+        {
+            constexpr index_t MPerXdl = WarpTile::at(I0);
+            constexpr index_t KPerXdl = WarpTile::at(I2);
 
-        constexpr index_t KLane      = get_warp_size() / MPerXdl;
-        constexpr index_t KPerThread = KPerXdl / KLane;
+            constexpr index_t KLane      = get_warp_size() / MPerXdl;
+            constexpr index_t KPerThread = KPerXdl / KLane;
 
-        constexpr index_t PackedSize    = numeric_traits<typename Problem::BDataType>::PackedSize;
-        constexpr index_t MaxVecSize    = 16 / sizeof(ADataType) * PackedSize;
-        constexpr index_t KItemsPerLoad = min(MaxVecSize, KPerThread);
-        constexpr index_t KFragment     = KPerThread / KItemsPerLoad;
-        constexpr auto a_block_inner_dstr_encoding = tile_distribution_encoding<
-            sequence<>,
-            tuple<sequence<MPerXdl>, sequence<KFragment, KLane, KItemsPerLoad>>,
-            tuple<sequence<2, 1>>,
-            tuple<sequence<1, 0>>,
-            sequence<2, 2>,
-            sequence<0, 2>>{};
+            constexpr index_t PackedSize = numeric_traits<typename Problem::BDataType>::PackedSize;
+            constexpr index_t MaxVecSize = 16 / sizeof(ADataType) * PackedSize;
+            constexpr index_t KItemsPerLoad            = min(MaxVecSize, KPerThread);
+            constexpr index_t KFragment                = KPerThread / KItemsPerLoad;
+            constexpr auto a_block_inner_dstr_encoding = tile_distribution_encoding<
+                sequence<>,
+                tuple<sequence<MPerXdl>, sequence<KFragment, KLane, KItemsPerLoad>>,
+                tuple<sequence<2, 1>>,
+                tuple<sequence<1, 0>>,
+                sequence<2, 2>,
+                sequence<0, 2>>{};
 
-        constexpr auto a_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
-            a_block_outer_dstr_encoding, a_block_inner_dstr_encoding);
-#endif
-        return a_block_dstr_encode;
+            constexpr auto a_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
+                a_block_outer_dstr_encoding, a_block_inner_dstr_encoding);
+            return a_block_dstr_encode;
+        }
+        else
+        {
+            constexpr auto a_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
+                a_block_outer_dstr_encoding, typename WarpGemm::AWarpDstrEncoding{});
+            return a_block_dstr_encode;
+        }
     }
 
     template <typename SmemBlockWindow>
