@@ -26,11 +26,11 @@ struct ReferenceFactory
     static constexpr auto kValidation = (internal::ValidateReferenceSignature<SIGNATURE>(), 0);
 
     static constexpr size_t SPATIAL_DIM = SIGNATURE.spatial_dim;
-    using Types                         = internal::ConvTensorDataTypes<SIGNATURE>;
+    using Types                         = internal::FwdConvTensorDataTypes<SIGNATURE>;
 
-    using InDataType  = typename Types::InDataType;
-    using WeiDataType = typename Types::WeiDataType;
-    using OutDataType = typename Types::OutDataType;
+    using InDataType  = typename Types::ADataType;
+    using WeiDataType = typename Types::BDataType;
+    using OutDataType = typename Types::EDataType;
 
     struct Instance
     {

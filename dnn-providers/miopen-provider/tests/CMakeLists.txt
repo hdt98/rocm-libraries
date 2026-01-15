@@ -15,7 +15,6 @@ add_executable(
     engines/plans/TestMiopenBatchnormApplicabilityChecks.cpp
     engines/plans/TestMiopenBatchnormBwdPlan.cpp
     engines/plans/TestMiopenBatchnormFwdInferencePlan.cpp
-    engines/plans/TestMiopenBatchnormFwdInferenceWithVariancePlan.cpp
     engines/plans/TestMiopenBatchnormFwdTrainingPlan.cpp
     engines/plans/TestMiopenBatchnormFwdTrainingActivPlan.cpp
     engines/plans/TestMiopenBatchnormFwdTrainingActivPlanBuilder.cpp

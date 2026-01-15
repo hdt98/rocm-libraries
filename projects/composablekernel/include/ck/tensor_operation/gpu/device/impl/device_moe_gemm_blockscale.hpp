@@ -80,8 +80,7 @@ template <typename ALayout,
           typename ComputeTypeA                       = CDataType,
           typename ComputeTypeB                       = ComputeTypeA,
           typename LDSTypeA                           = ComputeTypeA,
-          typename LDSTypeB                           = ComputeTypeB,
-          bool NonTemporalLoadB                       = false>
+          typename LDSTypeB                           = ComputeTypeB>
 struct DeviceMoeGemmBlockScale
     : public DeviceGemmMultipleD_BlockScale_BPreshuffle<ALayout,
                                                         BLayout,
@@ -164,8 +163,7 @@ struct DeviceMoeGemmBlockScale
         ComputeTypeA,
         ComputeTypeB,
         LDSTypeA,
-        LDSTypeB,
-        NonTemporalLoadB>;
+        LDSTypeB>;
     using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
     using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
 

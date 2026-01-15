@@ -30,7 +30,6 @@
 #include "gbyte.hpp"
 #include "hipsparse.hpp"
 #include "hipsparse_arguments.hpp"
-#include "hipsparse_graph.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -71,7 +70,8 @@ void testing_spmm_csr_bad_arg(const Arguments& argus)
     hipsparseSpMMAlg_t alg = HIPSPARSE_MM_ALG_DEFAULT;
 #endif
 
-    hipsparseLocalHandle_t handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     auto dptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int64_t) * safe_size), device_free};
@@ -221,7 +221,8 @@ void testing_spmm_csr(Arguments argus)
     hipDataType          typeT = getDataType<T>();
 
     // hipSPARSE handle
-    hipsparseLocalHandle_t handle(argus);
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
     std::vector<I> hcsr_row_ptr;
@@ -331,7 +332,7 @@ void testing_spmm_csr(Arguments argus)
 
     // Query SpMM buffer
     size_t bufferSize;
-    CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM_bufferSize(
+    CHECK_HIPSPARSE_ERROR(hipsparseSpMM_bufferSize(
         handle, transA, transB, &h_alpha, A, B, &h_beta, C1, typeT, alg, &bufferSize));
 
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)
@@ -348,26 +349,26 @@ void testing_spmm_csr(Arguments argus)
     // HIPSPARSE pointer mode host
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-    CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM_preprocess(
+    CHECK_HIPSPARSE_ERROR(hipsparseSpMM_preprocess(
         handle, transA, transB, &h_alpha, A, B, &h_beta, C1, typeT, alg, buffer));
 #endif
 
     // HIPSPARSE pointer mode device
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
-    CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM_preprocess(
+    CHECK_HIPSPARSE_ERROR(hipsparseSpMM_preprocess(
         handle, transA, transB, d_alpha, A, B, d_beta, C2, typeT, alg, buffer));
 #endif
 
     if(argus.unit_check)
     {
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM(
-            handle, transA, transB, &h_alpha, A, B, &h_beta, C1, typeT, alg, buffer));
+        CHECK_HIPSPARSE_ERROR(
+            hipsparseSpMM(handle, transA, transB, &h_alpha, A, B, &h_beta, C1, typeT, alg, buffer));
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
-        CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM(
-            handle, transA, transB, d_alpha, A, B, d_beta, C2, typeT, alg, buffer));
+        CHECK_HIPSPARSE_ERROR(
+            hipsparseSpMM(handle, transA, transB, d_alpha, A, B, d_beta, C2, typeT, alg, buffer));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(hipMemcpy(hC_1.data(), dC_1, sizeof(T) * nnz_C, hipMemcpyDeviceToHost));
@@ -407,7 +408,7 @@ void testing_spmm_csr(Arguments argus)
         // Warm up
         for(int iter = 0; iter < number_cold_calls; ++iter)
         {
-            CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM(
+            CHECK_HIPSPARSE_ERROR(hipsparseSpMM(
                 handle, transA, transB, &h_alpha, A, B, &h_beta, C1, typeT, alg, buffer));
         }
 
@@ -416,7 +417,7 @@ void testing_spmm_csr(Arguments argus)
         // Performance run
         for(int iter = 0; iter < number_hot_calls; ++iter)
         {
-            CHECK_HIPSPARSE_ERROR(testing::hipsparseSpMM(
+            CHECK_HIPSPARSE_ERROR(hipsparseSpMM(
                 handle, transA, transB, &h_alpha, A, B, &h_beta, C1, typeT, alg, buffer));
         }
 

@@ -20,8 +20,7 @@ public:
         MEAN = 1,
         VARIANCE = 2,
         SCALE = 3,
-        BIAS = 4,
-        EPSILON = 5
+        BIAS = 4
     };
     typedef InputNames input_names; // NOLINT(readability-identifier-naming)
 
@@ -58,11 +57,6 @@ public:
     std::shared_ptr<TensorAttributes> get_bias() const
     {
         return getInput(InputNames::BIAS);
-    }
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    std::shared_ptr<TensorAttributes> get_epsilon() const
-    {
-        return getInput(InputNames::EPSILON);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_y() const
@@ -120,16 +114,6 @@ public:
     {
         return setInput(InputNames::BIAS, std::move(value));
     }
-    BatchnormInferenceAttributesVarianceExt&
-        set_epsilon(const std::shared_ptr<TensorAttributes>& value) // NOLINT
-    {
-        return setInput(InputNames::EPSILON, value);
-    }
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    BatchnormInferenceAttributesVarianceExt& set_epsilon(std::shared_ptr<TensorAttributes>&& value)
-    {
-        return setInput(InputNames::EPSILON, std::move(value));
-    }
     // NOLINTNEXTLINE(readability-identifier-naming)
     BatchnormInferenceAttributesVarianceExt& set_y(const std::shared_ptr<TensorAttributes>& value)
     {
@@ -146,7 +130,6 @@ public:
     {
         auto mean = get_mean();
         auto variance = get_variance();
-        auto epsilon = get_epsilon();
 
         return hipdnn_data_sdk::data_objects::CreateBatchnormInferenceAttributesVarianceExt(
             builder,
@@ -155,8 +138,7 @@ public:
             variance->get_uid(),
             get_scale()->get_uid(),
             get_bias()->get_uid(),
-            get_y()->get_uid(),
-            epsilon->get_uid());
+            get_y()->get_uid());
     }
 
 private:

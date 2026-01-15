@@ -53,8 +53,7 @@ void ComputeCPUBNInference(DLModule& dl_module)
                                       dl_module.shift,
                                       dl_module.epsilon,
                                       dl_module.estMean,
-                                      dl_module.estVariance,
-                                      dl_module.useInverseVariance);
+                                      dl_module.estVariance);
     }
     else if(dl_module.bn_mode == miopenBNPerActivation)
     {
@@ -64,8 +63,7 @@ void ComputeCPUBNInference(DLModule& dl_module)
                                        dl_module.shift,
                                        dl_module.epsilon,
                                        dl_module.estMean,
-                                       dl_module.estVariance,
-                                       dl_module.useInverseVariance);
+                                       dl_module.estVariance);
     }
     else
     {

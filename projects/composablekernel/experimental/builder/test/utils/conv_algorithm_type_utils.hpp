@@ -54,7 +54,7 @@ inline std::string to_string<PipelineScheduler>(PipelineScheduler t)
 }
 
 template <>
-inline std::string to_string<ConvSpecialization>(ConvSpecialization t)
+inline std::string to_string<ConvFwdSpecialization>(ConvFwdSpecialization t)
 {
     std::ostringstream oss;
     oss << t;
@@ -86,20 +86,11 @@ inline std::string to_string<ThreadBlock>(ThreadBlock t)
 }
 
 template <>
-inline std::string to_string<GridwiseBwdXdlGemm>(GridwiseBwdXdlGemm t)
+inline std::string to_string<GridwiseXdlGemm>(GridwiseXdlGemm t)
 {
     std::ostringstream oss;
-    oss << t.k1 << "," << t.xdl_params.m_per_xdl << "," << t.xdl_params.n_per_xdl << ","
-        << t.xdl_params.m_xdl_per_wave << "," << t.xdl_params.n_xdl_per_wave;
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<GridwiseFwdXdlGemm>(GridwiseFwdXdlGemm t)
-{
-    std::ostringstream oss;
-    oss << t.ak1 << "," << t.bk1 << "," << t.xdl_params.m_per_xdl << "," << t.xdl_params.n_per_xdl
-        << "," << t.xdl_params.m_xdl_per_wave << "," << t.xdl_params.n_xdl_per_wave;
+    oss << t.ak1 << "," << t.bk1 << "," << t.m_per_xdl << "," << t.n_per_xdl << ","
+        << t.m_xdl_per_wave << "," << t.n_xdl_per_wave;
     return oss.str();
 }
 
@@ -113,29 +104,17 @@ inline std::string to_string<GridwiseWmmaGemm>(GridwiseWmmaGemm t)
 }
 
 template <>
-inline std::string to_string<BlockGemmPipeline>(BlockGemmPipeline t)
+inline std::string to_string<BlockGemm>(BlockGemm t)
 {
     std::ostringstream oss;
     oss << to_string(t.scheduler) << "," << to_string(t.pipeline_version);
     return oss.str();
 }
 
-template <size_t ThreadClusterRank>
-inline std::string to_string(BlockTransfer<ThreadClusterRank> t)
+template <>
+inline std::string to_string<BlockTransfer>(BlockTransfer t)
 {
-    if constexpr(ThreadClusterRank == 4)
-    {
-        return array_to_seq(std::array<size_t, 4>{t.k_batch_size, t.k0, t.m_n, t.k1});
-    }
-    else if constexpr(ThreadClusterRank == 3)
-    {
-        return array_to_seq(std::array<size_t, 3>{t.k0, t.m_n, t.k1});
-    }
-    else
-    {
-        static_assert(ThreadClusterRank == 3 || ThreadClusterRank == 4,
-                      "Unsupported ThreadClusterRank");
-    }
+    return array_to_seq(std::array<size_t, 3>{t.k0, t.m_n, t.k1});
 }
 
 template <>
@@ -155,14 +134,14 @@ inline std::string to_string<LdsTransfer>(LdsTransfer t)
     return oss.str();
 }
 
-template <size_t N>
-inline std::string to_string(AccessOrder<N> t)
+template <>
+inline std::string to_string<AccessOrder>(AccessOrder t)
 {
     return array_to_seq(t.order);
 }
 
-template <size_t N = 3>
-inline std::string to_string(InputTransfer<N> t)
+template <>
+inline std::string to_string<TransferAB>(TransferAB t)
 {
     std::ostringstream oss;
     oss << to_string(t.block_transfer) << "," << to_string(t.block_transfer_access_order) << ","
@@ -173,7 +152,7 @@ inline std::string to_string(InputTransfer<N> t)
 }
 
 template <>
-inline std::string to_string<OutputTransfer>(OutputTransfer t)
+inline std::string to_string<TransferC>(TransferC t)
 {
     std::ostringstream oss;
     oss << t.epilogue.m_xdl_per_wave_per_shuffle << "," << t.epilogue.n_per_wave_per_shuffle << ","
@@ -181,8 +160,8 @@ inline std::string to_string<OutputTransfer>(OutputTransfer t)
     return oss.str();
 }
 
-template <size_t N = 3>
-inline std::string to_string(Transfer<N> t)
+template <>
+inline std::string to_string<TransferABC>(TransferABC t)
 {
     std::ostringstream oss;
     oss << to_string(t.a) << "," << to_string(t.b) << "," << to_string(t.c);
@@ -206,19 +185,7 @@ inline std::string to_string<DlThreadCluster>(DlThreadCluster t)
 }
 
 template <>
-inline std::string to_string<DlBlockTransfer<4>>(DlBlockTransfer<4> t)
-{
-    std::ostringstream oss;
-    oss << array_to_seq(t.thread_slice_lengths) << "," << array_to_seq(t.thread_cluster_lengths)
-        << "," << array_to_seq(t.thread_cluster_arrange_order) << ","
-        << array_to_seq(t.src_access_order) << "," << array_to_seq(t.src_vector_tensor_lengths)
-        << "," << array_to_seq(t.src_vector_tensor_contiguous_dim_order) << ","
-        << array_to_seq(t.dst_vector_tensor_lengths);
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<DlBlockTransfer<5>>(DlBlockTransfer<5> t)
+inline std::string to_string<DlBlockTransfer>(DlBlockTransfer t)
 {
     std::ostringstream oss;
     oss << array_to_seq(t.thread_slice_lengths) << "," << array_to_seq(t.thread_cluster_lengths)
@@ -239,24 +206,19 @@ inline std::string to_string<DlEpilogue>(DlEpilogue t)
 }
 
 template <>
-inline std::string to_string<TransposeParams_>(TransposeParams_ t)
+inline std::string to_string<DlBlockTransferAB>(DlBlockTransferAB t)
 {
-    std::ostringstream oss;
-    oss << t.max_transpose_transfer_src_scalar_per_vector << ","
-        << t.max_transpose_transfer_dst_scalar_per_vector;
-    return oss.str();
+    return to_string(t.block_transfer);
 }
 
 template <>
-inline std::string to_string<DlTransfer<4>>(DlTransfer<4> t)
+inline std::string to_string<DlBlockTransferC>(DlBlockTransferC t)
 {
-    std::ostringstream oss;
-    oss << to_string(t.a) << "," << to_string(t.b) << "," << to_string(t.c);
-    return oss.str();
+    return to_string(t.epilogue);
 }
 
 template <>
-inline std::string to_string<DlTransfer<5>>(DlTransfer<5> t)
+inline std::string to_string<DlTransferABC>(DlTransferABC t)
 {
     std::ostringstream oss;
     oss << to_string(t.a) << "," << to_string(t.b) << "," << to_string(t.c);
@@ -272,13 +234,7 @@ inline std::string to_string<ThreadBlock_>(ThreadBlock_ t)
 }
 
 template <>
-inline std::string to_string<FwdXdlGemm_>(FwdXdlGemm_ t)
-{
-    return to_string(t.gridwise_gemm);
-}
-
-template <>
-inline std::string to_string<BwdXdlGemm_>(BwdXdlGemm_ t)
+inline std::string to_string<XdlGemm_>(XdlGemm_ t)
 {
     return to_string(t.gridwise_gemm);
 }
@@ -289,14 +245,14 @@ inline std::string to_string<WmmaGemm_>(WmmaGemm_ t)
     return to_string(t.gridwise_gemm);
 }
 
-template <size_t ThreadClusterRank = 3>
-inline std::string to_string(Transfer_<ThreadClusterRank> t)
+template <>
+inline std::string to_string<Transfer_>(Transfer_ t)
 {
     return to_string(t.transfer);
 }
 
 template <>
-inline std::string to_string<ConvSpecializationFwd_>(ConvSpecializationFwd_ t)
+inline std::string to_string<ConvSpecialization_>(ConvSpecialization_ t)
 {
     std::ostringstream oss;
     oss << to_string(t.fwd_specialization) << "," << to_string(t.gemm_specialization);
@@ -304,25 +260,18 @@ inline std::string to_string<ConvSpecializationFwd_>(ConvSpecializationFwd_ t)
 }
 
 template <>
-inline std::string to_string<ConvSpecializationBwdWeight_>(ConvSpecializationBwdWeight_ t)
-{
-    std::ostringstream oss;
-    oss << to_string(t.bwd_weight_specialization);
-    return oss.str();
-}
-
-template <>
 inline std::string to_string<Prefetch_>(Prefetch_ t)
 {
     std::ostringstream oss;
-    oss << t.num_gemm_k_prefetch_stages << "," << to_string(t.loop_scheduler);
+    oss << t.num_gemm_k_prefetch_stages << "," << t.num_groups_to_merge << ","
+        << to_string(t.loop_scheduler);
     return oss.str();
 }
 
 template <>
 inline std::string to_string<BlockGemm_>(BlockGemm_ t)
 {
-    return to_string(t.block_gemm_pipeline);
+    return to_string(t.block_gemm);
 }
 
 template <>
@@ -338,13 +287,7 @@ inline std::string to_string<DlThreadCluster_>(DlThreadCluster_ t)
 }
 
 template <>
-inline std::string to_string<DlTransfer_<4>>(DlTransfer_<4> t)
-{
-    return to_string(t.transfer);
-}
-
-template <>
-inline std::string to_string<DlTransfer_<5>>(DlTransfer_<5> t)
+inline std::string to_string<DlTransfer_>(DlTransfer_ t)
 {
     return to_string(t.transfer);
 }
@@ -356,8 +299,8 @@ inline std::string to_string<ConvAlgorithm_DeviceGroupedConvFwdMultipleABD_Xdl_C
     ConvAlgorithm_DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle t)
 {
     std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<FwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
+    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<XdlGemm_>(t))
+        << "," << to_string(static_cast<Transfer_>(t));
     return oss.str();
 }
 
@@ -366,8 +309,8 @@ inline std::string to_string<ConvAlgorithm_DeviceGroupedConvFwdMultipleABD_Xdl_C
     ConvAlgorithm_DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 t)
 {
     std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<FwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
+    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<XdlGemm_>(t))
+        << "," << to_string(static_cast<Transfer_>(t));
     return oss.str();
 }
 
@@ -377,7 +320,7 @@ inline std::string to_string<ConvAlgorithm_DeviceGroupedConvFwdMultipleD_Wmma_CS
 {
     std::ostringstream oss;
     oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<WmmaGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
+        << "," << to_string(static_cast<Transfer_>(t));
     return oss.str();
 }
 
@@ -389,7 +332,7 @@ inline std::string to_string<ConvAlgorithm_DeviceGroupedConvFwdDlMultipleD_NHWC_
     oss << to_string(static_cast<ThreadBlock_>(t)) << ","
         << to_string(static_cast<DlThreadConfig_>(t)) << ","
         << to_string(static_cast<DlThreadCluster_>(t)) << ","
-        << to_string(static_cast<DlTransfer_<4>>(t));
+        << to_string(static_cast<DlTransfer_>(t));
     return oss.str();
 }
 
@@ -397,102 +340,7 @@ template <>
 inline std::string to_string<ConvAlgorithm_DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor>(
     ConvAlgorithm_DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor t)
 {
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<FwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_Xdl_CShuffle>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_Xdl_CShuffle t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<BwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<4>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_Xdl_CShuffle_V3>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_Xdl_CShuffle_V3 t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<BwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_Wmma_CShuffle>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_Wmma_CShuffle t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<WmmaGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_Wmma_CShuffle_V3>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_Wmma_CShuffle_V3 t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<WmmaGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffle_V3>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffle_V3 t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<WmmaGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_TwoStage_Wmma_CShuffle_V3>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_TwoStage_Wmma_CShuffle_V3 t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<WmmaGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_TwoStage_Xdl_CShuffle>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_TwoStage_Xdl_CShuffle t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<BwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeight_Dl>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeight_Dl t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << ","
-        << to_string(static_cast<DlThreadConfig_>(t)) << ","
-        << to_string(static_cast<DlThreadCluster_>(t)) << ","
-        << to_string(static_cast<DlTransfer_<5>>(t));
-    return oss.str();
-}
-
-template <>
-inline std::string to_string<ConvAlgorithm_DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle>(
-    ConvAlgorithm_DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle t)
-{
-    std::ostringstream oss;
-    oss << to_string(static_cast<ThreadBlock_>(t)) << "," << to_string(static_cast<BwdXdlGemm_>(t))
-        << "," << to_string(static_cast<Transfer_<4>>(t));
-    return oss.str();
+    return to_string(t.base_algorithm);
 }
 
 } // namespace ck_tile::builder::test

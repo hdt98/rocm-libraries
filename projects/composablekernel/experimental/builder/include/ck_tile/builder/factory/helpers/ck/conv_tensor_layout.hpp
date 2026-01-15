@@ -190,7 +190,7 @@ consteval auto GetAuxiliaryTensorLayoutTuple(std::index_sequence<Indices...>)
         decltype(TensorLayoutToCK<AuxiliaryTensorConfigsArray[Indices].layout>())...>{};
 }
 
-template <auto AuxiliaryTensorConfigsValue, size_t SPATIAL_DIM>
+template <auto AuxiliaryTensorConfigsValue, size_t SPATIAL_DIM, ConvDirection DIR>
     requires(ConvSpatialDim<SPATIAL_DIM>)
 struct AuxiliaryTensorLayouts
 {
@@ -200,32 +200,34 @@ struct AuxiliaryTensorLayouts
 };
 
 // TODO: Currently only the ouput tensor can have auxiliary tensors (e.g., bias).
-template <auto Signature, size_t SPATIAL_DIM>
+template <auto Signature, size_t SPATIAL_DIM, ConvDirection DIR>
     requires(HasElementwiseOpWithAuxiliaryOperands<decltype(Signature.output)>)
 consteval auto GetAuxiliaryTensorLayouts()
 {
     return AuxiliaryTensorLayouts<Signature.output.operation.auxiliary_operand_configs,
-                                  SPATIAL_DIM>{};
+                                  SPATIAL_DIM,
+                                  DIR>{};
 }
 
-template <auto Signature, size_t SPATIAL_DIM>
+template <auto Signature, size_t SPATIAL_DIM, ConvDirection DIR>
     requires(!HasElementwiseOpWithAuxiliaryOperands<decltype(Signature.output)>)
 consteval auto GetAuxiliaryTensorLayouts()
 {
     return EmptyAuxiliaryTensorLayout{};
 }
 
-template <auto Signature, size_t SPATIAL_DIM>
+template <auto Signature, size_t SPATIAL_DIM, ConvDirection DIR>
     requires(ConvSpatialDim<SPATIAL_DIM> &&
              ValidConvInputLayoutForSpatialDim<Signature.input.config.layout, SPATIAL_DIM> &&
              ValidConvWeightLayoutForSpatialDim<Signature.weight.config.layout, SPATIAL_DIM> &&
              ValidConvOutputLayoutForSpatialDim<Signature.output.config.layout, SPATIAL_DIM>)
 struct ConvTensorLayouts
 {
-    using InLayout  = decltype(TensorLayoutToCK<Signature.input.config.layout>());
-    using WeiLayout = decltype(TensorLayoutToCK<Signature.weight.config.layout>());
-    using OutLayout = decltype(TensorLayoutToCK<Signature.output.config.layout>());
-    using DsLayout  = decltype(GetAuxiliaryTensorLayouts<Signature, SPATIAL_DIM>())::type;
+    static_assert(DIR == ConvDirection::FORWARD, "Only Forward convolution is supported.");
+    using ALayout  = decltype(TensorLayoutToCK<Signature.input.config.layout>());
+    using BLayout  = decltype(TensorLayoutToCK<Signature.weight.config.layout>());
+    using ELayout  = decltype(TensorLayoutToCK<Signature.output.config.layout>());
+    using DsLayout = decltype(GetAuxiliaryTensorLayouts<Signature, SPATIAL_DIM, DIR>())::type;
 };
 
 } // namespace ck_tile::builder::factory::internal

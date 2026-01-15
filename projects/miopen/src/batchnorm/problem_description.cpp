@@ -193,17 +193,13 @@ NetworkConfig ProblemDescription::MakeNetworkConfig() const
 
     // direction
     ss << "x" << GetDirectionStr();
-    // per-direction configs
-    if(direction == Direction::ForwardInference)
-    {
-        ss << "x" << (useInverseVariance ? "InvVar" : "Var");
-    }
-    else if(direction == Direction::ForwardTraining)
+    // save and running
+    if(direction == Direction::ForwardTraining)
     {
         ss << "x" << resultsave;
         ss << "x" << resultrunning;
     }
-    else if(direction == Direction::Backward)
+    if(direction == Direction::Backward)
     {
         ss << "x" << useSaved;
     }

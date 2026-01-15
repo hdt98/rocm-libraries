@@ -164,7 +164,7 @@ struct AQuantGemmPipelineAgBgCrMem : public BaseGemmPipelineAgBgCrMem<Problem>
     };
 
     template <>
-    struct PipelineImpl<GemmPipelineScheduler::Intrawave> : public PipelineImplBase
+    struct PipelineImpl<GemmPipelineScheduler::Interwave> : public PipelineImplBase
     {
         using Base = PipelineImplBase;
 
@@ -491,7 +491,7 @@ struct AQuantGemmPipelineAgBgCrMem : public BaseGemmPipelineAgBgCrMem<Problem>
                                    void* p_smem,
                                    index_t m = 0) const
     {
-        return PipelineImpl<GemmPipelineScheduler::Intrawave>{}
+        return PipelineImpl<GemmPipelineScheduler::Interwave>{}
             .template operator()<HasHotLoop, TailNum>(
                 a_dram_block_window_tmp,
                 [](const BDataType& a) { return a; },

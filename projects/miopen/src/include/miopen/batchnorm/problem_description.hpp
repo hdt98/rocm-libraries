@@ -33,7 +33,6 @@
 
 #include <cassert>
 #include <string>
-#include <optional>
 
 namespace miopen {
 
@@ -150,7 +149,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
         out_layout = ComputeOutLayout();
     }
 
-    // Forward Inference with activation, epsilon_ doesn't have a value if using inverse variance.
+    // Forward Inference with activation
     ProblemDescription(miopenBatchNormMode_t bn_mode_,
                        const TensorDescriptor& xDesc_,
                        const TensorDescriptor& yDesc_,
@@ -158,7 +157,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
                        const TensorDescriptor& biasDesc_,
                        const TensorDescriptor& sMeanDesc_,
                        const TensorDescriptor& sVarianceDesc_,
-                       std::optional<double> epsilon_,
+                       double epsilon_,
                        const ActivationDescriptor& activDesc_)
         : direction(Direction::ForwardInference),
           bn_mode(bn_mode_),
@@ -168,16 +167,9 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
           biasDesc(biasDesc_),
           sMeanDesc(sMeanDesc_),
           sVarianceDesc(sVarianceDesc_),
+          epsilon(epsilon_),
           activDesc(activDesc_)
     {
-        if(epsilon_.has_value())
-        {
-            epsilon = epsilon_.value();
-        }
-        else
-        {
-            useInverseVariance = true;
-        }
         SetSpatialDims();
         in_layout  = ComputeInLayout();
         out_layout = ComputeOutLayout();
@@ -342,7 +334,6 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
 
     bool Is2D() const { return xDesc.GetLengths().size() == 4; }
     bool Is3D() const { return xDesc.GetLengths().size() == 5; }
-    bool isInverseVariance() const { return useInverseVariance; }
 
     bool IsFp64() const { return xDesc.GetType() == miopenDouble; }
     bool IsFp32() const { return xDesc.GetType() == miopenFloat; }
@@ -421,7 +412,6 @@ private:
     bool resultsave            = false;
     bool resultrunning         = false;
     bool useSaved              = false;
-    bool useInverseVariance    = false;
     std::string in_layout      = "NCHW";
     std::string out_layout     = "NCHW";
     std::string din_layout     = "NCHW";

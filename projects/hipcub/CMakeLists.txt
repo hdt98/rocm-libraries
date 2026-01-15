@@ -221,9 +221,6 @@ if(BUILD_TEST)
     endif()
   endif()
 
-  # Used by tests to define their RESOURCE_GROUPS
-  set(DEFAULT_GPU_RESOURCE "gpus")
-
   enable_testing()
   rocm_package_setup_client_component(tests)
   add_subdirectory(test)

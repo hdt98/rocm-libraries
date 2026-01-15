@@ -197,16 +197,18 @@ constexpr builder::ConvDirection conv_direction()
 
 /// @brief Derives the convolution-specific specialization from a device kernel `Instance` type.
 /// @tparam Instance The device kernel instance type.
-/// @return A `builder::ConvSpecialization` enum value.
+/// @return A `builder::ConvFwdSpecialization`, `builder::ConvBwdDataSpecialization`, or
+/// `builder::ConvBwdWeightSpecialization` enum value.
 template <typename Instance>
 constexpr auto conv_spec()
 {
     using InstTraits = InstanceTraits<Instance>;
-    using enum builder::ConvSpecialization;
 
     if constexpr(requires { InstTraits::kConvForwardSpecialization; })
     {
         using enum ck::tensor_operation::device::ConvolutionForwardSpecialization;
+        using enum builder::ConvFwdSpecialization;
+
         switch(InstTraits::kConvForwardSpecialization)
         {
         case Default: return DEFAULT;
@@ -219,6 +221,8 @@ constexpr auto conv_spec()
     else if constexpr(requires { InstTraits::kConvBwdDataSpecialization; })
     {
         using enum ck::tensor_operation::device::ConvolutionBackwardDataSpecialization;
+        using enum builder::ConvBwdDataSpecialization;
+
         switch(InstTraits::kConvBwdDataSpecialization)
         {
         case Default: return DEFAULT;
@@ -228,6 +232,8 @@ constexpr auto conv_spec()
     else if constexpr(requires { InstTraits::kConvBwdWeightSpecialization; })
     {
         using enum ck::tensor_operation::device::ConvolutionBackwardWeightSpecialization;
+        using enum builder::ConvBwdWeightSpecialization;
+
         switch(InstTraits::kConvBwdWeightSpecialization)
         {
         case Default: return DEFAULT;

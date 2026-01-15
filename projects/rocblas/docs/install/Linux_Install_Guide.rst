@@ -203,27 +203,18 @@ Other dependencies are listed in the ``install.sh`` script.
 Pass the ``-d`` flag to ``install.sh`` to install these dependencies.
 
 
-Client dependencies: BLAS library
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The rocBLAS test and benchmark clients require a host reference BLAS library. When building
-clients with ``-dc`` flags, ``install.sh`` automatically builds AOCL 5.2 (AMD Optimizing CPU Libraries)
-from source with ILP64 support. The build searches for BLAS libraries in this order:
-
-1. AOCL 5.x (built or pre-installed)
-2. AOCL 4.x BLIS
-3. Bundled BLIS
-4. System BLAS
-
-To skip the automatic AOCL build and use an alternative, add ``--skip-aocl`` to the install command.
-To clean and rebuild all dependencies, use ``--clean-deps``. You can also set ``AOCL_ROOT``
-to specify a custom AOCL location, or manually install AOCL from
-`AMD Developer Central <https://www.amd.com/en/developer/aocl.html>`_.
+However, for the host reference BLAS test and benchmark clients,
+it is recommended that you manually download and install the AMD `ILP64 version of
+AOCL-BLAS 4.2 <https://www.amd.com/en/developer/aocl.html>`_.
+If you download and install the full AOCL packages into their default locations
+or download the BLIS archive files and extract them into the build directory ``deps`` subfolder,
+then the client's ``CMakeLists.txt`` should find the reference BLAS.
 
 .. note::
 
-   If using a BLAS library without ILP64 support, some stress tests might fail.
-   To exclude these tests, use the ``--gtest_filter=-*stress*`` option.
+   If you only use the ``install.sh -d`` script-based BLIS download and install,
+   you might experience ``rocblas-test`` stress test failures due to 32-bit integer overflow on the host.
+   If this occurs, exclude the stress tests using the command line argument ``--gtest_filter=-*stress*``.
 
 Building the library dependencies and library
 ---------------------------------------------
@@ -261,14 +252,12 @@ listed in this table.
 
 .. csv-table::
    :header: "Command","Description"
-   :widths: 40, 90
+   :widths: 33, 97
 
    "``./install.sh -h``", "Help information."
-   "``./install.sh -dc``", "Build the library dependencies, client dependencies, library, and client in your local directory. Automatically builds AOCL 5.2. The ``-d`` flag only has to be used once. For subsequent invocations of ``install.sh``, it is not necessary to rebuild the dependencies."
-   "``./install.sh -dc --skip-aocl``", "Build clients without AOCL, using the next available BLAS library."
-   "``./install.sh -dc --clean-deps``", "Clean and rebuild all dependencies before building."
+   "``./install.sh -dc``", "Build the library dependencies, client dependencies, library, and client in your local directory. The ``-d`` flag only has to be used once. For subsequent invocations of ``install.sh``, it is not necessary to rebuild the dependencies."
    "``./install.sh -c``", "Build the library and client in your local directory. It is assumed the dependencies have been built."
-   "``./install.sh -idc``", "Build the library dependencies, client dependencies, library, and client, then build and install the rocBLAS package. You will be prompted for ``sudo`` access. To install rocBLAS for all users, use the ``-i`` flag. To restrict it to your local directory, do not use the ``-i`` flag."
+   "``./install.sh -idc``", "Build the library  dependencies, client dependencies, library, and client, then build and install the rocBLAS package. You will be prompted for ``sudo`` access. To install rocBLAS for all users, use the ``-i`` flag. To restrict it to your local directory, do not use the ``-i`` flag."
    "``./install.sh -ic``", "Build and install the rocBLAS package and build the client. You will be prompted for ``sudo`` access. This installs it for all users. To restrict rocBLAS to your local directory, do not use the ``-i`` flag."
    "``./install.sh -t /path/to/Tensile``", "``tensile_tag.txt`` has been deprecated so use this option to build a folder that has a different Tensile commit than the rocBLAS commit."
 

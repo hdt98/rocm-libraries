@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from itertools import product
 
-from typing import List
+from pyparsing import List
 
 TYPE_MAP = {"fp16": "ck_tile::half_t", "float": "float"}
 

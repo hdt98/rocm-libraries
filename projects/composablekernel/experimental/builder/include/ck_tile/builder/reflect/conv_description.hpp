@@ -63,7 +63,10 @@ struct GemmAlgorithmInfo
     OutputTileTransferInfo c_tile_transfer;
     builder::PipelineVersion pipeline_version;
     builder::PipelineScheduler pipeline_scheduler;
-    builder::ConvSpecialization conv_specialization;
+    std::variant<builder::ConvFwdSpecialization,
+                 builder::ConvBwdDataSpecialization,
+                 builder::ConvBwdWeightSpecialization>
+        conv_specialization;
     builder::GemmPadding padding;
 };
 

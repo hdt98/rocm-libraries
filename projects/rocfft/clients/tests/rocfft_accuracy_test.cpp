@@ -117,23 +117,21 @@ TEST_P(accuracy_test, vs_fftw)
         {
             fft_vs_reference(params, round_trip);
         }
-        catch(const std::bad_alloc&)
+        catch(std::bad_alloc&)
         {
-            // explicitly clear cache
-            last_cpu_fft_data = last_cpu_fft_cache();
             GTEST_SKIP() << "host memory allocation failure";
         }
-        catch(const HOSTBUF_MEM_USAGE& e)
+        catch(HOSTBUF_MEM_USAGE& e)
         {
             // explicitly clear cache
             last_cpu_fft_data = last_cpu_fft_cache();
             GTEST_SKIP() << e.what();
         }
-        catch(const ROCFFT_SKIP& e)
+        catch(ROCFFT_SKIP& e)
         {
             GTEST_SKIP() << e.what();
         }
-        catch(const ROCFFT_FAIL& e)
+        catch(ROCFFT_FAIL& e)
         {
             GTEST_FAIL() << e.what();
         }
