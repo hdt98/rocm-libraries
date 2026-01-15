@@ -863,33 +863,59 @@ struct BlockFmhaPipelineQRKSVS
                         SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
 
                         // Convert using scales
-                        static_for<0, 16 / 4, 1>{}([&](auto j) {
-                            using vec_t = ext_vector_t<short, 2>;
+
+                        // These builtins require the old value, and will generate a v_mov_b32 vxxx
+                        // [old] before cvt, which result in unwanted ISA so we prepare an
+                        // uninitialized variable dummy_old purposely, and turn off the warning
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wuninitialized"
-                            // __builtin_amdgcn_cvt_scalef32_pk_fp8_f32() this builtin requires the
-                            // old value, and will generate a v_mov_b32 vxxx [old] before cvt, which
-                            // result in unwanted ISA so we prepare an uninitialized variable
-                            // purposely, and turn off the warning
-                            vec_t dummy_old;
-                            vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
-                                dummy_old,
-                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
-                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
-                                scale,
-                                false); // false -> WORD0
+                        if constexpr(std::is_same_v<PDataType, fp8_t>)
+                        {
+                            static_for<0, 16 / 4, 1>{}([&](auto j) {
+                                using vec_t = ext_vector_t<short, 2>;
+                                vec_t dummy_old;
+                                vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                    dummy_old,
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
+                                    scale,
+                                    false); // false -> WORD0
+                                vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                    x,
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
+                                    scale,
+                                    true); // true -> WORD1
+                                p_result.get_thread_buffer().template set_as<vec_t>(
+                                    number<i * 4 + j>{}, y);
+                            });
+                        }
+                        else if constexpr(std::is_same_v<PDataType, bf8_t>)
+                        {
+                            static_for<0, 16 / 4, 1>{}([&](auto j) {
+                                using vec_t = ext_vector_t<short, 2>;
+                                vec_t dummy_old;
+                                vec_t x = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
+                                    dummy_old,
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
+                                    scale,
+                                    false); // false -> WORD0
+                                vec_t y = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
+                                    x,
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
+                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
+                                    scale,
+                                    true); // true -> WORD1
+                                p_result.get_thread_buffer().template set_as<vec_t>(
+                                    number<i * 4 + j>{}, y);
+                            });
+                        }
+                        else
+                        {
+                            static_assert(false);
+                        }
 #pragma clang diagnostic pop
-
-                            vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
-                                x,
-                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
-                                p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
-                                scale,
-                                true); // true -> WORD1
-
-                            p_result.get_thread_buffer().template set_as<vec_t>(number<i * 4 + j>{},
-                                                                                y);
-                        });
 
                         // Save scale for the corresponding lane
                         if constexpr(kABKLane == 4)
