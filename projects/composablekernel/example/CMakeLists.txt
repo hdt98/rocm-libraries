@@ -85,7 +85,7 @@ function(add_example_executable EXAMPLE_NAME FILE_NAME)
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
         #Do not build any microscaling examples if gfx950|gfx125 target is not on the list
-        if(source_name MATCHES "gemm_mx_fp8|gemm_mx_fp4")
+        if(source_name MATCHES "gemm_mx_fp8|gemm_mx_bf8|gemm_mx_fp4")
             if(NOT EX_TARGETS MATCHES "gfx95|gfx125" )
                 message(STATUS "removing microscaling example ${source} ")
                 list(REMOVE_ITEM FILE_NAME "${source}")
