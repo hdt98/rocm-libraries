@@ -39,6 +39,10 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL false
+#endif
+
 template <bool BATCHED, typename T>
 void rocsolver_orgbr_ungbr_getMemorySize(const rocblas_storev storev,
                                          const rocblas_int m,
@@ -51,14 +55,15 @@ void rocsolver_orgbr_ungbr_getMemorySize(const rocblas_storev storev,
                                          size_t* size_trfact,
                                          size_t* size_workArr)
 {
+    *size_scalars = 0;
+    *size_work = 0;
+    *size_Abyx_tmptr = 0;
+    *size_trfact = 0;
+    *size_workArr = 0;
+
     // if quick return no workspace needed
     if(m == 0 || n == 0 || batch_count == 0)
     {
-        *size_scalars = 0;
-        *size_work = 0;
-        *size_Abyx_tmptr = 0;
-        *size_trfact = 0;
-        *size_workArr = 0;
         return;
     }
 
@@ -101,6 +106,42 @@ void rocsolver_orgbr_ungbr_getMemorySize(const rocblas_storev storev,
             *size_work = std::max(s1, s2);
         }
     }
+
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work);
+    adjust_for_alignment(size_Abyx_tmptr);
+    adjust_for_alignment(size_trfact);
+    adjust_for_alignment(size_workArr);
+}
+
+template <bool BATCHED, typename T>
+void rocsolver_orgbr_ungbr_getMemorySize_alt(const rocblas_storev storev,
+                                             const rocblas_int m,
+                                             const rocblas_int n,
+                                             const rocblas_int k,
+                                             const rocblas_int batch_count,
+
+                                             size_t* p_size_orgbr)
+{
+    size_t size_scalars = 0;
+    size_t size_work = 0;
+    size_t size_Abyx_tmptr = 0;
+    size_t size_trfact = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_orgbr_ungbr_getMemorySize<BATCHED, T>(storev, m, n, k, batch_count,
+
+                                                    &size_scalars, &size_work, &size_Abyx_tmptr,
+                                                    &size_trfact, &size_workArr);
+    size_t size_orgbr = 0;
+
+    size_orgbr += size_scalars;
+    size_orgbr += size_work;
+    size_orgbr += size_Abyx_tmptr;
+    size_orgbr += size_trfact;
+    size_orgbr += size_workArr;
+
+    *p_size_orgbr = size_orgbr;
 }
 
 template <typename T, typename U>
@@ -240,6 +281,66 @@ rocblas_status rocsolver_orgbr_ungbr_template(rocblas_handle handle,
     }
 
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+rocblas_status rocsolver_orgbr_ungbr_template_alt(rocblas_handle handle,
+                                                  const rocblas_storev storev,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  const rocblas_int k,
+                                                  U A,
+                                                  const rocblas_int shiftA,
+                                                  const rocblas_int lda,
+                                                  const rocblas_stride strideA,
+                                                  T* ipiv,
+                                                  const rocblas_stride strideP,
+                                                  const rocblas_int batch_count,
+
+                                                  void* const work,
+                                                  size_t const size_work)
+
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_work1 = 0;
+    size_t size_Abyx_tmptr = 0;
+    size_t size_trfact = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_orgbr_ungbr_getMemorySize<BATCHED, T>(storev, m, n, k, batch_count,
+
+                                                    &size_scalars, &size_work1, &size_Abyx_tmptr,
+                                                    &size_trfact, &size_workArr);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    T* const work1 = (T*)pfree;
+    pfree += size_work1;
+
+    T* const Abyx_tmptr = (T*)pfree;
+    pfree += size_Abyx_tmptr;
+
+    T* const trfact = (T*)pfree;
+    pfree += size_trfact;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_orgbr_ungbr_template<BATCHED, STRIDED, T, U>(
+        handle, storev, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count,
+
+        scalars, work1, Abyx_tmptr, trfact, workArr);
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE
