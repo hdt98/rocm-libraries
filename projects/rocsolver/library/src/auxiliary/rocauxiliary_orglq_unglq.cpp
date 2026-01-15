@@ -68,32 +68,63 @@ rocblas_status rocsolver_orglq_unglq_impl(rocblas_handle handle,
     size_t size_Abyx_tmptr;
     // size of temporary array for triangular factor
     size_t size_trfact;
-    rocsolver_orglq_unglq_getMemorySize<false, T>(m, n, k, batch_count, &size_scalars, &size_work,
-                                                  &size_Abyx_tmptr, &size_trfact, &size_workArr);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work,
-                                                      size_Abyx_tmptr, size_trfact, size_workArr);
+    if(USE_ORIGINAL)
+    {
+        rocsolver_orglq_unglq_getMemorySize<false, T>(m, n, k, batch_count, &size_scalars, &size_work,
+                                                      &size_Abyx_tmptr, &size_trfact, &size_workArr);
 
-    // memory workspace allocation
-    void *scalars, *work, *Abyx_tmptr, *trfact, *workArr;
-    rocblas_device_malloc mem(handle, size_scalars, size_work, size_Abyx_tmptr, size_trfact,
-                              size_workArr);
-    if(!mem)
-        return rocblas_status_memory_error;
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(
+                handle, size_scalars, size_work, size_Abyx_tmptr, size_trfact, size_workArr);
 
-    scalars = mem[0];
-    work = mem[1];
-    Abyx_tmptr = mem[2];
-    trfact = mem[3];
-    workArr = mem[4];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+        // memory workspace allocation
+        void *scalars, *work, *Abyx_tmptr, *trfact, *workArr;
+        rocblas_device_malloc mem(handle, size_scalars, size_work, size_Abyx_tmptr, size_trfact,
+                                  size_workArr);
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    // execution
-    return rocsolver_orglq_unglq_template<false, false, T>(
-        handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count, (T*)scalars, (T*)work,
-        (T*)Abyx_tmptr, (T*)trfact, (T**)workArr);
+        scalars = mem[0];
+        work = mem[1];
+        Abyx_tmptr = mem[2];
+        trfact = mem[3];
+        workArr = mem[4];
+        if(size_scalars > 0)
+            init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_orglq_unglq_template<false, false, T>(
+            handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count, (T*)scalars,
+            (T*)work, (T*)Abyx_tmptr, (T*)trfact, (T**)workArr);
+    }
+    else
+    {
+        size_t size_orglq = 0;
+        rocsolver_orglq_unglq_getMemorySize_alt<false, T>(m, n, k, batch_count, &size_orglq);
+
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_orglq);
+
+        // memory workspace allocation
+        rocblas_device_malloc mem(handle, size_orglq);
+
+        if(!mem)
+            return rocblas_status_memory_error;
+
+        void* const work_orglq = mem[0];
+
+        // -----------------------------------------------------------
+        // note: scalars[] initialized in rocauxiliary_orglq_unglq.hpp
+        // -----------------------------------------------------------
+        // if(size_scalars > 0) init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_orglq_unglq_template_alt<false, false, T>(
+            handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count,
+
+            work_orglq, size_orglq);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE
