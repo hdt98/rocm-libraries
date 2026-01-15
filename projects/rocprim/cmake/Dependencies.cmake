@@ -42,22 +42,22 @@ macro(restore_cache_variable _variable _type)
 endmacro(restore_cache_variable)
 
 macro(remove_warning_flags _flags _var)
-set(${_var} ${flags})
-list(REMOVE_ITEM ${_var} /WX -Werror -Werror=pendantic -pedantic-errors)
-if(MSVC)
-  list(FILTER ${_var} EXCLUDE REGEX "/[Ww]([0-4]?)(all)?") # Remove MSVC warning flags
-  list(APPEND ${_var} /w)
-else()
-  list(FILTER ${_var} EXCLUDE REGEX "-W(all|extra|everything)") # Remove GCC/LLVM flags
-  list(APPEND ${_var} -w)
-endif()
-set(${_var})
+  set(${_var} ${flags})
+  list(REMOVE_ITEM ${_var} /WX -Werror -Werror=pendantic -pedantic-errors)
+  if(MSVC)
+    list(FILTER ${_var} EXCLUDE REGEX "/[Ww]([0-4]?)(all)?") # Remove MSVC warning flags
+    list(APPEND ${_var} /w)
+  else()
+    list(FILTER ${_var} EXCLUDE REGEX "-W(all|extra|everything)") # Remove GCC/LLVM flags
+    list(APPEND ${_var} -w)
+  endif()
+  set(${_var})
 endmacro(remove_warning_flags)
 
 # This function checks to see if the download branch given by "branch" exists in the repository.
 # It does so using the git ls-remote command.
 # If the branch cannot be found, the variable described by "branch" is changed to "develop" in the host scope.
-function(find__branch git_path branch)
+function(find_branch git_path branch)
   set(branch_value ${${branch}})
   execute_process(COMMAND ${git_path} "ls-remote" "https://github.com/ROCm/rocm-libraries.git" "refs/heads/${branch_value}" RESULT_VARIABLE ret_code OUTPUT_VARIABLE output)
 
@@ -352,7 +352,7 @@ macro(fetch_monorepo _method _project _version _path _branch)
     endif()
 
     message(STATUS "Checking if repository contains requested branch ${${_branch}}")
-    find__branch(${GIT_PATH} ${_branch})
+    find_branch(${GIT_PATH} ${_branch})
     set(_branch_value ${${_branch}})
 
     message(STATUS "Downloading ${_project} from https://github.com/ROCm/rocm-libraries.git")
