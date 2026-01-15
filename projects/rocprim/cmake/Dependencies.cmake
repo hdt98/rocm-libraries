@@ -269,80 +269,74 @@ macro(fetch_monorepo _method _project _version _path _branch)
     # Add default install location for WIN32 and non-WIN32 as hint
     find_package(${_project} ${_version} CONFIG QUIET PATHS "${ROCM_ROOT}/lib/cmake/${_project}")
 
-    if(NOT ${${_project}_FOUND})
-      # TODO: Remove fallback behavior. This simplifies the code and makes sure we don't download code
-      # without the user's explicit perm
-      message(STATUS "No existing ${_project} package meeting the minimum version requirement (${_version}) was found. Falling back to downloading it.")
-      # Update local and parent variable values
-      set(${_method} "DOWNLOAD")
+    if(${${_project}_FOUND})
+      message(STATUS "Found ${_project} at ${${_project}_DIR}")
     else()
-      message(STATUS "Package found (${${_project}_DIR})")
+      message(FATAL_ERROR "Could not find package for ${_project} that satisfies version requirement ${_verseion}!")
     endif()
 
   elseif(${${_method}} STREQUAL "MONOREPO")
     message(STATUS "Searching for ${_project} in the parent monorepo directory")
 
     # Check if this looks like a monorepo checkout
-    find_path(found_path NAMES "." PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/" NO_CACHE NO_DEFAULT_PATH)
+    set(_potential_project_path "${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/")
+    find_path(monorepo_path NAMES "." PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/" NO_CACHE NO_DEFAULT_PATH)
 
     # If not, see if the local monorepo is a sparse-checkout.
     # If it is a sparse-checkout, try to add the dependency to the sparse-checkout list.
     # If it's not a sparse-checkout (or adding to the sparse-checkout list fails), fall back to downloading the dependency.
-    if(${found_path} STREQUAL "found_path-NOTFOUND")
-      set(FALLBACK_TO_DOWNLOAD ON)
+    if(EXISTS ${_potential_project_path})
+      message(STATUS "Found ${_project} at ${monorepo_path}!")
+      set(${_path} ${monorepo_path})
+    else()
       message(WARNING "Unable to locate ${_project} in parent monorepo (it's not at \"${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/\").")
       message(STATUS "Checking if local monorepo is a sparse-checkout that we can add ${_project} to.")
+      # We're going to download things, so make sure that's allowed.
+      if (NOT ${ALLOW_DOWNLOADING_DEPS})
+        message(FATAL_ERROR "Downloading depedencies is disallowed. Please pass ALLOW_DOWNLOADING_DEPS=1 to cmake!")
+      endif()
+      # Check for 'git'.
       if(NOT(GIT_PATH))
         message(FATAL_ERROR "Git could not be found on the system. Since ${_project} could not be found in the local monorepo, git is required to download it.")
       endif()
-
-      if(USE_SPARSE_CHECKOUT)
-        execute_process(COMMAND ${GIT_PATH} "sparse-checkout" "list" OUTPUT_VARIABLE sparse_list ERROR_VARIABLE git_error RESULT_VARIABLE git_result
-                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../)
-
-        if(NOT(git_result EQUAL 0) OR git_error)
-          message(STATUS "The local monorepo does not appear to be a sparse-checkout.")
-        else()
-          message(STATUS "The local monorepo appears to be a sparse checkout. Attempting to add \"projects/${_project}\" to the checkout list.")
-          # Check if the dependency is already present in the checkout list.
-          # Git lists sparse checkout directories each on a separate line.
-          # Take care not to match something in the middle of a path, eg. "other_dir/projects/${_project}/sub_dir".
-          string(REGEX MATCH "(^|\n)projects/${_project}($|\n)" find_result ${sparse_list})
-          if(find_result)
-            message(STATUS "Found existing entry for \"projects/${_project}\" in sparse-checkout list - has the directory structure been modified?")
-          else()
-            # Add project/${_project} to the sparse checkout
-            execute_process(COMMAND ${GIT_PATH} "sparse-checkout" "add" "projects/${_project}" RESULT_VARIABLE sparse_checkout_result
-                            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../)
-            # Note that in this case, we are forced to checkout the same branch that the sparse-checkout was created with.
-            execute_process(COMMAND ${GIT_PATH} "checkout" RESULT_VARIABLE checkout_result
-                            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../)
-
-            if(sparse_checkout_result EQUAL 0 AND checkout_result EQUAL 0)
-              message(STATUS "Added new checkout list entry.")
-              set(FALLBACK_TO_DOWNLOAD OFF)
-            else()
-              message(STATUS "Unable to add new checkout list entry.")
-            endif()
-            # Save the monorepo path in the parent scope
-            set(${_path} "${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}")
-          endif()
-        endif()
-      else()
-        message(STATUS "The version of git installed on the system (${GIT_VERSION}) does not support sparse-checkout.")
+      # Check if 'git' can do sparse checkout.
+      if(NOT USE_SPARSE_CHECKOUT)
+        message(FATAL_ERROR "The version of git installed on the system (${GIT_VERSION}) does not support sparse-checkout.")
       endif()
-
-      if (FALLBACK_TO_DOWNLOAD)
-        message(WARNING "Unable to locate/fetch dependency ${_project} from monorepo. Falling back to downloading it.")
-        # Update local and parent variable values
-        set(${_method} "DOWNLOAD")
+      # Run 'git sparse-checkout list'.
+      execute_process(COMMAND ${GIT_PATH} "sparse-checkout" "list" OUTPUT_VARIABLE sparse_list RESULT_VARIABLE proc_res
+                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../)
+      if(NOT proc_res EQUAL 0)
+        message(FATAL_ERROR "The local monorepo does not appear to be a sparse-checkout.")
       endif()
-
-    else()
-      message(STATUS "Found ${_project} at ${found_path}")
-
-      # Save the monorepo path in the parent scope
-      set(${_path} ${found_path})
+      message(STATUS "The local monorepo appears to be a sparse checkout. Attempting to add \"projects/${_project}\" to the checkout list.")
+      # Check if the dependency is already present in the checkout list.
+      # Git lists sparse checkout directories each on a separate line.
+      # Take care not to match something in the middle of a path, eg. "other_dir/projects/${_project}/sub_dir".
+      string(REGEX MATCH "(^|\n)projects/${_project}($|\n)" find_result ${sparse_list})
+      if(find_result)
+        message(STATUS "Found existing entry for \"projects/${_project}\" in sparse-checkout list - has the directory structure been modified?")
+      endif()
+      # Add project/${_project} to the sparse checkout
+      # Run 'git sparse-checkout add projects/${_project}'.
+      execute_process(
+        COMMAND ${GIT_PATH} "sparse-checkout" "add" "projects/${_project}" RESULT_VARIABLE proc_res
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../)
+      if(NOT proc_res EQUAL 0)
+        message(FATAL_ERROR "Failed to execute 'git sparse-checkout add projects/${_project}'!")
+      endif()
+      # Note that in this case, we are forced to checkout the same branch that the sparse-checkout was created with.
+      # Run 'git checkout'.
+      execute_process(
+        COMMAND ${GIT_PATH} "checkout" RESULT_VARIABLE proc_res
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../)
+      if(NOT proc_res EQUAL 0)
+        message(FATAL_ERROR "Failed to execute 'git checkout'!")
+      endif()
+      if(NOT EXISTS ${_potential_project_path})
+        message(FATAL_ERROR "Could not find ${_potential_project_path}, even after doing a sparse checkout!")
+      endif()
+      set(${_path} "${_potential_project_path}")
     endif()
   endif()
 
@@ -359,8 +353,8 @@ macro(fetch_monorepo _method _project _version _path _branch)
     if(${USE_SPARSE_CHECKOUT})
       # In this case, we have access to git sparse-checkout.
       # Check if the dependency has already been downloaded in the past:
-      find_path(found_path NAMES "." PATHS "${CMAKE_CURRENT_BINARY_DIR}/${_project}-src/" NO_CACHE NO_DEFAULT_PATH)
-      if(${found_path} STREQUAL "found_path-NOTFOUND")
+      find_path(monorepo_path NAMES "." PATHS "${CMAKE_CURRENT_BINARY_DIR}/${_project}-src/" NO_CACHE NO_DEFAULT_PATH)
+      if(${monorepo_path} STREQUAL "monorepo_path-NOTFOUND")
         # First, git clone with options "--no-checkout" and "--filter=tree:0" to prevent files from being pulled immediately.
         # Use option "--depth=1" to avoid downloading past commit history.
         execute_process(COMMAND ${GIT_PATH} clone --branch ${_branch_value} --no-checkout --depth=1 --filter=tree:0 https://github.com/ROCm/rocm-libraries.git ${CMAKE_CURRENT_BINARY_DIR}/${_project}-src)
@@ -386,8 +380,8 @@ macro(fetch_monorepo _method _project _version _path _branch)
     else()
       # In this case, we do not have access to sparse-checkout, so we need to download the whole monorepo.
       # Check if the monorepo has already been downloaded to satisfy a previous dependency
-      find_path(found_path NAMES "." PATHS "${CMAKE_CURRENT_BINARY_DIR}/monorepo-src/" NO_CACHE NO_DEFAULT_PATH)
-      if(${found_path} STREQUAL "found_path-NOTFOUND")
+      find_path(monorepo_path NAMES "." PATHS "${CMAKE_CURRENT_BINARY_DIR}/monorepo-src/" NO_CACHE NO_DEFAULT_PATH)
+      if(${monorepo_path} STREQUAL "monorepo_path-NOTFOUND")
         # Warn the user that this will take some time.
         message(WARNING "The detected version of git (${GIT_VERSION}) is older than 2.25 and does not provide sparse-checkout functionality. Falling back to checking out the whole rocm-libraries repository (this may take a long time).")
         # Avoid downloading anything related to branches other than the target branch (--single-branch), and avoid any past commit history information (--depth=1)

@@ -66,7 +66,7 @@ register_dep_option(BUILD_CODE_COVERAGE    "Build with code coverage enabled." O
 register_dep_option(BUILD_OFFLOAD_COMPRESS "Build rocPRIM with offload compression." ON "NOT ONLY_INSTALL" OFF)
 register_dep_option(ROCPRIM_ENABLE_ASSERTS "Enable asserts in release build." OFF "NOT ONLY_INSTALL" OFF)
 
-register_set(DEPS_ALLOW_DOWNLOADS OFF     BOOL   "Allow downloads during configuration.")
+register_set(ALLOW_DOWNLOADING_DEPS OFF     BOOL   "Allow downloads during configuration.")
 register_set(ROCRAND_FETCH_METHOD PACKAGE STRING "Method to fetch rocRAND dependency.")
 register_set(ROCRAND_FETCH_BRANCH develop STRING "Branch to fetch rocRAND from.")
 
