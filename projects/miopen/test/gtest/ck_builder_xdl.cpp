@@ -198,7 +198,7 @@ std::size_t FirstDifference(const std::string& a, const std::string& b)
     return min(a.size(), b.size());
 }
 
-TEST(CK_Builder, CreateExistingInstance_Xdl)
+TEST(CK_Builder_Xdl, CreateExistingInstance_Xdl)
 {
     // Verify that the signature structure conforms to the signature concept.
     static_assert(ckb::ConvSignatureDescriptor<Signature>);
