@@ -95,6 +95,11 @@ void rocsolver_orglq_unglq_getMemorySize(const rocblas_int m,
         // size of temporary array for triangular factor
         *size_trfact = sizeof(T) * jb * jb * batch_count;
     }
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work);
+    adjust_for_alignment(size_Abyx_tmptr);
+    adjust_for_alignment(size_trfact);
+    adjust_for_alignment(size_workArr);
 }
 
 template <bool BATCHED, typename T>
