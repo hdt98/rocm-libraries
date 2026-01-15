@@ -211,7 +211,10 @@ struct Op5dTensorGeneric final : TensorOpSolver
 
 struct Op5dTensorGenericContiguous final : TensorOpSolver
 {
-    const std::string& SolverDbId() const override { return GetSolverDbId<Op5dTensorGenericContiguous>(); }
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<Op5dTensorGenericContiguous>();
+    }
 
     bool IsApplicable(const ExecutionContext& context,
                       const miopen::tensorOp::ProblemDescription& problem) const override;
