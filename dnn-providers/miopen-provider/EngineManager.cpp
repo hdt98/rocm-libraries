@@ -54,7 +54,7 @@ size_t EngineManager::getWorkspaceSize(const HipdnnEnginePluginHandle& handle,
 void EngineManager::initializeExecutionContext(
     const HipdnnEnginePluginHandle& handle,
     const hipdnn_plugin_sdk::IGraph& opGraph,
-    const hipdnn_plugin_sdk::IEngineConfig& engineConfig,
+    const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
     HipdnnEnginePluginExecutionContext& executionContext) const
 {
     auto& engine = getEngine(engineConfig.engineId());

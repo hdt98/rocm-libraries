@@ -7,8 +7,9 @@
 #include <memory>
 
 #include <hipdnn_data_sdk/data_objects/engine_config_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/KnobSettingWrapper.hpp>
 
-namespace hipdnn_plugin_sdk
+namespace hipdnn_data_sdk::flatbuffer_utilities
 {
 
 class IEngineConfig
@@ -19,6 +20,11 @@ public:
     virtual const hipdnn_data_sdk::data_objects::EngineConfig& getEngineConfig() const = 0;
     virtual bool isValid() const = 0;
     virtual int64_t engineId() const = 0;
+
+    // virtual uint32_t knobSettingCount() const = 0;
+    // virtual const std::vector<std::unique_ptr<IKnobSetting>>& knobSettingWrappers() const = 0;
+    // virtual const IKnobSetting& getKnobSettingById(int64_t knobId) const = 0;
+    // virtual const IKnobSetting& getKnobSettingByName(const std::string& knobName) const = 0;
 };
 
 class EngineConfigWrapper : public IEngineConfig

@@ -8,7 +8,7 @@
 
 #include <hipdnn_data_sdk/data_objects/engine_details_generated.h>
 
-namespace hipdnn_plugin_sdk
+namespace hipdnn_data_sdk::flatbuffer_utilities
 {
 
 class IEngineDetails
