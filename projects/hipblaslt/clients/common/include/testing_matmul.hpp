@@ -287,6 +287,92 @@ inline void post_gpu_time(bool         use_gpu_timer,
     }
 }
 
+// ============================================================================
+// Modified Z-Score based outlier removal (borrowed from MIOpen)
+// Used to remove high outliers and get a more accurate mean timing
+// ============================================================================
+inline double timing_mean(const std::vector<double>& data)
+{
+    if(data.empty())
+        return 0.0;
+    double sum = std::accumulate(data.begin(), data.end(), 0.0);
+    return sum / data.size();
+}
+
+inline double timing_median_of_sorted(const std::vector<double>& sortedData)
+{
+    if(sortedData.empty())
+        return 0.0;
+    size_t size = sortedData.size();
+    return (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / 2.0
+                           : sortedData[size / 2];
+}
+
+inline std::vector<double> timing_median_absolute_deviation(const std::vector<double>& sortedData)
+{
+    double med = timing_median_of_sorted(sortedData);
+    std::vector<double> absDeviation;
+    absDeviation.reserve(sortedData.size());
+    for(const auto& value : sortedData)
+    {
+        absDeviation.push_back(std::abs(value - med));
+    }
+    return absDeviation;
+}
+
+inline std::vector<double> timing_modified_z_scores(const std::vector<double>& sortedData)
+{
+    double medianValue = timing_median_of_sorted(sortedData);
+    
+    std::vector<double> absolute_deviation = timing_median_absolute_deviation(sortedData);
+    std::sort(absolute_deviation.begin(), absolute_deviation.end());
+    double mad = timing_median_of_sorted(absolute_deviation);
+    
+    // If MAD is 0, then we cannot calculate the ModifiedZScore
+    if(mad == 0.0)
+    {
+        return std::vector<double>(sortedData.size(), 0.0);
+    }
+    
+    std::vector<double> modZScores;
+    modZScores.reserve(sortedData.size());
+    for(const auto& value : sortedData)
+    {
+        modZScores.push_back(0.6745 * (value - medianValue) / mad);
+    }
+    return modZScores;
+}
+
+// Remove high outliers using Modified Z-Score and return mean of filtered data
+// z_threshold: data points with z-score > z_threshold are considered outliers
+inline double removeHighOutliersAndGetMean(std::vector<double> data, double z_threshold = 2.0)
+{
+    if(data.empty())
+        return 0.0;
+    if(data.size() == 1)
+        return data[0];
+        
+    std::sort(data.begin(), data.end());
+    
+    std::vector<double> modZScores = timing_modified_z_scores(data);
+    std::vector<double> filteredData;
+    
+    for(size_t i = 0; i < data.size(); ++i)
+    {
+        if(modZScores[i] <= z_threshold)
+        {
+            filteredData.push_back(data[i]);
+        }
+    }
+    
+    // If all data was filtered out, return mean of original data
+    if(filteredData.empty())
+        return timing_mean(data);
+    
+    return timing_mean(filteredData);
+}
+// ============================================================================
+
 template <typename Tout>
 Tout cast_from_type(void* in, hipDataType type, size_t index)
 {
@@ -3645,6 +3731,26 @@ void testing_matmul_with_bias(const Arguments& arg,
                   : arg.cold_iters;
         int number_hot_calls = arg.iters;
 
+        // Storage for per-iteration timing (Method: multiple events, post-calculation)
+        std::vector<double> cold_iter_times(number_cold_calls, 0.0);
+        std::vector<double> hot_iter_times(number_hot_calls, 0.0);
+        
+        // Create event arrays for per-iteration timing (avoids pipeline stalls)
+        std::vector<hipEvent_t> cold_events_start(number_cold_calls);
+        std::vector<hipEvent_t> cold_events_end(number_cold_calls);
+        std::vector<hipEvent_t> hot_events_start(number_hot_calls);
+        std::vector<hipEvent_t> hot_events_end(number_hot_calls);
+        for(int i = 0; i < number_cold_calls; i++)
+        {
+            CHECK_HIP_ERROR(hipEventCreate(&cold_events_start[i]));
+            CHECK_HIP_ERROR(hipEventCreate(&cold_events_end[i]));
+        }
+        for(int i = 0; i < number_hot_calls; i++)
+        {
+            CHECK_HIP_ERROR(hipEventCreate(&hot_events_start[i]));
+            CHECK_HIP_ERROR(hipEventCreate(&hot_events_end[i]));
+        }
+
         int    flush_iter      = 100000;
         double flush_time_used = 0;
         if(arg.flush)
@@ -3692,22 +3798,33 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                   tuningVec[heuristicTuningIndex[sol]],
                                                   *dWorkspace));
                     }
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
+                    // Cold iterations with per-iteration timing (no pipeline stall)
                     for(int i = 0; i < number_cold_calls; i++)
                     {
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
+                    // Synchronize once after all cold iterations
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    // Calculate cold iteration times
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_cold_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, cold_events_start[i], cold_events_end[i]));
+                            cold_iter_times[i] = ms * 1000.0; // ms to us
+                        }
+                        gpu_time_used += cold_iter_times[i];
+                    }
                     if(arg.skip_slow_solution_ratio)
                     {
-                        post_gpu_time(arg.use_gpu_timer,
-                                      event_gpu_time_start,
-                                      event_gpu_time_end,
-                                      gpu_time_used,
-                                      stream);
                         best_warm_time
                             = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
                         if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
@@ -3722,20 +3839,38 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                     }
                     perf_monitor.start();
-                    pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
+                    // Hot iterations with per-iteration timing (no pipeline stall)
                     for(int i = 0; i < number_hot_calls; i++)
                     {
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
                         if(arg.flush)
                             hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                    }
+                    // Synchronize once after all hot iterations
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    // Calculate hot iteration times
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
+                            hot_iter_times[i] = ms * 1000.0; // ms to us
+                            if(arg.flush && flush_time_used > 0)
+                                hot_iter_times[i] -= flush_time_used;
+                        }
+                        gpu_time_used += hot_iter_times[i];
                     }
                 }
                 else
                 {
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
+                    // Cold iterations with per-iteration timing (C API, no pipeline stall)
                     for(int i = 0; i < number_cold_calls; i++)
                     {
                         auto ptr_matmul = matmul[i % block_count][0];
@@ -3744,6 +3879,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                    + (i % block_count) * size_scaleAlphaVec[0]
                                               : alpha_in[0];
 
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_start[i], stream));
                         EXPECT_HIPBLAS_STATUS(
                             hipblasLtMatmul(
                                 handle,
@@ -3767,16 +3904,27 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 workspace_size,
                                 stream),
                             HIPBLAS_STATUS_SUCCESS);
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
+                    // Synchronize once after all cold iterations
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    // Calculate cold iteration times
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_cold_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, cold_events_start[i], cold_events_end[i]));
+                            cold_iter_times[i] = ms * 1000.0; // ms to us
+                        }
+                        gpu_time_used += cold_iter_times[i];
+                    }
                     if(arg.skip_slow_solution_ratio)
                     {
-                        post_gpu_time(arg.use_gpu_timer,
-                                      event_gpu_time_start,
-                                      event_gpu_time_end,
-                                      gpu_time_used,
-                                      stream);
                         best_warm_time
                             = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
                         if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
@@ -3791,8 +3939,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                     }
                     perf_monitor.start();
-                    pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
+                    // Hot iterations with per-iteration timing (C API, no pipeline stall)
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         auto ptr_matmul = matmul[i % block_count][0];
@@ -3800,6 +3948,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                               ? (dScaleAlphaVec[0].as<char>())
                                                    + (i % block_count) * size_scaleAlphaVec[0]
                                               : alpha_in[0];
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
                         EXPECT_HIPBLAS_STATUS(
                             hipblasLtMatmul(
                                 handle,
@@ -3825,13 +3975,26 @@ void testing_matmul_with_bias(const Arguments& arg,
                             HIPBLAS_STATUS_SUCCESS);
                         if(arg.flush)
                             hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                    }
+                    // Synchronize once after all hot iterations
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    // Calculate hot iteration times
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
+                            hot_iter_times[i] = ms * 1000.0; // ms to us
+                            if(arg.flush && flush_time_used > 0)
+                                hot_iter_times[i] -= flush_time_used;
+                        }
+                        gpu_time_used += hot_iter_times[i];
                     }
                 }
-                post_gpu_time(arg.use_gpu_timer,
-                              event_gpu_time_start,
-                              event_gpu_time_end,
-                              gpu_time_used,
-                              stream);
                 perf_monitor.stop();
             }
             else
@@ -3857,23 +4020,32 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                   gemm_count * sizeof(hipblaslt_ext::UserArguments),
                                                   hipMemcpyHostToDevice));
                     }
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
+                    // Cold iterations with per-iteration timing (grouped gemm with user_args)
                     for(int i = 0; i < number_cold_calls; i++)
                     {
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(
                             d_userArgsVec[i % block_count], stream));
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_cold_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, cold_events_start[i], cold_events_end[i]));
+                            cold_iter_times[i] = ms * 1000.0;
+                        }
+                        gpu_time_used += cold_iter_times[i];
+                    }
                     if(arg.skip_slow_solution_ratio)
                     {
-                        post_gpu_time(arg.use_gpu_timer,
-                                      event_gpu_time_start,
-                                      event_gpu_time_end,
-                                      gpu_time_used,
-                                      stream);
                         best_warm_time
                             = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
                         if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
@@ -3888,17 +4060,29 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                     }
                     perf_monitor.start();
-                    pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
+                    // Hot iterations with per-iteration timing (grouped gemm with user_args)
                     for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(
                             d_userArgsVec[i % block_count], stream));
-
-                    post_gpu_time(arg.use_gpu_timer,
-                                  event_gpu_time_start,
-                                  event_gpu_time_end,
-                                  gpu_time_used,
-                                  stream);
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                    }
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
+                            hot_iter_times[i] = ms * 1000.0;
+                        }
+                        gpu_time_used += hot_iter_times[i];
+                    }
                     perf_monitor.stop();
                 }
                 else
@@ -3915,22 +4099,31 @@ void testing_matmul_with_bias(const Arguments& arg,
                             stream));
                     }
 
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
+                    // Cold iterations with per-iteration timing (grouped gemm)
                     for(int i = 0; i < number_cold_calls; i++)
                     {
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_cold_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, cold_events_start[i], cold_events_end[i]));
+                            cold_iter_times[i] = ms * 1000.0;
+                        }
+                        gpu_time_used += cold_iter_times[i];
+                    }
                     if(arg.skip_slow_solution_ratio)
                     {
-                        post_gpu_time(arg.use_gpu_timer,
-                                      event_gpu_time_start,
-                                      event_gpu_time_end,
-                                      gpu_time_used,
-                                      stream);
                         best_warm_time
                             = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
                         if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
@@ -3945,16 +4138,28 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                     }
                     perf_monitor.start();
-                    pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
+                    // Hot iterations with per-iteration timing (grouped gemm)
                     for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
-
-                    post_gpu_time(arg.use_gpu_timer,
-                                  event_gpu_time_start,
-                                  event_gpu_time_end,
-                                  gpu_time_used,
-                                  stream);
+                        if(arg.use_gpu_timer)
+                            CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                    }
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    gpu_time_used = 0.0;
+                    for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(arg.use_gpu_timer)
+                        {
+                            float ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
+                            hot_iter_times[i] = ms * 1000.0;
+                        }
+                        gpu_time_used += hot_iter_times[i];
+                    }
                     perf_monitor.stop();
                 }
             }
@@ -4104,6 +4309,57 @@ void testing_matmul_with_bias(const Arguments& arg,
                     hipblaslt_error,
                     hipblaslt_atol,
                     hipblaslt_rtol);
+
+                // Print per-iteration timing details (only when using GPU timer)
+                if(arg.use_gpu_timer)
+                {
+                    hipblaslt_cout << "  Per-iteration timing (us) [pipeline-preserved]:" << std::endl;
+                    hipblaslt_cout << "    Cold iterations (" << number_cold_calls << "): [";
+                    for(int i = 0; i < number_cold_calls; i++)
+                    {
+                        if(i > 0) hipblaslt_cout << ", ";
+                        hipblaslt_cout << std::fixed << std::setprecision(2) << cold_iter_times[i];
+                    }
+                    hipblaslt_cout << "]" << std::endl;
+                    hipblaslt_cout << "    Hot iterations (" << number_hot_calls << "): [";
+                    for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        if(i > 0) hipblaslt_cout << ", ";
+                        hipblaslt_cout << std::fixed << std::setprecision(2) << hot_iter_times[i];
+                    }
+                    hipblaslt_cout << "]" << std::endl;
+                    
+                    // Calculate and print statistics
+                    double cold_sum = 0.0, hot_sum = 0.0;
+                    double cold_min = cold_iter_times[0], cold_max = cold_iter_times[0];
+                    double hot_min = hot_iter_times[0], hot_max = hot_iter_times[0];
+                    for(int i = 0; i < number_cold_calls; i++)
+                    {
+                        cold_sum += cold_iter_times[i];
+                        cold_min = std::min(cold_min, cold_iter_times[i]);
+                        cold_max = std::max(cold_max, cold_iter_times[i]);
+                    }
+                    for(int i = 0; i < number_hot_calls; i++)
+                    {
+                        hot_sum += hot_iter_times[i];
+                        hot_min = std::min(hot_min, hot_iter_times[i]);
+                        hot_max = std::max(hot_max, hot_iter_times[i]);
+                    }
+                    
+                    // Calculate filtered mean using Modified Z-Score (z_threshold=2.0)
+                    double cold_filtered_avg = removeHighOutliersAndGetMean(cold_iter_times, 2.0);
+                    double hot_filtered_avg  = removeHighOutliersAndGetMean(hot_iter_times, 2.0);
+                    
+                    hipblaslt_cout << "    Cold stats: avg=" << cold_sum / number_cold_calls
+                                   << " us, min=" << cold_min << " us, max=" << cold_max << " us"
+                                   << ", filtered_avg=" << cold_filtered_avg << " us" << std::endl;
+                    hipblaslt_cout << "    Hot stats:  avg=" << hot_sum / number_hot_calls
+                                   << " us, min=" << hot_min << " us, max=" << hot_max << " us"
+                                   << ", filtered_avg=" << hot_filtered_avg << " us" << std::endl;
+                    
+                    // Update gpu_time_used to use filtered average for more accurate performance calculation
+                    gpu_time_used = hot_filtered_avg * number_hot_calls;
+                }
             }
             if(best_gpu_time > gpu_time_used)
             {
@@ -4162,6 +4418,18 @@ void testing_matmul_with_bias(const Arguments& arg,
                 best_norm,
                 best_atol,
                 best_rtol);
+        }
+
+        // Destroy per-iteration event arrays
+        for(int i = 0; i < number_cold_calls; i++)
+        {
+            CHECK_HIP_ERROR(hipEventDestroy(cold_events_start[i]));
+            CHECK_HIP_ERROR(hipEventDestroy(cold_events_end[i]));
+        }
+        for(int i = 0; i < number_hot_calls; i++)
+        {
+            CHECK_HIP_ERROR(hipEventDestroy(hot_events_start[i]));
+            CHECK_HIP_ERROR(hipEventDestroy(hot_events_end[i]));
         }
     }
 
