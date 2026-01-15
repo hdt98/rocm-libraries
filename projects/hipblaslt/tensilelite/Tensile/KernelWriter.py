@@ -2077,7 +2077,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st)
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters1st))
-      moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd, True)
+      skip2ndWaitForDtl = kernel["DirectToLds%s"%tensorParameters1st["tensorChar"]]
+      moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd, skip2ndWaitForDtl)
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters2nd))
       tPA = tensorParametersA
@@ -3344,7 +3345,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # skip wait for DTL if global load 1st is DTL
       skip2ndWaitForDtl = kernel["DirectToLds%s"%tc1]
       moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, skip2ndWaitForDtl)
-      moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd, True)
       module.add(replaceHolder(moduleTmp, 0))
       module.addComment1("Tail global read %s"%tc2)
       if tailLoopOpt2nd and (globalReadMode2nd == 2):
