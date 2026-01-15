@@ -222,4 +222,54 @@ TEST_F(TestKnobSettingWrapper, NegativeKnobId)
     EXPECT_EQ(wrapper.knobId(), negativeId);
 }
 
+TEST_F(TestKnobSettingWrapper, ToKnobSettingTWithIntValue)
+{
+    auto buffer = createKnobSetting(42, 100);
+    KnobSettingWrapper wrapper(buffer.data(), buffer.size());
+
+    auto knobSettingT = wrapper.toKnobSettingT();
+
+    ASSERT_NE(knobSettingT, nullptr);
+    EXPECT_EQ(knobSettingT->knob_id, 42);
+    EXPECT_EQ(knobSettingT->value.type, hipdnn_data_sdk::data_objects::KnobValue::IntValue);
+    ASSERT_NE(knobSettingT->value.AsIntValue(), nullptr);
+    EXPECT_EQ(knobSettingT->value.AsIntValue()->value, 100);
+}
+
+TEST_F(TestKnobSettingWrapper, ToKnobSettingTWithStringValue)
+{
+    auto buffer = createKnobSettingWithString(99, "test_string_value");
+    KnobSettingWrapper wrapper(buffer.data(), buffer.size());
+
+    auto knobSettingT = wrapper.toKnobSettingT();
+
+    ASSERT_NE(knobSettingT, nullptr);
+    EXPECT_EQ(knobSettingT->knob_id, 99);
+    EXPECT_EQ(knobSettingT->value.type, hipdnn_data_sdk::data_objects::KnobValue::StringValue);
+    ASSERT_NE(knobSettingT->value.AsStringValue(), nullptr);
+    EXPECT_EQ(knobSettingT->value.AsStringValue()->value, "test_string_value");
+}
+
+TEST_F(TestKnobSettingWrapper, ToKnobSettingTWithFloatValue)
+{
+    auto buffer = createKnobSettingWithFloat(123, 3.14159);
+    KnobSettingWrapper wrapper(buffer.data(), buffer.size());
+
+    auto knobSettingT = wrapper.toKnobSettingT();
+
+    ASSERT_NE(knobSettingT, nullptr);
+    EXPECT_EQ(knobSettingT->knob_id, 123);
+    EXPECT_EQ(knobSettingT->value.type, hipdnn_data_sdk::data_objects::KnobValue::FloatValue);
+    ASSERT_NE(knobSettingT->value.AsFloatValue(), nullptr);
+    EXPECT_DOUBLE_EQ(knobSettingT->value.AsFloatValue()->value, 3.14159);
+}
+
+TEST_F(TestKnobSettingWrapper, ToKnobSettingTOnInvalidWrapperThrows)
+{
+    KnobSettingWrapper wrapper(nullptr, 0);
+    EXPECT_FALSE(wrapper.isValid());
+
+    EXPECT_THROW(wrapper.toKnobSettingT(), std::invalid_argument);
+}
+
 } // namespace hipdnn_plugin_sdk

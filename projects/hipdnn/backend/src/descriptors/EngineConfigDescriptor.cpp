@@ -242,22 +242,8 @@ void EngineConfigDescriptor::setKnobChoice(hipdnnBackendAttributeType_t attribut
                               "Invalid KnobSetting flatbuffer.");
     }
 
-    // Create a KnobSettingT object from the wrapper
-    auto knobSetting = std::make_unique<hipdnn_data_sdk::data_objects::KnobSettingT>();
-    knobSetting->knob_id = wrapper.knobId();
-
-    // Get the knob value from the wrapper and convert it
-    auto valueType = wrapper.valueType();
-    auto valuePtr = wrapper.value();
-
-    if(valuePtr != nullptr)
-    {
-        knobSetting->value.type = valueType;
-
-        // Unpack the value based on its type
-        knobSetting->value.value
-            = hipdnn_data_sdk::data_objects::KnobValueUnion::UnPack(valuePtr, valueType, nullptr);
-    }
+    // Convert the wrapper to an unpacked KnobSettingT object
+    auto knobSetting = wrapper.toKnobSettingT();
 
     // Add or update the knob setting in the engine config
     // Remove any existing knob setting with the same knob_id

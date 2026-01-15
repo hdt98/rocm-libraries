@@ -26,6 +26,8 @@ public:
 
     virtual const void* value() const = 0;
 
+    virtual std::unique_ptr<hipdnn_data_sdk::data_objects::KnobSettingT> toKnobSettingT() const = 0;
+
     template <typename T>
     const T& valueAs() const
     {
@@ -109,6 +111,26 @@ public:
     {
         throwIfNotValid();
         return _shallowKnobSetting->value();
+    }
+
+    std::unique_ptr<hipdnn_data_sdk::data_objects::KnobSettingT> toKnobSettingT() const override
+    {
+        throwIfNotValid();
+
+        auto knobSettingT = std::make_unique<hipdnn_data_sdk::data_objects::KnobSettingT>();
+        knobSettingT->knob_id = _shallowKnobSetting->knob_id();
+
+        auto knobValueType = _shallowKnobSetting->value_type();
+        auto knobValuePtr = _shallowKnobSetting->value();
+
+        if(knobValuePtr != nullptr)
+        {
+            knobSettingT->value.type = knobValueType;
+            knobSettingT->value.value = hipdnn_data_sdk::data_objects::KnobValueUnion::UnPack(
+                knobValuePtr, knobValueType, nullptr);
+        }
+
+        return knobSettingT;
     }
 
 private:
