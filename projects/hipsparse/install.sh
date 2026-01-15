@@ -279,7 +279,6 @@ rocm_path=/opt/rocm
 build_relocatable=false
 build_address_sanitizer=false
 compiler=${CXX}
-c_compiler=${CC}
 
 # #################################################
 # Parameter parsing
@@ -344,7 +343,6 @@ while true; do
     --address-sanitizer)
         build_address_sanitizer=true
         compiler=amdclang++
-        c_compiler=amdclang
         shift ;;
     --matrices-dir)
         matrices_dir=${2}
@@ -375,7 +373,6 @@ done
 # or through using --compiler option. This is important so that googletest and hipsparse are built with the same
 # compiler to ensure settings like position independent code is consistent when linking.
 CXX=${compiler}
-CC=${c_compiler}
 
 if [[ "${build_relocatable}" == true ]]; then
     if ! [ -z ${ROCM_PATH+x} ]; then
@@ -542,7 +539,7 @@ pushd .
 
   # Build library
   if [[ "${build_relocatable}" == true ]]; then
-    CXX=${compiler} CC=${c_compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} \
+    CXX=${compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} \
       -DCMAKE_INSTALL_PREFIX="${install_prefix}" \
       -DCMAKE_SHARED_LINKER_FLAGS="${rocm_rpath}" \
       -DCMAKE_PREFIX_PATH="${rocm_path} ${rocm_path}/hip" \
@@ -551,7 +548,7 @@ pushd .
       -DROCM_DISABLE_LDCONFIG=ON \
       -DROCM_PATH="${rocm_path}" ../..
   else
-    CXX=${compiler} CC=${c_compiler} ${cmake_executable} -DCMAKE_EXE_LINKER_FLAGS=" ${cmake_build_static_options}" ${cmake_common_options} ${cmake_client_options} -DCMAKE_INSTALL_PREFIX=hipsparse-install -DROCM_PATH=${rocm_path} ../..
+    CXX=${compiler} ${cmake_executable} -DCMAKE_EXE_LINKER_FLAGS=" ${cmake_build_static_options}" ${cmake_common_options} ${cmake_client_options} -DCMAKE_INSTALL_PREFIX=hipsparse-install -DROCM_PATH=${rocm_path} ../..
   fi
 
   check_exit_code "$?"
