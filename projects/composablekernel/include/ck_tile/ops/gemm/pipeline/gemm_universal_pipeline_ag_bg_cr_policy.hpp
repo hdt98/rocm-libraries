@@ -761,20 +761,19 @@ struct UniversalGemmBasePolicy
     template <typename Problem, bool IsWave32Host = false>
     CK_TILE_HOST_DEVICE static constexpr index_t GetVectorSizeA()
     {
-        using AsLayout              = remove_cvref_t<typename Problem::AsLayoutTuple>;
-        using AsDataType            = remove_cvref_t<typename Problem::AsDataTypeTuple>;
+        using AsLayout              = problem_as_layout_t<Problem>;
+        using AsDataType            = problem_as_data_type_t<Problem>;
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
 
         using ALayout   = remove_cvref_t<std::tuple_element_t<number<0>{}, AsLayout>>;
         using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataType>>;
 
-        if constexpr(Problem::FixedVectorSize)
+        if constexpr(problem_fixed_vector_size_v<Problem>)
         {
             return Problem::VectorSizeA;
         }
-
-        if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::RowMajor>)
+        else if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::RowMajor>)
         {
             return GetGlobalVectorLoadSize<Problem,
                                            ADataType,
@@ -795,19 +794,18 @@ struct UniversalGemmBasePolicy
     template <typename Problem, bool IsWave32Host = false>
     CK_TILE_HOST_DEVICE static constexpr index_t GetVectorSizeB()
     {
-        using BsLayout              = remove_cvref_t<typename Problem::BsLayoutTuple>;
-        using BsDataType            = remove_cvref_t<typename Problem::BsDataTypeTuple>;
+        using BsLayout              = problem_bs_layout_t<Problem>;
+        using BsDataType            = problem_bs_data_type_t<Problem>;
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
         using BLayout               = remove_cvref_t<std::tuple_element_t<number<0>{}, BsLayout>>;
         using BDataType             = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataType>>;
 
-        if constexpr(Problem::FixedVectorSize)
+        if constexpr(problem_fixed_vector_size_v<Problem>)
         {
             return Problem::VectorSizeB;
         }
-
-        if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
+        else if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
         {
             return GetGlobalVectorLoadSize<Problem,
                                            BDataType,
@@ -906,7 +904,7 @@ struct UniversalGemmBasePolicy
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
         constexpr index_t VecLoadSize =
-            Problem::FixedVectorSize ? Problem::VectorSizeA : GetVectorSizeA<Problem>();
+            problem_fixed_vector_size_v<Problem> ? Problem::VectorSizeA : GetVectorSizeA<Problem>();
         constexpr index_t NumWaveGroups = Problem::NumWaveGroups;
 
         using ALayout = remove_cvref_t<
@@ -949,7 +947,8 @@ struct UniversalGemmBasePolicy
         constexpr index_t VecLoadSize =
             std::is_same_v<BDataType, ck_tile::pk_fp4_raw_t>
                 ? 4
-                : (Problem::FixedVectorSize ? Problem::VectorSizeB : GetVectorSizeB<Problem>());
+                : (problem_fixed_vector_size_v<Problem> ? Problem::VectorSizeB
+                                                        : GetVectorSizeB<Problem>());
         constexpr index_t NumWaveGroups = Problem::NumWaveGroups;
         using BLayout                   = remove_cvref_t<
                               std::tuple_element_t<number<0>{}, remove_cvref_t<typename Problem::BsLayoutTuple>>>;
