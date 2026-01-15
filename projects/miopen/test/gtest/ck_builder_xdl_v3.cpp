@@ -17,53 +17,56 @@ namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 struct DefaultAlgorithm
 {
-    using ConvSpecial = ckb::ConvFwdSpecialization;
+    using ConvSpecial = ckb::ConvSpecialization;
     using GemmSpecial = ckb::GemmSpecialization;
     using PipeVers    = ckb::PipelineVersion;
     using PipeSched   = ckb::PipelineScheduler;
 
     struct ThreadBlock
     {
-        int block_size = 128;
+        unsigned int block_size = 128;
         struct TileSize
         {
-            int m = 32;
-            int n = 64;
-            int k = 64;
+            unsigned int m = 32;
+            unsigned int n = 64;
+            unsigned int k = 64;
         } tile_size;
     } thread_block;
 
     static_assert(ckb::ThreadBlockDescriptor<ThreadBlock>);
-
     struct GridwiseGemm
     {
-        int ak1            = 8;
-        int bk1            = 8;
-        int m_per_xdl      = 32;
-        int n_per_xdl      = 32;
-        int m_xdl_per_wave = 1;
-        int n_xdl_per_wave = 1;
+        unsigned int ak1 = 8;
+        unsigned int bk1 = 8;
+        struct XdlParams
+        {
+            unsigned int m_per_xdl      = 32;
+            unsigned int n_per_xdl      = 32;
+            unsigned int m_xdl_per_wave = 1;
+            unsigned int n_xdl_per_wave = 1;
+        } xdl_params;
+
+        static_assert(ckb::GridwiseXdlGemmDescriptor<XdlParams>);
     } gridwise_gemm;
 
-    static_assert(ckb::GridwiseXdlGemmDescriptor<GridwiseGemm>);
-
+    static_assert(ckb::GridwiseFwdXdlGemmDescriptor<GridwiseGemm>);
     struct TransferABC
     {
         struct TransferAB
         {
             struct BlockTransfer
             {
-                int k0  = 8;
-                int m_n = 16;
-                int k1  = 1;
+                unsigned int k0  = 8;
+                unsigned int m_n = 16;
+                unsigned int k1  = 1;
             } block_transfer;
             struct LdsTransfer
             {
-                int src_vector_dim            = 2;
-                int src_scalar_per_vector     = 4;
-                int lds_dst_scalar_per_vector = 4;
-                bool is_direct_load           = false;
-                bool lds_padding              = false;
+                unsigned int src_vector_dim            = 2;
+                unsigned int src_scalar_per_vector     = 4;
+                unsigned int lds_dst_scalar_per_vector = 4;
+                bool is_direct_load                    = false;
+                bool lds_padding                       = false;
             } lds_transfer;
             struct BlockTransferAccessOrder
             {
@@ -80,16 +83,16 @@ struct DefaultAlgorithm
         {
             struct ThreadClusterDims
             {
-                int m_block        = 1;
-                int m_wave_per_xdl = 16;
-                int n_block        = 1;
-                int n_wave_per_xdl = 8;
+                unsigned int m_block        = 1;
+                unsigned int m_wave_per_xdl = 16;
+                unsigned int n_block        = 1;
+                unsigned int n_wave_per_xdl = 8;
             } thread_cluster_dims;
             struct Epilogue
             {
-                int m_xdl_per_wave_per_shuffle = 1;
-                int n_per_wave_per_shuffle     = 1;
-                int scalar_per_vector          = 8;
+                unsigned int m_xdl_per_wave_per_shuffle = 1;
+                unsigned int n_per_wave_per_shuffle     = 1;
+                unsigned int scalar_per_vector          = 8;
             } epilogue;
         } c;
     } transfer;
@@ -101,11 +104,8 @@ struct DefaultAlgorithm
     {
         PipeVers pipeline_version = PipeVers::V2;
         PipeSched scheduler       = PipeSched::INTRAWAVE;
-    } block_gemm;
+    } block_gemm_pipeline;
 };
-
-static_assert(ckb::factory::IsXdlV3Algorithm<DefaultAlgorithm> &&
-              !ckb::factory::IsXdlAlgorithm<DefaultAlgorithm>);
 
 struct Signature
 {
@@ -188,6 +188,8 @@ TEST(CK_Builder, CreateExistingInstance_Xdl_V3)
 
     // Verify that Builder is a class type
     static_assert(std::is_class_v<Builder>, "Builder should be a class type");
+
+    static_assert(ckb::factory::FwdXdlV3Algorithm<DefaultAlgorithm>);
 
     // Verify that Builder::Instance exists and is the actual device kernel class
     static_assert(std::is_class_v<typename Builder::Instance>,
