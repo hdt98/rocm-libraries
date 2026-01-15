@@ -83,7 +83,7 @@ namespace rocRoller
          * Increasing this value could decrease SGPR pressure; decreasing it could speed up a
          * kernel if there are enough available SGPRs.
          */
-        int minLaunchTimeExpressionComplexity = 20;
+        int minLaunchTimeExpressionComplexity = 6;
 
         /**
          * The maximum number of concurrent subexpressions given at once to the scheduler when
@@ -96,7 +96,7 @@ namespace rocRoller
          * If you are running out of registers (particularly SGPRs), reducing this number
          * might help.
          */
-        int maxConcurrentSubExpressions = 2;
+        int maxConcurrentSubExpressions = 4;
 
         /**
          * The maximum number of concurrent control operations given at once to the scheduler
