@@ -40,7 +40,8 @@
 
 namespace rocRoller::Scheduling::LDSModel
 {
-    std::optional<std::pair<LdsDirection, int>> getLdsInfoFromOpcode(const std::string& opCode)
+    std::optional<std::pair<LdsDirection, int>>
+        getLdsInfoFromOpcodeIfSupported(const std::string& opCode)
     {
         // Model does not support sub-dword or special opcodes
         // e.g. ds_read_u8, ds_read2st64_b32

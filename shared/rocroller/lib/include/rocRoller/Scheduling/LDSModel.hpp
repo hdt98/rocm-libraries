@@ -242,7 +242,8 @@ namespace rocRoller::Scheduling::LDSModel
      * @param opCode The opcode string (e.g., "ds_read_b64", "ds_write_b128")
      * @return Optional pair of (LdsDirection, dwords) if opcode is supported, nullopt otherwise
      */
-    std::optional<std::pair<LdsDirection, int>> getLdsInfoFromOpcode(const std::string& opCode);
+    std::optional<std::pair<LdsDirection, int>>
+        getLdsInfoFromOpcodeIfSupported(const std::string& opCode);
 
     /**
      * @brief Calculate queue slots required for an LDS operation

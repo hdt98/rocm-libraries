@@ -41,7 +41,6 @@ namespace rocRoller
 {
     namespace Scheduling
     {
-        // Determines whether valid to use WeightlessDSMemObserver for given instruction
         bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
             AssertFatal(context != nullptr);
@@ -51,9 +50,13 @@ namespace rocRoller
             if(observerType == DSObserverType::WeightlessDSMemObserver)
             {
                 const auto addrs = inst.getAddresses();
-                return addrs.has_value() && addrs->size() % 64 == 0
-                       && LDSModel::getLdsInfoFromOpcode(inst.getOpCode()).has_value()
-                       && context->targetArchitecture().target().isGFX9GPU();
+                AssertFatal(addrs.has_value(), ShowValue(inst.toString(LogLevel::Terse)));
+                AssertFatal(addrs->size() % 64 == 0, ShowValue(addrs->size()));
+                AssertFatal(LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode()).has_value(),
+                            ShowValue(inst.toString(LogLevel::Terse)));
+                AssertFatal(context->targetArchitecture().target().isGFX9GPU(),
+                            ShowValue(context->targetArchitecture().target().toString()));
+                return true;
             }
 
             return false;
@@ -105,7 +108,7 @@ namespace rocRoller
         {
             if(!m_scheduler.has_value())
             {
-                // Observers get created before workgroupSize is set
+                // Observers get created before workgroupSize is set in m_context
                 auto context = m_context.lock();
                 AssertFatal(context != nullptr);
 
@@ -118,7 +121,7 @@ namespace rocRoller
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                const auto ldsInfo = LDSModel::getLdsInfoFromOpcode(inst.getOpCode());
+                const auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
                 if(ldsInfo.has_value())
                 {
                     const auto [direction, dwords] = ldsInfo.value();
@@ -174,7 +177,7 @@ namespace rocRoller
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                auto ldsInfo = LDSModel::getLdsInfoFromOpcode(inst.getOpCode());
+                auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
                 if(ldsInfo.has_value())
                 {
                     auto [direction, dwords] = ldsInfo.value();
