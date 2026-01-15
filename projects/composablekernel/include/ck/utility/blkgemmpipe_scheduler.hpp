@@ -60,7 +60,12 @@ struct BlockwiseGemmXdlops_pipeline_hotloop_inst
     static constexpr index_t C_MFMA_Inst_Num =
         MPerBlock * NPerBlock * KPerBlock / (BlockSize / WaveSize) / (MPerXDL * NPerXDL * KPerXDL);
 
-    static constexpr index_t C_MFMA_SpeedUp = IsF4F6 ? 2 : 1;
+    static constexpr index_t C_MFMA_SpeedUp =
+#if defined(__gfx125__)
+        1; // gfx1250: no 2x speedup for FP4/FP6
+#else
+        IsF4F6 ? 2 : 1;
+#endif
 
     static constexpr index_t C_MFMA_Inst_Cycle = []() {
         if constexpr(NPerXDL == 16)

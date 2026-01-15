@@ -1177,6 +1177,85 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
 #endif
     }
 
+    // Overload for f6x16x4_t (4 vectors of 16-packed FP6)
+    template <class FloatC>
+    __device__ static void Run(const f6x16x4_t& reg_a,
+                               const int32_t& scale_a,
+                               const f6x16x4_t& reg_b,
+                               const int32_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        // f6x16x4_t = 4 x f6x16_pk_t, each f6x16_pk_t has data_ as uint32_t[3]
+        // Extract the 12 uint32_t values (4 packs x 3 uint32_t each)
+        auto a0 = reg_a.template AsType<f6x16_pk_t>()[Number<0>{}].data_;
+        auto a1 = reg_a.template AsType<f6x16_pk_t>()[Number<1>{}].data_;
+        auto a2 = reg_a.template AsType<f6x16_pk_t>()[Number<2>{}].data_;
+        auto a3 = reg_a.template AsType<f6x16_pk_t>()[Number<3>{}].data_;
+
+        auto b0 = reg_b.template AsType<f6x16_pk_t>()[Number<0>{}].data_;
+        auto b1 = reg_b.template AsType<f6x16_pk_t>()[Number<1>{}].data_;
+        auto b2 = reg_b.template AsType<f6x16_pk_t>()[Number<2>{}].data_;
+        auto b3 = reg_b.template AsType<f6x16_pk_t>()[Number<3>{}].data_;
+
+        using arg_type = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                0x2, // OPSEL:0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{static_cast<int32_t>(a0[0]),
+                         static_cast<int32_t>(a0[1]),
+                         static_cast<int32_t>(a0[2]),
+                         static_cast<int32_t>(a1[0]),
+                         static_cast<int32_t>(a1[1]),
+                         static_cast<int32_t>(a1[2]),
+                         static_cast<int32_t>(a2[0]),
+                         static_cast<int32_t>(a2[1]),
+                         static_cast<int32_t>(a2[2]),
+                         static_cast<int32_t>(a3[0]),
+                         static_cast<int32_t>(a3[1]),
+                         static_cast<int32_t>(a3[2]),
+                         0,
+                         0,
+                         0,
+                         0},
+                0x2, // OPSEL_HI
+                arg_type{static_cast<int32_t>(b0[0]),
+                         static_cast<int32_t>(b0[1]),
+                         static_cast<int32_t>(b0[2]),
+                         static_cast<int32_t>(b1[0]),
+                         static_cast<int32_t>(b1[1]),
+                         static_cast<int32_t>(b1[2]),
+                         static_cast<int32_t>(b2[0]),
+                         static_cast<int32_t>(b2[1]),
+                         static_cast<int32_t>(b2[2]),
+                         static_cast<int32_t>(b3[0]),
+                         static_cast<int32_t>(b3[1]),
+                         static_cast<int32_t>(b3[2]),
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA, // SCALE_OPSEL[0]
+                0,           // SCALE_OPSEL_HI[0]
+                scale_a,     // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
+                             // K=96..127
+                ScaleOpselB, // SCALE_OPSEL[1]
+                0,           // SCALE_OPSEL_HI[1]
+                scale_b,     // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24]
+                             // K=96..127
+                0,           // NEG
+                0);          // NEG_HI
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
     template <class FloatC>
     __device__ static void Run(const bf6x64_t& reg_a,
                                const int32_t& scale_a,
@@ -1239,6 +1318,83 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16, 16, ScaleOpselA, ScaleOpselB>
                              // K=96..127
                 0,           // NEG
                 0);          // NEG_HI
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+
+    // Overload for bf6x16x4_t (4 vectors of 16-packed BF6)
+    template <class FloatC>
+    __device__ static void Run(const bf6x16x4_t& reg_a,
+                               const int32_t& scale_a,
+                               const bf6x16x4_t& reg_b,
+                               const int32_t& scale_b,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx125__)
+        // bf6x16x4_t = 4 x bf6x16_pk_t, each bf6x16_pk_t has data_ as uint32_t[3]
+        // Extract the 12 uint32_t values (4 packs x 3 uint32_t each)
+        auto a0 = reg_a.template AsType<bf6x16_pk_t>()[Number<0>{}].data_;
+        auto a1 = reg_a.template AsType<bf6x16_pk_t>()[Number<1>{}].data_;
+        auto a2 = reg_a.template AsType<bf6x16_pk_t>()[Number<2>{}].data_;
+        auto a3 = reg_a.template AsType<bf6x16_pk_t>()[Number<3>{}].data_;
+
+        auto b0 = reg_b.template AsType<bf6x16_pk_t>()[Number<0>{}].data_;
+        auto b1 = reg_b.template AsType<bf6x16_pk_t>()[Number<1>{}].data_;
+        auto b2 = reg_b.template AsType<bf6x16_pk_t>()[Number<2>{}].data_;
+        auto b3 = reg_b.template AsType<bf6x16_pk_t>()[Number<3>{}].data_;
+
+        using arg_type = int32x16_t;
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                0x3, // OPSEL:0-FP8 E4M3; 1-FP8 E5M2; 2-FP6 E2M3; 3-FP6 E3M2; 4-FP4 E2M1
+                arg_type{static_cast<int32_t>(a0[0]),
+                         static_cast<int32_t>(a0[1]),
+                         static_cast<int32_t>(a0[2]),
+                         static_cast<int32_t>(a1[0]),
+                         static_cast<int32_t>(a1[1]),
+                         static_cast<int32_t>(a1[2]),
+                         static_cast<int32_t>(a2[0]),
+                         static_cast<int32_t>(a2[1]),
+                         static_cast<int32_t>(a2[2]),
+                         static_cast<int32_t>(a3[0]),
+                         static_cast<int32_t>(a3[1]),
+                         static_cast<int32_t>(a3[2]),
+                         0,
+                         0,
+                         0,
+                         0},
+                0x3, // OPSEL_HI
+                arg_type{static_cast<int32_t>(b0[0]),
+                         static_cast<int32_t>(b0[1]),
+                         static_cast<int32_t>(b0[2]),
+                         static_cast<int32_t>(b1[0]),
+                         static_cast<int32_t>(b1[1]),
+                         static_cast<int32_t>(b1[2]),
+                         static_cast<int32_t>(b2[0]),
+                         static_cast<int32_t>(b2[1]),
+                         static_cast<int32_t>(b2[2]),
+                         static_cast<int32_t>(b3[0]),
+                         static_cast<int32_t>(b3[1]),
+                         static_cast<int32_t>(b3[2]),
+                         0,
+                         0,
+                         0,
+                         0},
+                0,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                ScaleOpselA, // SCALE_OPSEL[0]
+                0,           // SCALE_OPSEL_HI[0]
+                scale_a,
+                ScaleOpselB, // SCALE_OPSEL[1]
+                0,           // SCALE_OPSEL_HI[1]
+                scale_b,
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
