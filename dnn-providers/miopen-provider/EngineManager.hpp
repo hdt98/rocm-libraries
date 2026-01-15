@@ -39,11 +39,10 @@ public:
                             int64_t engineId,
                             const hipdnn_plugin_sdk::IGraph& opGraph) const;
 
-    void initializeExecutionContext(
-        const HipdnnEnginePluginHandle& handle,
-        const hipdnn_plugin_sdk::IGraph& opGraph,
-        const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
-        HipdnnEnginePluginExecutionContext& executionContext) const;
+    void initializeExecutionContext(const HipdnnEnginePluginHandle& handle,
+                                    const hipdnn_plugin_sdk::IGraph& opGraph,
+                                    const hipdnn_plugin_sdk::IEngineConfig& engineConfig,
+                                    HipdnnEnginePluginExecutionContext& executionContext) const;
 
 private:
     IEngine& getEngine(int64_t engineId) const;

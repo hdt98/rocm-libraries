@@ -11,7 +11,7 @@
 #include <hipdnn_data_sdk/flatbuffer_utilities/KnobWrapper.hpp>
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
 
-namespace hipdnn_data_sdk::flatbuffer_utilities
+namespace hipdnn_plugin_sdk
 {
 
 class IEngineDetails
@@ -24,9 +24,14 @@ public:
     virtual int64_t engineId() const = 0;
 
     virtual uint32_t knobCount() const = 0;
-    virtual const std::vector<std::unique_ptr<IKnob>>& knobWrappers() const = 0;
-    virtual const IKnob& getKnobById(int64_t knobId) const = 0;
-    virtual const IKnob& getKnobByName(const std::string& knobName) const = 0;
+    virtual const std::vector<std::unique_ptr<hipdnn_data_sdk::flatbuffer_utilities::IKnob>>&
+        knobWrappers() const
+        = 0;
+    virtual const hipdnn_data_sdk::flatbuffer_utilities::IKnob& getKnobById(int64_t knobId) const
+        = 0;
+    virtual const hipdnn_data_sdk::flatbuffer_utilities::IKnob&
+        getKnobByName(const std::string& knobName) const
+        = 0;
 };
 
 class EngineDetailsWrapper : public IEngineDetails
@@ -75,14 +80,15 @@ public:
         return knobs->size();
     }
 
-    const std::vector<std::unique_ptr<IKnob>>& knobWrappers() const override
+    const std::vector<std::unique_ptr<hipdnn_data_sdk::flatbuffer_utilities::IKnob>>&
+        knobWrappers() const override
     {
         throwIfNotValid();
         populateKnobWrappers();
         return _knobWrappers;
     }
 
-    const IKnob& getKnobById(int64_t knobId) const override
+    const hipdnn_data_sdk::flatbuffer_utilities::IKnob& getKnobById(int64_t knobId) const override
     {
         throwIfNotValid();
         populateKnobWrappers();
@@ -96,9 +102,10 @@ public:
         return *_knobWrappers[it->second];
     }
 
-    const IKnob& getKnobByName(const std::string& knobName) const override
+    const hipdnn_data_sdk::flatbuffer_utilities::IKnob&
+        getKnobByName(const std::string& knobName) const override
     {
-        auto knobId = static_cast<int64_t>(utilities::fnv1aHash(knobName));
+        auto knobId = static_cast<int64_t>(hipdnn_data_sdk::utilities::fnv1aHash(knobName));
         return getKnobById(knobId);
     }
 
@@ -125,7 +132,8 @@ private:
             for(uint32_t i = 0; i < knobs->size(); ++i)
             {
                 auto knob = knobs->Get(i);
-                auto wrapper = std::make_unique<KnobWrapper>(knob);
+                auto wrapper
+                    = std::make_unique<hipdnn_data_sdk::flatbuffer_utilities::KnobWrapper>(knob);
                 auto knobId = wrapper->knobId();
                 _knobIdToIndex[knobId] = i;
                 _knobWrappers.push_back(std::move(wrapper));
@@ -139,7 +147,8 @@ private:
     const hipdnn_data_sdk::data_objects::EngineDetails* _shallowEngineDetails = nullptr;
 
     // Lazily populated cache of knob wrappers
-    mutable std::vector<std::unique_ptr<IKnob>> _knobWrappers;
+    mutable std::vector<std::unique_ptr<hipdnn_data_sdk::flatbuffer_utilities::IKnob>>
+        _knobWrappers;
     mutable std::unordered_map<int64_t, size_t> _knobIdToIndex;
     mutable bool _knobsPopulated = false;
 };
