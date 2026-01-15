@@ -1957,7 +1957,9 @@ namespace TensileLite
                && DataTypeInfo::Get(problemType.aType).elementSize
                       < DataTypeInfo::Get(rocisa::DataType::Double).elementSize)
                 vw = 4;
-            else if(problem.freeSizeA(0) % 2 == 0)
+            else if(problem.freeSizeA(0) % 2 == 0
+                && DataTypeInfo::Get(problemType.aType).elementSize
+                      < DataTypeInfo::Get(rocisa::DataType::ComplexDouble).elementSize)
                 vw = 2;
         }
 

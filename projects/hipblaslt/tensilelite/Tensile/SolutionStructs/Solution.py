@@ -413,7 +413,6 @@ class Solution(collections.abc.Mapping):
       state["reorderGRInstForDTVB"] = False
 
     state["UsePLRPack"] = False
-    state["SwapGlobalReadOrder"] = False
     state["MfmaInitCVgprs"] = False
 
     # done
@@ -1440,8 +1439,8 @@ class Solution(collections.abc.Mapping):
       
     # Complex datatype restrictions.
     if state["ProblemType"]["DataType"].isComplex():
-      if state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1:
-        reject(state, printRejectionReason, "Complex datatype kernel does not support GSU yet.")
+      if (state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1) and (state["GlobalSplitUAlgorithm"] != "MultipleBuffer"):
+        reject(state, printRejectionReason, "Complex datatype kernel currently only supports MultiBuffer GSU.")
         return
       if state["MIArchVgpr"]:
         reject(state, printRejectionReason, "Complex datatype kernel does not support MIArchVgpr yet.")
@@ -2617,6 +2616,25 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "didn't support UnrollMajorLDS in VALU mode yet (except for dot2 kernel)")
       if state["LdsBlockSizePerPadA"] != 0 or state["LdsBlockSizePerPadB"] != 0:
         reject(state, printRejectionReason, "didn't support LdsBlockSizePerPad in VALU mode yet")
+
+    # disable SwapGlobalReadOrder if grmode(normal/DTL/DTV) is different between A and B
+    # GRA and GRB need to be equivalent to swap the order
+    def getGrMode(tc):
+      grmode = 0
+      if state["DirectToLds%s"%tc]:
+        grmode = 1
+      elif state["DirectToVgpr%s"%tc]:
+        grmode = 2
+      return grmode
+
+    if getGrMode("A") != getGrMode("B"):
+      state["SwapGlobalReadOrder"] = False
+    # SwapGlobalReadOrder does not work with UnrollLoopSwapGlobalReadOrder
+    if state["UnrollLoopSwapGlobalReadOrder"]:
+      state["SwapGlobalReadOrder"] = False
+    # SwapGlobalReadOrder needs to be False for CMS (SwapGlobalReadOrder will be set later in CMS code)
+    if state["UseCustomMainLoopSchedule"]:
+      state["SwapGlobalReadOrder"] = False
 
     def checkLdsBlockSizePerPad(tc):
       """
