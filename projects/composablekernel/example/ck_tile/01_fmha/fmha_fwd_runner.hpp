@@ -829,16 +829,22 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
     else if(qscale.type == quant_scale_enum::mx)
     {
-        auto gen_scales = [&](auto& scales, float range_min, float range_max) {
+        auto gen_scales = [&](auto& scales, auto data) {
+            using DataType  = decltype(data);
             using ScaleType = ck_tile::remove_cvref_t<decltype(*scales.begin())>;
             if constexpr(std::is_same_v<ScaleType, ck_tile::e8m0_t>)
             {
+                const float base =
+                    -std::log2(ck_tile::type_convert<float>(ck_tile::numeric<DataType>::max()));
+                const float range = 3;
                 // e8m0_t is basically an exponent of float32
+                // When scales are applied to tensor values, value * exp2(base - range) is around
+                // 0.125 and value * exp2(base + range) is around 8 for all types (fp8/bf8/fp4)
                 ck_tile::HostTensor<float> pow2(scales.get_lengths());
                 ck_tile::FillUniformDistributionIntegerValue<float>{
-                    range_min, range_max, next_seed()}(pow2);
+                    base - range, base + range, next_seed()}(pow2);
                 scales.ForEach([&](auto& self, const auto& i) {
-                    self(i) = static_cast<ScaleType>(std::exp2(pow2(i)));
+                    self(i) = ck_tile::type_convert<ScaleType>(std::exp2(pow2(i)));
                 });
             }
             else
@@ -846,9 +852,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 static_assert(false);
             }
         };
-        gen_scales(q_descale_host, -8, -6);
-        gen_scales(k_descale_host, -8, -6);
-        gen_scales(v_descale_host, -8, -6);
+        gen_scales(q_descale_host, QDataType{});
+        gen_scales(k_descale_host, KDataType{});
+        gen_scales(v_descale_host, VDataType{});
     }
 
     iota_shuffle(block_table_host.begin(), block_table_host.end(), 0, random_engine);

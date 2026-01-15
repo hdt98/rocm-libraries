@@ -109,9 +109,9 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                 constexpr bool SwizzleA =
                     Problem::BlockFmhaShape::Gemm0WarpTile::at(number<0>{}) == 32 &&
                     Problem::QScaleEnum != BlockAttentionQuantScaleEnum::MX;
-                // TODO: For fp8 only, support fp4
                 constexpr auto AttrNumAccess =
-                    Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX
+                    (Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX &&
+                     !std::is_same_v<typename Problem::QDataType, pk_fp4_t>)
                         ? WGAttrNumAccessEnum::Double
                         : WGAttrNumAccessEnum::Single;
                 return WarpGemmDispatcher<typename Problem::QDataType,
@@ -1042,9 +1042,9 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             }
             else
             {
-                // TODO: For fp8 only, support fp4
                 constexpr auto AttrNumAccess =
-                    Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX
+                    (Problem::QScaleEnum == BlockAttentionQuantScaleEnum::MX &&
+                     !std::is_same_v<typename Problem::PDataType, pk_fp4_t>)
                         ? WGAttrNumAccessEnum::Double
                         : WGAttrNumAccessEnum::Single;
                 return WarpGemmDispatcher<typename Problem::PDataType,

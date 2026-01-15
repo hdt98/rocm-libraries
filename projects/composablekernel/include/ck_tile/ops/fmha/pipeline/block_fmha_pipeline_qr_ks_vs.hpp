@@ -834,7 +834,7 @@ struct BlockFmhaPipelineQRKSVS
                         make_static_distributed_tensor<PDataType>(p_.get_tile_distribution());
                     auto p_scale_result = make_static_distributed_tensor<PScaleDataType>(
                         Policy::template MakePScaleRegTileDistribution<Problem>());
-                    static_assert(p_result.get_thread_buffer().size() ==
+                    static_assert(p_compute.get_thread_buffer().size() ==
                                   p_scale_result.get_thread_buffer().size() * kVScaleGranularity);
 
                     using BlockGemm =
@@ -846,92 +846,151 @@ struct BlockFmhaPipelineQRKSVS
                     constexpr index_t kABKLane = WG::WarpGemmAttribute::Impl::kABKLane;
                     constexpr index_t kAMLane  = WG::WarpGemmAttribute::Impl::kAMLane;
 
-                    const index_t lane = __lane_id();
-                    SMPLComputeDataType scale_result{0};
-                    static_for<0, p_.get_thread_buffer().size() / 16, 1>{}([&](auto i) {
-                        // Maximum of consecutive kVScaleGranularity values
-                        // (2 lanes, 16 per lane for fp8)
-                        SMPLComputeDataType p_max{0};
-                        static_for<0, 16, 1>{}([&](auto j) {
-                            p_max = max(p_max, p_compute.get_thread_buffer()[i * 16 + j]);
-                        });
-                        p_max = min(SMPLComputeDataType{1},
-                                    max(p_max, warp_shuffle(p_max, lane ^ kAMLane)));
+                    if constexpr(std::is_same_v<PDataType, pk_fp4_t>)
+                    {
+                        static_for<0, p_.get_thread_buffer().size() / 32, 1>{}([&](auto i) {
+                            // Maximum of consecutive kVScaleGranularity values
+                            // (1 lane, 32 per lane for fp4)
+                            SMPLComputeDataType p_max{0};
+                            static_for<0, 32, 1>{}([&](auto j) {
+                                p_max = max(p_max, p_compute.get_thread_buffer()[i * 32 + j]);
+                            });
+                            p_max = min(SMPLComputeDataType{1}, p_max);
 
-                        static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
-                        // For e8m0 round up to the next power of 2
-                        SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
+                            static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
+                            // For e8m0 round up to the next power of 2
+                            SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
 
-                        // Convert using scales
+                            // Convert using scales
 
-                        // These builtins require the old value, and will generate a v_mov_b32 vxxx
-                        // [old] before cvt, which result in unwanted ISA so we prepare an
-                        // uninitialized variable dummy_old purposely, and turn off the warning
+                            // These builtins require the old value, and will generate a v_mov_b32
+                            // vxxx [old] before cvt, which result in unwanted ISA so we prepare an
+                            // uninitialized variable dummy_old purposely, and turn off the warning
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wuninitialized"
-                        if constexpr(std::is_same_v<PDataType, fp8_t>)
-                        {
-                            static_for<0, 16 / 4, 1>{}([&](auto j) {
-                                using vec_t = ext_vector_t<short, 2>;
+                            static_for<0, 32 / 8, 1>{}([&](auto j) {
+                                using vec_t = uint32_t;
                                 vec_t dummy_old;
-                                vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
                                     dummy_old,
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 0>{}],
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 1>{}],
                                     scale,
-                                    false); // false -> WORD0
-                                vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                    0); // byte 0
+                                vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
                                     x,
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 2>{}],
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 3>{}],
                                     scale,
-                                    true); // true -> WORD1
+                                    1); // byte 1
+                                vec_t z = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
+                                    y,
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 4>{}],
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 5>{}],
+                                    scale,
+                                    2); // byte 2
+                                vec_t w = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
+                                    z,
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 6>{}],
+                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 7>{}],
+                                    scale,
+                                    3); // byte 3
                                 p_result.get_thread_buffer().template set_as<vec_t>(
-                                    number<i * 4 + j>{}, y);
+                                    number<i * 4 + j>{}, w);
                             });
-                        }
-                        else if constexpr(std::is_same_v<PDataType, bf8_t>)
-                        {
-                            static_for<0, 16 / 4, 1>{}([&](auto j) {
-                                using vec_t = ext_vector_t<short, 2>;
-                                vec_t dummy_old;
-                                vec_t x = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
-                                    dummy_old,
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
-                                    scale,
-                                    false); // false -> WORD0
-                                vec_t y = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
-                                    x,
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
-                                    p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
-                                    scale,
-                                    true); // true -> WORD1
-                                p_result.get_thread_buffer().template set_as<vec_t>(
-                                    number<i * 4 + j>{}, y);
-                            });
-                        }
-                        else
-                        {
-                            static_assert(false);
-                        }
 #pragma clang diagnostic pop
 
-                        // Save scale for the corresponding lane
-                        if constexpr(kABKLane == 4)
-                        {
-                            scale = warp_shuffle(scale, (lane % kAMLane) | ((lane & kAMLane) << 1));
-                        }
-                        if((i % 2 == 0) == (lane < 32))
-                        {
-                            scale_result = scale;
-                        }
-                        if(i % 2 == 1)
-                        {
-                            p_scale_result.get_thread_buffer()(i / 2) =
-                                type_convert<PScaleDataType>(scale_result);
-                        }
-                    });
+                            // Save scale for the corresponding lane
+                            p_scale_result.get_thread_buffer()(i) =
+                                type_convert<PScaleDataType>(scale);
+                        });
+                    }
+                    else
+                    {
+                        const index_t lane = __lane_id();
+                        SMPLComputeDataType scale_result{0};
+                        static_for<0, p_.get_thread_buffer().size() / 16, 1>{}([&](auto i) {
+                            // Maximum of consecutive kVScaleGranularity values
+                            // (2 lanes, 16 per lane for fp8/bf8)
+                            SMPLComputeDataType p_max{0};
+                            static_for<0, 16, 1>{}([&](auto j) {
+                                p_max = max(p_max, p_compute.get_thread_buffer()[i * 16 + j]);
+                            });
+                            p_max = max(p_max, warp_shuffle(p_max, lane ^ kAMLane));
+                            p_max = min(SMPLComputeDataType{1}, p_max);
+
+                            static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
+                            // For e8m0 round up to the next power of 2
+                            SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
+
+                            // Convert using scales
+
+                            // These builtins require the old value, and will generate a v_mov_b32
+                            // vxxx [old] before cvt, which result in unwanted ISA so we prepare an
+                            // uninitialized variable dummy_old purposely, and turn off the warning
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
+                            if constexpr(std::is_same_v<PDataType, fp8_t>)
+                            {
+                                static_for<0, 16 / 4, 1>{}([&](auto j) {
+                                    using vec_t = ext_vector_t<short, 2>;
+                                    vec_t dummy_old;
+                                    vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                        dummy_old,
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
+                                        scale,
+                                        false); // false -> WORD0
+                                    vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
+                                        x,
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
+                                        scale,
+                                        true); // true -> WORD1
+                                    p_result.get_thread_buffer().template set_as<vec_t>(
+                                        number<i * 4 + j>{}, y);
+                                });
+                            }
+                            else if constexpr(std::is_same_v<PDataType, bf8_t>)
+                            {
+                                static_for<0, 16 / 4, 1>{}([&](auto j) {
+                                    using vec_t = ext_vector_t<short, 2>;
+                                    vec_t dummy_old;
+                                    vec_t x = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
+                                        dummy_old,
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
+                                        scale,
+                                        false); // false -> WORD0
+                                    vec_t y = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
+                                        x,
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
+                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
+                                        scale,
+                                        true); // true -> WORD1
+                                    p_result.get_thread_buffer().template set_as<vec_t>(
+                                        number<i * 4 + j>{}, y);
+                                });
+                            }
+#pragma clang diagnostic pop
+
+                            // Save scale for the corresponding lane
+                            if constexpr(kABKLane == 4)
+                            {
+                                scale =
+                                    warp_shuffle(scale, (lane % kAMLane) | ((lane & kAMLane) << 1));
+                            }
+                            if((i % 2 == 0) == (lane < 32))
+                            {
+                                scale_result = scale;
+                            }
+                            if(i % 2 == 1)
+                            {
+                                p_scale_result.get_thread_buffer()(i / 2) =
+                                    type_convert<PScaleDataType>(scale_result);
+                            }
+                        });
+                    }
 
                     return make_tuple(p_result, p_scale_result);
                 }

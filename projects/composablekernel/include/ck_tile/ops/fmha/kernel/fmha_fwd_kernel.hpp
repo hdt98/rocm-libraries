@@ -1561,10 +1561,12 @@ struct FmhaFwdKernel
                         typename FmhaPipeline::Problem>();
                     using WG = remove_cvref_t<decltype(config.template at<0>())>;
 
-                    constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
-                    // fp8: 16 = kABKPerLane / WGAttrNumAccessEnum::Double
-                    constexpr index_t N2 = 16 / WG::WarpGemmAttribute::Impl::kCM1PerLane;
                     constexpr index_t N3 = WG::WarpGemmAttribute::Impl::kCM1PerLane;
+                    // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
+                    // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
+                    constexpr index_t N2 = WG::WarpGemmAttribute::Impl::kABKPerLane /
+                                           WG::WarpGemmAttribute::AttrNumAccessV / N3;
+                    constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
 
                     const index_t N0 = padded_seqlen_k / (N1 * N2 * N3);
 
@@ -2015,10 +2017,12 @@ struct FmhaFwdKernel
                             typename FmhaPipeline::Problem>();
                         using WG = remove_cvref_t<decltype(config.template at<0>())>;
 
-                        constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
-                        // fp8: 16 = kABKPerLane / WGAttrNumAccessEnum::Double
-                        constexpr index_t N2 = 16 / WG::WarpGemmAttribute::Impl::kCM1PerLane;
                         constexpr index_t N3 = WG::WarpGemmAttribute::Impl::kCM1PerLane;
+                        // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
+                        // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
+                        constexpr index_t N2 = WG::WarpGemmAttribute::Impl::kABKPerLane /
+                                               WG::WarpGemmAttribute::AttrNumAccessV / N3;
+                        constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
 
                         const index_t N0 = padded_seqlen_k / (N1 * N2 * N3);
 
