@@ -31,13 +31,9 @@ public:
     virtual const std::type_info& defaultValueClassType() const = 0;
 
     // Constraint accessors
-    virtual bool hasConstraints() const = 0;
+    virtual bool hasConstraint() const = 0;
     virtual hipdnn_data_sdk::data_objects::KnobConstraint constraintType() const = 0;
-    virtual const std::type_info& constraintsClassType() const = 0;
-
-    // Raw pointer accessors (for serialization use cases)
-    virtual const void* defaultValue() const = 0;
-    virtual const void* constraints() const = 0;
+    virtual const std::type_info& constraintClassType() const = 0;
 
     template <typename T>
     const T& defaultValueAs() const
@@ -57,21 +53,26 @@ public:
     }
 
     template <typename T>
-    const T& constraintsAs() const
+    const T& constraintAs() const
     {
-        if(constraintsClassType() != typeid(T))
+        if(constraintClassType() != typeid(T))
         {
-            throw std::invalid_argument("Constraints are not of the expected type");
+            throw std::invalid_argument("Constraint is not of the expected type");
         }
 
-        auto* c = constraints();
+        auto* c = constraint();
         if(c == nullptr)
         {
-            throw std::invalid_argument("Constraints are null");
+            throw std::invalid_argument("Constraint is null");
         }
 
         return *static_cast<const T*>(c);
     }
+
+private:
+    // Raw pointer accessors (for serialization use cases)
+    virtual const void* defaultValue() const = 0;
+    virtual const void* constraint() const = 0;
 };
 
 class KnobWrapper : public IKnob
@@ -160,19 +161,19 @@ public:
         }
     }
 
-    bool hasConstraints() const override
+    bool hasConstraint() const override
     {
         throwIfNotValid();
-        return _shallowKnob->constraints() != nullptr;
+        return _shallowKnob->constraint() != nullptr;
     }
 
     hipdnn_data_sdk::data_objects::KnobConstraint constraintType() const override
     {
         throwIfNotValid();
-        return _shallowKnob->constraints_type();
+        return _shallowKnob->constraint_type();
     }
 
-    const std::type_info& constraintsClassType() const override
+    const std::type_info& constraintClassType() const override
     {
         throwIfNotValid();
         switch(constraintType())
@@ -189,18 +190,6 @@ public:
         }
     }
 
-    const void* defaultValue() const override
-    {
-        throwIfNotValid();
-        return _shallowKnob->default_value();
-    }
-
-    const void* constraints() const override
-    {
-        throwIfNotValid();
-        return _shallowKnob->constraints();
-    }
-
 private:
     void throwIfNotValid() const
     {
@@ -208,6 +197,18 @@ private:
         {
             throw std::invalid_argument("Knob is not valid");
         }
+    }
+
+    const void* defaultValue() const override
+    {
+        throwIfNotValid();
+        return _shallowKnob->default_value();
+    }
+
+    const void* constraint() const override
+    {
+        throwIfNotValid();
+        return _shallowKnob->constraint();
     }
 
     // Pointer to the flatbuffer representation of the knob. We do not own this memory

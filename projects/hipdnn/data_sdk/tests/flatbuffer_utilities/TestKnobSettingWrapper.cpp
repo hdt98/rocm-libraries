@@ -176,7 +176,6 @@ TEST_F(TestKnobSettingWrapper, AccessMethodsOnInvalidWrapperThrow)
 
     EXPECT_THROW(wrapper.knobId(), std::invalid_argument);
     EXPECT_THROW(wrapper.valueType(), std::invalid_argument);
-    EXPECT_THROW(wrapper.value(), std::invalid_argument);
     EXPECT_THROW(wrapper.getKnobSetting(), std::invalid_argument);
 }
 

@@ -24,8 +24,6 @@ public:
     virtual hipdnn_data_sdk::data_objects::KnobValue valueType() const = 0;
     virtual const std::type_info& valueClassType() const = 0;
 
-    virtual const void* value() const = 0;
-
     virtual std::unique_ptr<hipdnn_data_sdk::data_objects::KnobSettingT> toKnobSettingT() const = 0;
 
     template <typename T>
@@ -44,6 +42,9 @@ public:
 
         return *static_cast<const T*>(val);
     }
+
+private:
+    virtual const void* value() const = 0;
 };
 
 class KnobSettingWrapper : public IKnobSetting
@@ -107,12 +108,6 @@ public:
         }
     }
 
-    const void* value() const override
-    {
-        throwIfNotValid();
-        return _shallowKnobSetting->value();
-    }
-
     std::unique_ptr<hipdnn_data_sdk::data_objects::KnobSettingT> toKnobSettingT() const override
     {
         throwIfNotValid();
@@ -134,6 +129,12 @@ public:
     }
 
 private:
+    const void* value() const override
+    {
+        throwIfNotValid();
+        return _shallowKnobSetting->value();
+    }
+
     void throwIfNotValid() const
     {
         if(!isValid())
