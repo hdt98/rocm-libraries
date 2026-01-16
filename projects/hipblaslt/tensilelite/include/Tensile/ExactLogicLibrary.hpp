@@ -232,7 +232,12 @@ namespace TensileLite
                     solutions
                         = row.second->findTopSolutions(problem, hardware, numSolutions - rv.size());
 
-                    if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
+                    if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
+                    {
+                        for(auto& sol : solutions)
+                            sol->tag = MySolution::MatchingTag::Prediction;
+                    }
+                    else if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
                     {
                         for(auto& sol : solutions)
                             sol->tag = MySolution::MatchingTag::Equal;
@@ -251,11 +256,6 @@ namespace TensileLite
                     {
                         for(auto& sol : solutions)
                             sol->tag = MySolution::MatchingTag::FreeSize;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::Prediction;
                     }
                     // TODO- Experimental
 
