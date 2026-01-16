@@ -40,7 +40,7 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Added
 
-* Compute the condition number of a matrix
+* Computation of the condition number of a matrix
     * GECON
     * GECON_64
 
