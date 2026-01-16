@@ -22,12 +22,16 @@
 #include "logging.h"
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <map>
+#include <numeric>
 #include <stdexcept>
 
 namespace rocfft_rccl
 {
 #ifdef ROCFFT_RCCL_ENABLE
+
+    std::shared_ptr<Communicator> Communicator::comm_world;
 
     // RCCL data type mapping - returns base NCCL type for given element size.
     // for complex types (8 or 16 bytes), callers must double the count.
@@ -58,7 +62,6 @@ namespace rocfft_rccl
         std::vector<ncclComm_t> comms; // one per device
         std::vector<int>        devices; // device IDs
         std::map<int, int>      device_to_rank;
-        std::map<int, int>      rank_to_device;
 
         ~Impl()
         {
@@ -69,6 +72,16 @@ namespace rocfft_rccl
                     ncclCommFinalize(comm);
                     ncclCommDestroy(comm);
                 }
+            }
+        }
+
+        // build device-rank mappings
+        void init_maps()
+        {
+            for(int rank = 0; rank < static_cast<int>(devices.size()); ++rank)
+            {
+                int dev_id             = devices[rank];
+                device_to_rank[dev_id] = rank;
             }
         }
     };
@@ -98,7 +111,7 @@ namespace rocfft_rccl
         return *this;
     }
 
-    std::optional<Communicator> Communicator::create(const std::vector<int>& devices)
+    std::shared_ptr<Communicator> Communicator::create(const std::set<int>& devices)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         // check if RCCL is disabled via environment variable
@@ -113,32 +126,59 @@ namespace rocfft_rccl
             return {};
         }
 
-        try
+        // create world communicator if necessary
+        if(!comm_world)
         {
-            auto ret   = std::make_optional<Communicator>();
-            ret->pimpl = std::make_unique<Impl>();
+            int ndevices = 0;
+            if(hipGetDeviceCount(&ndevices) != hipSuccess || ndevices < 2)
+                return {};
+            auto new_comm   = std::make_shared<Communicator>();
+            new_comm->pimpl = std::make_unique<Impl>();
 
-            int ndevices        = static_cast<int>(devices.size());
-            ret->pimpl->devices = devices;
-            ret->pimpl->comms.resize(ndevices);
-
-            // use ncclCommInitAll for single-process multi-GPU
-            ncclResult_t result
-                = ncclCommInitAll(ret->pimpl->comms.data(), ndevices, devices.data());
-
+            // init with devices 0..N
+            new_comm->pimpl->devices.resize(ndevices);
+            std::iota(new_comm->pimpl->devices.begin(), new_comm->pimpl->devices.end(), 0);
+            new_comm->pimpl->comms.resize(ndevices);
+            ncclResult_t result = ncclCommInitAll(
+                new_comm->pimpl->comms.data(), ndevices, new_comm->pimpl->devices.data());
             if(result != ncclSuccess)
             {
                 return {};
             }
+            new_comm->pimpl->init_maps();
+            std::swap(comm_world, new_comm);
+        }
 
-            // build device-rank mappings
-            for(int rank = 0; rank < ndevices; ++rank)
+        // if we need a communicator for all devices, just use the world communicator
+        if(devices.size() == comm_world->pimpl->devices.size())
+            return comm_world;
+
+        try
+        {
+            // create sub-communicator from comm_world for specified devices
+            auto ret   = std::make_shared<Communicator>();
+            ret->pimpl = std::make_unique<Impl>();
+
+            std::copy(devices.begin(), devices.end(), std::back_inserter(ret->pimpl->devices));
+
+            // for each rank in comm_world, split it into a
+            // sub-communicator.  use NOCOLOR for ranks that aren't
+            // supposed to be in this sub-communicator
+            for(size_t rank = 0; rank < comm_world->pimpl->comms.size(); ++rank)
             {
-                int dev_id                         = devices[rank];
-                ret->pimpl->device_to_rank[dev_id] = rank;
-                ret->pimpl->rank_to_device[rank]   = dev_id;
+                bool rank_in_sub = devices.find(comm_world->pimpl->devices[rank]) != devices.end();
+                ncclComm_t   rank_comm = nullptr;
+                ncclResult_t result    = ncclCommSplit(comm_world->pimpl->comms[rank],
+                                                    rank_in_sub ? 0 : NCCL_SPLIT_NOCOLOR,
+                                                    comm_world->pimpl->devices[rank],
+                                                    &rank_comm,
+                                                    nullptr);
+                if(result != ncclSuccess)
+                    return {};
+                ret->pimpl->comms.push_back(rank_comm);
             }
 
+            ret->pimpl->init_maps();
             return ret;
         }
         catch(const std::exception& e)

@@ -23,7 +23,7 @@
 
 #include <hip/hip_runtime.h>
 #include <memory>
-#include <optional>
+#include <set>
 #include <vector>
 
 #ifdef ROCFFT_RCCL_ENABLE
@@ -37,7 +37,7 @@ namespace rocfft_rccl
     {
     public:
         // default ctor does not actually initialize rccl - call
-        // create to init and check success, returning an optional.
+        // create to init and check success
         Communicator();
         ~Communicator();
 
@@ -45,8 +45,11 @@ namespace rocfft_rccl
         Communicator(Communicator&&);
         Communicator& operator=(Communicator&&);
 
-        // initialize RCCL for given devices
-        static std::optional<Communicator> create(const std::vector<int>& devices);
+        // return a communicator for the specified devices
+        static std::shared_ptr<Communicator> create(const std::set<int>& devices);
+        // process-wide communicator for all visible devices, created
+        // on demand and destroyed at cleanup
+        static std::shared_ptr<Communicator> comm_world;
 
         // get the RCCL communicator for a specific device
         void* get_comm(int device_id) const;

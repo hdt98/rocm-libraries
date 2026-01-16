@@ -2873,8 +2873,7 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
         // initialize RCCL with these devices
         if(!device_set.empty())
         {
-            std::vector<int> devices(device_set.begin(), device_set.end());
-            rccl = rocfft_rccl::Communicator::create(devices);
+            rccl = rocfft_rccl::Communicator::create(device_set);
         }
     }
 #endif

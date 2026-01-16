@@ -218,7 +218,7 @@ struct rocfft_plan_t
 
 #ifdef ROCFFT_RCCL_ENABLE
     // rccl communicator used for single-proc multi-GPU transforms
-    std::optional<rocfft_rccl::Communicator> rccl;
+    std::shared_ptr<rocfft_rccl::Communicator> rccl;
 #endif
 
     rocfft_plan_t() = default;
