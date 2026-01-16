@@ -161,6 +161,7 @@ set( MIOpen_Source
     multimarginloss_api.cpp
     op_args.cpp
     operator.cpp
+    origami_search.cpp
     performance_config.cpp
     pooling/problem_description.cpp
     pooling_api.cpp
@@ -260,6 +261,7 @@ set( MIOpen_Source
     solver/conv/conv_hip_implicit_gemm_wrw_v4r4.cpp
     solver/conv/conv_hip_implicit_gemm_wrw_v4r4_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_wrw_v4r4_xdlops_padded_gemm.cpp
+    solver/conv/implicitgemm_ck_util.cpp
     solver/conv/conv_MP_bidirectional_winograd.cpp
     solver/conv/conv_mlir_igemm_bwd.cpp
     solver/conv/conv_mlir_igemm_bwd_xdlops.cpp

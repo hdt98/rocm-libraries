@@ -466,8 +466,10 @@ auto GenericSearch(const Solver s,
     // rank order configs
     const size_t origami_ret_size = 5;
     auto ranked_configs           = GetOrigamiPerformanceConfig(s, problem, all_configs);
+    MIOPEN_LOG_I2("origami rank finished");
     if(!ranked_configs.empty())
     {
+        MIOPEN_LOG_I2("Use origami selected");
         if(ranked_configs.size() > origami_ret_size)
         {
             ranked_configs.resize(origami_ret_size);
@@ -478,6 +480,7 @@ auto GenericSearch(const Solver s,
     std::size_t n_runs_total = std::min(all_configs.size(), GetTuningIterationsMax());
     all_configs.resize(n_runs_total);
     std::size_t patience = GetTuningPatience(context, problem);
+    MIOPEN_LOG_I2("n_runs_total " << n_runs_total);
 
     if(all_configs.empty())
     {

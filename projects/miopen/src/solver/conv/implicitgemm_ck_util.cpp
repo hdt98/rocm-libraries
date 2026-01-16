@@ -24,9 +24,10 @@
  *
  *******************************************************************************/
 
-#include <miopen/solver/implicitgemm_ck_util.hpp>
+//#include <miopen/solver/implicitgemm_ck_util.hpp>
 
 #include <origami/types.hpp>
+#include <vector>
 
 namespace miopen {
 namespace solver {

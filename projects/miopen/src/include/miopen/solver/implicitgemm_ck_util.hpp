@@ -2300,6 +2300,14 @@ origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& pro
     origami::config_t ori_cfg;
     auto ck_args               = CKArgsType{problem};
     auto conv_ptrs             = DeviceOpType::GetInstances();
+
+    //auto valid_kerns =  FillValidKernelsIDs<DeviceOpType, CKArgsType>(problem);
+    //for(auto kern : valid_kerns)
+    //{
+    //    MIOPEN_LOG_I2("valid kern: " << kern);
+    //}
+
+
     std::optional<int> split_k = std::nullopt;
     std::string id_string      = perf_cfg.kernel_id;
     auto pos                   = perf_cfg.kernel_id.find_last_of('+');
@@ -2318,17 +2326,31 @@ origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& pro
     auto kernel_name = parsed[0];
     std::vector<std::string> args;
     std::copy(parsed.begin() + 1, parsed.end(), std::back_inserter(args));
-    std::vector<std::string> fields = device_instance_field_map.find(kernel_name)->second;
+    MIOPEN_LOG_I2("retrieving fields for kernel: " << kernel_name);
+    //std::vector<std::string> fields;
+    //if(device_instance_field_map.find(kernel_name) != device_instance_field_map.end())
+    //{
+    //    fields = device_instance_field_map.find(kernel_name)->second;
+    //}
+    //else
+    //{
+    //    MIOPEN_LOG_E("kernel name isn't in device instances map " << kernel_name);
+    //    return ori_cfg;
+    //}
+    //MIOPEN_LOG_I2("fields: " << fields[0]);
+    //MIOPEN_LOG_I2("size fields: " << fields.size());
+    //MIOPEN_LOG_I2("idx m: " << IndexOf(fields, "MPer Block"));
 
-    ori_cfg.mt.m = std::stoi(args[size_t(IndexOf(fields, "MPer Block"))]); // Macro tile M
-    ori_cfg.mt.n = std::stoi(args[size_t(IndexOf(fields, "NPer Block"))]); // Macro tile N
-    ori_cfg.mt.k = std::stoi(args[size_t(IndexOf(fields, "KPer Block"))]); // Macro tile K
-    ori_cfg.mi.m = std::stoi(args[size_t(IndexOf(fields, "MPer Op"))]);    // Matrix instruction M
-    ori_cfg.mi.n = std::stoi(args[size_t(IndexOf(fields, "NPer Op"))]);    // Matrix instruction N
-    if(IndexOf(fields, "NPer Op") >= 0)
-        ori_cfg.mi.k = std::stoi(args[size_t(IndexOf(fields, "KPer Op"))]); // Matrix instruction K
-    else
-        ori_cfg.mi.k = 32; // Matrix instruction K
+    MIOPEN_LOG_I2("size args: " << args.size());
+    MIOPEN_LOG_I2("kernel_id: " << id_string);
+    MIOPEN_LOG_I2("perf_cfg: " << perf_cfg);
+    //MIOPEN_LOG_I2("args m: " << args[size_t(IndexOf(fields, "MPer Block"))]);
+    ori_cfg.mt.m = std::stoi(args[1]); // Macro tile M
+    ori_cfg.mt.n = std::stoi(args[2]); // Macro tile N
+    ori_cfg.mt.k = std::stoi(args[3]); // Macro tile K
+    ori_cfg.mi.m = std::stoi(args[5]);    // Matrix instruction M
+    ori_cfg.mi.n = std::stoi(args[6]);    // Matrix instruction N
+    ori_cfg.mi.k = 32; // Matrix instruction K
     ori_cfg.occupancy = 4;
 
     MIOPEN_LOG_I2("CK id string: " << id_string << ", MT.M(" << ori_cfg.mt.m << ") MT.N("
