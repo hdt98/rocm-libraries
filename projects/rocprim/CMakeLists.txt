@@ -158,7 +158,7 @@ if(BUILD_OFFLOAD_COMPRESS)
   # Detect capability and add flag.
   cmake_check_compiler_flag(HIP "--offload-compress" HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
   if(HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
-    add_compile_options("--offload-compress")
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:--offload-compress>)
   else()
     message(WARNING "BUILD_OFFLOAD_COMPRESS=ON but flag not supported by compiler. Ignoring option.")
   endif()
