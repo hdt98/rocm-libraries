@@ -466,7 +466,9 @@ struct BlockUniversalGemmAsBsCr
             // hot loop:
             static_for<0, KRepeat, 1>{}([&](auto kIter) {
                 LocalPrefetch<kIter.value>(a_block_window, b_block_window, a_load_tr, b_load_tr);
-                __builtin_amdgcn_sched_barrier(0);
+                __builtin_amdgcn_sched_barrier(
+                    0); // Complete scheduling all pending instruction groups before this point
+
                 // NOTE: Synchronize threads in a workgroup at the start of each MAC
                 // cluster, but except the first, as we can shorten non-MAC cluster a bit
                 // and there's no observable negative impact. The desired effect is waves in
@@ -476,8 +478,14 @@ struct BlockUniversalGemmAsBsCr
                 // sync point.
                 if constexpr(kIter.value != 0 || KRepeat == 1)
                 {
-                    __builtin_amdgcn_s_barrier();
-                    __builtin_amdgcn_sched_barrier(0);
+                    // This pattern ensures:
+                    // At runtime: All waves synchronize (hardware barrier)
+                    // At compile-time: Instructions after the barrier don't get moved before it
+                    // (scheduling barrier)
+                    __builtin_amdgcn_s_barrier(); // Blocks execution until all waves (threads) in
+                                                  // the workgroup reach this point
+                    __builtin_amdgcn_sched_barrier(
+                        0); // Prevents instruction reordering across this boundary
                 }
 
                 static_for<0, KInnerLoopIter, 1>{}([&](auto kInnerIter) {

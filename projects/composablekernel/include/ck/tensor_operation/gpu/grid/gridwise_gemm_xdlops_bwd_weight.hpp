@@ -15,6 +15,7 @@
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/device/gemm_specialization.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
+#include "ck/tensor_operation/gpu/device/device_base.hpp"
 
 namespace ck {
 
@@ -150,7 +151,8 @@ template <typename GridwiseGemm,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           typename CBlockClusterAdaptor,
-          bool HasMainKBlockLoop>
+          bool HasMainKBlockLoop,
+          bool SplitKOffsetHack>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
@@ -165,7 +167,10 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                                   const AElementwiseOperation a_element_op,
                                   const BElementwiseOperation b_element_op,
                                   const CElementwiseOperation c_element_op,
-                                  const CBlockClusterAdaptor c_block_cluster_adaptor)
+                                  const CBlockClusterAdaptor c_block_cluster_adaptor,
+                                  const long_index_t split_k_stride_a,
+                                  const long_index_t split_k_stride_b,
+                                  index_t k_batch)
 {
 #if defined(__gfx908__) || defined(__gfx90a__) || defined(__gfx94__) || defined(__gfx11__) || \
     defined(__gfx12__)
@@ -173,17 +178,21 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
     {
         __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
 
-        GridwiseGemm::template Run<HasMainKBlockLoop>(p_a_grid,
-                                                      p_b_grid,
-                                                      p_c_grid,
-                                                      p_shared,
-                                                      a_b_k0_m_k1_grid_desc,
-                                                      b_b_k0_n_k1_grid_desc,
-                                                      c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                                      a_element_op,
-                                                      b_element_op,
-                                                      c_element_op,
-                                                      c_block_cluster_adaptor);
+        GridwiseGemm::template Run<HasMainKBlockLoop, SplitKOffsetHack>(
+            p_a_grid,
+            p_b_grid,
+            p_c_grid,
+            p_shared,
+            a_b_k0_m_k1_grid_desc,
+            b_b_k0_n_k1_grid_desc,
+            c_grid_desc_mblock_mperblock_nblock_nperblock,
+            a_element_op,
+            b_element_op,
+            c_element_op,
+            c_block_cluster_adaptor,
+            split_k_stride_a,
+            split_k_stride_b,
+            k_batch);
     }
 #else
     ignore = p_a_grid;
@@ -196,6 +205,9 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
     ignore = b_element_op;
     ignore = c_element_op;
     ignore = c_block_cluster_adaptor;
+    ignore = split_k_stride_a;
+    ignore = split_k_stride_b;
+    ignore = k_batch;
 #endif // end of if (defined(__gfx908__) || defined(__gfx90a__))
 }
 
@@ -604,7 +616,7 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_bwd_weight
             MRepeat,
             NRepeat,
             FloatC,
-            CGlobalMemoryDataOperation>();
+            CGlobalMemoryDataOperation_>();
         if constexpr(!valid)
         {
             return false;
@@ -712,6 +724,224 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_bwd_weight
     using CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock =
         decltype(MakeCGridDesc_MBlock_MPerBlock_NBlock_NPerBlock(CMNGridDesc{}));
     using CBlockClusterAdaptor = decltype(MakeCBlockClusterAdaptor(CMNGridDesc{}, 1, 1, 1));
+
+    template <bool HasMainKBlockLoop, bool SplitKOffsetHack = false>
+    __device__ static void Run(const FloatA* __restrict__ p_a_grid,
+                               const FloatB* __restrict__ p_b_grid,
+                               FloatC* __restrict__ p_c_grid,
+                               void* __restrict__ p_shared,
+                               const AGridDesc_B_K0_M_K1& a_b_k0_m_k1_grid_desc,
+                               const BGridDesc_B_K0_N_K1& b_b_k0_n_k1_grid_desc,
+                               const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock&
+                                   c_grid_desc_mblock_mperblock_nblock_nperblock,
+                               const AElementwiseOperation& a_element_op,
+                               const BElementwiseOperation& b_element_op,
+                               const CElementwiseOperation& c_element_op,
+                               const CBlockClusterAdaptor& c_block_cluster_adaptor,
+                               const long_index_t split_k_stride_a,
+                               const long_index_t split_k_stride_b,
+                               index_t k_batch)
+    {
+        const auto K0 = a_b_k0_m_k1_grid_desc.GetLength(I1);
+
+        // divide block work by [M, N]
+        const auto block_work_idx =
+            c_block_cluster_adaptor.CalculateBottomIndex(make_multi_index(get_block_1d_id()));
+
+        const index_t k_batch_id = block_work_idx[I0];
+
+        // Use compile-time branching based on template parameters
+        const long_index_t split_k_offset_a = SplitKOffsetHack ? k_batch_id * split_k_stride_a : 0;
+        const long_index_t split_k_offset_b = SplitKOffsetHack ? k_batch_id * split_k_stride_b : 0;
+
+        // When hack is enabled, buffer size equals the stride (calculated from descriptor's
+        // CalculateOffset method in the device layer). This properly accounts for the
+        // descriptor's transform pipeline and non-compact strides.
+        // When hack is disabled, use the full element space size.
+        const long_index_t a_buffer_size =
+            SplitKOffsetHack ? split_k_stride_a : a_b_k0_m_k1_grid_desc.GetElementSpaceSize();
+
+        const long_index_t b_buffer_size =
+            SplitKOffsetHack ? split_k_stride_b : b_b_k0_n_k1_grid_desc.GetElementSpaceSize();
+
+        ignore = k_batch; // k_batch value itself not used in this function
+
+        const auto a_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
+            p_a_grid + split_k_offset_a, a_buffer_size);
+        const auto b_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
+            p_b_grid + split_k_offset_b, b_buffer_size);
+
+        if(!c_block_cluster_adaptor.ValidCTileIndex(
+               make_tuple(block_work_idx[I1], block_work_idx[I2]),
+               make_tuple(c_grid_desc_mblock_mperblock_nblock_nperblock.GetLength(I0),
+                          c_grid_desc_mblock_mperblock_nblock_nperblock.GetLength(I2))))
+        {
+            return;
+        }
+
+        // HACK: this force m/n_block_data_idx_on_grid into SGPR
+        const index_t m_block_data_idx_on_grid =
+            __builtin_amdgcn_readfirstlane(block_work_idx[I1] * MPerBlock);
+
+        const index_t n_block_data_idx_on_grid =
+            __builtin_amdgcn_readfirstlane(block_work_idx[I2] * NPerBlock);
+
+        // lds max alignment
+        constexpr auto max_lds_align = K1;
+
+        // A matrix in LDS memory, dst of blockwise copy
+        constexpr auto a_k0_m_k1_block_desc = GetABlockDescriptor_K0PerBlock_MPerBlock_K1();
+
+        constexpr auto a_b_k0_m_k1_block_desc = GetABlockDescriptor_Batch_K0PerBlock_MPerBlock_K1();
+        // B matrix in LDS memory, dst of blockwise copy
+        constexpr auto b_k0_n_k1_block_desc = GetBBlockDescriptor_K0PerBlock_NPerBlock_K1();
+
+        constexpr auto b_b_k0_n_k1_block_desc = GetBBlockDescriptor_Batch_K0PerBlock_NPerBlock_K1();
+        // A matrix blockwise copy
+        auto a_blockwise_copy =
+            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
+                                                AElementwiseOperation,
+                                                ck::tensor_operation::element_wise::PassThrough,
+                                                InMemoryDataOperationEnum::Set,
+                                                Sequence<1, K0PerBlock, MPerBlock, K1>,
+                                                ABlockTransferThreadClusterLengths_K0_M_K1,
+                                                ABlockTransferThreadClusterArrangeOrder,
+                                                FloatA,
+                                                FloatAAdjusted,
+                                                decltype(a_b_k0_m_k1_grid_desc),
+                                                decltype(a_b_k0_m_k1_block_desc),
+                                                ABlockTransferSrcAccessOrder,
+                                                Sequence<0, 2, 1, 3>,
+                                                ABlockTransferSrcVectorDim,
+                                                3,
+                                                ABlockTransferSrcScalarPerVector,
+                                                ABlockTransferDstScalarPerVector_K1,
+                                                1,
+                                                1,
+                                                AThreadTransferSrcResetCoordinateAfterRun,
+                                                true>(
+                a_b_k0_m_k1_grid_desc,
+                make_multi_index(SplitKOffsetHack ? 0 : k_batch_id, 0, m_block_data_idx_on_grid, 0),
+                a_element_op,
+                a_b_k0_m_k1_block_desc,
+                make_multi_index(0, 0, 0, 0),
+                ck::tensor_operation::element_wise::PassThrough{});
+
+        // B matrix blockwise copy
+        auto b_blockwise_copy =
+            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
+                                                BElementwiseOperation,
+                                                ck::tensor_operation::element_wise::PassThrough,
+                                                InMemoryDataOperationEnum::Set,
+                                                Sequence<1, K0PerBlock, NPerBlock, K1>,
+                                                BBlockTransferThreadClusterLengths_K0_N_K1,
+                                                BBlockTransferThreadClusterArrangeOrder,
+                                                FloatB,
+                                                FloatBAdjusted,
+                                                decltype(b_b_k0_n_k1_grid_desc),
+                                                decltype(b_b_k0_n_k1_block_desc),
+                                                BBlockTransferSrcAccessOrder,
+                                                Sequence<0, 2, 1, 3>,
+                                                BBlockTransferSrcVectorDim,
+                                                3,
+                                                BBlockTransferSrcScalarPerVector,
+                                                BBlockTransferDstScalarPerVector_K1,
+                                                1,
+                                                1,
+                                                BThreadTransferSrcResetCoordinateAfterRun,
+                                                true>(
+                b_b_k0_n_k1_grid_desc,
+                make_multi_index(SplitKOffsetHack ? 0 : k_batch_id, 0, n_block_data_idx_on_grid, 0),
+                b_element_op,
+                b_b_k0_n_k1_block_desc,
+                make_multi_index(0, 0, 0, 0),
+                ck::tensor_operation::element_wise::PassThrough{});
+
+        // GEMM definition
+        //   c_mtx += transpose(a_mtx) * b_mtx
+        //     a_mtx[K0PerBlock, MPerBlock] is in LDS
+        //     b_mtx[K0PerBlock, NPerBlock] is in LDS
+        //     c_mtx[MPerBlock, NPerBlock] is distributed among threads, and saved in
+        //       register
+        // sanity check
+        constexpr bool is_single_rate_mfma =
+            (((is_same<ComputeTypeA, half_t>::value || is_same<ComputeTypeA, bhalf_t>::value) &&
+              K1 <= 4) ||
+             (is_same<ComputeTypeA, int8_t>::value && K1 <= 8) ||
+             ((is_same<ComputeTypeA, f8_t>::value || is_same<ComputeTypeA, bf8_t>::value) &&
+              K1 < 32))
+                ? true
+                : false;
+        constexpr auto is_scale_mfma = false;
+        constexpr index_t KPack      = math::max(K1,
+                                            MfmaSelector<ComputeTypeA,
+                                                              MPerXdl,
+                                                              NPerXdl,
+                                                              ComputeTypeB,
+                                                              is_single_rate_mfma,
+                                                              is_scale_mfma>::selected_mfma.k_per_blk);
+
+        auto blockwise_gemm =
+            BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<BlockSize,
+                                                                FloatAAdjusted,
+                                                                FloatBAdjusted,
+                                                                FloatAcc,
+                                                                decltype(a_k0_m_k1_block_desc),
+                                                                decltype(b_k0_n_k1_block_desc),
+                                                                MPerXdl,
+                                                                NPerXdl,
+                                                                MRepeat,
+                                                                NRepeat,
+                                                                KPack,
+                                                                ComputeTypeA,
+                                                                ComputeTypeB>{};
+
+        auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
+
+        // LDS allocation for A and B: be careful of alignment
+        constexpr auto a_block_space_size =
+            math::integer_least_multiple(a_k0_m_k1_block_desc.GetElementSpaceSize(), max_lds_align);
+
+        constexpr auto a_block_slice_copy_step = make_multi_index(0, K0PerBlock, 0, 0);
+        constexpr auto b_block_slice_copy_step = make_multi_index(0, K0PerBlock, 0, 0);
+
+        auto a_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+            static_cast<FloatAAdjusted*>(p_shared), a_k0_m_k1_block_desc.GetElementSpaceSize());
+
+        auto b_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+            static_cast<FloatBAdjusted*>(p_shared) + a_block_space_size,
+            b_k0_n_k1_block_desc.GetElementSpaceSize());
+
+        // gridwise GEMM pipeline
+        const index_t K0BlockMainLoop = __builtin_amdgcn_readfirstlane(K0 / K0PerBlock);
+
+        GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_b_k0_m_k1_grid_desc,
+                                                          a_b_k0_m_k1_block_desc,
+                                                          a_blockwise_copy,
+                                                          a_grid_buf,
+                                                          a_block_buf,
+                                                          a_block_slice_copy_step,
+                                                          b_b_k0_n_k1_grid_desc,
+                                                          b_b_k0_n_k1_block_desc,
+                                                          b_blockwise_copy,
+                                                          b_grid_buf,
+                                                          b_block_buf,
+                                                          b_block_slice_copy_step,
+                                                          blockwise_gemm,
+                                                          c_thread_buf,
+                                                          K0BlockMainLoop);
+
+        // output: register to global memory
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+            blockwise_gemm,
+            c_grid_desc_mblock_mperblock_nblock_nperblock,
+            c_thread_buf,
+            block_work_idx[I1],
+            block_work_idx[I2],
+            p_shared,
+            p_c_grid,
+            c_element_op);
+    }
 
     template <bool HasMainKBlockLoop>
     __device__ static void Run(const FloatA* __restrict__ p_a_grid,

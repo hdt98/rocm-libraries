@@ -72,6 +72,8 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
 
     static constexpr bool PreshuffleQuant   = Problem::Traits::PreshuffleQuant;
     static constexpr index_t VectorLoadSize = Problem::VectorLoadSize;
+    static constexpr index_t NPerBlockBQ =
+        integer_divide_ceil(BlockGemmShape::kN, QuantGroupSize::kN);
     static constexpr index_t KPerBlockBQ =
         integer_divide_ceil(BlockGemmShape::kK, QuantGroupSize::kK);
     static constexpr index_t QScalesPerBlockRow =
@@ -353,8 +355,10 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
         if constexpr(PreshuffleQuant)
         {
             move_tile_window(bq_copy_dram_window,
-                             {ck_tile::integer_least_multiple(n, kNPerBlock) /
-                                  BlockGemmShape::WarpTile::at(number<1>{}),
+                             {((NPerBlockBQ < BlockGemmShape::BlockWarps::at(number<1>{}))
+                                   ? ck_tile::integer_divide_ceil(n, QuantGroupSize::kN)
+                                   : ck_tile::integer_least_multiple(n, kNPerBlock) /
+                                         BlockGemmShape::WarpTile::at(number<1>{})),
                               0});
         }
         else
@@ -428,8 +432,10 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
             if constexpr(PreshuffleQuant)
             {
                 move_tile_window(bq_copy_dram_window,
-                                 {ck_tile::integer_least_multiple(n, kNPerBlock) /
-                                      BlockGemmShape::WarpTile::at(number<1>{}),
+                                 {((NPerBlockBQ < BlockGemmShape::BlockWarps::at(number<1>{}))
+                                       ? ck_tile::integer_divide_ceil(n, QuantGroupSize::kN)
+                                       : ck_tile::integer_least_multiple(n, kNPerBlock) /
+                                             BlockGemmShape::WarpTile::at(number<1>{})),
                                   0});
             }
             else
@@ -463,8 +469,10 @@ struct WPQuantBPipelineAgBgCrV2 : public WeightPreshufflePipelineAGmemBGmemCRegV
             if constexpr(PreshuffleQuant)
             {
                 move_tile_window(bq_copy_dram_window,
-                                 {ck_tile::integer_least_multiple(n, kNPerBlock) /
-                                      BlockGemmShape::WarpTile::at(number<1>{}),
+                                 {((NPerBlockBQ < BlockGemmShape::BlockWarps::at(number<1>{}))
+                                       ? ck_tile::integer_divide_ceil(n, QuantGroupSize::kN)
+                                       : ck_tile::integer_least_multiple(n, kNPerBlock) /
+                                             BlockGemmShape::WarpTile::at(number<1>{})),
                                   0});
             }
             else
