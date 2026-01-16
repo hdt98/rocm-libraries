@@ -522,30 +522,28 @@ bool profile_gemm_mx_impl(int do_verification,
                         }
                         else
                         {
-                            // if constexpr(is_same_v<ADataType, ck::f8_t> ||
-                            //              is_same_v<ADataType, ck::bf8_t>)
-                            //     LogRangeAsType<float>(std::cout << "a : ", a_m_k.mData, ",")
-                            //         << "\n";
-                            // else
-                            //     std::cout << "A: WIP PRINT PACKED TYPE\n";
-                            // LogRangeAsType<float>(std::cout << "a_scale : ", a_m_k_scale.mData,
-                            // ",")
-                            //     << "\n";
-                            // if constexpr(is_same_v<BDataType, ck::f8_t> ||
-                            //              is_same_v<BDataType, ck::bf8_t>)
-                            //     LogRangeAsType<float>(std::cout << "b : ", b_k_n->mData, ",")
-                            //         << "\n";
-                            // else
-                            //     std::cout << "B: WIP PRINT PACKED TYPE\n";
-                            // LogRangeAsType<float>(std::cout << "b_scale: ", b_k_n_scale.mData,
-                            // ",")
-                            //     << "\n";
-                            // LogRangeAsType<float>(
-                            //     std::cout << "c_host  : ", c_m_n_host_result.mData, ",")
-                            //     << "\n";
-                            // LogRangeAsType<float>(
-                            //     std::cout << "c_device: ", c_m_n_device_result.mData, ",")
-                            //     << std::endl;
+                            if constexpr(is_same_v<ADataType, ck::f8_t> ||
+                                         is_same_v<ADataType, ck::bf8_t>)
+                                LogRangeAsType<float>(std::cout << "a : ", a_m_k.mData, ",")
+                                    << "\n";
+                            else
+                                std::cout << "A: WIP PRINT PACKED TYPE\n";
+                            LogRangeAsType<float>(std::cout << "a_scale : ", a_m_k_scale.mData, ",")
+                                << "\n";
+                            if constexpr(is_same_v<BDataType, ck::f8_t> ||
+                                         is_same_v<BDataType, ck::bf8_t>)
+                                LogRangeAsType<float>(std::cout << "b : ", b_k_n->mData, ",")
+                                    << "\n";
+                            else
+                                std::cout << "B: WIP PRINT PACKED TYPE\n";
+                            LogRangeAsType<float>(std::cout << "b_scale: ", b_k_n_scale.mData, ",")
+                                << "\n";
+                            LogRangeAsType<float>(
+                                std::cout << "c_host  : ", c_m_n_host_result.mData, ",")
+                                << "\n";
+                            LogRangeAsType<float>(
+                                std::cout << "c_device: ", c_m_n_device_result.mData, ",")
+                                << std::endl;
                         }
                     }
                     if(do_log > 0)

@@ -286,9 +286,8 @@ struct DeviceOperationInstanceFactory<
             {
                 add_device_gemm_mx_xdl_f4_f4_f16_mk_mfma_mn_default_instances(op_ptrs);
             }
-
-            if constexpr(is_same_v<ADataType, F8> && is_same_v<BDataType, F8> &&
-                         is_same_v<CDataType, F16>)
+            else if constexpr(is_same_v<ADataType, F8> && is_same_v<BDataType, F8> &&
+                              is_same_v<CDataType, F16>)
             {
                 add_device_gemm_mx_xdl_f8_f8_f16_mk_mfma_mn_default_instances(op_ptrs);
             }

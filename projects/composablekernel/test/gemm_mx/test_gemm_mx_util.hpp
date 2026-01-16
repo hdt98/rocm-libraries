@@ -48,7 +48,7 @@ class TestGemmMX : public testing::Test
     static constexpr index_t ScaleBlockSize = std::tuple_element_t<5, Tuple>{};
     static constexpr bool verify_           = true;
     static constexpr int init_method_       = 2; // decimal value initialization
-    static constexpr bool log_              = true;
+    static constexpr bool log_              = false;
     static constexpr bool bench_            = false; // measure kernel performance
     std::vector<int> k_batches_;
 
