@@ -939,10 +939,26 @@ if(MIOPEN_USE_COMPOSABLEKERNEL)
 endif()
 
 # Link origami library
-if(MIOPEN_BUILD_ORIGAMI)
-    target_link_libraries(MIOpen PRIVATE origami)
-else()
+# When origami is built inline (via MIOPEN_BUILD_ORIGAMI or fallback), it's a static
+# library and we should link directly to ensure symbols are embedded in libMIOpen.so.
+# When using system origami (from hipblaslt or find_package), use the namespaced target.
+if(TARGET origami)
+    get_target_property(_origami_type origami TYPE)
+    if(_origami_type STREQUAL "STATIC_LIBRARY")
+        # Inline-built static library - link directly to embed symbols
+        target_link_libraries(MIOpen PRIVATE origami)
+    elseif(_origami_type STREQUAL "ALIAS")
+        # Alias target (from inline build with roc:: namespace)
+        target_link_libraries(MIOpen PRIVATE origami)
+    else()
+        # Shared or imported library
+        target_link_libraries(MIOpen PRIVATE roc::origami)
+    endif()
+elseif(TARGET roc::origami)
+    # System-installed origami (from hipblaslt or find_package)
     target_link_libraries(MIOpen PRIVATE roc::origami)
+else()
+    message(FATAL_ERROR "origami target not found - check dependency resolution")
 endif()
 
 if(WIN32)
