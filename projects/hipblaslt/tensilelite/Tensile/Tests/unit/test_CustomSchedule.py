@@ -784,6 +784,36 @@ class TestCustomScheduleTF32:
         valid, message = isValid(schedule_info, {"kernel" : kernel})
         assert valid, message
 
+    @pytest.mark.parametrize(
+        # fmt: off
+        "transA, transB, lds_tr_inst,  tr_lds", [
+        ( False,  False,       True,       1),
+        # fmt: on
+        ])
+    def test_schedule_160x128x64(self, transA, transB, lds_tr_inst, tr_lds):
+        """Tests the 160x128x64 TF32 TN schedule."""
+        kernel = create_base_kernel()
+        kernel["ProblemType"].update({
+            "TransposeA": transA, "TransposeB": transB
+        })
+        kernel.update({
+            "UseF32XEmulation": True,
+            "MacroTile0": 160, "MacroTile1": 128, "DepthU": 64,
+            "PrefetchGlobalRead": 2, "PrefetchLocalRead": 1,
+            "GlobalReadVectorWidthA": 4, "GlobalReadVectorWidthB": 4, "LocalReadVectorWidth": 4,
+            "MatrixInstruction": [16,16,32,1], "MIWaveGroup": [2,2],
+            "LDSTrInst": lds_tr_inst, "TransposeLDS": tr_lds, "MIWaveTileA": 4, "MIWaveTileB": 5,
+        })
+
+        has_schedule, schedule_info = hasCustomSchedule(kernel)
+        assert has_schedule
+        assert isinstance(schedule_info, ScheduleInfo)
+        assert schedule_info.numCodePaths == 2
+        numMfma = 120
+        assert schedule_info.numMfma == numMfma
+        valid, message = isValid(schedule_info, {"kernel" : kernel})
+        assert valid, message
+
 class TestCustomScheduleValidation:
     def test_schedule_validation_disable(self):
         """
