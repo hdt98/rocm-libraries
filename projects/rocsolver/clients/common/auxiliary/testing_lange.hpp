@@ -310,9 +310,25 @@ void testing_lange(Arguments& argus)
     }
 
     // validate results for rocsolver-test
-    // using m * n * machine_precision as tolerance
     if(argus.unit_check)
-        ROCSOLVER_TEST_CHECK(T, max_error, m * n);
+    {
+        if(norm_type == rocsolver_norm_type_one)
+        {
+            ROCSOLVER_TEST_CHECK(T, max_error, m); // column sums of m elements
+        }
+        else if(norm_type == rocsolver_norm_type_infinity)
+        {
+            ROCSOLVER_TEST_CHECK(T, max_error, n); // row sums of n elements
+        }
+        else if(norm_type == rocsolver_norm_type_max)
+        {
+            ROCSOLVER_TEST_CHECK(T, max_error, 1); // no summation
+        }
+        else
+        {
+            ROCSOLVER_TEST_CHECK(T, max_error, m * n); // Frobenius: sum of m*n terms
+        }
+    }
 
     // output results for rocsolver-bench
     if(argus.timing)
