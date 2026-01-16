@@ -150,7 +150,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
     }
 }
 
-// find index of maximum abosolute value in vector x
+// find index of maximum absolute value in vector x
 // to be called with only a single block
 template <typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump2(const I n, T* x, I* max_idx)
@@ -161,7 +161,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump2(const I n, 
     __shared__ S sval[GECON_BLOCKSIZE / WarpSize];
     __shared__ S sval_indices[GECON_BLOCKSIZE / WarpSize];
 
-    // find index of maximum abosolute value in vector x
+    // find index of maximum absolute value in vector x
     S local_max = std::numeric_limits<S>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
@@ -369,7 +369,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     __shared__ S sval[GECON_BLOCKSIZE / WarpSize];
     __shared__ S sval_indices[GECON_BLOCKSIZE / WarpSize];
 
-    // find index of maximum abosolute value in vector x
+    // find index of maximum absolute value in vector x
     S local_max = std::numeric_limits<S>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
