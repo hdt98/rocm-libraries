@@ -50,6 +50,20 @@ option(ORIGAMI_ENABLE_FETCH "Auto-fetch dependencies with FetchContent" ON)
 
 find_package(hip REQUIRED)
 
+# Check if origami targets already exist (e.g., imported from hipblaslt or another package)
+# If they do, skip building origami to avoid target name collisions
+if(TARGET roc::origami)
+    message(STATUS "origami: roc::origami target already exists, skipping build")
+    # Create local aliases pointing to the existing targets for internal use
+    if(NOT TARGET origami)
+        add_library(origami ALIAS roc::origami)
+    endif()
+    if(NOT TARGET origami-headers AND TARGET roc::origami-headers)
+        add_library(origami-headers ALIAS roc::origami-headers)
+    endif()
+    return()
+endif()
+
 if(ORIGAMI_BUILD_SHARED_LIBS OR (BUILD_SHARED_LIBS AND ORIGAMI_STANDALONE))
     add_library(origami SHARED)
 else()
@@ -58,13 +72,20 @@ endif()
 
 rocm_set_soversion(origami "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 
-add_library(roc::origami ALIAS origami)
+# Only create alias if it doesn't already exist
+if(NOT TARGET roc::origami)
+    add_library(roc::origami ALIAS origami)
+endif()
 
 set_target_properties(origami PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(origami PUBLIC cxx_std_17)
 
 add_library(origami-headers INTERFACE)
-add_library(roc::origami-headers ALIAS origami-headers)
+
+# Only create alias if it doesn't already exist
+if(NOT TARGET roc::origami-headers)
+    add_library(roc::origami-headers ALIAS origami-headers)
+endif()
 
 target_compile_features(origami-headers INTERFACE cxx_std_17)
 
