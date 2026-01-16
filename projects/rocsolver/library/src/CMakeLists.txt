@@ -231,13 +231,14 @@ set(rocsolver_auxiliary_source
   # vector & matrix manipulations
   auxiliary/rocauxiliary_aliases.cpp
   auxiliary/rocauxiliary_lacgv.cpp
-  auxiliary/rocauxiliary_lange.cpp
   auxiliary/rocauxiliary_laswp.cpp
   # householder reflections
   auxiliary/rocauxiliary_larfg.cpp
   auxiliary/rocauxiliary_larf.cpp
   auxiliary/rocauxiliary_larft.cpp
   auxiliary/rocauxiliary_larfb.cpp
+  # norm and condition number
+  auxiliary/rocauxiliary_lange.cpp
   # plane rotations
   auxiliary/rocauxiliary_lasr.cpp
   # orthonormal/unitary matrices
