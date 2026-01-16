@@ -323,7 +323,7 @@ __host__ __device__ constexpr Y f8_convert_sr(X x);
 template <>
 inline __host__ __device__ f8_fnuz_t f8_convert_sr<f8_fnuz_t, float>(float x)
 {
-#if defined(__gfx950__) || defined(__gfx1250__)
+#if defined(__gfx950__) || defined(__gfx125__)
     // use HW clock for stochastic input multiply by incremented thread id
     uint32_t rng =
         __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
@@ -391,7 +391,7 @@ inline __host__ __device__ f8_fnuz_t f8_convert_sr<f8_fnuz_t, half_t>(half_t x)
 template <>
 inline __host__ __device__ bf8_fnuz_t f8_convert_sr<bf8_fnuz_t, float>(float x)
 {
-#if defined(__gfx950__) || defined(__gfx1250__)
+#if defined(__gfx950__) || defined(__gfx125__)
     // use HW clock for stochastic input multiply by incremented thread id
     uint32_t rng =
         __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() * (get_thread_global_1d_id() + 1));
@@ -1027,12 +1027,12 @@ inline __host__ __device__ half_t type_convert<half_t, f8_ocp_t>(f8_ocp_t x)
     output.half_vec = __builtin_amdgcn_cvt_scalef32_pk_f16_fp8(input.i16val, /*scale*/ 1.f, 0);
 
     return output.half_arr[0];
-#elif defined(__gfx1250__)
+#elif defined(__gfx125__)
     union
     {
         int ival;
         fp8_storage_t i8val[4];
-    } input;
+    } input{};
     input.i8val[0] = x.data;
     return __builtin_amdgcn_cvt_f16_fp8(input.ival, 0);
 #else
@@ -1051,7 +1051,7 @@ inline __host__ __device__ half2_t type_convert<half2_t, f8x2_ocp_t>(f8x2_ocp_t 
 {
 #if defined(__gfx950__)
     return __builtin_amdgcn_cvt_scalef32_pk_f16_fp8(bit_cast<uint16_t>(x), /*scale*/ 1.f, 0);
-#elif defined(__gfx1250__)
+#elif defined(__gfx125__)
     return __builtin_amdgcn_cvt_pk_f16_fp8(bit_cast<uint16_t>(x));
 #else
     return half2_t{type_convert<half_t>(float(x.AsType<f8_ocp_t>()[Number<0>{}])),
@@ -1084,6 +1084,20 @@ inline __host__ __device__ bhalf_t type_convert<bhalf_t, f8_ocp_t>(f8_ocp_t x)
     output.bhalf_vec = __builtin_amdgcn_cvt_scalef32_pk_bf16_fp8(input.i16val, /*scale*/ 1.f, 0);
 
     return output.bhalf_arr[0];
+#elif defined(__gfx125__)
+    union
+    {
+        fp8_impl::uint32x2_t ival;
+        f8_ocp_t f8val[8];
+    } input{};
+    input.f8val[0] = x;
+    union
+    {
+        bhalf8_t bhalf_vec;
+        bhalf_t bhalf_arr[8];
+    } output;
+    output.bhalf_vec = __builtin_amdgcn_cvt_scale_pk8_bf16_fp8(input.ival, uint32_t{0x7F}, 0);
+    return output.bhalf_arr[0];
 #else
     return type_convert<bhalf_t>(
         fp8_impl::cast_from_f8<float, f8_ocp_t::wm, f8_ocp_t::we, false>(x.data));
@@ -1101,6 +1115,20 @@ inline __host__ __device__ bhalf2_t type_convert<bhalf2_t, f8x2_ocp_t>(f8x2_ocp_
 {
 #if defined(__gfx950__)
     return __builtin_amdgcn_cvt_scalef32_pk_bf16_fp8(bit_cast<uint16_t>(x), /*scale*/ 1.f, 0);
+#elif defined(__gfx125__)
+    union
+    {
+        fp8_impl::uint32x2_t ival;
+        f8x2_ocp_t f8x2val[4];
+    } input{};
+    input.f8x2val[0] = x;
+    union
+    {
+        bhalf8_t bhalf_vec;
+        bhalf2_t bhalf_arr[4];
+    } output;
+    output.bhalf_vec = __builtin_amdgcn_cvt_scale_pk8_bf16_fp8(input.ival, uint32_t{0x7F}, 0);
+    return output.bhalf_arr[0];
 #else
     return bhalf2_t{type_convert<bhalf_t>(float(x.AsType<f8_ocp_t>()[Number<0>{}])),
                     type_convert<bhalf_t>(float(x.AsType<f8_ocp_t>()[Number<1>{}]))};
@@ -1172,12 +1200,12 @@ inline __host__ __device__ half_t type_convert<half_t, bf8_ocp_t>(bf8_ocp_t x)
     } val;
     val.i8val[0] = x.data;
     return __builtin_amdgcn_cvt_scalef32_pk_f16_bf8(val.i16val, /*scale*/ 1.f, 0)[0];
-#elif defined(__gfx1250__)
+#elif defined(__gfx125__)
     union
     {
         int ival;
         fp8_storage_t i8val[4];
-    } input;
+    } input{};
     input.i8val[0] = x.data;
     return __builtin_amdgcn_cvt_f16_bf8(input.ival, 0);
 #else
@@ -1196,7 +1224,7 @@ inline __host__ __device__ half2_t type_convert<half2_t, bf8x2_ocp_t>(bf8x2_ocp_
 {
 #if defined(__gfx950__)
     return __builtin_amdgcn_cvt_scalef32_pk_f16_bf8(bit_cast<uint16_t>(x), /*scale*/ 1.f, 0);
-#elif defined(__gfx1250__)
+#elif defined(__gfx125__)
     return __builtin_amdgcn_cvt_pk_f16_bf8(bit_cast<uint16_t>(x));
 #else
     return half2_t{type_convert<half_t>(float(x.AsType<bf8_ocp_t>()[Number<0>{}])),
@@ -1229,6 +1257,20 @@ inline __host__ __device__ bhalf_t type_convert<bhalf_t, bf8_ocp_t>(bf8_ocp_t x)
     output.bhalf_vec = __builtin_amdgcn_cvt_scalef32_pk_bf16_bf8(input.i16val, /*scale*/ 1.f, 0);
 
     return output.bhalf_arr[0];
+#elif defined(__gfx125__)
+    union
+    {
+        fp8_impl::uint32x2_t ival;
+        bf8_ocp_t bf8val[8];
+    } input{};
+    input.bf8val[0] = x;
+    union
+    {
+        bhalf8_t bhalf_vec;
+        bhalf_t bhalf_arr[8];
+    } output;
+    output.bhalf_vec = __builtin_amdgcn_cvt_scale_pk8_bf16_bf8(input.ival, uint32_t{0x7F}, 0);
+    return output.bhalf_arr[0];
 #else
     return type_convert<bhalf_t>(
         fp8_impl::cast_from_f8<float, bf8_ocp_t::wm, bf8_ocp_t::we, false>(x.data));
@@ -1246,6 +1288,20 @@ inline __host__ __device__ bhalf2_t type_convert<bhalf2_t, bf8x2_ocp_t>(bf8x2_oc
 {
 #if defined(__gfx950__)
     return __builtin_amdgcn_cvt_scalef32_pk_bf16_bf8(bit_cast<uint16_t>(x), /*scale*/ 1.f, 0);
+#elif defined(__gfx125__)
+    union
+    {
+        fp8_impl::uint32x2_t ival;
+        bf8x2_ocp_t f8x2val[4];
+    } input{};
+    input.f8x2val[0] = x;
+    union
+    {
+        bhalf8_t bhalf_vec;
+        bhalf2_t bhalf_arr[4];
+    } output;
+    output.bhalf_vec = __builtin_amdgcn_cvt_scale_pk8_bf16_bf8(input.ival, uint32_t{0x7F}, 0);
+    return output.bhalf_arr[0];
 #else
     return bhalf2_t{type_convert<bhalf_t>(float(x.AsType<bf8_ocp_t>()[Number<0>{}])),
                     type_convert<bhalf_t>(float(x.AsType<bf8_ocp_t>()[Number<1>{}]))};

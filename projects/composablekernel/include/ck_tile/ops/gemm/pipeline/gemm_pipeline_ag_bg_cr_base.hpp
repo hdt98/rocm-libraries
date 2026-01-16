@@ -30,10 +30,12 @@ struct GemmPipelineAgBgCrImplBase
     using BsLayout       = remove_cvref_t<typename Problem::BsLayoutTuple>;
     using BlockGemmShape = remove_cvref_t<typename Problem::BlockGemmShape>;
 
-    using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataType>>;
-    using ALayout   = remove_cvref_t<std::tuple_element_t<number<0>{}, AsLayout>>;
-    using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataType>>;
-    using BLayout   = remove_cvref_t<std::tuple_element_t<number<0>{}, BsLayout>>;
+    using ADataType   = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataType>>;
+    using ALayout     = remove_cvref_t<std::tuple_element_t<number<0>{}, AsLayout>>;
+    using BInDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataType>>;
+    using BDataType =
+        std::conditional_t<std::is_same_v<BInDataType, pk_fp4_raw_t>, ADataType, BInDataType>;
+    using BLayout = remove_cvref_t<std::tuple_element_t<number<0>{}, BsLayout>>;
 
     static constexpr index_t MPerBlock = BlockGemmShape::kM;
     static constexpr index_t NPerBlock = BlockGemmShape::kN;
@@ -77,12 +79,17 @@ struct GemmPipelineAgBgCrImplBase
 
     CK_TILE_HOST_DEVICE static constexpr auto TransposeC() { return Problem::TransposeC; }
 
-    template <typename DstBlockTile, typename SrcTileWindow, typename DramTileWindowStep>
+    template <typename SrcDataType = void,
+              typename DstDataType = void,
+              index_t UnaryOpSize  = 8,
+              typename DstBlockTile,
+              typename SrcTileWindow,
+              typename DramTileWindowStep>
     CK_TILE_DEVICE void GlobalPrefetch(DstBlockTile& dst_block_tile,
                                        SrcTileWindow& dram_tile_window,
                                        const DramTileWindowStep& dram_tile_window_step) const
     {
-        load_tile(dst_block_tile, dram_tile_window);
+        load_int4_tile<SrcDataType, DstDataType, UnaryOpSize>(dst_block_tile, dram_tile_window);
         move_tile_window(dram_tile_window, dram_tile_window_step);
     }
 
@@ -144,21 +151,24 @@ struct GemmPipelineAgBgCrImplBase
             load_tile(dst_block_tile, lds_tile_window);
     }
 
-    template <typename OverrideADataType = ADataType, typename OverrideBDataType = BDataType>
     CK_TILE_DEVICE auto GetABLdsTensorViews(void* p_smem) const
     {
+        using ALdsType = typename Policy::template ALdsDataType_<Problem>;
+        using BLdsType = typename Policy::template BLdsDataType_<Problem>;
         // A tile in LDS
-        OverrideADataType* __restrict__ p_a_lds = static_cast<OverrideADataType*>(p_smem);
-        constexpr auto a_lds_block_desc =
-            Policy::template MakeALdsBlockDescriptor<Problem, OverrideADataType>();
+        ALdsType* __restrict__ p_a_lds  = static_cast<ALdsType*>(p_smem);
+        constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
         auto a_lds_block = make_tensor_view<address_space_enum::lds>(p_a_lds, a_lds_block_desc);
+
+        constexpr index_t APackedSize =
+            ck_tile::numeric_traits<remove_cvref_t<ALdsType>>::PackedSize;
 
         // TODO: LDS alignment should come from Policy!
         constexpr index_t a_lds_block_space_size_aligned = integer_least_multiple(
-            sizeof(OverrideADataType) * a_lds_block_desc.get_element_space_size(), 16);
+            sizeof(ALdsType) * a_lds_block_desc.get_element_space_size() / APackedSize, 16);
 
         // B tile in LDS
-        OverrideBDataType* __restrict__ p_b_lds = static_cast<OverrideBDataType*>(
+        BLdsType* __restrict__ p_b_lds = static_cast<BLdsType*>(
             static_cast<void*>(static_cast<char*>(p_smem) + a_lds_block_space_size_aligned));
         constexpr auto b_lds_block_desc = Policy::template MakeBLdsBlockDescriptor<Problem>();
         auto b_lds_block = make_tensor_view<address_space_enum::lds>(p_b_lds, b_lds_block_desc);
@@ -170,21 +180,27 @@ struct GemmPipelineAgBgCrImplBase
     template <index_t num_lds_buffers>
     CK_TILE_DEVICE auto GetABLdsTensorViews(void* p_smem) const
     {
-
+        using ALdsType                  = typename Policy::template ALdsDataType_<Problem>;
+        using BLdsType                  = typename Policy::template BLdsDataType_<Problem>;
         constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
         constexpr auto b_lds_block_desc = Policy::template MakeBLdsBlockDescriptor<Problem>();
 
+        constexpr index_t APackedSize =
+            ck_tile::numeric_traits<remove_cvref_t<ALdsType>>::PackedSize;
+        constexpr index_t BPackedSize =
+            ck_tile::numeric_traits<remove_cvref_t<BLdsType>>::PackedSize;
+
         constexpr index_t a_lds_block_space_size_aligned = integer_least_multiple(
-            sizeof(ADataType) * a_lds_block_desc.get_element_space_size(), 16);
+            sizeof(ALdsType) * a_lds_block_desc.get_element_space_size() / APackedSize, 16);
         constexpr index_t b_lds_block_space_size_aligned = integer_least_multiple(
-            sizeof(BDataType) * b_lds_block_desc.get_element_space_size(), 16);
+            sizeof(BLdsType) * b_lds_block_desc.get_element_space_size() / BPackedSize, 16);
 
         constexpr index_t all_a_buffers_size = a_lds_block_space_size_aligned * num_lds_buffers;
 
         // num_lds_buffers a_lds_block: [A_0][A_1]
         auto a_lds_blocks = generate_tuple(
             [&](auto i) {
-                ADataType* __restrict__ p_a_lds = static_cast<ADataType*>(static_cast<void*>(
+                ALdsType* __restrict__ p_a_lds = static_cast<ALdsType*>(static_cast<void*>(
                     static_cast<char*>(p_smem) + a_lds_block_space_size_aligned * i.value));
                 return make_tensor_view<address_space_enum::lds>(p_a_lds, a_lds_block_desc);
             },
@@ -193,7 +209,7 @@ struct GemmPipelineAgBgCrImplBase
         // num_lds_buffers b_lds_block: [B_0][B_1]
         auto b_lds_blocks = generate_tuple(
             [&](auto i) {
-                BDataType* __restrict__ p_b_lds = static_cast<BDataType*>(
+                BLdsType* __restrict__ p_b_lds = static_cast<BLdsType*>(
                     static_cast<void*>(static_cast<char*>(p_smem) + all_a_buffers_size +
                                        b_lds_block_space_size_aligned * i.value));
                 return make_tensor_view<address_space_enum::lds>(p_b_lds, b_lds_block_desc);
@@ -394,12 +410,17 @@ struct GemmPipelineAgBgCrImplBase
 
         auto b_copy_lds_window = make_tile_window(b_lds_block_view, b_lds_shape, {0, 0});
 
+        using BLdsDataType =
+            std::conditional_t<std::is_same_v<typename Problem::BDataType, pk_fp4_raw_t>,
+                               typename Problem::ADataType,
+                               typename Problem::BDataType>;
+
         auto b_lds_load_tile_distr = []() {
             if constexpr(is_b_load_tr)
                 return make_static_tile_distribution(
-                    typename InputTileDistributionTraits<
-                        typename BLdsLoadTileDistr::DstrEncode,
-                        typename Problem::BDataType>::TransposedDstrEncode{});
+                    typename InputTileDistributionTraits<typename BLdsLoadTileDistr::DstrEncode,
+                                                         BLdsDataType>::TransposedDstrEncode{});
+
             else
                 return BLdsLoadTileDistr{};
         }();

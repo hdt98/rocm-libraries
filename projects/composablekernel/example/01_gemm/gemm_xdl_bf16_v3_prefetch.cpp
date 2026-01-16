@@ -46,6 +46,7 @@ using DeviceGemmV3Instance =
         CDataType,
         false,
         false,
+        0,
         UseDataCachePrefetch>;
 // clang-format on
 #else
@@ -72,6 +73,7 @@ using DeviceGemmV3Instance =
         CDataType,
         false,
         false,
+        0,
         UseDataCachePrefetch>;
 // clang-format on
 #endif

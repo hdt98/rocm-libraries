@@ -12,51 +12,6 @@
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/utility/json_dump.hpp"
 
-template <typename PrecType, ck_tile::index_t M_Warp_Tile>
-constexpr ck_tile::index_t get_k_warp_tile()
-{
-#if CK_TILE_USE_WMMA
-#if defined(CK_USE_GFX1250)
-    constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
-                             std::is_same_v<PrecType, ck_tile::bf8_t> ||
-                             std::is_same_v<PrecType, ck_tile::int8_t>;
-    return is_8bit ? 64 : 32;
-#else
-    return 16;
-#endif
-#else
-#if defined(CK_GFX950_SUPPORT)
-    constexpr bool is_8bit_float =
-        std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::bf8_t>;
-    if constexpr(M_Warp_Tile == 32)
-        return is_8bit_float ? 64 : 16;
-    else
-        return is_8bit_float ? 128 : 32;
-#else
-    if constexpr(M_Warp_Tile == 32)
-        return 16;
-    else
-        return 32;
-#endif
-#endif
-}
-
-template <typename PrecType, ck_tile::index_t M_Warp_Tile>
-constexpr ck_tile::index_t get_k_warp_tile_flatmm()
-{
-#if defined(CK_GFX950_SUPPORT)
-    if constexpr(M_Warp_Tile == 32)
-        return sizeof(PrecType) == 2 ? 16 : 64;
-    else
-        return sizeof(PrecType) == 2 ? 32 : 128;
-#else
-    if constexpr(M_Warp_Tile == 32)
-        return sizeof(PrecType) == 2 ? 16 : 32;
-    else
-        return sizeof(PrecType) == 2 ? 32 : 64;
-#endif
-}
-
 struct GemmConfigBase
 {
     static constexpr bool kPadM = false;
@@ -137,7 +92,8 @@ struct GemmConfigComputeV3 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = false;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V3;
@@ -156,7 +112,8 @@ struct GemmConfigComputeV3_1 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
     static constexpr ck_tile::index_t N_Warp_Tile = 32;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = false;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V3;
@@ -175,7 +132,8 @@ struct GemmConfigComputeV3_2 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = false;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V3;
@@ -196,7 +154,8 @@ struct GemmConfigComputeV3_WMMA : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = false;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V3;
@@ -219,7 +178,8 @@ struct GemmConfigComputeV4 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
     static constexpr ck_tile::index_t N_Warp_Tile = 32;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = true;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V4;
@@ -238,7 +198,8 @@ struct GemmConfigComputeV4_1 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
     static constexpr ck_tile::index_t N_Warp_Tile = 32;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = true;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V4;
@@ -257,7 +218,8 @@ struct GemmConfigComputeV5 : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
     static constexpr ck_tile::index_t N_Warp_Tile = 32;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile>();
 
     static constexpr bool DoubleSmemBuffer          = false;
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V5;
@@ -297,7 +259,8 @@ struct GemmConfigPreshuffleDecode : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile_flatmm<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile, true>();
 
     static constexpr int kBlockPerCu                = 1;
     static constexpr auto Scheduler                 = ck_tile::GemmPipelineScheduler::Default;
@@ -321,7 +284,8 @@ struct GemmConfigPreshufflePrefill : public GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile_flatmm<PrecType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile, true>();
 
     static constexpr int kBlockPerCu                = 2;
     static constexpr auto Scheduler                 = ck_tile::GemmPipelineScheduler::Default;
@@ -337,7 +301,20 @@ struct GemmConfigPreshufflePrefill_Wmma : public GemmConfigPreshufflePrefill<Pre
 {
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::get_k_warp_tile<PrecType, M_Warp_Tile, true>();
+};
+
+template <typename PrecType>
+struct GemmConfigMixedPrec_Wmma : public GemmConfigComputeV3_WMMA<PrecType>
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 128;
 };
 
 template <typename ADataType, typename BDataType = ADataType, typename CDataType = ADataType>
@@ -414,6 +391,24 @@ struct GemmTypeConfig<ck_tile::int8_t, ck_tile::int8_t, int32_t>
     using BDataType   = ck_tile::int8_t;
     using AccDataType = int32_t;
     using CDataType   = int32_t;
+};
+
+template <>
+struct GemmTypeConfig<ck_tile::fp8_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::fp8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
+template <>
+struct GemmTypeConfig<ck_tile::bf8_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::bf8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
 };
 
 template <ck_tile::GemmPipeline PipelineId>
@@ -502,6 +497,15 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_ASYNC>
 };
 
 template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_ASYNC_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompAsyncV2<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompAsyncV2<PipelineProblem>;
+};
+
+template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V1>
 {
     template <typename PipelineProblem>
@@ -563,12 +567,6 @@ inline auto create_args()
         .insert("rotating_count", "1000", "rotating count, defaults to 1000");
     return arg_parser;
 }
-
-// Type aliases for memory operation integral constants
-using MemoryOpSet =
-    std::integral_constant<ck_tile::memory_operation_enum, ck_tile::memory_operation_enum::set>;
-using MemoryOpAtomicAdd = std::integral_constant<ck_tile::memory_operation_enum,
-                                                 ck_tile::memory_operation_enum::atomic_add>;
 
 // host API
 template <typename ADataType,

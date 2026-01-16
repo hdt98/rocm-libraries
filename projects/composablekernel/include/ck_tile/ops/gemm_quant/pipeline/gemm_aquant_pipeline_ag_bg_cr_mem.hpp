@@ -28,7 +28,7 @@ struct AQuantGemmPipelineAgBgCrMem : public BaseGemmPipelineAgBgCrMem<Problem>
     using BDataType      = remove_cvref_t<typename Problem::BDataType>;
     using CDataType      = remove_cvref_t<typename Problem::CDataType>;
     using BlockGemmShape = remove_cvref_t<typename Problem::BlockGemmShape>;
-    using QuantGroupSize = remove_cvref_t<typename Problem::QuantGroupSize>;
+    using QuantGroupSize = remove_cvref_t<typename Problem::AQuantGroupSize>;
 
     static_assert(QuantGroupSize::kM == 1, "no block for M supported yet!");
     static_assert(QuantGroupSize::kN == 1, "only M/K blocks for AQuant kernel!");
@@ -228,7 +228,7 @@ struct AQuantGemmPipelineAgBgCrMem : public BaseGemmPipelineAgBgCrMem<Problem>
                           "B block window has incorrect lengths for defined BLayout!");
 
             // A/B tiles in LDS - using the same approach as regular gemm pipeline
-            auto ab_lds_blocks = Base::template GetABLdsTensorViews<BDataType, BDataType>(p_smem);
+            auto ab_lds_blocks = Base::GetABLdsTensorViews(p_smem);
             auto& a_lds_block  = ab_lds_blocks.at(I0{});
             auto& b_lds_block  = ab_lds_blocks.at(I1{});
 

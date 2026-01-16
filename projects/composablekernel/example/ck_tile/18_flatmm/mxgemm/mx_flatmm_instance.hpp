@@ -61,8 +61,7 @@ float mx_flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                   "mixed_prec_flatmm requires ADataType is a wider type than BDataType");
 
     constexpr auto scheduler = FlatmmConfig::Scheduler;
-    constexpr auto memory_operation =
-        Splitk ? ck_tile::memory_operation_enum::atomic_add : ck_tile::memory_operation_enum::set;
+    ck_tile::ignore          = Splitk;
 
     constexpr int BlockedXDLN_PerWarp = 2; // determined by scale shuffle pattern
 
@@ -98,7 +97,6 @@ float mx_flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                                                                    FlatmmConfig::N_Warp_Tile,
                                                                    FlatmmConfig::K_Warp_Tile,
                                                                    MXPipelineProblem::TransposeC,
-                                                                   memory_operation,
                                                                    FlatmmConfig::NumWaveGroups,
                                                                    false, // FixedVectorSize
                                                                    1,     // VectorSizeC
@@ -109,8 +107,8 @@ float mx_flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
 
     auto kargs = Kernel::MakeKernelArgs(args);
 
-    const dim3 grids      = Kernel::GridSize(kargs);
-    constexpr dim3 blocks = Kernel::BlockSize();
+    const dim3 grids  = Kernel::GridSize(kargs);
+    const dim3 blocks = Kernel::BlockSize();
 
     if(!Kernel::IsSupportedArgument(kargs))
         throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!\n");

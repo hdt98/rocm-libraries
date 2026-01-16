@@ -43,9 +43,6 @@ using DeviceGemmV2Instance = ck::tensor_operation::device::DeviceGemm_Xdl_CkTile
     ck_tile::GemmPipeline::COMPUTE_V3>;
 // clang-format on
 
-using ReferenceGemmInstance = ck::tensor_operation::host::
-    ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
-
 #include "run_gemm_example_v2.inc"
 
 int main(int argc, char* argv[]) { return !run_gemm_splitk_example(argc, argv); }

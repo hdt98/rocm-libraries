@@ -24,13 +24,14 @@ struct BlockUniversalGemmAsBsCr
     template <typename PipelineProblem_, typename GemmPolicy_>
     struct GemmTraits_
     {
-        using Problem         = remove_cvref_t<PipelineProblem_>;
-        using Policy          = remove_cvref_t<GemmPolicy_>;
-        using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-        using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-        using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-        using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-        using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>;
+        using Problem          = remove_cvref_t<PipelineProblem_>;
+        using Policy           = remove_cvref_t<GemmPolicy_>;
+        using ADataType        = remove_cvref_t<typename Problem::ADataType>;
+        using BDataType        = remove_cvref_t<typename Problem::BDataType>;
+        using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
+        using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
+        using CDataType        = remove_cvref_t<typename Problem::CDataType>;
+        using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;
@@ -89,20 +90,14 @@ struct BlockUniversalGemmAsBsCr
     public:
     using Traits = GemmTraits_<Problem_, Policy_>;
 
-    using ADataType       = remove_cvref_t<typename Traits::ADataType>;
-    using BDataType       = remove_cvref_t<typename Traits::BDataType>;
-    using ComputeDataType = remove_cvref_t<typename Traits::ComputeDataType>;
-    using CDataType       = remove_cvref_t<typename Traits::CDataType>;
+    using ADataType        = remove_cvref_t<typename Traits::ADataType>;
+    using BDataType        = remove_cvref_t<typename Traits::BDataType>;
+    using AComputeDataType = remove_cvref_t<typename Traits::AComputeDataType>;
+    using BComputeDataType = remove_cvref_t<typename Traits::BComputeDataType>;
+    using CDataType        = remove_cvref_t<typename Traits::CDataType>;
 
-    using ATypeToUse = std::conditional_t<
-        std::is_same_v<ADataType, pk_int4_t> && std::is_same_v<BDataType, pk_int4_t>,
-        ComputeDataType,
-        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>>;
-
-    using BTypeToUse = std::conditional_t<
-        std::is_same_v<ADataType, pk_int4_t> && std::is_same_v<BDataType, pk_int4_t>,
-        ComputeDataType,
-        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>>;
+    using ATypeToUse = AComputeDataType;
+    using BTypeToUse = BComputeDataType;
 
     using WarpGemm = remove_cvref_t<typename Traits::WarpGemm>;
 

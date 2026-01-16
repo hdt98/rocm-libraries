@@ -14,14 +14,28 @@ struct BaseFlatmmPipelineAGmemBGmemCRegV1
 {
     static constexpr index_t PrefetchStages = 2;
 
-    CK_TILE_HOST static constexpr bool BlockHasHotloop(index_t num_loop)
+    CK_TILE_HOST_DEVICE static constexpr bool BlockHasHotloop(index_t num_loop)
     {
         return num_loop > PrefetchStages;
     }
 
-    CK_TILE_HOST static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)
+    CK_TILE_HOST_DEVICE static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)
     {
         return num_loop % 2 == 0 ? TailNumber::Even : TailNumber::Odd;
+    }
+
+    CK_TILE_HOST static constexpr amd_buffer_coherence_enum
+    GetBMemNTType(index_t M, index_t N, index_t K)
+    {
+        ck_tile::ignore = N;
+        ck_tile::ignore = K;
+        if(M <= 416)
+        {
+#if defined(__gfx942__) || defined(__gfx950__)
+            return ck_tile::amd_buffer_coherence_enum::WAVE_NT1;
+#endif
+        }
+        return ck_tile::amd_buffer_coherence_enum::coherence_default;
     }
 
     template <bool DispatchHotloop = false, TailNumber tail_num, typename RunFunction>
@@ -46,14 +60,15 @@ struct BaseFlatmmPipelineAGmemBGmemCRegV1
         else
         {
             assert(("Wrong TailNumber!", false));
-            return decltype(TailHandler<>(run_func, true, TailNumber::Even)){};
+            return TailHandler<DispatchHotloop, TailNumber::Even>(run_func, has_hot_loop);
         }
     }
 };
 
 template <typename Problem, typename PipelinePolicy = UniversalFlatmmPipelineAgBgCrPolicy>
-struct FlatmmPipelineAGmemBGmemCRegV1
+struct FlatmmPipelineAGmemBGmemCRegV1 : public BaseFlatmmPipelineAGmemBGmemCRegV1<Problem>
 {
+    using Base           = BaseFlatmmPipelineAGmemBGmemCRegV1<Problem>;
     using ADataType      = remove_cvref_t<typename Problem::ADataType>;
     using BDataType      = remove_cvref_t<typename Problem::BDataType>;
     using CDataType      = remove_cvref_t<typename Problem::CDataType>;
@@ -123,9 +138,6 @@ struct FlatmmPipelineAGmemBGmemCRegV1
     static constexpr index_t m_preload = (MIterPerWarp * KIterPerWarp >= DsReadPreload)
                                              ? DsReadPreload
                                              : MIterPerWarp * KIterPerWarp;
-
-    static constexpr bool HasHotLoop = Problem::HasHotLoop;
-    static constexpr auto TailNum    = Problem::TailNum;
 
 /*
 defined(USING_MFMA_16x16x32) && defined(ENABLE_FP8) // mi300 fp8 16c 0.5*K1
@@ -509,7 +521,11 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
         // __builtin_amdgcn_sched_barrier(0);
     }
 
-    template <typename ADramBlockWindowTmp, typename BFlatBlockWindowTmp, typename AElementFunction>
+    template <bool HasHotLoop,
+              TailNumber TailNum,
+              typename ADramBlockWindowTmp,
+              typename BFlatBlockWindowTmp,
+              typename AElementFunction>
     CK_TILE_HOST_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
                                         const AElementFunction& a_element_func,
                                         const BFlatBlockWindowTmp& b_flat_dram_block_window_tmp,
@@ -1000,13 +1016,20 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
                                    void* p_smem_ping,
                                    void* p_smem_pong) const
     {
-        return operator()(
-            a_dram_block_window_tmp,
-            [](const ADataType & a) { return a; },
-            b_flat_dram_block_window_tmp,
-            num_loop,
-            p_smem_ping,
-            p_smem_pong);
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+
+        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+            return operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                [](const ADataType& a) { return a; },
+                b_flat_dram_block_window_tmp,
+                num_loop,
+                p_smem_ping,
+                p_smem_pong);
+        };
+
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
 };
 

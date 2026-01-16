@@ -25,6 +25,7 @@
 #include "ck/host_utility/kernel_launch.hpp"
 
 #ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/description.hpp"
 #include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_weight_xdl_cshuffle.hpp"
 #endif
 
@@ -47,7 +48,7 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_batched_gemm_xdlops_bwd_weight(const FloatA* __restrict__ p_a_grid,
                                           const FloatB* __restrict__ p_b_grid,
@@ -168,14 +169,30 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
                                         ComputeTypeA,
                                         ComputeTypeB>
 {
-    using DeviceOp = DeviceGroupedConvBwdWeight_Xdl_CShuffle;
-    GET_NXDL_PER_WAVE_IMPL
-    static constexpr auto NXdlPerWave64 = GetNXdlPerWave<true>();
-    static constexpr auto NXdlPerWave32 = GetNXdlPerWave<false>();
-
-    using ADataType = OutDataType;
-    using BDataType = InDataType;
-    using CDataType = WeiDataType;
+    using DeviceOp                         = DeviceGroupedConvBwdWeight_Xdl_CShuffle;
+    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               true>();
+    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               false>();
+    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
+    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
+    using ADataType                        = OutDataType;
+    using BDataType                        = InDataType;
+    using CDataType                        = WeiDataType;
 
     // If NGCHW then ADataType must be equal to BDataType
     static_assert(!(is_NGCHW_NGKHW<InLayout, WeiLayout, OutLayout>() ||
@@ -372,7 +389,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
                             I1,
                             I0>;
 
-    template <index_t NXdlPerWave_>
+    template <typename WarpTileConfig>
     using GridwiseGemmBase = GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_bwd_weight<
         BlockSize,
         ADataType,
@@ -389,11 +406,11 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
         MPerBlock,
         NPerBlock,
         K0PerBlock,
-        MPerXDL,
-        NPerXDL,
+        WarpTileConfig::At(0),
+        WarpTileConfig::At(1),
         K1,
-        MXdlPerWave,
-        NXdlPerWave_,
+        WarpTileConfig::At(2),
+        WarpTileConfig::At(3),
         ABlockTransferThreadClusterLengths_K0_M_K1,
         ABlockTransferThreadClusterArrangeOrder,
         ABlockTransferSrcAccessOrder,
@@ -416,8 +433,8 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
         BBlockLdsN1PerBlock,
         BBlockLdsN0PerBlock,
         BBlockLdsN1Padding,
-        CShuffleMXdlPerWavePerShuffle,
-        CShuffleNXdlPerWavePerShuffle,
+        WarpTileConfig::At(4),
+        WarpTileConfig::At(5),
         CBlockTransferScalarPerVector_NWaveNPerXdl,
         CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         true,
@@ -426,8 +443,8 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
         PipelineVersion::v1,
         ComputeTypeA,
         ComputeTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
+    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
+    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     // Argument
     using CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock =
@@ -946,7 +963,12 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
             return false;
         }
 #endif
-        if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
+        if(!ck::is_xdl_wmma_supported<ComputeTypeA,
+                                      ComputeTypeB,
+                                      MPerXDL,
+                                      NPerXDL,
+                                      WarpTileConfig32.At(0),
+                                      WarpTileConfig32.At(1)>())
         {
             return false;
         }
@@ -1247,6 +1269,11 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
                       "instance_traits_device_grouped_conv_bwd_weight_xdl_cshuffle.hpp "
                       "for the given template parameters.");
         return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+
+    std::unique_ptr<ck_tile::reflect::Description> describe() const override
+    {
+        return std::make_unique<ck_tile::reflect::InstanceStringDescription>(GetInstanceString());
     }
 #endif
 

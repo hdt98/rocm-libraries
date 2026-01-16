@@ -170,13 +170,10 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
     const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
     float ave_time{0};
 
-    const auto Run = [&](const auto has_hot_loop_,
-                         const auto tail_number_,
-                         const auto memory_operation_) {
-        constexpr bool has_hot_loop_v   = has_hot_loop_.value;
-        constexpr auto tail_number_v    = tail_number_.value;
-        constexpr auto scheduler        = FlatmmConfig::Scheduler;
-        constexpr auto memory_operation = memory_operation_.value;
+    const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {
+        constexpr bool has_hot_loop_v = has_hot_loop_.value;
+        constexpr auto tail_number_v  = tail_number_.value;
+        constexpr auto scheduler      = FlatmmConfig::Scheduler;
 
         using CodegenPipelineProblem = ck_tile::FlatmmPipelineProblem<ADataType,
                                                                       BDataType,
@@ -207,7 +204,6 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                                              FlatmmConfig::N_Warp_Tile,
                                              FlatmmConfig::K_Warp_Tile,
                                              CodegenPipelineProblem::TransposeC,
-                                             memory_operation,
                                              FlatmmConfig::NumWaveGroups,
                                              false,
                                              1,
@@ -219,8 +215,8 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
 
         auto kargs = Kernel::MakeKernelArgs(args);
 
-        const dim3 grids      = Kernel::GridSize(kargs);
-        constexpr dim3 blocks = Kernel::BlockSize();
+        const dim3 grids  = Kernel::GridSize(kargs);
+        const dim3 blocks = Kernel::BlockSize();
 
         if(!Kernel::IsSupportedArgument(kargs))
         {
@@ -282,23 +278,7 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
         return ave_time;
     };
 
-    const auto RunSplitk = [&](const auto has_hot_loop_, const auto tail_number_) {
-        if(args.k_batch == 1)
-        {
-            Run(has_hot_loop_,
-                tail_number_,
-                ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                           ck_tile::memory_operation_enum::set>{});
-        }
-        else
-        {
-            Run(has_hot_loop_,
-                tail_number_,
-                ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                           ck_tile::memory_operation_enum::atomic_add>{});
-        }
-    };
-    BaseGemmPipeline::TailHandler(RunSplitk, has_hot_loop, tail_num);
+    BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
     return ave_time;
 }
 
@@ -504,6 +484,9 @@ int main(int argc, char* argv[])
 
     try
     {
+#if CK_TILE_USE_WMMA
+        return !run_flatmm_example<FlatmmConfig16_Wmma>(argc, argv);
+#else
         int warp_tile = arg_parser.get_int("warp_tile");
         if(warp_tile == 0)
         {
@@ -521,6 +504,7 @@ int main(int argc, char* argv[])
         {
             return !run_flatmm_example<FlatmmConfig32_950>(argc, argv);
         }
+#endif
     }
     catch(const std::runtime_error& e)
     {

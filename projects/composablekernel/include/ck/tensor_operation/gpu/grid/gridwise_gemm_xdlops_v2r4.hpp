@@ -30,7 +30,7 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_gemm_xdlops_v2r4(const FloatAB* __restrict__ p_a_grid,
                             const FloatAB* __restrict__ p_b_grid,
@@ -195,7 +195,8 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_v2r4
             return false;
         }
 
-        if constexpr(K1Value % MfmaSelector<FloatAB, MPerXdl, NPerXdl>::selected_mfma.k_per_blk !=
+        if constexpr(K1Value % MfmaSelector<FloatAB, MPerXdl, NPerXdl, FloatAB, true>::selected_mfma
+                                   .k_per_blk !=
                      0)
         {
             return false;

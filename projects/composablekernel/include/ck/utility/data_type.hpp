@@ -48,6 +48,10 @@ struct f4x2_pk_t
     type data;
     __host__ __device__ constexpr f4x2_pk_t() : data{type{}} {}
     __host__ __device__ constexpr f4x2_pk_t(const type init) : data{init} {}
+    __host__ __device__ constexpr f4x2_pk_t(const type x0, const type x1)
+        : data{static_cast<type>((x1 << 4) | (x0 & 0b00001111))}
+    {
+    }
 
     template <index_t I>
     __host__ __device__ inline type unpack(Number<I>) const
@@ -59,9 +63,10 @@ struct f4x2_pk_t
             return data & 0b00001111;
     }
 
-    __host__ __device__ inline type pack(const type x0, const type x1)
+    __host__ __device__ inline f4x2_pk_t& pack(const type x0, const type x1)
     {
-        return (x1 << 4) | (x0 & 0b00001111);
+        this->data = (x1 << 4) | (x0 & 0b00001111);
+        return *this;
     }
 
     // Compare operator
@@ -421,13 +426,13 @@ struct packed_type_info
         static_cast<index_t>(get_packed_type_info().At(ck::Number<0>{}));
 };
 template <typename T>
-using element_type_t = typename packed_type_info<T>::element_type;
+using element_type_t = typename packed_type_info<remove_cvref_t<T>>::element_type;
 
 template <typename T>
-inline constexpr index_t packed_size_v = packed_type_info<T>::packed_size;
+inline constexpr index_t packed_size_v = packed_type_info<remove_cvref_t<T>>::packed_size;
 
 template <typename T>
-inline constexpr bool is_packed_type_v = packed_size_v<T> > 1;
+inline constexpr bool is_packed_type_v = packed_size_v<remove_cvref_t<T>> > 1;
 
 template <typename T, index_t N = 0>
 struct packed_type_maker

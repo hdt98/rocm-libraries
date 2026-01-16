@@ -205,11 +205,19 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
             constexpr index_t B_LDS_Read_Inst_Num =
                 WaveNumM * NPerBlock * KPerBlock / (BlockSize * B_LDS_Read_Width) / sub_tile_num;
 
+            // for fp8 will use ds_load_2addr_b64
+            constexpr auto num_ds_read_inst_a =
+                A_LDS_Read_Width * sizeof(ADataType) / APackedSize == 16 ? A_LDS_Read_Inst_Num
+                                                                         : A_LDS_Read_Inst_Num / 2;
+            constexpr auto num_ds_read_inst_b =
+                B_LDS_Read_Width * sizeof(BDataType) / BPackedSize == 16 ? B_LDS_Read_Inst_Num
+                                                                         : B_LDS_Read_Inst_Num / 2;
+
             constexpr index_t C_MFMA_Inst_Num = MPerBlock * NPerBlock * KPerBlock / sub_tile_num /
                                                 (BlockSize / WaveSize) /
                                                 (MPerXDL * NPerXDL * KPerXDL);
 
-            constexpr auto num_lds_load_inst = A_LDS_Read_Inst_Num + B_LDS_Read_Inst_Num;
+            constexpr auto num_lds_load_inst = num_ds_read_inst_a + num_ds_read_inst_b;
             if constexpr(C_MFMA_Inst_Num >= num_lds_load_inst)
             {
                 constexpr index_t mfma_insts_per_lds_load =

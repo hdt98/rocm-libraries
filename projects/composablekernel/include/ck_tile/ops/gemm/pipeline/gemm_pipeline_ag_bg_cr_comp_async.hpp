@@ -92,7 +92,7 @@ struct BaseGemmPipelineAgBgCrCompAsync
  * This pipeline introduces asynchronous load from global memory to LDS,
  * skipping the intermediate loading into pipeline registers.
  */
-template <typename Problem, typename Policy = GemmPipelineAgBgCrCompAsyncDefaultPolicy>
+template <typename Problem, typename Policy = GemmPipelineAgBgCrCompAsyncDefaultPolicy<>>
 struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Problem>
 {
     using Base             = BaseGemmPipelineAgBgCrCompAsync<Problem>;
@@ -157,6 +157,8 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
     static constexpr bool kPadK = Problem::kPadK;
 
     static constexpr bool DoubleSmemBuffer = Problem::DoubleSmemBuffer;
+
+    static_assert(DoubleSmemBuffer == true, "pipeline requires double smem buffer");
 
     static constexpr auto Scheduler = Problem::Scheduler;
 
@@ -541,8 +543,7 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
     {
         const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
         const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
-
-        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+        const auto RunPipeline  = [&](auto hot_loop_, auto tail_num_) {
             return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
                 a_dram_block_window_tmp,
                 a_element_func,

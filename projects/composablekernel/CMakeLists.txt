@@ -208,10 +208,10 @@ if(NOT ENABLE_ASAN_PACKAGING)
         set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102")
     elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 600300000 AND ${hip_VERSION_FLAT} LESS 600400000)
         set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201")
-    elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 600400000 AND ${hip_VERSION_FLAT} LESS 600443483)
+    elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 600400000 AND ${hip_VERSION_FLAT} LESS 700200000)
         set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx950")
-    elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 600443483)
-        set(CK_GPU_TARGETS "gfx1250")
+    elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 700200000)
+        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx10-3-generic;gfx11-generic;gfx12-generic;gfx950;gfx1250")
     endif()
 else()
     #build CK only for xnack-supported targets when using ASAN
@@ -777,6 +777,9 @@ if(CK_EXPERIMENTAL_BUILDER)
         ${PROJECT_SOURCE_DIR}/experimental/builder/include/ck_tile/builder
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ck_tile
     )
+
+    set(CK_TILE_SRC_FOLDER ${CMAKE_SOURCE_DIR}/include/ck_tile/)
+    rocm_install(DIRECTORY ${CK_TILE_SRC_FOLDER} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ck_tile)
 endif()
 
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")

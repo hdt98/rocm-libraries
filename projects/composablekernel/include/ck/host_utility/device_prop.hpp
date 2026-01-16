@@ -52,6 +52,23 @@ inline std::string get_device_name()
     }
 }
 
+inline int get_device_revision()
+{
+    hipDeviceProp_t props{};
+    int device;
+    auto status = hipGetDevice(&device);
+    if(status != hipSuccess)
+    {
+        return -1; // Error: cannot get device
+    }
+    status = hipGetDeviceProperties(&props, device);
+    if(status != hipSuccess)
+    {
+        return -1; // Error: cannot get device properties
+    }
+    return props.asicRevision;
+}
+
 inline bool is_gfx12_supported()
 {
     return ck::get_device_name() == "gfx1200" || ck::get_device_name() == "gfx1201" ||
@@ -96,7 +113,12 @@ inline bool is_xdl_supported()
            is_gfx12_supported() || is_gfx11_supported();
 }
 
-template <typename ADataType, typename BDataType, index_t MPerXDL, index_t NPerXDL>
+template <typename ADataType,
+          typename BDataType,
+          index_t MPerXDL64,
+          index_t NPerXDL64,
+          index_t MPerXDL32 = MPerXDL64,
+          index_t NPerXDL32 = NPerXDL64>
 inline bool is_xdl_wmma_supported()
 {
     if(ck::get_device_name() == "gfx908" || ck::get_device_name() == "gfx90a" ||
@@ -106,7 +128,7 @@ inline bool is_xdl_wmma_supported()
     }
     else if(is_gfx120_supported() || is_gfx11_supported())
     {
-        if constexpr((MPerXDL != 16) || (NPerXDL != 16))
+        if constexpr((MPerXDL32 != 16) || (NPerXDL32 != 16))
         {
             return false;
         }
@@ -119,9 +141,17 @@ inline bool is_xdl_wmma_supported()
     }
     else if(is_gfx125_supported())
     {
-        if constexpr((MPerXDL != 16) || (NPerXDL != 16))
+        if constexpr((MPerXDL32 != 16) || (NPerXDL32 != 16))
         {
             return false;
+        }
+
+        if constexpr(sizeof(ADataType) > 4 || sizeof(BDataType) > 4)
+        {
+            if(ck::get_device_name() == "gfx1250")
+            {
+                return false;
+            }
         }
         return true;
     }
@@ -145,6 +175,14 @@ inline bool is_xdl_wmma_k_supported()
             return (KPerBlock % 32 == 0) && (KPack % 16 == 0);
         }
         return true;
+    }
+    else if(is_gfx120_supported())
+    {
+        return (KPerBlock % 16 == 0) && (KPack % 8 == 0);
+    }
+    else if(is_gfx11_supported())
+    {
+        return (KPerBlock % 16 == 0) && (KPack % 16 == 0);
     }
     return true;
 }

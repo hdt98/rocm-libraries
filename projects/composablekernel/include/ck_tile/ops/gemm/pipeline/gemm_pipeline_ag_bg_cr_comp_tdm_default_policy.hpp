@@ -4,7 +4,6 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/gemm/pipeline/tile_gemm_shape.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
@@ -24,6 +23,12 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
     : public UniversalGemmBasePolicy<GemmPipelineAgBgCrCompTDMDefaultPolicy<WaveSpecialized>>
 {
     using Base = UniversalGemmBasePolicy<GemmPipelineAgBgCrCompTDMDefaultPolicy<WaveSpecialized>>;
+
+    template <typename Problem>
+    using LdsADataType = typename Problem::ADataType;
+
+    template <typename Problem>
+    using LdsBDataType = typename Problem::BDataType;
 
     static constexpr index_t VecByteSize = 16;
     // currently implement basic situation: the tile is divided into same parts
@@ -127,8 +132,7 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
     }
 
-    template <typename Problem,
-              typename OverrideADataType = remove_cvref_t<typename Problem::ADataType>>
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
         if constexpr(Base::template is_a_load_tr<Problem>)
@@ -144,14 +148,17 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
             constexpr auto IsNeedPadding     = LdsPaddingConfigA[Base::I0];
             // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
             constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigA[Base::I1] : -1;
-            using ADataType              = OverrideADataType;
+            using ADataType              = LdsADataType<Problem>;
+            constexpr index_t PackedSize = numeric_traits<ADataType>::PackedSize;
             constexpr auto DataTypeSize  = sizeof(ADataType);
-            constexpr index_t AVectorLen = VecByteSize / DataTypeSize;
-            constexpr auto MLdsLayer =
-                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+            constexpr index_t AVectorLen = VecByteSize / DataTypeSize * PackedSize;
+            constexpr auto MLdsLayer     = max(1UL,
+                                           get_n_lds_banks() * get_n_words_per_128b() / KPerBlock /
+                                               DataTypeSize * PackedSize);
             // calculate how many elements to pad to avoid bank conflict
-            constexpr index_t BytesPerDword  = sizeof(int32_t);
-            constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
+            constexpr index_t BytesPerDword = sizeof(int32_t);
+            constexpr auto PaddingDataAmount =
+                (PaddingAmount + 1) * BytesPerDword / DataTypeSize * PackedSize;
 
             constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MPerBlock / MLdsLayer>{},
@@ -185,8 +192,7 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         }
     }
 
-    template <typename Problem,
-              typename OverrideBDataType = remove_cvref_t<typename Problem::BDataType>>
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
         if constexpr(Base::template is_b_load_tr<Problem>)
@@ -202,15 +208,18 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
             constexpr auto IsNeedPadding     = LdsPaddingConfigB[Base::I0];
             // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
             constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigB[Base::I1] : -1;
-            using BDataType              = OverrideBDataType;
+            using BDataType              = LdsBDataType<Problem>;
+            constexpr index_t PackedSize = numeric_traits<BDataType>::PackedSize;
             constexpr auto DataTypeSize  = sizeof(BDataType);
 
-            constexpr index_t BVectorLen = VecByteSize / DataTypeSize;
-            constexpr auto NLdsLayer =
-                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+            constexpr index_t BVectorLen = VecByteSize / DataTypeSize * PackedSize;
+            constexpr auto NLdsLayer     = max(1UL,
+                                           get_n_lds_banks() * get_n_words_per_128b() / KPerBlock /
+                                               DataTypeSize * PackedSize);
             // calculate how many elements to pad to avoid bank conflict
-            constexpr index_t BytesPerDword  = sizeof(int32_t);
-            constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
+            constexpr index_t BytesPerDword = sizeof(int32_t);
+            constexpr auto PaddingDataAmount =
+                (PaddingAmount + 1) * BytesPerDword / DataTypeSize * PackedSize;
 
             constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<NPerBlock / NLdsLayer>{},
@@ -242,18 +251,6 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
 
             return b_lds_block_desc;
         }
-    }
-
-    template <typename Problem>
-    CK_TILE_HOST_DEVICE static constexpr bool isClusterLaunch()
-    {
-        constexpr index_t clusterM = Problem::BlockGemmShape::kclusterM;
-        constexpr index_t clusterN = Problem::BlockGemmShape::kclusterN;
-        constexpr index_t clusterK = Problem::BlockGemmShape::kclusterK;
-        // cluster launch is enabled only when TilePartitioner uses cluster tile gemm shape and
-        // cluster size > 1
-        return is_cluster_tile_gemm_shape<typename Problem::BlockGemmShape>::value &&
-               (clusterM * clusterN * clusterK > 1);
     }
 
     template <MultiCastDirection Direction, typename Problem>

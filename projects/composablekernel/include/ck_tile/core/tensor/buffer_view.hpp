@@ -92,6 +92,7 @@ struct buffer_view<address_space_enum::generic,
 
     // i is offset of T, not X. i should be aligned to X
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -284,6 +285,7 @@ struct buffer_view<address_space_enum::global,
 
     // i is offset of T, not X. i should be aligned to X
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -907,7 +909,9 @@ struct buffer_view<address_space_enum::lds,
     CK_TILE_DEVICE constexpr T& operator()(index_t i) { return p_data_[i]; }
 
     // i is offset of T, not X. i should be aligned to X
+    // static_offset is compile-time offset for LDS access optimization
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -931,14 +935,15 @@ struct buffer_view<address_space_enum::lds,
 #if CK_TILE_EXPERIMENTAL_USE_MEMCPY_FOR_VECTOR_ACCESS
             X tmp;
 
-            __builtin_memcpy(&tmp, &(p_data_[i + linear_offset]), sizeof(X));
+            __builtin_memcpy(&tmp, &(p_data_[i + linear_offset + static_offset]), sizeof(X));
 
             return tmp;
 #else
             using buf_t = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
                                        scalar_per_t_vector * scalar_per_x_vector>;
             // using buf_t = ushort __attribute__((ext_vector_type(8)));
-            auto rtn = *c_style_pointer_cast<const buf_t*>(&p_data_[i + linear_offset]);
+            auto rtn =
+                *c_style_pointer_cast<const buf_t*>(&p_data_[i + linear_offset + static_offset]);
             return bit_cast<X>(rtn);
 #endif
         }
@@ -1266,6 +1271,7 @@ struct buffer_view<address_space_enum::vgpr,
 
     // i is offset of T, not X. i should be aligned to X
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,

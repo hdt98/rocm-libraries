@@ -6,6 +6,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm/block/block_gemm_asmem_bsmem_creg_v1_custom_policy.hpp"
 #include "ck_tile/ops/gemm/block/block_universal_gemm_as_bs_cr.hpp"
+#include "ck_tile/ops/gemm/pipeline/tile_gemm_shape.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 
@@ -31,9 +32,58 @@ struct has_b_tile_access_pattern<T, std::void_t<decltype(T::BTileAccessPattern)>
 {
 };
 
+template <typename D, typename P, typename = void>
+struct GetLdsADataType
+{
+    using type =
+        std::conditional_t<std::is_same_v<remove_cvref_t<typename P::ADataType>, pk_int4_t>,
+                           remove_cvref_t<typename P::BDataType>,
+                           remove_cvref_t<typename P::ADataType>>;
+};
+
+template <typename D, typename P>
+struct GetLdsADataType<D, P, std::void_t<typename D::template LdsADataType<P>>>
+{
+    using type = typename D::template LdsADataType<P>;
+};
+
+template <typename D, typename P, typename = void>
+struct GetLdsBDataType
+{
+    using type =
+        std::conditional_t<std::is_same_v<remove_cvref_t<typename P::BDataType>, pk_int4_t> ||
+                               std::is_same_v<remove_cvref_t<typename P::BDataType>, pk_fp4_raw_t>,
+                           remove_cvref_t<typename P::ADataType>,
+                           remove_cvref_t<typename P::BDataType>>;
+};
+
+template <typename D, typename P>
+struct GetLdsBDataType<D, P, std::void_t<typename D::template LdsBDataType<P>>>
+{
+    using type = typename D::template LdsBDataType<P>;
+};
+
+// Trait combining both LDS data types
+template <typename D, typename P>
+struct LdsDataTypeTraits
+{
+    using AType = typename GetLdsADataType<D, P>::type;
+    using BType = typename GetLdsBDataType<D, P>::type;
+};
+
 template <typename Derived>
 struct UniversalGemmBasePolicy
 {
+    // Trait for LDS data types: use Derived's version if defined, otherwise use default
+    template <typename Problem>
+    using LdsDataTypes_ = LdsDataTypeTraits<Derived, Problem>;
+
+    template <typename Problem>
+    using ALdsDataType_ = typename LdsDataTypes_<Problem>::AType;
+
+    template <typename Problem>
+    using BLdsDataType_ = typename LdsDataTypes_<Problem>::BType;
+
 #if defined(__gfx950__) || defined(__gfx125__)
     // The combination of pk_int4_t and transposed loading causes numerical errors.
     // Therefore do not use transposed loading in this case.
@@ -49,7 +99,7 @@ struct UniversalGemmBasePolicy
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
         constexpr index_t kMaxKWarpTile = (sizeof(ADataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<BDataType, pk_int4_t>)
+        if constexpr(std::is_same_v<BDataType, pk_int4_t> || std::is_same_v<BDataType, pk_fp4_t>)
             return false;
         else if constexpr(kKWarpTile > kMaxKWarpTile)
             return false;
@@ -65,7 +115,7 @@ struct UniversalGemmBasePolicy
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
         constexpr index_t kMaxKWarpTile = (sizeof(BDataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<BDataType, pk_int4_t>)
+        if constexpr(std::is_same_v<BDataType, pk_int4_t> || std::is_same_v<BDataType, pk_fp4_t>)
             return false;
         else if constexpr(kKWarpTile > kMaxKWarpTile)
             return false;
@@ -109,31 +159,32 @@ struct UniversalGemmBasePolicy
             return DefaultBTileAccessPattern;
     }
 
-    template <typename Problem,
-              typename OverrideADataType = remove_cvref_t<typename Problem::ADataType>>
-    CK_TILE_DEVICE static constexpr auto MakeALdsBlockDescriptor()
+    // =====================================================
+    // Architecture-specific A LDS Block Descriptor implementations
+    // =====================================================
+
+    // Default implementation for gfx9 (Wave64) with XOR swizzle
+    template <typename Problem, typename ArchTag>
+    CK_TILE_DEVICE static constexpr auto MakeALdsBlockDescriptorImpl(ArchTag)
     {
         using ALayout               = remove_cvref_t<typename Problem::ALayout>;
-        using ADataType             = OverrideADataType;
+        using ADataType             = ALdsDataType_<Problem>;
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+        constexpr index_t KPack     = GetSmemPackA<Problem>();
 
         if constexpr(is_a_load_tr<Problem>)
         {
-            return MakeALdsBlockDescriptorForTrLoad<Problem>();
+            // TODO: better lds descriptor for performance
+            constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor( //
+                make_tuple(number<KPerBlock>{}, number<MPerBlock>{}),
+                make_tuple(number<MPerBlock>{}, number<1>{}),
+                number<MPerBlock>{},
+                number<1>{});
+            return a_lds_block_desc_0;
         }
         else
         {
-            constexpr auto DataTypeSize = sizeof(ADataType);
-#if defined(__gfx125__)
-            constexpr index_t BytesPerDword = 4;
-            constexpr index_t KPack         = get_n_words_per_128b() * BytesPerDword / DataTypeSize;
-#else
-            constexpr index_t KPack = GetSmemPackA<Problem>();
-#endif
-            constexpr auto MLdsLayer =
-                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
-
             // Only use this ColumnMajor layout for Wave64 mode (gfx9)
             constexpr auto Wave64 = get_warp_size() == 64;
             if constexpr(Wave64 &&
@@ -254,6 +305,12 @@ struct UniversalGemmBasePolicy
             }
             else // A is in RowMajor
             {
+                constexpr auto DataTypeSize    = sizeof(ADataType);
+                constexpr uint64_t MinLdsLayer = 1ULL;
+                constexpr auto MLdsLayer =
+                    max(MinLdsLayer,
+                        get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
                 constexpr index_t RowMul = (NBanks == 64) ? 2 : 1;
@@ -298,36 +355,108 @@ struct UniversalGemmBasePolicy
         }
     }
 
-    /**
-     * @brief Create LDS block descriptor for B tensor.
-     *
-     * @tparam Problem  Gemm pipeline problem.
-     * @return B tensor LDS block descriptor.
-     */
+    // gfx125 specific implementation (uses padding instead of XOR for bank conflict avoidance)
+    // TODO: need support fp4 transpose load
     template <typename Problem>
-    CK_TILE_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
+    CK_TILE_DEVICE static constexpr auto MakeALdsBlockDescriptorImpl(gfx125_t)
     {
-        using BLayout   = remove_cvref_t<typename Problem::BLayout>;
-        using BDataType = remove_cvref_t<typename Problem::BDataType>;
+        using ADataType             = ALdsDataType_<Problem>;
+        constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
+        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+        constexpr auto DataTypeSize = sizeof(ADataType);
 
+        constexpr index_t PackedSize = numeric_traits<ADataType>::PackedSize;
+
+        // for gfx1250, always use KPack based on 128bits
+        constexpr index_t BytesPerDword = sizeof(int32_t);
+        constexpr index_t KPack =
+            get_n_words_per_128b() * BytesPerDword / DataTypeSize * PackedSize;
+
+        if constexpr(is_a_load_tr<Problem>)
+        {
+            return MakeALdsBlockDescriptorForTrLoad<Problem>();
+        }
+        else
+        {
+
+            constexpr auto LdsPaddingConfigA = GetLdsPaddingConfig<Problem, true>();
+
+            constexpr auto IsNeedPadding = LdsPaddingConfigA[I0];
+            // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
+            constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigA[I1] : -1;
+
+            constexpr auto MLdsLayer =
+                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+
+            constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
+
+            // gfx125: use simple layout without XOR (relies on padding in descriptor)
+            constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
+                make_tuple(number<MPerBlock / MLdsLayer>{},
+                           number<KPerBlock / KPack * MLdsLayer>{},
+                           number<KPack>{}),
+                make_tuple(number<KPerBlock * MLdsLayer + PaddingDataAmount>{},
+                           number<KPack>{},
+                           number<1>{}),
+                number<KPack>{},
+                number<1>{});
+
+            constexpr auto a_lds_block_desc_1 = transform_tensor_descriptor(
+                a_lds_block_desc_0,
+                make_tuple(make_pass_through_transform(number<MPerBlock / MLdsLayer>{}),
+                           make_unmerge_transform(
+                               make_tuple(number<MLdsLayer>{}, number<KPerBlock / KPack>{})),
+                           make_pass_through_transform(number<KPack>{})),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+                make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
+
+            constexpr auto a_lds_block_desc = transform_tensor_descriptor(
+                a_lds_block_desc_1,
+                make_tuple(make_merge_transform_v3_division_mod(
+                               make_tuple(number<MPerBlock / MLdsLayer>{}, number<MLdsLayer>{})),
+                           make_merge_transform_v3_division_mod(
+                               make_tuple(number<KPerBlock / KPack>{}, number<KPack>{}))),
+                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+
+            return a_lds_block_desc;
+        }
+    }
+
+    // =====================================================
+    // Main entry point: dispatches based on architecture
+    // =====================================================
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeALdsBlockDescriptor()
+    {
+        return MakeALdsBlockDescriptorImpl<Problem>(get_device_arch());
+    }
+
+    // =====================================================
+    // Architecture-specific B LDS Block Descriptor implementations
+    // =====================================================
+
+    // Default implementation for gfx9 (Wave64) with XOR swizzle
+    template <typename Problem, typename ArchTag>
+    CK_TILE_DEVICE static constexpr auto MakeBLdsBlockDescriptorImpl(ArchTag)
+    {
+        using BLayout               = remove_cvref_t<typename Problem::BLayout>;
+        using BDataType             = BLdsDataType_<Problem>;
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
 
         if constexpr(is_b_load_tr<Problem>)
         {
-            return MakeBLdsBlockDescriptorForTrLoad<Problem>();
+            // TODO: better lds descriptor for performance
+            constexpr auto b_lds_block_desc_0 =
+                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),
+                                             make_tuple(number<NPerBlock>{}, number<1>{}),
+                                             number<NPerBlock>{},
+                                             number<1>{});
+            return b_lds_block_desc_0;
         }
         else
         {
-            constexpr auto DataTypeSize = sizeof(BDataType);
-#if defined(__gfx125__)
-            constexpr index_t BytesPerDword = 4;
-            constexpr index_t KPack         = get_n_words_per_128b() * BytesPerDword / DataTypeSize;
-#else
-            constexpr index_t KPack = GetSmemPackB<Problem>();
-#endif
-            constexpr auto NLdsLayer =
-                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
             // Only use this RowMajor layout for Wave64 mode (gfx9)
             constexpr auto Wave64 = get_warp_size() == 64;
             if constexpr(Wave64 && std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
@@ -445,7 +574,14 @@ struct UniversalGemmBasePolicy
             }
             else // B is Column Major
             {
-                constexpr auto BK0       = number<KPerBlock / KPack>{};
+                constexpr index_t KPack        = GetSmemPackB<Problem>();
+                constexpr auto BK0             = number<KPerBlock / KPack>{};
+                constexpr auto DataTypeSize    = sizeof(BDataType);
+                constexpr uint64_t MinLdsLayer = 1ULL;
+                constexpr auto NLdsLayer =
+                    max(MinLdsLayer,
+                        get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
                 constexpr index_t RowMul = (NBanks == 64) ? 2 : 1;
@@ -486,6 +622,88 @@ struct UniversalGemmBasePolicy
                 return b_lds_block_desc;
             }
         }
+    }
+
+    // gfx125 specific implementation (uses padding instead of XOR for bank conflict avoidance)
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeBLdsBlockDescriptorImpl(gfx125_t)
+    {
+        using BDataType = BLdsDataType_<Problem>;
+
+        constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
+        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+        constexpr auto DataTypeSize = sizeof(BDataType);
+
+        constexpr index_t PackedSize = numeric_traits<BDataType>::PackedSize;
+
+        // for gfx1250, always use KPack based on 128bits
+        constexpr index_t BytesPerDword = sizeof(int32_t);
+        constexpr index_t KPack =
+            get_n_words_per_128b() * BytesPerDword / DataTypeSize * PackedSize;
+
+        if constexpr(is_b_load_tr<Problem>)
+        {
+            return MakeBLdsBlockDescriptorForTrLoad<Problem>();
+        }
+        else
+        {
+            constexpr auto LdsPaddingConfigB = GetLdsPaddingConfig<Problem, false>();
+
+            constexpr auto IsNeedPadding = LdsPaddingConfigB[I0];
+            // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
+            constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigB[I1] : -1;
+
+            constexpr auto NLdsLayer =
+                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+
+            constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
+
+            // gfx125: use simple layout without XOR (relies on padding in descriptor)
+            constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
+                make_tuple(number<NPerBlock / NLdsLayer>{},
+                           number<KPerBlock / KPack * NLdsLayer>{},
+                           number<KPack>{}),
+                make_tuple(number<KPerBlock * NLdsLayer + PaddingDataAmount>{},
+                           number<KPack>{},
+                           number<1>{}),
+                number<KPack>{},
+                number<1>{});
+
+            constexpr auto b_lds_block_desc_1 = transform_tensor_descriptor(
+                b_lds_block_desc_0,
+                make_tuple(make_pass_through_transform(number<NPerBlock / NLdsLayer>{}),
+                           make_unmerge_transform(
+                               make_tuple(number<NLdsLayer>{}, number<KPerBlock / KPack>{})),
+                           make_pass_through_transform(number<KPack>{})),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
+                make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
+
+            constexpr auto b_lds_block_desc = transform_tensor_descriptor(
+                b_lds_block_desc_1,
+                make_tuple(make_merge_transform_v3_division_mod(
+                               make_tuple(number<NPerBlock / NLdsLayer>{}, number<NLdsLayer>{})),
+                           make_merge_transform_v3_division_mod(
+                               make_tuple(number<KPerBlock / KPack>{}, number<KPack>{}))),
+                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+
+            return b_lds_block_desc;
+        }
+    }
+
+    // =====================================================
+    // Main entry point: dispatches based on architecture
+    // =====================================================
+    /**
+     * @brief Create LDS block descriptor for B tensor.
+     *
+     * @tparam Problem  Gemm pipeline problem.
+     * @return B tensor LDS block descriptor.
+     */
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
+    {
+        return MakeBLdsBlockDescriptorImpl<Problem>(get_device_arch());
     }
 
     /**
@@ -580,9 +798,8 @@ struct UniversalGemmBasePolicy
         using BsDataType            = remove_cvref_t<typename Problem::BsDataTypeTuple>;
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
-
-        using BLayout   = remove_cvref_t<std::tuple_element_t<number<0>{}, BsLayout>>;
-        using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataType>>;
+        using BLayout               = remove_cvref_t<std::tuple_element_t<number<0>{}, BsLayout>>;
+        using BDataType             = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataType>>;
 
         if constexpr(Problem::FixedVectorSize)
         {
@@ -724,13 +941,17 @@ struct UniversalGemmBasePolicy
     {
         constexpr index_t BlockSize = Problem::kBlockSize;
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
-        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+        using BDataType             = remove_cvref_t<typename Problem::BDataType>;
+        constexpr index_t KPerBlock = std::is_same_v<BDataType, ck_tile::pk_fp4_raw_t>
+                                          ? Problem::BlockGemmShape::kK / 2
+                                          : Problem::BlockGemmShape::kK;
         constexpr index_t VecLoadSize =
-            Problem::FixedVectorSize ? Problem::VectorSizeB : GetVectorSizeB<Problem>();
+            std::is_same_v<BDataType, ck_tile::pk_fp4_raw_t>
+                ? 4
+                : (Problem::FixedVectorSize ? Problem::VectorSizeB : GetVectorSizeB<Problem>());
         constexpr index_t NumWaveGroups = Problem::NumWaveGroups;
-
-        using BLayout = remove_cvref_t<
-            std::tuple_element_t<number<0>{}, remove_cvref_t<typename Problem::BsLayoutTuple>>>;
+        using BLayout                   = remove_cvref_t<
+                              std::tuple_element_t<number<0>{}, remove_cvref_t<typename Problem::BsLayoutTuple>>>;
         // Tile: KPerBlock X NPerBlock
         if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
         {
@@ -802,11 +1023,14 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemPackA()
     {
-        using A         = remove_cvref_t<typename Problem::ADataType>;
+        using A         = ALdsDataType_<Problem>;
         using BlockGemm = remove_cvref_t<decltype(Derived::template GetBlockGemm<Problem>())>;
 
-        constexpr index_t KPack    = static_cast<index_t>(BlockGemm::Traits::KPack);
-        constexpr index_t VecElems = static_cast<index_t>(Problem::VectorLoadSize / sizeof(A));
+        constexpr index_t PackedSize = numeric_traits<A>::PackedSize;
+
+        constexpr index_t KPack = static_cast<index_t>(BlockGemm::Traits::KPack);
+        constexpr index_t VecElems =
+            static_cast<index_t>(Problem::VectorLoadSize / sizeof(A) * PackedSize);
 
         return (KPack < VecElems) ? KPack : VecElems;
     }
@@ -814,11 +1038,14 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemPackB()
     {
-        using B         = remove_cvref_t<typename Problem::BDataType>;
+        using B         = BLdsDataType_<Problem>;
         using BlockGemm = remove_cvref_t<decltype(Derived::template GetBlockGemm<Problem>())>;
 
-        constexpr index_t KPack    = static_cast<index_t>(BlockGemm::Traits::KPack);
-        constexpr index_t VecElems = static_cast<index_t>(Problem::VectorLoadSize / sizeof(B));
+        constexpr index_t PackedSize = numeric_traits<B>::PackedSize;
+
+        constexpr index_t KPack = static_cast<index_t>(BlockGemm::Traits::KPack);
+        constexpr index_t VecElems =
+            static_cast<index_t>(Problem::VectorLoadSize / sizeof(B) * PackedSize);
 
         return (KPack < VecElems) ? KPack : VecElems;
     }
@@ -826,20 +1053,22 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     CK_TILE_DEVICE static constexpr index_t GetSmemSizeA()
     {
-        using ADataType                 = remove_cvref_t<typename Problem::ADataType>;
+        using ADataType                 = ALdsDataType_<Problem>;
+        constexpr index_t PackedSize    = numeric_traits<ADataType>::PackedSize;
         constexpr auto a_lds_block_desc = Derived::template MakeALdsBlockDescriptor<Problem>();
         constexpr index_t smem_size_a   = integer_least_multiple(
-            a_lds_block_desc.get_element_space_size() * sizeof(ADataType), 16);
+            a_lds_block_desc.get_element_space_size() * sizeof(ADataType) / PackedSize, 16);
         return smem_size_a;
     }
 
     template <typename Problem>
     CK_TILE_DEVICE static constexpr index_t GetSmemSizeB()
     {
-        using BDataType                 = remove_cvref_t<typename Problem::BDataType>;
+        using BDataType                 = BLdsDataType_<Problem>;
+        constexpr index_t PackedSize    = numeric_traits<BDataType>::PackedSize;
         constexpr auto b_lds_block_desc = Derived::template MakeBLdsBlockDescriptor<Problem>();
         constexpr index_t smem_size_b   = integer_least_multiple(
-            b_lds_block_desc.get_element_space_size() * sizeof(BDataType), 16);
+            b_lds_block_desc.get_element_space_size() * sizeof(BDataType) / PackedSize, 16);
         return smem_size_b;
     }
 
@@ -866,8 +1095,8 @@ struct UniversalGemmBasePolicy
             }
             return result;
         };
-        using DataType = remove_cvref_t<
-            std::conditional_t<IsA, typename Problem::ADataType, typename Problem::BDataType>>;
+        using DataType =
+            remove_cvref_t<std::conditional_t<IsA, ALdsDataType_<Problem>, BLdsDataType_<Problem>>>;
         constexpr index_t MNPerBlock =
             IsA ? Problem::BlockGemmShape::kM : Problem::BlockGemmShape::kN;
 
@@ -875,9 +1104,9 @@ struct UniversalGemmBasePolicy
         constexpr auto DataTypeSize     = sizeof(DataType);
 
         constexpr auto is_tr_load = IsA ? is_a_load_tr<Problem> : is_b_load_tr<Problem>;
+        constexpr auto PackedSize = numeric_traits<DataType>::PackedSize;
         if constexpr(is_tr_load)
         {
-            constexpr auto PackedSize = numeric_traits<DataType>::PackedSize;
             constexpr index_t banks_per_mblk =
                 MNPerBlock * DataTypeSize / PackedSize / BytesPerDword;
             // 8 * PackedSize means 8 * PackedSize columns which is in gfx1250 tr load instructions
@@ -900,9 +1129,14 @@ struct UniversalGemmBasePolicy
         }
         else
         {
+            constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
+            constexpr index_t banks_per_kblk =
+                KPerBlock * DataTypeSize / PackedSize / BytesPerDword;
             // log2 minus 1 of the number of dwords to store into the destination before adding
             // padding; one bank is 1 dword size
-            constexpr index_t pad_interval = constexpr_log2_floor(get_n_lds_banks()) - 1;
+            constexpr index_t pad_interval = (banks_per_kblk < get_n_lds_banks())
+                                                 ? constexpr_log2_floor(get_n_lds_banks()) - 1
+                                                 : constexpr_log2_floor(banks_per_kblk) - 1;
             // always use b128 to ds_load; this value calculate the bank number per 128 bits
             constexpr index_t banks_per_128b = get_n_words_per_128b();
             // amount of padding to add in dwords 0 means 1 dword padding; 1 means 2 dwords
@@ -926,7 +1160,7 @@ struct UniversalGemmBasePolicy
         constexpr auto IsPadding         = LdsPaddingConfigA[I0];
         constexpr auto PaddingAmount     = LdsPaddingConfigA[I1];
         constexpr auto PaddingInterval   = LdsPaddingConfigA[I2];
-        using ADataType                  = remove_cvref_t<typename Problem::ADataType>;
+        using ADataType                  = ALdsDataType_<Problem>;
         constexpr auto DataTypeSize      = sizeof(ADataType);
         constexpr auto PackedSize        = numeric_traits<ADataType>::PackedSize;
         if constexpr(!IsPadding)
@@ -1026,7 +1260,7 @@ struct UniversalGemmBasePolicy
         constexpr auto IsPadding         = LdsPaddingConfigB[I0];
         constexpr auto PaddingAmount     = LdsPaddingConfigB[I1];
         constexpr auto PaddingInterval   = LdsPaddingConfigB[I2];
-        using BDataType                  = remove_cvref_t<typename Problem::BDataType>;
+        using BDataType                  = BLdsDataType_<Problem>;
         constexpr auto DataTypeSize      = sizeof(BDataType);
         constexpr auto PackedSize        = numeric_traits<BDataType>::PackedSize;
         if constexpr(!IsPadding)
@@ -1113,12 +1347,30 @@ struct UniversalGemmBasePolicy
             }
         }
     }
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr bool isClusterLaunch()
+    {
+        constexpr index_t clusterM = Problem::BlockGemmShape::kclusterM;
+        constexpr index_t clusterN = Problem::BlockGemmShape::kclusterN;
+        constexpr index_t clusterK = Problem::BlockGemmShape::kclusterK;
+        // cluster launch is enabled only when TilePartitioner uses cluster tile gemm shape and
+        // cluster size > 1
+        return is_cluster_tile_gemm_shape<typename Problem::BlockGemmShape>::value &&
+               (clusterM * clusterN * clusterK > 1);
+    }
 };
 
 // UniversalGemm Policy
 struct UniversalGemmPipelineAgBgCrPolicy
     : public UniversalGemmBasePolicy<UniversalGemmPipelineAgBgCrPolicy>
 {
+    template <typename Problem>
+    using LdsADataType = typename Problem::ADataType;
+
+    template <typename Problem>
+    using LdsBDataType = typename Problem::BDataType;
+
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetBlockGemm()
     {
@@ -1127,7 +1379,7 @@ struct UniversalGemmPipelineAgBgCrPolicy
 
 #if defined(__gfx950__)
         constexpr index_t vector_size =
-            DS_READ_TR_SIZE() / sizeof(typename Problem::ComputeDataType);
+            DS_READ_TR_SIZE() / sizeof(typename Problem::AComputeDataType);
         constexpr index_t thread_elements = WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
         constexpr auto wg_attr_num_access =
             !(is_a_load_tr<Problem> || is_b_load_tr<Problem>) ? WGAttrNumAccessEnum::Single
@@ -1139,12 +1391,8 @@ struct UniversalGemmPipelineAgBgCrPolicy
         constexpr auto wg_attr_num_access = WGAttrNumAccessEnum::Single;
 #endif
 
-        using ADataType = remove_cvref_t<typename Problem::ADataType>;
-        using BDataType = remove_cvref_t<typename Problem::BDataType>;
-        using ATypeToUse =
-            std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>;
-        using BTypeToUse =
-            std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>;
+        using ATypeToUse = remove_cvref_t<typename Problem::AComputeDataType>;
+        using BTypeToUse = remove_cvref_t<typename Problem::BComputeDataType>;
 
         using WarpGemm = WarpGemmDispatcher<ATypeToUse,
                                             BTypeToUse,

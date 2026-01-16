@@ -3,17 +3,12 @@
 
 #pragma once
 
-using ::ck::DeviceMem;
-using ::ck::HostTensorDescriptor;
-using ::ck::Tensor;
+using ReferenceGemmInstance = ck::tensor_operation::host::
+    ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
 
 template <typename ProblemType>
 bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 {
-#if defined(BUILD_INT4_EXAMPLE) && defined(CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4)
-    static_assert(sizeof(ck::int4_t) == sizeof(int8_t));
-#endif
-
     using namespace ck::literals;
 
     auto M       = problem_size.M;
@@ -84,15 +79,17 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 
     Tensor<float> a_m_k_f32({M, K});
     Tensor<float> b_k_n_f32({K, N});
+    Tensor<float> a_m_k_gfx9_f32({M, K});
+    Tensor<float> b_k_n_gfx9_f32({K, N});
 
     if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t>)
     {
-        permute_a_pk_i4(a_m_k, M, K, a_m_k_f32, config.use_gfx9_i4);
+        permute_a_pk_i4(a_m_k, M, K, a_m_k_f32, a_m_k_gfx9_f32);
     }
 
     if constexpr(ck::is_same_v<BDataType, ck::pk_i4_t>)
     {
-        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, config.use_gfx9_i4);
+        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, b_k_n_gfx9_f32);
     }
 
     Tensor<CDataType> c_m_n_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
@@ -102,25 +99,13 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     std::cout << "b_k_n: " << b_k_n.mDesc << std::endl;
     std::cout << "c_m_n: " << c_m_n_host_result.mDesc << std::endl;
 
-#ifdef BUILD_INT4_EXAMPLE
-    DeviceMem a_m_k_device_buf(sizeof(KernelADataType) * a_m_k.mDesc.GetElementSpaceSize());
-    DeviceMem b_k_n_device_buf(sizeof(KernelBDataType) * b_k_n.mDesc.GetElementSpaceSize());
-    DeviceMem c_m_n_device_buf(sizeof(KernelCDataType) *
-                               c_m_n_device_result.mDesc.GetElementSpaceSize());
-
-    const Tensor<KernelADataType> a_m_k_converted(a_m_k);
-    const Tensor<KernelBDataType> b_k_n_converted(b_k_n);
-
-    a_m_k_device_buf.ToDevice(a_m_k_converted.mData.data());
-    b_k_n_device_buf.ToDevice(b_k_n_converted.mData.data());
-#else
     DeviceMem a_m_k_device_buf(sizeof(ADataType) * a_m_k.mDesc.GetElementSpaceSize());
     DeviceMem b_k_n_device_buf(sizeof(BDataType) * b_k_n.mDesc.GetElementSpaceSize());
     DeviceMem c_m_n_device_buf(sizeof(CDataType) * c_m_n_device_result.mDesc.GetElementSpaceSize());
 
     a_m_k_device_buf.ToDevice(a_m_k.mData.data());
     b_k_n_device_buf.ToDevice(b_k_n.mData.data());
-#endif
+
     DeviceMem workspace;
 
     auto a_element_op = AElementOp{};
@@ -132,26 +117,19 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     auto invoker   = gemm.MakeInvoker();
     float ave_time = 0;
 
-    auto argument = gemm.MakeArgument(
-#ifdef BUILD_INT4_EXAMPLE
-        static_cast<KernelADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-        static_cast<KernelBDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
-        static_cast<KernelCDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
-#else
-        static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-        static_cast<BDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
-        static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
-#endif
-        M,
-        N,
-        K,
-        StrideA,
-        StrideB,
-        StrideC,
-        KBatch,
-        a_element_op,
-        b_element_op,
-        c_element_op);
+    auto argument = gemm.MakeArgument(static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
+                                      static_cast<BDataType*>(b_k_n_device_buf.GetDeviceBuffer()),
+                                      static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()),
+                                      M,
+                                      N,
+                                      K,
+                                      StrideA,
+                                      StrideB,
+                                      StrideC,
+                                      KBatch,
+                                      a_element_op,
+                                      b_element_op,
+                                      c_element_op);
 
     if(!gemm.IsSupportedArgument(argument))
     {
@@ -165,6 +143,11 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     {
         if constexpr(ck::is_same_v<ADataType, ck::pk_i4_t> && ck::is_same_v<BDataType, ck::pk_i4_t>)
         {
+
+            bool useGfx9Result =
+                (ck::is_same_v<ADataType, ck::pk_i4_t> && ck::is_same_v<BDataType, ck::pk_i4_t> &&
+                 (gemm->GetKPerBlock() & DisableGfx9I4ToF32) == 0);
+
             using PkInt4ReferenceGemmInstance =
                 ck::tensor_operation::host::ReferenceGemm<float,
                                                           float,
@@ -176,8 +159,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
             auto ref_gemm    = PkInt4ReferenceGemmInstance{};
             auto ref_invoker = ref_gemm.MakeInvoker();
 
-            auto ref_argument = ref_gemm.MakeArgument(a_m_k_f32,
-                                                      b_k_n_f32,
+            auto ref_argument = ref_gemm.MakeArgument(useGfx9Result ? a_m_k_gfx9_f32 : a_m_k_f32,
+                                                      useGfx9Result ? b_k_n_gfx9_f32 : b_k_n_f32,
                                                       c_m_n_host_result,
                                                       PassThrough{},
                                                       PassThrough{},
@@ -197,15 +180,7 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         }
 
         ave_time = invoker.Run(argument, StreamConfig{nullptr, false, 1});
-#ifdef BUILD_INT4_EXAMPLE
-        Tensor<CDataType> c_m_n_device_result_converted(c_m_n_host_result.mDesc);
 
-        c_m_n_device_buf.FromDevice(c_m_n_device_result_converted.mData.data());
-
-        c_m_n_device_result = c_m_n_device_result_converted.CopyAsType<CDataType>();
-
-        return ck::utils::check_err(c_m_n_device_result_converted, c_m_n_host_result);
-#else
         c_m_n_device_buf.FromDevice(c_m_n_device_result.mData.data());
 
         pass &= ck::utils::check_err(c_m_n_device_result,
@@ -213,7 +188,6 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
                                      "Error: Incorrect results!",
                                      get_rtol<CDataType>(),
                                      get_atol<CDataType>());
-#endif
     }
 
     if(config.time_kernel)

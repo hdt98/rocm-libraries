@@ -12,36 +12,6 @@
 
 namespace ck_tile {
 
-template <typename Problem>
-struct BlockGemmBQuantBase
-{
-    using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
-    using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-
-    template <typename T>
-    CK_TILE_DEVICE static float cvt_scale_to_fp32(T scale)
-    {
-        float scale_reg_f = 0.f;
-        if constexpr(std::is_same_v<BQDataType, ck_tile::fp8_t>)
-        {
-            scale_reg_f = __builtin_amdgcn_cvt_f32_fp8(static_cast<uint32_t>(scale), 0);
-        }
-        else if constexpr(std::is_same_v<BQDataType, ck_tile::bf8_t>)
-        {
-            scale_reg_f = __builtin_amdgcn_cvt_f32_bf8(static_cast<uint32_t>(scale), 0);
-        }
-        else if constexpr(std::is_same_v<BQDataType, float>)
-        {
-            scale_reg_f = ck_tile::bit_cast<float>(scale);
-        }
-        else
-        {
-            static_assert(false, "BQDataType must be float, fp8_t or bf8_t.");
-        }
-        return scale_reg_f;
-    }
-};
-
 // A is block window on shared memory
 // BQ (scale tensor) is block distributed tensor.
 // Consecutive QuantGroupSize elements of B are quantized with a separate scale.
@@ -50,21 +20,24 @@ struct BlockGemmBQuantBase
 template <typename Problem_,
           typename Policy_     = BlockGemmASmemBSmemCRegV1DefaultPolicy,
           index_t UnaryOpSize_ = 8>
-struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
+struct BQuantBlockUniversalGemmAsBsCr
 {
     private:
     template <typename PipelineProblem_, typename GemmPolicy_>
     struct GemmTraits_
     {
-        using Problem         = remove_cvref_t<PipelineProblem_>;
-        using Policy          = remove_cvref_t<GemmPolicy_>;
-        using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-        using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-        using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
-        using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-        using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-        using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>;
-        using QuantGroupSize  = remove_cvref_t<typename Problem::QuantGroupSize>;
+        using Problem          = remove_cvref_t<PipelineProblem_>;
+        using Policy           = remove_cvref_t<GemmPolicy_>;
+        using ADataType        = remove_cvref_t<typename Problem::ADataType>;
+        using BDataType        = remove_cvref_t<typename Problem::BDataType>;
+        using BQDataType       = remove_cvref_t<typename Problem::BQDataType>;
+        using BLayout          = remove_cvref_t<typename Problem::BLayout>;
+        using BQLayout         = remove_cvref_t<typename Problem::BQLayout>;
+        using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
+        using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
+        using CDataType        = remove_cvref_t<typename Problem::CDataType>;
+        using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
+        using QuantGroupSize   = remove_cvref_t<typename Problem::BQuantGroupSize>;
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;
@@ -129,15 +102,15 @@ struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
         // 2. bf8, bf8, fp32 -> f32
         // 3. i4,  fp8, (fp8/fp32) -> f32
         // 4. i4,  bf8, (fp8/fp32) -> f32
-        static_assert((std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, bf8_t>) &&
-                      (std::is_same_v<BDataType, fp8_t> || std::is_same_v<BDataType, bf8_t> ||
-                       std::is_same_v<BDataType, ck_tile::pk_int4_t>) &&
-                      (std::is_same_v<BQDataType, float> ||
-                       std::is_same_v<BQDataType, ck_tile::fp8_t> ||
-                       std::is_same_v<BQDataType, ck_tile::bf8_t>) &&
-                      (std::is_same_v<ComputeDataType, fp8_t> ||
-                       std::is_same_v<ComputeDataType, bf8_t>) &&
-                      std::is_same_v<CDataType, fp32_t>);
+        static_assert(
+            (std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, bf8_t>) &&
+            (std::is_same_v<BDataType, fp8_t> || std::is_same_v<BDataType, bf8_t> ||
+             std::is_same_v<BDataType, ck_tile::pk_int4_t>) &&
+            (std::is_same_v<BQDataType, float> || std::is_same_v<BQDataType, ck_tile::fp8_t> ||
+             std::is_same_v<BQDataType, ck_tile::bf8_t>) &&
+            (std::is_same_v<AComputeDataType, fp8_t> || std::is_same_v<AComputeDataType, bf8_t>) &&
+            (std::is_same_v<BComputeDataType, fp8_t> || std::is_same_v<BComputeDataType, bf8_t>) &&
+            std::is_same_v<CDataType, fp32_t>);
 
         static constexpr index_t InterWaveSchedulingMacClusters = 1;
 
@@ -148,14 +121,21 @@ struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
     public:
     using Traits = GemmTraits_<Problem_, Policy_>;
 
-    using ADataType       = remove_cvref_t<typename Traits::ADataType>;
-    using BDataType       = remove_cvref_t<typename Traits::BDataType>;
-    using BQDataType      = remove_cvref_t<typename Traits::BQDataType>;
-    using ComputeDataType = remove_cvref_t<typename Traits::ComputeDataType>;
-    using CDataType       = remove_cvref_t<typename Traits::CDataType>;
+    using ADataType        = remove_cvref_t<typename Traits::ADataType>;
+    using BDataType        = remove_cvref_t<typename Traits::BDataType>;
+    using BQDataType       = remove_cvref_t<typename Traits::BQDataType>;
+    using AComputeDataType = remove_cvref_t<typename Traits::AComputeDataType>;
+    using BComputeDataType = remove_cvref_t<typename Traits::BComputeDataType>;
+    using CDataType        = remove_cvref_t<typename Traits::CDataType>;
 
-    using Base = BlockGemmBQuantBase<Problem_>;
+    // BDataType gets converted from PkInt4 during loading
+    using OverrideBDataType = std::conditional_t<
+        std::is_same_v<BDataType, pk_int4_t> &&
+            std::is_same_v<typename Traits::BLayout, tensor_layout::gemm::RowMajor>,
+        ADataType,
+        BDataType>;
 
+    using Base     = BlockGemmQuantBase;
     using WarpGemm = remove_cvref_t<typename Traits::WarpGemm>;
 
     static constexpr index_t KIterPerWarp = Traits::KIterPerWarp;
@@ -265,18 +245,26 @@ struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
         static constexpr auto BLdsTileDistr =
             decltype(make_static_tile_distribution(MakeBBlockDistributionEncode())){};
 
-        using ALdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(ALdsTileDistr));
-        using BLdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(BLdsTileDistr));
+        using ALdsTile = decltype(make_static_distributed_tensor<AComputeDataType>(ALdsTileDistr));
+        using BLdsTile = decltype(make_static_distributed_tensor<BComputeDataType>(BLdsTileDistr));
 
         ALdsTile a_warp_tile_;
         BLdsTile b_warp_tile_;
 
-        template <typename ASmemBlockWindow, typename BSmemBlockWindow>
+        template <typename ASmemBlockWindow,
+                  typename BSmemBlockWindow,
+                  bool ALoadTranspose = false,
+                  bool BLoadTranspose = false>
         CK_TILE_DEVICE void LocalPrefetch(const ASmemBlockWindow& a_block_window,
-                                          const BSmemBlockWindow& b_block_window)
+                                          const BSmemBlockWindow& b_block_window,
+                                          bool_constant<ALoadTranspose> = {},
+                                          bool_constant<BLoadTranspose> = {})
         {
-            load_int4_tile<ADataType, ComputeDataType, UnaryOpSize_>(a_warp_tile_, a_block_window);
-            load_int4_tile<BDataType, ComputeDataType, UnaryOpSize_>(b_warp_tile_, b_block_window);
+            load_int4_tile<ADataType, AComputeDataType, UnaryOpSize_, ALoadTranspose>(
+                a_warp_tile_, a_block_window);
+            // If B datatype were pkint4 it would be converted prior to storing in LDS
+            load_int4_tile<OverrideBDataType, BComputeDataType, UnaryOpSize_, BLoadTranspose>(
+                b_warp_tile_, b_block_window);
         }
 
         // C += A * B
@@ -353,7 +341,9 @@ struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
                             int gathered_scale_reg = __builtin_amdgcn_ds_bpermute(
                                 pull_from_lane << 2, __builtin_bit_cast(int, scale_reg_dword));
 
-                            float scale_reg_f = Base::cvt_scale_to_fp32(gathered_scale_reg);
+                            float scale_reg_f =
+                                Base::cvt_scale_to_fp32<typename Traits::BQDataType>(
+                                    gathered_scale_reg);
 
                             static_for<0, WarpGemm::kM * WarpGemm::kN / warp_size, 1>{}(
                                 [&](auto c_row) {
@@ -376,8 +366,9 @@ struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
                                 }
                             }();
 
-                            auto& scale_reg   = bq_block_tensor.get_thread_buffer()[reg_offset];
-                            float scale_reg_f = Base::cvt_scale_to_fp32(scale_reg);
+                            auto& scale_reg = bq_block_tensor.get_thread_buffer()[reg_offset];
+                            float scale_reg_f =
+                                Base::cvt_scale_to_fp32<typename Traits::BQDataType>(scale_reg);
                             static_for<0, WarpGemm::kM * WarpGemm::kN / warp_size, 1>{}(
                                 [&](auto c_row) {
                                     c_block_tensor.get_thread_buffer()[tbuf_offset + c_row] +=
@@ -397,11 +388,16 @@ struct BQuantBlockUniversalGemmAsBsCr : public BlockGemmBQuantBase<Problem_>
             MakeCBlockTile();
     }
 
-    template <typename ASmemBlockWindow, typename BSmemBlockWindow>
+    template <typename ASmemBlockWindow,
+              typename BSmemBlockWindow,
+              bool ALoadTranspose = false,
+              bool BLoadTranspose = false>
     CK_TILE_DEVICE void LocalPrefetch(const ASmemBlockWindow& a_block_window,
-                                      const BSmemBlockWindow& b_block_window)
+                                      const BSmemBlockWindow& b_block_window,
+                                      bool_constant<ALoadTranspose> a_load_tr = {},
+                                      bool_constant<BLoadTranspose> b_load_tr = {})
     {
-        block_gemm_impl_.LocalPrefetch(a_block_window, b_block_window);
+        block_gemm_impl_.LocalPrefetch(a_block_window, b_block_window, a_load_tr, b_load_tr);
     }
 
     // C += A * B

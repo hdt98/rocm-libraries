@@ -42,7 +42,7 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_batched_gemm_gemm_xdl_cshuffle_v1(
         const A0B0B1DataType* __restrict__ p_a0_grid,
@@ -235,20 +235,26 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
 {
     using DeviceOp = DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle;
 
-    static constexpr auto Gemm0MXdlPerWave64 = GetNXdlPerWave2<BlockSize,
-                                                               Gemm0NPerBlock,
-                                                               Gemm0MPerBlock,
-                                                               Gemm0NPerXdl,
-                                                               Gemm0MPerXdl,
-                                                               Gemm0NXdlPerWave,
-                                                               true>();
-    static constexpr auto Gemm0MXdlPerWave32 = GetNXdlPerWave2<BlockSize,
-                                                               Gemm0NPerBlock,
-                                                               Gemm0MPerBlock,
-                                                               Gemm0NPerXdl,
-                                                               Gemm0MPerXdl,
-                                                               Gemm0NXdlPerWave,
-                                                               false>();
+    static constexpr auto WarpTileConfig64   = GetWarpTileConfig<BlockSize,
+                                                                 Gemm0NPerBlock,
+                                                                 Gemm0MPerBlock,
+                                                                 Gemm0NPerXdl,
+                                                                 Gemm0MPerXdl,
+                                                                 Gemm0NXdlPerWave,
+                                                                 1,
+                                                                 1,
+                                                                 true>();
+    static constexpr auto WarpTileConfig32   = GetWarpTileConfig<BlockSize,
+                                                                 Gemm0NPerBlock,
+                                                                 Gemm0MPerBlock,
+                                                                 Gemm0NPerXdl,
+                                                                 Gemm0MPerXdl,
+                                                                 Gemm0NXdlPerWave,
+                                                                 1,
+                                                                 1,
+                                                                 false>();
+    static constexpr auto Gemm0MXdlPerWave64 = WarpTileConfig64.At(3);
+    static constexpr auto Gemm0MXdlPerWave32 = WarpTileConfig32.At(3);
 
     static constexpr index_t NumD0Tensor = D0sDataType::Size();
     static constexpr index_t NumD1Tensor = D1sDataType::Size();
@@ -462,7 +468,7 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
     using E1GridDesc_M_N  = decltype(MakeE1GridDescriptor_M_N<E1Layout>(1, 1, 1));
 
     // GridwiseGemm
-    template <index_t Gemm0MXdlPerWave_>
+    template <typename WarpTileConfig>
     using GridwiseGemmBase = GridwiseBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle<
         A0DataType, // TODO: distinguish A/B datatype
         Acc0DataType,
@@ -493,11 +499,11 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
         A0K1,
         B0K1,
         B1K1,
-        Gemm0MPerXdl,
-        Gemm0NPerXdl,
-        Gemm0MXdlPerWave_,
-        Gemm0NXdlPerWave,
-        Gemm1NXdlPerWave,
+        WarpTileConfig::At(1),
+        WarpTileConfig::At(0),
+        WarpTileConfig::At(3),
+        WarpTileConfig::At(2),
+        Gemm1NXdlPerWave * Gemm0NPerXdl / WarpTileConfig::At(0),
         A0BlockTransferThreadClusterLengths_AK0_M_AK1,
         A0BlockTransferThreadClusterArrangeOrder,
         A0BlockTransferSrcAccessOrder,
@@ -525,12 +531,13 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
         false,
         B1BlockLdsExtraN,
         C1ShuffleMXdlPerWavePerShuffle,
-        C1ShuffleGemm0NXdlPerWavePerShuffle,
+        math::min(C1ShuffleGemm0NXdlPerWavePerShuffle* Gemm0NPerXdl / WarpTileConfig::At(0),
+                  Gemm1NXdlPerWave* Gemm0NPerXdl / WarpTileConfig::At(0)),
         CDE1ShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CDE1ShuffleBlockTransferScalarPerVector_NPerBlock,
         LoopSched>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(Gemm0MXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<Gemm0MXdlPerWave32>;
+    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
+    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     using A0GridDesc_AK0_M_AK1 =
         remove_cvref_t<decltype(GridwiseGemm64::MakeDefaultA0GridDescriptor_AK0_M_AK1(
@@ -823,7 +830,12 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_xdl_wmma_supported<A0DataType, B0DataType, Gemm0MPerXdl, Gemm0NPerXdl>())
+        if(!ck::is_xdl_wmma_supported<A0DataType,
+                                      B0DataType,
+                                      Gemm0MPerXdl,
+                                      Gemm0NPerXdl,
+                                      WarpTileConfig32.At(1),
+                                      WarpTileConfig32.At(0)>())
         {
             return false;
         }

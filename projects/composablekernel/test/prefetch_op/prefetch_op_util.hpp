@@ -33,9 +33,9 @@ struct GlobalPrefetchDataOp
         // for now!
         __builtin_amdgcn_global_prefetch(
             addr,
-            static_cast<index_t>(AmdBufferCoherenceEnum::GLC)
-                << 3); // static_cast<index_t>(coherence) << 3); // bits 0..2 are for Temporal
-                       // Hints, bits 3..4 are for scope
+            static_cast<index_t>(
+                AmdBufferCoherenceEnum::
+                    SE_RT)); // static_cast<index_t>(AmdBufferCoherenceEnum::CU_RT));
 #endif
     }
 };
