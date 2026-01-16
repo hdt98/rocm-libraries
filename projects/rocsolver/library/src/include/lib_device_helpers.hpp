@@ -91,7 +91,7 @@ __device__ __host__ inline bool rocblas_isnan(rocblas_half arg)
 
 __device__ __host__ inline bool rocblas_isnan(rocblas_bfloat16 arg)
 {
-    // NaN if exponent is all 1s and mantissa is non-zero (IEEE 754 bfloat16)
+    // NaN if exponent is all 1s and mantissa is non-zero
     return (~arg.data & 0x7f80) == 0 && (arg.data & 0x007f) != 0;
 }
 
