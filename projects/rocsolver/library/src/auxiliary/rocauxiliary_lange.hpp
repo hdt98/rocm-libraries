@@ -40,6 +40,14 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#ifndef LANGE_THDS
+#define LANGE_THDS 1024
+#endif
+
+#ifndef LANGE_FROBENIUS_MAX_BDIM
+#define LANGE_FROBENIUS_MAX_BDIM 1024
+#endif
+
 template <typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_MAX_BDIM)
     lange_frobenius_kernel(const I m,
