@@ -181,16 +181,10 @@ struct DeviceMoeGemmBlockScale
         ComputeTypeA,
         ComputeTypeB,
         LDSTypeA,
-<<<<<<< HEAD
-        LDSTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
-=======
         LDSTypeB,
         NonTemporalLoadB>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
->>>>>>> develop
+    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
+    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     using Argument = typename GridwiseGemm64::Argument;
 

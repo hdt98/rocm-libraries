@@ -498,13 +498,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
         const auto a_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
             p_a_grid, a_grid_desc_ak0_m_ak1.GetElementSpaceSize() / a_space_size_divisor);
         const auto b_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-<<<<<<< HEAD
-            p_b_grid, b_grid_desc_bk0_n_bk1.GetElementSpaceSize());
-=======
             p_b_grid, b_grid_desc_bk0_n_bk1.GetElementSpaceSize() / b_space_size_divisor);
-        auto c_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-            p_c_grid, c_grid_desc_mblock_mperblock_nblock_nperblock.GetElementSpaceSize());
->>>>>>> develop
 
         const AElementwiseOperation a_element_op{};
         const BElementwiseOperation b_element_op{};

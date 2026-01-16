@@ -1304,7 +1304,7 @@ struct tile_window_with_static_distribution
                 this->get_bottom_tensor_view().get_tensor_descriptor();
             cached_global_strides_ = to_array<index_t, Base::NDimBottomTensor>(
                 tuple_reverse(container_reverse_inclusive_scan(
-                    glb_tensor_descriptor.get_lengths(), multiplies{}, 1)));
+                    glb_tensor_descriptor.get_lengths(), multiplies<>{}, 1)));
             tensor_cache_initialized_ = true;
         }
 

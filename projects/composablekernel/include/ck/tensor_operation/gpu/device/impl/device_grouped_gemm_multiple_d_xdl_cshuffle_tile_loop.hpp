@@ -687,33 +687,6 @@ struct DeviceGroupedGemmMultipleDXdlCShuffleTileLoop
         }
 
         template <typename KernelFunction>
-<<<<<<< HEAD
-        int CalculateMaxOccupancyGridSize(const KernelFunction& kernel,
-                                          const StreamConfig& stream_config) const
-        {
-            // Calculate max number of workgroups that can simultaneously reside on the CU.
-            int occ_num_blocks            = 0;
-            size_t dyn_shared_mem_per_blk = 0;
-            hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
-                &occ_num_blocks, kernel, BlockSize, dyn_shared_mem_per_blk));
-
-            occ_num_blocks = std::max(occ_num_blocks, 1);
-            int cu_count   = getAvailableComputeUnitCount(stream_config);
-
-            if(stream_config.log_level_ > 0)
-            {
-                std::cout << "MaxActiveBlocksPerCU: " << occ_num_blocks
-                          << ", available CUs count: " << cu_count << ", occup. grid size: "
-                          << ck::math::min(occ_num_blocks, KernelConfig::GetCuBlocks()) * cu_count
-                          << std::endl;
-            }
-
-            return cu_count * ck::math::min(occ_num_blocks, KernelConfig::GetCuBlocks());
-        }
-
-        template <typename KernelFunction>
-=======
->>>>>>> develop
         float LaunchKernel(const KernelFunction& kernel,
                            const Argument& arg,
                            const void* dev_gemm_args,
@@ -885,10 +858,6 @@ struct DeviceGroupedGemmMultipleDXdlCShuffleTileLoop
                 return kernel;
             }
         }
-<<<<<<< HEAD
-        return std::max(occupancy, 1);
-=======
-
         // This is here to handle the case where MXdlPerWave/NxdPerWave is too small
         // This is caught by IsSupportedArgument(), but as GetKernelFunction is sometimes called
         // before we need a fallback kernel to return here.
@@ -899,7 +868,6 @@ struct DeviceGroupedGemmMultipleDXdlCShuffleTileLoop
     {
         const auto kernel = GetKernelFunction();
         return KernelConfig::GetKernelOccupancy(kernel);
->>>>>>> develop
     }
 
     static auto MakeArgument(std::vector<const void*>& p_As,

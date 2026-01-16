@@ -193,7 +193,6 @@ struct BlockUniversalGemmAsBsCr
     };
 
     template <typename GemmTraits>
-<<<<<<< HEAD
     struct BlockGemmImpl<GemmPipelineScheduler::Default, GemmTraits>
     {
         static constexpr auto ALdsTileDistr =
@@ -280,8 +279,6 @@ struct BlockUniversalGemmAsBsCr
     };
 
     template <typename GemmTraits>
-=======
->>>>>>> develop
     struct BlockGemmImpl<GemmPipelineScheduler::Intrawave, GemmTraits>
     {
         static constexpr auto ALdsTileDistr =

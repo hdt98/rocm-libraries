@@ -80,24 +80,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
         const long_index_t e_batch_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx));
 
-<<<<<<< HEAD
         __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
-        GridwiseGemm::template Run<AGridDesc_AK0_M_K1,
-                                   BGridDesc_BK0_N_K1,
-                                   CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
-                                   HasMainKBlockLoop,
-                                   CGlobalMemoryDataOperation,
-                                   TailNum>(karg.p_a_grid + a_batch_offset,
-                                            karg.p_b_grid + b_batch_offset,
-                                            karg.p_c_grid + e_batch_offset,
-                                            p_shared,
-                                            karg,
-                                            a_grid_desc_ak0_m_ak1,
-                                            b_grid_desc_bk0_n_bk1,
-                                            c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                            k_idx);
-=======
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
 
         DispatchSplitKHack<GridwiseGemm,
                            AGridDesc_AK0_M_K1,
@@ -116,7 +99,6 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
                                     k_idx * num_k_per_block,
                                     gridDim.y,
                                     split_k_offset_hack);
->>>>>>> develop
     }
 #else
     ignore = karg;
