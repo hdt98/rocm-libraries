@@ -43,6 +43,10 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#ifndef GECON_BLOCKSIZE
+#define GECON_BLOCKSIZE 1024
+#endif
+
 template <typename T, typename I>
 ROCSOLVER_KERNEL void gecon_init_vector(T* x, const rocblas_int n, const T value)
 {
