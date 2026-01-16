@@ -29,9 +29,9 @@
 
 namespace rocfft_rccl
 {
-#ifdef ROCFFT_RCCL_ENABLE
-
     std::shared_ptr<Communicator> Communicator::comm_world;
+
+#ifdef ROCFFT_RCCL_ENABLE
 
     // RCCL data type mapping - returns base NCCL type for given element size.
     // for complex types (8 or 16 bytes), callers must double the count.
