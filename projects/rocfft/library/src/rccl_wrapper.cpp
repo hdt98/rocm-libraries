@@ -59,9 +59,9 @@ namespace rocfft_rccl
     // implementation details
     struct Communicator::Impl
     {
-        std::vector<ncclComm_t> comms; // one per device
-        std::vector<int>        devices; // device IDs
-        std::map<int, int>      device_to_rank;
+        // each comm is for one rank, and each rank has exactly one
+        // device
+        std::vector<ncclComm_t> comms;
 
         ~Impl()
         {
@@ -72,16 +72,6 @@ namespace rocfft_rccl
                     ncclCommFinalize(comm);
                     ncclCommDestroy(comm);
                 }
-            }
-        }
-
-        // build device-rank mappings
-        void init_maps()
-        {
-            for(int rank = 0; rank < static_cast<int>(devices.size()); ++rank)
-            {
-                int dev_id             = devices[rank];
-                device_to_rank[dev_id] = rank;
             }
         }
     };
@@ -136,56 +126,16 @@ namespace rocfft_rccl
             new_comm->pimpl = std::make_unique<Impl>();
 
             // init with devices 0..N
-            new_comm->pimpl->devices.resize(ndevices);
-            std::iota(new_comm->pimpl->devices.begin(), new_comm->pimpl->devices.end(), 0);
             new_comm->pimpl->comms.resize(ndevices);
-            ncclResult_t result = ncclCommInitAll(
-                new_comm->pimpl->comms.data(), ndevices, new_comm->pimpl->devices.data());
+            ncclResult_t result = ncclCommInitAll(new_comm->pimpl->comms.data(), ndevices, nullptr);
             if(result != ncclSuccess)
             {
                 return {};
             }
-            new_comm->pimpl->init_maps();
             std::swap(comm_world, new_comm);
         }
 
-        // if we need a communicator for all devices, just use the world communicator
-        // if(devices.size() == comm_world->pimpl->devices.size())
         return comm_world;
-
-        // try
-        // {
-        //     // create sub-communicator from comm_world for specified devices
-        //     auto ret   = std::make_shared<Communicator>();
-        //     ret->pimpl = std::make_unique<Impl>();
-
-        //     std::copy(devices.begin(), devices.end(), std::back_inserter(ret->pimpl->devices));
-
-        //     // for each rank in comm_world, split it into a
-        //     // sub-communicator.  use NOCOLOR for ranks that aren't
-        //     // supposed to be in this sub-communicator
-        //     for(size_t rank = 0; rank < comm_world->pimpl->comms.size(); ++rank)
-        //     {
-        //         bool rank_in_sub = devices.find(comm_world->pimpl->devices[rank]) != devices.end();
-        //         ncclComm_t   rank_comm = nullptr;
-        //         ncclResult_t result    = ncclCommSplit(comm_world->pimpl->comms[rank],
-        //                                             rank_in_sub ? 0 : NCCL_SPLIT_NOCOLOR,
-        //                                             comm_world->pimpl->devices[rank],
-        //                                             &rank_comm,
-        //                                             nullptr);
-        //         if(result != ncclSuccess)
-        //             return {};
-        //         ret->pimpl->comms.push_back(rank_comm);
-        //     }
-
-        //     ret->pimpl->init_maps();
-        //     return ret;
-        // }
-        // catch(const std::exception& e)
-        // {
-        //     log_trace(__func__, "rccl initialization failed", e.what());
-        //     return {};
-        // }
 #else
         return {};
 #endif
@@ -194,36 +144,9 @@ namespace rocfft_rccl
     void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
-        auto it = pimpl->device_to_rank.find(device_id);
-        if(it == pimpl->device_to_rank.end())
-            return nullptr;
-
-        int rank = it->second;
-        if(rank < 0 || rank >= static_cast<int>(pimpl->comms.size()))
-            return nullptr;
-
-        return static_cast<void*>(&pimpl->comms[rank]);
+        return &pimpl->comms[device_id];
 #else
         return nullptr;
-#endif
-    }
-
-    int Communicator::get_rank_for_device(int device_id) const
-    {
-#ifdef ROCFFT_RCCL_ENABLE
-        auto it = pimpl->device_to_rank.find(device_id);
-        return (it != pimpl->device_to_rank.end()) ? it->second : -1;
-#else
-        return -1;
-#endif
-    }
-
-    bool Communicator::has_device(int device_id) const
-    {
-#ifdef ROCFFT_RCCL_ENABLE
-        return pimpl->device_to_rank.find(device_id) != pimpl->device_to_rank.end();
-#else
-        return false;
 #endif
     }
 

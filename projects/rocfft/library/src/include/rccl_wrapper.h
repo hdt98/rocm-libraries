@@ -54,12 +54,6 @@ namespace rocfft_rccl
         // get the RCCL communicator for a specific device
         void* get_comm(int device_id) const;
 
-        // get rank for a device ID
-        int get_rank_for_device(int device_id) const;
-
-        // check if a specific device is managed
-        bool has_device(int device_id) const;
-
         // all-to-all with uniform counts
         bool alltoall(const void* sendbuf,
                       void*       recvbuf,

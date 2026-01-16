@@ -2175,7 +2175,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             packItems.push_back(packIdx);
 
             // add RCCL send operation
-            int dst_rank = rccl->get_rank_for_device(outBrick.location.device);
+            const int dst_rank = outBrick.location.device;
             if(dst_rank >= 0)
             {
                 rcclGrouped->AddTransfer(true,
@@ -2188,7 +2188,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             }
 
             // add RCCL recv operation
-            int src_rank = rccl->get_rank_for_device(inBrick.location.device);
+            const int src_rank = inBrick.location.device;
             if(src_rank >= 0)
             {
                 rcclGrouped->AddTransfer(false,
