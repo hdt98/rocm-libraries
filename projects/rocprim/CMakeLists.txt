@@ -26,8 +26,6 @@
 
 cmake_minimum_required(VERSION 3.21...3.25 FATAL_ERROR)
 
-include(CheckLanguage)
-
 if(WIN32)
   set(ROCM_PATH "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
 else()
@@ -37,10 +35,6 @@ endif()
 # Configure default CMake install behavior.
 set(CMAKE_INSTALL_PREFIX ${ROCM_PATH} CACHE PATH "Install path prefix, prepended onto install directories")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker search and installed rpath")
-
-# Use HIP language features if available in CMake.
-check_language(HIP)
-enable_language(HIP)
 
 # Declare project.
 project(rocprim LANGUAGES CXX HIP)
@@ -52,6 +46,7 @@ set(VERSION_STRING "4.2.0")
 
 include(cmake/ConfigUtils.cmake)
 
+register_option(ALLOW_DOWNLOADING_DEPS OFF "Allow downloads during configuration.")
 register_option(ONLY_INSTALL "Only install package. Skips building dependencies and tests." OFF)
 register_option(ROCPRIM_INSTALL "Enable installation of rocPRIM, projects embedding rocPRIM may want to turn this off." ON)
 
@@ -66,7 +61,6 @@ register_dep_option(BUILD_CODE_COVERAGE    "Build with code coverage enabled." O
 register_dep_option(BUILD_OFFLOAD_COMPRESS "Build rocPRIM with offload compression." ON "NOT ONLY_INSTALL" OFF)
 register_dep_option(ROCPRIM_ENABLE_ASSERTS "Enable asserts in release build." OFF "NOT ONLY_INSTALL" OFF)
 
-register_set(ALLOW_DOWNLOADING_DEPS OFF     BOOL   "Allow downloads during configuration.")
 register_set(ROCRAND_FETCH_METHOD PACKAGE STRING "Method to fetch rocRAND dependency.")
 register_set(ROCRAND_FETCH_BRANCH develop STRING "Branch to fetch rocRAND from.")
 

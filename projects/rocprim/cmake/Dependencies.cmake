@@ -164,6 +164,9 @@ macro(fetch_googletest)
       )
     else()
       message(STATUS "Google Test not found. Fetching...")
+      if (NOT ${ALLOW_DOWNLOADING_DEPS})
+        message(FATAL_ERROR "Downloading depedencies is disallowed. Please pass ALLOW_DOWNLOADING_DEPS=1 to cmake!")
+      endif()
       FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
@@ -194,6 +197,9 @@ macro(fetch_googlebench)
   # Otherwise fetch from source.
   if(NOT benchmark_FOUND)
     message(STATUS "Google Benchmark not found. Fetching...")
+    if (NOT ${ALLOW_DOWNLOADING_DEPS})
+      message(FATAL_ERROR "Downloading depedencies is disallowed. Please pass ALLOW_DOWNLOADING_DEPS=1 to cmake!")
+    endif()
     FetchContent_Declare(
       googlebench
       GIT_REPOSITORY https://github.com/google/benchmark.git
@@ -253,12 +259,7 @@ macro(fetch_monorepo _method _project _version _path _branch)
       set(USE_SPARSE_CHECKOUT "ON" CACHE INTERNAL "Records whether git supports sparse checkout functionality")
     endif()
 
-    if(NOT GIT_VERSION)
-      # Warn the user that we were unable to find git. This will only actually be a problem if we use one of the
-      # fetch _methods (download, or monorepo with dependency not present) that requires it. If we end up running
-      # into one of those scenarios, a fatal error will be issued at that point.
-      message(WARNING "Unable to find git.")
-    else()
+    if(DEFINED GIT_PATH)
       message(STATUS "Found git at: ${GIT_PATH}, version: ${GIT_VERSION}")
     endif()
   endif()
@@ -272,22 +273,19 @@ macro(fetch_monorepo _method _project _version _path _branch)
     if(${${_project}_FOUND})
       message(STATUS "Found ${_project} at ${${_project}_DIR}")
     else()
-      message(FATAL_ERROR "Could not find package for ${_project} that satisfies version requirement ${_verseion}!")
+      message(FATAL_ERROR "Could not find package for ${_project} that satisfies version requirement ${_version}!")
     endif()
 
   elseif(${${_method}} STREQUAL "MONOREPO")
     message(STATUS "Searching for ${_project} in the parent monorepo directory")
-
-    # Check if this looks like a monorepo checkout
     set(_potential_project_path "${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/")
-    find_path(monorepo_path NAMES "." PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/" NO_CACHE NO_DEFAULT_PATH)
-
+    
+    # Check if this looks like a monorepo checkout
     # If not, see if the local monorepo is a sparse-checkout.
     # If it is a sparse-checkout, try to add the dependency to the sparse-checkout list.
-    # If it's not a sparse-checkout (or adding to the sparse-checkout list fails), fall back to downloading the dependency.
     if(EXISTS ${_potential_project_path})
-      message(STATUS "Found ${_project} at ${monorepo_path}!")
-      set(${_path} ${monorepo_path})
+      message(STATUS "Found ${_project} at ${_potential_project_path}!")
+      set(${_path} ${_potential_project_path})
     else()
       message(WARNING "Unable to locate ${_project} in parent monorepo (it's not at \"${CMAKE_CURRENT_SOURCE_DIR}/../../projects/${_project}/\").")
       message(STATUS "Checking if local monorepo is a sparse-checkout that we can add ${_project} to.")
@@ -296,7 +294,7 @@ macro(fetch_monorepo _method _project _version _path _branch)
         message(FATAL_ERROR "Downloading depedencies is disallowed. Please pass ALLOW_DOWNLOADING_DEPS=1 to cmake!")
       endif()
       # Check for 'git'.
-      if(NOT(GIT_PATH))
+      if(NOT DEFINED GIT_PATH)
         message(FATAL_ERROR "Git could not be found on the system. Since ${_project} could not be found in the local monorepo, git is required to download it.")
       endif()
       # Check if 'git' can do sparse checkout.
@@ -338,9 +336,10 @@ macro(fetch_monorepo _method _project _version _path _branch)
       endif()
       set(${_path} "${_potential_project_path}")
     endif()
-  endif()
-
-  if(${${_method}} STREQUAL "DOWNLOAD")
+  elseif(${${_method}} STREQUAL "DOWNLOAD")
+    if (NOT ${ALLOW_DOWNLOADING_DEPS})
+      message(FATAL_ERROR "Downloading depedencies is disallowed. Please pass ALLOW_DOWNLOADING_DEPS=1 to cmake!")
+    endif()
     if(NOT DEFINED GIT_PATH)
       message(FATAL_ERROR "Git could not be found on the system. Git is required for downloading ${_project}.")
     endif()
@@ -353,53 +352,53 @@ macro(fetch_monorepo _method _project _version _path _branch)
     if(${USE_SPARSE_CHECKOUT})
       # In this case, we have access to git sparse-checkout.
       # Check if the dependency has already been downloaded in the past:
-      find_path(monorepo_path NAMES "." PATHS "${CMAKE_CURRENT_BINARY_DIR}/${_project}-src/" NO_CACHE NO_DEFAULT_PATH)
-      if(${monorepo_path} STREQUAL "monorepo_path-NOTFOUND")
+      set(_dep_repo_dir "${CMAKE_CURRENT_BINARY_DIR}/${_project}-src/")
+      if(EXISTS ${_dep_repo_dir})
+        message("Found previously downloaded directory, skipping download step.")
+      else()
         # First, git clone with options "--no-checkout" and "--filter=tree:0" to prevent files from being pulled immediately.
         # Use option "--depth=1" to avoid downloading past commit history.
-        execute_process(COMMAND ${GIT_PATH} clone --branch ${_branch_value} --no-checkout --depth=1 --filter=tree:0 https://github.com/ROCm/rocm-libraries.git ${CMAKE_CURRENT_BINARY_DIR}/${_project}-src)
+        execute_process(COMMAND ${GIT_PATH} clone --branch ${_branch_value} --no-checkout --depth=1 --filter=tree:0 https://github.com/ROCm/rocm-libraries.git ${_dep_repo_dir})
 
         # Next, use git sparse-checkout to ensure we only pull the directory containing the desired repo.
         execute_process(COMMAND ${GIT_PATH} sparse-checkout init --cone
-                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${_project}-src)
+                        WORKING_DIRECTORY ${_dep_repo_dir})
 
         execute_process(COMMAND ${GIT_PATH} sparse-checkout set projects/${_project}
-                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${_project}-src)
+                        WORKING_DIRECTORY ${_dep_repo_dir})
 
         # Finally, download the files using git checkout.
         execute_process(COMMAND ${GIT_PATH} checkout ${_branch_value}
-                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${_project}-src)
+                        WORKING_DIRECTORY ${_dep_repo_dir})
 
         message(STATUS "${_project} download complete")
-      else()
-        message("Found previously downloaded directory, skipping download step.")
       endif()
-
+    
       # Save the downloaded path in the parent scope
-      set(${_path} "${CMAKE_CURRENT_BINARY_DIR}/${_project}-src/projects/${_project}")
+      set(${_path} "${_dep_repo_dir}/projects/${_project}")
     else()
       # In this case, we do not have access to sparse-checkout, so we need to download the whole monorepo.
       # Check if the monorepo has already been downloaded to satisfy a previous dependency
-      find_path(monorepo_path NAMES "." PATHS "${CMAKE_CURRENT_BINARY_DIR}/monorepo-src/" NO_CACHE NO_DEFAULT_PATH)
-      if(${monorepo_path} STREQUAL "monorepo_path-NOTFOUND")
+      set(_dep_repo_dir "${CMAKE_CURRENT_BINARY_DIR}/monorepo-src/")
+      if(EXISTS ${_dep_repo_dir})
+        message("Found previously downloaded directory, skipping download step.")
+      else()
         # Warn the user that this will take some time.
         message(WARNING "The detected version of git (${GIT_VERSION}) is older than 2.25 and does not provide sparse-checkout functionality. Falling back to checking out the whole rocm-libraries repository (this may take a long time).")
         # Avoid downloading anything related to branches other than the target branch (--single-branch), and avoid any past commit history information (--depth=1)
-        execute_process(COMMAND ${GIT_PATH} clone --single-branch --branch=${_branch_value} --depth=1 https://github.com/ROCm/rocm-libraries.git ${CMAKE_CURRENT_BINARY_DIR}/monorepo-src)
+        execute_process(COMMAND ${GIT_PATH} clone --single-branch --branch=${_branch_value} --depth=1 https://github.com/ROCm/rocm-libraries.git ${_dep_repo_dir})
         message(STATUS "rocm-libraries download complete")
-      else()
-        message("Found previously downloaded directory, skipping download step.")
       endif()
 
       # Save the downloaded path in the parent scope
-      set(${_path} "${CMAKE_CURRENT_BINARY_DIR}/monorepo-src/projects/${_project}")
+      set(${_path} "${_dep_repo_dir}/projects/${_project}")
     endif()
   endif()
 endmacro(fetch_monorepo)
 
 macro(fetch_rocrand)
   override_cache_variable(ROCM_PACKAGE_CREATED FALSE BOOL)
-  fetch_monorepo(ROCRAND_FETCH_METHOD rocrand 4.2.0 ROCRAND_PATH ROCRAND_FETCH_BRANCH)
+  fetch_monorepo(ROCRAND_FETCH_METHOD rocrand 4.1.0 ROCRAND_PATH ROCRAND_FETCH_BRANCH)
   if(NOT rocrand_FOUND)
     FetchContent_Declare(
       rocrand
