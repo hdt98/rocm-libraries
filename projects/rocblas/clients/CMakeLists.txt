@@ -357,3 +357,36 @@ rocm_install(
   DESTINATION "${CMAKE_INSTALL_BINDIR}"
   COMPONENT clients
 )
+
+# On Windows, install vcpkg DLLs required by clients
+if(WIN32)
+  # Find vcpkg installation directory
+  if(DEFINED ENV{VCPKG_ROOT})
+    set(VCPKG_INSTALLED_DIR "$ENV{VCPKG_ROOT}/installed/x64-windows/bin")
+  elseif(EXISTS "C:/github/vcpkg/installed/x64-windows/bin")
+    set(VCPKG_INSTALLED_DIR "C:/github/vcpkg/installed/x64-windows/bin")
+  endif()
+
+  if(VCPKG_INSTALLED_DIR)
+    # Install GTest DLLs (required by rocblas-test)
+    if(EXISTS "${VCPKG_INSTALLED_DIR}/gtest.dll")
+      install(FILES "${VCPKG_INSTALLED_DIR}/gtest.dll"
+              DESTINATION "${CMAKE_INSTALL_BINDIR}"
+              COMPONENT clients)
+    endif()
+    if(EXISTS "${VCPKG_INSTALLED_DIR}/gtest_main.dll")
+      install(FILES "${VCPKG_INSTALLED_DIR}/gtest_main.dll"
+              DESTINATION "${CMAKE_INSTALL_BINDIR}"
+              COMPONENT clients)
+    endif()
+
+    # Install OpenBLAS DLL (required by all clients for reference BLAS)
+    if(EXISTS "${VCPKG_INSTALLED_DIR}/openblas.dll")
+      install(FILES "${VCPKG_INSTALLED_DIR}/openblas.dll"
+              DESTINATION "${CMAKE_INSTALL_BINDIR}"
+              COMPONENT clients)
+    endif()
+  else()
+    message(WARNING "vcpkg installation not found. Client DLLs (gtest, openblas) will not be copied to install directory.")
+  endif()
+endif()
