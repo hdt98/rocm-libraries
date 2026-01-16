@@ -150,42 +150,42 @@ namespace rocfft_rccl
         }
 
         // if we need a communicator for all devices, just use the world communicator
-        if(devices.size() == comm_world->pimpl->devices.size())
-            return comm_world;
+        // if(devices.size() == comm_world->pimpl->devices.size())
+        return comm_world;
 
-        try
-        {
-            // create sub-communicator from comm_world for specified devices
-            auto ret   = std::make_shared<Communicator>();
-            ret->pimpl = std::make_unique<Impl>();
+        // try
+        // {
+        //     // create sub-communicator from comm_world for specified devices
+        //     auto ret   = std::make_shared<Communicator>();
+        //     ret->pimpl = std::make_unique<Impl>();
 
-            std::copy(devices.begin(), devices.end(), std::back_inserter(ret->pimpl->devices));
+        //     std::copy(devices.begin(), devices.end(), std::back_inserter(ret->pimpl->devices));
 
-            // for each rank in comm_world, split it into a
-            // sub-communicator.  use NOCOLOR for ranks that aren't
-            // supposed to be in this sub-communicator
-            for(size_t rank = 0; rank < comm_world->pimpl->comms.size(); ++rank)
-            {
-                bool rank_in_sub = devices.find(comm_world->pimpl->devices[rank]) != devices.end();
-                ncclComm_t   rank_comm = nullptr;
-                ncclResult_t result    = ncclCommSplit(comm_world->pimpl->comms[rank],
-                                                    rank_in_sub ? 0 : NCCL_SPLIT_NOCOLOR,
-                                                    comm_world->pimpl->devices[rank],
-                                                    &rank_comm,
-                                                    nullptr);
-                if(result != ncclSuccess)
-                    return {};
-                ret->pimpl->comms.push_back(rank_comm);
-            }
+        //     // for each rank in comm_world, split it into a
+        //     // sub-communicator.  use NOCOLOR for ranks that aren't
+        //     // supposed to be in this sub-communicator
+        //     for(size_t rank = 0; rank < comm_world->pimpl->comms.size(); ++rank)
+        //     {
+        //         bool rank_in_sub = devices.find(comm_world->pimpl->devices[rank]) != devices.end();
+        //         ncclComm_t   rank_comm = nullptr;
+        //         ncclResult_t result    = ncclCommSplit(comm_world->pimpl->comms[rank],
+        //                                             rank_in_sub ? 0 : NCCL_SPLIT_NOCOLOR,
+        //                                             comm_world->pimpl->devices[rank],
+        //                                             &rank_comm,
+        //                                             nullptr);
+        //         if(result != ncclSuccess)
+        //             return {};
+        //         ret->pimpl->comms.push_back(rank_comm);
+        //     }
 
-            ret->pimpl->init_maps();
-            return ret;
-        }
-        catch(const std::exception& e)
-        {
-            log_trace(__func__, "rccl initialization failed", e.what());
-            return {};
-        }
+        //     ret->pimpl->init_maps();
+        //     return ret;
+        // }
+        // catch(const std::exception& e)
+        // {
+        //     log_trace(__func__, "rccl initialization failed", e.what());
+        //     return {};
+        // }
 #else
         return {};
 #endif
