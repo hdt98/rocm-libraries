@@ -254,7 +254,7 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                 math::max(1, num_mfma_perstage / buffer_load_perstage_less);
 
             constexpr auto buffer_load_issue_point_interval_stage2 =
-                num_mfma_perstage / buffer_load_perstage_stage2;
+                math::max(1, num_mfma_perstage / buffer_load_perstage_stage2);
 
             // Stage 1
             // global read more
