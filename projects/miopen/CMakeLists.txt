@@ -463,19 +463,83 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
     set_var_to_condition(MIOPEN_USE_HIPBLASLT_DEFAULT NOT WIN32)
     option(MIOPEN_USE_HIPBLASLT "Use hipBlasLt" ${MIOPEN_USE_HIPBLASLT_DEFAULT})
     if(MIOPEN_USE_HIPBLASLT)
-        find_package(hipblaslt REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
-        message(STATUS "Build with hipBLASLt ${hipblaslt_VERSION} ${hipblaslt_DIR}")
-        
-        # If origami was skipped because hipblaslt provides it, create local aliases now
-        if(_origami_from_hipblaslt AND TARGET roc::origami)
-            if(NOT TARGET origami)
-                add_library(origami ALIAS roc::origami)
+        # Check if we need to handle origami target collision (ROCm 7.1+)
+        # When origami is built inline AND hipblaslt exports origami targets,
+        # find_package(hipblaslt) would fail with "targets already defined" error.
+        set(_hipblaslt_manual_import OFF)
+        if(TARGET roc::origami)
+            # Check if hipblaslt's cmake exports origami targets
+            find_file(_hipblaslt_targets_file hipblaslt-targets.cmake 
+                PATHS /opt/rocm ${CMAKE_PREFIX_PATH} $ENV{HIP_PATH}
+                PATH_SUFFIXES lib/cmake/hipblaslt cmake/hipblaslt
+                NO_DEFAULT_PATH
+            )
+            if(_hipblaslt_targets_file)
+                file(STRINGS "${_hipblaslt_targets_file}" _hipblaslt_targets_content)
+                string(FIND "${_hipblaslt_targets_content}" "roc::origami" _origami_in_targets)
+                if(NOT _origami_in_targets EQUAL -1)
+                    message(STATUS "hipblaslt exports origami targets - using manual import to avoid collision")
+                    set(_hipblaslt_manual_import ON)
+                endif()
             endif()
-            if(NOT TARGET origami-headers AND TARGET roc::origami-headers)
-                add_library(origami-headers ALIAS roc::origami-headers)
-            endif()
-            message(STATUS "Build with origami (from hipblaslt)")
         endif()
+        
+        if(_hipblaslt_manual_import)
+            # Manually import hipblaslt to avoid origami target collision
+            # Find the hipblaslt library and headers
+            find_library(_hipblaslt_library hipblaslt 
+                PATHS /opt/rocm $ENV{HIP_PATH}
+                PATH_SUFFIXES lib
+                REQUIRED
+            )
+            find_path(_hipblaslt_include_dir hipblaslt/hipblaslt.h
+                PATHS /opt/rocm $ENV{HIP_PATH}
+                PATH_SUFFIXES include
+                REQUIRED
+            )
+            
+            # Extract version from hipblaslt-version.cmake if it exists
+            find_file(_hipblaslt_version_file hipblaslt-config-version.cmake
+                PATHS /opt/rocm $ENV{HIP_PATH}
+                PATH_SUFFIXES lib/cmake/hipblaslt cmake/hipblaslt
+                NO_DEFAULT_PATH
+            )
+            if(_hipblaslt_version_file)
+                set(PACKAGE_FIND_VERSION "0.0.0")
+                include(${_hipblaslt_version_file})
+                set(hipblaslt_VERSION ${PACKAGE_VERSION})
+            else()
+                set(hipblaslt_VERSION "unknown")
+            endif()
+            
+            # Create the hipblaslt imported target manually
+            if(NOT TARGET roc::hipblaslt)
+                add_library(roc::hipblaslt SHARED IMPORTED GLOBAL)
+                set_target_properties(roc::hipblaslt PROPERTIES
+                    IMPORTED_LOCATION "${_hipblaslt_library}"
+                    INTERFACE_INCLUDE_DIRECTORIES "${_hipblaslt_include_dir}"
+                )
+            endif()
+            
+            set(hipblaslt_FOUND TRUE)
+            message(STATUS "Build with hipBLASLt ${hipblaslt_VERSION} (manual import, using inline origami)")
+        else()
+            # Standard find_package - no collision expected
+            find_package(hipblaslt REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
+            message(STATUS "Build with hipBLASLt ${hipblaslt_VERSION} ${hipblaslt_DIR}")
+            
+            # If origami was skipped because hipblaslt provides it, create local aliases now
+            if(_origami_from_hipblaslt AND TARGET roc::origami)
+                if(NOT TARGET origami)
+                    add_library(origami ALIAS roc::origami)
+                endif()
+                if(NOT TARGET origami-headers AND TARGET roc::origami-headers)
+                    add_library(origami-headers ALIAS roc::origami-headers)
+                endif()
+                message(STATUS "Build with origami (from hipblaslt)")
+            endif()
+        endif()
+        
         find_package(hipblas-common REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
         message(STATUS "Build with hipBLAS-common ${hipblas-common_VERSION} ${hipBLAS-common_DIR}")
     else()
