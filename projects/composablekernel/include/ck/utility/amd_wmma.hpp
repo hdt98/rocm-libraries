@@ -1038,6 +1038,13 @@ struct ScaleTypeSelector
     static constexpr int value = 0xFF; // default
 };
 
+// use int32_t for backward compatibility
+template <>
+struct ScaleTypeSelector<int32_t>
+{
+    static constexpr int value = 0x0;
+};
+
 template <>
 struct ScaleTypeSelector<e8m0x4_bexp_t>
 {
@@ -1108,8 +1115,11 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                                const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
-        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t>, "ScaleTypeA must be e8m0x4_bexp_t");
-        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t>, "ScaleTypeB must be e8m0x4_bexp_t");
+        // keep int32_t for backward compatibility
+        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> || is_same_v<ScaleTypeA, int32_t>,
+                      "ScaleTypeA must be e8m0x4_bexp_t or int32_t");
+        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> || is_same_v<ScaleTypeB, int32_t>,
+                      "ScaleTypeB must be e8m0x4_bexp_t or int32_t");
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
@@ -1145,8 +1155,11 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                                const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
-        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t>, "ScaleTypeA must be e8m0x4_bexp_t");
-        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t>, "ScaleTypeB must be e8m0x4_bexp_t");
+        // keep int32_t for backward compatibility
+        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> || is_same_v<ScaleTypeA, int32_t>,
+                      "ScaleTypeA must be e8m0x4_bexp_t or int32_t");
+        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> || is_same_v<ScaleTypeB, int32_t>,
+                      "ScaleTypeB must be e8m0x4_bexp_t or int32_t");
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
@@ -1182,8 +1195,11 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                                const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
-        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t>, "ScaleTypeA must be e8m0x4_bexp_t");
-        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t>, "ScaleTypeB must be e8m0x4_bexp_t");
+        // keep int32_t for backward compatibility
+        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> || is_same_v<ScaleTypeA, int32_t>,
+                      "ScaleTypeA must be e8m0x4_bexp_t or int32_t");
+        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> || is_same_v<ScaleTypeB, int32_t>,
+                      "ScaleTypeB must be e8m0x4_bexp_t or int32_t");
 #if defined(__gfx125__)
         // f6x64_t is a vector of 2 f6x32_pk_t, so we have to repack and cast them to int32x6_t
         int32x6_t arg_a_0 = bit_cast<int32x6_t>(reg_a.AsType<f6x32_pk_t>()[Number<0>{}]);
@@ -1255,8 +1271,11 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                                const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
-        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t>, "ScaleTypeA must be e8m0x4_bexp_t");
-        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t>, "ScaleTypeB must be e8m0x4_bexp_t");
+        // keep int32_t for backward compatibility
+        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> || is_same_v<ScaleTypeA, int32_t>,
+                      "ScaleTypeA must be e8m0x4_bexp_t or int32_t");
+        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> || is_same_v<ScaleTypeB, int32_t>,
+                      "ScaleTypeB must be e8m0x4_bexp_t or int32_t");
 #if defined(__gfx125__)
         // bf6x64_t is a vector of 2 bf6x32_pk_t, so we have to repack and cast them to int32x6_t
         int32x6_t arg_a_0 = bit_cast<int32x6_t>(reg_a.AsType<bf6x32_pk_t>()[Number<0>{}]);
@@ -1328,14 +1347,15 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                                const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
-        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> ||
-                          is_same_v<ScaleTypeA, e5m3x4_scale_t> ||
-                          is_same_v<ScaleTypeA, e4m3x4_scale_t>,
-                      "ScaleTypeA must be e8m0x4_bexp_t, e5m3x4_scale_t, or e4m3x4_scale_t");
-        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> ||
-                          is_same_v<ScaleTypeB, e5m3x4_scale_t> ||
-                          is_same_v<ScaleTypeB, e4m3x4_scale_t>,
-                      "ScaleTypeB must be e8m0x4_bexp_t, e5m3x4_scale_t, or e4m3x4_scale_t");
+        // keep int32_t for backward compatibility
+        static_assert(
+            is_same_v<ScaleTypeA, e8m0x4_bexp_t> || is_same_v<ScaleTypeA, int32_t> ||
+                is_same_v<ScaleTypeA, e5m3x4_scale_t> || is_same_v<ScaleTypeA, e4m3x4_scale_t>,
+            "ScaleTypeA must be e8m0x4_bexp_t, int32_t, e5m3x4_scale_t, or e4m3x4_scale_t");
+        static_assert(
+            is_same_v<ScaleTypeB, e8m0x4_bexp_t> || is_same_v<ScaleTypeB, int32_t> ||
+                is_same_v<ScaleTypeB, e5m3x4_scale_t> || is_same_v<ScaleTypeB, e4m3x4_scale_t>,
+            "ScaleTypeB must be e8m0x4_bexp_t, int32_t, e5m3x4_scale_t, or e4m3x4_scale_t");
 #if defined(__gfx125__)
         int32x8_t arg_a = bit_cast<int32x8_t>(reg_a);
         int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
@@ -1402,11 +1422,13 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                                const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
-        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t>, "ScaleTypeA must be e8m0x4_bexp_t");
-        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> ||
-                          is_same_v<ScaleTypeB, e5m3x4_scale_t> ||
-                          is_same_v<ScaleTypeB, e4m3x4_scale_t>,
-                      "ScaleTypeB must be e8m0x4_bexp_t, e5m3x4_scale_t, or e4m3x4_scale_t");
+        // keep int32_t for backward compatibility
+        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> || is_same_v<ScaleTypeA, int32_t>,
+                      "ScaleTypeA must be e8m0x4_bexp_t or int32_t");
+        static_assert(
+            is_same_v<ScaleTypeB, e8m0x4_bexp_t> || is_same_v<ScaleTypeB, int32_t> ||
+                is_same_v<ScaleTypeB, e5m3x4_scale_t> || is_same_v<ScaleTypeB, e4m3x4_scale_t>,
+            "ScaleTypeB must be e8m0x4_bexp_t, int32_t, e5m3x4_scale_t, or e4m3x4_scale_t");
 #if defined(__gfx125__)
         int32x8_t arg_b = bit_cast<int32x8_t>(reg_b);
         using arg_type  = int32x16_t;
