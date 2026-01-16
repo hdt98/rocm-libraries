@@ -184,6 +184,7 @@ option(MIOPEN_EMBED_BINCACHE "Embed Binary Cache or KDB" Off)
 option(MIOPEN_EMBED_BUILD "Build with the set of embed flags." Off)
 option(MIOPEN_DISABLE_USERDB "Disable user database access" ${MIOPEN_EMBED_BUILD})
 option(MIOPEN_BUILD_CK "Build own CK libs inline with MIOpen build" OFF)
+option(MIOPEN_BUILD_ORIGAMI "Build origami inline with MIOpen build" OFF)
 
 # MIOPEN_USE_HIP_KERNELS is a Workaround for COMgr issues
 if(MIOPEN_EMBED_BUILD)
@@ -355,6 +356,37 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
             find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
         endif()
     endif()
+    
+    # Origami for analytical GEMM kernel configuration
+    # If an installed origami is incomplete (missing origami-targets.cmake),
+    # fall back to building it inline.
+    set(_origami_force_build ${MIOPEN_BUILD_ORIGAMI})
+    if(NOT _origami_force_build)
+        find_file(_origami_config origami-config.cmake PATHS ${CMAKE_PREFIX_PATH})
+        if(_origami_config)
+            get_filename_component(_origami_config_dir ${_origami_config} DIRECTORY)
+            if(NOT EXISTS "${_origami_config_dir}/origami-targets.cmake")
+                message(WARNING "origami-config.cmake found but origami-targets.cmake missing; building origami inline")
+                set(_origami_force_build ON)
+            endif()
+        else()
+            set(_origami_force_build ON)
+        endif()
+    endif()
+
+    include(cmake/Dependencies.cmake)
+    if(_origami_force_build)
+        miopen_add_dependency(origami NO_LOCAL)
+    else()
+        miopen_add_dependency(origami)
+    endif()
+
+    if(origami_VERSION)
+        message(STATUS "Build with origami ${origami_VERSION}")
+    else()
+        message(STATUS "Build with origami")
+    endif()
+    
     if( MIOPEN_BACKEND STREQUAL "HIPNOGPU")
         set(MIOPEN_MODE_NOGPU 1)
     endif()

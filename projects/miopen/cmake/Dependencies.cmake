@@ -19,6 +19,7 @@ endif()
 # Dependencies where the local version should be used, if available
 set(_miopen_all_local_deps
     composable_kernel
+    origami
 )
 # Dependencies where we never look for a local version
 set(_miopen_all_remote_deps
@@ -143,6 +144,36 @@ function(_fetch_composable_kernel VERSION HASH)
 
     _exclude_from_all(${composable_kernel_SOURCE_DIR})
     _mark_targets_as_system(${composable_kernel_SOURCE_DIR})
+endfunction()
+
+function(_fetch_origami VERSION HASH)
+    set(_origami_src "${CMAKE_CURRENT_LIST_DIR}/../../shared/origami")
+    
+    message(STATUS "Using local origami from ${_origami_src}")
+    FetchContent_Declare(
+        origami
+        SOURCE_DIR ${_origami_src}
+    )
+    
+    _save_var(BUILD_SHARED_LIBS)
+    _save_var(ORIGAMI_ENABLE_PYTHON)
+    _save_var(ORIGAMI_BUILD_TESTING)
+    _save_var(ORIGAMI_ENABLE_INSTALL)
+    
+    set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
+    set(ORIGAMI_ENABLE_PYTHON OFF CACHE INTERNAL "")
+    set(ORIGAMI_BUILD_TESTING OFF CACHE INTERNAL "")
+    set(ORIGAMI_ENABLE_INSTALL OFF CACHE INTERNAL "")
+    
+    FetchContent_MakeAvailable(origami)
+    
+    _restore_var(BUILD_SHARED_LIBS)
+    _restore_var(ORIGAMI_ENABLE_PYTHON)
+    _restore_var(ORIGAMI_BUILD_TESTING)
+    _restore_var(ORIGAMI_ENABLE_INSTALL)
+    
+    _exclude_from_all(${origami_SOURCE_DIR})
+    _mark_targets_as_system(${origami_SOURCE_DIR})
 endfunction()
 
 # Utility functions, pulled from rocroller repo
