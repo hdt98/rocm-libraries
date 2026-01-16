@@ -2076,7 +2076,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
     ResizeWorkspaceDev(ctx, ws_size);
     wall.start(wall_enabled);
 
-    for(int i = 0; i < num_iterations + 2; i++) // +2  to run CI/CD
+    for(int i = 0; i < num_iterations + 1; i++) // +1  to run CI/CD
     {
         if(init_output_nan)
         {
