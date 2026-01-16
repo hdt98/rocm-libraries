@@ -106,43 +106,57 @@ namespace KernelBodies
 class DSObserverValidator
 {
 public:
-    static bool validateArithmeticWeave(const LatencyAnalysisResult& analysis,
+    static void validateArithmeticWeave(const KernelLatencyResults&  result,
+                                        const LatencyAnalysisResult& analysis,
                                         int                          instrDwords,
                                         int                          strideMultiplier,
                                         bool                         write,
                                         uint32_t /*workgroupSize*/)
     {
+        INFO(result.infoStr);
+
         if(write && instrDwords == 4)
-            return (analysis.incorrectPredictionCount <= 16);
-        return (analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0);
+        {
+            CHECK(analysis.incorrectPredictionCount <= 16);
+        }
+        else
+        {
+            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
+        }
     }
 
-    static bool validateSteadyState(const LatencyAnalysisResult& analysis,
+    static void validateSteadyState(const KernelLatencyResults&  result,
+                                    const LatencyAnalysisResult& analysis,
                                     int                          instrDwords,
                                     int                          strideMultiplier,
                                     bool                         write,
                                     uint32_t                     workgroupSize)
     {
+        INFO(result.infoStr);
+
         if(write && instrDwords == 4)
         {
             if(workgroupSize <= 128u)
             {
-                return std::abs(analysis.totalDelta) <= 210;
+                CHECK(std::abs(analysis.totalDelta) <= 210);
             }
             else
             {
-                return analysis.totalAbsoluteDelta <= 1600;
+                CHECK(analysis.totalAbsoluteDelta <= 1600);
             }
         }
         else if(workgroupSize == 64u)
         {
-            return (analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0);
+            CHECK((analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0));
         }
         else if(workgroupSize > 64u)
         {
-            return std::abs(analysis.totalDelta) <= 300;
+            CHECK(std::abs(analysis.totalDelta) <= 300);
         }
-        return (analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0);
+        else
+        {
+            CHECK((analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0));
+        }
     }
 };
 

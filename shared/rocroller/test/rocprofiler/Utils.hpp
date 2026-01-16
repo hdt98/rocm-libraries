@@ -187,7 +187,9 @@ namespace rocRoller
     {
         bool                                                           useMultipleWorkgroupSizes;
         std::function<Generator<Instruction>(ParameterizedLDSKernel*)> kernelBodyGen;
-        std::function<bool(const LatencyAnalysisResult&, int, int, bool, uint32_t)> validationFunc;
+        std::function<void(
+            const KernelLatencyResults&, const LatencyAnalysisResult&, int, int, bool, uint32_t)>
+            validationFunc;
     };
 
     /**
@@ -229,21 +231,11 @@ namespace rocRoller
         SECTION(kernel.getSectionName())
         {
             auto result = runKernelAndCollectLatencies(context, kernel);
-            INFO(result.infoStr);
-            const auto& filteredInstructions = result.filteredInstructions;
-            const auto& medianLatencies      = result.medianLatencies;
+            auto analysis
+                = analyzeLatencyDeltas(result.filteredInstructions, result.medianLatencies);
 
-            auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-            INFO(fmt::format(
-                "Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                analysis.totalDelta,
-                analysis.totalAbsoluteDelta,
-                analysis.incorrectPredictionCount,
-                filteredInstructions.size() - 1));
-
-            CHECK(config.validationFunc(
-                analysis, instrDwords, strideMultiplier, write, workgroupSize));
+            config.validationFunc(
+                result, analysis, instrDwords, strideMultiplier, write, workgroupSize);
         }
     }
 

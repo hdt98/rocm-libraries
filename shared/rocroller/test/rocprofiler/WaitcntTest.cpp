@@ -116,54 +116,72 @@ namespace KernelBodies
 class WaitcntTestValidator
 {
 public:
-    static bool WeaveLDSAndWaitcnt0(const LatencyAnalysisResult& analysis,
+    static void WeaveLDSAndWaitcnt0(const KernelLatencyResults&  result,
+                                    const LatencyAnalysisResult& analysis,
                                     int                          instrDwords,
                                     int                          strideMultiplier,
                                     bool                         write,
                                     uint32_t                     workgroupSize)
     {
+        INFO(result.infoStr);
+
         if(workgroupSize > 64u)
         {
-            return (analysis.incorrectPredictionCount <= 28);
+            CHECK(analysis.incorrectPredictionCount <= 28);
         }
-        return (analysis.incorrectPredictionCount <= 6);
+        else
+        {
+            CHECK(analysis.incorrectPredictionCount <= 6);
+        }
     }
 
-    static bool weaveNonzeroWaitcnt(const LatencyAnalysisResult& analysis,
+    static void weaveNonzeroWaitcnt(const KernelLatencyResults&  result,
+                                    const LatencyAnalysisResult& analysis,
                                     int                          instrDwords,
                                     int                          strideMultiplier,
                                     bool                         write,
                                     uint32_t /*workgroupSize*/)
     {
+        INFO(result.infoStr);
+
         if(instrDwords == 4)
         {
             if(write)
             {
-                return (analysis.incorrectPredictionCount <= 64);
+                CHECK(analysis.incorrectPredictionCount <= 64);
             }
             else
             {
-                return (std::abs(analysis.totalDelta) <= 80);
+                CHECK(std::abs(analysis.totalDelta) <= 80);
             }
         }
         else if(strideMultiplier >= 4)
         {
-            return (std::abs(analysis.totalDelta) <= 80);
+            CHECK(std::abs(analysis.totalDelta) <= 80);
         }
-        return (analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 0);
+        else
+        {
+            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 0));
+        }
     }
 
-    static bool weaveLDSAndDecreasingWaitcnt(const LatencyAnalysisResult& analysis,
+    static void weaveLDSAndDecreasingWaitcnt(const KernelLatencyResults&  result,
+                                             const LatencyAnalysisResult& analysis,
                                              int                          instrDwords,
                                              int                          strideMultiplier,
                                              bool                         write,
                                              uint32_t /*workgroupSize*/)
     {
+        INFO(result.infoStr);
+
         if(write && instrDwords == 4)
         {
-            return (analysis.incorrectPredictionCount <= 28);
+            CHECK(analysis.incorrectPredictionCount <= 28);
         }
-        return (analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 0);
+        else
+        {
+            CHECK((analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 0));
+        }
     }
 };
 

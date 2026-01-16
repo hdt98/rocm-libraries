@@ -254,7 +254,15 @@ namespace rocRoller
             medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
         }
 
-        const auto infoStr = formatLatencyComparison(filteredInstructions, medianLatencies);
+        auto infoStr = formatLatencyComparison(filteredInstructions, medianLatencies);
+
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
+        infoStr += fmt::format(
+            "\nTotal delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
+            analysis.totalDelta,
+            analysis.totalAbsoluteDelta,
+            analysis.incorrectPredictionCount,
+            filteredInstructions.size() - 1);
 
         return KernelLatencyResults{.filteredInstructions = std::move(filteredInstructions),
                                     .medianLatencies      = std::move(medianLatencies),
