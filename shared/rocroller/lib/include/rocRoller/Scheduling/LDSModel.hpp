@@ -268,18 +268,18 @@ namespace rocRoller::Scheduling::LDSModel
     public:
         LDSModule(GPUArchitectureGFX gfx, int waveCount);
 
-        void incrementProgramCycle(int cycles);
+        void incrementProgramCycleBy(int cycles);
         int  getProgramCycle() const
         {
             return m_programCycle;
         }
         void reset();
 
-        // Returns tuple of <stall_cycles, additional_cycles>
-        std::tuple<int, int> predictStallCycles(const RuntimeLDSInstruction& instr) const;
+        // Returns tuple of (stall_cycles, additional_cycles)
+        std::tuple<int, int> predictCycles(const RuntimeLDSInstruction& instr) const;
         void                 scheduleInstruction(const RuntimeLDSInstruction& instr);
 
-        int predictWaitcntStall(int waitcnt) const;
+        int predictWaitcntStallCycles(int waitcnt) const;
 
         void updateQueues();
 
@@ -291,7 +291,6 @@ namespace rocRoller::Scheduling::LDSModel
         int                m_programCycle;
         int                m_multiplierQueueSlots;
         int                m_multiplierWaveCount;
-        int                m_multiplierLdsIo;
 
         std::deque<int> m_commandQueue;
         std::deque<int> m_waitcntQueue; // Includes round-trip delay

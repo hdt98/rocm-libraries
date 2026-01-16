@@ -79,17 +79,14 @@ namespace rocRoller::Scheduling::LDSModel
     LDSModule::LDSModule(GPUArchitectureGFX gfx, int waveCount)
         : m_gfx(gfx)
         , m_programCycle(0)
+        , m_multiplierWaveCount(waveCount)
         // With 3 or more waves, two SIMDs will be active on at least one SP
         // so two SIMDs share the same LDS queues
         , m_multiplierQueueSlots(waveCount > 2 ? 2 : 1)
-        , m_multiplierWaveCount(waveCount)
-        , m_multiplierLdsIo(waveCount > 1 ? 2 : 1)
-
     {
     }
 
-    // Advance program cycle by delta cycles
-    void LDSModule::incrementProgramCycle(int cycles)
+    void LDSModule::incrementProgramCycleBy(int cycles)
     {
         m_programCycle += cycles;
     }
@@ -115,7 +112,7 @@ namespace rocRoller::Scheduling::LDSModel
         return dataQueueSize - usedSlots;
     }
 
-    std::tuple<int, int> LDSModule::predictStallCycles(const RuntimeLDSInstruction& instr) const
+    std::tuple<int, int> LDSModule::predictCycles(const RuntimeLDSInstruction& instr) const
     {
         int stallCycles = 0;
 
@@ -146,7 +143,7 @@ namespace rocRoller::Scheduling::LDSModel
         return std::make_tuple(stallCycles, additionalCycles);
     }
 
-    int LDSModule::predictWaitcntStall(int waitcnt) const
+    int LDSModule::predictWaitcntStallCycles(int waitcnt) const
     {
         int stallCycles = 0;
         AssertFatal(m_waitcntQueue.size() <= std::numeric_limits<int>::max(),
@@ -154,6 +151,7 @@ namespace rocRoller::Scheduling::LDSModel
         const auto size = static_cast<int>(m_waitcntQueue.size());
         if(waitcnt >= 0 && size > waitcnt)
         {
+            // Wait until there are only 'waitcnt' commands in queue
             const auto commandsToWaitFor = size - waitcnt - 1;
             AssertFatal(commandsToWaitFor >= 0 && commandsToWaitFor < size,
                         ShowValue(commandsToWaitFor),
@@ -173,17 +171,18 @@ namespace rocRoller::Scheduling::LDSModel
 
         const int requiredSlots = getQueueSlotsRequired(instr.memoryOp.direction, instr.dwords);
 
-        // For all intents, there's only two SP, so only 128 threads are in consideration per cycle
+        // Each SP has own queue to LDS module, therefore at most only two waves' LDS instructions are in consideration
+        // When workgroup size is 256, the model assumes the two groups of 128 threads have the same access pattern
         std::vector<size_t> truncatedAddresses(
             instr.baseAddresses.begin(),
             instr.baseAddresses.begin()
                 + std::min(static_cast<size_t>(128), instr.baseAddresses.size()));
-        instr.baseAddresses = truncatedAddresses;
+        instr.baseAddresses = std::move(truncatedAddresses);
 
         int dataCycles = getInstructionDataCycles(instr, m_gfx);
 
-        // In general, this reduction in cycles as soon as waves go out-of-sync
-        // However, the model has no real way of predicting that
+        // As soon as the waves on each SP go out-of-sync, this conflict no longer occurs
+        // In the non-overlapping case, this is true even if in-sync
         if(m_multiplierWaveCount > 1 && hasNonOverlappingBankAccess(instr, m_gfx))
         {
             Log::debug("Non-overlapping bank access detected, reducing data cycles");
@@ -197,9 +196,9 @@ namespace rocRoller::Scheduling::LDSModel
                     ShowValue(getRemainingDataSlots()),
                     ShowValue(requiredSlots));
 
-        const auto roundtripLatency = 40;
-        auto       waitcntBase      = m_programCycle + roundtripLatency + dataCycles;
-        Log::debug("dataCycles {}", dataCycles);
+        const auto roundtripLatencyCycles = 40; // Determined experimentally
+        auto       waitcntBase            = m_programCycle + roundtripLatencyCycles + dataCycles;
+
         for(int i = 0; i < m_multiplierQueueSlots; ++i)
         {
             if(instr.memoryOp.direction == LdsDirection::Write)
@@ -240,8 +239,8 @@ namespace rocRoller::Scheduling::LDSModel
                     waitcntBase = std::max(waitcntBase, m_waitcntQueue.back() + dataCycles);
                 }
 
-                AssertFatal(requiredSlots == 1,
-                            ShowValue(requiredSlots)); // read should only need 1 slot
+                // read should only need 1 slot
+                AssertFatal(requiredSlots == 1, ShowValue(requiredSlots));
 
                 m_commandQueue.push_back(cmdBase);
                 m_waitcntQueue.push_back(waitcntBase);

@@ -131,7 +131,7 @@ namespace rocRoller
 
                     std::vector<size_t> addresses = inst.getAddresses().value();
                     auto [stallCycles, additionalCycles]
-                        = m_scheduler.value().predictStallCycles({{direction}, dwords, addresses});
+                        = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
 
                     status.stallCycles      = stallCycles / 4;
                     status.additionalCycles = additionalCycles / 4;
@@ -145,7 +145,7 @@ namespace rocRoller
                 AssertFatal(ctx != nullptr);
                 if(ctx->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver)
                 {
-                    auto stallCycles   = m_scheduler.value().predictWaitcntStall(waitcnt);
+                    auto stallCycles   = m_scheduler.value().predictWaitcntStallCycles(waitcnt);
                     status.stallCycles = stallCycles / 4;
                 }
             }
@@ -168,7 +168,7 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
-            m_scheduler.value().incrementProgramCycle(inst.totalCycles() * 4);
+            m_scheduler.value().incrementProgramCycleBy(inst.totalCycles() * 4);
             m_scheduler.value().updateQueues();
 
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
