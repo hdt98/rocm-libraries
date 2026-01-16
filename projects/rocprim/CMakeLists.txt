@@ -144,7 +144,8 @@ include(CheckCompilerFlag)
 
 # Enable offload compress.
 if(BUILD_OFFLOAD_COMPRESS)
-  # Except on SPIR-V!
+  # Offload compression does not work with SPIR-V.
+  # This may get fixed in a future compiler version.
   if ("amdgcnspirv" IN_LIST HIP_ARCHITECTURES)
     message(FATAL_ERROR "Cannot combine SPIR-V and BUILD_OFFLOAD_COMPRESS")
   endif()
