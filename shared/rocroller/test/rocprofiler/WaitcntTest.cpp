@@ -59,52 +59,222 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <functional>
 
 using namespace rocRoller;
 
-class LDSWaitcntWeaveKernel : public LDSTestKernelBase
+class ParameterizedLDSWaitcntKernel : public LDSTestKernelBase
 {
 public:
-    LDSWaitcntWeaveKernel(ContextPtr                 context,
-                          uint32_t                   workgroupSize,
-                          size_t                     instrDwords,
-                          size_t                     strideMultiplier,
-                          const std::vector<size_t>& baseAddresses,
-                          bool                       write)
+    using BodyGenerator = std::function<Generator<Instruction>(ParameterizedLDSWaitcntKernel*)>;
+
+    ParameterizedLDSWaitcntKernel(ContextPtr                 context,
+                                  uint32_t                   workgroupSize,
+                                  size_t                     instrDwords,
+                                  size_t                     strideMultiplier,
+                                  const std::vector<size_t>& baseAddresses,
+                                  bool                       write,
+                                  BodyGenerator              bodyGen)
         : LDSTestKernelBase(
             context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
+        , m_bodyGenerator(bodyGen)
     {
+    }
+
+    Generator<Instruction> scheduleLdsInstruction(int& counter)
+    {
+        const auto [start, end]
+            = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+        auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
+        if(m_write)
+            co_yield m_context->mem()->storeLocal(m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+        else
+            co_yield m_context->mem()->loadLocal(dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+    }
+
+    ContextPtr getContext() const
+    {
+        return m_context;
     }
 
 protected:
     Generator<Instruction> generateKernelBody() override
     {
-        int counter = 0;
-        // Too many iterations, then latency of s_barrier gets noticeable
+        return m_bodyGenerator(this);
+    }
+
+private:
+    BodyGenerator m_bodyGenerator;
+};
+
+namespace KernelBodies
+{
+
+    Generator<Instruction> WeaveLDSAndWaitcnt0(ParameterizedLDSWaitcntKernel* kernel)
+    {
+        int  counter = 0;
+        auto context = kernel->getContext();
         for(int i = 1; i <= 4; ++i)
         {
             for(int k = 0; k < i; ++k)
             {
-                const auto [start, end]
-                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-                if(m_write)
-                    co_yield m_context->mem()->storeLocal(
-                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-                else
-                    co_yield m_context->mem()->loadLocal(
-                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+                co_yield kernel->scheduleLdsInstruction(counter);
             }
-            co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), 0));
-            co_yield m_context->mem()->barrier({});
+            co_yield Instruction::Wait(WaitCount::DSCnt(context->targetArchitecture(), 0));
+            co_yield context->mem()->barrier({});
         }
+    }
+
+    Generator<Instruction> weaveNonzeroWaitcnt(ParameterizedLDSWaitcntKernel* kernel)
+    {
+        int  counter = 0;
+        auto context = kernel->getContext();
+        for(int i = 0; i < 8; ++i)
+        {
+            for(int k = 0; k < 16; ++k)
+            {
+                co_yield kernel->scheduleLdsInstruction(counter);
+            }
+            co_yield Instruction::Wait(WaitCount::DSCnt(context->targetArchitecture(), i));
+        }
+    }
+
+    Generator<Instruction> weaveLDSAndDecreasingWaitcnt(ParameterizedLDSWaitcntKernel* kernel)
+    {
+        int  counter = 0;
+        auto context = kernel->getContext();
+        for(int i = 1; i <= 8; ++i)
+        {
+            for(int k = 0; k < i; ++k)
+            {
+                co_yield kernel->scheduleLdsInstruction(counter);
+            }
+            for(int w = 0; w < i; ++w)
+            {
+                co_yield Instruction::Wait(
+                    WaitCount::DSCnt(context->targetArchitecture(), i - w - 1));
+            }
+        }
+    }
+}
+
+class WaitcntTestValidator
+{
+public:
+    using LatencyAnalysis = LatencyAnalysisResult;
+
+    static bool WeaveLDSAndWaitcnt0(const LatencyAnalysis& analysis,
+                                    int                    instrDwords,
+                                    int                    strideMultiplier,
+                                    bool                   write,
+                                    uint32_t               workgroupSize)
+    {
+        if(workgroupSize > 64u)
+        {
+            // Larger workgroup sizes go out-of-sync, resulting in incorrect predictions
+            return (analysis.incorrectPredictionCount <= 28);
+        }
+        return (analysis.incorrectPredictionCount <= 6);
+    }
+
+    static bool weaveNonzeroWaitcnt(const LatencyAnalysis& analysis,
+                                    int                    instrDwords,
+                                    int                    strideMultiplier,
+                                    bool                   write,
+                                    uint32_t /*workgroupSize*/)
+    {
+        if(instrDwords == 4)
+        {
+            if(write)
+            {
+                return (analysis.incorrectPredictionCount <= 64);
+            }
+            else
+            {
+                return (std::abs(analysis.totalDelta) <= 80);
+            }
+        }
+        else if(strideMultiplier >= 4)
+        {
+            return (std::abs(analysis.totalDelta) <= 80);
+        }
+        return (analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 0);
+    }
+
+    static bool weaveLDSAndDecreasingWaitcnt(const LatencyAnalysis& analysis,
+                                             int                    instrDwords,
+                                             int                    strideMultiplier,
+                                             bool                   write,
+                                             uint32_t /*workgroupSize*/)
+    {
+        if(write && instrDwords == 4)
+        {
+            return (analysis.incorrectPredictionCount <= 28);
+        }
+        return (analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 0);
     }
 };
 
-TEST_CASE("Weave multiple LDS and waitcnt 0",
-          "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
+struct TestConfig
 {
-    // Mainly affected by waitcnt queue values
+    bool                                                                  useMultipleWorkgroupSizes;
+    std::function<Generator<Instruction>(ParameterizedLDSWaitcntKernel*)> kernelBodyGen;
+    std::function<bool(const WaitcntTestValidator::LatencyAnalysis&, int, int, bool, uint32_t)>
+        validationFunc;
+};
+
+void runLDSWaitcntTest(const TestConfig& config)
+{
+    using namespace Scheduling::LDSModel;
+
+    const auto workgroupSize = config.useMultipleWorkgroupSizes ? GENERATE(64u, 128u, 256u) : 64u;
+
+    int  instrDwords      = GENERATE(1, 2, 4);
+    int  strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+    bool write            = GENERATE(true, false);
+
+    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+    rocRoller::profiler::reset();
+
+    rocRoller::KernelOptions kernelOpts;
+    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+    auto context           = TestContext::ForTestDevice(kernelOpts, "");
+
+    if(not context->targetArchitecture().target().isCDNA35GPU())
+    {
+        SKIP("Currently only testing on gfx950");
+    }
+
+    ParameterizedLDSWaitcntKernel kernel(context.get(),
+                                         workgroupSize,
+                                         instrDwords,
+                                         strideMultiplier,
+                                         baseAddresses,
+                                         write,
+                                         config.kernelBodyGen);
+
+    SECTION(kernel.getSectionName())
+    {
+        auto result = runKernelAndCollectLatencies(context, kernel);
+        INFO(result.infoStr);
+        const auto& filteredInstructions = result.filteredInstructions;
+        const auto& medianLatencies      = result.medianLatencies;
+
+        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
+
+        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
+                         analysis.totalDelta,
+                         analysis.totalAbsoluteDelta,
+                         analysis.incorrectPredictionCount,
+                         filteredInstructions.size() - 1));
+
+        CHECK(config.validationFunc(analysis, instrDwords, strideMultiplier, write, workgroupSize));
+    }
+}
+
+TEST_CASE("Weave LDS and waitcnt 0", "[rocprofiler][lds-model][gpu]")
+{
     /*
     ds_read_b128 v[60:63], v1, model 16, profiler 16, delta 0
     s_waitcnt lgkmcnt(0), model 168, profiler 164, delta -4
@@ -127,125 +297,11 @@ TEST_CASE("Weave multiple LDS and waitcnt 0",
     ds_read_b128 v[116:119], v1, model 4, profiler 4, delta 0
     s_waitcnt lgkmcnt(0), model 108, profiler 108, delta 0
     */
-    using namespace Scheduling::LDSModel;
-
-    const auto workgroupSize = GENERATE(64u, 128u, 256u);
-
-    int instrDwords      = GENERATE(1, 2, 4);
-    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-    int write            = GENERATE(true, false);
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    rocRoller::KernelOptions kernelOpts;
-    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
-    auto context           = TestContext::ForTestDevice(kernelOpts, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    LDSWaitcntWeaveKernel kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
-
-    SECTION(kernel.getSectionName())
-    {
-
-        auto result = runKernelAndCollectLatencies(context, kernel);
-        INFO(result.infoStr);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         analysis.totalDelta,
-                         analysis.totalAbsoluteDelta,
-                         analysis.incorrectPredictionCount,
-                         filteredInstructions.size() - 1));
-
-        if(workgroupSize == 64u)
-        {
-            if(write && instrDwords == 2 && strideMultiplier == 1)
-            {
-                CHECK((analysis.incorrectPredictionCount <= 8
-                       || std::abs(analysis.totalDelta) <= 35));
-            }
-            else if(write && instrDwords == 4)
-            {
-                CHECK((analysis.incorrectPredictionCount <= 20
-                       || std::abs(analysis.totalDelta) <= 180));
-            }
-            else if(instrDwords == 1 && strideMultiplier == 1)
-            {
-                CHECK((analysis.incorrectPredictionCount <= 9
-                       || std::abs(analysis.totalDelta) <= 32));
-            }
-            else if(instrDwords == 2 && strideMultiplier == 1)
-            {
-                CHECK((analysis.incorrectPredictionCount <= 8
-                       || std::abs(analysis.totalDelta) <= 35));
-            }
-            else if(instrDwords == 4 && strideMultiplier == 1)
-            {
-                CHECK((analysis.incorrectPredictionCount <= 8
-                       || std::abs(analysis.totalDelta) <= 35));
-            }
-            else
-            {
-                CHECK(
-                    (analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
-            }
-        }
-        else
-        {
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 500));
-        }
-    }
+    runLDSWaitcntTest(
+        {true, KernelBodies::WeaveLDSAndWaitcnt0, WaitcntTestValidator::WeaveLDSAndWaitcnt0});
 }
 
-class WeaveLdsAndNonzeroWaitcnt : public LDSTestKernelBase
-{
-public:
-    WeaveLdsAndNonzeroWaitcnt(ContextPtr                 context,
-                              uint32_t                   workgroupSize,
-                              size_t                     instrDwords,
-                              size_t                     strideMultiplier,
-                              const std::vector<size_t>& baseAddresses,
-                              bool                       write)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
-    {
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
-    {
-        int counter = 0;
-        for(int i = 0; i < 8; ++i)
-        {
-            for(int k = 0; k < 16; ++k)
-            {
-                const auto [start, end]
-                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-                if(m_write)
-                    co_yield m_context->mem()->storeLocal(
-                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-                else
-                    co_yield m_context->mem()->loadLocal(
-                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-            }
-            co_yield Instruction::Wait(WaitCount::DSCnt(m_context->targetArchitecture(), i));
-        }
-    }
-};
-
-TEST_CASE("Weave LDS and waitcnt at steady state",
-          "[rocprofiler][lds-model][lds-model-waitcnt][gpu]")
+TEST_CASE("Weave LDS and non-zero waitcnt", "[rocprofiler][lds-model][gpu]")
 {
     /*
     ...
@@ -260,147 +316,11 @@ TEST_CASE("Weave LDS and waitcnt at steady state",
     s_waitcnt lgkmcnt(4), model 104, profiler 100, delta -4
     ...
     */
-    using namespace Scheduling::LDSModel;
-
-    const auto workgroupSize = 64u;
-
-    int instrDwords      = GENERATE(1, 2, 4);
-    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-    int write            = GENERATE(true, false);
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    rocRoller::KernelOptions kernelOpts;
-    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
-    auto context           = TestContext::ForTestDevice(kernelOpts, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    WeaveLdsAndNonzeroWaitcnt kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
-
-    SECTION(kernel.getSectionName())
-    {
-
-        auto result = runKernelAndCollectLatencies(context, kernel);
-        INFO(result.infoStr);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         analysis.totalDelta,
-                         analysis.totalAbsoluteDelta,
-                         analysis.incorrectPredictionCount,
-                         filteredInstructions.size() - 1));
-
-        if(!write && instrDwords == 1 && strideMultiplier >= 4)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 21 || std::abs(analysis.totalDelta) <= 85));
-        }
-        else if(!write && instrDwords == 2 && strideMultiplier >= 8)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 40 || std::abs(analysis.totalDelta) <= 1100));
-        }
-        else if(!write && instrDwords == 2 && strideMultiplier >= 4)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 21 || std::abs(analysis.totalDelta) <= 85));
-        }
-        else if(!write && instrDwords == 2 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 50));
-        }
-        else if(!write && instrDwords == 4 && strideMultiplier >= 8)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 25 || std::abs(analysis.totalDelta) <= 920));
-        }
-        else if(!write && instrDwords == 4 && strideMultiplier >= 2)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 32 || std::abs(analysis.totalDelta) <= 230));
-        }
-        else if(!write && instrDwords == 4 && strideMultiplier == 1)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 20 || std::abs(analysis.totalDelta) <= 110));
-        }
-        else if(write && instrDwords == 4)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 80 || std::abs(analysis.totalDelta) <= 1300));
-        }
-        else if(write)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 43 || std::abs(analysis.totalDelta) <= 500));
-        }
-        else if(instrDwords == 1 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 50));
-        }
-        else
-        {
-            CHECK((analysis.incorrectPredictionCount <= 4 || std::abs(analysis.totalDelta) <= 0));
-        }
-    }
+    runLDSWaitcntTest(
+        {false, KernelBodies::weaveNonzeroWaitcnt, WaitcntTestValidator::weaveNonzeroWaitcnt});
 }
 
-class WeaveLdsAndWaitcntZeroNoSaturation : public LDSTestKernelBase
-{
-public:
-    WeaveLdsAndWaitcntZeroNoSaturation(ContextPtr                 context,
-                                       uint32_t                   workgroupSize,
-                                       size_t                     instrDwords,
-                                       size_t                     strideMultiplier,
-                                       const std::vector<size_t>& baseAddresses,
-                                       bool                       write)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
-    {
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
-    {
-        int counter = 0;
-
-        const auto scheduleLds = [&]() -> Generator<Instruction> {
-            const auto [start, end]
-                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-            if(m_write)
-                co_yield m_context->mem()->storeLocal(
-                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-            else
-                co_yield m_context->mem()->loadLocal(
-                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-        };
-
-        for(int i = 1; i <= 8; ++i)
-        {
-            for(int k = 0; k < i; ++k)
-            {
-                co_yield scheduleLds();
-            }
-            for(int w = 0; w < i; ++w)
-            {
-                co_yield Instruction::Wait(
-                    WaitCount::DSCnt(m_context->targetArchitecture(), i - w - 1));
-            }
-        }
-    }
-};
-
-TEST_CASE("Weave LDS and waitcnt not steady state",
-          "[rocprofiler][lds-model][lds-model-waitcnt][lds-model-waitcnt-not-steady][gpu]")
+TEST_CASE("Weave LDS and decreasing waitcnt", "[rocprofiler][lds-model][gpu]")
 {
     /*
     ds_write_b32 v1, v2, model 8, profiler 8, delta 0
@@ -424,70 +344,7 @@ TEST_CASE("Weave LDS and waitcnt not steady state",
   * s_waitcnt lgkmcnt(1), model 16, profiler 8, delta -8
   * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
     */
-    using namespace Scheduling::LDSModel;
-
-    const auto workgroupSize = 64u;
-
-    int instrDwords      = GENERATE(1, 2, 4);
-    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-    int write            = GENERATE(true, false);
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    rocRoller::KernelOptions kernelOpts;
-    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
-    auto context           = TestContext::ForTestDevice(kernelOpts, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    WeaveLdsAndWaitcntZeroNoSaturation kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
-
-    SECTION(kernel.getSectionName())
-    {
-
-        auto result = runKernelAndCollectLatencies(context, kernel);
-        INFO(result.infoStr);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         analysis.totalDelta,
-                         analysis.totalAbsoluteDelta,
-                         analysis.incorrectPredictionCount,
-                         filteredInstructions.size() - 1));
-
-        if(write && instrDwords == 2 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 35));
-        }
-        else if(write && instrDwords == 4)
-        {
-            CHECK(
-                (analysis.incorrectPredictionCount <= 34 || std::abs(analysis.totalDelta) <= 240));
-        }
-        else if(!write && instrDwords == 2 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 45));
-        }
-        else if(!write && instrDwords == 4 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 45));
-        }
-        else if(instrDwords == 1 && strideMultiplier == 1)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 40));
-        }
-        else
-        {
-            CHECK((analysis.incorrectPredictionCount <= 5 || std::abs(analysis.totalDelta) <= 0));
-        }
-    }
+    runLDSWaitcntTest({false,
+                       KernelBodies::weaveLDSAndDecreasingWaitcnt,
+                       WaitcntTestValidator::weaveLDSAndDecreasingWaitcnt});
 }
