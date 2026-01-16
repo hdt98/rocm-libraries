@@ -32,9 +32,12 @@
 #include <sstream>
 
 #include <common/Scheduling.hpp>
+#include <rocRoller/CodeGen/Arithmetic/ArithmeticGenerator.hpp>
 #include <rocRoller/CodeGen/MemoryInstructions.hpp>
 #include <rocRoller/Expression.hpp>
+#include <rocRoller/InstructionValues/LabelAllocator.hpp>
 #include <rocRoller/KernelArguments.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 
 namespace rocRoller
 {
@@ -256,6 +259,41 @@ namespace rocRoller
         return KernelLatencyResults{.filteredInstructions = std::move(filteredInstructions),
                                     .medianLatencies      = std::move(medianLatencies),
                                     .infoStr              = infoStr};
+    }
+
+    // ParameterizedLDSKernel implementation
+    ParameterizedLDSKernel::ParameterizedLDSKernel(ContextPtr                 context,
+                                                   uint32_t                   workgroupSize,
+                                                   size_t                     instrDwords,
+                                                   size_t                     strideMultiplier,
+                                                   const std::vector<size_t>& baseAddresses,
+                                                   bool                       write,
+                                                   BodyGenerator              bodyGen)
+        : LDSTestKernelBase(
+            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
+        , m_bodyGenerator(bodyGen)
+    {
+    }
+
+    Generator<Instruction> ParameterizedLDSKernel::scheduleLdsInstruction(int& counter)
+    {
+        const auto [start, end]
+            = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+        auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
+        if(m_write)
+            co_yield m_context->mem()->storeLocal(m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
+        else
+            co_yield m_context->mem()->loadLocal(dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+    }
+
+    ContextPtr ParameterizedLDSKernel::getContext() const
+    {
+        return m_context;
+    }
+
+    Generator<Instruction> ParameterizedLDSKernel::generateKernelBody()
+    {
+        return m_bodyGenerator(this);
     }
 
 } // namespace rocRoller

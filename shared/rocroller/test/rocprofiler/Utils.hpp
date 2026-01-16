@@ -33,11 +33,18 @@
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/InstructionValues/Register.hpp>
+#include <rocRoller/KernelOptions.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
+#include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 
 #include <algorithm>
+#include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <common/Scheduling.hpp>
+#include <fmt/format.h>
+#include <functional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -145,5 +152,99 @@ namespace rocRoller
     LatencyAnalysisResult
         analyzeLatencyDeltas(const std::vector<Instruction>& filteredInstructions,
                              const std::vector<std::tuple<std::string, size_t>>& medianLatencies);
+
+    /**
+     * @brief Generic parameterized kernel class for LDS tests
+     */
+    class ParameterizedLDSKernel : public LDSTestKernelBase
+    {
+    public:
+        using BodyGenerator = std::function<Generator<Instruction>(ParameterizedLDSKernel*)>;
+
+        ParameterizedLDSKernel(ContextPtr                 context,
+                               uint32_t                   workgroupSize,
+                               size_t                     instrDwords,
+                               size_t                     strideMultiplier,
+                               const std::vector<size_t>& baseAddresses,
+                               bool                       write,
+                               BodyGenerator              bodyGen);
+
+        Generator<Instruction> scheduleLdsInstruction(int& counter);
+
+        ContextPtr getContext() const;
+
+    protected:
+        Generator<Instruction> generateKernelBody() override;
+
+    private:
+        BodyGenerator m_bodyGenerator;
+    };
+
+    /**
+     * @brief Configuration for LDS test cases
+     */
+    struct LDSTestConfig
+    {
+        bool                                                           useMultipleWorkgroupSizes;
+        std::function<Generator<Instruction>(ParameterizedLDSKernel*)> kernelBodyGen;
+        std::function<bool(const LatencyAnalysisResult&, int, int, bool, uint32_t)> validationFunc;
+    };
+
+    /**
+     * @brief Common test harness function for LDS tests
+     */
+    inline void runLDSTest(const LDSTestConfig& config)
+    {
+        using namespace Scheduling::LDSModel;
+
+        const auto workgroupSize
+            = config.useMultipleWorkgroupSizes ? GENERATE(64u, 128u, 256u) : 64u;
+
+        int  instrDwords      = GENERATE(1, 2, 4);
+        int  strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+        bool write            = GENERATE(true, false);
+
+        const auto baseAddresses
+            = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+        profiler::reset();
+
+        KernelOptions kernelOpts;
+        kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
+        auto context           = TestContext::ForTestDevice(kernelOpts, "");
+
+        if(not context->targetArchitecture().target().isCDNA35GPU())
+        {
+            SKIP("Currently only testing on gfx950");
+        }
+
+        ParameterizedLDSKernel kernel(context.get(),
+                                      workgroupSize,
+                                      instrDwords,
+                                      strideMultiplier,
+                                      baseAddresses,
+                                      write,
+                                      config.kernelBodyGen);
+
+        SECTION(kernel.getSectionName())
+        {
+            auto result = runKernelAndCollectLatencies(context, kernel);
+            INFO(result.infoStr);
+            const auto& filteredInstructions = result.filteredInstructions;
+            const auto& medianLatencies      = result.medianLatencies;
+
+            auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
+
+            INFO(fmt::format(
+                "Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
+                analysis.totalDelta,
+                analysis.totalAbsoluteDelta,
+                analysis.incorrectPredictionCount,
+                filteredInstructions.size() - 1));
+
+            CHECK(config.validationFunc(
+                analysis, instrDwords, strideMultiplier, write, workgroupSize));
+        }
+    }
 
 } // namespace rocRoller

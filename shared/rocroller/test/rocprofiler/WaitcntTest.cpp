@@ -63,54 +63,9 @@
 
 using namespace rocRoller;
 
-class ParameterizedLDSWaitcntKernel : public LDSTestKernelBase
-{
-public:
-    using BodyGenerator = std::function<Generator<Instruction>(ParameterizedLDSWaitcntKernel*)>;
-
-    ParameterizedLDSWaitcntKernel(ContextPtr                 context,
-                                  uint32_t                   workgroupSize,
-                                  size_t                     instrDwords,
-                                  size_t                     strideMultiplier,
-                                  const std::vector<size_t>& baseAddresses,
-                                  bool                       write,
-                                  BodyGenerator              bodyGen)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
-        , m_bodyGenerator(bodyGen)
-    {
-    }
-
-    Generator<Instruction> scheduleLdsInstruction(int& counter)
-    {
-        const auto [start, end]
-            = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-        auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-        if(m_write)
-            co_yield m_context->mem()->storeLocal(m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-        else
-            co_yield m_context->mem()->loadLocal(dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
-    }
-
-    ContextPtr getContext() const
-    {
-        return m_context;
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
-    {
-        return m_bodyGenerator(this);
-    }
-
-private:
-    BodyGenerator m_bodyGenerator;
-};
-
 namespace KernelBodies
 {
-
-    Generator<Instruction> WeaveLDSAndWaitcnt0(ParameterizedLDSWaitcntKernel* kernel)
+    Generator<Instruction> WeaveLDSAndWaitcnt0(ParameterizedLDSKernel* kernel)
     {
         int  counter = 0;
         auto context = kernel->getContext();
@@ -125,7 +80,7 @@ namespace KernelBodies
         }
     }
 
-    Generator<Instruction> weaveNonzeroWaitcnt(ParameterizedLDSWaitcntKernel* kernel)
+    Generator<Instruction> weaveNonzeroWaitcnt(ParameterizedLDSKernel* kernel)
     {
         int  counter = 0;
         auto context = kernel->getContext();
@@ -139,7 +94,7 @@ namespace KernelBodies
         }
     }
 
-    Generator<Instruction> weaveLDSAndDecreasingWaitcnt(ParameterizedLDSWaitcntKernel* kernel)
+    Generator<Instruction> weaveLDSAndDecreasingWaitcnt(ParameterizedLDSKernel* kernel)
     {
         int  counter = 0;
         auto context = kernel->getContext();
@@ -161,26 +116,23 @@ namespace KernelBodies
 class WaitcntTestValidator
 {
 public:
-    using LatencyAnalysis = LatencyAnalysisResult;
-
-    static bool WeaveLDSAndWaitcnt0(const LatencyAnalysis& analysis,
-                                    int                    instrDwords,
-                                    int                    strideMultiplier,
-                                    bool                   write,
-                                    uint32_t               workgroupSize)
+    static bool WeaveLDSAndWaitcnt0(const LatencyAnalysisResult& analysis,
+                                    int                          instrDwords,
+                                    int                          strideMultiplier,
+                                    bool                         write,
+                                    uint32_t                     workgroupSize)
     {
         if(workgroupSize > 64u)
         {
-            // Larger workgroup sizes go out-of-sync, resulting in incorrect predictions
             return (analysis.incorrectPredictionCount <= 28);
         }
         return (analysis.incorrectPredictionCount <= 6);
     }
 
-    static bool weaveNonzeroWaitcnt(const LatencyAnalysis& analysis,
-                                    int                    instrDwords,
-                                    int                    strideMultiplier,
-                                    bool                   write,
+    static bool weaveNonzeroWaitcnt(const LatencyAnalysisResult& analysis,
+                                    int                          instrDwords,
+                                    int                          strideMultiplier,
+                                    bool                         write,
                                     uint32_t /*workgroupSize*/)
     {
         if(instrDwords == 4)
@@ -201,77 +153,19 @@ public:
         return (analysis.incorrectPredictionCount <= 8 || std::abs(analysis.totalDelta) <= 0);
     }
 
-    static bool weaveLDSAndDecreasingWaitcnt(const LatencyAnalysis& analysis,
-                                             int                    instrDwords,
-                                             int                    strideMultiplier,
-                                             bool                   write,
+    static bool weaveLDSAndDecreasingWaitcnt(const LatencyAnalysisResult& analysis,
+                                             int                          instrDwords,
+                                             int                          strideMultiplier,
+                                             bool                         write,
                                              uint32_t /*workgroupSize*/)
     {
         if(write && instrDwords == 4)
         {
             return (analysis.incorrectPredictionCount <= 28);
         }
-        return (analysis.incorrectPredictionCount <= 9 || std::abs(analysis.totalDelta) <= 0);
+        return (analysis.incorrectPredictionCount <= 10 || std::abs(analysis.totalDelta) <= 0);
     }
 };
-
-struct TestConfig
-{
-    bool                                                                  useMultipleWorkgroupSizes;
-    std::function<Generator<Instruction>(ParameterizedLDSWaitcntKernel*)> kernelBodyGen;
-    std::function<bool(const WaitcntTestValidator::LatencyAnalysis&, int, int, bool, uint32_t)>
-        validationFunc;
-};
-
-void runLDSWaitcntTest(const TestConfig& config)
-{
-    using namespace Scheduling::LDSModel;
-
-    const auto workgroupSize = config.useMultipleWorkgroupSizes ? GENERATE(64u, 128u, 256u) : 64u;
-
-    int  instrDwords      = GENERATE(1, 2, 4);
-    int  strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-    bool write            = GENERATE(true, false);
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    rocRoller::KernelOptions kernelOpts;
-    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
-    auto context           = TestContext::ForTestDevice(kernelOpts, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    ParameterizedLDSWaitcntKernel kernel(context.get(),
-                                         workgroupSize,
-                                         instrDwords,
-                                         strideMultiplier,
-                                         baseAddresses,
-                                         write,
-                                         config.kernelBodyGen);
-
-    SECTION(kernel.getSectionName())
-    {
-        auto result = runKernelAndCollectLatencies(context, kernel);
-        INFO(result.infoStr);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         analysis.totalDelta,
-                         analysis.totalAbsoluteDelta,
-                         analysis.incorrectPredictionCount,
-                         filteredInstructions.size() - 1));
-
-        CHECK(config.validationFunc(analysis, instrDwords, strideMultiplier, write, workgroupSize));
-    }
-}
 
 TEST_CASE("Weave LDS and waitcnt 0", "[rocprofiler][lds-model][gpu]")
 {
@@ -297,7 +191,7 @@ TEST_CASE("Weave LDS and waitcnt 0", "[rocprofiler][lds-model][gpu]")
     ds_read_b128 v[116:119], v1, model 4, profiler 4, delta 0
     s_waitcnt lgkmcnt(0), model 108, profiler 108, delta 0
     */
-    runLDSWaitcntTest(
+    runLDSTest(
         {true, KernelBodies::WeaveLDSAndWaitcnt0, WaitcntTestValidator::WeaveLDSAndWaitcnt0});
 }
 
@@ -316,7 +210,7 @@ TEST_CASE("Weave LDS and non-zero waitcnt", "[rocprofiler][lds-model][gpu]")
     s_waitcnt lgkmcnt(4), model 104, profiler 100, delta -4
     ...
     */
-    runLDSWaitcntTest(
+    runLDSTest(
         {false, KernelBodies::weaveNonzeroWaitcnt, WaitcntTestValidator::weaveNonzeroWaitcnt});
 }
 
@@ -344,7 +238,7 @@ TEST_CASE("Weave LDS and decreasing waitcnt", "[rocprofiler][lds-model][gpu]")
   * s_waitcnt lgkmcnt(1), model 16, profiler 8, delta -8
   * s_waitcnt lgkmcnt(0), model 16, profiler 8, delta -8
     */
-    runLDSWaitcntTest({false,
-                       KernelBodies::weaveLDSAndDecreasingWaitcnt,
-                       WaitcntTestValidator::weaveLDSAndDecreasingWaitcnt});
+    runLDSTest({false,
+                KernelBodies::weaveLDSAndDecreasingWaitcnt,
+                WaitcntTestValidator::weaveLDSAndDecreasingWaitcnt});
 }

@@ -61,57 +61,30 @@
 
 using namespace rocRoller;
 
-class LDSArithmeticWeaveTestKernel : public LDSTestKernelBase
+namespace KernelBodies
 {
-public:
-    LDSArithmeticWeaveTestKernel(ContextPtr                 context,
-                                 uint32_t                   workgroupSize,
-                                 size_t                     instrDwords,
-                                 size_t                     strideMultiplier,
-                                 const std::vector<size_t>& baseAddresses,
-                                 bool                       write)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
+    Generator<Instruction> ldsArithmeticWeave(ParameterizedLDSKernel* kernel)
     {
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
-    {
+        auto context = kernel->getContext();
         auto s0
-            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
+            = Register::Value::Placeholder(context, Register::Type::Scalar, DataType::UInt32, 1);
         auto s1
-            = Register::Value::Placeholder(m_context, Register::Type::Scalar, DataType::UInt32, 1);
+            = Register::Value::Placeholder(context, Register::Type::Scalar, DataType::UInt32, 1);
         co_yield s0->allocate();
         co_yield s1->allocate();
 
         int counter = 0;
+
         for(int i = 0; i < 14; ++i)
         {
-            const auto [start, end]
-                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-            if(m_write)
-                co_yield m_context->mem()->storeLocal(
-                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-            else
-                co_yield m_context->mem()->loadLocal(
-                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+            co_yield kernel->scheduleLdsInstruction(counter);
         }
 
         for(int i = 1; i < 8; ++i)
         {
             for(int k = 0; k < 4; ++k)
             {
-                const auto [start, end]
-                    = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-                auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-                if(m_write)
-                    co_yield m_context->mem()->storeLocal(
-                        m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-                else
-                    co_yield m_context->mem()->loadLocal(
-                        dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+                co_yield kernel->scheduleLdsInstruction(counter);
             }
             for(int j = 0; j < i; ++j)
             {
@@ -119,161 +92,72 @@ protected:
             }
         }
     }
-};
 
-TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
-{
-    using namespace Scheduling::LDSModel;
-
-    const auto workgroupSize = 64u;
-
-    int instrDwords      = GENERATE(1, 2, 4);
-    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-    int write            = GENERATE(true, false);
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    rocRoller::KernelOptions kernelOpts;
-    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
-    auto context           = TestContext::ForTestDevice(kernelOpts, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    LDSArithmeticWeaveTestKernel kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
-
-    SECTION(kernel.getSectionName())
-    {
-
-        auto result = runKernelAndCollectLatencies(context, kernel);
-        INFO(result.infoStr);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         analysis.totalDelta,
-                         analysis.totalAbsoluteDelta,
-                         analysis.incorrectPredictionCount,
-                         filteredInstructions.size() - 1));
-
-        if(write && instrDwords == 4)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 16));
-        }
-        else
-        {
-            CHECK((analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0));
-        }
-    }
-}
-
-class SteadyStateLdsInstructions : public LDSTestKernelBase
-{
-public:
-    SteadyStateLdsInstructions(ContextPtr                 context,
-                               uint32_t                   workgroupSize,
-                               size_t                     instrDwords,
-                               size_t                     strideMultiplier,
-                               const std::vector<size_t>& baseAddresses,
-                               bool                       write)
-        : LDSTestKernelBase(
-            context, workgroupSize, instrDwords, strideMultiplier, baseAddresses, write)
-    {
-    }
-
-protected:
-    Generator<Instruction> generateKernelBody() override
+    Generator<Instruction> steadyStateLds(ParameterizedLDSKernel* kernel)
     {
         int counter = 0;
         for(int i = 0; i < 32; ++i)
         {
-            const auto [start, end]
-                = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
-            auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
-            if(m_write)
-                co_yield m_context->mem()->storeLocal(
-                    m_ldsWithOffset, dstRegs, 0, 4 * m_instrDwords);
-            else
-                co_yield m_context->mem()->loadLocal(
-                    dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords);
+            co_yield kernel->scheduleLdsInstruction(counter);
         }
+    }
+}
+
+class DSObserverValidator
+{
+public:
+    static bool validateArithmeticWeave(const LatencyAnalysisResult& analysis,
+                                        int                          instrDwords,
+                                        int                          strideMultiplier,
+                                        bool                         write,
+                                        uint32_t /*workgroupSize*/)
+    {
+        if(write && instrDwords == 4)
+            return (analysis.incorrectPredictionCount <= 16);
+        return (analysis.incorrectPredictionCount <= 4 || analysis.totalDelta == 0);
+    }
+
+    static bool validateSteadyState(const LatencyAnalysisResult& analysis,
+                                    int                          instrDwords,
+                                    int                          strideMultiplier,
+                                    bool                         write,
+                                    uint32_t                     workgroupSize)
+    {
+        if(write && instrDwords == 4)
+        {
+            if(workgroupSize <= 128u)
+            {
+                return std::abs(analysis.totalDelta) <= 210;
+            }
+            else
+            {
+                return analysis.totalAbsoluteDelta <= 1600;
+            }
+        }
+        else if(workgroupSize == 64u)
+        {
+            return (analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0);
+        }
+        else if(workgroupSize > 64u)
+        {
+            return std::abs(analysis.totalDelta) <= 300;
+        }
+        return (analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0);
     }
 };
 
+TEST_CASE("Weave LDS and s_add", "[rocprofiler][lds-model][gpu]")
+{
+    runLDSTest(
+        {false, KernelBodies::ldsArithmeticWeave, DSObserverValidator::validateArithmeticWeave});
+}
+
 TEST_CASE("Steady state LDS instructions", "[rocprofiler][lds-model][gpu]")
 {
-    // Mainly affected by the queue size, e.g. when does steady state get reached?
     /*
     ds_read_b128 v[4:7], v1, model 4, profiler 4, delta 0
     ds_read_b128 v[8:11], v1, model 4, profiler 4, delta 0
     ... 32 times
     */
-    using namespace Scheduling::LDSModel;
-
-    const auto workgroupSize = GENERATE(64u, 128u, 256u);
-
-    int instrDwords      = GENERATE(1, 2, 4);
-    int strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-    int write            = GENERATE(true, false);
-
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-
-    rocRoller::profiler::reset();
-
-    rocRoller::KernelOptions kernelOpts;
-    kernelOpts->dsObserver = DSObserverType::WeightlessDSMemObserver;
-    auto context           = TestContext::ForTestDevice(kernelOpts, "");
-
-    if(not context->targetArchitecture().target().isCDNA35GPU())
-    {
-        SKIP("Currently only testing on gfx950");
-    }
-
-    SteadyStateLdsInstructions kernel(
-        context.get(), workgroupSize, instrDwords, strideMultiplier, baseAddresses, write);
-
-    SECTION(kernel.getSectionName())
-    {
-
-        auto result = runKernelAndCollectLatencies(context, kernel);
-        INFO(result.infoStr);
-        const auto& filteredInstructions = result.filteredInstructions;
-        const auto& medianLatencies      = result.medianLatencies;
-
-        auto analysis = analyzeLatencyDeltas(filteredInstructions, medianLatencies);
-
-        INFO(fmt::format("Total delta: {}, Total absolute delta: {}, Incorrect predictions: {}/{}",
-                         analysis.totalDelta,
-                         analysis.totalAbsoluteDelta,
-                         analysis.incorrectPredictionCount,
-                         filteredInstructions.size() - 1));
-
-        if(write && instrDwords == 4)
-        {
-            if(workgroupSize <= 128u)
-            {
-                CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 210));
-            }
-            else
-            {
-                // These are super off
-                CHECK(analysis.totalAbsoluteDelta <= 1600);
-            }
-        }
-        else if(workgroupSize == 64u)
-        {
-            CHECK((analysis.incorrectPredictionCount <= 5 || analysis.totalDelta == 0));
-        }
-        else if(workgroupSize > 64u)
-        {
-            CHECK_THAT(analysis.totalDelta, Catch::Matchers::WithinAbs(0, 300));
-        }
-    }
+    runLDSTest({true, KernelBodies::steadyStateLds, DSObserverValidator::validateSteadyState});
 }
