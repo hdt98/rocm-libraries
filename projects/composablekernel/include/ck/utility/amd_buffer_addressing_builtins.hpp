@@ -4,6 +4,9 @@
 #pragma once
 #include "data_type.hpp"
 #include "ck/utility/amd_buffer_coherence.hpp"
+#if defined(__gfx125__)
+#include "ck/utility/amd_address_space.hpp"
+#endif
 
 namespace ck {
 
@@ -48,6 +51,29 @@ __device__ int32x4_t make_wave_buffer_resource(T* p_wave, index_t element_space_
     return wave_buffer_resource.content;
 }
 
+#if defined(__gfx125__)
+// SW workaround for HW issue: SMEM Buffer Ops Misinterpreting V# NUM_RECORDS (A)
+// W/A - set STRIDE (bits 121:108) to 1 for constant address space buffer access
+template <typename T>
+__device__ int32x4_t make_wave_buffer_resource(T CK_CONSTANT_ADDRESS_SPACE* p_wave,
+                                               index_t element_space_size)
+{
+    BufferResource<T> wave_buffer_resource;
+
+    // Cast constant address space pointer to generic
+    wave_buffer_resource.address(Number<0>{}) =
+        const_cast<remove_cv_t<T>*>(cast_pointer_to_generic_address_space(p_wave));
+    // wavewise range (45 bit)
+    uint64_t num_records = element_space_size * sizeof(T);
+    wave_buffer_resource.range(Number<1>{}) |= (num_records & 0x7f) << 25;
+    wave_buffer_resource.range(Number<2>{}) = (num_records >> 7);
+    // wavewise setting (26 bit) with STRIDE=1 at bits 121:108 (bits 25:12 of dword 3)
+    wave_buffer_resource.config(Number<3>{}) = CK_BUFFER_RESOURCE_3RD_DWORD | (1 << 12);
+
+    return wave_buffer_resource.content;
+}
+#endif
+
 template <typename T>
 __device__ int32x4_t make_wave_buffer_resource_with_default_range(T* p_wave)
 {
@@ -63,6 +89,27 @@ __device__ int32x4_t make_wave_buffer_resource_with_default_range(T* p_wave)
     return wave_buffer_resource.content;
 }
 
+#if defined(__gfx125__)
+// SW workaround for HW issue: SMEM Buffer Ops Misinterpreting V# NUM_RECORDS (A)
+// W/A - set STRIDE (bits 121:108) to 1 for constant address space buffer access
+template <typename T>
+__device__ int32x4_t
+make_wave_buffer_resource_with_default_range(T CK_CONSTANT_ADDRESS_SPACE* p_wave)
+{
+    BufferResource<T> wave_buffer_resource;
+
+    // Cast constant address space pointer to generic
+    wave_buffer_resource.address(Number<0>{}) =
+        const_cast<remove_cv_t<T>*>(cast_pointer_to_generic_address_space(p_wave));
+    // wavewise range (32 bit)
+    wave_buffer_resource.range(Number<2>{}) = 0xffffffff; // max possible range
+    // wavewise setting (32 bit) with STRIDE=1 at bits 121:108 (bits 25:12 of dword 3)
+    wave_buffer_resource.config(Number<3>{}) = CK_BUFFER_RESOURCE_3RD_DWORD | (1 << 12);
+
+    return wave_buffer_resource.content;
+}
+#endif
+
 template <typename T>
 __device__ __amdgpu_buffer_rsrc_t make_wave_buffer_resource_new(T* p_wave,
                                                                 index_t element_space_size)
@@ -76,6 +123,23 @@ __device__ __amdgpu_buffer_rsrc_t make_wave_buffer_resource_new(T* p_wave,
     return __builtin_amdgcn_make_buffer_rsrc(p, stride, num, flags);
 }
 
+#if defined(__gfx125__)
+// SW workaround for HW issue: SMEM Buffer Ops Misinterpreting V# NUM_RECORDS (A)
+// W/A - set STRIDE to 1 for constant address space buffer access
+template <typename T>
+__device__ __amdgpu_buffer_rsrc_t make_wave_buffer_resource_new(T CK_CONSTANT_ADDRESS_SPACE* p_wave,
+                                                                index_t element_space_size)
+{
+    // Cast constant address space pointer to generic and set stride = 1
+    auto p         = const_cast<remove_cv_t<T>*>(cast_pointer_to_generic_address_space(p_wave));
+    int32_t stride = 1; // stride = 1 for constant address space buffer access
+    int32_t num    = element_space_size * sizeof(T);
+    auto flags     = CK_BUFFER_RESOURCE_3RD_DWORD;
+
+    return __builtin_amdgcn_make_buffer_rsrc(p, stride, num, flags);
+}
+#endif
+
 template <typename T>
 __device__ __amdgpu_buffer_rsrc_t make_wave_buffer_resource_with_default_range_new(T* p_wave)
 {
@@ -87,6 +151,23 @@ __device__ __amdgpu_buffer_rsrc_t make_wave_buffer_resource_with_default_range_n
 
     return __builtin_amdgcn_make_buffer_rsrc(p, stride, num, flags);
 }
+
+#if defined(__gfx125__)
+// SW workaround for HW issue: SMEM Buffer Ops Misinterpreting V# NUM_RECORDS (A)
+// W/A - set STRIDE to 1 for constant address space buffer access
+template <typename T>
+__device__ __amdgpu_buffer_rsrc_t
+make_wave_buffer_resource_with_default_range_new(T CK_CONSTANT_ADDRESS_SPACE* p_wave)
+{
+    // Cast constant address space pointer to generic and set stride = 1
+    auto p         = const_cast<remove_cv_t<T>*>(cast_pointer_to_generic_address_space(p_wave));
+    int32_t stride = 1; // stride = 1 for constant address space buffer access
+    int32_t num    = 0xffffffff;
+    auto flags     = CK_BUFFER_RESOURCE_3RD_DWORD;
+
+    return __builtin_amdgcn_make_buffer_rsrc(p, stride, num, flags);
+}
+#endif
 
 // buffer atomic-add fp16
 __device__ half2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
