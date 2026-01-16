@@ -731,15 +731,8 @@ double compute_tile_latency(const problem_t& problem,
 
   // 5)
   // 5-0) Look up main_loop_efficiency from hardware map
-  double main_loop_efficiency = 1.0;
-  if (config.custom_mainloop_scheduling) {
-    main_loop_efficiency = hardware.get_adjusted_main_loop_efficiency(problem.a_transpose, 
-                                                                      problem.b_transpose, 
-                                                                      config.mt.m, 
-                                                                      config.mt.n, 
-                                                                      config.mt.k, 
-                                                                      problem.mi_dtype);
-  }
+  double main_loop_efficiency = cache.kernel_cache.main_loop_efficiency;
+
   // 5-1) Single-tile latency (apply penalty after finding the bottleneck)
   double L_tile_single = (std::max(L_compute, L_mem) * main_loop_efficiency * effective_tile_penalty) + L_cvt;
   L_prologue *= effective_tile_penalty;
@@ -832,6 +825,10 @@ kernel_cache_t create_kernel_cache(const problem_t& problem_type,
   return kernel_cache_t{
     .L_cvt = L_cvt,
     .mt_compute_latency = compute_mt_compute_latency(problem_type, hardware, config),
+    .main_loop_efficiency = config.custom_mainloop_scheduling ?
+      hardware.get_adjusted_main_loop_efficiency(
+        problem_type.a_transpose, problem_type.b_transpose,
+        config.mt.m, config.mt.n, config.mt.k, problem_type.mi_dtype) : 1.0,
     .fits_lds_capacity = check_lds_capacity(hardware, config.mt, problem_type.a_dtype, problem_type.b_dtype),
     .a_bytes = a_bytes,
     .b_bytes = b_bytes,

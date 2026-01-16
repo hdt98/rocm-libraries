@@ -336,6 +336,9 @@ struct kernel_cache_t {
   /// latency for single macro-tile
   size_t mt_compute_latency;
 
+  /// for CMS kernels
+  double main_loop_efficiency;
+
   /// whether the config macrotile fits in LDS
   bool fits_lds_capacity;
 
