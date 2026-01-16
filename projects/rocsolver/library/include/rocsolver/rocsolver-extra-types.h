@@ -204,4 +204,6 @@ typedef enum rocsolver_function_
     rocsolver_function_syev_heev = 405, /**< Affected by sterf and steqr. */
 } rocsolver_function;
 
+
+
 #endif /* ROCSOLVER_EXTRA_TYPES_H */
