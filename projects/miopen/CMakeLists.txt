@@ -358,33 +358,72 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
     endif()
     
     # Origami for analytical GEMM kernel configuration
-    # If an installed origami is incomplete (missing origami-targets.cmake),
-    # fall back to building it inline.
+    # In ROCm 7.1+, hipblaslt exports origami targets. To avoid target collision,
+    # check if hipblaslt will provide origami before deciding to build inline.
+    set(_origami_skip_build OFF)
     set(_origami_force_build ${MIOPEN_BUILD_ORIGAMI})
+    
     if(NOT _origami_force_build)
-        find_file(_origami_config origami-config.cmake PATHS ${CMAKE_PREFIX_PATH})
-        if(_origami_config)
-            get_filename_component(_origami_config_dir ${_origami_config} DIRECTORY)
-            if(NOT EXISTS "${_origami_config_dir}/origami-targets.cmake")
-                message(WARNING "origami-config.cmake found but origami-targets.cmake missing; building origami inline")
+        # Check if hipblaslt's cmake config exports origami targets
+        # This happens in ROCm 7.1+ where hipblaslt depends on origami
+        find_file(_hipblaslt_targets hipblaslt-targets.cmake 
+            PATHS ${CMAKE_PREFIX_PATH}
+            PATH_SUFFIXES lib/cmake/hipblaslt cmake/hipblaslt
+            NO_DEFAULT_PATH
+        )
+        if(_hipblaslt_targets)
+            file(STRINGS "${_hipblaslt_targets}" _hipblaslt_content)
+            string(FIND "${_hipblaslt_content}" "roc::origami" _origami_in_hipblaslt)
+            if(NOT _origami_in_hipblaslt EQUAL -1)
+                message(STATUS "origami: hipblaslt will provide roc::origami targets, skipping inline build")
+                set(_origami_skip_build ON)
+            endif()
+        endif()
+    endif()
+    
+    if(NOT _origami_skip_build)
+        # Check if origami targets already exist (e.g., from another package)
+        if(TARGET roc::origami)
+            message(STATUS "origami: roc::origami target already exists")
+            set(_origami_skip_build ON)
+        endif()
+    endif()
+    
+    if(_origami_skip_build)
+        # Create local target aliases if needed (will be populated when hipblaslt is found)
+        # For now, just note that origami will come from hipblaslt
+        set(_origami_from_hipblaslt ON)
+    else()
+        # If an installed origami is incomplete (missing origami-targets.cmake),
+        # fall back to building it inline.
+        if(NOT _origami_force_build)
+            find_file(_origami_config origami-config.cmake PATHS ${CMAKE_PREFIX_PATH})
+            if(_origami_config)
+                get_filename_component(_origami_config_dir ${_origami_config} DIRECTORY)
+                if(NOT EXISTS "${_origami_config_dir}/origami-targets.cmake")
+                    message(WARNING "origami-config.cmake found but origami-targets.cmake missing; building origami inline")
+                    set(_origami_force_build ON)
+                endif()
+            else()
                 set(_origami_force_build ON)
             endif()
+        endif()
+
+        include(cmake/Dependencies.cmake)
+        if(_origami_force_build)
+            miopen_add_dependency(origami NO_LOCAL)
         else()
-            set(_origami_force_build ON)
+            miopen_add_dependency(origami)
         endif()
     endif()
 
-    include(cmake/Dependencies.cmake)
-    if(_origami_force_build)
-        miopen_add_dependency(origami NO_LOCAL)
-    else()
-        miopen_add_dependency(origami)
-    endif()
-
-    if(origami_VERSION)
-        message(STATUS "Build with origami ${origami_VERSION}")
-    else()
-        message(STATUS "Build with origami")
+    # Print origami status message (only if not deferred to hipblaslt)
+    if(NOT _origami_from_hipblaslt)
+        if(origami_VERSION)
+            message(STATUS "Build with origami ${origami_VERSION}")
+        else()
+            message(STATUS "Build with origami")
+        endif()
     endif()
     
     if( MIOPEN_BACKEND STREQUAL "HIPNOGPU")
@@ -426,6 +465,17 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
     if(MIOPEN_USE_HIPBLASLT)
         find_package(hipblaslt REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
         message(STATUS "Build with hipBLASLt ${hipblaslt_VERSION} ${hipblaslt_DIR}")
+        
+        # If origami was skipped because hipblaslt provides it, create local aliases now
+        if(_origami_from_hipblaslt AND TARGET roc::origami)
+            if(NOT TARGET origami)
+                add_library(origami ALIAS roc::origami)
+            endif()
+            if(NOT TARGET origami-headers AND TARGET roc::origami-headers)
+                add_library(origami-headers ALIAS roc::origami-headers)
+            endif()
+            message(STATUS "Build with origami (from hipblaslt)")
+        endif()
         find_package(hipblas-common REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
         message(STATUS "Build with hipBLAS-common ${hipblas-common_VERSION} ${hipBLAS-common_DIR}")
     else()
