@@ -76,6 +76,8 @@ struct WeightPreshufflePipelineAGmemBGmemCRegTDM
 
     using CDataType = remove_cvref_t<typename Problem::CDataType>;
 
+    using AElementWise   = element_wise::PassThrough;
+    using BElementWise   = element_wise::PassThrough;
     using BlockGemmShape = remove_cvref_t<typename Problem::BlockGemmShape>; // TileFlatmmShape
 
     using AsLayout = problem_as_layout_t<Problem>;
