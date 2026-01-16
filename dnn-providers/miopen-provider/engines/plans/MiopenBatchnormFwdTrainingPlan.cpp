@@ -232,6 +232,7 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
     if(_trainingParams.hasRunningStats())
     {
         expAvgFactor = _trainingParams.momentumValue();
+        HIPDNN_LOG_INFO("BatchnormFwdTrainingPlan: expAvgFactor (momentum) = {}", expAvgFactor);
     }
 
     // Get all required device buffers
@@ -285,9 +286,6 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
                   _trainingParams.nextRunningVariance().uid(), deviceBuffers, numDeviceBuffers)
                   .ptr;
     }
-
-    void* resultRunningMeanPtr = nullptr;
-    void* resultRunningVariancePtr = nullptr;
 
     // Check if activation fusion is enabled
     if(_trainingParams.optActivation().has_value())
@@ -362,8 +360,8 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
                 scaleBuffer.ptr,
                 biasBuffer.ptr,
                 expAvgFactor,
-                resultRunningMeanPtr,
-                resultRunningVariancePtr,
+                nullptr, // resultRunningMean: nullptr means running mean is not saved
+                nullptr, // resultRunningVariance: nullptr means running variance is not saved
                 epsilon,
                 resultSaveMeanPtr,
                 resultSaveInvVariancePtr,
@@ -417,8 +415,8 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
                                                         scaleBuffer.ptr,
                                                         biasBuffer.ptr,
                                                         expAvgFactor,
-                                                        resultRunningMeanPtr,
-                                                        resultRunningVariancePtr,
+                                                        nullptr, // resultRunningMean: nullptr means running mean is not saved
+                                                        nullptr, // resultRunningVariance: nullptr means running variance is not saved
                                                         epsilon,
                                                         resultSaveMeanPtr,
                                                         resultSaveInvVariancePtr));
