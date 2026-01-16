@@ -167,18 +167,17 @@ void lange_getPerfData(const rocblas_handle handle,
     size_t size_work = std::max(m, n);
     std::vector<S> work(size_work);
 
+    // only init CPU data once as it is not overwritten
+    lange_initData<true, false, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
+
     if(!perf)
     {
-        lange_initData<true, false, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
-
         // cpu-lapack performance (only if not in perf mode)
         char norm = rocsolver2char_norm_type(norm_type);
         *cpu_time_used = get_time_us_no_sync();
         hnorms[0][0] = cpu_lange<T, S>(norm, m, n, hA[0], lda, work.data());
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
-
-    lange_initData<true, false, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
     // cold calls
     for(int iter = 0; iter < 2; iter++)
