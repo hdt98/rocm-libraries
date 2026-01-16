@@ -37,7 +37,7 @@ function(pad_string _var _str _length)
   set(${_var} "  ${_str}" PARENT_SCOPE)
 endfunction(pad_string)
 
-# For each variable in '_vars'. Print the padded
+# For each variable in '_vars', print the padded
 # variable name and value.
 function(print_summary_vars _vars)
   foreach(_var ${${_vars}})
