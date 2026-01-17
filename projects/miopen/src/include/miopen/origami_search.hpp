@@ -43,10 +43,8 @@ GetOrigamiPerformanceConfig(const Solver s,
                             const miopen::conv::ProblemDescription& problem,
                             const std::vector<PerformanceConfig>& all_configs)
 {
-    MIOPEN_LOG_I2("get hardware");
     auto hardware = origami::hardware_t::get_hardware_for_device(0);
 
-    MIOPEN_LOG_I2("write problem");
     // Create a problem description
     origami::problem_t ori_prob;
     ori_prob.size.m = ProblemInterpreter::GetBatchN(problem); // M dimension // batch size
@@ -79,7 +77,6 @@ GetOrigamiPerformanceConfig(const Solver s,
         origami::config_t ori_cfg = s.GetOrigamiConfig(problem, perf_cfg);
         if(ori_cfg.is_valid())
         {
-            MIOPEN_LOG_I2("valid config");
             ori_cfgs.push_back(ori_cfg);
 
             if(ori_to_perf_cfg.contains(ori_cfg.hash()))
@@ -89,7 +86,6 @@ GetOrigamiPerformanceConfig(const Solver s,
         }
     }
 
-    MIOPEN_LOG_I2("had configs");
     // Rank all configurations by performance
     std::vector<PerformanceConfig> ret;
     if(!ori_cfgs.empty())
@@ -97,9 +93,23 @@ GetOrigamiPerformanceConfig(const Solver s,
         MIOPEN_LOG_I2("rank perf_cfg");
         auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
 
+        bool first = true;
         for(auto prediction : ranked_configs)
+        {
             for(auto perf_cfg : ori_to_perf_cfg[prediction.config.hash()])
+            {
                 ret.push_back(perf_cfg);
+                if(first)
+                    MIOPEN_LOG_I2(perf_cfg);
+            }
+            first = false;
+        }
+
+        auto ori_cfg = ranked_configs[0].config;
+        MIOPEN_LOG_I2("CK id string: " << ret[0] << std::endl << "MT.M(" << ori_cfg.mt.m << ") MT.N("
+                                   << ori_cfg.mt.n << ") MT.K(" << ori_cfg.mt.k << ") MI.M("
+                                   << ori_cfg.mi.m << ") MI.N(" << ori_cfg.mi.n << ") MI.K("
+                                   << ori_cfg.mi.k << ")");
     }
     MIOPEN_LOG_I2("return perf_cfg: " << ret.size());
 
