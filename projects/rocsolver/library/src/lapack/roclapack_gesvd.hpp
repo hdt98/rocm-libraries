@@ -81,6 +81,36 @@ void local_orgqrlq_ungqrlq_template(rocblas_handle handle,
                                                          Abyx_tmptr, trfact, workArr);
 }
 
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+void local_orgqrlq_ungqrlq_template_alt(rocblas_handle handle,
+                                        const rocblas_int m,
+                                        const rocblas_int n,
+                                        const rocblas_int k,
+                                        U A,
+                                        const rocblas_int shiftA,
+                                        const rocblas_int lda,
+                                        const rocblas_stride strideA,
+                                        T* ipiv,
+                                        const rocblas_stride strideP,
+                                        const rocblas_int batch_count,
+                                        const bool row,
+
+                                        void* const work,
+                                        size_t const size_work)
+{
+    if(row)
+    {
+        rocsolver_orgqr_ungqr_template_alt<BATCHED, STRIDED>(
+            handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count, work, size_work);
+    }
+    else
+    {
+        rocsolver_orglq_unglq_template_alt<BATCHED, STRIDED>(handle, m, n, k, A, shiftA, lda,
+                                                             strideA, ipiv, strideP, batch_count,
+
+                                                             work, size_work);
+    }
+}
 /** wrapper to GEQRF/GELQF_TEMPLATE **/
 template <bool BATCHED, bool STRIDED, typename T, typename U>
 void local_geqrlq_template(rocblas_handle handle,
@@ -109,7 +139,7 @@ void local_geqrlq_template(rocblas_handle handle,
                                                    strideP, batch_count, scalars, work_workArr,
                                                    Abyx_norms_trfact, diag_tmptr, workArr);
 }
-#if(0)
+
 template <bool BATCHED, bool STRIDED, typename T, typename U>
 void local_geqrlq_template_alt(rocblas_handle handle,
                                const rocblas_int m,
@@ -141,7 +171,6 @@ void local_geqrlq_template_alt(rocblas_handle handle,
                                                        work, size_work);
     }
 }
-#endif
 
 /** Argument checking **/
 template <typename T, typename TT, typename W>
@@ -205,6 +234,7 @@ void rocsolver_gesvd_getMemorySize(const rocblas_svect left_svect,
                                    const rocblas_int n,
                                    const rocblas_int batch_count,
                                    const rocblas_workmode fast_alg,
+
                                    size_t* size_scalars,
                                    size_t* size_work_workArr,
                                    size_t* size_Abyx_norms_tmptr_cmplt,
@@ -367,6 +397,16 @@ void rocsolver_gesvd_getMemorySize(const rocblas_svect left_svect,
     *size_Abyx_norms_tmptr_cmplt = *std::max_element(std::begin(a), std::end(a));
     *size_Abyx_norms_trfact_X = *std::max_element(std::begin(x), std::end(x));
     *size_diag_tmptr_Y = *std::max_element(std::begin(y), std::end(y));
+
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_work_workArr);
+    adjust_for_alignment(size_Abyx_norms_tmptr_cmplt);
+    adjust_for_alignment(size_Abyx_norms_trfact_X);
+    adjust_for_alignment(size_diag_tmptr_Y);
+    adjust_for_alignment(size_tau_splits);
+    adjust_for_alignment(size_tempArrayT);
+    adjust_for_alignment(size_tempArrayC);
+    adjust_for_alignment(size_workArr);
 }
 
 template <bool BATCHED, typename T, typename S>
@@ -378,6 +418,303 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
                                        const rocblas_workmode fast_alg,
 
                                        size_t* p_size_gesvd)
+{
+    size_t size_gesvd = 0;
+    *p_size_gesvd = size_gesvd;
+
+    // if quick return, set workspace to zero
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_tmptr_cmplt = 0;
+    size_t size_Abyx_norms_trfact_X = 0;
+    size_t size_diag_tmptr_Y = 0;
+
+    size_t size_tau_splits = 0;
+    size_t size_tempArrayT = 0;
+    size_t size_tempArrayC = 0;
+    size_t size_workArr = 0;
+
+    if(n == 0 || m == 0 || batch_count == 0)
+    {
+        return;
+    }
+
+    size_t w[6] = {0, 0, 0, 0, 0, 0};
+    size_t a[6] = {0, 0, 0, 0, 0, 0};
+    size_t x[6] = {0, 0, 0, 0, 0, 0};
+    size_t y[3] = {0, 0, 0};
+    size_t unused;
+
+    // booleans used to determine the path that the execution will follow:
+    const bool row = (m >= n);
+    const bool leftvS = (left_svect == rocblas_svect_singular);
+    const bool leftvO = (left_svect == rocblas_svect_overwrite);
+    const bool leftvA = (left_svect == rocblas_svect_all);
+    const bool leftvN = (left_svect == rocblas_svect_none);
+    const bool rightvS = (right_svect == rocblas_svect_singular);
+    const bool rightvO = (right_svect == rocblas_svect_overwrite);
+    const bool rightvA = (right_svect == rocblas_svect_all);
+    const bool rightvN = (right_svect == rocblas_svect_none);
+    //const bool leadvS = row ? leftvS : rightvS;
+    const bool leadvO = row ? leftvO : rightvO;
+    const bool leadvA = row ? leftvA : rightvA;
+    const bool leadvN = row ? leftvN : rightvN;
+    //const bool othervS = !row ? leftvS : rightvS;
+    const bool othervO = !row ? leftvO : rightvO;
+    //const bool othervA = !row ? leftvA : rightvA;
+    const bool othervN = !row ? leftvN : rightvN;
+    const bool thinSVD = (m >= THIN_SVD_SWITCH * n || n >= THIN_SVD_SWITCH * m);
+    const bool fast_thinSVD = (thinSVD && fast_alg == rocblas_outofplace);
+
+    // auxiliary sizes and variables
+    const rocblas_int k = std::min(m, n);
+    const rocblas_int kk = std::max(m, n);
+    const rocblas_int nu = leftvN ? 0 : ((fast_thinSVD || (thinSVD && leadvN)) ? k : m);
+    const rocblas_int nv = rightvN ? 0 : ((fast_thinSVD || (thinSVD && leadvN)) ? k : n);
+    const rocblas_storev storev_lead = row ? rocblas_column_wise : rocblas_row_wise;
+    const rocblas_storev storev_other = row ? rocblas_row_wise : rocblas_column_wise;
+    const rocblas_side side = row ? rocblas_side_right : rocblas_side_left;
+    rocblas_int mn;
+
+    // size of array of pointers to workspace
+    if(BATCHED)
+        size_workArr = 2 * sizeof(T*) * batch_count;
+    else
+        size_workArr = 0;
+
+    // size of arrays to store temporary copies
+    size_tempArrayT
+        = (fast_thinSVD || (thinSVD && leadvO && othervN)) ? sizeof(T) * k * k * batch_count : 0;
+    size_tempArrayC
+        = (fast_thinSVD && (othervN || othervO || leadvO)) ? sizeof(T) * m * n * batch_count : 0;
+
+    // workspace required for the bidiagonalization
+    size_t size_gebrd = 0;
+
+    if(thinSVD)
+    {
+        size_t size_work_temp = 0;
+        rocsolver_gebrd_getMemorySize_alt<BATCHED, T>(k, k, batch_count, &size_work_temp);
+
+        size_gebrd = std::max(size_gebrd, size_work_temp);
+    }
+    else
+    {
+        size_t size_work_temp = 0;
+        rocsolver_gebrd_getMemorySize_alt<BATCHED, T>(m, n, batch_count, &size_work_temp);
+
+        size_gebrd = std::max(size_gebrd, size_work_temp);
+    }
+
+    // workspace required for the SVD of the bidiagonal form
+
+    size_t size_bdsqr = 0;
+
+    {
+        size_t size_work_temp = 0;
+        rocsolver_bdsqr_getMemorySize_alt<S>(k, nv, nu, 0, batch_count, &size_work_temp);
+        size_bdsqr = std::max(size_bdsqr, size_work_temp);
+    }
+
+    // size of array tau to store householder scalars on intermediate
+    // orthonormal/unitary matrices
+    size_tau_splits = std::max(size_tau_splits, 2 * sizeof(T) * std::min(m, n) * batch_count);
+
+    // extra requirements for QR/LQ factorization
+    size_t size_geqrf = 0;
+    size_t size_gelqf = 0;
+
+    if(thinSVD)
+    {
+        if(row)
+        {
+            bool constexpr STRIDED = true;
+
+            size_t size_work_temp = 0;
+            rocsolver_geqrf_getMemorySize_alt<BATCHED, STRIDED, T>(m, n, batch_count,
+                                                                   &size_work_temp);
+
+            size_geqrf = std::max(size_geqrf, size_work_temp);
+        }
+        else
+        {
+            size_t size_work_temp = 0;
+            rocsolver_gelqf_getMemorySize_alt<BATCHED, T>(m, n, batch_count, &size_work_temp);
+
+            size_gelqf = std::max(size_gelqf, size_work_temp);
+        }
+    }
+
+    // extra requirements for orthonormal/unitary matrix generation
+    // ormbr
+    size_t size_ormbr = 0;
+
+    if(thinSVD && !fast_thinSVD && !leadvN)
+    {
+        size_t size_work_temp = 0;
+        rocsolver_ormbr_unmbr_getMemorySize_alt<BATCHED, T>(storev_lead, side, m, n, k, batch_count,
+                                                            &size_work_temp);
+        size_ormbr = std::max(size_ormbr, size_work_temp);
+    }
+    // orgbr
+    size_t size_orgbr = 0;
+
+    if(thinSVD)
+    {
+        if(!othervN)
+        {
+            size_t size_work_temp = 0;
+            rocsolver_orgbr_ungbr_getMemorySize_alt<BATCHED, T>(storev_other, k, k, k, batch_count,
+                                                                &size_work_temp);
+            size_orgbr = std::max(size_orgbr, size_work_temp);
+        }
+
+        if(fast_thinSVD && !leadvN)
+        {
+            size_t size_work_temp = 0;
+            rocsolver_orgbr_ungbr_getMemorySize_alt<BATCHED, T>(storev_lead, k, k, k, batch_count,
+                                                                &size_work_temp);
+            size_orgbr = std::max(size_orgbr, size_work_temp);
+        }
+    }
+    else
+    {
+        mn = (row && leftvS) ? n : m;
+        if(leftvS || leftvA)
+        {
+            size_t size_work_temp = 0;
+            rocsolver_orgbr_ungbr_getMemorySize_alt<BATCHED, T>(rocblas_column_wise, m, mn, n,
+                                                                batch_count, &size_work_temp);
+
+            size_orgbr = std::max(size_orgbr, size_work_temp);
+        }
+        else if(leftvO)
+        {
+            size_t size_work_temp = 0;
+            rocsolver_orgbr_ungbr_getMemorySize_alt<BATCHED, T>(rocblas_column_wise, m, k, n,
+                                                                batch_count, &size_work_temp);
+
+            size_orgbr = std::max(size_orgbr, size_work_temp);
+        }
+
+        mn = (!row && rightvS) ? m : n;
+        if(rightvS || rightvA)
+        {
+            size_t size_work_temp = 0;
+            rocsolver_orgbr_ungbr_getMemorySize_alt<BATCHED, T>(rocblas_row_wise, mn, n, m,
+                                                                batch_count, &size_work_temp);
+            size_orgbr = std::max(size_orgbr, size_work_temp);
+        }
+        else if(rightvO)
+        {
+            size_t size_work_temp = 0;
+            rocsolver_orgbr_ungbr_getMemorySize_alt<BATCHED, T>(rocblas_row_wise, k, n, m,
+                                                                batch_count, &size_work_temp);
+            size_orgbr = std::max(size_orgbr, size_work_temp);
+        }
+    }
+    // orgqr/orglq
+    size_t size_orgqr = 0;
+    size_t size_orglq = 0;
+
+    if(thinSVD && !leadvN)
+    {
+        if(leadvA)
+        {
+            if(row)
+            {
+                size_t size_work_temp = 0;
+                rocsolver_orgqr_ungqr_getMemorySize_alt<BATCHED, T>(kk, kk, k, batch_count,
+                                                                    &size_work_temp);
+                size_orgqr = std::max(size_orgqr, size_work_temp);
+            }
+            else
+            {
+                size_t size_work_temp = 0;
+                rocsolver_orglq_unglq_getMemorySize_alt<BATCHED, T>(kk, kk, k, batch_count,
+                                                                    &size_work_temp);
+                size_orglq = std::max(size_orglq, size_work_temp);
+            }
+        }
+        else
+        {
+            if(row)
+            {
+                size_t size_work_temp = 0;
+                rocsolver_orgqr_ungqr_getMemorySize_alt<BATCHED, T>(m, n, k, batch_count,
+                                                                    &size_work_temp);
+
+                size_orgqr = std::max(size_orgqr, size_work_temp);
+            }
+            else
+            {
+                size_t size_work_temp = 0;
+                rocsolver_orglq_unglq_getMemorySize_alt<BATCHED, T>(m, n, k, batch_count,
+                                                                    &size_work_temp);
+                size_orglq = std::max(size_orglq, size_work_temp);
+            }
+        }
+    }
+
+    // get max sizes
+    size_work_workArr = *std::max_element(std::begin(w), std::end(w));
+    size_Abyx_norms_tmptr_cmplt = *std::max_element(std::begin(a), std::end(a));
+    size_Abyx_norms_trfact_X = *std::max_element(std::begin(x), std::end(x));
+    size_diag_tmptr_Y = *std::max_element(std::begin(y), std::end(y));
+
+    adjust_for_alignment(size_tau_splits);
+
+    adjust_for_alignment(size_workArr);
+    adjust_for_alignment(size_Abyx_norms_tmptr_cmplt);
+    adjust_for_alignment(size_Abyx_norms_trfact_X);
+    adjust_for_alignment(size_diag_tmptr_Y);
+
+    adjust_for_alignment(size_tempArrayT);
+    adjust_for_alignment(size_tempArrayC);
+
+    adjust_for_alignment(size_gebrd);
+    adjust_for_alignment(size_bdsqr);
+    adjust_for_alignment(size_geqrf);
+    adjust_for_alignment(size_gelqf);
+
+    adjust_for_alignment(size_ormbr);
+    adjust_for_alignment(size_orgbr);
+    adjust_for_alignment(size_orgqr);
+    adjust_for_alignment(size_orglq);
+
+    // TODO: revisit  legacy shared array
+    size_gesvd += size_tau_splits;
+    size_gesvd += size_workArr;
+    size_gesvd += size_work_workArr;
+    size_gesvd += size_Abyx_norms_tmptr_cmplt;
+    size_gesvd += size_Abyx_norms_trfact_X;
+    size_gesvd += size_diag_tmptr_Y;
+    size_gesvd += size_tempArrayT;
+    size_gesvd += size_tempArrayC;
+
+    size_gesvd += size_gebrd;
+    size_gesvd += size_bdsqr;
+
+    size_gesvd += std::max(size_geqrf, size_gelqf);
+
+    size_gesvd += size_ormbr;
+    size_gesvd += size_orgbr;
+
+    size_gesvd += std::max(size_orgqr, size_orglq);
+
+    adjust_for_alignment(size_gesvd);
+    *p_size_gesvd = size_gesvd;
+}
+
+template <bool BATCHED, typename T, typename S>
+void rocsolver_gesvd_getMemorySize_alt_org(const rocblas_svect left_svect,
+                                           const rocblas_svect right_svect,
+                                           const rocblas_int m,
+                                           const rocblas_int n,
+                                           const rocblas_int batch_count,
+                                           const rocblas_workmode fast_alg,
+
+                                           size_t* p_size_gesvd)
 {
     size_t size_scalars = 0;
     size_t size_work_workArr = 0;

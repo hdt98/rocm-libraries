@@ -72,33 +72,65 @@ rocblas_status rocsolver_ormbr_unmbr_impl(rocblas_handle handle,
     size_t size_AbyxORwork, size_diagORtmptr;
     size_t size_trfact;
     size_t size_workArr;
-    rocsolver_ormbr_unmbr_getMemorySize<false, T>(storev, side, m, n, k, batch_count, &size_scalars,
-                                                  &size_AbyxORwork, &size_diagORtmptr, &size_trfact,
-                                                  &size_workArr);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_AbyxORwork,
-                                                      size_diagORtmptr, size_trfact, size_workArr);
+    if(USE_ORIGINAL)
+    {
+        rocsolver_ormbr_unmbr_getMemorySize<false, T>(storev, side, m, n, k, batch_count,
+                                                      &size_scalars, &size_AbyxORwork,
+                                                      &size_diagORtmptr, &size_trfact, &size_workArr);
 
-    // memory workspace allocation
-    void *scalars, *AbyxORwork, *diagORtmptr, *trfact, *workArr;
-    rocblas_device_malloc mem(handle, size_scalars, size_AbyxORwork, size_diagORtmptr, size_trfact,
-                              size_workArr);
-    if(!mem)
-        return rocblas_status_memory_error;
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(
+                handle, size_scalars, size_AbyxORwork, size_diagORtmptr, size_trfact, size_workArr);
 
-    scalars = mem[0];
-    AbyxORwork = mem[1];
-    diagORtmptr = mem[2];
-    trfact = mem[3];
-    workArr = mem[4];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+        // memory workspace allocation
+        void *scalars, *AbyxORwork, *diagORtmptr, *trfact, *workArr;
+        rocblas_device_malloc mem(handle, size_scalars, size_AbyxORwork, size_diagORtmptr,
+                                  size_trfact, size_workArr);
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    // execution
-    return rocsolver_ormbr_unmbr_template<false, false, T>(
-        handle, storev, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, C, shiftC, ldc,
-        strideC, batch_count, (T*)scalars, (T*)AbyxORwork, (T*)diagORtmptr, (T*)trfact, (T**)workArr);
+        scalars = mem[0];
+        AbyxORwork = mem[1];
+        diagORtmptr = mem[2];
+        trfact = mem[3];
+        workArr = mem[4];
+        if(size_scalars > 0)
+            init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_ormbr_unmbr_template<false, false, T>(
+            handle, storev, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, C, shiftC,
+            ldc, strideC, batch_count, (T*)scalars, (T*)AbyxORwork, (T*)diagORtmptr, (T*)trfact,
+            (T**)workArr);
+    }
+    else
+    {
+        size_t size_ormbr = 0;
+        rocsolver_ormbr_unmbr_getMemorySize_alt<false, T>(storev, side, m, n, k, batch_count,
+                                                          &size_ormbr);
+
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_ormbr);
+
+        // memory workspace allocation
+        rocblas_device_malloc mem(handle, size_ormbr);
+
+        if(!mem)
+            return rocblas_status_memory_error;
+
+        void* const work = (void*)mem[0];
+
+        // ---------------------------------------
+        // note: scalars[] initialized in HPP file
+        // ---------------------------------------
+        // if(size_scalars > 0) init_scalars(handle, (T*)scalars);
+
+        // execution
+        return rocsolver_ormbr_unmbr_template_alt<false, false, T>(
+            handle, storev, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, C, shiftC,
+            ldc, strideC, batch_count, work, size_ormbr);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE

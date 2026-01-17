@@ -37,7 +37,13 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
+#include "rocsolver_mem_utils.hpp"
+
 ROCSOLVER_BEGIN_NAMESPACE
+
+#ifndef USE_ORIGINAL
+#define USE_ORIGINAL false
+#endif
 
 template <bool BATCHED, typename T>
 void rocsolver_ormbr_unmbr_getMemorySize(const rocblas_storev storev,
@@ -53,13 +59,13 @@ void rocsolver_ormbr_unmbr_getMemorySize(const rocblas_storev storev,
                                          size_t* size_workArr)
 {
     // if quick return no workspace needed
+    *size_scalars = 0;
+    *size_AbyxORwork = 0;
+    *size_diagORtmptr = 0;
+    *size_trfact = 0;
+    *size_workArr = 0;
     if(m == 0 || n == 0 || k == 0 || batch_count == 0)
     {
-        *size_scalars = 0;
-        *size_AbyxORwork = 0;
-        *size_diagORtmptr = 0;
-        *size_trfact = 0;
-        *size_workArr = 0;
         return;
     }
 
@@ -75,6 +81,45 @@ void rocsolver_ormbr_unmbr_getMemorySize(const rocblas_storev storev,
         rocsolver_ormlq_unmlq_getMemorySize<BATCHED, T>(side, m, n, std::min(nq, k), batch_count,
                                                         size_scalars, size_AbyxORwork,
                                                         size_diagORtmptr, size_trfact, size_workArr);
+
+    adjust_for_alignment(size_scalars);
+    adjust_for_alignment(size_AbyxORwork);
+    adjust_for_alignment(size_diagORtmptr);
+    adjust_for_alignment(size_trfact);
+    adjust_for_alignment(size_workArr);
+}
+
+template <bool BATCHED, typename T>
+void rocsolver_ormbr_unmbr_getMemorySize_alt(const rocblas_storev storev,
+                                             const rocblas_side side,
+                                             const rocblas_int m,
+                                             const rocblas_int n,
+                                             const rocblas_int k,
+                                             const rocblas_int batch_count,
+
+                                             size_t* p_size_ormbr)
+
+{
+    size_t size_scalars = 0;
+    size_t size_AbyxORwork = 0;
+    size_t size_diagORtmptr = 0;
+    size_t size_trfact = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_ormbr_unmbr_getMemorySize<BATCHED, T>(storev, side, m, n, k, batch_count,
+
+                                                    &size_scalars, &size_AbyxORwork,
+                                                    &size_diagORtmptr, &size_trfact, &size_workArr);
+
+    size_t size_ormbr = 0;
+
+    size_ormbr += size_scalars;
+    size_ormbr += size_AbyxORwork;
+    size_ormbr += size_diagORtmptr;
+    size_ormbr += size_trfact;
+    size_ormbr += size_workArr;
+
+    *p_size_ormbr = size_ormbr;
 }
 
 template <bool COMPLEX, typename T, typename U>
@@ -230,31 +275,98 @@ rocblas_status rocsolver_ormbr_unmbr_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 
+template <bool BATCHED, bool STRIDED, typename T, typename U, bool COMPLEX = rocblas_is_complex<T>>
+rocblas_status rocsolver_ormbr_unmbr_template_alt(rocblas_handle handle,
+                                                  const rocblas_storev storev,
+                                                  const rocblas_side side,
+                                                  const rocblas_operation trans,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  const rocblas_int k,
+                                                  U A,
+                                                  const rocblas_int shiftA,
+                                                  const rocblas_int lda,
+                                                  const rocblas_stride strideA,
+                                                  T* ipiv,
+                                                  const rocblas_stride strideP,
+                                                  U C,
+                                                  const rocblas_int shiftC,
+                                                  const rocblas_int ldc,
+                                                  const rocblas_stride strideC,
+                                                  const rocblas_int batch_count,
+
+                                                  void* const work,
+                                                  size_t const size_work)
+{
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_AbyxORwork = 0;
+    size_t size_diagORtmptr = 0;
+    size_t size_trfact = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_ormbr_unmbr_getMemorySize<BATCHED, T>(storev, side, m, n, k, batch_count,
+
+                                                    &size_scalars, &size_AbyxORwork,
+                                                    &size_diagORtmptr, &size_trfact, &size_workArr);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    T* const AbyxORwork = (T*)pfree;
+    pfree += size_AbyxORwork;
+
+    T* const diagORtmptr = (T*)pfree;
+    pfree += size_diagORtmptr;
+
+    T* const trfact = (T*)pfree;
+    pfree += size_trfact;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_status const istat = rocsolver_ormbr_unmbr_template<BATCHED, STRIDED, T, U, COMPLEX>(
+        handle, storev, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, C, shiftC,
+        ldc, strideC, batch_count,
+
+        scalars, AbyxORwork, diagORtmptr, trfact, workArr);
+
+    return (istat);
+}
+
 /** Adapts A and C to be of the same type **/
 template <bool BATCHED, bool STRIDED, typename T>
-void rocsolver_ormbr_unmbr_template(rocblas_handle handle,
-                                    const rocblas_storev storev,
-                                    const rocblas_side side,
-                                    const rocblas_operation trans,
-                                    const rocblas_int m,
-                                    const rocblas_int n,
-                                    const rocblas_int k,
-                                    T* const A[],
-                                    const rocblas_int shiftA,
-                                    const rocblas_int lda,
-                                    const rocblas_stride strideA,
-                                    T* ipiv,
-                                    const rocblas_stride strideP,
-                                    T* C,
-                                    const rocblas_int shiftC,
-                                    const rocblas_int ldc,
-                                    const rocblas_stride strideC,
-                                    const rocblas_int batch_count,
-                                    T* scalars,
-                                    T* AbyxORwork,
-                                    T* diagORtmptr,
-                                    T* trfact,
-                                    T** workArr)
+rocblas_status rocsolver_ormbr_unmbr_template(rocblas_handle handle,
+                                              const rocblas_storev storev,
+                                              const rocblas_side side,
+                                              const rocblas_operation trans,
+                                              const rocblas_int m,
+                                              const rocblas_int n,
+                                              const rocblas_int k,
+                                              T* const A[],
+                                              const rocblas_int shiftA,
+                                              const rocblas_int lda,
+                                              const rocblas_stride strideA,
+                                              T* ipiv,
+                                              const rocblas_stride strideP,
+                                              T* C,
+                                              const rocblas_int shiftC,
+                                              const rocblas_int ldc,
+                                              const rocblas_stride strideC,
+                                              const rocblas_int batch_count,
+                                              T* scalars,
+                                              T* AbyxORwork,
+                                              T* diagORtmptr,
+                                              T* trfact,
+                                              T** workArr)
 {
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
@@ -263,37 +375,109 @@ void rocsolver_ormbr_unmbr_template(rocblas_handle handle,
     ROCSOLVER_LAUNCH_KERNEL(get_array, dim3(blocks), dim3(256), 0, stream, workArr, C, strideC,
                             batch_count);
 
-    rocsolver_ormbr_unmbr_template<BATCHED, STRIDED>(
+    return (rocsolver_ormbr_unmbr_template<BATCHED, STRIDED>(
         handle, storev, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP,
         (T* const*)workArr, shiftC, ldc, strideC, batch_count, scalars, AbyxORwork, diagORtmptr,
-        trfact, (workArr + batch_count));
+        trfact, (workArr + batch_count)));
+}
+
+template <bool BATCHED, bool STRIDED, typename T>
+rocblas_status rocsolver_ormbr_unmbr_template_alt(rocblas_handle handle,
+                                                  const rocblas_storev storev,
+                                                  const rocblas_side side,
+                                                  const rocblas_operation trans,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  const rocblas_int k,
+                                                  T* const A[],
+                                                  const rocblas_int shiftA,
+                                                  const rocblas_int lda,
+                                                  const rocblas_stride strideA,
+                                                  T* ipiv,
+                                                  const rocblas_stride strideP,
+                                                  T* C,
+                                                  const rocblas_int shiftC,
+                                                  const rocblas_int ldc,
+                                                  const rocblas_stride strideC,
+                                                  const rocblas_int batch_count,
+
+                                                  void* const work,
+                                                  size_t const size_work)
+
+{
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_AbyxORwork = 0;
+    size_t size_diagORtmptr = 0;
+    size_t size_trfact = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_ormbr_unmbr_getMemorySize<BATCHED, T>(storev, side, m, n, k, batch_count,
+
+                                                    &size_scalars, &size_AbyxORwork,
+                                                    &size_diagORtmptr, &size_trfact, &size_workArr);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    T* const AbyxORwork = (T*)pfree;
+    pfree += size_AbyxORwork;
+
+    T* const diagORtmptr = (T*)pfree;
+    pfree += size_diagORtmptr;
+
+    T* const trfact = (T*)pfree;
+    pfree += size_trfact;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_int blocks = (batch_count - 1) / 256 + 1;
+    ROCSOLVER_LAUNCH_KERNEL(get_array, dim3(blocks), dim3(256), 0, stream, workArr, C, strideC,
+                            batch_count);
+
+    return (rocsolver_ormbr_unmbr_template<BATCHED, STRIDED>(
+        handle, storev, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP,
+        (T* const*)workArr, shiftC, ldc, strideC, batch_count, scalars, AbyxORwork, diagORtmptr,
+        trfact, (workArr + batch_count)));
 }
 
 /** Adapts A and C to be of the same type **/
 template <bool BATCHED, bool STRIDED, typename T>
-void rocsolver_ormbr_unmbr_template(rocblas_handle handle,
-                                    const rocblas_storev storev,
-                                    const rocblas_side side,
-                                    const rocblas_operation trans,
-                                    const rocblas_int m,
-                                    const rocblas_int n,
-                                    const rocblas_int k,
-                                    T* A,
-                                    const rocblas_int shiftA,
-                                    const rocblas_int lda,
-                                    const rocblas_stride strideA,
-                                    T* ipiv,
-                                    const rocblas_stride strideP,
-                                    T* const C[],
-                                    const rocblas_int shiftC,
-                                    const rocblas_int ldc,
-                                    const rocblas_stride strideC,
-                                    const rocblas_int batch_count,
-                                    T* scalars,
-                                    T* AbyxORwork,
-                                    T* diagORtmptr,
-                                    T* trfact,
-                                    T** workArr)
+rocblas_status rocsolver_ormbr_unmbr_template(rocblas_handle handle,
+                                              const rocblas_storev storev,
+                                              const rocblas_side side,
+                                              const rocblas_operation trans,
+                                              const rocblas_int m,
+                                              const rocblas_int n,
+                                              const rocblas_int k,
+                                              T* A,
+                                              const rocblas_int shiftA,
+                                              const rocblas_int lda,
+                                              const rocblas_stride strideA,
+                                              T* ipiv,
+                                              const rocblas_stride strideP,
+                                              T* const C[],
+                                              const rocblas_int shiftC,
+                                              const rocblas_int ldc,
+                                              const rocblas_stride strideC,
+                                              const rocblas_int batch_count,
+                                              T* scalars,
+                                              T* AbyxORwork,
+                                              T* diagORtmptr,
+                                              T* trfact,
+                                              T** workArr)
 {
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
@@ -302,10 +486,81 @@ void rocsolver_ormbr_unmbr_template(rocblas_handle handle,
     ROCSOLVER_LAUNCH_KERNEL(get_array, dim3(blocks), dim3(256), 0, stream, workArr, A, strideA,
                             batch_count);
 
-    rocsolver_ormbr_unmbr_template<BATCHED, STRIDED>(
+    return (rocsolver_ormbr_unmbr_template<BATCHED, STRIDED>(
         handle, storev, side, trans, m, n, k, (T* const*)workArr, shiftA, lda, strideA, ipiv,
         strideP, C, shiftC, ldc, strideC, batch_count, scalars, AbyxORwork, diagORtmptr, trfact,
-        (workArr + batch_count));
+        (workArr + batch_count)));
 }
 
+template <bool BATCHED, bool STRIDED, typename T>
+rocblas_status rocsolver_ormbr_unmbr_template_alt(rocblas_handle handle,
+                                                  const rocblas_storev storev,
+                                                  const rocblas_side side,
+                                                  const rocblas_operation trans,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  const rocblas_int k,
+                                                  T* A,
+                                                  const rocblas_int shiftA,
+                                                  const rocblas_int lda,
+                                                  const rocblas_stride strideA,
+                                                  T* ipiv,
+                                                  const rocblas_stride strideP,
+                                                  T* const C[],
+                                                  const rocblas_int shiftC,
+                                                  const rocblas_int ldc,
+                                                  const rocblas_stride strideC,
+                                                  const rocblas_int batch_count,
+
+                                                  void* const work,
+                                                  size_t const size_work)
+
+{
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    size_t size_scalars = 0;
+    size_t size_AbyxORwork = 0;
+    size_t size_diagORtmptr = 0;
+    size_t size_trfact = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_ormbr_unmbr_getMemorySize<BATCHED, T>(storev, side, m, n, k, batch_count,
+
+                                                    &size_scalars, &size_AbyxORwork,
+                                                    &size_diagORtmptr, &size_trfact, &size_workArr);
+
+    T* const scalars = (T*)pfree;
+    pfree += size_scalars;
+    if(size_scalars > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    T* const AbyxORwork = (T*)pfree;
+    pfree += size_AbyxORwork;
+
+    T* const diagORtmptr = (T*)pfree;
+    pfree += size_diagORtmptr;
+
+    T* const trfact = (T*)pfree;
+    pfree += size_trfact;
+
+    T** const workArr = (T**)pfree;
+    pfree += size_workArr;
+
+    MEM_CHECK(pfree);
+
+    rocblas_int blocks = (batch_count - 1) / 256 + 1;
+    ROCSOLVER_LAUNCH_KERNEL(get_array, dim3(blocks), dim3(256), 0, stream, workArr, A, strideA,
+                            batch_count);
+
+    return (rocsolver_ormbr_unmbr_template<BATCHED, STRIDED>(
+        handle, storev, side, trans, m, n, k, (T* const*)workArr, shiftA, lda, strideA, ipiv,
+        strideP, C, shiftC, ldc, strideC, batch_count, scalars, AbyxORwork, diagORtmptr, trfact,
+        (workArr + batch_count)));
+}
 ROCSOLVER_END_NAMESPACE
