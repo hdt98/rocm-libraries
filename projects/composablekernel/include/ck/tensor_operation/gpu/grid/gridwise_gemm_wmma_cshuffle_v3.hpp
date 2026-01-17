@@ -595,8 +595,9 @@ struct GridwiseGemm_wmma_cshuffle_v3
         }
         else
         {
-            // invalid pipeline version
-            static_assert(0);
+            static_assert(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3 ||
+                              BlkGemmPipelineVer == BlockGemmPipelineVersion::v1,
+                          "Invalid pipeline version");
         }
     }
 
