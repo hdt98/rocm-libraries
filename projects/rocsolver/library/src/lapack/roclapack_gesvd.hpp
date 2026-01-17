@@ -82,34 +82,35 @@ void local_orgqrlq_ungqrlq_template(rocblas_handle handle,
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U>
-void local_orgqrlq_ungqrlq_template_alt(rocblas_handle handle,
-                                        const rocblas_int m,
-                                        const rocblas_int n,
-                                        const rocblas_int k,
-                                        U A,
-                                        const rocblas_int shiftA,
-                                        const rocblas_int lda,
-                                        const rocblas_stride strideA,
-                                        T* ipiv,
-                                        const rocblas_stride strideP,
-                                        const rocblas_int batch_count,
-                                        const bool row,
+rocblas_status local_orgqrlq_ungqrlq_template_alt(rocblas_handle handle,
+                                                  const rocblas_int m,
+                                                  const rocblas_int n,
+                                                  const rocblas_int k,
+                                                  U A,
+                                                  const rocblas_int shiftA,
+                                                  const rocblas_int lda,
+                                                  const rocblas_stride strideA,
+                                                  T* ipiv,
+                                                  const rocblas_stride strideP,
+                                                  const rocblas_int batch_count,
+                                                  const bool row,
 
-                                        void* const work,
-                                        size_t const size_work)
+                                                  void* const work,
+                                                  size_t const size_work)
 {
     if(row)
     {
-        rocsolver_orgqr_ungqr_template_alt<BATCHED, STRIDED>(
-            handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count, work, size_work);
+        return (rocsolver_orgqr_ungqr_template_alt<BATCHED, STRIDED>(
+            handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count, work, size_work));
     }
     else
     {
-        rocsolver_orglq_unglq_template_alt<BATCHED, STRIDED>(handle, m, n, k, A, shiftA, lda,
-                                                             strideA, ipiv, strideP, batch_count,
+        return (rocsolver_orglq_unglq_template_alt<BATCHED, STRIDED>(
+            handle, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count,
 
-                                                             work, size_work);
+            work, size_work));
     }
+    return (rocblas_status_success);
 }
 /** wrapper to GEQRF/GELQF_TEMPLATE **/
 template <bool BATCHED, bool STRIDED, typename T, typename U>
@@ -141,35 +142,36 @@ void local_geqrlq_template(rocblas_handle handle,
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U>
-void local_geqrlq_template_alt(rocblas_handle handle,
-                               const rocblas_int m,
-                               const rocblas_int n,
-                               U A,
-                               const rocblas_int shiftA,
-                               const rocblas_int lda,
-                               const rocblas_stride strideA,
-                               T* ipiv,
-                               const rocblas_stride strideP,
-                               const rocblas_int batch_count,
-                               const bool row,
+rocblas_status local_geqrlq_template_alt(rocblas_handle handle,
+                                         const rocblas_int m,
+                                         const rocblas_int n,
+                                         U A,
+                                         const rocblas_int shiftA,
+                                         const rocblas_int lda,
+                                         const rocblas_stride strideA,
+                                         T* ipiv,
+                                         const rocblas_stride strideP,
+                                         const rocblas_int batch_count,
+                                         const bool row,
 
-                               void* const work,
-                               size_t const size_work)
+                                         void* const work,
+                                         size_t const size_work)
 {
     if(row)
     {
-        rocsolver_geqrf_template_alt<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda, strideA, ipiv,
-                                                       strideP, batch_count,
+        return (rocsolver_geqrf_template_alt<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda,
+                                                               strideA, ipiv, strideP, batch_count,
 
-                                                       work, size_work);
+                                                               work, size_work));
     }
     else
     {
-        rocsolver_gelqf_template_alt<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda, strideA, ipiv,
-                                                       strideP, batch_count,
+        return (rocsolver_gelqf_template_alt<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda,
+                                                               strideA, ipiv, strideP, batch_count,
 
-                                                       work, size_work);
+                                                               work, size_work));
     }
+    return (rocblas_status_success);
 }
 
 /** Argument checking **/
@@ -434,16 +436,33 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
     size_t size_tempArrayC = 0;
     size_t size_workArr = 0;
 
+    //       ---------------------------------------------
+    // TODO: try to figure out how arrays tempArrayT[], tempArrayC[],
+    //       tau_splits[], Abyx_norms_tmptr_trfact_X[],  diag_tmptr_Y[]
+    //       are reused
+    //       ---------------------------------------------
+
+    {
+        rocsolver_gesvd_getMemorySize<BATCHED, T, S>(
+            left_svect, right_svect, m, n, batch_count, fast_alg,
+
+            &size_scalars, &size_work_workArr, &size_Abyx_norms_tmptr_cmplt,
+            &size_Abyx_norms_trfact_X, &size_diag_tmptr_Y, &size_tau_splits, &size_tempArrayT,
+            &size_tempArrayC, &size_workArr);
+    }
+
     if(n == 0 || m == 0 || batch_count == 0)
     {
         return;
     }
 
+#if(0)
     size_t w[6] = {0, 0, 0, 0, 0, 0};
     size_t a[6] = {0, 0, 0, 0, 0, 0};
     size_t x[6] = {0, 0, 0, 0, 0, 0};
     size_t y[3] = {0, 0, 0};
     size_t unused;
+#endif
 
     // booleans used to determine the path that the execution will follow:
     const bool row = (m >= n);
@@ -656,51 +675,66 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
         }
     }
 
-    // get max sizes
-    size_work_workArr = *std::max_element(std::begin(w), std::end(w));
-    size_Abyx_norms_tmptr_cmplt = *std::max_element(std::begin(a), std::end(a));
-    size_Abyx_norms_trfact_X = *std::max_element(std::begin(x), std::end(x));
-    size_diag_tmptr_Y = *std::max_element(std::begin(y), std::end(y));
+    {
+        // TODO: revisit  legacy shared array
 
-    adjust_for_alignment(size_tau_splits);
+        adjust_for_alignment(size_tempArrayT);
+        adjust_for_alignment(size_tempArrayC);
 
-    adjust_for_alignment(size_workArr);
-    adjust_for_alignment(size_Abyx_norms_tmptr_cmplt);
-    adjust_for_alignment(size_Abyx_norms_trfact_X);
-    adjust_for_alignment(size_diag_tmptr_Y);
+        size_gesvd += size_tempArrayT;
+        size_gesvd += size_tempArrayC;
 
-    adjust_for_alignment(size_tempArrayT);
-    adjust_for_alignment(size_tempArrayC);
+        adjust_for_alignment(size_tau_splits);
+        adjust_for_alignment(size_Abyx_norms_trfact_X);
+        adjust_for_alignment(size_diag_tmptr_Y);
 
-    adjust_for_alignment(size_gebrd);
-    adjust_for_alignment(size_bdsqr);
-    adjust_for_alignment(size_geqrf);
-    adjust_for_alignment(size_gelqf);
+        size_gesvd += size_tau_splits;
+        size_gesvd += size_diag_tmptr_Y;
+        size_gesvd += size_Abyx_norms_trfact_X;
+    }
 
-    adjust_for_alignment(size_ormbr);
-    adjust_for_alignment(size_orgbr);
-    adjust_for_alignment(size_orgqr);
-    adjust_for_alignment(size_orglq);
+    {
+        // for GEMM
 
-    // TODO: revisit  legacy shared array
-    size_gesvd += size_tau_splits;
-    size_gesvd += size_workArr;
-    size_gesvd += size_work_workArr;
-    size_gesvd += size_Abyx_norms_tmptr_cmplt;
-    size_gesvd += size_Abyx_norms_trfact_X;
-    size_gesvd += size_diag_tmptr_Y;
-    size_gesvd += size_tempArrayT;
-    size_gesvd += size_tempArrayC;
+        adjust_for_alignment(size_workArr);
+        size_gesvd += size_workArr;
+    }
 
-    size_gesvd += size_gebrd;
-    size_gesvd += size_bdsqr;
+    {
+        // TODO: check whether these are still needed
+        adjust_for_alignment(size_work_workArr);
+        adjust_for_alignment(size_Abyx_norms_tmptr_cmplt);
 
-    size_gesvd += std::max(size_geqrf, size_gelqf);
+        size_gesvd += size_work_workArr;
+        size_gesvd += size_Abyx_norms_tmptr_cmplt;
+    }
 
-    size_gesvd += size_ormbr;
-    size_gesvd += size_orgbr;
+    {
+        adjust_for_alignment(size_gebrd);
+        adjust_for_alignment(size_bdsqr);
+        adjust_for_alignment(size_geqrf);
+        adjust_for_alignment(size_gelqf);
 
-    size_gesvd += std::max(size_orgqr, size_orglq);
+        size_gesvd += size_gebrd;
+        size_gesvd += size_bdsqr;
+
+        size_gesvd += std::max(size_geqrf, size_gelqf);
+    }
+
+    {
+        adjust_for_alignment(size_ormbr);
+        adjust_for_alignment(size_orgbr);
+
+        size_gesvd += size_ormbr;
+        size_gesvd += size_orgbr;
+    }
+
+    {
+        adjust_for_alignment(size_orgqr);
+        adjust_for_alignment(size_orglq);
+
+        size_gesvd += std::max(size_orgqr, size_orglq);
+    }
 
     adjust_for_alignment(size_gesvd);
     *p_size_gesvd = size_gesvd;
@@ -1400,8 +1434,1154 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
                                             rocblas_int* info,
                                             const rocblas_int batch_count,
 
-                                            void* work,
+                                            void* const work,
                                             size_t const size_work)
+
+{
+    ROCSOLVER_ENTER("gesvd", "leftsv:", left_svect, "rightsv:", right_svect, "m:", m, "n:", n,
+                    "shiftA:", shiftA, "lda:", lda, "ldu:", ldu, "ldv:", ldv, "mode:", fast_alg,
+                    "bc:", batch_count);
+
+    constexpr bool COMPLEX = rocblas_is_complex<T>;
+
+    // quick return
+    if(n == 0 || m == 0 || batch_count == 0)
+        return rocblas_status_success;
+
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    // ---------------------------------------------------------------------------------
+    // TODO: try to figure out how arrays diag_tmptr_Y, tau_splits, Abyx_norms_trfact_X
+    // are shared and reused
+    // ---------------------------------------------------------------------------------
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms_tmptr_cmplt = 0;
+    size_t size_Abyx_norms_trfact_X = 0;
+    size_t size_diag_tmptr_Y = 0;
+    size_t size_tau_splits = 0;
+    size_t size_tempArrayT = 0;
+    size_t size_tempArrayC = 0;
+    size_t size_workArr = 0;
+
+    rocsolver_gesvd_getMemorySize<BATCHED, T, TT>(
+        left_svect, right_svect, m, n, batch_count, fast_alg,
+
+        &size_scalars, &size_work_workArr, &size_Abyx_norms_tmptr_cmplt, &size_Abyx_norms_trfact_X,
+        &size_diag_tmptr_Y, &size_tau_splits, &size_tempArrayT, &size_tempArrayC, &size_workArr);
+
+    rocblas_status istat = rocblas_status_success;
+
+    std::byte* const pwork = (std::byte*)work;
+    std::byte* pfree = pwork;
+
+    T* const tau_splits = (T*)pfree;
+    pfree += size_tau_splits;
+
+    T* const Abyx_norms_trfact_X = (T*)pfree;
+    pfree += size_Abyx_norms_trfact_X;
+
+    T* const diag_tmptr_Y = (T*)pfree;
+    pfree += size_diag_tmptr_Y;
+
+    T* tempArrayC = (T*)pfree;
+    pfree += size_tempArrayC;
+
+    T* tempArrayT = (T*)pfree;
+    pfree += size_tempArrayT;
+
+    {
+        bool const is_mem_ok = (pfree <= (pwork + size_work));
+        if(!is_mem_ok)
+        {
+            istat = rocblas_status_memory_error;
+            return (istat);
+        }
+    }
+
+    // everything must be executed with scalars on the host
+    rocblas_pointer_mode old_mode;
+    rocblas_get_pointer_mode(handle, &old_mode);
+    rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
+
+    // -----------------------------------------
+    // use try/throw/catch to reset pointer mode
+    // in case of error
+    // -----------------------------------------
+    try
+    {
+        // constants to use when calling rocablas functions
+        T one = 1;
+        T zero = 0;
+
+        // booleans used to determine the path that the execution will follow:
+        const bool row = (m >= n);
+        const bool leftvS = (left_svect == rocblas_svect_singular);
+        const bool leftvO = (left_svect == rocblas_svect_overwrite);
+        const bool leftvA = (left_svect == rocblas_svect_all);
+        const bool leftvN = (left_svect == rocblas_svect_none);
+        const bool rightvS = (right_svect == rocblas_svect_singular);
+        const bool rightvO = (right_svect == rocblas_svect_overwrite);
+        const bool rightvA = (right_svect == rocblas_svect_all);
+        const bool rightvN = (right_svect == rocblas_svect_none);
+        const bool leadvS = row ? leftvS : rightvS;
+        const bool leadvO = row ? leftvO : rightvO;
+        const bool leadvA = row ? leftvA : rightvA;
+        const bool leadvN = row ? leftvN : rightvN;
+        const bool othervS = !row ? leftvS : rightvS;
+        const bool othervO = !row ? leftvO : rightvO;
+        const bool othervA = !row ? leftvA : rightvA;
+        const bool othervN = !row ? leftvN : rightvN;
+        const bool thinSVD = (m >= THIN_SVD_SWITCH * n || n >= THIN_SVD_SWITCH * m);
+        const bool fast_thinSVD = (thinSVD && fast_alg == rocblas_outofplace);
+
+        // auxiliary sizes and variables
+        const rocblas_int k = std::min(m, n);
+        const rocblas_int kk = std::max(m, n);
+        const rocblas_int shiftX = 0;
+        const rocblas_int shiftY = 0;
+        const rocblas_int shiftUV = 0;
+        const rocblas_int shiftT = 0;
+        const rocblas_int shiftC = 0;
+        const rocblas_int shiftU = 0;
+        const rocblas_int shiftV = 0;
+        const rocblas_int ldx = thinSVD ? k : m;
+        const rocblas_int ldy = thinSVD ? k : n;
+        const rocblas_stride strideX = ldx * GEBRD_BLOCKSIZE;
+        const rocblas_stride strideY = ldy * GEBRD_BLOCKSIZE;
+        T* bufferT = tempArrayT;
+        rocblas_int ldt = k;
+        rocblas_stride strideT = k * k;
+        T* bufferC = tempArrayC;
+        rocblas_int ldc = m;
+        rocblas_stride strideC = m * n;
+
+        T* UV;
+        rocblas_int lduv, mn, nu, nv;
+        rocblas_int offset_other, offset_lead;
+        rocblas_storev storev_other, storev_lead;
+        rocblas_stride strideUV;
+        rocblas_fill uplo;
+        rocblas_side side;
+        rocblas_operation trans;
+
+        nu = leftvN ? 0 : m;
+        nv = rightvN ? 0 : n;
+        if(row)
+        {
+            UV = U;
+            lduv = ldu;
+            strideUV = strideU;
+            uplo = rocblas_fill_upper;
+            storev_other = rocblas_row_wise;
+            storev_lead = rocblas_column_wise;
+            offset_other = k * batch_count;
+            offset_lead = 0;
+            if(othervS || othervA)
+            {
+                bufferC = V;
+                ldc = ldv;
+                strideC = strideV;
+                if(!fast_thinSVD)
+                {
+                    bufferT = V;
+                    ldt = ldv;
+                    strideT = strideV;
+                }
+            }
+            side = rocblas_side_right;
+            trans = rocblas_operation_none;
+        }
+        else
+        {
+            UV = V;
+            lduv = ldv;
+            strideUV = strideV;
+            uplo = rocblas_fill_lower;
+            storev_other = rocblas_column_wise;
+            storev_lead = rocblas_row_wise;
+            offset_other = 0;
+            offset_lead = k * batch_count;
+            if(othervS || othervA)
+            {
+                bufferC = U;
+                ldc = ldu;
+                strideC = strideU;
+                if(!fast_thinSVD)
+                {
+                    bufferT = U;
+                    ldt = ldu;
+                    strideT = strideU;
+                }
+            }
+            side = rocblas_side_left;
+            trans = COMPLEX ? rocblas_operation_conjugate_transpose : rocblas_operation_transpose;
+        }
+
+        // common block sizes and number of threads for internal kernels
+        constexpr rocblas_int thread_count = 32;
+        const rocblas_int blocks_m = (m - 1) / thread_count + 1;
+        const rocblas_int blocks_n = (n - 1) / thread_count + 1;
+        const rocblas_int blocks_k = (k - 1) / thread_count + 1;
+
+        /** A thin SVD could be computed for matrices with sufficiently more rows than
+        columns (or columns than rows) by starting with a QR factorization (or LQ
+        factorization) and working with the triangular factor afterwards. When
+        computing a thin SVD, a fast algorithm could be executed by doing some
+        computations out-of-place. **/
+
+        if(thinSVD)
+        /*******************************************/
+        /********** CASE: CHOOSE THIN-SVD **********/
+        /*******************************************/
+        {
+            if(leadvN)
+            /***** SUB-CASE: USE THIN-SVD WITH NO LEAD-DIMENSION VECTORS *****/
+            /*****************************************************************/
+            {
+                nu = leftvN ? 0 : k;
+                nv = rightvN ? 0 : k;
+
+                //*** STAGE 1: Row (or column) compression ***//
+                {
+                    size_t const size_geqrlq = (pwork + size_work) - pfree;
+                    void* work_geqrlq = (void*)pfree;
+
+                    istat = local_geqrlq_template_alt<BATCHED, STRIDED>(
+                        handle, m, n, A, shiftA, lda, strideA, tau_splits, k, batch_count, row,
+
+                        work_geqrlq, size_geqrlq);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 2: generate orthonormal/unitary matrix from row/column compression ***//
+                // N/A
+
+                //*** STAGE 3: Bidiagonalization ***//
+                // clean triangular factor
+                ROCSOLVER_LAUNCH_KERNEL(set_zero<T>, dim3(blocks_k, blocks_k, batch_count),
+                                        dim3(thread_count, thread_count, 1), 0, stream, k, k, A,
+                                        shiftA, lda, strideA, uplo);
+
+                {
+                    size_t const size_work_gebrd = (pwork + size_work) - pfree;
+                    void* const work_gebrd = (void*)pfree;
+
+                    // --------------------------------
+                    // TODO: are X, Y scratch arrays in gebrd ?
+                    // --------------------------------
+                    T* const X = (T*)Abyx_norms_trfact_X;
+                    T* const Y = (T*)diag_tmptr_Y;
+
+                    istat = rocsolver_gebrd_template_alt<BATCHED, STRIDED>(
+                        handle, k, k,
+
+                        A, shiftA, lda, strideA,
+
+                        S, strideS, E, strideE,
+
+                        tau_splits, k, (tau_splits + k * batch_count), k,
+
+                        X, shiftX, ldx, strideX,
+
+                        Y, shiftY, ldy, strideY,
+
+                        batch_count,
+
+                        work_gebrd, size_work_gebrd);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 4: generate orthonormal/unitary matrices from bidiagonalization ***//
+                if(!othervN)
+                {
+                    size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<BATCHED, STRIDED>(
+                        handle, storev_other, k, k, k, A, shiftA, lda, strideA,
+                        (tau_splits + offset_other), k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 5: Compute singular values and vectors from the bidiagonal form ***//
+                if(row)
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(handle, rocblas_fill_upper, k, nv, nu,
+                                                            0, S, strideS, E, strideE, A, shiftA,
+                                                            lda, strideA, U, shiftU, ldu, strideU,
+                                                            (W) nullptr, 0, 1, 1, info, batch_count,
+
+                                                            work_bdsqr, size_work_bdsqr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(handle, rocblas_fill_upper, k, nv, nu,
+                                                            0, S, strideS, E, strideE, V, shiftV,
+                                                            ldv, strideV, A, shiftA, lda, strideA,
+                                                            (W) nullptr, 0, 1, 1, info, batch_count,
+
+                                                            work_bdsqr, size_work_bdsqr);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 6: update vectors with orthonormal/unitary matrices ***//
+                if(othervS || othervA)
+                {
+                    mn = row ? n : m;
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, mn, mn,
+                                            A, shiftA, lda, strideA, bufferC, shiftC, ldc, strideC);
+                }
+            }
+
+            else if(fast_thinSVD)
+            /***** SUB-CASE: USE FAST (OUT-OF-PLACE) THIN-SVD ALGORITHM *****/
+            /****************************************************************/
+            {
+                nu = leftvN ? 0 : k;
+                nv = rightvN ? 0 : k;
+
+                //*** STAGE 1: Row (or column) compression ***//
+                {
+                    size_t const size_work_geqrlq = (pwork + size_work) - pfree;
+                    void* const work_geqrlq = (void*)pfree;
+
+                    istat = local_geqrlq_template_alt<BATCHED, STRIDED>(
+                        handle, m, n, A, shiftA, lda, strideA, tau_splits, k, batch_count, row,
+
+                        work_geqrlq, size_work_geqrlq);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                if(leadvA)
+                {
+                    // copy factorization to U or V when needed
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, m, n, A,
+                                            shiftA, lda, strideA, UV, shiftUV, lduv, strideUV);
+                }
+
+                // copy the triangular part to be used in the bidiagonalization
+                ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_k, blocks_k, batch_count),
+                                        dim3(thread_count, thread_count, 1), 0, stream, k, k, A,
+                                        shiftA, lda, strideA, bufferT, shiftT, ldt, strideT,
+                                        no_mask{}, uplo);
+
+                //*** STAGE 2: generate orthonormal/unitary matrix from row/column compression ***//
+                if(leadvA)
+                {
+                    size_t const size_work_orgqrlq = (pwork + size_work) - pfree;
+                    void* work_orgqrlq = (void*)pfree;
+
+                    istat = local_orgqrlq_ungqrlq_template_alt<false, STRIDED>(
+                        handle, kk, kk, k, UV, shiftUV, lduv, strideUV, tau_splits, k, batch_count,
+                        row,
+
+                        work_orgqrlq, size_work_orgqrlq);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else
+                {
+                    size_t const size_work_orgqrlq = (pwork + size_work) - pfree;
+                    void* work_orgqrlq = (void*)pfree;
+                    istat = local_orgqrlq_ungqrlq_template_alt<BATCHED, STRIDED>(
+                        handle, m, n, k, A, shiftA, lda, strideA, tau_splits, k, batch_count, row,
+
+                        work_orgqrlq, size_work_orgqrlq);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 3: Bidiagonalization ***//
+                // clean triangular factor
+                ROCSOLVER_LAUNCH_KERNEL(set_zero<T>, dim3(blocks_k, blocks_k, batch_count),
+                                        dim3(thread_count, thread_count, 1), 0, stream, k, k,
+                                        bufferT, shiftT, ldt, strideT, uplo);
+
+                {
+                    size_t const size_work_gebrd = (pwork + size_work) - pfree;
+                    void* const work_gebrd = (void*)pfree;
+
+                    // --------------------------------
+                    // TODO: are X, Y scratch arrays in gebrd ?
+                    // --------------------------------
+                    T* const X = (T*)Abyx_norms_trfact_X;
+                    T* const Y = (T*)diag_tmptr_Y;
+
+                    istat = rocsolver_gebrd_template_alt<false, STRIDED>(
+                        handle, k, k, bufferT, shiftT, ldt, strideT, S, strideS, E, strideE,
+
+                        tau_splits, k, (tau_splits + k * batch_count), k,
+
+                        X, shiftX, ldx, strideX,
+
+                        Y, shiftY, ldy, strideY,
+
+                        batch_count,
+
+                        work_gebrd, size_work_gebrd);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                if(!othervN)
+                {
+                    // copy results to generate non-lead vectors if required
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_k, blocks_k, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, k, k,
+                                            bufferT, shiftT, ldt, strideT, bufferC, shiftC, ldc,
+                                            strideC);
+                }
+
+                //*** STAGE 4: generate orthonormal/unitary matrices from bidiagonalization ***//
+                // for lead-dimension vectors
+                {
+                    size_t const size_work_orgbr = (pfree + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<false, STRIDED>(
+                        handle, storev_lead, k, k, k, bufferT, shiftT, ldt, strideT,
+                        (tau_splits + offset_lead), k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                // for the other-side vectors
+                if(!othervN)
+                {
+                    size_t const size_work_orgbr = (pfree + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<false, STRIDED>(
+                        handle, storev_other, k, k, k, bufferC, shiftC, ldc, strideC,
+                        (tau_splits + offset_other), k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 5: Compute singular values and vectors from the bidiagonal form ***//
+                if(row)
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(
+                        handle, rocblas_fill_upper, k, nv, nu, 0, S, strideS, E, strideE, bufferC,
+                        shiftC, ldc, strideC, bufferT, shiftT, ldt, strideT, (T*)nullptr, 0, 1, 1,
+                        info, batch_count,
+
+                        work_bdsqr, size_work_bdsqr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(
+                        handle, rocblas_fill_upper, k, nv, nu, 0, S, strideS, E, strideE, bufferT,
+                        shiftT, ldt, strideT, bufferC, shiftC, ldc, strideC, (T*)nullptr, 0, 1, 1,
+                        info, batch_count,
+
+                        work_bdsqr, size_work_bdsqr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 6: update vectors with orthonormal/unitary matrices ***//
+                if(leadvO)
+                {
+                    bufferC = tempArrayC;
+                    ldc = m;
+                    strideC = m * n;
+
+                    // update
+                    if(row)
+                    {
+                        auto const pfree_saved = pfree;
+                        size_t const size_workArr = sizeof(T*) * batch_count;
+
+                        T** workArr = (T**)pfree;
+                        pfree += size_workArr;
+                        MEM_CHECK_THROW(pfree);
+
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, A, shiftA, lda, strideA, bufferT, shiftT, ldt,
+                                       strideT, &zero, bufferC, shiftC, ldc, strideC, batch_count,
+                                       workArr);
+
+                        pfree = pfree_saved;
+                    }
+                    else
+                    {
+                        auto const pfree_saved = pfree;
+                        size_t const size_workArr = sizeof(T*) * batch_count;
+                        T** workArr = (T**)pfree;
+                        pfree += size_workArr;
+                        MEM_CHECK_THROW(pfree);
+
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, bufferT, shiftT, ldt, strideT, A, shiftA, lda,
+                                       strideA, &zero, bufferC, shiftC, ldc, strideC, batch_count,
+                                       workArr);
+
+                        pfree = pfree_saved;
+                    }
+
+                    // copy to overwrite A
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, m, n,
+                                            bufferC, shiftC, ldc, strideC, A, shiftA, lda, strideA);
+                }
+                else if(leadvS)
+                {
+                    // update
+                    if(row)
+                    {
+                        auto const pfree_saved = pfree;
+                        size_t const size_workArr = sizeof(T*) * batch_count;
+                        T** workArr = (T**)pfree;
+                        pfree += size_workArr;
+                        MEM_CHECK_THROW(pfree);
+
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, A, shiftA, lda, strideA, bufferT, shiftT, ldt,
+                                       strideT, &zero, UV, shiftUV, lduv, strideUV, batch_count,
+                                       workArr);
+
+                        pfree = pfree_saved;
+                    }
+                    else
+                    {
+                        auto const pfree_saved = pfree;
+                        size_t const size_workArr = sizeof(T*) * batch_count;
+                        T** workArr = (T**)pfree;
+                        pfree += size_workArr;
+                        MEM_CHECK_THROW(pfree);
+
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, bufferT, shiftT, ldt, strideT, A, shiftA, lda,
+                                       strideA, &zero, UV, shiftUV, lduv, strideUV, batch_count,
+                                       workArr);
+
+                        pfree = pfree_saved;
+                    }
+
+                    // overwrite A if required
+                    if(othervO)
+                        ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_k, blocks_k, batch_count),
+                                                dim3(thread_count, thread_count, 1), 0, stream, k,
+                                                k, bufferC, shiftC, ldc, strideC, A, shiftA, lda,
+                                                strideA);
+                }
+                else
+                {
+                    // update
+                    if(row)
+                    {
+                        auto const pfree_saved = pfree;
+                        size_t const size_workArr = sizeof(T*) * batch_count;
+                        T** workArr = (T**)pfree;
+                        pfree += size_workArr;
+                        MEM_CHECK_THROW(pfree);
+
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, UV, shiftUV, lduv, strideUV, bufferT, shiftT, ldt,
+                                       strideT, &zero, A, shiftA, lda, strideA, batch_count, workArr);
+                        pfree = pfree_saved;
+                    }
+                    else
+                    {
+                        auto const pfree_saved = pfree;
+                        size_t const size_workArr = sizeof(T*) * batch_count;
+                        T** workArr = (T**)pfree;
+                        pfree += size_workArr;
+                        MEM_CHECK_THROW(pfree);
+
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, bufferT, shiftT, ldt, strideT, UV, shiftUV, lduv,
+                                       strideUV, &zero, A, shiftA, lda, strideA, batch_count,
+                                       workArr);
+
+                        pfree = pfree_saved;
+                    }
+
+                    // copy back to U/V
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, m, n, A,
+                                            shiftA, lda, strideA, UV, shiftUV, lduv, strideUV);
+
+                    // overwrite A if required
+                    if(othervO)
+                        ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_k, blocks_k, batch_count),
+                                                dim3(thread_count, thread_count, 1), 0, stream, k,
+                                                k, bufferC, shiftC, ldc, strideC, A, shiftA, lda,
+                                                strideA);
+                }
+            }
+
+            else
+            /************ SUB-CASE: USE IN-PLACE THIN-SVD ALGORITHM *******/
+            /**************************************************************/
+            {
+                /** (Note: A compression is not required when leadvO and othervN. We are
+                compressing matrix A here, albeit requiring extra workspace for the purpose of
+                testing. -See corresponding unit test for more details-) **/
+
+                //*** STAGE 1: Row (or column) compression ***//
+                {
+                    size_t const size_work_geqrlq = (pwork + size_work) - pfree;
+                    void* const work_geqrlq = pfree;
+
+                    istat = local_geqrlq_template_alt<BATCHED, STRIDED>(
+                        handle, m, n, A, shiftA, lda, strideA, tau_splits, k, batch_count, row,
+
+                        work_geqrlq, size_work_geqrlq);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                if(!leadvO)
+                {
+                    // copy factorization to U or V when needed
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, m, n, A,
+                                            shiftA, lda, strideA, UV, shiftUV, lduv, strideUV);
+                }
+
+                if(othervS || othervA || (leadvO && othervN))
+                {
+                    // copy the triangular part
+                    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_k, blocks_k, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, k, k, A,
+                                            shiftA, lda, strideA, bufferT, shiftT, ldt, strideT,
+                                            no_mask{}, uplo);
+                }
+
+                //*** STAGE 2: generate orthonormal/unitary matrix from row/column compression ***//
+                if(leadvO)
+                {
+                    size_t const size_work_orgqrlq = (pwork + size_work) - pfree;
+                    void* const work_orgqrlq = (void*)pfree;
+
+                    istat = local_orgqrlq_ungqrlq_template_alt<BATCHED, STRIDED>(
+                        handle, m, n, k, A, shiftA, lda, strideA, tau_splits, k, batch_count, row,
+
+                        work_orgqrlq, size_work_orgqrlq);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else if(leadvA)
+                {
+                    size_t const size_work_orgqrlq = (pwork + size_work) - pfree;
+                    void* const work_orgqrlq = (void*)pfree;
+
+                    istat = local_orgqrlq_ungqrlq_template_alt<false, STRIDED>(
+                        handle, kk, kk, k, UV, shiftUV, lduv, strideUV, tau_splits, k, batch_count,
+                        row,
+
+                        work_orgqrlq, size_work_orgqrlq);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else
+                {
+                    size_t const size_work_orgqrlq = (pwork + size_work) - pfree;
+                    void* const work_orgqrlq = (void*)pfree;
+
+                    istat = local_orgqrlq_ungqrlq_template_alt<false, STRIDED>(
+                        handle, m, n, k, UV, shiftUV, lduv, strideUV, tau_splits, k, batch_count, row,
+
+                        work_orgqrlq, size_work_orgqrlq);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 3: Bidiagonalization ***//
+                if(othervS || othervA || (leadvO && othervN))
+                {
+                    // clean triangular factor
+                    ROCSOLVER_LAUNCH_KERNEL(set_zero<T>, dim3(blocks_k, blocks_k, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, k, k,
+                                            bufferT, shiftT, ldt, strideT, uplo);
+
+                    {
+                        size_t const size_work_gebrd = (pwork + size_work) - pfree;
+                        void* const work_gebrd = (void*)pfree;
+
+                        // --------------------------------
+                        // TODO: are X, Y scratch arrays in gebrd ?
+                        // --------------------------------
+                        T* const X = (T*)Abyx_norms_trfact_X;
+                        T* const Y = (T*)diag_tmptr_Y;
+
+                        istat = rocsolver_gebrd_template_alt<false, STRIDED>(
+                            handle, k, k, bufferT, shiftT, ldt, strideT, S, strideS, E, strideE,
+
+                            tau_splits, k, (tau_splits + k * batch_count), k,
+
+                            X, shiftX, ldx, strideX,
+
+                            Y, shiftY, ldy, strideY,
+
+                            batch_count,
+
+                            work_gebrd, size_work_gebrd);
+                        if(istat != rocblas_status_success)
+                        {
+                            throw(istat);
+                        }
+                    }
+
+                    uplo = rocblas_fill_upper;
+                }
+                else
+                {
+                    // clean triangular factor
+                    ROCSOLVER_LAUNCH_KERNEL(set_zero<T>, dim3(blocks_k, blocks_k, batch_count),
+                                            dim3(thread_count, thread_count, 1), 0, stream, k, k, A,
+                                            shiftA, lda, strideA, uplo);
+
+                    {
+                        size_t const size_work_gebrd = (pwork + size_work) - pfree;
+                        void* const work_gebrd = (void*)pfree;
+
+                        // --------------------------------
+                        // TODO: are X, Y scratch arrays in gebrd ?
+                        // --------------------------------
+                        T* const X = (T*)Abyx_norms_trfact_X;
+                        T* const Y = (T*)diag_tmptr_Y;
+
+                        istat = rocsolver_gebrd_template_alt<BATCHED, STRIDED>(
+                            handle, k, k, A, shiftA, lda, strideA, S, strideS, E, strideE,
+
+                            tau_splits, k, (tau_splits + k * batch_count), k,
+
+                            X, shiftX, ldx, strideX,
+
+                            Y, shiftY, ldy, strideY,
+
+                            batch_count,
+
+                            work_gebrd, size_work_gebrd);
+                        if(istat != rocblas_status_success)
+                        {
+                            throw(istat);
+                        }
+                    }
+
+                    uplo = rocblas_fill_upper;
+                }
+
+                //*** STAGE 4: generate orthonormal/unitary matrices from bidiagonalization ***//
+                // for lead-dimension vectors
+                if(othervS || othervA || (leadvO && othervN))
+                {
+                    if(leadvO)
+                    {
+                        size_t const size_work_ormbr = (pwork + size_work) - pfree;
+                        void* const work_ormbr = (void*)pfree;
+
+                        istat = rocsolver_ormbr_unmbr_template_alt<BATCHED, STRIDED>(
+                            handle, storev_lead, side, trans, m, n, k, bufferT, shiftT, ldt, strideT,
+                            (tau_splits + offset_lead), k, A, shiftA, lda, strideA, batch_count,
+
+                            work_ormbr, size_work_ormbr);
+
+                        if(istat != rocblas_status_success)
+                        {
+                            throw(istat);
+                        }
+                    }
+                    else
+                    {
+                        size_t const size_work_ormbr = (pwork + size_work) - pfree;
+                        void* const work_ormbr = (void*)pfree;
+
+                        istat = rocsolver_ormbr_unmbr_template_alt<false, STRIDED>(
+                            handle, storev_lead, side, trans, m, n, k, bufferT, shiftT, ldt, strideT,
+                            (tau_splits + offset_lead), k, UV, shiftUV, lduv, strideUV, batch_count,
+
+                            work_ormbr, size_work_ormbr);
+
+                        if(istat != rocblas_status_success)
+                        {
+                            throw(istat);
+                        }
+                    }
+                }
+                else
+                {
+                    size_t const size_work_ormbr = (pwork + size_work) - pfree;
+                    void* const work_ormbr = (void*)pfree;
+
+                    istat = rocsolver_ormbr_unmbr_template_alt<BATCHED, STRIDED>(
+                        handle, storev_lead, side, trans, m, n, k, A, shiftA, lda, strideA,
+                        (tau_splits + offset_lead), k, UV, shiftUV, lduv, strideUV, batch_count,
+
+                        work_ormbr, size_work_ormbr);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                // for the other-side vectors
+                if(othervS || othervA)
+                {
+                    size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<false, STRIDED>(
+                        handle, storev_other, k, k, k, bufferT, shiftT, ldt, strideT,
+                        (tau_splits + offset_other), k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else if(othervO)
+                {
+                    size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<BATCHED, STRIDED>(
+                        handle, storev_other, k, k, k, A, shiftA, lda, strideA,
+                        (tau_splits + offset_other), k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 5: Compute singular values and vectors from the bidiagonal form ***//
+                uplo = rocblas_fill_upper;
+                if(!leftvO && !rightvO)
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(
+                        handle, uplo, k, nv, nu, 0, S, strideS, E, strideE, V, shiftV, ldv, strideV,
+                        U, shiftU, ldu, strideU, (T*)nullptr, 0, 1, 1, info, batch_count,
+
+                        work_bdsqr, size_work_bdsqr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else if(leftvO && !rightvO)
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(
+                        handle, uplo, k, nv, nu, 0, S, strideS, E, strideE, V, shiftV, ldv, strideV,
+                        A, shiftA, lda, strideA, (W) nullptr, 0, 1, 1, info, batch_count,
+
+                        work_bdsqr, size_work_bdsqr);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+                else
+                {
+                    size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                    void* const work_bdsqr = (void*)pfree;
+
+                    istat = rocsolver_bdsqr_template_alt<T>(
+                        handle, uplo, k, nv, nu, 0, S, strideS, E, strideE, A, shiftA, lda, strideA,
+                        U, shiftU, ldu, strideU, (W) nullptr, 0, 1, 1, info, batch_count,
+
+                        work_bdsqr, size_work_bdsqr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+
+                //*** STAGE 6: update vectors with orthonormal/unitary matrices ***//
+                // N/A
+            }
+        }
+
+        else
+        /*********************************************/
+        /********** CASE: CHOOSE NORMAL SVD **********/
+        /*********************************************/
+        {
+            //*** STAGE 1: Row (or column) compression ***//
+            // N/A
+
+            //*** STAGE 2: generate orthonormal/unitary matrix from row/column compression ***//
+            // N/A
+
+            //*** STAGE 3: Bidiagonalization ***//
+            {
+                size_t const size_work_gebrd = (pwork + size_work) - pfree;
+                void* const work_gebrd = (void*)pfree;
+
+                istat = rocsolver_gebrd_template_alt<BATCHED, STRIDED>(
+                    handle, m, n, A, shiftA, lda, strideA, S, strideS, E, strideE, tau_splits, k,
+                    (tau_splits + k * batch_count), k, Abyx_norms_trfact_X, shiftX, ldx, strideX,
+                    diag_tmptr_Y, shiftY, ldy, strideY, batch_count,
+
+                    work_gebrd, size_work_gebrd);
+                if(istat != rocblas_status_success)
+                {
+                    throw(istat);
+                }
+            }
+
+            //*** STAGE 4: generate orthonormal/unitary matrices from bidiagonalization ***//
+            if(leftvS || leftvA)
+            {
+                // copy data to matrix U where orthogonal matrix will be generated
+                mn = (row && leftvS) ? n : m;
+                ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_k, batch_count),
+                                        dim3(thread_count, thread_count, 1), 0, stream, m, k, A,
+                                        shiftA, lda, strideA, U, shiftU, ldu, strideU);
+
+                {
+                    size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<false, STRIDED>(
+                        handle, rocblas_column_wise, m, mn, n, U, shiftU, ldu, strideU, tau_splits,
+                        k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+            }
+
+            if(rightvS || rightvA)
+            {
+                // copy data to matrix V where othogonal matrix will be generated
+                mn = (!row && rightvS) ? m : n;
+                ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_k, blocks_n, batch_count),
+                                        dim3(thread_count, thread_count, 1), 0, stream, k, n, A,
+                                        shiftA, lda, strideA, V, shiftV, ldv, strideV);
+
+                {
+                    size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                    void* const work_orgbr = (void*)pfree;
+
+                    istat = rocsolver_orgbr_ungbr_template_alt<false, STRIDED>(
+                        handle, rocblas_row_wise, mn, n, m, V, shiftV, ldv, strideV,
+                        (tau_splits + k * batch_count), k, batch_count,
+
+                        work_orgbr, size_work_orgbr);
+                    if(istat != rocblas_status_success)
+                    {
+                        throw(istat);
+                    }
+                }
+            }
+
+            if(leftvO)
+            {
+                size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                void* const work_orgbr = (void*)pfree;
+
+                istat = rocsolver_orgbr_ungbr_template_alt<BATCHED, STRIDED>(
+                    handle, rocblas_column_wise, m, k, n, A, shiftA, lda, strideA, tau_splits, k,
+                    batch_count,
+
+                    work_orgbr, size_work_orgbr);
+
+                if(istat != rocblas_status_success)
+                {
+                    throw(istat);
+                }
+            }
+
+            if(rightvO)
+            {
+                size_t const size_work_orgbr = (pwork + size_work) - pfree;
+                void* const work_orgbr = (void*)pfree;
+
+                istat = rocsolver_orgbr_ungbr_template_alt<BATCHED, STRIDED>(
+                    handle, rocblas_row_wise, k, n, m, A, shiftA, lda, strideA,
+                    (tau_splits + k * batch_count), k, batch_count,
+
+                    work_orgbr, size_work_orgbr);
+                if(istat != rocblas_status_success)
+                {
+                    throw(istat);
+                }
+            }
+
+            //*** STAGE 5: Compute singular values and vectors from the bidiagonal form ***//
+            if(!leftvO && !rightvO)
+            {
+                size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                void* const work_bdsqr = (void*)pfree;
+
+                istat = rocsolver_bdsqr_template_alt<T>(
+                    handle, uplo, k, nv, nu, 0, S, strideS, E, strideE, V, shiftV, ldv, strideV, U,
+                    shiftU, ldu, strideU, (T*)nullptr, 0, 1, 1, info, batch_count,
+
+                    work_bdsqr, size_work_bdsqr);
+                if(istat != rocblas_status_success)
+                {
+                    throw(istat);
+                }
+            }
+
+            else if(leftvO && !rightvO)
+            {
+                size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                void* const work_bdsqr = (void*)pfree;
+
+                istat = rocsolver_bdsqr_template_alt<T>(
+                    handle, uplo, k, nv, nu, 0, S, strideS, E, strideE, V, shiftV, ldv, strideV, A,
+                    shiftA, lda, strideA, (W) nullptr, 0, 1, 1, info, batch_count,
+
+                    work_bdsqr, size_work_bdsqr);
+                if(istat != rocblas_status_success)
+                {
+                    throw(istat);
+                }
+            }
+
+            else
+            {
+                size_t const size_work_bdsqr = (pwork + size_work) - pfree;
+                void* const work_bdsqr = (void*)pfree;
+
+                istat = rocsolver_bdsqr_template_alt<T>(
+                    handle, uplo, k, nv, nu, 0, S, strideS, E, strideE, A, shiftA, lda, strideA, U,
+                    shiftU, ldu, strideU, (W) nullptr, 0, 1, 1, info, batch_count,
+
+                    work_bdsqr, size_work_bdsqr);
+                if(istat != rocblas_status_success)
+                {
+                    throw(istat);
+                }
+            }
+
+            //*** STAGE 6: update vectors with orthonormal/unitary matrices ***//
+            // N/A
+        }
+
+        rocblas_set_pointer_mode(handle, old_mode);
+        return rocblas_status_success;
+    }
+    catch(rocblas_status istat)
+    {
+        rocblas_set_pointer_mode(handle, old_mode);
+        return istat;
+    }
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename TT, typename W>
+rocblas_status rocsolver_gesvd_template_alt_org(rocblas_handle handle,
+                                                const rocblas_svect left_svect,
+                                                const rocblas_svect right_svect,
+                                                const rocblas_int m,
+                                                const rocblas_int n,
+                                                W A,
+                                                const rocblas_int shiftA,
+                                                const rocblas_int lda,
+                                                const rocblas_stride strideA,
+                                                TT* S,
+                                                const rocblas_stride strideS,
+                                                T* U,
+                                                const rocblas_int ldu,
+                                                const rocblas_stride strideU,
+                                                T* V,
+                                                const rocblas_int ldv,
+                                                const rocblas_stride strideV,
+                                                TT* E,
+                                                const rocblas_stride strideE,
+                                                const rocblas_workmode fast_alg,
+                                                rocblas_int* info,
+                                                const rocblas_int batch_count,
+
+                                                void* work,
+                                                size_t const size_work)
 
 {
     size_t size_scalars = 0;
