@@ -135,6 +135,40 @@ void rocsolver_gebrd_getMemorySize_alt(const rocblas_int m,
     *p_size_gebrd = size_gebrd;
 }
 
+template <bool BATCHED, typename T>
+void rocsolver_gebrd_getMemorySize_alt_pass_xy(const rocblas_int m,
+                                               const rocblas_int n,
+                                               const rocblas_int batch_count,
+
+                                               size_t* p_size_gebrd)
+
+{
+    size_t size_scalars = 0;
+    size_t size_work_workArr = 0;
+    size_t size_Abyx_norms = 0;
+    size_t size_X = 0;
+    size_t size_Y = 0;
+
+    rocsolver_gebrd_getMemorySize<BATCHED, T>(m, n, batch_count,
+
+                                              &size_scalars, &size_work_workArr, &size_Abyx_norms,
+                                              &size_X, &size_Y);
+
+    size_t size_gebrd = 0;
+
+    size_gebrd += size_scalars;
+    size_gebrd += size_work_workArr;
+    size_gebrd += size_Abyx_norms;
+
+    // ----------------------------------------
+    // note: assume X, Y are not scratch arrays
+    // ----------------------------------------
+    // size_gebrd += size_X;
+    // size_gebrd += size_Y;
+
+    *p_size_gebrd = size_gebrd;
+}
+
 template <bool BATCHED, bool STRIDED, typename T, typename S, typename U>
 rocblas_status rocsolver_gebrd_template(rocblas_handle handle,
                                         const rocblas_int m,

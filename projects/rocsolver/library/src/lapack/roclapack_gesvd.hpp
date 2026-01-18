@@ -513,6 +513,10 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
     if(thinSVD)
     {
         size_t size_work_temp = 0;
+
+        // --------------------------------------------------------------------
+        // assume X, Y are not scratch arrays but are arguments to be passed in
+        // --------------------------------------------------------------------
         rocsolver_gebrd_getMemorySize_alt<BATCHED, T>(k, k, batch_count, &size_work_temp);
 
         size_gebrd = std::max(size_gebrd, size_work_temp);
@@ -681,16 +685,21 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
         adjust_for_alignment(size_tempArrayT);
         adjust_for_alignment(size_tempArrayC);
 
-        size_gesvd += size_tempArrayT;
-        size_gesvd += size_tempArrayC;
-
         adjust_for_alignment(size_tau_splits);
         adjust_for_alignment(size_Abyx_norms_trfact_X);
         adjust_for_alignment(size_diag_tmptr_Y);
 
+        size_gesvd += size_tempArrayT;
+        size_gesvd += size_tempArrayC;
+
         size_gesvd += size_tau_splits;
-        size_gesvd += size_diag_tmptr_Y;
-        size_gesvd += size_Abyx_norms_trfact_X;
+
+        // ----------------------------------------
+        // note: no need for temporary arrays
+        // Abyx_norms_trfact_X[] and diag_tmptr_Y[]
+        // ----------------------------------------
+        // size_gesvd += size_diag_tmptr_Y;
+        // size_gesvd += size_Abyx_norms_trfact_X;
     }
 
     {
@@ -714,26 +723,23 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
         adjust_for_alignment(size_bdsqr);
         adjust_for_alignment(size_geqrf);
         adjust_for_alignment(size_gelqf);
-
-        size_gesvd += size_gebrd;
-        size_gesvd += size_bdsqr;
-
-        size_gesvd += std::max(size_geqrf, size_gelqf);
-    }
-
-    {
         adjust_for_alignment(size_ormbr);
         adjust_for_alignment(size_orgbr);
-
-        size_gesvd += size_ormbr;
-        size_gesvd += size_orgbr;
-    }
-
-    {
         adjust_for_alignment(size_orgqr);
         adjust_for_alignment(size_orglq);
 
-        size_gesvd += std::max(size_orgqr, size_orglq);
+        // clang-format off
+        size_gesvd += std::max( size_gebrd, 
+                      std::max( size_bdsqr,
+                      std::max( size_geqrf,
+                      std::max( size_gelqf,
+                      std::max( size_ormbr,
+                      std::max( size_orgbr,
+                      std::max( size_orgqr,
+                      std::max( size_orgqr,
+			        size_orglq ) ) ) ) ) ) ) );
+
+        // clang-format on
     }
 
     adjust_for_alignment(size_gesvd);
@@ -1471,6 +1477,16 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
         &size_scalars, &size_work_workArr, &size_Abyx_norms_tmptr_cmplt, &size_Abyx_norms_trfact_X,
         &size_diag_tmptr_Y, &size_tau_splits, &size_tempArrayT, &size_tempArrayC, &size_workArr);
 
+    {
+        // -----------------------------------------
+        // not need for temporary arrays
+        // diag_tmptr_Y[] and Abyx_norms_trfact_X[]
+        // -----------------------------------------
+
+        size_Abyx_norms_trfact_X = 0;
+        size_diag_tmptr_Y = 0;
+    }
+
     rocblas_status istat = rocblas_status_success;
 
     std::byte* const pwork = (std::byte*)work;
@@ -1686,9 +1702,11 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
 
                         tau_splits, k, (tau_splits + k * batch_count), k,
 
-                        X, shiftX, ldx, strideX,
+                        // X,
+                        shiftX, ldx, strideX,
 
-                        Y, shiftY, ldy, strideY,
+                        // Y,
+                        shiftY, ldy, strideY,
 
                         batch_count,
 
@@ -1849,13 +1867,19 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
                     T* const Y = (T*)diag_tmptr_Y;
 
                     istat = rocsolver_gebrd_template_alt<false, STRIDED>(
-                        handle, k, k, bufferT, shiftT, ldt, strideT, S, strideS, E, strideE,
+                        handle, k, k,
+
+                        bufferT, shiftT, ldt, strideT,
+
+                        S, strideS, E, strideE,
 
                         tau_splits, k, (tau_splits + k * batch_count), k,
 
-                        X, shiftX, ldx, strideX,
+                        // X,
+                        shiftX, ldx, strideX,
 
-                        Y, shiftY, ldy, strideY,
+                        // Y,
+                        shiftY, ldy, strideY,
 
                         batch_count,
 
@@ -2189,9 +2213,11 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
 
                             tau_splits, k, (tau_splits + k * batch_count), k,
 
-                            X, shiftX, ldx, strideX,
+                            // X,
+                            shiftX, ldx, strideX,
 
-                            Y, shiftY, ldy, strideY,
+                            // Y,
+                            shiftY, ldy, strideY,
 
                             batch_count,
 
@@ -2226,9 +2252,11 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
 
                             tau_splits, k, (tau_splits + k * batch_count), k,
 
-                            X, shiftX, ldx, strideX,
+                            // X,
+                            shiftX, ldx, strideX,
 
-                            Y, shiftY, ldy, strideY,
+                            // Y,
+                            shiftY, ldy, strideY,
 
                             batch_count,
 
@@ -2398,12 +2426,28 @@ rocblas_status rocsolver_gesvd_template_alt(rocblas_handle handle,
                 size_t const size_work_gebrd = (pwork + size_work) - pfree;
                 void* const work_gebrd = (void*)pfree;
 
+                T* const X = (T*)Abyx_norms_trfact_X;
+                T* const Y = (T*)diag_tmptr_Y;
+
                 istat = rocsolver_gebrd_template_alt<BATCHED, STRIDED>(
-                    handle, m, n, A, shiftA, lda, strideA, S, strideS, E, strideE, tau_splits, k,
-                    (tau_splits + k * batch_count), k, Abyx_norms_trfact_X, shiftX, ldx, strideX,
-                    diag_tmptr_Y, shiftY, ldy, strideY, batch_count,
+                    handle, m, n,
+
+                    A, shiftA, lda, strideA,
+
+                    S, strideS, E, strideE, tau_splits,
+
+                    k, (tau_splits + k * batch_count), k,
+
+                    // X,
+                    shiftX, ldx, strideX,
+
+                    // Y,
+                    shiftY, ldy, strideY,
+
+                    batch_count,
 
                     work_gebrd, size_work_gebrd);
+
                 if(istat != rocblas_status_success)
                 {
                     throw(istat);
