@@ -736,8 +736,7 @@ void rocsolver_gesvd_getMemorySize_alt(const rocblas_svect left_svect,
                       std::max( size_ormbr,
                       std::max( size_orgbr,
                       std::max( size_orgqr,
-                      std::max( size_orgqr,
-			        size_orglq ) ) ) ) ) ) ) );
+			        size_orglq ) ) ) ) ) ) ) ;
 
         // clang-format on
     }
