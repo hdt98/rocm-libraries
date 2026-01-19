@@ -464,17 +464,20 @@ auto GenericSearch(const Solver s,
     std::shuffle(all_configs.begin(), all_configs.end(), rng);
 
     // rank order configs
-    const size_t origami_ret_size = 5;
-    auto ranked_configs           = GetOrigamiPerformanceConfig(s, problem, all_configs);
-    MIOPEN_LOG_I2("origami rank finished");
-    if(!ranked_configs.empty())
+    bool enable_origami           = env::value(MIOPEN_ENABLE_ORIGAMI);
+    const size_t origami_ret_size = env::value(MIOPEN_NUM_ORIGAMI_CFG);
+    if(enable_origami)
     {
-        MIOPEN_LOG_I2("Use origami selected");
-        if(ranked_configs.size() > origami_ret_size)
+        auto ranked_configs = GetOrigamiPerformanceConfig(s, problem, all_configs);
+        if(!ranked_configs.empty())
         {
-            ranked_configs.resize(origami_ret_size);
+            MIOPEN_LOG_I2("Using Origami ranked configs.");
+            if(ranked_configs.size() > origami_ret_size)
+            {
+                ranked_configs.resize(origami_ret_size);
+            }
+            all_configs = ranked_configs;
         }
-        all_configs = ranked_configs;
     }
 
     std::size_t n_runs_total = std::min(all_configs.size(), GetTuningIterationsMax());

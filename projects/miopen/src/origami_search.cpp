@@ -48,5 +48,18 @@ origami::data_type_t GetOriDataType(const miopen::conv::ProblemDescription& prob
     return origami::data_type_t::None;
 }
 
+std::string SerializeOrigamiConfig(const origami::config_t config)
+{
+    std::string ret;
+    ret = std::to_string(config.mt.m);
+    ret += "_" + std::to_string(config.mt.n);
+    ret += "_" + std::to_string(config.mt.k);
+    ret += "_" + std::to_string(config.mi.m);
+    ret += "_" + std::to_string(config.mi.n);
+    ret += "_" + std::to_string(config.mi.k);
+    ret += "_" + std::to_string(config.occupancy);
+    return ret;
+}
+
 } // namespace solver
 } // namespace miopen

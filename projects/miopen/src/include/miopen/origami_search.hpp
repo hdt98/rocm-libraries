@@ -37,6 +37,8 @@ namespace solver {
 
 origami::data_type_t GetOriDataType(const miopen::conv::ProblemDescription& problem);
 
+std::string SerializeOrigamiConfig(const origami::config_t config);
+
 template <class Solver, class PerformanceConfig>
 std::vector<PerformanceConfig>
 GetOrigamiPerformanceConfig(const Solver s,
@@ -67,49 +69,52 @@ GetOrigamiPerformanceConfig(const Solver s,
     ori_prob.a_mx_block_size = 0;
     ori_prob.b_mx_block_size = 0;
 
-    MIOPEN_LOG_I2("write configs: " << all_configs.size());
     // Create candidate configurations
     std::vector<origami::config_t> ori_cfgs;
-    std::map<size_t, std::vector<PerformanceConfig>> ori_to_perf_cfg;
+    std::map<std::string, std::vector<PerformanceConfig>> ori_to_perf_cfg;
 
     for(auto perf_cfg : all_configs)
     {
         origami::config_t ori_cfg = s.GetOrigamiConfig(problem, perf_cfg);
         if(ori_cfg.is_valid())
         {
-            ori_cfgs.push_back(ori_cfg);
+            auto ori_cfg_str = SerializeOrigamiConfig(ori_cfg);
+            if(!ori_to_perf_cfg.contains(ori_cfg_str))
+                ori_cfgs.push_back(ori_cfg);
 
-            if(ori_to_perf_cfg.contains(ori_cfg.hash()))
-                ori_to_perf_cfg[ori_cfg.hash()].push_back(perf_cfg);
+            if(ori_to_perf_cfg.contains(ori_cfg_str))
+                ori_to_perf_cfg[ori_cfg_str].push_back(perf_cfg);
             else
-                ori_to_perf_cfg[ori_cfg.hash()] = {perf_cfg};
+                ori_to_perf_cfg[ori_cfg_str] = {perf_cfg};
         }
     }
 
     // Rank all configurations by performance
-    std::vector<PerformanceConfig> ret;
+    std::vector<PerformanceConfig> ret{};
     if(!ori_cfgs.empty())
     {
-        MIOPEN_LOG_I2("rank perf_cfg");
+        MIOPEN_LOG_I2("Ranking PerformanceConfig");
         auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
 
         bool first = true;
         for(auto prediction : ranked_configs)
         {
-            for(auto perf_cfg : ori_to_perf_cfg[prediction.config.hash()])
+            if(first)
+            {
+                auto ori_cfg = prediction.config;
+                MIOPEN_LOG_T("Rank 1 configs: "
+                             << "MT.M(" << ori_cfg.mt.m << ") MT.N(" << ori_cfg.mt.n << ") MT.K("
+                             << ori_cfg.mt.k << ") MI.M(" << ori_cfg.mi.m << ") MI.N("
+                             << ori_cfg.mi.n << ") MI.K(" << ori_cfg.mi.k << ")");
+            }
+            for(auto perf_cfg : ori_to_perf_cfg[SerializeOrigamiConfig(prediction.config)])
             {
                 ret.push_back(perf_cfg);
                 if(first)
-                    MIOPEN_LOG_I2(perf_cfg);
+                    MIOPEN_LOG_T(perf_cfg);
             }
             first = false;
         }
-
-        auto ori_cfg = ranked_configs[0].config;
-        MIOPEN_LOG_I2("CK id string: " << ret[0] << std::endl << "MT.M(" << ori_cfg.mt.m << ") MT.N("
-                                   << ori_cfg.mt.n << ") MT.K(" << ori_cfg.mt.k << ") MI.M("
-                                   << ori_cfg.mi.m << ") MI.N(" << ori_cfg.mi.n << ") MI.K("
-                                   << ori_cfg.mi.k << ")");
     }
     MIOPEN_LOG_I2("return perf_cfg: " << ret.size());
 
