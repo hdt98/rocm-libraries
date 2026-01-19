@@ -390,7 +390,14 @@ def config_cmd():
     if args.cmake_args:
         cmake_options.append(args.cmake_args)
 
-    cmake_base_options = f"-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH={rocm_path}"
+    # Add msgpack install directory to CMAKE_PREFIX_PATH on Windows
+    prefix_paths = [rocm_path]
+    if os.name == "nt":
+        msgpack_install = os.path.join(build_dir, "deps", "msgpack-c", "install")
+        if os.path.exists(msgpack_install):
+            prefix_paths.append(cmake_path(msgpack_install))
+    
+    cmake_base_options = f"-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH={';'.join(prefix_paths)}"
     cmake_options.append(cmake_base_options)
 
     # packaging options
