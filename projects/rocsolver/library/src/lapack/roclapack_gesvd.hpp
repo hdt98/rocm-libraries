@@ -40,6 +40,7 @@
 #include "roclapack_gelqf.hpp"
 #include "roclapack_geqrf.hpp"
 #include "rocsolver/rocsolver.h"
+#include "rocsolver_device_workspace.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -941,6 +942,117 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
 
     rocblas_set_pointer_mode(handle, old_mode);
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename TT, typename W>
+auto rocsolver_gesvd_getWorkItems(rocblas_handle handle,
+                                  const rocblas_svect left_svect,
+                                  const rocblas_svect right_svect,
+                                  const rocblas_int m,
+                                  const rocblas_int n,
+                                  W /* A */,
+                                  const rocblas_int shiftA,
+                                  const rocblas_int lda,
+                                  const rocblas_stride strideA,
+                                  TT* /* S */,
+                                  const rocblas_stride strideS,
+                                  T* /* U */,
+                                  const rocblas_int ldu,
+                                  const rocblas_stride strideU,
+                                  T* /* V */,
+                                  const rocblas_int ldv,
+                                  const rocblas_stride strideV,
+                                  TT* /* E */,
+                                  const rocblas_stride strideE,
+                                  const rocblas_workmode fast_alg,
+                                  rocblas_int* info,
+                                  const rocblas_int batch_count)
+{
+    // memory workspace sizes:
+    // size for constants in rocblas calls
+    size_t size_scalars;
+    // size of reusable workspace and array of pointers (batched case)
+    size_t size_work_workArr;
+    // extra requirements for calling orthogonal/unitary matrix operations and factorizations
+    size_t size_Abyx_norms_tmptr, size_Abyx_norms_trfact_X, size_diag_tmptr_Y;
+    // size of array tau to store householder scalars, plus extra requirements for calling BDSQR
+    size_t size_tau_splits;
+    // size of temporary arrays for copies
+    size_t size_tempArrayT, size_tempArrayC;
+    // size of array of pointers (only for batched case)
+    size_t size_workArr;
+
+    rocsolver_gesvd_getMemorySize<BATCHED, T, TT>(
+        left_svect, right_svect, m, n, batch_count, fast_alg, &size_scalars, &size_work_workArr,
+        &size_Abyx_norms_tmptr, &size_Abyx_norms_trfact_X, &size_diag_tmptr_Y, &size_tau_splits,
+        &size_tempArrayT, &size_tempArrayC, &size_workArr);
+
+    constexpr std::size_t N{9}; // num of work items
+    work_items_list_t wlist = {{"gesvd_scalars", size_scalars},
+                               {"gesvd_work_workArr", size_work_workArr},
+                               {"gesvd_Abyx_norms_tmptr", size_Abyx_norms_tmptr},
+                               {"gesvd_Abyx_norms_trfact_X", size_Abyx_norms_trfact_X},
+                               {"gesvd_diag_tmptr_Y", size_diag_tmptr_Y},
+                               {"gesvd_tau_splits", size_tau_splits},
+                               {"gesvd_tempArrayT", size_tempArrayT},
+                               {"gesvd_tempArrayC", size_tempArrayC},
+                               {"gesvd_workArr", size_workArr}};
+
+    auto work_items = create_work_items_sorted_by_size<N>(wlist);
+    return work_items;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename TT, typename W>
+rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
+                                        const rocblas_svect left_svect,
+                                        const rocblas_svect right_svect,
+                                        const rocblas_int m,
+                                        const rocblas_int n,
+                                        W A,
+                                        const rocblas_int shiftA,
+                                        const rocblas_int lda,
+                                        const rocblas_stride strideA,
+                                        TT* S,
+                                        const rocblas_stride strideS,
+                                        T* U,
+                                        const rocblas_int ldu,
+                                        const rocblas_stride strideU,
+                                        T* V,
+                                        const rocblas_int ldv,
+                                        const rocblas_stride strideV,
+                                        TT* E,
+                                        const rocblas_stride strideE,
+                                        const rocblas_workmode fast_alg,
+                                        rocblas_int* info,
+                                        const rocblas_int batch_count,
+                                        rocsolver_device_workspace_ptr_t dwptr)
+{
+    ROCSOLVER_INIT_DEVICE_WORKSPACE(dwptr,
+                                    rocsolver_gesvd_getWorkItems<BATCHED, STRIDED, T, TT, W>(
+                                        handle, left_svect, right_svect, m, n, A, shiftA, lda,
+                                        strideA, S, strideS, U, ldu, strideU, V, ldv, strideV, E,
+                                        strideE, fast_alg, info, batch_count));
+
+    T* scalars = (T*)dwptr->work("gesvd_scalars");
+    void* work_workArr = dwptr->work("gesvd_work_workArr");
+    T* Abyx_norms_tmptr = (T*)dwptr->work("gesvd_Abyx_norms_tmptr");
+    T* Abyx_norms_trfact_X = (T*)dwptr->work("gesvd_Abyx_norms_trfact_X");
+    T* diag_tmptr_Y = (T*)dwptr->work("gesvd_diag_tmptr_Y");
+    T* tau_splits = (T*)dwptr->work("gesvd_tau_splits");
+    T* tempArrayT = (T*)dwptr->work("gesvd_tempArrayT");
+    T* tempArrayC = (T*)dwptr->work("gesvd_tempArrayC");
+    T** workArr = (T**)dwptr->work("gesvd_workArr");
+
+    if(dwptr->size("gesvd_scalars") > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    return rocsolver_gesvd_template<BATCHED, STRIDED, T>(
+        handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
+        V, ldv, strideV, E, strideE, fast_alg, info, batch_count, (T*)scalars, work_workArr,
+        (T*)Abyx_norms_tmptr, (T*)Abyx_norms_trfact_X, (T*)diag_tmptr_Y, (T*)tau_splits,
+        (T*)tempArrayT, (T*)tempArrayC, (T**)workArr);
 }
 
 ROCSOLVER_END_NAMESPACE
