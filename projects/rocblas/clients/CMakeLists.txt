@@ -358,8 +358,8 @@ rocm_install(
   COMPONENT clients
 )
 
-# On Windows, install vcpkg DLLs required by clients
-if(WIN32)
+# On Windows custom builds, install vcpkg DLLs required by clients
+if(CREATE_TEST_APP_LOCAL_DEPLOY AND WIN32)
   # Find vcpkg installation directory
   if(DEFINED ENV{VCPKG_ROOT})
     set(VCPKG_INSTALLED_DIR "$ENV{VCPKG_ROOT}/installed/x64-windows/bin")
@@ -386,7 +386,5 @@ if(WIN32)
               DESTINATION "${CMAKE_INSTALL_BINDIR}"
               COMPONENT clients)
     endif()
-  else()
-    message(WARNING "vcpkg installation not found. Client DLLs (gtest, openblas) will not be copied to install directory.")
   endif()
 endif()
