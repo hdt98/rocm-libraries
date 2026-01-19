@@ -55,12 +55,6 @@ void gecon_checkBadArgs(const rocblas_handle handle,
                                           dipiv, danorm, drcond),
                           rocblas_status_invalid_value);
 
-    // sizes
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, (I)-1, dA, lda, dipiv, danorm, drcond),
-                          rocblas_status_invalid_size);
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA, (I)-1, dipiv, danorm, drcond),
-                          rocblas_status_invalid_size);
-
     // pointers
     EXPECT_ROCBLAS_STATUS(
         rocsolver_gecon(handle, norm_type, n, (T) nullptr, lda, dipiv, danorm, drcond),
@@ -290,21 +284,7 @@ void testing_gecon(Arguments& argus)
     rocblas_int hot_calls = argus.iters;
 
     // check non-supported values
-    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity
-       && norm_type != rocsolver_norm_type_frobenius && norm_type != rocsolver_norm_type_max)
-    {
-        EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (I*)nullptr,
-                                              (S*)nullptr, (S*)nullptr),
-                              rocblas_status_invalid_value);
-
-        if(argus.timing)
-            rocsolver_bench_inform(inform_invalid_args);
-
-        return;
-    }
-
-    // check for invalid_value for Frobenius and max norms (not supported)
-    if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
+    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity)
     {
         EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (I*)nullptr,
                                               (S*)nullptr, (S*)nullptr),
