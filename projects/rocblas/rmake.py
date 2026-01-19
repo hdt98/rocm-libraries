@@ -393,7 +393,7 @@ def config_cmd():
     # Add msgpack install directory to CMAKE_PREFIX_PATH on Windows
     prefix_paths = [rocm_path]
     if os.name == "nt":
-        msgpack_install = os.path.join(build_dir, "deps", "msgpack-c", "install")
+        msgpack_install = os.path.join(src_path, args.build_dir, "deps", "msgpack-c", "install")
         if os.path.exists(msgpack_install):
             prefix_paths.append(cmake_path(msgpack_install))
     
