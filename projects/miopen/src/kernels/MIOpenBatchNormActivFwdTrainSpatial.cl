@@ -33,7 +33,7 @@
 #endif
 
 #define MIOPEN_USE_AMDGCN 0
-#if defined(__AMDGCN__) && !(MIO_BN_GFX103X || MIO_BN_GFX110X || MIO_BN_GFX120X)
+#if defined(__AMDGCN__) && !(MIO_BN_GFX103X || MIO_BN_GFX110X || MIO_BN_GFX120X || MIO_BN_GFX115X)
 #undef MIOPEN_USE_AMDGCN
 #define MIOPEN_USE_AMDGCN 1
 #endif
@@ -184,7 +184,14 @@ MIOpenBatchNormActivFwdTrainSpatial(float INHW,
     if(lid == 0)
     {
 #if(MIO_RUNNING_RESULT == 1)
-        running_stash(runningMean, runningVariance, expAvgFactor, mean, variance, grpid);
+        running_stash(runningMean,
+                      runningVariance,
+                      runningMean,
+                      runningVariance,
+                      expAvgFactor,
+                      mean,
+                      variance,
+                      grpid);
 #endif
 
 #if(MIO_SAVE_MEAN_VARIANCE == 1)
@@ -439,7 +446,14 @@ MIOpenBatchNormActivFwdTrainSpatial(
     if(lid == 0)
     {
 #if(MIO_RUNNING_RESULT == 1)
-        running_stash(runningMean, runningVariance, expAvgFactor, mean, variance, grpid);
+        running_stash(runningMean,
+                      runningVariance,
+                      runningMean,
+                      runningVariance,
+                      expAvgFactor,
+                      mean,
+                      variance,
+                      grpid);
 #endif
 
 #if(MIO_SAVE_MEAN_VARIANCE == 1)
@@ -624,7 +638,14 @@ MIOpenBatchNormActivFwdTrainSpatial(
     if(lid == 0)
     {
 #if(MIO_RUNNING_RESULT == 1)
-        running_stash(runningMean, runningVariance, expAvgFactor, mean, variance, grpid);
+        running_stash(runningMean,
+                      runningVariance,
+                      runningMean,
+                      runningVariance,
+                      expAvgFactor,
+                      mean,
+                      variance,
+                      grpid);
 #endif
 
 #if(MIO_SAVE_MEAN_VARIANCE == 1)
