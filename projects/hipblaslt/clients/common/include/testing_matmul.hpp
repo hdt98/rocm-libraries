@@ -3751,6 +3751,9 @@ void testing_matmul_with_bias(const Arguments& arg,
             CHECK_HIP_ERROR(hipEventCreate(&hot_events_end[i]));
         }
 
+        // Number of sub-iterations per hot call (for averaging)
+        const int num_sub_iterations = 5;
+
         int    flush_iter      = 100000;
         double flush_time_used = 0;
         if(arg.flush)
@@ -3841,27 +3844,32 @@ void testing_matmul_with_bias(const Arguments& arg,
                     perf_monitor.start();
 
                     // Hot iterations with per-iteration timing (no pipeline stall)
+                    // Each hot iteration runs 5 times and takes the average
+                    gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
-                        CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
-                        if(arg.flush)
-                            hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        // Run 5 sub-iterations
+                        for(int j = 0; j < num_sub_iterations; j++)
+                        {
+                            CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
+                            if(arg.flush)
+                                hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
                     }
-                    // Synchronize once after all hot iterations
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    // Calculate hot iteration times
-                    gpu_time_used = 0.0;
+                    
+                    // Calculate hot iteration times (average of 5 sub-iterations)
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         if(arg.use_gpu_timer)
                         {
                             float ms;
                             CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
-                            hot_iter_times[i] = ms * 1000.0; // ms to us
+                            hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                             if(arg.flush && flush_time_used > 0)
                                 hot_iter_times[i] -= flush_time_used;
                         }
@@ -3941,6 +3949,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     perf_monitor.start();
 
                     // Hot iterations with per-iteration timing (C API, no pipeline stall)
+                    // Each hot iteration runs 5 times and takes the average
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         auto ptr_matmul = matmul[i % block_count][0];
@@ -3950,37 +3959,41 @@ void testing_matmul_with_bias(const Arguments& arg,
                                               : alpha_in[0];
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
-                        EXPECT_HIPBLAS_STATUS(
-                            hipblasLtMatmul(
-                                handle,
-                                ptr_matmul,
-                                ptr_alpha,
-                                dA[0].as<char>()
-                                    + (i % block_count) * size_dA[0] * realDataTypeSize(TiA),
-                                matA[0],
-                                dB[0].as<char>()
-                                    + (i % block_count) * size_dB[0] * realDataTypeSize(TiB),
-                                matB[0],
-                                &(h_beta[0]),
-                                dC[0].as<char>()
-                                    + (i % block_count) * size_C[0] * realDataTypeSize(To),
-                                matC[0],
-                                (*dDp)[0].as<char>()
-                                    + (i % block_count) * size_D[0] * realDataTypeSize(To),
-                                matD[0],
-                                &heuristicResult[sol].algo,
-                                *dWorkspace,
-                                workspace_size,
-                                stream),
-                            HIPBLAS_STATUS_SUCCESS);
-                        if(arg.flush)
-                            hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        // Run 5 sub-iterations
+                        for(int j = 0; j < num_sub_iterations; j++)
+                        {
+                            EXPECT_HIPBLAS_STATUS(
+                                hipblasLtMatmul(
+                                    handle,
+                                    ptr_matmul,
+                                    ptr_alpha,
+                                    dA[0].as<char>()
+                                        + (i % block_count) * size_dA[0] * realDataTypeSize(TiA),
+                                    matA[0],
+                                    dB[0].as<char>()
+                                        + (i % block_count) * size_dB[0] * realDataTypeSize(TiB),
+                                    matB[0],
+                                    &(h_beta[0]),
+                                    dC[0].as<char>()
+                                        + (i % block_count) * size_C[0] * realDataTypeSize(To),
+                                    matC[0],
+                                    (*dDp)[0].as<char>()
+                                        + (i % block_count) * size_D[0] * realDataTypeSize(To),
+                                    matD[0],
+                                    &heuristicResult[sol].algo,
+                                    *dWorkspace,
+                                    workspace_size,
+                                    stream),
+                                HIPBLAS_STATUS_SUCCESS);
+                            if(arg.flush)
+                                hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
                     }
-                    // Synchronize once after all hot iterations
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    // Calculate hot iteration times
+                    
+                    // Calculate hot iteration times (average of 5 sub-iterations)
                     gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
                     {
@@ -3988,7 +4001,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         {
                             float ms;
                             CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
-                            hot_iter_times[i] = ms * 1000.0; // ms to us
+                            hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                             if(arg.flush && flush_time_used > 0)
                                 hot_iter_times[i] -= flush_time_used;
                         }
@@ -4062,16 +4075,23 @@ void testing_matmul_with_bias(const Arguments& arg,
                     perf_monitor.start();
 
                     // Hot iterations with per-iteration timing (grouped gemm with user_args)
+                    // Each hot iteration runs 5 times and takes the average
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
-                        CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(
-                            d_userArgsVec[i % block_count], stream));
+                        // Run 5 sub-iterations
+                        for(int j = 0; j < num_sub_iterations; j++)
+                        {
+                            CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(
+                                d_userArgsVec[i % block_count], stream));
+                        }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    
+                    // Calculate hot iteration times (average of 5 sub-iterations)
                     gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
                     {
@@ -4079,7 +4099,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         {
                             float ms;
                             CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
-                            hot_iter_times[i] = ms * 1000.0;
+                            hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                         }
                         gpu_time_used += hot_iter_times[i];
                     }
@@ -4140,15 +4160,22 @@ void testing_matmul_with_bias(const Arguments& arg,
                     perf_monitor.start();
 
                     // Hot iterations with per-iteration timing (grouped gemm)
+                    // Each hot iteration runs 5 times and takes the average
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
-                        CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
+                        // Run 5 sub-iterations
+                        for(int j = 0; j < num_sub_iterations; j++)
+                        {
+                            CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
+                        }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    
+                    // Calculate hot iteration times (average of 5 sub-iterations)
                     gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
                     {
@@ -4156,7 +4183,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         {
                             float ms;
                             CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
-                            hot_iter_times[i] = ms * 1000.0;
+                            hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                         }
                         gpu_time_used += hot_iter_times[i];
                     }
