@@ -37,6 +37,37 @@
 
 #include "rocblas_utility.hpp"
 
+#define ROCSOLVER_INIT_DEVICE_WORKSPACE_IMPL(dwptr, work_items)                                     \
+    do                                                                                              \
+    {                                                                                               \
+        /* */                                                                                       \
+        /* Initialize workspace if empty */                                                         \
+        /* */                                                                                       \
+        if(dwptr == nullptr)                                                                        \
+        {                                                                                           \
+            /* Allocate device memory */                                                            \
+            auto [dev_workspace_ptr, status] = rocsolver_device_workspace::Get(handle, work_items); \
+                                                                                                    \
+            /* Early return with `status` if this is a memory query */                              \
+            if(rocblas_is_device_memory_size_query(handle))                                         \
+            {                                                                                       \
+                return status;                                                                      \
+            }                                                                                       \
+                                                                                                    \
+            /* Early return with `status` in case of error */                                       \
+            if(!dev_workspace_ptr || (status != rocblas_status_success))                            \
+            {                                                                                       \
+                return status;                                                                      \
+            }                                                                                       \
+                                                                                                    \
+            /* Memory has been correctly allocated and is ready for use */                          \
+            dwptr = dev_workspace_ptr;                                                              \
+        }                                                                                           \
+    } while(0);
+
+#define ROCSOLVER_INIT_DEVICE_WORKSPACE(dwptr, ...) \
+    ROCSOLVER_INIT_DEVICE_WORKSPACE_IMPL(dwptr, (__VA_ARGS__))
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 namespace detail
@@ -223,13 +254,13 @@ protected:
         return true;
     }
 
-    template <typename Lambda, size_t... Indices>
+    template <typename Lambda, std::size_t... Indices>
     auto generate_tuple_impl(Lambda l, std::integer_sequence<std::size_t, Indices...>) const
     {
         return std::make_tuple(l(Indices)...);
     }
 
-    template <size_t M, typename Lambda>
+    template <std::size_t M, typename Lambda>
     auto generate_tuple(Lambda l) const
     {
         return generate_tuple_impl(l, std::make_integer_sequence<std::size_t, M>{});
@@ -418,8 +449,8 @@ public:
     using work_items_impl = detail::work_items_impl;
 
     template <std::size_t N>
-    static auto Get(Handle handle, const rocsolver_work_items_n<N>& work_items)
-        -> std::pair<Ptr, Status>
+    static auto Get(Handle handle,
+                    const rocsolver_work_items_n<N>& work_items) -> std::pair<Ptr, Status>
     {
         Ptr ptr{nullptr};
         Status status = rocblas_status_success;
@@ -436,9 +467,9 @@ public:
         }
 
         ptr = Ptr(new rocsolver_device_workspace(handle, work_items.impl()));
-        ptr->work_ = std::apply(
+        ptr->work_ = std::make_shared<rocblas_device_malloc>(std::apply(
             [&](auto&&... args) { return rocblas_device_malloc(handle, std::size_t(args)...); },
-            sizes);
+            sizes));
 
         if(!ptr->work_)
         {
@@ -479,7 +510,7 @@ public:
 
     void* work(std::size_t item_id)
     {
-        return work_[item_id];
+        return (*work_)[item_id];
     }
 
     void* work(const std::string& item_name)
@@ -491,7 +522,7 @@ public:
 private:
     Handle handle_{nullptr};
     work_items_impl work_items_{};
-    rocblas_device_malloc work_{nullptr};
+    std::shared_ptr<rocblas_device_malloc> work_{nullptr};
 
     rocsolver_device_workspace(Handle h, work_items_impl w)
         : handle_(h)
@@ -521,27 +552,36 @@ auto rocsolver_geqrf_getWorkItems(rocblas_handle handle,
                                   const rocblas_stride strideP,
                                   const I batch_count)
 {
-    // memory workspace sizes:
-    // size for constants in rocblas calls
+    //
+    // Get sizes using legacy `_getMemorySize` method
+    //
+    // Size for constants in rocblas calls
     size_t size_scalars;
-    // size of arrays of pointers (for batched cases) and re-usable workspace
+    // Size of arrays of pointers (for batched cases) and re-usable workspace
     size_t size_work_workArr, size_workArr;
-    // extra requirements for calling GEQR2 and to store temporary triangular factor
+    // Extra requirements for calling GEQR2 and to store temporary triangular factor
     size_t size_Abyx_norms_trfact;
-    // extra requirements for calling GEQR2 and LARFB
+    // Extra requirements for calling GEQR2 and LARFB
     size_t size_diag_tmptr;
     rocsolver_geqrf_getMemorySize<BATCHED, T>(m, n, batch_count, &size_scalars, &size_work_workArr,
                                               &size_Abyx_norms_trfact, &size_diag_tmptr,
                                               &size_workArr);
 
-    constexpr std::size_t N{5};
+    //
+    // Create a list of work items with previously computed sizes and return it
+    //
     work_items_list_t wlist = {{"geqrf_scalars", size_scalars},
                                {"geqrf_work_workArr", size_work_workArr},
                                {"geqrf_workArr", size_workArr},
                                {"geqrf_Abyx_norms_trfact", size_Abyx_norms_trfact},
                                {"geqrf_diag_tmptr", size_diag_tmptr}};
 
+    // Note: Number of elements in `wlist` must be known at compile time
+    // if we are to use rocBLAS' methods for device memory management
+    constexpr std::size_t N{5};
+
     auto work_items = create_work_items_sorted_by_size<N>(wlist);
+
     return work_items;
 }
 
@@ -558,22 +598,67 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
                                         const I batch_count,
                                         DevWorkPtr dwptr)
 {
-    if(dwptr == nullptr)
-    {
-    }
+    /* // */
+    /* // Initialize workspace if empty (an empty workspace means that this is a top level function call) */
+    /* // */
+    /* // Note: This can be abstracted in a macro */
+    /* // */
+    /* if(dwptr == nullptr) */
+    /* { */
+    /*     // Get work items, i.e., names and sizes corresponding to all memory */
+    /*     // buffers that the template method will use */
+    /*     auto work_items = rocsolver_geqrf_getWorkItems<BATCHED, STRIDED, T, I, U>( */
+    /*         handle, m, n, A, shiftA, lda, strideA, ipiv, strideP, batch_count); */
 
+    /*     // Allocate device memory */
+    /*     auto [dev_workspace_ptr, status] = rocsolver_device_workspace::Get(handle, work_items); */
+
+    /*     // Early return with `status` if this is a memory query */
+    /*     if(rocblas_is_device_memory_size_query(handle)) */
+    /*     { */
+    /*         return status; */
+    /*     } */
+
+    /*     // Early return with `status` in case of error */
+    /*     if(!dev_workspace_ptr || (status != rocblas_status_success)) */
+    /*     { */
+    /*         return status; */
+    /*     } */
+
+    /*     // Memory has been correctly allocated and is ready for use */
+    /*     dwptr = dev_workspace_ptr; */
+    /* } */
+
+    //
+    // Initialize workspace if empty (an empty workspace means that this is a top level function call)
+    //
+    ROCSOLVER_INIT_DEVICE_WORKSPACE(
+        dwptr,
+        rocsolver_geqrf_getWorkItems<BATCHED, STRIDED, T, I, U>(
+            handle, m, n, A, shiftA, lda, strideA, ipiv, strideP, batch_count));
+
+    //
+    // Get pointers to buffers in device workspace pointer `dwptr`
+    //
+    // Note: Work items names must match the names defined in the `_getWorkItems` method
+    //
     T* scalars = (T*)dwptr->work("geqrf_scalars");
-    ;
     void* work_workArr = dwptr->work("geqrf_work_workArr");
     T* Abyx_norms_trfact = (T*)dwptr->work("geqrf_Abyx_norms_trfact");
     T* diag_tmptr = (T*)dwptr->work("geqrf_diag_tmptr");
     T** workArr = (T**)dwptr->work("geqrf_workArr");
 
+    //
+    // Initialize memory if required
+    //
     if(dwptr->size("geqrf_scalars") > 0)
     {
         init_scalars(handle, (T*)scalars);
     }
 
+    //
+    // Call legacy method
+    //
     return rocsolver_geqrf_template<BATCHED, STRIDED>(handle, m, n, A, shiftA, lda, strideA, ipiv,
                                                       strideP, batch_count, scalars, work_workArr,
                                                       Abyx_norms_trfact, diag_tmptr, workArr);

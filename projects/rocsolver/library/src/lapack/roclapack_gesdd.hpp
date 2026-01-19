@@ -670,26 +670,14 @@ rocblas_status rocsolver_gesdd_template_alt(Handle handle,
     ROCSOLVER_ENTER("gesdd", "leftsv:", left_svect, "rightsv:", right_svect, "m:", m, "n:", n,
                     "shiftA:", shiftA, "lda:", lda, "ldu:", ldu, "ldv:", ldv, "bc:", batch_count);
 
-    if(dwptr == nullptr)
-    {
-        auto gesdd_work_items = rocsolver_gesdd_getWorkItems_alt<BATCHED, STRIDED, T, SS, W>(
+    auto gesdd_work_items = [&]() -> auto {
+        return rocsolver_gesdd_getWorkItems_alt<BATCHED, STRIDED, T, SS, W>(
             handle, left_svect, right_svect, m, n, nullptr /* W A */, lda, strideA, nullptr /* S */,
             strideS, nullptr /* T* U */, ldu, strideU, nullptr /* T* V */, ldv, strideV,
             nullptr /* rocblas_int* info */, batch_count);
+    };
 
-        auto [dev_workspace_ptr, status] = rocsolver_device_workspace::Get(handle, gesdd_work_items);
-        if(rocblas_is_device_memory_size_query(handle))
-        {
-            return status;
-        }
-
-        if(!dev_workspace_ptr || (status != rocblas_status_success))
-        {
-            return status;
-        }
-
-        dwptr = dev_workspace_ptr;
-    }
+    ROCSOLVER_INIT_DEVICE_WORKSPACE(dwptr, gesdd_work_items());
 
     T* VUtmp = (T*)dwptr->work("gesdd_VUtmp");
     void* UVtmp = dwptr->work("gesdd_UVtmp");
