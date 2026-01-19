@@ -786,12 +786,7 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
     // order is important for unit tests:
 
     // 1. invalid/non-supported values
-    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity
-       && norm_type != rocsolver_norm_type_frobenius && norm_type != rocsolver_norm_type_max)
-        return rocblas_status_invalid_value;
-
-    // Frobenius and max norms are not supported
-    if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
+    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity)
         return rocblas_status_invalid_value;
 
     // 2. invalid size
