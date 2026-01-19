@@ -179,6 +179,10 @@ if(NOT SKIP_LIBRARY)
     set( TENSILE_VERSION 4.45.0 CACHE STRING "The version of Tensile to be used")
 
     set( Tensile_NO_ENUMERATE ON CACHE BOOL "Disable enumerating GPU targets for Tensile builds" FORCE)
+    
+    # Disable Tensile client and testing - rocBLAS has its own
+    set( TENSILE_ENABLE_CLIENT OFF CACHE BOOL "Disable Tensile client to avoid Boost dependency" FORCE)
+    set( TENSILE_BUILD_TESTING OFF CACHE BOOL "Disable Tensile testing to avoid Boost dependency" FORCE)
 
     if(BUILD_WITH_PIP)
       if (WIN32)

@@ -303,6 +303,48 @@ def run_install_script(script, xml):
     else:
         return 0
 
+def install_msgpack_from_source():
+    """Install msgpack-c 3.0.1 from source on Windows (Boost-free, same as Linux)"""
+    import pathlib
+    
+    build_dir = pathlib.Path.cwd() / "build"
+    msgpack_dir = build_dir / "deps" / "msgpack-c"
+    
+    # Check if already built
+    if msgpack_dir.exists():
+        print(f"msgpack-c already installed at {msgpack_dir}")
+        return 0
+    
+    print("Installing msgpack-c 3.0.1 from source (Boost-free)...")
+    
+    # Create deps directory
+    deps_dir = build_dir / "deps"
+    deps_dir.mkdir(parents=True, exist_ok=True)
+    
+    cwd = pathlib.Path.cwd()
+    os.chdir(deps_dir)
+    
+    try:
+        # Clone msgpack-c 3.0.1 (same version as Linux)
+        print("Cloning msgpack-c 3.0.1...")
+        run_cmd("git -c advice.detachedHead=false clone --quiet --depth 1 --branch cpp-3.0.1 https://github.com/msgpack/msgpack-c.git")
+        os.chdir("msgpack-c")
+        
+        # Configure and install (header-only library)
+        print("Configuring msgpack-c...")
+        run_cmd("cmake -DMSGPACK_BUILD_TESTS=OFF -DMSGPACK_BUILD_EXAMPLES=OFF -DMSGPACK_USE_BOOST=OFF -DCMAKE_INSTALL_PREFIX=install .")
+        
+        print("Installing msgpack-c...")
+        run_cmd("cmake --build . --config Release --target install")
+        
+        print(f"✓ msgpack-c 3.0.1 installed successfully (Boost-free)")
+        os.chdir(cwd)
+        return 0
+    except Exception as e:
+        print(f"ERROR installing msgpack-c: {e}")
+        os.chdir(cwd)
+        return 1
+
 def installation():
     global vcpkg_script
     global xml_script
@@ -325,6 +367,14 @@ def installation():
             #print("Failure in script. ABORTING")
             os.chdir( cwd )
             return 1
+    
+    # Install msgpack from source on Windows (Boost-free)
+    if os.name == "nt":
+        if install_msgpack_from_source():
+            print("Failed to install msgpack-c")
+            os.chdir( cwd )
+            return 1
+    
     os.chdir( cwd )
     return 0
 
