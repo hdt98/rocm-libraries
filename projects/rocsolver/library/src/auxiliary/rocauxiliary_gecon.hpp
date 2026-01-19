@@ -236,9 +236,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
     {
         sum += rocblas_abs(v[i]);
-        if constexpr(rocblas_is_complex<T>)
-            continue;
-        else
+        if constexpr(!rocblas_is_complex<T>)
         {
             if(v[i] >= 0)
             {
