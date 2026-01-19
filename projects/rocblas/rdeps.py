@@ -214,8 +214,9 @@ def install_msgpack_from_source():
     build_dir = pathlib.Path.cwd() / "build"
     msgpack_dir = build_dir / "deps" / "msgpack-c"
     
-    # Check if already built
-    if msgpack_dir.exists():
+    # Check if already built successfully by verifying the config file exists
+    msgpack_config = msgpack_dir / "install" / "lib" / "cmake" / "msgpack-cxx" / "msgpack-cxx-config.cmake"
+    if msgpack_config.exists():
         print(f"msgpack-c already installed at {msgpack_dir}")
         return 0
     
