@@ -39,11 +39,20 @@ namespace rocRoller
     {
         struct InstructionProfile
         {
-            uint64_t    totalLatency{0}; // Total latency in cycles
+            // Note: many of these latency numbers are architecture-dependent
+            // Refer to comments for `rocprofiler_thread_trace_decoder_inst_t` for details
+
+            // Total latency in cycles (includes stall)
+            uint64_t totalLatency{0};
+
+            // Total latency including gaps since previous instruction
+            uint64_t totalLatencyWithPrecedingNone{0};
+
             uint64_t    hitcount{0}; // Number of times instruction was executed
             std::string instruction; // Disassembled instruction text
 
             uint64_t    meanLatency() const;
+            uint64_t    meanLatencyWithPrecedingNone() const;
             std::string toString() const;
         };
 

@@ -31,6 +31,7 @@
 #include <vector>
 
 #include <rocRoller/Scheduling/Costs/LinearWeightedCost.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Scheduling.hpp>
 
 namespace rocRoller
@@ -112,6 +113,26 @@ namespace rocRoller
 
         static_assert(CObserverConst<VMEMObserver>);
         static_assert(CObserverConst<DSMEMObserver>);
+
+        struct WeightlessDSMemObserver
+        {
+            WeightlessDSMemObserver(ContextPtr ctx);
+
+            InstructionStatus peek(Instruction const& inst) const;
+
+            void modify(Instruction& inst) const;
+
+            void observe(Instruction const& inst);
+
+            constexpr static bool required(GPUArchitectureTarget const& target)
+            {
+                return true;
+            }
+
+        private:
+            std::weak_ptr<Context>                     m_context;
+            mutable std::optional<LDSModel::LDSModule> m_scheduler;
+        };
     }
 }
 

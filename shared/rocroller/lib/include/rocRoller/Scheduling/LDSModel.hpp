@@ -28,6 +28,7 @@
 
 #include <deque>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <unordered_set>
@@ -36,7 +37,7 @@
 #include <rocRoller/DataTypes/DataTypes.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 
-namespace rocRoller::Scheduling::LDSBankModel
+namespace rocRoller::Scheduling::LDSModel
 {
     enum class LdsDirection
     {
@@ -79,7 +80,11 @@ namespace rocRoller::Scheduling::LDSBankModel
         MemoryOpLDS         memoryOp;
         int                 dwords;
         std::vector<size_t> baseAddresses;
+
+        std::string toString() const;
     };
+
+    std::ostream& operator<<(std::ostream& stream, RuntimeLDSInstruction const& instruction);
 
     struct OperationAccesses
     {
@@ -195,10 +200,10 @@ namespace rocRoller::Scheduling::LDSBankModel
     uint calculateBankConflictCycles(const std::map<uint, uint>& bankToAddressCounts);
 
     /**
-     * @brief Compute bank-to-address mappings for each thread group
+     * @brief Compute bank-to-address-count mappings for each thread group
      * 
      * This function divides the instruction's base addresses into thread groups
-     * and computes the bank-to-address count mapping for each group.
+     * and computes the bank-to-address-count mapping for each group.
      * 
      * @param instr The LDS instruction containing memory operation details and addresses
      * @param gfx The GPU architecture
@@ -218,4 +223,79 @@ namespace rocRoller::Scheduling::LDSBankModel
      */
     uint calculateTotalCyclesFromBankMappings(
         const std::vector<std::map<uint, uint>>& threadGroupBankMappings);
+
+    /**
+     * @brief Check if an instruction's wave accesses non-overlapping banks across cycles
+     * 
+     * The hardware will optimize this by having the waves access out-of-phase,
+     * resulting in no penalty from bank conflicts in cases with more than 1 active SIMD.
+     * 
+     * @param instr The LDS instruction containing memory operation details and addresses
+     * @param gfx The GPU architecture
+     * @return true if each cycle accesses different banks (no overlap), false otherwise
+     */
+    bool hasNonOverlappingBankAccess(const RuntimeLDSInstruction& instr, GPUArchitectureGFX gfx);
+
+    /**
+     * @brief Parse LDS instruction information from opcode
+     * 
+     * @param opCode The opcode string (e.g., "ds_read_b64", "ds_write_b128")
+     * @return Optional pair of (LdsDirection, dwords) if opcode is supported, nullopt otherwise
+     */
+    std::optional<std::pair<LdsDirection, int>>
+        getLdsInfoFromOpcodeIfSupported(const std::string& opCode);
+
+    /**
+     * @brief Calculate queue slots required for an LDS operation
+     * 
+     * @param direction Read or Write operation
+     * @param dwords Number of dwords (1-4)
+     * @return Number of queue slots required
+     */
+    int getQueueSlotsRequired(LdsDirection direction, int dwords);
+
+    /**
+     * @brief LDS Scheduler for managing LDS instruction scheduling and queue state
+     * 
+     * This class encapsulates the scheduling logic for LDS instructions,
+     * managing command and data queues, tracking conflicts, and predicting stalls.
+     * It can be used independently of the observer system.
+     * 
+     * Note: This scheduler works in hardware cycles, not quadcycles.
+     */
+    class LDSModule
+    {
+    public:
+        LDSModule(GPUArchitectureGFX gfx, int waveCount);
+
+        void incrementProgramCycleBy(int cycles);
+        int  getProgramCycle() const
+        {
+            return m_programCycle;
+        }
+        void reset();
+
+        // Returns tuple of (stall_cycles, additional_cycles)
+        std::tuple<int, int> predictCycles(const RuntimeLDSInstruction& instr) const;
+        void                 scheduleInstruction(const RuntimeLDSInstruction& instr);
+
+        int predictWaitcntStallCycles(int waitcnt) const;
+
+        void updateQueues();
+
+    private:
+        static constexpr int dataQueueSize    = 10;
+        static constexpr int commandQueueSize = 8;
+
+        GPUArchitectureGFX m_gfx;
+        int                m_programCycle;
+        int                m_multiplierQueueSlots;
+        int                m_multiplierWaveCount;
+
+        std::deque<int> m_commandQueue;
+        std::deque<int> m_waitcntQueue; // Includes round-trip delay
+        std::deque<int> m_dataQueue;
+
+        int getRemainingDataSlots() const;
+    };
 }

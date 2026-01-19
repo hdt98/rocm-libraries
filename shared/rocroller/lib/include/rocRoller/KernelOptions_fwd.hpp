@@ -26,8 +26,19 @@
 
 #pragma once
 
+#include <string>
+
 namespace rocRoller
 {
+    enum class DSObserverType
+    {
+        DSMEMObserver,
+        WeightlessDSMemObserver,
+        Count
+    };
+
+    std::string toString(DSObserverType);
+
     struct KernelOptionValues;
 
     class KernelOptions;

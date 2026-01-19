@@ -28,15 +28,39 @@
 #include <string>
 #include <vector>
 
+#include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitecture.hpp>
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
+#include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
+#include <rocRoller/Utilities/Utils.hpp>
 
 namespace rocRoller
 {
     namespace Scheduling
     {
+        bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
+        {
+            AssertFatal(context != nullptr);
+
+            const DSObserverType observerType = context->kernelOptions()->dsObserver;
+
+            if(observerType == DSObserverType::WeightlessDSMemObserver)
+            {
+                const auto addrs = inst.getAddresses();
+                AssertFatal(addrs.has_value(), ShowValue(inst.toString(LogLevel::Terse)));
+                AssertFatal(addrs->size() % 64 == 0, ShowValue(addrs->size()));
+                AssertFatal(LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode()).has_value(),
+                            ShowValue(inst.toString(LogLevel::Terse)));
+                AssertFatal(context->targetArchitecture().target().isGFX9GPU(),
+                            ShowValue(context->targetArchitecture().target().toString()));
+                return true;
+            }
+
+            return false;
+        }
 
         VMEMObserver::VMEMObserver(ContextPtr ctx)
             : MEMObserver(ctx,
@@ -66,12 +90,99 @@ namespace rocRoller
 
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
         {
-            return GPUInstructionInfo::isLDS(inst.getOpCode());
+            return GPUInstructionInfo::isLDS(inst.getOpCode())
+                   && !useWeightlessObserver(inst, m_context.lock());
         }
 
         int DSMEMObserver::getWait(Instruction const& inst) const
         {
             return inst.getWaitCount().dscnt();
+        }
+
+        WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
+            : m_context(ctx)
+        {
+        }
+
+        InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
+        {
+            if(!m_scheduler.has_value())
+            {
+                // Observers get created before workgroupSize is set in m_context
+                auto context = m_context.lock();
+                AssertFatal(context != nullptr);
+
+                const auto& gpuArch = context->targetArchitecture().target();
+                m_scheduler.emplace(gpuArch.gfx, product(context->kernel()->workgroupSize()) / 64);
+            }
+
+            InstructionStatus status;
+
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
+            {
+                const auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
+                if(ldsInfo.has_value())
+                {
+                    const auto [direction, dwords] = *ldsInfo;
+
+                    auto ctx = m_context.lock();
+                    AssertFatal(ctx != nullptr);
+
+                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    auto [stallCycles, additionalCycles]
+                        = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
+
+                    status.stallCycles      = stallCycles / 4;
+                    status.additionalCycles = additionalCycles / 4;
+                }
+            }
+
+            const auto waitcnt = inst.getWaitCount().dscnt();
+            if(waitcnt >= 0)
+            {
+                auto ctx = m_context.lock();
+                AssertFatal(ctx != nullptr);
+                if(ctx->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver)
+                {
+                    auto stallCycles   = m_scheduler.value().predictWaitcntStallCycles(waitcnt);
+                    status.stallCycles = stallCycles / 4;
+                }
+            }
+
+            return status;
+        }
+
+        void WeightlessDSMemObserver::modify(Instruction& inst) const
+        {
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
+            {
+                const auto status = peek(inst);
+                inst.addComment(fmt::format("WeightlessDSMemObserver {}: stall {}, additional {}",
+                                            m_scheduler.value().getProgramCycle(),
+                                            status.stallCycles,
+                                            status.additionalCycles));
+            }
+        }
+
+        void WeightlessDSMemObserver::observe(Instruction const& inst)
+        {
+            m_scheduler.value().incrementProgramCycleBy(inst.totalCycles() * 4);
+            m_scheduler.value().updateQueues();
+
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
+            {
+                auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
+                if(ldsInfo.has_value())
+                {
+                    auto [direction, dwords] = *ldsInfo;
+
+                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    m_scheduler.value().scheduleInstruction({{direction}, dwords, addresses});
+                }
+            }
         }
     }
 }

@@ -74,6 +74,8 @@ namespace rocRoller
             return concatenate("Status: {",
                                "stall ",
                                stallCycles,
+                               ", additional ",
+                               additionalCycles,
                                ", wait ",
                                waitCount.toString(LogLevel::Terse),
                                ", nop ",
@@ -93,7 +95,8 @@ namespace rocRoller
 
         inline void InstructionStatus::combine(InstructionStatus const& other)
         {
-            stallCycles = std::max(stallCycles, other.stallCycles);
+            stallCycles      = std::max(stallCycles, other.stallCycles);
+            additionalCycles = std::max(additionalCycles, other.additionalCycles);
             waitCount.combine(other.waitCount);
             nops = std::max(nops, other.nops);
 

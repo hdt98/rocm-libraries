@@ -39,4 +39,5 @@ namespace rocRoller
     {
         return Settings::getInstance()->get(Settings::SaveAssembly);
     }
+
 }

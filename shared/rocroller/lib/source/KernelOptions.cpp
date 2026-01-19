@@ -33,6 +33,20 @@
 
 namespace rocRoller
 {
+    std::string toString(DSObserverType type)
+    {
+        switch(type)
+        {
+        case DSObserverType::DSMEMObserver:
+            return "DSMEMObserver";
+        case DSObserverType::WeightlessDSMemObserver:
+            return "WeightlessDSMemObserver";
+        case DSObserverType::Count:
+        default:
+            return "Unknown";
+        }
+    }
+
     static void increaseRegisterLimit(KernelOptionValues& values)
     {
         if(Settings::Get(Settings::NoRegisterLimits))
@@ -137,7 +151,7 @@ namespace rocRoller
 
     std::string toString(KernelOptionValues const& values)
     {
-        static_assert(sizeof(KernelOptionValues) == 72,
+        static_assert(sizeof(KernelOptionValues) == 76,
                       "Edit the toString() function when adding a kernel option!");
 
         std::string rv = "Kernel Options:\n";
@@ -147,6 +161,7 @@ namespace rocRoller
 #define ShowOption(name) Show(#name, values.name)
 #define ShowString(name) Show(#name, toString(values.name))
 
+        ShowString(dsObserver);
         ShowString(logLevel);
         ShowOption(alwaysWaitAfterLoad);
         ShowOption(alwaysWaitAfterStore);

@@ -53,7 +53,8 @@ namespace rocRoller
          */
         struct InstructionStatus
         {
-            unsigned int stallCycles = 0;
+            unsigned int stallCycles      = 0;
+            unsigned int additionalCycles = 0;
             WaitCount    waitCount;
             unsigned int nops = 0;
 
