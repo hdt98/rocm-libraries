@@ -86,6 +86,10 @@ bool GemmWrwBase::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         MIOPEN_LOG_I2("GEMM not applicable for F8 on this GPU architecture");
         return false;
     }
+
+    if(problem.HasNonPackedTensors())
+        return false;
+
     return problem.IsDirectionBackwardWrW() && problem.IsLayoutDefault() &&
            !(gemm::IsAnyBufferBf16(xDesc, dyDesc, dwDesc) && !gemm::IsBf16Supported) &&
            !(gemm::IsAnyBufferFp16(xDesc, dyDesc, dwDesc) && !gemm::IsFp16Supported);
@@ -331,10 +335,9 @@ size_t GemmWrwUniversal::GetWorkspaceSize(const ExecutionContext& context,
         ws_size += dwf32Desc.GetNumBytes();
     }
 
-    if(ws_size > gemm::MaxMemAllocSz(handle, problem))
+    if(ws_size > handle.GetMaxMemoryAllocSize())
     {
-        MIOPEN_LOG_I2("GemmWrwUniversal: " << ws_size << " > "
-                                           << gemm::MaxMemAllocSz(handle, problem));
+        MIOPEN_LOG_I2("GemmWrwUniversal: " << ws_size << " > " << handle.GetMaxMemoryAllocSize());
         return 0;
     }
     return ws_size;
