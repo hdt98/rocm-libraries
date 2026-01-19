@@ -118,7 +118,6 @@ void gecon_initData(const rocblas_handle handle,
                     Sd& danorm,
                     Sd& drcond,
                     Th& hA,
-                    Th& hA_factored,
                     Thi& hipiv,
                     Sh& hanorm,
                     Sh& hrcond,
@@ -132,14 +131,14 @@ void gecon_initData(const rocblas_handle handle,
         char norm = rocsolver2char_norm_type(norm_type);
         hanorm[0][0] = cpu_lange<T, S>(norm, n, n, hA[0], lda, work.data());
 
-        // factor matrix with CPU GETRF
+        // factor matrix with CPU GETRF (in place)
         hinfo.resize(1);
         cpu_getrf(n, n, hA[0], lda, hipiv[0], hinfo.data());
     }
 
     if(GPU)
     {
-        // copy data from CPU to device
+        // copy factored data from CPU to device
         CHECK_HIP_ERROR(dA.transfer_from(hA));
         CHECK_HIP_ERROR(danorm.transfer_from(hanorm));
 
@@ -162,7 +161,6 @@ void gecon_getError(const rocblas_handle handle,
                     Sd& danorm,
                     Sd& drcond,
                     Th& hA,
-                    Th& hA_factored,
                     Thi& hipiv,
                     Sh& hanorm,
                     Sh& hrcond,
@@ -173,7 +171,7 @@ void gecon_getError(const rocblas_handle handle,
 
     // initialize data
     gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                        hA_factored, hipiv, hanorm, hrcond, hinfo);
+                                        hipiv, hanorm, hrcond, hinfo);
 
     CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
                                         danorm.data(), drcond.data()));
@@ -199,7 +197,6 @@ void gecon_getPerfData(const rocblas_handle handle,
                        Sd& danorm,
                        Sd& drcond,
                        Th& hA,
-                       Th& hA_factored,
                        Thi& hipiv,
                        Sh& hanorm,
                        Sh& hrcond,
@@ -212,30 +209,27 @@ void gecon_getPerfData(const rocblas_handle handle,
 {
     std::vector<rocblas_int> hinfo;
 
+    gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
+                                         hipiv, hanorm, hrcond, hinfo);
+
     if(!perf)
     {
-        gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
-
         // cpu-lapack performance (only if not in perf mode)
         char norm = rocsolver2char_norm_type(norm_type);
         std::vector<T> work(4 * n);
         std::vector<S> rwork(2 * n);
         std::vector<rocblas_int> iwork(n);
         *cpu_time_used = get_time_us_no_sync();
-        hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA_factored[0], lda, hanorm[0][0], work.data(),
+        hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA[0], lda, hanorm[0][0], work.data(),
                                        rwork.data(), iwork.data());
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
-
-    gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                         hA_factored, hipiv, hanorm, hrcond, hinfo);
 
     // cold calls
     for(int iter = 0; iter < 2; iter++)
     {
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
+                                             hA, hipiv, hanorm, hrcond, hinfo);
 
         CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
                                             danorm.data(), drcond.data()));
@@ -259,7 +253,7 @@ void gecon_getPerfData(const rocblas_handle handle,
     for(int iter = 0; iter < hot_calls; iter++)
     {
         gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hA_factored, hipiv, hanorm, hrcond, hinfo);
+                                             hA, hipiv, hanorm, hrcond, hinfo);
 
         timer.start(stream);
         rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(), danorm.data(),
@@ -335,7 +329,6 @@ void testing_gecon(Arguments& argus)
 
     // memory allocations
     host_strided_batch_vector<T> hA(size_A, 1, size_A, 1);
-    host_strided_batch_vector<T> hA_factored(size_A, 1, size_A, 1);
     host_strided_batch_vector<rocblas_int> hipiv(size_ipiv, 1, size_ipiv, 1);
     host_strided_batch_vector<S> hanorm(size_anorm, 1, size_anorm, 1);
     host_strided_batch_vector<S> hrcond(size_rcond, 1, size_rcond, 1);
@@ -367,12 +360,12 @@ void testing_gecon(Arguments& argus)
     // check computations
     if(argus.unit_check || argus.norm_check)
         gecon_getError<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                hA_factored, hipiv, hanorm, hrcond, hrcond_res, &max_error);
+                                hipiv, hanorm, hrcond, hrcond_res, &max_error);
 
     // collect performance data
     if(argus.timing)
         gecon_getPerfData<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                   hA_factored, hipiv, hanorm, hrcond, &gpu_time_used, &cpu_time_used,
+                                   hipiv, hanorm, hrcond, &gpu_time_used, &cpu_time_used,
                                    hot_calls, argus.profile, argus.profile_kernels, argus.perf);
 
     // validate results for rocsolver-test
