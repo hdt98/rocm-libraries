@@ -1258,10 +1258,9 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a, 
                         static_cast<wide_t>(w) * c_wstride;
 
                     // execute tensor op for the tail part
-                    const MIOPEN_TYPE av = a_base[static_cast<size_t>(a_off_tail)];
-                    const MIOPEN_TYPE bv_tail =
-                        should_cache_bw ? bv_cached : b_base[static_cast<size_t>(b_off_tail)];
-                    const MIOPEN_TYPE tmp = MIOPEN_TENSOR_OP(av * alpha0, bv_tail * alpha1);
+                    const MIOPEN_TYPE av      = a_base[static_cast<size_t>(a_off_tail)];
+                    const MIOPEN_TYPE bv_tail = b_base[static_cast<size_t>(b_off_tail)];
+                    const MIOPEN_TYPE tmp     = MIOPEN_TENSOR_OP(av * alpha0, bv_tail * alpha1);
 
                     if(!use_beta)
                     {
@@ -1284,7 +1283,7 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a, 
     for(wide_t i = static_cast<wide_t>(tid); i < static_cast<wide_t>(total_work);
         i += static_cast<wide_t>(tcount))
     {
-        // widen dims once
+           // widen dims once
         const wide_t cw  = static_cast<wide_t>(c_w);
         const wide_t ch  = static_cast<wide_t>(c_h);
         const wide_t cd  = static_cast<wide_t>(c_d);
@@ -1328,12 +1327,12 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a, 
 
         if(!use_beta)
         {
-            c_base[static_cast<size_t>(c_off)] = tmp;
+               c_base[static_cast<size_t>(c_off)] = tmp;
         }
         else
         {
-            const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
-            c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
+               const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
+               c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
         }
     }
 #endif // USE_PACKED_INNER
