@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -26,6 +26,11 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/description.hpp"
+#include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_weight_multiple_d_xdl_cshuffle.hpp"
+#endif
+
 namespace ck {
 namespace tensor_operation {
 namespace device {
@@ -47,19 +52,20 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-    kernel_batched_gemm_xdlops_bwd_weight(const FloatA* __restrict__ p_a_grid,
-                                          const FloatB* __restrict__ p_b_grid,
-                                          FloatC* __restrict__ p_c_grid,
-                                          const AElementwiseOperation a_element_op,
-                                          const BElementwiseOperation b_element_op,
-                                          const CElementwiseOperation c_element_op,
-                                          const index_t batch_count,
-                                          const AGridDesc_B_K0_M_K1 a_b_k0_m_k1_grid_desc,
-                                          const BGridDesc_B_K0_N_K1 b_b_k0_n_k1_grid_desc,
-                                          const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock
-                                              c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                          const Block2CTileMap block_2_ctile_map,
-                                          const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
+    kernel_batched_gemm_xdlops_bwd_weight_multiple_d(
+        const FloatA* __restrict__ p_a_grid,
+        const FloatB* __restrict__ p_b_grid,
+        FloatC* __restrict__ p_c_grid,
+        const AElementwiseOperation a_element_op,
+        const BElementwiseOperation b_element_op,
+        const CElementwiseOperation c_element_op,
+        const index_t batch_count,
+        const AGridDesc_B_K0_M_K1 a_b_k0_m_k1_grid_desc,
+        const BGridDesc_B_K0_N_K1 b_b_k0_n_k1_grid_desc,
+        const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock
+            c_grid_desc_mblock_mperblock_nblock_nperblock,
+        const Block2CTileMap block_2_ctile_map,
+        const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
 #if defined(__gfx9__) || defined(__gfx11__) || defined(__gfx12__)
     if constexpr(GridwiseGemm::template IsValidCompilationParameter<>())
@@ -563,7 +569,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
             int max_occupancy               = 0;
             hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
                 &max_occupancy,
-                kernel_batched_gemm_xdlops_bwd_weight<
+                kernel_batched_gemm_xdlops_bwd_weight_multiple_d<
                     GridwiseGemm,
                     ADataType,
                     BDataType,
@@ -671,6 +677,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                       end(a_g_n_k_wos_lengths),
                       begin(output_spatial_lengths_));
 
+#if !DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
             if(split_k < 0)
             {
                 ck::index_t gemmM, gemmN;
@@ -683,6 +690,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                                                             grid_size);
             }
             else
+#endif
             {
                 k_batch_ = split_k;
             }
@@ -834,7 +842,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                         p_c_grid, 0, arg.c_space_size_bytes, stream_config.stream_id_));
                 };
 
-                const auto kernel = kernel_batched_gemm_xdlops_bwd_weight<
+                const auto kernel = kernel_batched_gemm_xdlops_bwd_weight_multiple_d<
                     GridwiseGemm,
                     ADataType,
                     BDataType,
@@ -939,9 +947,31 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
 
     static bool IsSupportedArgument(const Argument& arg)
     {
+#if DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
+        if(arg.k_batch_ < 0)
+        {
+            return false;
+        }
+#endif
         if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
         {
             return false;
+        }
+        if constexpr(is_same_v<ComputeTypeA, ck::tf32_t> || is_same_v<ComputeTypeB, ck::tf32_t>)
+        {
+            if(!is_tf32_supported())
+            {
+                return false;
+            }
+            if constexpr(!is_same_v<ComputeTypeA, ComputeTypeB>)
+            {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "ComputeDataType for A and B should be same while using TF32"
+                              << std::endl;
+                }
+                return false;
+            }
         }
         if constexpr(NDimSpatial == 1)
         {
@@ -1183,6 +1213,24 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                 "The argument pointer is not an object of "
                 "DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle::Argument structure!");
     }
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    std::string GetInstanceString() const override
+    {
+        static_assert(ck_tile::reflect::HasInstanceTraits<DeviceOp>,
+                      "Specialization of instance_traits not found. Please check that a "
+                      "specialization exists in file "
+                      "ck_tile/builder/reflect/"
+                      "instance_traits_device_grouped_conv_bwd_weight_multiple_d_xdl_cshuffle.hpp "
+                      "for the given template parameters.");
+        return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+
+    std::unique_ptr<ck_tile::reflect::Description> describe() const override
+    {
+        return std::make_unique<ck_tile::reflect::InstanceStringDescription>(GetInstanceString());
+    }
+#endif
 };
 
 } // namespace device

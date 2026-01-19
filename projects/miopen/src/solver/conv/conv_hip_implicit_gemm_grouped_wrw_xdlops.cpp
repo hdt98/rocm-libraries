@@ -49,9 +49,9 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 
-template <typename DataType>
-using DeviceOpGWrwPtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<DeviceOpGWrw<DataType>>;
+template <typename DataType, typename ComputeType>
+using DeviceOpGWrwPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    DeviceOpGWrw<DataType, ComputeType>>;
 
 namespace {
 
@@ -165,27 +165,28 @@ struct CKArgs
     template <typename ConvPtr>
     bool IsSupportedBy(const ConvPtr& conv_ptr) const
     {
-        auto arg_ptr = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, 1);
-        // Creat dummy workspace to pass the ck IsSupportedArgument check.
-
-        int dummy_var = 1;
-        conv_ptr->SetWorkSpacePointer(arg_ptr.get(), &dummy_var);
-
+        auto arg_ptr        = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, 1);
+        auto workspace_size = conv_ptr->GetWorkSpaceSize(arg_ptr.get());
+        if(workspace_size != 0)
+            conv_ptr->SetWorkSpacePointer(arg_ptr.get(), &workspace_size);
         return conv_ptr->IsSupportedArgument(arg_ptr.get());
     }
 
     template <typename ConvPtr>
     bool IsSupportedBySplitK(const ConvPtr& conv_ptr, int split_k) const
     {
-        auto arg_ptr = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k);
-
-        if(CKWrwRequireWorkspace(G, C1, K1, data_type, alpha_beta_case))
-        {
-            // Creat dummy workspace to pass the ck IsSupportedArgument check.
-            int dummy_var = 1;
-            conv_ptr->SetWorkSpacePointer(arg_ptr.get(), &dummy_var);
-        }
+        auto arg_ptr        = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k);
+        auto workspace_size = conv_ptr->GetWorkSpaceSize(arg_ptr.get());
+        if(workspace_size != 0)
+            conv_ptr->SetWorkSpacePointer(arg_ptr.get(), &workspace_size);
         return conv_ptr->IsSupportedArgument(arg_ptr.get());
+    }
+
+    template <typename ConvPtr>
+    std::size_t GetCKSplitkWorkspaceSize(const ConvPtr& conv_ptr, int split_k) const
+    {
+        auto arg_ptr = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k);
+        return conv_ptr->GetWorkSpaceSize(arg_ptr.get());
     }
 
     int G;
@@ -219,16 +220,43 @@ struct CKArgs
 template <typename DataType>
 void PerformanceConfigHipImplicitGemmGroupWrwXdlops::Init(const ProblemDescription& problem)
 {
-    valid_kernels = FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem);
-    index         = 0;
-    split_k       = 1;
-    kernel_id     = valid_kernels[index] + "+" + std::to_string(split_k);
+    if constexpr(std::is_same_v<DataType, float>)
+    {
+        if(problem.UseTF32())
+        {
+            use_tf32 = true;
+            valid_kernels =
+                FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType, ck::tf32_t>, CKArgs>(problem);
+        }
+        else
+        {
+            use_tf32      = false;
+            valid_kernels = FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem);
+        }
+    }
+    else
+    {
+        valid_kernels = FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem);
+    }
+    index     = 0;
+    split_k   = 1;
+    kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
 }
 
 template <typename DataType>
 bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::CheckIsSupportCKArgs(
     const ProblemDescription& problem) const
 {
+    if constexpr(std::is_same_v<DataType, float>)
+    {
+        if(problem.UseTF32() &&
+           IsCKArgsSupported<DeviceOpGWrwPtrs<DataType, ck::tf32_t>, CKArgs>(problem, kernel_id))
+        {
+            use_tf32 = true;
+            return true;
+        }
+        use_tf32 = false;
+    }
     return IsCKArgsSupported<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem, kernel_id);
 }
 
@@ -236,6 +264,14 @@ template <typename DataType>
 bool ConvHipImplicitGemmGroupWrwXdlops::CheckCKApplicability(
     const ProblemDescription& problem) const
 {
+    if constexpr(std::is_same_v<DataType, float>)
+    {
+        if(problem.UseTF32() &&
+           IsCKApplicable<DeviceOpGWrwPtrs<DataType, ck::tf32_t>, CKArgs>(problem))
+        {
+            return true;
+        }
+    }
     return IsCKApplicable<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem);
 }
 
@@ -275,7 +311,7 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::ModelApplyToken(
 {
     if(idx == 13 && arch == "gfx90a")
         idx += 1; // skip
-    if(arch == "gfx942")
+    if(arch == "gfx942" || arch == "gfx950")
     {
         if(idx == 0)
         {
@@ -394,8 +430,20 @@ template <typename DataType>
 bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::RunParameterPredictionModel(
     const ExecutionContext& ctx, const ProblemDescription& problem)
 {
-    valid_kernels = FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType>, CKArgs>(
-        problem); // filter valid_kernel ID's
+    // filter valid_kernel ID's
+    if constexpr(std::is_same_v<DataType, float>)
+    {
+        if(problem.UseTF32())
+        {
+            valid_kernels =
+                FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType, ck::tf32_t>, CKArgs>(problem);
+        }
+    }
+    if(valid_kernels.empty())
+    {
+        valid_kernels = FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem);
+    }
+
     static const std::string& arch = ctx.GetStream().GetDeviceName();
     if(arch == "gfx90a")
         InitHeuristicKernelIDs("DeviceGroupedConvBwdWeight_Xdl_CShuffle");
@@ -423,7 +471,8 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::RunParameterPredictionModel
 bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::IsModelApplicable(
     const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
-    if(ctx.GetStream().GetDeviceName() != "gfx90a" && ctx.GetStream().GetDeviceName() != "gfx942")
+    if(ctx.GetStream().GetDeviceName() != "gfx90a" && ctx.GetStream().GetDeviceName() != "gfx942" &&
+       ctx.GetStream().GetDeviceName() != "gfx950")
         return false;
     if(problem.GetInDataType() != miopenFloat && problem.GetInDataType() != miopenHalf &&
        problem.GetInDataType() != miopenBFloat16)
@@ -499,7 +548,7 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::SetNextValue(const ProblemD
     }
     do
     {
-        bool flag = NextTwoPower<1, 128>(split_k);
+        bool flag = NextCKSplitkValue<1, 128>(split_k);
         if(!flag)
         {
             kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
@@ -567,10 +616,33 @@ bool ConvHipImplicitGemmGroupWrwXdlops::IsValidPerformanceConfig(
     return config.IsValid(problem);
 }
 
+size_t
+ConvHipImplicitGemmGroupWrwXdlops::GetCKMaxWorkspaceSize(const ProblemDescription& problem) const
+{
+#if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+    switch(problem.GetInDataType())
+    {
+    case miopenHalf:
+        return GetCKSplitkMaxWorkspaceSize<DeviceOpGWrwPtrs<ck::half_t>, CKArgs>(problem);
+    case miopenFloat: return GetCKSplitkMaxWorkspaceSize<DeviceOpGWrwPtrs<float>, CKArgs>(problem);
+    case miopenInt8: return GetCKSplitkMaxWorkspaceSize<DeviceOpGWrwPtrs<int8_t>, CKArgs>(problem);
+    case miopenBFloat16:
+        return GetCKSplitkMaxWorkspaceSize<DeviceOpGWrwPtrs<ck::bhalf_t>, CKArgs>(problem);
+    case miopenInt64:
+    case miopenInt32:
+    case miopenFloat8_fnuz:
+    case miopenBFloat8_fnuz:
+    case miopenDouble: break;
+    }
+#endif
+    return 0; // other types not applicable for this solver
+}
+
 size_t ConvHipImplicitGemmGroupWrwXdlops::GetWorkspaceSize(const ExecutionContext&,
                                                            const ProblemDescription& problem) const
 {
-    return GetWorkspaceSizeLayoutTransformConv(problem);
+    auto ck_ws_size = GetCKMaxWorkspaceSize(problem);
+    return GetWorkspaceSizeLayoutTransformConv(problem, ck_ws_size);
 }
 
 PerformanceConfigHipImplicitGemmGroupWrwXdlops
@@ -610,10 +682,7 @@ bool ConvHipImplicitGemmGroupWrwXdlops::IsApplicable(
     case miopenHalf: return CheckCKApplicability<ck::half_t>(problem);
     case miopenFloat: return CheckCKApplicability<float>(problem);
     case miopenInt8: return CheckCKApplicability<int8_t>(problem);
-    case miopenBFloat16:
-        return (ctx.GetStream().GetDeviceName() == "gfx942" ||
-                StartsWith(ctx.GetStream().GetDeviceName(), "gfx95")) &&
-               CheckCKApplicability<ck::bhalf_t>(problem);
+    case miopenBFloat16: return CheckCKApplicability<ck::bhalf_t>(problem);
     case miopenInt64:
     case miopenInt32:
     case miopenFloat8_fnuz:
@@ -632,23 +701,26 @@ ConvSolution ConvHipImplicitGemmGroupWrwXdlops::GetSolution(
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
     return MakeSolutionGroupConvImplicitGemmXdlops(
         problem,
-        [&](auto data_type_val) {
-            using T = decltype(data_type_val);
+        [&](auto data_type_val, auto compute_type_val) {
+            using T        = decltype(data_type_val);
+            using TCompute = decltype(compute_type_val);
             return InitInvokerFactoryWrwNCHW<2,
                                              false,
-                                             DeviceOpGWrwPtrs<T>,
+                                             DeviceOpGWrwPtrs<T, TCompute>,
                                              CKArgs,
                                              miopen::conv::WrWInvokeParams>(
                 ctx, problem, config.kernel_id);
         },
-        [&](auto data_type_val) {
-            using T = decltype(data_type_val);
+        [&](auto data_type_val, auto compute_type_val) {
+            using T        = decltype(data_type_val);
+            using TCompute = decltype(compute_type_val);
             return InitInvokerFactoryNHWC<false,
-                                          DeviceOpGWrwPtrs<T>,
+                                          DeviceOpGWrwPtrs<T, TCompute>,
                                           CKArgs,
                                           miopen::conv::WrWInvokeParams>(
                 ctx, problem, config.kernel_id);
-        });
+        },
+        config.UseTF32());
 
 #else
     return {};
