@@ -41,12 +41,12 @@ using ResidualScaleLayout = typename LayoutSettingSelector<NDimSpatial>::Residua
 using ConvolutionForwardSpecialization =
     typename ck::tensor_operation::device::ConvolutionForwardSpecialization;
 
-static constexpr ck::index_t HPerWcnn  = 4;
-static constexpr ck::index_t WPerWcnn  = 2;
-static constexpr ck::index_t HPerBlock = 16;
-static constexpr ck::index_t WPerBlock = 16;
-static constexpr bool EnableAsync      = false;
-static constexpr bool EnableWaveGroup  = false;
+static constexpr ck::index_t HPerWcnn      = 4;
+static constexpr ck::index_t WPerWcnn      = 2;
+static constexpr ck::index_t HPerBlock     = 16;
+static constexpr ck::index_t WPerBlock     = 16;
+static constexpr bool EnableAsync          = false;
+static constexpr bool EnableWaveGroup      = false;
 static constexpr bool EnableSpatialCluster = false;
 
 template <ck::index_t NDimSpatial,
@@ -343,13 +343,13 @@ bool run_grouped_conv_fwd_bias_relu_add_example(int argc, char* argv[])
     {
         return false;
     }
-
     switch(conv_param.num_dim_spatial_)
     {
     // TODO: remove unsupported kernel instance for dimension 1 & 3.
-    case 1: return run_grouped_conv_fwd_bias_relu_add<1>(config, conv_param);
-    case 2: return run_grouped_conv_fwd_bias_relu_add<2>(config, conv_param);
-    case 3: return run_grouped_conv_fwd_bias_relu_add<3>(config, conv_param);
+    // case 1: return run_grouped_conv_fwd_bias_relu_add<1>(config, conv_param);
+    case 2:
+        return run_grouped_conv_fwd_bias_relu_add<2>(config, conv_param);
+        // case 3: return run_grouped_conv_fwd_bias_relu_add<3>(config, conv_param);
     }
 
     return false;

@@ -320,7 +320,8 @@ make_scalebias_host_tensor_descriptor(const ck::utils::conv::ConvParam& conv_par
                 0,         // k
                 1,         // c
                 0          // x
-            });
+            },
+            ck::tensor_layout::convolution::GNKW{});
     case 2:
         return HostTensorDescriptor({conv_param.G_,
                                      conv_param.N_,
@@ -333,7 +334,8 @@ make_scalebias_host_tensor_descriptor(const ck::utils::conv::ConvParam& conv_par
                                         1,         // k
                                         0,         // ho
                                         0          // wo
-                                    });
+                                    },
+                                    ck::tensor_layout::convolution::GNKHW{});
     case 3:
         return HostTensorDescriptor({conv_param.G_,
                                      conv_param.N_,
@@ -348,7 +350,8 @@ make_scalebias_host_tensor_descriptor(const ck::utils::conv::ConvParam& conv_par
                                         0,         // z
                                         0,         // y
                                         0          // x
-                                    });
+                                    },
+                                    ck::tensor_layout::convolution::GNKDHW{});
     }
 
     throw std::runtime_error("unsuppored # dim spatial");

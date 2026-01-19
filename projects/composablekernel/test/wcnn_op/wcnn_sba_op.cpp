@@ -1132,14 +1132,14 @@ bool run_test()
     // Fill other lenghts than G,K with 1 and strides with 0
     scalebias_g_k_lengths.fill(1);
     scalebias_g_k_strides.fill(0);
-    scalebias_g_k_lengths[0] = G;
-    scalebias_g_k_strides[0] = K; // stride to G
-    scalebias_g_k_lengths[2] = K;
-    scalebias_g_k_strides[2] = 1; // stride to K
-    const auto broadcasted_bias_desc =
-        HostTensorDescriptor(scalebias_g_k_lengths, scalebias_g_k_strides);
-    const auto broadcasted_scale_desc =
-        HostTensorDescriptor(scalebias_g_k_lengths, scalebias_g_k_strides);
+    scalebias_g_k_lengths[0]         = G;
+    scalebias_g_k_strides[0]         = K; // stride to G
+    scalebias_g_k_lengths[2]         = K;
+    scalebias_g_k_strides[2]         = 1; // stride to K
+    const auto broadcasted_bias_desc = HostTensorDescriptor(
+        scalebias_g_k_lengths, scalebias_g_k_strides, ck::tensor_layout::convolution::GNKW{});
+    const auto broadcasted_scale_desc = HostTensorDescriptor(
+        scalebias_g_k_lengths, scalebias_g_k_strides, ck::tensor_layout::convolution::GNKW{});
 
     std::array<Tensor<GPUAccType>, NumDs> d_tensors = {Tensor<GPUAccType>(broadcasted_scale_desc),
                                                        Tensor<GPUAccType>(broadcasted_bias_desc)};

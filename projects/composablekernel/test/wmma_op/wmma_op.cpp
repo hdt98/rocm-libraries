@@ -123,6 +123,7 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
+                                       8, // not use
                                        KMultiplier>{}(
                 std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
@@ -204,6 +205,7 @@ int main(int argc, char* argv[])
     pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 8    >();
     pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      8    >();
     pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
+
     // the below are gfx13 only
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
     pass &= run_test<ck::half_t,  ck::half_t,   float,       float,       float              >(); // V_WMMA_F32_16X16_F16

@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "ck/utility/env.hpp"
 #include "ck/utility/data_type.hpp"
 #include "ck/utility/span.hpp"
 #include "ck/utility/type_convert.hpp"
@@ -443,9 +444,13 @@ struct HostTensorDescriptor
         {
             // TBD: implement verification for Conv layouts
             // For now, just print warning and return
-            std::cerr << "Warning: Tensor layout verification for ck::tensor_layout::convolution "
-                         "layouts is not supported yet. Skipping..."
-                      << std::endl;
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cerr
+                    << "Warning: Tensor layout verification for ck::tensor_layout::convolution "
+                       "layouts is not supported yet. Skipping..."
+                    << std::endl;
+            }
             return;
         }
         else
@@ -820,6 +825,8 @@ struct Tensor
             return mDesc.GetElementSpaceSize();
         }
     }
+
+    bool empty() const { return mData.empty(); }
 
     std::size_t GetElementSpaceSizeInBytes() const { return sizeof(T) * GetElementSpaceSize(); }
 

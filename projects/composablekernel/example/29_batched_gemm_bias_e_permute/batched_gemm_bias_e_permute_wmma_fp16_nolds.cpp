@@ -22,6 +22,9 @@ using ::ck::HostTensorDescriptor;
 using ::ck::make_ParallelTensorFunctor;
 using ::ck::Tensor;
 
+using Row    = ck::tensor_layout::gemm::RowMajor;
+using Bypass = ck::tensor_layout::BypassLayoutVerification;
+
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
 
@@ -73,23 +76,23 @@ using DeviceOpInstanceKKNN =
                                                                                   BSpec,
                                                                                   DESpec,
                                                                                   1,
-                                                                                  32,
-                                                                                  16,
-                                                                                  16,
+                                                                                  128,
+                                                                                  64,
+                                                                                  64,
                                                                                   64,
                                                                                   4,
                                                                                   16,
                                                                                   16,
                                                                                   1,
-                                                                                  1,
-                                                                                  S<4, 8, 1>,
+                                                                                  4,
+                                                                                  S<4, 32, 1>,
                                                                                   S<1, 0, 2>,
                                                                                   S<1, 0, 2>,
                                                                                   2,
                                                                                   4,
                                                                                   4,
                                                                                   false,
-                                                                                  S<4, 8, 1>,
+                                                                                  S<4, 32, 1>,
                                                                                   S<1, 0, 2>,
                                                                                   S<1, 0, 2>,
                                                                                   2,
@@ -98,7 +101,7 @@ using DeviceOpInstanceKKNN =
                                                                                   false,
                                                                                   1,
                                                                                   1,
-                                                                                  S<1, 16, 1, 2>,
+                                                                                  S<1, 64, 1, 2>,
                                                                                   8>;
 
 using DeviceOpInstance = DeviceOpInstanceKKNN;
@@ -305,11 +308,11 @@ int main(int argc, char* argv[])
     std::vector<ck::index_t> e_gs_ms_ns_strides{
         G1 * M0 * N0 * M1 * N1, M0 * N0 * M1 * N1, N0 * M1 * N1, N1, M1 * N1, 1};
 
-    Tensor<ADataType> a_gs_ms_ks(a_gs_ms_ks_lengths, a_gs_ms_ks_strides);
-    Tensor<BDataType> b_gs_ns_ks(b_gs_ns_ks_lengths, b_gs_ns_ks_strides);
-    Tensor<DDataType> d_gs_ms_ns(d_gs_ms_ns_lengths, d_gs_ms_ns_strides);
-    Tensor<EDataType> e_gs_ms_ns_host_result(e_gs_ms_ns_lengths, e_gs_ms_ns_strides);
-    Tensor<EDataType> e_gs_ms_ns_device_result(e_gs_ms_ns_lengths, e_gs_ms_ns_strides);
+    Tensor<ADataType> a_gs_ms_ks(a_gs_ms_ks_lengths, a_gs_ms_ks_strides, Row{});
+    Tensor<BDataType> b_gs_ns_ks(b_gs_ns_ks_lengths, b_gs_ns_ks_strides, Row{});
+    Tensor<DDataType> d_gs_ms_ns(d_gs_ms_ns_lengths, d_gs_ms_ns_strides, Bypass{});
+    Tensor<EDataType> e_gs_ms_ns_host_result(e_gs_ms_ns_lengths, e_gs_ms_ns_strides, Bypass{});
+    Tensor<EDataType> e_gs_ms_ns_device_result(e_gs_ms_ns_lengths, e_gs_ms_ns_strides, Bypass{});
     std::cout << "a_gs_ms_ks: " << a_gs_ms_ks.mDesc << std::endl;
     std::cout << "b_gs_ns_ks: " << b_gs_ns_ks.mDesc << std::endl;
     std::cout << "d_gs_ms_ns: " << d_gs_ms_ns.mDesc << std::endl;
@@ -401,7 +404,8 @@ int main(int argc, char* argv[])
 
     if(do_verification)
     {
-        Tensor<CShuffleDataType> c_ms_ns_host_result(e_gs_ms_ns_lengths, e_gs_ms_ns_strides);
+        Tensor<CShuffleDataType> c_ms_ns_host_result(
+            e_gs_ms_ns_lengths, e_gs_ms_ns_strides, Bypass{});
 
         using ReferenceOpInstance = ReferenceContraction_G2_M2_N2_K1<NumDimG,
                                                                      NumDimM,
