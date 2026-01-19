@@ -238,7 +238,7 @@ struct GroupedConvolutionForwardInvoker
             using GemmPipeline = typename PipelineTypeTraits<
                 ConvConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
 
-            using ConvEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
+            using EpilogueProblem = ck_tile::CShuffleEpilogueProblem<
                 InDataType,
                 WeiDataType,
                 DsDataType,
@@ -257,7 +257,14 @@ struct GroupedConvolutionForwardInvoker
                 GroupedConvTraitsType::FixedGemmParams::TransposeC,
                 ConvConfig::NumWaveGroups,
                 GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
-                GroupedConvTraitsType::VectorSizeC>>;
+                GroupedConvTraitsType::VectorSizeC>;
+
+            using ConvEpilogue =
+                std::conditional_t<ConvConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
+                                       ConvConfig::Pipeline ==
+                                           ck_tile::GemmPipeline::COMPUTE_TDM_V2,
+                                   ck_tile::TdmEpilogue<EpilogueProblem>,
+                                   ck_tile::CShuffleEpilogue<EpilogueProblem>>;
 
             // Use split-image kernel if layout supports it, otherwise use regular kernel
             using Kernel = ck_tile::GroupedConvolutionForwardKernel<GroupedConvTraitsType,
