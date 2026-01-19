@@ -565,26 +565,7 @@ origami::config_t ConvHipImplicitGemmGroupWrwXdlops::GetOrigamiConfig(
     const ::miopen::conv::ProblemDescription& problem,
     const PerformanceConfigHipImplicitGemmGroupWrwXdlops& perf_cfg) const
 {
-    switch(problem.GetInDataType())
-    {
-    case miopenHalf:
-        return miopen::solver::GetOrigamiConfig<DeviceOpGWrwPtrs<ck::half_t>,
-                                                CKArgs,
-                                                decltype(perf_cfg)>(problem, perf_cfg);
-    case miopenFloat:
-        return miopen::solver::GetOrigamiConfig<DeviceOpGWrwPtrs<float>,
-                                                CKArgs,
-                                                decltype(perf_cfg)>(problem, perf_cfg);
-    case miopenInt8:
-        return miopen::solver::GetOrigamiConfig<DeviceOpGWrwPtrs<int8_t>,
-                                                CKArgs,
-                                                decltype(perf_cfg)>(problem, perf_cfg);
-    case miopenBFloat16:
-        return miopen::solver::GetOrigamiConfig<DeviceOpGWrwPtrs<ck::bhalf_t>,
-                                                CKArgs,
-                                                decltype(perf_cfg)>(problem, perf_cfg);
-    default: return {}; // Unsupported data types
-    }
+    return miopen::solver::GetOrigamiConfig(problem, perf_cfg);
 }
 
 bool ConvHipImplicitGemmGroupWrwXdlops::IsValidPerformanceConfig(

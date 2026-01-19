@@ -2685,13 +2685,11 @@ std::vector<std::string> parseDeviceInstanceArguments(const std::string& instanc
 
 int IndexOf(std::vector<std::string> vec, std::string val);
 
-template <typename DeviceOpType, typename CKArgsType, typename PerformanceConfig>
+template <typename PerformanceConfig>
 origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& problem,
                                    const PerformanceConfig& perf_cfg)
 {
     origami::config_t ori_cfg;
-    auto ck_args   = CKArgsType{problem};
-    auto conv_ptrs = DeviceOpType::GetInstances();
 
     std::optional<int> split_k = std::nullopt;
     std::string id_string      = perf_cfg.kernel_id;
