@@ -690,13 +690,11 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
             if(norm_type == rocsolver_norm_type_one)
             {
                 opr = (h_kase == 1) ? rocblas_operation_none
-                                    : (rocblas_is_complex<T> ? rocblas_operation_conjugate_transpose
-                                                             : rocblas_operation_transpose);
+                                    : rocblas_operation_conjugate_transpose;
             }
             else
             { // infinity norm
-                opr = (h_kase == 1) ? (rocblas_is_complex<T> ? rocblas_operation_conjugate_transpose
-                                                             : rocblas_operation_transpose)
+                opr = (h_kase == 1) ? rocblas_operation_conjugate_transpose
                                     : rocblas_operation_none;
             }
 
