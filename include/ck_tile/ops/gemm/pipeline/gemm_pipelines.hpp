@@ -12,6 +12,7 @@ enum struct GemmPipeline
     COMPUTE_V4,
     COMPUTE_V5,
     COMPUTE_V6,
+    COMPUTE_V7,
     MEMORY,
     BASIC_V1,
     BASIC_V2,

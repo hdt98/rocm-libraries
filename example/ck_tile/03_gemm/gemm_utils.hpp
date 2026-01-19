@@ -242,6 +242,31 @@ struct GemmConfigComputeV6 : public GemmConfigBase
 };
 
 template <typename PrecType>
+struct GemmConfigComputeV7 : public GemmConfigBase
+{
+    static constexpr bool kPadM = true;
+    static constexpr bool kPadN = true;
+    static constexpr bool kPadK = true;
+
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr bool DoubleSmemBuffer          = false;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V7;
+
+    static constexpr int kBlockPerCu = 2;
+};
+
+template <typename PrecType>
 struct GemmConfigPreshuffleDecode : public GemmConfigBase
 {
     static constexpr ck_tile::index_t M_Tile = 16;
@@ -421,6 +446,15 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V6>
     using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV6<PipelineProblem>;
     template <typename PipelineProblem>
     using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV6<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V7>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV7<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV7<PipelineProblem>;
 };
 
 template <>
