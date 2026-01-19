@@ -30,6 +30,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <vector>
 
 #include <boost/program_options.hpp>
 
@@ -129,6 +130,8 @@ namespace TensileLite
             using double_nanos  = std::chrono::duration<double, std::nano>;
             using prob_sol_map  = std::map<int, int>;
 
+            std::vector<double_millis> m_syncDurations;
+            size_t                     m_syncDurationCount = 0;
             double_millis m_timeInSolution;
             double_millis m_totalGPUTime;
             double_millis m_currentBestWarmUpTime;

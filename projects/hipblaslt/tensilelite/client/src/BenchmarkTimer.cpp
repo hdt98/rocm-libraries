@@ -32,6 +32,7 @@
 
 #include <Tensile/hip/HipUtils.hpp>
 
+#include <algorithm>
 #include <csignal>
 #include <cstddef>
 #include <thread>
@@ -56,6 +57,7 @@ namespace TensileLite
             , m_numEnqueuesPerSolution(m_numEnqueuesPerSync * m_numSyncsPerBenchmark)
             , m_useGPUTimer(args["use-gpu-timer"].as<bool>())
             , m_sleepPercent(args["sleep-percent"].as<int>())
+            , m_syncDurations(m_numSyncsPerBenchmark)
             , m_timeInSolution(0)
             , m_totalGPUTime(0)
             , m_currentBestWarmUpTime(std::numeric_limits<double>::max())
@@ -120,6 +122,7 @@ namespace TensileLite
         {
             m_numEnqueuesInSolution = 0;
             m_timeInSolution        = double_millis::zero();
+            m_syncDurationCount     = 0;
             m_skip_slow_solution    = false;
 
             ++m_currSolutionIdx; // update current sol-idx
@@ -160,11 +163,38 @@ namespace TensileLite
 
         void BenchmarkTimer::postSolution()
         {
-            bool   sol_is_skipped    = (m_skiprun_from_map || m_skip_slow_solution);
-            double timePerEnqueue_us = !sol_is_skipped ? double_micros(m_timeInSolution).count()
-                                                                 / m_numEnqueuesInSolution
-                                                             - m_flushTimeUs
-                                                       : std::numeric_limits<double>::quiet_NaN();
+            bool timingAvailable = !(m_skiprun_from_map || m_skip_slow_solution)
+                                    && (m_syncDurationCount > 0);
+            double timePerEnqueue_us = std::numeric_limits<double>::quiet_NaN();
+
+            if(timingAvailable)
+            {
+                auto beginSample = m_syncDurations.begin();
+                auto endSample   = beginSample + m_syncDurationCount;
+                std::sort(beginSample, endSample, std::less<double_millis>());
+
+                size_t takeCount = (m_syncDurationCount * 8) / 10;
+                if(takeCount == 0)
+                    takeCount = 1;
+
+                double_millis trimmedTotal(0.0);
+                for(size_t i = 0; i < takeCount; i++)
+                    trimmedTotal += m_syncDurations[i];
+
+                double_millis trimmedMean    = trimmedTotal / takeCount;
+                double        enqueuesPerSync = static_cast<double>(m_numEnqueuesInSolution)
+                                          / static_cast<double>(m_syncDurationCount);
+
+                if(enqueuesPerSync > 0.0)
+                {
+                    double timePerSync_us = double_micros(trimmedMean).count();
+                    timePerEnqueue_us     = timePerSync_us / enqueuesPerSync - m_flushTimeUs;
+                }
+                else
+                {
+                    timingAvailable = false;
+                }
+            }
 
             ContractionSolution::ProjectedPerformance pp;
             double                                    flopCount = 0;
@@ -184,7 +214,7 @@ namespace TensileLite
                     "[BenchmarkTimer] Failed to cast problem to any ContractionProblem.");
             }
 
-            double gflops      = !sol_is_skipped ? flopCount / (timePerEnqueue_us) / 1000.0 : 0;
+            double gflops      = timingAvailable ? flopCount / (timePerEnqueue_us) / 1000.0 : 0;
             int    tiles       = pp.granularities.tilesPerCu * perf.CUs;
             int    usedCus     = std::min(tiles, perf.CUs);
             double gflopsPerCu = gflops / usedCus;
@@ -195,6 +225,7 @@ namespace TensileLite
 
             m_timeInSolution        = double_millis::zero();
             m_numEnqueuesInSolution = 0;
+            m_syncDurationCount     = 0;
         }
 
         bool BenchmarkTimer::needMoreRunsInSolution() const
@@ -377,7 +408,15 @@ namespace TensileLite
             }
             else
             {
+                // CPU timing measures the span between m_endTime and m_startTime for this sync.
                 totalTime = double_millis(m_endTime - m_startTime);
+            }
+
+            bool sol_is_skipped = (m_skiprun_from_map || m_skip_slow_solution);
+            if(!sol_is_skipped && m_syncDurationCount < m_syncDurations.size())
+            {
+                m_syncDurations[m_syncDurationCount] = totalTime;
+                m_syncDurationCount++;
             }
 
             m_timeInSolution += totalTime;
