@@ -269,7 +269,6 @@ namespace rocRoller
                                     .infoStr              = infoStr};
     }
 
-    // ParameterizedLDSKernel implementation
     ParameterizedLDSKernel::ParameterizedLDSKernel(ContextPtr                 context,
                                                    uint32_t                   workgroupSize,
                                                    size_t                     instrDwords,
