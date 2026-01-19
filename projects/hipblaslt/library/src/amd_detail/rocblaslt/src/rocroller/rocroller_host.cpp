@@ -260,11 +260,8 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
                                const int32_t&                            coldIterations,
                                const int32_t&                            hotIterations)
 {
-    // Part 1: Kernel Name
-    log_profile("Kernel", "kernel_name", kernelName);
-
-    // Part 2: Solution
-    log_profile("Solution",
+    // Solution parameters
+    log_profile("matmul: solution_parameters",
                 "solution_index",
                 solutionIndex,
                 "workgroup_tile",
@@ -320,7 +317,7 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
                 "scheduler",
                 solutionParams->scheduler.empty() ? "Priority" : solutionParams->scheduler);
 
-    // Part 3: Type (KernelType parameters)
+    // Type (KernelType parameters)
     auto& kt = solutionParams->kernelType;
 
     // Format preSwizzleTile vectors as strings
@@ -344,7 +341,7 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
     if(preSwizzleB.empty())
         preSwizzleB = "none";
 
-    log_profile("Type",
+    log_profile("matmul: type_parameters",
                 "transA",
                 kt.transA ? "T" : "N",
                 "transB",
@@ -378,62 +375,19 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
                 "scaleB_preSwizzle",
                 preSwizzleB);
 
-    // Part 4: Problem
-    log_profile("Problem",
-                "M",
-                prob.m,
-                "N",
-                prob.n,
-                "K",
-                prob.k,
-                "lda",
-                prob.col_stride_a,
-                "ldb",
-                prob.col_stride_b,
-                "ldc",
-                prob.col_stride_c,
-                "ldd",
-                prob.col_stride_d,
-                "stride_a",
-                prob.batch_stride_a,
-                "stride_b",
-                prob.batch_stride_b,
-                "stride_c",
-                prob.batch_stride_c,
-                "stride_d",
-                prob.batch_stride_e,
-                "alpha",
-                *((float*)prob.alpha),
-                "beta",
-                *((float*)prob.beta),
-                "transA",
-                prob.trans_a == HIPBLAS_OP_T ? "T" : "N",
-                "transB",
-                prob.trans_b == HIPBLAS_OP_T ? "T" : "N",
-                "batch_count",
-                prob.batch_count,
-                "scaleA",
-                scaleModeOption(prob.scaleAType),
-                "scaleB",
-                scaleModeOption(prob.scaleBType),
-                "a_type",
-                hipDataType_to_bench_string(prob.a_type),
-                "b_type",
-                hipDataType_to_bench_string(prob.b_type),
-                "c_type",
-                hipDataType_to_bench_string(prob.c_type),
-                "d_type",
-                hipDataType_to_bench_string(prob.d_type),
-                "compute_type",
-                "f32_r",
-                "flush",
-                flush ? "true" : "false",
-                "rotating",
-                rotatingBufferSize,
-                "cold_iters",
-                coldIterations,
-                "iters",
-                hotIterations);
+    // Problem
+    log_profile("matmul",
+        "M",
+        prob.m,
+        "N",
+        "cold_iters",
+        coldIterations,
+        "iters",
+        hotIterations,
+        "solution_index",
+        solutionIndex,
+        "kernel_name",
+        kernelName);
 }
 
 /**
