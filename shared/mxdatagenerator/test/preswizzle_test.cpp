@@ -598,6 +598,111 @@ void FillPreSwizzleAndTile(std::vector<float>&        scales,
     }
 }
 
+void FillTile(std::vector<float>&        scales,
+              size_t                     k,
+              size_t                     mn,
+              std::vector<size_t> const& preTileSize)
+{
+    size_t ptTileSizeK  = preTileSize[0];
+    size_t ptTileSizeMN = preTileSize[1];
+    size_t numTilesK    = k / ptTileSizeK;
+    size_t numTilesMN   = mn / ptTileSizeMN;
+
+    // This fills the data in normal tiled layout (BEFORE pre-tiling).
+    // The layout is standard column-major: [within-tile-K, tile-K, within-tile-MN, tile-MN]
+    //
+    // Memory layout formula (strides in parentheses):
+    //   outputIdx = withinTileK   * (1)
+    //             + tileIdxK      * (ptTileSizeK)
+    //             + withinTileMN  * (ptTileSizeK * numTilesK)
+    //             + tileIdxMN     * (ptTileSizeK * numTilesK * ptTileSizeMN)
+    //
+    // The iteration order from slowest (outermost) to fastest (innermost) is:
+    // tile-MN -> within-tile-MN -> tile-K -> within-tile-K
+
+    for(size_t tileIdxMN = 0; tileIdxMN < numTilesMN; ++tileIdxMN)
+    {
+        for(size_t withinTileMN = 0; withinTileMN < ptTileSizeMN; ++withinTileMN)
+        {
+            for(size_t tileIdxK = 0; tileIdxK < numTilesK; ++tileIdxK)
+            {
+                for(size_t withinTileK = 0; withinTileK < ptTileSizeK; ++withinTileK)
+                {
+                    // Calculate output index explicitly from 4D coordinates
+                    size_t outputIdx = withinTileK + tileIdxK * ptTileSizeK
+                                       + withinTileMN * (ptTileSizeK * numTilesK)
+                                       + tileIdxMN * (ptTileSizeK * numTilesK * ptTileSizeMN);
+
+                    // Create a unique value based on the 4D coordinates
+                    // dim0 = withinTileK, dim1 = tileIdxK, dim2 = withinTileMN, dim3 = tileIdxMN
+                    float value = static_cast<float>(withinTileK) * std::pow(10.0f, 0.0f)
+                                  + static_cast<float>(tileIdxK) * std::pow(10.0f, 1.0f)
+                                  + static_cast<float>(withinTileMN) * std::pow(10.0f, 2.0f)
+                                  + static_cast<float>(tileIdxMN) * std::pow(10.0f, 3.0f);
+
+                    scales[outputIdx] = value;
+                }
+            }
+        }
+    }
+}
+
+// This is intentionally verbose (and does not use MultiIndex) for readability.
+void FillPreTile(std::vector<float>&        scales,
+                 size_t                     k,
+                 size_t                     mn,
+                 std::vector<size_t> const& preTileSize)
+{
+    size_t ptTileSizeK  = preTileSize[0];
+    size_t ptTileSizeMN = preTileSize[1];
+    size_t numTilesK    = k / ptTileSizeK;
+    size_t numTilesMN   = mn / ptTileSizeMN;
+
+    // Pre-tiling reorders the data so that tiles are contiguous in memory.
+    // Before pre-tiling, the layout is: [within-tile-K, tile-K, within-tile-MN, tile-MN]
+    // After pre-tiling, the layout is:  [within-tile-K, within-tile-MN, tile-K, tile-MN]
+    //
+    // Memory layout formula (strides in parentheses):
+    //   outputIdx = withinTileK   * (1)
+    //             + withinTileMN  * (ptTileSizeK)
+    //             + tileIdxK      * (ptTileSizeK * ptTileSizeMN)
+    //             + tileIdxMN     * (ptTileSizeK * ptTileSizeMN * numTilesK)
+    //
+    // Notice how the tile indices now have larger strides - each tile is stored
+    // contiguously in memory (all within-tile elements together).
+    //
+    // The iteration order from slowest (outermost) to fastest (innermost) is:
+    // tile-MN -> tile-K -> within-tile-MN -> within-tile-K
+
+    // Loop through tiles (outermost = slowest varying)
+    for(size_t tileIdxMN = 0; tileIdxMN < numTilesMN; ++tileIdxMN)
+    {
+        for(size_t tileIdxK = 0; tileIdxK < numTilesK; ++tileIdxK)
+        {
+            // Loop through elements within each tile (innermost = fastest varying)
+            for(size_t withinTileMN = 0; withinTileMN < ptTileSizeMN; ++withinTileMN)
+            {
+                for(size_t withinTileK = 0; withinTileK < ptTileSizeK; ++withinTileK)
+                {
+                    // Calculate output index explicitly from 4D coordinates
+                    size_t outputIdx = withinTileK + withinTileMN * ptTileSizeK
+                                       + tileIdxK * (ptTileSizeK * ptTileSizeMN)
+                                       + tileIdxMN * (ptTileSizeK * ptTileSizeMN * numTilesK);
+
+                    // Create a unique value based on the 4D coordinates
+                    // dim0 = withinTileK, dim1 = tileIdxK, dim2 = withinTileMN, dim3 = tileIdxMN
+                    float value = static_cast<float>(withinTileK) * std::pow(10.0f, 0.0f)
+                                  + static_cast<float>(tileIdxK) * std::pow(10.0f, 1.0f)
+                                  + static_cast<float>(withinTileMN) * std::pow(10.0f, 2.0f)
+                                  + static_cast<float>(tileIdxMN) * std::pow(10.0f, 3.0f);
+
+                    scales[outputIdx] = value;
+                }
+            }
+        }
+    }
+}
+
 TEST(PreSwizzleTest, PreSwizzleOnlySwizzle64)
 {
     size_t             k  = 256;
@@ -662,15 +767,70 @@ TEST(PreSwizzleTest, PreSwizzleOnlyPreTile)
     size_t             k  = 128;
     size_t             mn = 64;
     std::vector<float> input(k * mn);
-    std::iota(input.begin(), input.end(), 0.0f);
 
     std::vector<size_t> sizes = {k, mn};
     std::vector<size_t> preSwizzleSize; // empty
     std::vector<size_t> preTileSize = {16, 16};
 
+    // Fill input with the tiled (non-pre-tiled) layout
+    FillTile(input, k, mn, preTileSize);
+
     auto output = preSwizzle(input, sizes, preSwizzleSize, preTileSize);
 
+    // Generate expected output with pre-tiled layout
+    std::vector<float> expected(k * mn);
+    FillPreTile(expected, k, mn, preTileSize);
+
     ASSERT_EQ(output.size(), input.size());
+    EXPECT_EQ(output, expected);
+}
+
+TEST(PreSwizzleTest, PreSwizzleOnlyPreTileVariousSizes)
+{
+    // Test pre-tiling with different tile sizes
+    size_t             k  = 256;
+    size_t             mn = 128;
+    std::vector<float> input(k * mn);
+
+    std::vector<size_t> sizes = {k, mn};
+    std::vector<size_t> preSwizzleSize; // empty - no swizzling
+    std::vector<size_t> preTileSize = {64, 32};
+
+    // Fill input with the tiled (non-pre-tiled) layout
+    FillTile(input, k, mn, preTileSize);
+
+    auto output = preSwizzle(input, sizes, preSwizzleSize, preTileSize);
+
+    // Generate expected output with pre-tiled layout
+    std::vector<float> expected(k * mn);
+    FillPreTile(expected, k, mn, preTileSize);
+
+    ASSERT_EQ(output.size(), input.size());
+    EXPECT_EQ(output, expected);
+}
+
+TEST(PreSwizzleTest, PreSwizzleOnlyPreTileSmallTiles)
+{
+    // Test with smaller tiles
+    size_t             k  = 64;
+    size_t             mn = 64;
+    std::vector<float> input(k * mn);
+
+    std::vector<size_t> sizes = {k, mn};
+    std::vector<size_t> preSwizzleSize; // empty - no swizzling
+    std::vector<size_t> preTileSize = {8, 8};
+
+    // Fill input with the tiled (non-pre-tiled) layout
+    FillTile(input, k, mn, preTileSize);
+
+    auto output = preSwizzle(input, sizes, preSwizzleSize, preTileSize);
+
+    // Generate expected output with pre-tiled layout
+    std::vector<float> expected(k * mn);
+    FillPreTile(expected, k, mn, preTileSize);
+
+    ASSERT_EQ(output.size(), input.size());
+    EXPECT_EQ(output, expected);
 }
 
 TEST(PreSwizzleTest, PreSwizzleBothSwizzleAndTile64)
