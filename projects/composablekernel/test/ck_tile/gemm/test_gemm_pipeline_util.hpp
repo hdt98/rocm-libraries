@@ -27,7 +27,16 @@ constexpr ck_tile::index_t get_k_warp_tile()
     constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
                              std::is_same_v<PrecType, ck_tile::bf8_t> ||
                              std::is_same_v<PrecType, ck_tile::int8_t>;
-    return is_8bit ? 64 : 32;
+    constexpr bool is_mxtype =
+        std::is_same_v<PrecType, ck_tile::fp8_t> || std::is_same_v<PrecType, ck_tile::pk_fp4_t>;
+    if constexpr(M_Warp_Tile == 32 && is_mxtype) // only mx data type can enter this branch
+    {
+        return 128;
+    }
+    else
+    {
+        return is_8bit ? 64 : 32;
+    }
 #else
     return 16;
 #endif
@@ -192,7 +201,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
 
     static constexpr ck_tile::index_t M_Warp_Tile = std::tuple_element_t<10, Tuple>{};
     static constexpr ck_tile::index_t N_Warp_Tile = std::tuple_element_t<11, Tuple>{};
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<ADataType, M_Warp_Tile>();
+    static constexpr ck_tile::index_t K_Warp_Tile = ck_tile::max(
+        get_k_warp_tile<ADataType, M_Warp_Tile>(), get_k_warp_tile<BDataType, N_Warp_Tile>());
 
     using AComputeDataType = ADataType;
     using BComputeDataType =

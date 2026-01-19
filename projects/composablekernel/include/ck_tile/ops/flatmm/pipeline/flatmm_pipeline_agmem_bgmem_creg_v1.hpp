@@ -203,15 +203,15 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
                       concat('x', kPadM, kPadN, kPadK));
         // clang-format on
     }
-
-    // For the basic gemm pipelien DoubleSmemBuffer set to be false naturally.
-    static constexpr bool DoubleSmemBuffer = false;
+    // as this pipeline uses double smem buffer, so the smem size is 2 times of single buffer size
+    static constexpr bool DoubleSmemBuffer = true;
 
     CK_TILE_HOST_DEVICE static constexpr auto TransposeC() { return Problem::TransposeC; }
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
-        return PipelinePolicy::template GetSmemSize<Problem>();
+        return DoubleSmemBuffer ? 2 * PipelinePolicy::template GetSmemSize<Problem>()
+                                : PipelinePolicy::template GetSmemSize<Problem>();
     }
 
     CK_TILE_HOST_DEVICE static constexpr auto
@@ -530,8 +530,7 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
                                         const AElementFunction& a_element_func,
                                         const BFlatBlockWindowTmp& b_flat_dram_block_window_tmp,
                                         index_t num_loop,
-                                        void* p_smem_ping,
-                                        void* p_smem_pong) const
+                                        void* p_smem) const
     {
         static_assert(
             std::is_same_v<ADataType, remove_cvref_t<typename ADramBlockWindowTmp::DataType>>,
@@ -555,8 +554,9 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
         __builtin_amdgcn_sched_barrier(0);
 
         // A tile in LDS
-        ADataType* p_a_lds_ping = static_cast<ADataType*>(p_smem_ping);
-        ADataType* p_a_lds_pong = static_cast<ADataType*>(p_smem_pong);
+        ADataType* p_a_lds_ping = static_cast<ADataType*>(p_smem);
+        ADataType* p_a_lds_pong = static_cast<ADataType*>(static_cast<void*>(
+            static_cast<char*>(p_smem) + PipelinePolicy::template GetSmemSize<Problem>()));
 
         constexpr auto a_lds_block_desc =
             PipelinePolicy::template MakeALdsBlockDescriptor<Problem>();
@@ -1013,8 +1013,7 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
     CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
                                    const BFlatBlockWindowTmp& b_flat_dram_block_window_tmp,
                                    index_t num_loop,
-                                   void* p_smem_ping,
-                                   void* p_smem_pong) const
+                                   void* p_smem) const
     {
         const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
         const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
@@ -1025,8 +1024,7 @@ defined(USING_MFMA_32x32x64) && defined(ENABLE_FP4) // mi350 fp4 32c 1*K1
                 [](const ADataType& a) { return a; },
                 b_flat_dram_block_window_tmp,
                 num_loop,
-                p_smem_ping,
-                p_smem_pong);
+                p_smem);
         };
 
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);

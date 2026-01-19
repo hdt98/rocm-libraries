@@ -282,7 +282,6 @@ struct UniversalGemmPipelineProblem
     using AsDataTypeTuple = std::conditional_t<ADataTypeIsTuple,
                                                remove_cvref_t<AsDataType>,
                                                remove_cvref_t<tuple<AsDataType>>>;
-
     using BsDataTypeTuple = std::conditional_t<BDataTypeIsTuple,
                                                remove_cvref_t<BsDataType>,
                                                remove_cvref_t<tuple<BsDataType>>>;

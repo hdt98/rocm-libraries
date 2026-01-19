@@ -471,7 +471,7 @@ struct tensor_view
                                          null_buffer_view,
                                          gather_index_offset>(tdm_config,
                                                               smem,
-                                                              coord.get_offset(),
+                                                              coord.get_offset() / PackedSize,
                                                               tensor_dims,
                                                               global_strides,
                                                               number<num_tensor_dims>{},
@@ -488,7 +488,7 @@ struct tensor_view
                                          decltype(buffer_view),
                                          gather_index_offset>(tdm_config,
                                                               smem,
-                                                              coord.get_offset(),
+                                                              coord.get_offset() / PackedSize,
                                                               tensor_dims,
                                                               global_strides,
                                                               number<num_tensor_dims>{},
@@ -509,7 +509,7 @@ struct tensor_view
         return buf_.template tdm_store<TDMConfig_, DimTuple_, BoxDim_, num_tensor_dims>(
             tdm_config,
             smem,
-            coord.get_offset(),
+            coord.get_offset() / PackedSize,
             tensor_dims,
             global_strides,
             number<num_tensor_dims>{});

@@ -107,4 +107,8 @@ template <typename AType, typename BType, bool kTransC>
 using WarpGemmWmma_f32_16x16x128_f8f6f4 = WarpGemmImpl<
     WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f8f6f4<AType, BType>, kTransC>>;
 
+template <typename AType, typename BType, bool kTransC>
+using WarpGemmWmma_f32_32x32x128_f8f6f4 = WarpGemmImpl<
+    WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_32x32x128_f8f6f4<AType, BType>, kTransC>>;
+
 } // namespace ck_tile

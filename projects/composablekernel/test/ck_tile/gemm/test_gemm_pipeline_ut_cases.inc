@@ -176,7 +176,20 @@ TYPED_TEST(TEST_SUITE_NAME, NotSupportedArgument)
     constexpr std::string_view suite_name = XSTRINGIFY(TEST_SUITE_NAME);
     if constexpr(suite_name == "TestCkTileGemmPipelineCompTDMWmma")
     {
-        this->template Run<PadM, PadN, PadK>(M, N, K);
+        using ADataType = TestFixture::ADataType;
+        using BDataType = TestFixture::BDataType;
+
+        constexpr int APackedSize = ck_tile::numeric_traits<ADataType>::PackedSize;
+        constexpr int BPackedSize = ck_tile::numeric_traits<BDataType>::PackedSize;
+        if constexpr((APackedSize == 1) && (BPackedSize == 1))
+        {
+            this->template Run<PadM, PadN, PadK>(M, N, K);
+        }
+        else
+        {
+            GTEST_SKIP()
+                << "TestCkTileGemmPipelineCompTDMWmma only supports A and B packed size of 1";
+        }
     }
     else
     {

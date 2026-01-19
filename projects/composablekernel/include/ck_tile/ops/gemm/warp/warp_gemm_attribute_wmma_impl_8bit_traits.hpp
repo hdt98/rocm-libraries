@@ -533,7 +533,7 @@ struct WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 128>
 };
 
 // f8f6f4 specialization - GFX125
-enum F8F6F4OpSelEnum
+enum F8F6F4OpDataTypeEnum
 {
     E4M3, // 0x0
     E5M2, // 0x1
@@ -542,39 +542,76 @@ enum F8F6F4OpSelEnum
     E2M1, // 0x4
 };
 
+// Traits for MX data types used in f8f6f4 intrinsics
+template <typename T>
+struct MXDataTypeTrait;
+
 template <>
-struct WmmaTraits<gfx125_t, fp8_t, pk_fp4_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, fp8_t, pk_fp4_t, float, 128, true>
+struct MXDataTypeTrait<fp8_t>
 {
+    static constexpr F8F6F4OpDataTypeEnum OpDataType = F8F6F4OpDataTypeEnum::E4M3;
+    using VecType                                    = int32x16_t;
+
+    CK_TILE_DEVICE static int32x16_t to_wmma_vec(const int32x16_t& vec) { return vec; }
+};
+
+template <>
+struct MXDataTypeTrait<bf8_t>
+{
+    static constexpr F8F6F4OpDataTypeEnum OpDataType = F8F6F4OpDataTypeEnum::E5M2;
+    using VecType                                    = int32x16_t;
+
+    CK_TILE_DEVICE static int32x16_t to_wmma_vec(const int32x16_t& vec) { return vec; }
+};
+
+template <>
+struct MXDataTypeTrait<pk_fp4_t>
+{
+    static constexpr F8F6F4OpDataTypeEnum OpDataType = F8F6F4OpDataTypeEnum::E2M1;
+    using VecType                                    = int32x8_t;
+
+    CK_TILE_DEVICE static int32x16_t to_wmma_vec(const int32x8_t& vec)
+    {
+        return int32x16_t{
+            vec[0], vec[1], vec[2], vec[3], vec[4], vec[5], vec[6], vec[7], 0, 0, 0, 0, 0, 0, 0, 0};
+    }
+};
+
+// Unified WmmaTraits for f8f6f4 combinations
+template <typename AType, typename BType>
+struct WmmaTraits<
+    gfx125_t,
+    AType,
+    BType,
+    float,
+    16,
+    16,
+    128,
+    std::enable_if_t<std::is_same_v<AType, pk_fp4_t> || std::is_same_v<BType, pk_fp4_t>>>
+    : WmmaTraitsBase<gfx12_t, AType, BType, float, 128, true>
+{
+    using Base     = WmmaTraitsBase<gfx12_t, AType, BType, float, 128, true>;
     using ArchType = gfx125_t;
+
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
+
+    using ATraits = MXDataTypeTrait<AType>;
+    using BTraits = MXDataTypeTrait<BType>;
 
     template <typename... Params>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx125__
-        int32x8_t arg_b = bit_cast<int32x8_t>(b_vec);
-        return __builtin_amdgcn_wmma_f32_16x16x128_f8f6f4(F8F6F4OpSelEnum::E4M3,
-                                                          bit_cast<int32x16_t>(a_vec),
-                                                          F8F6F4OpSelEnum::E2M1,
-                                                          int32x16_t{arg_b[0],
-                                                                     arg_b[1],
-                                                                     arg_b[2],
-                                                                     arg_b[3],
-                                                                     arg_b[4],
-                                                                     arg_b[5],
-                                                                     arg_b[6],
-                                                                     arg_b[7],
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0},
-                                                          0,
-                                                          bit_cast<fp32x8_t>(c_vec));
+        return __builtin_amdgcn_wmma_f32_16x16x128_f8f6f4(
+            ATraits::OpDataType,
+            ATraits::to_wmma_vec(bit_cast<typename ATraits::VecType>(a_vec)),
+            BTraits::OpDataType,
+            BTraits::to_wmma_vec(bit_cast<typename BTraits::VecType>(b_vec)),
+            0,
+            bit_cast<fp32x8_t>(c_vec));
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -584,139 +621,70 @@ struct WmmaTraits<gfx125_t, fp8_t, pk_fp4_t, float, 16, 16, 128>
     }
 };
 
-template <>
-struct WmmaTraits<gfx125_t, pk_fp4_t, fp8_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, pk_fp4_t, fp8_t, float, 128, true>
+template <typename AType, typename BType>
+struct WmmaTraits<gfx125_t, AType, BType, float, 32, 32, 128>
+    : WmmaTraitsBase<gfx12_t, AType, BType, float, 128, true, 32, 32>
 {
+    using Base     = WmmaTraitsBase<gfx12_t, AType, BType, float, 128, true, 32, 32>;
     using ArchType = gfx125_t;
+
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
+
+    using ATraits = MXDataTypeTrait<AType>;
+    using BTraits = MXDataTypeTrait<BType>;
+
+    using Base::kCMBlock;
+    using Base::kCNBlock;
 
     template <typename... Params>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx125__
-        int32x8_t arg_a = bit_cast<int32x8_t>(a_vec);
-        return __builtin_amdgcn_wmma_f32_16x16x128_f8f6f4(F8F6F4OpSelEnum::E2M1,
-                                                          int32x16_t{arg_a[0],
-                                                                     arg_a[1],
-                                                                     arg_a[2],
-                                                                     arg_a[3],
-                                                                     arg_a[4],
-                                                                     arg_a[5],
-                                                                     arg_a[6],
-                                                                     arg_a[7],
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0},
-                                                          F8F6F4OpSelEnum::E4M3,
-                                                          bit_cast<int32x16_t>(b_vec),
-                                                          0,
-                                                          bit_cast<fp32x8_t>(c_vec));
-#else
-        ck_tile::ignore = a_vec;
-        ck_tile::ignore = b_vec;
-        ck_tile::ignore = c_vec;
-        return CVecType{0};
-#endif
-    }
-};
+        constexpr index_t kASliceSize = sizeof(AVecType) / sizeof(AType) / kCMBlock;
+        constexpr index_t kBSliceSize = sizeof(BVecType) / sizeof(BType) / kCNBlock;
 
-template <>
-struct WmmaTraits<gfx125_t, pk_fp4_t, pk_fp4_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, pk_fp4_t, pk_fp4_t, float, 128, true>
-{
-    using ArchType = gfx125_t;
+        using ASliceType = ext_vector_t<AType, kASliceSize>;
+        using BSliceType = ext_vector_t<BType, kBSliceSize>;
+        using CSliceType = fp32x8_t;
 
-    template <typename... Params>
-    CK_TILE_DEVICE static CVecType
-    wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
-    {
-#ifdef __gfx125__
-        int32x8_t arg_a = bit_cast<int32x8_t>(a_vec);
-        int32x8_t arg_b = bit_cast<int32x8_t>(b_vec);
-        return __builtin_amdgcn_wmma_f32_16x16x128_f8f6f4(F8F6F4OpSelEnum::E2M1,
-                                                          int32x16_t{arg_a[0],
-                                                                     arg_a[1],
-                                                                     arg_a[2],
-                                                                     arg_a[3],
-                                                                     arg_a[4],
-                                                                     arg_a[5],
-                                                                     arg_a[6],
-                                                                     arg_a[7],
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0},
-                                                          F8F6F4OpSelEnum::E2M1,
-                                                          int32x16_t{arg_b[0],
-                                                                     arg_b[1],
-                                                                     arg_b[2],
-                                                                     arg_b[3],
-                                                                     arg_b[4],
-                                                                     arg_b[5],
-                                                                     arg_b[6],
-                                                                     arg_b[7],
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0},
-                                                          0,
-                                                          bit_cast<fp32x8_t>(c_vec));
-#else
-        ck_tile::ignore = a_vec;
-        ck_tile::ignore = b_vec;
-        ck_tile::ignore = c_vec;
-        return CVecType{0};
-#endif
-    }
-};
+        using a_buf = thread_buffer<ASliceType, kCMBlock>;
+        using b_buf = thread_buffer<BSliceType, kCNBlock>;
+        using c_buf = thread_buffer<CSliceType, kCMBlock * kCNBlock>;
 
-template <>
-struct WmmaTraits<gfx125_t, bf8_t, pk_fp4_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, bf8_t, pk_fp4_t, float, 128, true>
-{
-    using ArchType = gfx125_t;
+        static_assert(sizeof(CVecType) == sizeof(c_buf),
+                      "CVecType and c_buf must have the same size");
+        static_assert(sizeof(AVecType) == sizeof(a_buf),
+                      "AVecType and a_buf must have the same size");
+        static_assert(sizeof(BVecType) == sizeof(b_buf),
+                      "BVecType and b_buf must have the same size");
 
-    template <typename... Params>
-    CK_TILE_DEVICE static CVecType
-    wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
-    {
-#ifdef __gfx125__
-        int32x8_t arg_b = bit_cast<int32x8_t>(b_vec);
-        return __builtin_amdgcn_wmma_f32_16x16x128_f8f6f4(F8F6F4OpSelEnum::E5M2,
-                                                          bit_cast<int32x16_t>(a_vec),
-                                                          F8F6F4OpSelEnum::E2M1,
-                                                          int32x16_t{arg_b[0],
-                                                                     arg_b[1],
-                                                                     arg_b[2],
-                                                                     arg_b[3],
-                                                                     arg_b[4],
-                                                                     arg_b[5],
-                                                                     arg_b[6],
-                                                                     arg_b[7],
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0,
-                                                                     0},
-                                                          0,
-                                                          bit_cast<fp32x8_t>(c_vec));
+        auto&& a_buffer = bit_cast<a_buf>(a_vec);
+        auto&& b_buffer = bit_cast<b_buf>(b_vec);
+        auto&& c_result = bit_cast<c_buf>(c_vec);
+
+        static_for<0, kCNBlock, 1>{}([&](auto n) {
+            static_for<0, kCMBlock, 1>{}([&](auto m) {
+                constexpr index_t c_idx = m * kCNBlock + n;
+
+                const auto& a_slice = a_buffer.template get_as<ASliceType>()[m];
+                const auto& b_slice = b_buffer.template get_as<BSliceType>()[n];
+                auto& c_slice       = c_result.template get_as<CSliceType>()[number<c_idx>{}];
+
+                c_slice = __builtin_amdgcn_wmma_f32_16x16x128_f8f6f4(
+                    ATraits::OpDataType,
+                    ATraits::to_wmma_vec(bit_cast<typename ATraits::VecType>(a_slice)),
+                    BTraits::OpDataType,
+                    BTraits::to_wmma_vec(bit_cast<typename BTraits::VecType>(b_slice)),
+                    0,
+                    c_slice);
+            });
+        });
+
+        return bit_cast<CVecType>(c_result);
+
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;

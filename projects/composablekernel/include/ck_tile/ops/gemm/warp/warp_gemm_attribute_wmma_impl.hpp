@@ -15,7 +15,8 @@ template <typename Arch,
           typename CType,
           index_t M,
           index_t N,
-          index_t K>
+          index_t K,
+          typename MXTypeEnable = void>
 struct WmmaTraits;
 
 // Generic WMMA implementation using traits
@@ -38,6 +39,9 @@ struct WarpGemmAttributeWmmaImpl
 
     static constexpr index_t kAMBlock = Traits::kAMBlock;
     static constexpr index_t kBNBlock = Traits::kBNBlock;
+
+    static constexpr index_t kCMBlock = Traits::kCMBlock;
+    static constexpr index_t kCNBlock = Traits::kCNBlock;
 
     static constexpr index_t kRepeat     = Traits::kRepeat;
     static constexpr index_t kAMLane     = Traits::kAMLane;
@@ -158,6 +162,10 @@ using WarpGemmAttributeWmmaImpl_f16_16x16x64_bf8_f8 =
 template <typename AType, typename BType>
 using WarpGemmAttributeWmmaImpl_f32_16x16x128_f8f6f4 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, AType, BType, float, 16, 16, 128>>;
+
+template <typename AType, typename BType>
+using WarpGemmAttributeWmmaImpl_f32_32x32x128_f8f6f4 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, AType, BType, float, 32, 32, 128>>;
 
 template <typename Arch,
           typename AType,

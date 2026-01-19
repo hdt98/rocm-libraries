@@ -34,6 +34,7 @@ using ClusterDisable = std::false_type;
 using I16  = ck_tile::number<16>;
 using I32  = ck_tile::number<32>;
 using I64  = ck_tile::number<64>;
+using I128 = ck_tile::number<128>;
 using I256 = ck_tile::number<256>;
 
 // clang-format off
@@ -250,8 +251,11 @@ using KernelTypesCompTDMWmma = ::testing::Types<
     std::tuple<    Col,     Row,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV1>,
     std::tuple<    Col,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV2>,
     std::tuple<    Row,     Row,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV2, NonPersistent, ClusterEnable>,
-    std::tuple<    Col,     Row,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV2>
-
+    std::tuple<    Col,     Row,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV2>,
+    std::tuple<    Row,     Col,     Row,       F4,        F4,          F32,       F16,        I64,         I64,          I128,       I16,        I16, Intrawave,        CompTDMV1>,
+    std::tuple<    Row,     Col,     Row,       F8,        F4,          F32,       F16,        I64,         I64,          I128,       I16,        I16, Intrawave,        CompTDMV1>,
+    std::tuple<    Row,     Col,     Row,       F4,        F4,          F32,       F16,        I64,         I64,          I128,       I32,        I32, Intrawave,        CompTDMV1>,
+    std::tuple<    Row,     Col,     Row,       F8,        F4,          F32,       F16,        I64,         I64,          I128,       I32,        I32, Intrawave,        CompTDMV1>
 >;
 
 using KernelTypesCompAsyncWmma = ::testing::Types<

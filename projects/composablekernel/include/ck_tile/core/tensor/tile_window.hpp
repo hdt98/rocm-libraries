@@ -724,8 +724,13 @@ struct tile_window_with_static_distribution
                                         const GatherIndexView_& gather_index_view,
                                         number<i_access_> = {}) const
     {
-        using LdsTileWindow      = remove_cvref_t<LdsTileWindow_>;
-        using LdsDataType        = typename LdsTileWindow::DataType;
+        using LdsTileWindow = remove_cvref_t<LdsTileWindow_>;
+        using LdsDataType   = typename LdsTileWindow::DataType;
+
+        static_assert(std::is_same_v<LdsDataType, typename Base::DataType>,
+                      "LdsDataType must match tile window's DataType");
+
+        using Traits             = typename Base::Traits;
         constexpr auto tile_dstr = typename Base::TileDstr{};
 
         static constexpr index_t num_tensor_dims = BottomTensorView_::get_num_of_dimension();
@@ -738,7 +743,7 @@ struct tile_window_with_static_distribution
         const auto& glb_tensor_descriptor = this->get_bottom_tensor_view().get_tensor_descriptor();
 
         // Use cached computation for global strides
-        const auto& global_strides = get_cached_global_strides();
+        auto&& global_strides = get_cached_global_strides();
 
         auto process_coord = [&](auto iCoord) {
             auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0]; // without origin
@@ -748,21 +753,26 @@ struct tile_window_with_static_distribution
                 lds_window_origin + window_adaptor_thread_coord.get_bottom_index();
 
             // tdm's box dim is reversed from tile distribution
-            constexpr auto box_dim =
+            constexpr auto raw_box_dim =
                 to_sequence(tile_dstr.get_ys_to_d_descriptor().get_lengths()).reverse();
+
+            constexpr auto box_dim = raw_box_dim.modify(
+                number<0>{}, number<raw_box_dim.at(number<0>{}) / Traits::PackedSize>{});
             // Use precomputed tensor descriptor
             const auto lds_coord =
                 make_tensor_coordinate(lds_tensor_descriptor, lds_bottom_tensor_thread_idx);
 
             // Calculate SMEM address using base pointer
-            CK_TILE_LDS_ADDR LdsDataType* smem = smem_base_ptr + lds_coord.get_offset();
+            CK_TILE_LDS_ADDR LdsDataType* smem =
+                smem_base_ptr + lds_coord.get_offset() / Traits::PackedSize;
 
             // Calculate remaining tensor dimensions, clamping negative values to 0
             // This prevents out-of-bounds access when window_origin + bottom_index > tensor_length
-            const auto& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
+            auto&& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
                 transform_tuples([](auto x) { return max(index_t{0}, x); },
                                  glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
                                      window_adaptor_thread_coord.get_bottom_index())));
+            tensor_dims[0] /= Traits::PackedSize;
             // Assert that both window origins have the same dimensionality
             static_assert(
                 std::is_same<std::remove_cv_t<std::remove_reference_t<decltype(lds_window_origin)>>,
@@ -819,8 +829,12 @@ struct tile_window_with_static_distribution
                                            const LdsTileWindow_& lds_tile,
                                            number<i_access_unsupport_> = {}) const
     {
-        using LdsTileWindow      = remove_cvref_t<LdsTileWindow_>;
-        using LdsDataType        = typename LdsTileWindow::DataType;
+        using LdsTileWindow = remove_cvref_t<LdsTileWindow_>;
+        using LdsDataType   = typename LdsTileWindow::DataType;
+
+        static_assert(std::is_same_v<LdsDataType, typename Base::DataType>,
+                      "LdsDataType must match tile window's DataType");
+        using Traits             = typename Base::Traits;
         constexpr auto tile_dstr = typename Base::TileDstr{};
 
         static constexpr index_t num_tensor_dims = BottomTensorView_::get_num_of_dimension();
@@ -833,7 +847,7 @@ struct tile_window_with_static_distribution
         auto smem_base_ptr                 = lds_bottom_tensor_view.get_buffer_view().p_data_;
 
         // Use cached computation for global strides
-        const auto& global_strides = get_cached_global_strides();
+        auto&& global_strides = get_cached_global_strides();
 
         static_for<0, NumCoord, 1>{}([&](auto iCoord) {
             auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0]; // without origin
@@ -844,19 +858,24 @@ struct tile_window_with_static_distribution
 
             // Calculate remaining tensor dimensions, clamping negative values to 0
             // This prevents out-of-bounds access when window_origin + bottom_index > tensor_length
-            const auto& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
+            auto&& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
                 transform_tuples([](auto x) { return max(index_t{0}, x); },
                                  glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
                                      window_adaptor_thread_coord.get_bottom_index())));
+            tensor_dims[0] /= Traits::PackedSize;
 
-            constexpr auto box_dim =
+            constexpr auto raw_box_dim =
                 to_sequence(tile_dstr.get_ys_to_d_descriptor().get_lengths()).reverse();
+
+            constexpr auto box_dim = raw_box_dim.modify(
+                number<0>{}, number<raw_box_dim.at(number<0>{}) / Traits::PackedSize>{});
             // Use precomputed tensor descriptor
             const auto lds_coord =
                 make_tensor_coordinate(lds_tensor_descriptor, lds_bottom_tensor_thread_idx);
 
             // Calculate SMEM address using base pointer
-            CK_TILE_LDS_ADDR LdsDataType* smem = smem_base_ptr + lds_coord.get_offset();
+            CK_TILE_LDS_ADDR LdsDataType* smem =
+                smem_base_ptr + lds_coord.get_offset() / Traits::PackedSize;
             // Assert that both window origins have the same dimensionality
             static_assert(
                 std::is_same<std::remove_cv_t<std::remove_reference_t<decltype(lds_window_origin)>>,
@@ -1300,11 +1319,13 @@ struct tile_window_with_static_distribution
     {
         if(!tensor_cache_initialized_)
         {
+            using Traits = typename Base::Traits;
             const auto& glb_tensor_descriptor =
                 this->get_bottom_tensor_view().get_tensor_descriptor();
             cached_global_strides_ = to_array<index_t, Base::NDimBottomTensor>(
-                tuple_reverse(container_reverse_inclusive_scan(
-                    glb_tensor_descriptor.get_lengths(), multiplies<>{}, 1)));
+                transform_tuples([](auto x) { return max(x / Traits::PackedSize, index_t{1}); },
+                                 tuple_reverse(container_reverse_inclusive_scan(
+                                     glb_tensor_descriptor.get_lengths(), multiplies<>{}, 1))));
             tensor_cache_initialized_ = true;
         }
 

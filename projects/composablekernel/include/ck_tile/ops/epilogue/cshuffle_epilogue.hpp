@@ -98,6 +98,7 @@ struct CShuffleEpilogue
     using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
 
+    // to be compatiable with original implementation
     using ATypeToUse =
         std::conditional_t<std::is_same_v<AComputeDataType, void>,
                            std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||

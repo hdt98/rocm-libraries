@@ -17,7 +17,7 @@ struct AWarpDstrEncodingTrait
 {
     using type = tile_distribution_encoding<
         sequence<Impl::kRepeat>,
-        tuple<sequence<Impl::kAMLane>,
+        tuple<sequence<Impl::kAMBlock, Impl::kAMLane>,
               sequence<Impl::kAK0PerLane, Impl::kABKLane, Impl::kAK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
         tuple<typename Impl::kABPs2RHssMinor>,
@@ -30,7 +30,7 @@ struct BWarpDstrEncodingTrait
 {
     using type = tile_distribution_encoding<
         sequence<Impl::kRepeat>,
-        tuple<sequence<Impl::kBNLane>,
+        tuple<sequence<Impl::kBNBlock, Impl::kBNLane>,
               sequence<Impl::kBK0PerLane, Impl::kABKLane, Impl::kBK1PerLane>>,
         tuple<typename Impl::kABPs2RHssMajor>,
         tuple<typename Impl::kABPs2RHssMinor>,
@@ -43,8 +43,8 @@ struct CWarpDstrEncodingTrait
 {
     using type = tile_distribution_encoding<
         sequence<>,
-        tuple<sequence<Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>,
-              sequence<Impl::kCNLane>>,
+        tuple<sequence<Impl::kCMBlock, Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>,
+              sequence<Impl::kCNBlock, Impl::kCNLane>>,
         tuple<typename Impl::kCPs2RHssMajor>,
         tuple<typename Impl::kCPs2RHssMinor>,
         typename Impl::kCYs2RHsMajor,
@@ -56,8 +56,8 @@ struct CTransposedWarpDstrEncodingTrait
 {
     using type = tile_distribution_encoding<
         sequence<>,
-        tuple<sequence<Impl::kCNLane>,
-              sequence<Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>>,
+        tuple<sequence<Impl::kCNBlock, Impl::kCNLane>,
+              sequence<Impl::kCMBlock, Impl::kCM0PerLane, Impl::kCMLane, Impl::kCM1PerLane>>,
         tuple<typename Impl::kCTPs2RHssMajor>,
         tuple<typename Impl::kCTPs2RHssMinor>,
         typename Impl::kCTYs2RHsMajor,

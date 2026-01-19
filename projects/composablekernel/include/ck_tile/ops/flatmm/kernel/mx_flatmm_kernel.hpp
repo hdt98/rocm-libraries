@@ -374,8 +374,7 @@ struct MXFlatmmKernel : FlatmmKernel<TilePartitioner_, MXFlatmmPipeline_, Epilog
               const BDataType* b_flat_ptr,
               const std::array<const void*, NumDTensor>& ds_ptr,
               EDataType* e_ptr,
-              void* smem_ptr_ping,
-              void* smem_ptr_pong,
+              void* smem_ptr,
               const FlatmmKernelArgs<ScaleM, ScaleN, DsDataType::size()>& kargs,
               const SplitKBatchOffset& splitk_batch_offset,
               const index_t block_idx_m,
@@ -404,8 +403,7 @@ struct MXFlatmmKernel : FlatmmKernel<TilePartitioner_, MXFlatmmPipeline_, Epilog
                                                       scale_a_block_window,
                                                       scale_b_block_window,
                                                       num_loop,
-                                                      smem_ptr_ping,
-                                                      smem_ptr_pong);
+                                                      smem_ptr);
 
         // Run Epilogue Pipeline with split_k dispatch
         if constexpr(DoEpiScale)
@@ -417,7 +415,7 @@ struct MXFlatmmKernel : FlatmmKernel<TilePartitioner_, MXFlatmmPipeline_, Epilog
                 EpiloguePipeline{}(e_block_window,
                                    c_block_tile,
                                    ds_block_window,
-                                   smem_ptr_ping,
+                                   smem_ptr,
                                    kargs.scale_m_ptr + block_idx_m,
                                    kargs.scale_n_ptr + block_idx_n);
             }
@@ -428,7 +426,7 @@ struct MXFlatmmKernel : FlatmmKernel<TilePartitioner_, MXFlatmmPipeline_, Epilog
                 EpiloguePipeline{}(e_block_window,
                                    c_block_tile,
                                    ds_block_window,
-                                   smem_ptr_ping,
+                                   smem_ptr,
                                    kargs.scale_m_ptr + block_idx_m,
                                    kargs.scale_n_ptr + block_idx_n);
             }
@@ -439,13 +437,13 @@ struct MXFlatmmKernel : FlatmmKernel<TilePartitioner_, MXFlatmmPipeline_, Epilog
             {
                 auto e_block_window = MakeEBlockWindow<memory_operation_enum::set>(
                     e_ptr, kargs, block_idx_m, block_idx_n);
-                EpiloguePipeline{}(e_block_window, c_block_tile, ds_block_window, smem_ptr_ping);
+                EpiloguePipeline{}(e_block_window, c_block_tile, ds_block_window, smem_ptr);
             }
             else
             {
                 auto e_block_window = MakeEBlockWindow<memory_operation_enum::atomic_add>(
                     e_ptr, kargs, block_idx_m, block_idx_n);
-                EpiloguePipeline{}(e_block_window, c_block_tile, ds_block_window, smem_ptr_ping);
+                EpiloguePipeline{}(e_block_window, c_block_tile, ds_block_window, smem_ptr);
             }
         }
     }
@@ -472,16 +470,14 @@ struct MXFlatmmKernel : FlatmmKernel<TilePartitioner_, MXFlatmmPipeline_, Epilog
             EDataType* e_ptr = static_cast<EDataType*>(kargs.e_ptr);
 
             // allocate LDS
-            __shared__ char smem_ptr_ping[Underlying::GetSmemPingSize()];
-            __shared__ char smem_ptr_pong[Underlying::GetSmemPongSize()];
+            __shared__ char smem_ptr[Underlying::GetSmemSize()];
 
             constexpr auto scheduler_type = (MXFlatmmPipeline::NumWaveGroups == 1);
             RunFlatmm<ScaleM, ScaleN, scheduler_type>(a_ptr,
                                                       b_flat_ptr,
                                                       kargs.ds_ptr,
                                                       e_ptr,
-                                                      smem_ptr_ping,
-                                                      smem_ptr_pong,
+                                                      smem_ptr,
                                                       kargs,
                                                       splitk_batch_offset,
                                                       i_m,
