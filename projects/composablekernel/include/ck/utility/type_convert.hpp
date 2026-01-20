@@ -2922,31 +2922,9 @@ inline __host__ __device__ bhalf16_t type_convert<bhalf16_t, bf6x16_pk_t>(bf6x16
 }
 
 template <>
-inline __host__ __device__ float type_convert<float, e8m0_bexp_t>(e8m0_bexp_t x)
-{
-    return float(x);
-}
-
-template <>
 inline __host__ __device__ e8m0_bexp_t type_convert<e8m0_bexp_t, float>(float x)
 {
     return e8m0_bexp_t(x);
-}
-
-template <>
-inline __host__ __device__ float type_convert<float, e4m3_scale_t>(e4m3_scale_t x)
-{
-#if defined(__gfx1250__)
-    union
-    {
-        unsigned int i32val;
-        uint8_t i8val[4];
-    } val;
-    val.i8val[0] = x.data;
-    return __builtin_amdgcn_cvt_f32_fp8(val.i32val, false);
-#else
-    return float(x);
-#endif
 }
 
 template <>
@@ -2971,22 +2949,6 @@ inline __host__ __device__ e4m3_scale_t type_convert<e4m3_scale_t, float>(float 
     return e4m3_scale_t{val.i8val[0]};
 #else
     return e4m3_scale_t(x);
-#endif
-}
-
-template <>
-inline __host__ __device__ float type_convert<float, e5m3_scale_t>(e5m3_scale_t x)
-{
-#if defined(__gfx1250__)
-    union
-    {
-        unsigned int i32val;
-        uint8_t i8val[4];
-    } val;
-    val.i8val[0] = x.data;
-    return __builtin_amdgcn_cvt_f32_fp8(val.i32val, true);
-#else
-    return float(x);
 #endif
 }
 
