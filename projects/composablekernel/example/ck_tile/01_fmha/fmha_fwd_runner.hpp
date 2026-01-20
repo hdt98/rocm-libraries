@@ -765,10 +765,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
     else if(init_method == "3")
     {
-        float q_dtype_max    = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
-        float k_dtype_max    = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
-        float v_dtype_max    = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
-        float bias_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<BiasDataType>::max());
+        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
+        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
+        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
 
         ck_tile::FillUniformDistribution<QDataType>{-q_dtype_max, q_dtype_max, next_seed()}(q_host);
         ck_tile::FillUniformDistribution<KDataType>{-k_dtype_max, k_dtype_max, next_seed()}(k_host);
@@ -777,8 +776,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         ck_tile::FillUniformDistribution<VDataType>{-v_dtype_max, v_dtype_max, next_seed()}(v_host);
         ck_tile::FillUniformDistribution<VDataType>{-v_dtype_max, v_dtype_max, next_seed()}(
             vnew_host);
-        ck_tile::FillUniformDistribution<BiasDataType>{
-            -bias_dtype_max, bias_dtype_max, next_seed()}(bias_host);
+        ck_tile::FillUniformDistribution<BiasDataType>{0.f, 1.f, next_seed()}(bias_host);
     }
     if(bias.type == bias_enum::alibi)
     {
