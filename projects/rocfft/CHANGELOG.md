@@ -7,7 +7,7 @@ Documentation for rocFFT is available at
 
 ### Added
 
-* Added optional RCCL (ROCm Collective Communications Library) backend for single-node multi-GPU communication.
+* Added optional RCCL (ROCm Collective Communications Library) backend for single-node multi-GPU communication, enabled via `-DROCFFT_RCCL_ENABLE=ON`.
 
 ### Changed
 
