@@ -1,0 +1,33 @@
+Enable OpenMP multithreading support for AOCL on Windows
+
+This commit enables OpenMP support when building AOCL (AMD Optimizing CPU Libraries)
+on Windows with ROCm Clang. Previously, AOCL was built in single-threaded mode to
+avoid OpenMP compatibility issues.
+
+Key Changes:
+- Enable ENABLE_MULTITHREADING=ON for AOCL build
+- Use Visual Studio's OpenMP 2.0 library (libomp.lib) with ROCm Clang
+- Clone and patch BLIS to fix Windows/Clang OpenMP flag compatibility
+- Create omp_stub.h to provide OpenMP 3.0 functions missing in VS OpenMP 2.0
+- Configure AOCL to use patched BLIS via BLAS_PATH
+
+Technical Details:
+1. Fixed MSVC-style OpenMP flag (/openmp:experimental) to Clang-compatible
+   flag (-fopenmp-simd) in BLIS CMakeLists.txt
+   
+2. Created OpenMP 3.0 compatibility shim (omp_stub.h) that provides:
+   - omp_get_active_level()
+   - omp_get_max_active_levels()
+   - omp_set_max_active_levels()
+   These functions are required by BLIS but missing from VS OpenMP 2.0.
+   
+3. Force-include omp_stub.h to work around BLIS header flattening that
+   marks system headers as "skipped"
+
+Result: AOCL 5.2 builds successfully with OpenMP multithreading enabled,
+producing libaocl.lib with full threading support.
+
+Files Modified:
+- projects/rocblas/rdeps.py (AOCL build configuration)
+
+See: projects/rocblas/docs/AOCL_OpenMP_Integration.md for full technical report
