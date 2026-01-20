@@ -712,6 +712,10 @@ auto _relu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
     return static_cast<decltype(in)>(std::max(static_cast<decltype(in)>(0), in));
 };
 
+auto _drelu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
+    return static_cast<decltype(in)>(std::max(static_cast<decltype(in)>(0), 1));
+};
+
 auto _gelu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
     using Tc = float;
 
@@ -1685,6 +1689,14 @@ void testing_matmul_with_bias(const Arguments& arg,
                 CHECK_SUCCESS(arg.use_e && "Must enable use e if gradient is enabled with gelu.");
                 epilogue[i] = HIPBLASLT_EPILOGUE_DGELU_BGRAD;
                 break;
+            case HIPBLASLT_EPILOGUE_RELU:
+                CHECK_SUCCESS(arg.use_e && "Must enable use e if gradient is enabled with relu.");
+                epilogue[i] = HIPBLASLT_EPILOGUE_DRELU;
+                break;
+            case HIPBLASLT_EPILOGUE_RELU_BIAS:
+                CHECK_SUCCESS(arg.use_e && "Must enable use e if gradient is enabled with relu.");
+                epilogue[i] = HIPBLASLT_EPILOGUE_DRELU_BGRAD;
+                break;
             default:
                 break;
             }
@@ -1714,6 +1726,10 @@ void testing_matmul_with_bias(const Arguments& arg,
             case HIPBLASLT_EPILOGUE_DGELU:
             case HIPBLASLT_EPILOGUE_DGELU_BGRAD:
                 // DGELU_AUX and DGELU_AUX_BGRAD already use E
+                break;
+            case HIPBLASLT_EPILOGUE_DRELU:
+            case HIPBLASLT_EPILOGUE_DRELU_BGRAD:
+                // DRELU_AUX and DRELU_AUX_BGRAD already use E
                 break;
             default:
                 hipblaslt_cerr << "The activation type " << epilogue[i]

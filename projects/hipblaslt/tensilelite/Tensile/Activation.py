@@ -1393,6 +1393,13 @@ class ActivationInline:
       kStr += addSpace(asm, ": \"+v\"(value) : \n")
       needExec = True if self.enableGuard else False
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter, needExec=needExec)
+    elif (activationType == 'drelu'):
+      kStr += (asm + " // drelu\n")
+      module = activation.getDReluModule(self.dataType, 0, 0)
+      kStr += self.getActivationAsmStr(activation, module, (len(asm) * " "))
+      kStr += addSpace(asm, ": \"+v\"(value) : \n")
+      needExec = True if self.enableGuard else False
+      kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter, needExec=needExec)
     elif (activationType == 'silu'):
       kStr += (asm + " // Silu\n")
       module = activation.getSiluModule(self.dataType, 0, 0)
