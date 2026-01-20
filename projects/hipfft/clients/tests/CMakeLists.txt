@@ -1,5 +1,5 @@
 # #############################################################################
-# Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -52,10 +52,6 @@ project( hipfft-clients-tests LANGUAGES CXX )
 if( NOT HIPFFT_BUILD_SCOPE )
   find_package( hipfft REQUIRED CONFIG PATHS )
 endif()
-
-find_package( Boost REQUIRED)
-
-set( Boost_USE_STATIC_LIBS OFF )
 
 # searching FFTW with FindFFTW.cmake that is provided by project
 # because distro versions of FFTW does not include the cmake specific
@@ -127,6 +123,8 @@ set( hipfft-test_source
   multi_device_test.cpp
   multi_stream_test.cpp
   ../../shared/array_validator.cpp
+  ../../shared/test_callbacks.cpp
+  ../../shared/data_gen_device.cpp
   )
 
 add_executable( hipfft-test ${hipfft-test_source} ${hipfft-test_includes} )
@@ -136,7 +134,7 @@ set( TEST_TARGETS hipfft-test )
 # MPI worker for MPI tests
 if( HIPFFT_MPI_ENABLE )
   # build MPI worker to support the tests
-  add_executable( hipfft_mpi_worker hipfft_mpi_worker.cpp )
+  add_executable( hipfft_mpi_worker hipfft_mpi_worker.cpp ../../shared/test_callbacks.cpp )
   list( APPEND TEST_TARGETS hipfft_mpi_worker )
   target_include_directories( hipfft_mpi_worker
     PRIVATE
@@ -149,7 +147,7 @@ if( NOT BUILD_WITH_LIB STREQUAL "CUDA" )
   if( WIN32 )
     find_package( HIP CONFIG REQUIRED )
   else()
-    find_package( hip REQUIRED CONFIG PATHS /opt/rocm/lib/cmake/hip/ )
+    find_package( HIP REQUIRED )
   endif()
 endif()
 
@@ -180,7 +178,7 @@ endif()
 
 foreach( target ${TEST_TARGETS} )
   set_target_properties( ${target} PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     )
 
@@ -242,7 +240,6 @@ foreach( target ${TEST_TARGETS} )
 
   target_include_directories( ${target}
     PRIVATE
-    $<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${FFTW_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${hip_INCLUDE_DIRS}>
   )
