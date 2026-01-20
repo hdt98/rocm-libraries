@@ -37,6 +37,7 @@
 #include <miopen/solver/gemm_common.hpp>
 
 #include <boost/range/adaptors.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 namespace solver {
@@ -47,8 +48,8 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool GemmBwdBase::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
 #if MIOPEN_USE_GEMM
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
     const auto& dyDesc             = problem.GetIn();
     const auto& wDesc              = problem.GetWeights();
@@ -56,42 +57,38 @@ bool GemmBwdBase::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
     const auto rblas_fp8_supported = IsFP8Supported(ctx.GetStream().GetDeviceName());
     if(problem.IsTensorsCasted())
     {
-        if(!rblas_fp8_supported)
-        {
-            MIOPEN_LOG_I2("GEMM not supported with casted tensors on this GPU architecture");
-            return false;
-        }
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !rblas_fp8_supported,
+            "GEMM not supported with casted tensors on this GPU architecture");
+
         if(dyDesc.GetCastType() && wDesc.GetCastType())
         {
             const auto a_cast_type = dyDesc.GetCastType();
             const auto b_cast_type = wDesc.GetCastType();
-            if(a_cast_type != miopenFloat8_fnuz && a_cast_type != miopenBFloat8_fnuz)
-            {
-                MIOPEN_LOG_W("Casting is only supported for the miopenFloat8_fnuz and "
-                             "miopenBFloat8_fnuz data types");
-                return false;
-            }
-            if(b_cast_type != miopenFloat8_fnuz && b_cast_type != miopenBFloat8_fnuz)
-            {
-                MIOPEN_LOG_W("Casting is only supported for the miopenFloat8_fnuz and "
-                             "miopenBFloat8_fnuz data types");
-                return false;
-            }
+            MIOPEN_SOLVER_INAPPLICABLE_IF(
+                (a_cast_type != miopenFloat8_fnuz && a_cast_type != miopenBFloat8_fnuz),
+                inapplicable_msg::CastOnly8FNUZ);
+
+            MIOPEN_SOLVER_INAPPLICABLE_IF(
+                (b_cast_type != miopenFloat8_fnuz && b_cast_type != miopenBFloat8_fnuz),
+                inapplicable_msg::CastOnly8FNUZ);
         }
         else
         {
-            MIOPEN_LOG_I("Both the output and weights tensors need to be casted");
-            return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(true,
+                                          "Both the output and weights tensors need to be casted");
         }
     }
-    if(problem.IsFp8() && !rblas_fp8_supported)
-    {
-        MIOPEN_LOG_I2("GEMM not applicable for F8 on this GPU architecture");
-        return false;
-    }
-    return problem.IsDirectionBackwardData() && problem.IsLayoutDefault() &&
-           !(gemm::IsAnyBufferBf16(dxDesc, dyDesc, wDesc) && !gemm::IsBf16Supported) &&
-           !(gemm::IsAnyBufferFp16(dxDesc, dyDesc, wDesc) && !gemm::IsFp16Supported);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.IsFp8() && !rblas_fp8_supported),
+                                  "GEMM not applicable for F8 on this GPU architecture");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionBackwardData() && problem.IsLayoutDefault() &&
+          !(gemm::IsAnyBufferBf16(dxDesc, dyDesc, wDesc) && !gemm::IsBf16Supported) &&
+          !(gemm::IsAnyBufferFp16(dxDesc, dyDesc, wDesc) && !gemm::IsFp16Supported)),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 #else
     std::ignore = ctx;
     std::ignore = problem;
@@ -206,11 +203,14 @@ bool GemmBwd1x1_stride2::IsApplicable(const ExecutionContext& context,
     const auto spatial_dim = conv.GetSpatialDimension();
     const auto wei_spatial = boost::adaptors::slice(wDesc.GetLengths(), 2, 2 + spatial_dim);
 
-    return conv.GetSpatialDimension() == 2 &&
-           miopen::all_of(wei_spatial, [](auto v) { return v == 1; }) &&
-           miopen::all_of(conv.GetConvPads(), [](auto v) { return v == 0; }) &&
-           miopen::all_of(conv.GetConvStrides(), [](auto v) { return v == 2; }) &&
-           GetWorkspaceSize(context, problem) > 0;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(conv.GetSpatialDimension() == 2 &&
+          miopen::all_of(wei_spatial, [](auto v) { return v == 1; }) &&
+          miopen::all_of(conv.GetConvPads(), [](auto v) { return v == 0; }) &&
+          miopen::all_of(conv.GetConvStrides(), [](auto v) { return v == 2; }) &&
+          GetWorkspaceSize(context, problem) > 0),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 #else
     std::ignore = context;
     std::ignore = problem;
@@ -407,9 +407,12 @@ bool GemmBwd1x1_stride1::IsApplicable(const ExecutionContext& context,
     const auto spatial_dim = conv.GetSpatialDimension();
     const auto wei_spatial = boost::adaptors::slice(wDesc.GetLengths(), 2, 2 + spatial_dim);
 
-    return miopen::all_of(wei_spatial, [](auto v) { return v == 1; }) &&
-           miopen::all_of(conv.GetConvPads(), [](auto v) { return v == 0; }) &&
-           miopen::all_of(conv.GetConvStrides(), [](auto v) { return v == 1; });
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (miopen::all_of(wei_spatial, [](auto v) { return v == 1; }) &&
+         miopen::all_of(conv.GetConvPads(), [](auto v) { return v == 0; }) &&
+         miopen::all_of(conv.GetConvStrides(), [](auto v) { return v == 1; })),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 #else
     std::ignore = context;
     std::ignore = problem;
@@ -587,9 +590,11 @@ bool GemmBwdRest::IsApplicable(const ExecutionContext& context,
     if(!GemmBwdBase::IsApplicable(context, problem))
         return false;
 
-    return !GemmBwd1x1_stride2{}.IsApplicable(context, problem) &&
-           !GemmBwd1x1_stride1{}.IsApplicable(context, problem) &&
-           GetWorkspaceSize(context, problem) > 0;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(!GemmBwd1x1_stride2{}.IsApplicable(context, problem) &&
+                                    !GemmBwd1x1_stride1{}.IsApplicable(context, problem) &&
+                                    GetWorkspaceSize(context, problem) > 0),
+                                  inapplicable_msg::NoKernelForConfig);
+    return true;
 #else
     std::ignore = context;
     std::ignore = problem;
