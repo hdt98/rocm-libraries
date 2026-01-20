@@ -1283,7 +1283,7 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a, 
     for(wide_t i = static_cast<wide_t>(tid); i < static_cast<wide_t>(total_work);
         i += static_cast<wide_t>(tcount))
     {
-           // widen dims once
+        // widen dims once
         const wide_t cw  = static_cast<wide_t>(c_w);
         const wide_t ch  = static_cast<wide_t>(c_h);
         const wide_t cd  = static_cast<wide_t>(c_d);
@@ -1327,12 +1327,12 @@ extern "C" __global__ void Op5dTensorGeneric(const MIOPEN_TYPE* __restrict__ a, 
 
         if(!use_beta)
         {
-               c_base[static_cast<size_t>(c_off)] = tmp;
+            c_base[static_cast<size_t>(c_off)] = tmp;
         }
         else
         {
-               const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
-               c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
+            const MIOPEN_TYPE cv               = c_base[static_cast<size_t>(c_off)];
+            c_base[static_cast<size_t>(c_off)] = tmp + cv * beta;
         }
     }
 #endif // USE_PACKED_INNER
