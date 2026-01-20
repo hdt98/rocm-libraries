@@ -34,6 +34,7 @@
 #include <miopen/batched_transpose_sol.hpp>
 #include <miopen/buffer_info.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_BWD_GTC_XDLOPS_NHWC)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_PK_ATOMIC_ADD_FP16)
@@ -969,62 +970,60 @@ ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC::Search(const ExecutionContext& ctx,
 bool ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC::IsApplicable(
     const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_BWD_GTC_XDLOPS_NHWC))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_BWD_GTC_XDLOPS_NHWC),
+        inapplicable_msg::EnvDisabled);
 
-    if(problem.GetConv().attribute.deterministic)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
 
 #if WORKAROUND_ISSUE_1979
-    if(ProblemInterpreter::GetGroupCountG(problem) > 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((ProblemInterpreter::GetGroupCountG(problem) > 1),
+                                  inapplicable_msg::Workaround);
 #endif
 
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if((device_name != "gfx908") && (device_name != "gfx90a") && (device_name != "gfx942") &&
-       (!StartsWith(device_name, "gfx95")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((device_name != "gfx908") && (device_name != "gfx90a") &&
+                                      (device_name != "gfx942") &&
+                                      (!StartsWith(device_name, "gfx95")),
+                                  inapplicable_msg::UnsupportedDevice);
 
-    if(!ctx.use_asm_kernels)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(!problem.IsDirectionBackwardData())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardData(), inapplicable_msg::Direction);
 
-    if(!problem.Is2d())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsFp32() && !problem.IsFp16() &&
-       !(problem.IsBfp16() &&
-         (device_name == "gfx90a" || device_name == "gfx942" || StartsWith(device_name, "gfx95"))))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !problem.IsFp32() && !problem.IsFp16() &&
+            !(problem.IsBfp16() && (device_name == "gfx90a" || device_name == "gfx942" ||
+                                    StartsWith(device_name, "gfx95"))),
+        "Failed datatype and device check");
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!ctx.rmv.IsV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV3(), inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
-    if(0 ==
-       igemm_split_batch_size(ProblemInterpreter::GetInputHeightHi(problem),
-                              ProblemInterpreter::GetInputWidthWi(problem),
-                              ProblemInterpreter::GetOutputHeightHo(problem),
-                              ProblemInterpreter::GetOutputWidthWo(problem),
-                              ProblemInterpreter::GetBatchN(problem),
-                              ProblemInterpreter::GetOutputChannelK(problem),
-                              ProblemInterpreter::GetInputChannelC(problem),
-                              miopen::GetTypeSize(ProblemInterpreter::GetInputDataType(problem))))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (0 == igemm_split_batch_size(
+                  ProblemInterpreter::GetInputHeightHi(problem),
+                  ProblemInterpreter::GetInputWidthWi(problem),
+                  ProblemInterpreter::GetOutputHeightHo(problem),
+                  ProblemInterpreter::GetOutputWidthWo(problem),
+                  ProblemInterpreter::GetBatchN(problem),
+                  ProblemInterpreter::GetOutputChannelK(problem),
+                  ProblemInterpreter::GetInputChannelC(problem),
+                  miopen::GetTypeSize(ProblemInterpreter::GetInputDataType(problem)))),
+        inapplicable_msg::ZeroSplitBatchSize);
     {
         auto largest_config = problem.IsFp32()
                                   ? GetBwdXdlopsNHWCConfigLargestTileFp32()
@@ -1034,8 +1033,9 @@ bool ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC::IsApplicable(
         std::tie(current_block_size, current_grid_size, current_splits_4G) =
             GetImplicitGemmGtcDynamicBwdXdlopsNHWCKernel(problem, largest_config);
 
-        if(current_block_size * current_grid_size * current_splits_4G > 0xffffffffULL)
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            (current_block_size * current_grid_size * current_splits_4G > 0xffffffffULL),
+            inapplicable_msg::NoKernelForConfig);
     }
     return true;
 }

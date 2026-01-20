@@ -36,6 +36,7 @@
 #include <miopen/handle.hpp>
 #include <miopen/conv/solvers.hpp>
 #include <miopen/generic_search.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_ISSUE_532 1 // ConvAsmBwdWrW3x3 has precision issues with some PerformanceConfigs
 #define MIOPEN_GCN_ASM_DIRECT_3X3WRW_SEARCH_LWC_FIXED 0
@@ -391,46 +392,50 @@ bool ConvAsmBwdWrW3x3::IsValidPerformanceConfig(
 bool ConvAsmBwdWrW3x3::IsApplicable(const ExecutionContext& ctx,
                                     const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW3X3))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW3X3),
+                                  inapplicable_msg::EnvDisabled);
+
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")))
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
 #if WORKAROUND_ISSUE_532
-    if(StartsWith(name, "gfx9") &&
-       (problem.GetKernelStrideW() > 1 || problem.GetKernelStrideH() > 1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((StartsWith(name, "gfx9") && (problem.GetKernelStrideW() > 1 ||
+                                                                problem.GetKernelStrideH() > 1)),
+                                  inapplicable_msg::Workaround);
 #endif
 
-    if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                  inapplicable_msg::IsGfx90aFp16altRequired);
 
 #if WORKAROUND_SWDEV_330460
-    if(!env::enabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW3X3) && name == "gfx90a" && problem.IsFp32())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!env::enabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW3X3) &&
+                                      name == "gfx90a" && problem.IsFp32(),
+                                  inapplicable_msg::Workaround);
 #endif
 
     // clang-format off
@@ -445,13 +450,11 @@ bool ConvAsmBwdWrW3x3::IsApplicable(const ExecutionContext& ctx,
         && problem.GetBias() == 0
         && (problem.IsFp32() || problem.IsFp16())
         && problem.GetInLayout() == "NCHW";
-    if(!ok)
-        return false; // Early exit to speed up the check.
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ok, inapplicable_msg::Generic);
 
-    if(problem.IsFp16()
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.IsFp16()
           && (StartsWith(name, "gfx8") // Not supported.
-             || problem.GetBatchSize() % 2 != 0)) /// \todo Initial version.
-       return false;
+             || problem.GetBatchSize() % 2 != 0)), "Not supported for fp16 and gfx8x or when batch_size % 2 != 0" ); /// \todo Initial version.
 
     // Check limits:
     const auto h_w     = problem.GetOutHeight() * problem.GetOutWidth();
@@ -480,7 +483,9 @@ bool ConvAsmBwdWrW3x3::IsApplicable(const ExecutionContext& ctx,
          && n_c_h_w < std::pow(2, 29)
          && n_k_h_w < std::pow(2, 29)
          && c_k_r_s < std::pow(2, 29); // clang-format on
-    return ok;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ok, inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 ConvSolution ConvAsmBwdWrW3x3::GetSolution(const ExecutionContext& ctx,

@@ -40,6 +40,7 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/conv/heuristics/ai_heuristics.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1U_PERF_VALS)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1U_SEARCH_OPTIMIZED)
@@ -522,43 +523,44 @@ bool ConvAsm1x1U::IsValidPerformanceConfig(const ExecutionContext&,
 
 bool ConvAsm1x1U::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1U))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_1X1U),
+                                  inapplicable_msg::EnvDisabled);
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx90")))
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16()))
-        return false;
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(StartsWith(name, "gfx90")),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()),
+        inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16()),
+                                  inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
-    if(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8())
-        return false;
-
-    if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                  inapplicable_msg::IsGfx90aFp16altRequired);
 
     const auto elements_in_dword = 4 / GetTypeSize(problem.GetInDataType());
     if(elements_in_dword == 0) // For clang-tidy (false positive DIV/0)
@@ -582,24 +584,20 @@ bool ConvAsm1x1U::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         && (elements_in_dword == 1 || problem.GetOutChannels() >= 4));
     if(problem.IsDirectionBackwardData() && elements_in_dword != 1)
         ok = ok && (problem.GetOutChannels() % 4 == 0);
-    if(!ok)
-    {
-        return false; // Early exit to speed up the check.
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ok, inapplicable_msg::Generic);
+    
     /// \todo Ilya: The checks below look adequate but needs to be double-checked.
     {
         const uint64_t input_line_size = 4 * problem.GetInWidth();
         const uint64_t input_feature_map_size = input_line_size * problem.GetInHeight();
         const uint64_t input_stack_size = input_feature_map_size * problem.GetInChannels();
-        if (! (input_stack_size < (1U << 24)))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(! (input_stack_size < (1U << 24)), inapplicable_msg::Workaround);
     }
     {
         const uint64_t output_line_size = 4 * problem.GetOutWidth();
         const uint64_t output_feature_map_size = output_line_size * problem.GetOutHeight();
         const uint64_t output_stack_size = output_feature_map_size * problem.GetOutChannels();
-        if (! (output_stack_size < (1U << 24)))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(! (output_stack_size < (1U << 24)), inapplicable_msg::Workaround);
     }
     // Check limits:
     const auto h_w = AsmImgHeight(problem) * AsmImgWidth(problem);
@@ -617,7 +615,9 @@ bool ConvAsm1x1U::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
          && n_c_h_w < std::pow(2, 29)
          && n_k_h_w < std::pow(2, 29)
          && c_k_r_s < std::pow(2, 29); // clang-format on
-    return ok;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ok, inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 size_t ConvAsm1x1U::GetWorkspaceSize(const ExecutionContext&,

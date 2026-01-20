@@ -32,6 +32,7 @@
 #include <miopen/solver/implicitgemm_util.hpp>
 #include <miopen/conv/asm_implicit_gemm.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_BWD_GTC_XDLOPS)
 
@@ -981,52 +982,48 @@ FindImplicitGemmGtcDynamicBwdKernel(const ProblemDescription& problem)
 bool ConvAsmImplicitGemmGTCDynamicBwdXdlops::IsApplicable(const ExecutionContext& ctx,
                                                           const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_BWD_GTC_XDLOPS))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_BWD_GTC_XDLOPS),
+                                  inapplicable_msg::EnvDisabled);
 
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if(device_name != "gfx908")
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(device_name != "gfx908", inapplicable_msg::UnsupportedDevice);
 
-    if(!ctx.use_asm_kernels)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(!problem.IsDirectionBackwardData())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardData(), inapplicable_msg::Direction);
 
-    if(!problem.Is2d())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsFp32() && !problem.IsFp16())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((!problem.IsFp32() && !problem.IsFp16()),
+                                  inapplicable_msg::DataType);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!ctx.rmv.IsV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV3(), inapplicable_msg::MetaData);
 
     // So far, "group" is not supported by the bwd fp32 kernels
-    if(problem.IsFp32() && ProblemInterpreter::GetGroupCountG(problem) != 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (problem.IsFp32() && ProblemInterpreter::GetGroupCountG(problem) != 1),
+        "Grouped convs not supported in BWD FP32 Kernels");
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     bool isValid;
     std::tie(isValid, std::ignore, std::ignore, std::ignore, std::ignore) =
         FindImplicitGemmGtcDynamicBwdKernel(problem);
-    return isValid;
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!isValid, inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 ConvSolution

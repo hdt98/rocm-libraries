@@ -32,6 +32,7 @@
 #include <miopen/solver/implicitgemm_util.hpp>
 #include <miopen/solver/problem_description_helpers.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_V4R1)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_V4R1_1X1)
@@ -286,94 +287,84 @@ bool TunableImplicitGemmV4R1Dynamic::IsValid(const ExecutionContext& ctx,
 bool ConvAsmImplicitGemmV4R1DynamicFwd::IsApplicable(const ExecutionContext& ctx,
                                                      const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_V4R1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_V4R1),
+                                  inapplicable_msg::EnvDisabled);
 
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(device_name, "gfx900") || StartsWith(device_name, "gfx906")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(device_name, "gfx900") || StartsWith(device_name, "gfx906")),
+        inapplicable_msg::UnsupportedDevice);
 
-    if(!ctx.use_asm_kernels)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(!problem.IsDirectionForward())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
 
-    if(!problem.Is2d())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsFp32())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsFp32(), inapplicable_msg::DataType);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!ctx.rmv.IsV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV3(), inapplicable_msg::MetaData);
 
-    if(ProblemInterpreter::GetGroupCountG(problem) != 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((ProblemInterpreter::GetGroupCountG(problem) != 1),
+                                  inapplicable_msg::GetGroupCount);
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     auto tunables = GetImplicitGemmV4R1DynamicTunables();
-    return !std::none_of(tunables.begin(), tunables.end(), [&](auto tunable) {
+    auto tune_it  = std::find_if(tunables.begin(), tunables.end(), [&](auto tunable) {
         return tunable.IsValid(ctx, problem);
     });
+    MIOPEN_SOLVER_INAPPLICABLE_IF(tune_it == tunables.end(), inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 bool ConvAsmImplicitGemmV4R1DynamicFwd_1x1::IsApplicable(const ExecutionContext& ctx,
                                                          const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_V4R1_1X1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_V4R1_1X1),
+                                  inapplicable_msg::EnvDisabled);
 
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(device_name, "gfx900") || StartsWith(device_name, "gfx906")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(device_name, "gfx900") || StartsWith(device_name, "gfx906")),
+        inapplicable_msg::UnsupportedDevice);
 
-    if(!ctx.use_asm_kernels)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(!problem.IsDirectionForward())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
 
-    if(!problem.Is2d())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsFp32())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsFp32(), inapplicable_msg::DataType);
 
-    if(!ctx.rmv.IsV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV3(), inapplicable_msg::MetaData);
 
-    if(ProblemInterpreter::GetGroupCountG(problem) != 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((ProblemInterpreter::GetGroupCountG(problem) != 1),
+                                  inapplicable_msg::GetGroupCount);
 
     if((ProblemInterpreter::GetFilterHeightY(problem) != 1) ||
        (ProblemInterpreter::GetFilterWidthX(problem) != 1))
         return false;
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     auto tunables = GetImplicitGemmV4R1DynamicTunables();
     return !std::none_of(tunables.begin(), tunables.end(), [&](auto tunable) {

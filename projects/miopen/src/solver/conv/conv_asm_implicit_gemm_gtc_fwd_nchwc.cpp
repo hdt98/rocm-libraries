@@ -33,6 +33,7 @@
 #include <miopen/conv/asm_implicit_gemm.hpp>
 #include <miopen/batched_transpose_sol.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_GTC_DLOPS_NCHWC)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_PK_ATOMIC_ADD_FP16)
@@ -559,55 +560,49 @@ ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC::Search(const ExecutionContext& ctx,
 bool ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC::IsApplicable(
     const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_GTC_DLOPS_NCHWC))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_FWD_GTC_DLOPS_NCHWC),
+        inapplicable_msg::EnvDisabled);
 
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if((device_name != "gfx1030"))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((device_name != "gfx1030"), inapplicable_msg::UnsupportedDevice);
 
-    if(!ctx.use_asm_kernels)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(!problem.IsDirectionForward())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
 
-    if(!problem.Is2d())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsLayoutNCHWc())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutNCHWc(), inapplicable_msg::Layout);
 
-    if(!(problem.IsFp16() && problem.GetVectorLength() == 4) &&
-       !(problem.IsFp16() && problem.GetVectorLength() == 8))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((!(problem.IsFp16() && problem.GetVectorLength() == 4) &&
+                                   !(problem.IsFp16() && problem.GetVectorLength() == 8)),
+                                  "Unsupported vector length for FP16");
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!ctx.rmv.IsV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV3(), inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
-    if(0 ==
-       igemm_split_batch_size(ProblemInterpreter::GetInputHeightHi(problem),
-                              ProblemInterpreter::GetInputWidthWi(problem),
-                              ProblemInterpreter::GetOutputHeightHo(problem),
-                              ProblemInterpreter::GetOutputWidthWo(problem),
-                              ProblemInterpreter::GetBatchN(problem),
-                              ProblemInterpreter::GetOutputChannelK(problem),
-                              ProblemInterpreter::GetInputChannelC(problem),
-                              miopen::GetTypeSize(ProblemInterpreter::GetInputDataType(problem))))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (0 == igemm_split_batch_size(
+                  ProblemInterpreter::GetInputHeightHi(problem),
+                  ProblemInterpreter::GetInputWidthWi(problem),
+                  ProblemInterpreter::GetOutputHeightHo(problem),
+                  ProblemInterpreter::GetOutputWidthWo(problem),
+                  ProblemInterpreter::GetBatchN(problem),
+                  ProblemInterpreter::GetOutputChannelK(problem),
+                  ProblemInterpreter::GetInputChannelC(problem),
+                  miopen::GetTypeSize(ProblemInterpreter::GetInputDataType(problem)))),
+        inapplicable_msg::ZeroSplitBatchSize);
 
     return true;
 }

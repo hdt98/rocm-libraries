@@ -35,6 +35,7 @@
 #include <miopen/tensor_ops.hpp>
 #include <miopen/conv/asm_implicit_gemm.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_WRW_GTC_XDLOPS)
 
@@ -823,55 +824,49 @@ ConvAsmImplicitGemmGTCDynamicWrwXdlops::GetWorkspaceSize(const ExecutionContext&
 bool ConvAsmImplicitGemmGTCDynamicWrwXdlops::IsApplicable(const ExecutionContext& ctx,
                                                           const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_WRW_GTC_XDLOPS))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_ASM_WRW_GTC_XDLOPS),
+                                  inapplicable_msg::EnvDisabled);
 
-    if(problem.GetConv().attribute.deterministic)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
 
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if(device_name != "gfx908")
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(device_name != "gfx908", inapplicable_msg::UnsupportedDevice);
 
-    if(!ctx.use_asm_kernels)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
 
-    if(!problem.Is2d())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsFp32() && !problem.IsFp16())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((!problem.IsFp32() && !problem.IsFp16()),
+                                  inapplicable_msg::DataType);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!ctx.rmv.IsV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV3(), inapplicable_msg::MetaData);
 
-    if(ProblemInterpreter::GetGroupCountG(problem) != 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((ProblemInterpreter::GetGroupCountG(problem) != 1),
+                                  inapplicable_msg::GetGroupCount);
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     bool is_valid;
     std::tie(is_valid, std::ignore, std::ignore, std::ignore, std::ignore) =
         FindImplicitGemmWrwGTCDynamicXdlopsKernel(problem);
 
-    return is_valid;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!is_valid, inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 ConvSolution

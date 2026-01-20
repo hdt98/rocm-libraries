@@ -33,6 +33,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/sequences.hpp>
 #include <miopen/conv/invokers/gen_x_w_y_pad.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #include <cstdint>
 #include <sstream>
@@ -173,38 +174,39 @@ bool ConvAsm3x3U::IsValidPerformanceConfig(const ExecutionContext&,
 
 bool ConvAsm3x3U::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_3X3U))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_3X3U),
+                                  inapplicable_msg::EnvDisabled);
+
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")))
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()),
+        inapplicable_msg::Direction);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
-    if(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsFp8() || problem.IsBfp8(), inapplicable_msg::DataType);
 
     constexpr auto GIB                         = static_cast<int64_t>(1024) * 1024 * 1024;
     constexpr auto TIB                         = GIB * 1024;
@@ -219,7 +221,7 @@ bool ConvAsm3x3U::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
     const auto WEI_BUF_SZ = ELEM_SZ * problem.GetInChannels() * problem.GetOutChannels() *
                             problem.GetWeightsHeight() * problem.GetWeightsWidth();
     // clang-format off
-    return problem.GetPadW() == 1
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetPadW() == 1
         && problem.GetPadH() == 1
         && problem.GetKernelStrideW() == 1
         && problem.GetKernelStrideH() == 1
@@ -239,9 +241,10 @@ bool ConvAsm3x3U::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         && OUT_BUF_SZ <= 256 * TIB
         && WEI_BUF_SZ <= 4 * GIB
         && problem.IsFp32()
-        && problem.GetInLayout() == "NCHW";
+        && problem.GetInLayout() == "NCHW"), inapplicable_msg::NoKernelForConfig);
         // && (problem.forward ? problem.GetWeightsLayout() == "KCHW" : problem.GetWeightsLayout() == "CKHW" )
     // clang-format on
+    return true;
 }
 
 ConvSolution ConvAsm3x3U::GetSolution(const ExecutionContext& ctx,

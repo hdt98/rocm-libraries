@@ -29,6 +29,7 @@
 #include <miopen/env.hpp>
 #include <miopen/conv/invokers/gen_x_w_y_pad.hpp>
 #include <miopen/mlo_internal.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_ISSUE_1146 1 // check asm solver applicability for gfx90a
 
@@ -43,41 +44,42 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool ConvAsm5x10u2v2b1::IsApplicable(const ExecutionContext& ctx,
                                      const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_5X10U2V2))
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_5X10U2V2),
+                                  inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     const std::string name = ctx.GetStream().GetDeviceName();
     const bool device_is_gfx8_9_no_xnack =
         (name == "gfx800" || name == "gfx802" || name == "gfx803" || name == "gfx804" ||
          name == "gfx900" || name == "gfx904" || name == "gfx906" || name == "gfx908");
 #if WORKAROUND_ISSUE_1146
-    if(name == "gfx90a")
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a", inapplicable_msg::Workaround);
 #endif
-    if(!device_is_gfx8_9_no_xnack)
-        return false;
-    if(!problem.IsDirectionBackwardData())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!device_is_gfx8_9_no_xnack, inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardData(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8(),
+                                  "Casted tensor or unsupported Dtype");
 
     // Min image + padding shall be not smaller than filter matrix.
     const int min_out_width  = 138;
@@ -87,7 +89,7 @@ bool ConvAsm5x10u2v2b1::IsApplicable(const ExecutionContext& ctx,
     const int max_out_height = 131077 - 1;
 
     // clang-format off
-    return problem.GetPadW() == 0                    // -q   pad_w   fixed
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetPadW() == 0                    // -q   pad_w   fixed
         && problem.GetPadH() == 0                    // -p   pad_h   fixed
         && problem.GetKernelStrideW() == 2           // -v   inp_v   fixed
         && problem.GetKernelStrideH() == 2           // -u   inp_u   fixed
@@ -103,9 +105,10 @@ bool ConvAsm5x10u2v2b1::IsApplicable(const ExecutionContext& ctx,
         && problem.GetOutHeight() <= max_out_height
         && problem.IsFp32()
         && problem.GetGroupCount() == 1
-        && problem.GetOutLayout() == "NCHW";          // hardcoded
+        && problem.GetOutLayout() == "NCHW"), inapplicable_msg::NoKernelForConfig);          // hardcoded
         // && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
     // clang-format on
+    return true;
 }
 
 ConvSolution ConvAsm5x10u2v2b1::GetSolution(const ExecutionContext& ctx,

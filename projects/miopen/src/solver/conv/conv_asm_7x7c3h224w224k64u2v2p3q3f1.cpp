@@ -30,6 +30,7 @@
 #include <miopen/env.hpp>
 #include <miopen/conv/invokers/gen_x_w_y_pad.hpp>
 #include <miopen/mlo_internal.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_ISSUE_1146 1 // check asm solver applicability for gfx90a
 
@@ -44,44 +45,44 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool ConvAsm7x7c3h224w224k64u2v2p3q3f1::IsApplicable(const ExecutionContext& ctx,
                                                      const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_7X7C3H224W224))
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_7X7C3H224W224),
+                                  inapplicable_msg::EnvDisabled);
 
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     const std::string name = ctx.GetStream().GetDeviceName();
 #if WORKAROUND_ISSUE_1146
-    if(name == "gfx90a")
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a", inapplicable_msg::Workaround);
 #endif
-    if(!(name == "gfx800" || name == "gfx802" || name == "gfx803" || name == "gfx804" ||
-         name == "gfx900" || name == "gfx904" || name == "gfx906" || name == "gfx908"))
-        return false;
-    if(!problem.IsDirectionForward())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(name == "gfx800" || name == "gfx802" || name == "gfx803" ||
+                                    name == "gfx804" || name == "gfx900" || name == "gfx904" ||
+                                    name == "gfx906" || name == "gfx908"),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     // clang-format off
-    return problem.GetPadW() == 3            // -q
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetPadW() == 3            // -q
         && problem.GetPadH() == 3            // -p
         && problem.GetKernelStrideW() == 2   // -v
         && problem.GetKernelStrideH() == 2   // -u
@@ -95,9 +96,10 @@ bool ConvAsm7x7c3h224w224k64u2v2p3q3f1::IsApplicable(const ExecutionContext& ctx
         && problem.GetInHeight() == 224     // -H
         && problem.IsFp32()
         && problem.GetGroupCount() == 1
-        && problem.GetInLayout() == "NCHW";
+        && problem.GetInLayout() == "NCHW"), inapplicable_msg::NoKernelForConfig);
         // && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
     // clang-format on
+    return true;
 }
 
 ConvSolution ConvAsm7x7c3h224w224k64u2v2p3q3f1::GetSolution(const ExecutionContext& ctx,
