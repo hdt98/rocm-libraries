@@ -122,12 +122,6 @@ struct UniversalInvoker
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
-        auto kargs = Kernel::MakeKernelArgs(args);
-        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_FLAGS)))
-        {
-            kargs.flags = 1;
-        }
-
         const dim3 grids = [&]() {
             if constexpr(Persistent)
                 return Kernel::MaxOccupancyGridSize(s);
@@ -194,44 +188,21 @@ struct UniversalInvoker
         {
             preprocess = clear_gemm_output;
         }
-        static_assert(sizeof(kargs) == 7 * sizeof(uint64_t),
-                      "The size of kargs is expected to be 7 uint64_t!");
-        const uint64_t* args_ptr = reinterpret_cast<const uint64_t*>(&kargs);
         if constexpr(ClusterLaunch)
         {
             dim3 clusters = Kernel::ClusterSize();
             return ck_tile::launch_kernel_time_mask(
                 s,
                 preprocess,
-                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{},
-                                                              clusters,
-                                                              grids,
-                                                              blocks,
-                                                              0,
-                                                              args_ptr[0],
-                                                              args_ptr[1],
-                                                              args_ptr[2],
-                                                              args_ptr[3],
-                                                              args_ptr[4],
-                                                              args_ptr[5],
-                                                              args_ptr[6]));
+                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
+                    Kernel{}, clusters, grids, blocks, 0, kargs));
         }
         else
         {
             return ck_tile::launch_kernel_time_mask(
                 s,
                 preprocess,
-                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{},
-                                                              grids,
-                                                              blocks,
-                                                              0,
-                                                              args_ptr[0],
-                                                              args_ptr[1],
-                                                              args_ptr[2],
-                                                              args_ptr[3],
-                                                              args_ptr[4],
-                                                              args_ptr[5],
-                                                              args_ptr[6]));
+                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
         }
     }
 };
