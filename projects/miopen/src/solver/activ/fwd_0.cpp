@@ -29,6 +29,7 @@
 #include <miopen/activ/invoke_params.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -39,14 +40,13 @@ namespace activ {
 bool ActivFwdSolver0::IsApplicable(const ExecutionContext&,
                                    const miopen::activ::ProblemDescription& problem) const
 {
-    if(problem.GetDirection() != miopen::activ::Direction::Forward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetDirection() != miopen::activ::Direction::Forward,
+                                  inapplicable_msg::Direction);
 
     const auto x_elem_sz = problem.GetXDesc().GetElementSize();
     const auto y_elem_sz = problem.GetYDesc().GetElementSize();
 
-    if(x_elem_sz != y_elem_sz)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(x_elem_sz != y_elem_sz, inapplicable_msg::ElementSizeMismatch);
 
     if(problem.GetXDesc().IsPacked() && problem.GetYDesc().IsPacked())
         return true;
@@ -64,13 +64,14 @@ bool ActivFwdSolver0::IsApplicable(const ExecutionContext&,
     const auto y_width2D  = y_lens[y_lens.size() - 1];
 
     // clang-format off
-    return x_lens.size() == y_lens.size()
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(x_lens.size() == y_lens.size()
         && ((x_width2D != x_stride2D) || (y_width2D != y_stride2D))
         && (x_lens.size() == 2
             || (x_lens.size() == 3 && x_lens[0] == 1 && y_lens[0] == 1)
             || (x_lens.size() == 4 && x_lens[0] == 1 && x_lens[1] == 1 && y_lens[0] == 1 && y_lens[1] == 1)
-            || (x_lens.size() == 5 && x_lens[0] == 1 && x_lens[1] == 1 && x_lens[2] == 1 && y_lens[0] == 1 && y_lens[1] == 1 && y_lens[2] == 1));
+            || (x_lens.size() == 5 && x_lens[0] == 1 && x_lens[1] == 1 && x_lens[2] == 1 && y_lens[0] == 1 && y_lens[1] == 1 && y_lens[2] == 1))), inapplicable_msg::NoKernelForConfig);
     // clang-format on
+    return true;
 }
 
 ConvSolution ActivFwdSolver0::GetSolution(const ExecutionContext&,

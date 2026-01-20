@@ -29,6 +29,7 @@
 #include <miopen/activ/invoke_params.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #include <cassert>
 
@@ -41,17 +42,18 @@ namespace activ {
 bool ActivBwdSolver1::IsApplicable(const ExecutionContext& context,
                                    const miopen::activ::ProblemDescription& problem) const
 {
-    if(problem.GetDirection() != miopen::activ::Direction::Backward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetDirection() != miopen::activ::Direction::Backward),
+                                  inapplicable_msg::Direction);
 
     const auto x_elem_sz = problem.GetXDesc().GetElementSize();
     const auto y_elem_sz = problem.GetYDesc().GetElementSize();
 
-    if(x_elem_sz != y_elem_sz)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(x_elem_sz != y_elem_sz, inapplicable_msg::ElementSizeMismatch);
 
     // Todo: probably fix "the rest" logic here
-    return !ActivBwdSolver0{}.IsApplicable(context, problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(ActivBwdSolver0{}.IsApplicable(context, problem),
+                                  "ActivBwdSolver0 is preferred");
+    return true;
 }
 
 ConvSolution ActivBwdSolver1::GetSolution(const ExecutionContext&,

@@ -29,6 +29,7 @@
 #include <miopen/activ/invoke_params.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -38,17 +39,18 @@ namespace activ {
 bool ActivFwdSolver1::IsApplicable(const ExecutionContext& context,
                                    const miopen::activ::ProblemDescription& problem) const
 {
-    if(problem.GetDirection() != miopen::activ::Direction::Forward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetDirection() != miopen::activ::Direction::Forward,
+                                  inapplicable_msg::Direction);
 
     const auto x_elem_sz = problem.GetXDesc().GetElementSize();
     const auto y_elem_sz = problem.GetYDesc().GetElementSize();
 
-    if(x_elem_sz != y_elem_sz)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(x_elem_sz != y_elem_sz, inapplicable_msg::ElementSizeMismatch);
 
     // Todo: probably fix "the rest" logic here
-    return !ActivFwdSolver0{}.IsApplicable(context, problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(ActivFwdSolver0{}.IsApplicable(context, problem),
+                                  "ActivFwdSolver0 is preferred");
+    return true;
 }
 
 ConvSolution ActivFwdSolver1::GetSolution(const ExecutionContext&,

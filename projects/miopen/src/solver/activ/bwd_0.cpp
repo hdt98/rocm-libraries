@@ -29,6 +29,7 @@
 #include <miopen/activ/invoke_params.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #include <cassert>
 
@@ -41,8 +42,8 @@ namespace activ {
 bool ActivBwdSolver0::IsApplicable(const ExecutionContext&,
                                    const miopen::activ::ProblemDescription& problem) const
 {
-    if(problem.GetDirection() != miopen::activ::Direction::Backward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetDirection() != miopen::activ::Direction::Backward),
+                                  inapplicable_msg::Direction);
 
     const auto& xDesc  = problem.GetXDesc();
     const auto& yDesc  = problem.GetYDesc();
@@ -54,8 +55,9 @@ bool ActivBwdSolver0::IsApplicable(const ExecutionContext&,
     const auto dx_elem_sz = dxDesc.GetElementSize();
     const auto dy_elem_sz = dyDesc.GetElementSize();
 
-    if(!(x_elem_sz == y_elem_sz && dx_elem_sz == dy_elem_sz && x_elem_sz == dx_elem_sz))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(x_elem_sz == y_elem_sz && dx_elem_sz == dy_elem_sz && x_elem_sz == dx_elem_sz),
+        "Element sizes do not match");
 
     if(xDesc.IsPacked() && yDesc.IsPacked() && dxDesc.IsPacked() && dyDesc.IsPacked())
         return true;
@@ -81,7 +83,7 @@ bool ActivBwdSolver0::IsApplicable(const ExecutionContext&,
     const auto dy_width2D = dy_lens[dy_lens.size() - 1];
 
     // clang-format off
-    return x_lens.size() == y_lens.size() && dx_lens.size() == dy_lens.size() && x_lens.size() == dx_lens.size()
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(x_lens.size() == y_lens.size() && dx_lens.size() == dy_lens.size() && x_lens.size() == dx_lens.size()
         && ((x_width2D != x_stride2D) || (y_width2D != y_stride2D)
             || (dx_width2D != dx_stride2D) || (dy_width2D != dy_stride2D))
         && (x_lens.size() == 2
@@ -96,8 +98,9 @@ bool ActivBwdSolver0::IsApplicable(const ExecutionContext&,
                 && x_lens[0] == 1 && x_lens[1] == 1 && x_lens[2] == 1
                 && y_lens[0] == 1 && y_lens[1] == 1 && y_lens[2] == 1
                 && dy_lens[0] == 1 && dy_lens[1] == 1 && dy_lens[2] == 1
-                && dx_lens[0] == 1 && dx_lens[1] == 1 && dx_lens[2] == 1));
+                && dx_lens[0] == 1 && dx_lens[1] == 1 && dx_lens[2] == 1))), inapplicable_msg::NoKernelForConfig);
     // clang-format on
+    return true;
 }
 
 ConvSolution ActivBwdSolver0::GetSolution(const ExecutionContext&,
