@@ -32,6 +32,7 @@
 #include <miopen/kthvalue/invoke_params.hpp>
 #include <miopen/kthvalue/solvers.hpp>
 #include <miopen/kthvalue.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -52,10 +53,12 @@ bool IsImprovementOverROCm(const miopen::kthvalue::FwdProblemDescription& proble
 bool KthvalueFwd::IsApplicable(const ExecutionContext& /*context*/,
                                const miopen::kthvalue::FwdProblemDescription& problem) const
 {
-    if(!IsImprovementOverROCm(problem))
-        return false;
-    if(problem.GetInputDesc().GetNumDims() > 5)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsImprovementOverROCm(problem),
+                                  "Not an improvement over ROCm implementation");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetInputDesc().GetNumDims() > 5),
+                                  "Only support up to 5D tensors");
+
     return true;
 }
 
