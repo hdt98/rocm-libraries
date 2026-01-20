@@ -30,6 +30,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/float_equal.hpp>
 #include <miopen/datatype.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -65,7 +66,7 @@ bool OpTensorFwdBias::IsApplicable([[maybe_unused]] const ExecutionContext& cont
             return true;
         }
     }
-    return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(true, inapplicable_msg::NoKernelForConfig);
 }
 
 std::size_t OpTensorFwdBias::GetWorkspaceSize(

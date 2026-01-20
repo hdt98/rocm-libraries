@@ -31,6 +31,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/float_equal.hpp>
 #include <miopen/datatype.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -45,12 +46,9 @@ bool Op1dTensorGeneric::IsApplicable([[maybe_unused]] const ExecutionContext& co
     const auto& alens       = aTensorDesc.GetLengths();
     auto asize              = alens.size();
 
-    if(asize == 1)
-    {
-        return true;
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(asize == 1), "Only 1d tensor is supported");
 
-    return false;
+    return true;
 }
 
 std::size_t Op1dTensorGeneric::GetWorkspaceSize(

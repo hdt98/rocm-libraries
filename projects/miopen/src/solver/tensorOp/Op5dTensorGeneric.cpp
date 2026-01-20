@@ -31,6 +31,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/float_equal.hpp>
 #include <miopen/datatype.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -50,7 +51,7 @@ bool Op5dTensorGeneric::IsApplicable([[maybe_unused]] const ExecutionContext& co
         return true;
     }
 
-    return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(true, inapplicable_msg::NoKernelForConfig);
 }
 
 std::size_t Op5dTensorGeneric::GetWorkspaceSize(

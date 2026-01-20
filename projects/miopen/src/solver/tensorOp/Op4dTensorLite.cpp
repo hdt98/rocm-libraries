@@ -30,6 +30,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/float_equal.hpp>
 #include <miopen/datatype.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -74,7 +75,7 @@ bool Op4dTensorLite::IsApplicable([[maybe_unused]] const ExecutionContext& conte
         }
     }
 
-    return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(true, inapplicable_msg::NoKernelForConfig);
 }
 
 std::size_t Op4dTensorLite::GetWorkspaceSize(
