@@ -32,6 +32,7 @@
 #include <miopen/mlo_internal.hpp>
 #include <miopen/layernorm.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -44,16 +45,18 @@ namespace layernorm {
 bool LayernormBackward::IsApplicable(const ExecutionContext&,
                                      const miopen::layernorm::ProblemDescription& problem) const
 {
-    if(!problem.IsSameType())
-        return false;
-    if(!problem.IsSameLength())
-        return false;
-    if(!problem.IsAllPacked())
-        return false;
-    if(!problem.IsRightNormDim())
-        return false;
-    if(!(sizeof_local_memory(problem) <= TargetProperties::GetMaxLocalMemorySize()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameType(), inapplicable_msg::DataTypeMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameLength(), inapplicable_msg::LengthMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllPacked(), inapplicable_msg::IsAllPacked);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsRightNormDim(), inapplicable_msg::RightNormDim);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(sizeof_local_memory(problem) <= TargetProperties::GetMaxLocalMemorySize()),
+        inapplicable_msg::NotEnoughLDS);
+
     return true;
 }
 

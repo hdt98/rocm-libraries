@@ -32,6 +32,7 @@
 #include <miopen/kernels/ck_header_only/layernorm/normalization_fwd.hpp>
 #include <miopen/solver/ck_utility_common.hpp>
 #endif
+#include <miopen/solver/solver_utils.hpp>
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_LAYERNORM2DCKFORWARD_CONV_CK_LN)
 
 namespace miopen {
@@ -214,37 +215,46 @@ bool Layernorm2DCKForward::IsApplicable(
     [[maybe_unused]] const miopen::layernorm::ProblemDescription& problem) const
 {
 #if MIOPEN_USE_COMPOSABLEKERNEL
-    if(env::disabled(MIOPEN_DEBUG_LAYERNORM2DCKFORWARD_CONV_CK_LN))
-        return false;
-    if(!problem.IsSameType())
-        return false;
-    if(!problem.IsSameLength())
-        return false;
-    if(!problem.IsAllPacked())
-        return false;
-    if(!IsRank2Dim1(problem))
-        return false;
-    if(!problem.IsLargeSize())
-        return false;
-    if(!ck_utility::is_ck_whitelist(context.GetStream()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_LAYERNORM2DCKFORWARD_CONV_CK_LN),
+                                  inapplicable_msg::EnvDisabled);
 
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameType(), inapplicable_msg::DataTypeMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameLength(), inapplicable_msg::LengthMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllPacked(), inapplicable_msg::IsAllPacked);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsRank2Dim1(problem),
+                                  "Only rank 2 with normalized dimension 1 is supported.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLargeSize(), "Problem size is too small.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ck_utility::is_ck_whitelist(context.GetStream()),
+                                  inapplicable_msg::CKWhitelist);
+
+    bool CKApplicable = false;
     switch(problem.GetXDesc().GetType())
     {
     case miopenHalf:
-        return CheckCKApplicability<DeviceOpLnFwdPtrs<F16, F16, F16, F16, F32>>(problem);
+        CKApplicable = CheckCKApplicability<DeviceOpLnFwdPtrs<F16, F16, F16, F16, F32>>(problem);
+        break;
     case miopenFloat:
-        return CheckCKApplicability<DeviceOpLnFwdPtrs<F32, F32, F32, F32, F32>>(problem);
+        CKApplicable = CheckCKApplicability<DeviceOpLnFwdPtrs<F32, F32, F32, F32, F32>>(problem);
+        break;
     case miopenBFloat16:
     case miopenDouble:
     case miopenInt64:
     case miopenInt32:
     case miopenInt8:
     case miopenFloat8_fnuz:
-    case miopenBFloat8_fnuz: return false;
+    case miopenBFloat8_fnuz:
+    default: break;
     }
-#endif
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!CKApplicable, inapplicable_msg::CKNotApplicable);
+    return true;
+#else
     return false;
+#endif
 }
 
 ConvSolution Layernorm2DCKForward::GetSolution(

@@ -32,6 +32,7 @@
 #include <miopen/mlo_internal.hpp>
 #include <miopen/t5layernorm.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -44,14 +45,16 @@ namespace layernorm {
 bool T5LayernormBackward::IsApplicable(const ExecutionContext&,
                                        const miopen::layernorm::ProblemDescription& problem) const
 {
-    if(!problem.IsSameType())
-        return false;
-    if(!problem.IsSameLength())
-        return false;
-    if(!problem.IsAllPacked())
-        return false;
-    if(!(sizeof_local_memory_t5(problem) <= TargetProperties::GetMaxLocalMemorySize()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameType(), inapplicable_msg::DataTypeMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameLength(), inapplicable_msg::LengthMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllPacked(), inapplicable_msg::IsAllPacked);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(sizeof_local_memory_t5(problem) <= TargetProperties::GetMaxLocalMemorySize()),
+        inapplicable_msg::NotEnoughLDS);
+
     return true;
 }
 
