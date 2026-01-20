@@ -28,6 +28,7 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/env.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_NAIVE_CONV_WRW)
 
@@ -42,26 +43,26 @@ bool ConvDirectNaiveConvWrw::IsApplicable(const ExecutionContext& ctx,
 {
     if(!miopen::debug::AlwaysEnableConvDirectNaive)
     {
-        if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_NAIVE_CONV_WRW))
-            return false;
-        if(!ctx.use_hip_kernels)
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_NAIVE_CONV_WRW),
+                                      inapplicable_msg::EnvDisabled);
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_hip_kernels, inapplicable_msg::HIPDisabled);
     }
 
-    if(!ConvDirectNaiveConvIsApplicableByKernelType(ctx, problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault() && !problem.IsLayoutNHWC(),
+                                  inapplicable_msg::Layout);
 
-    if(!problem.IsLayoutDefault() && !problem.IsLayoutNHWC())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault() && !problem.IsLayoutNHWC(),
+                                  inapplicable_msg::Layout);
 
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16() || problem.IsFp8() ||
-         problem.IsBfp8()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16() ||
+                                    problem.IsFp8() || problem.IsBfp8()),
+                                  inapplicable_msg::DataType);
 
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(!problem.AllTensorsLengthsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsLengthsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
     if(problem.IsTensorsCasted())
     {
         auto test_cast = [&](const TensorDescriptor& desc) {
@@ -74,10 +75,9 @@ bool ConvDirectNaiveConvWrw::IsApplicable(const ExecutionContext& ctx,
             // all tested tensors must have cast type set
             return true;
         };
-        if(test_cast(problem.GetIn()))
-            return false;
-        if(test_cast(problem.GetOut()))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(test_cast(problem.GetIn()), "Input tensor missing cast type");
+        MIOPEN_SOLVER_INAPPLICABLE_IF(test_cast(problem.GetOut()),
+                                      "Weight tensor missing cast type");
     }
 
     return true;
