@@ -132,7 +132,6 @@ double sum_error_tolerance_for_gfx11_type(hipDataType Tc, hipDataType Ti, hipDat
 
 #define NEAR_ASSERT_FP8(a, b, err) ASSERT_NEAR(double(float(a)), double(float(b)), err)
 
-// FIX: Added custom complex comparison macros
 #define NEAR_ASSERT_COMPLEX_FLOAT(a, b, err)                   \
     do                                                         \
     {                                                          \
