@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
-
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 #include "ck/tensor_operation/gpu/device/device_gemm_v2.hpp"
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
@@ -105,23 +104,23 @@ struct FlatMMInvoker
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
         float ave_time{0};
 
-        const auto Run = [&](const auto has_hot_loop_,
-                             const auto tail_number_,
-                             const auto memory_operation_) {
-            constexpr bool has_hot_loop_v   = has_hot_loop_.value;
-            constexpr auto tail_number_v    = tail_number_.value;
-            constexpr auto scheduler        = FlatmmConfig::Scheduler;
-            constexpr auto memory_operation = memory_operation_.value;
+        const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {
+            constexpr bool has_hot_loop_v = has_hot_loop_.value;
+            constexpr auto tail_number_v  = tail_number_.value;
+            constexpr auto scheduler      = FlatmmConfig::Scheduler;
 
-            using CodegenPipelineProblem = ck_tile::FlatmmPipelineProblem<ADataType,
-                                                                          BDataType,
-                                                                          AccDataType,
-                                                                          CodegenFlatmmShape,
-                                                                          CodegenGemmTraits,
-                                                                          scheduler,
-                                                                          has_hot_loop_v,
-                                                                          tail_number_v,
-                                                                          CompuateType>;
+            using CodegenPipelineProblem = ck_tile::FlatmmPipelineProblem<
+                ADataType,
+                BDataType,
+                AccDataType,
+                CodegenFlatmmShape,
+                CodegenGemmTraits,
+                scheduler,
+                has_hot_loop_v,
+                tail_number_v,
+                ck_tile::amd_buffer_coherence_enum::coherence_default,
+                false,
+                CompuateType>;
 
             using CodegenFlatmmPipeline =
                 ck_tile::FlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
@@ -143,12 +142,12 @@ struct FlatMMInvoker
                                                  FlatmmConfig::N_Warp_Tile,
                                                  FlatmmConfig::K_Warp_Tile,
                                                  CodegenPipelineProblem::TransposeC,
-                                                 memory_operation,
                                                  FlatmmConfig::NumWaveGroups,
                                                  false,
                                                  1,
                                                  false,
                                                  FlatmmConfig::BlockedXDLN_PerWarp,
+                                                 FlatmmConfig::DoubleSmemBuffer,
                                                  CompuateType>>;
 
             // ToDo: Will add the codegen part to test different pipeline policies in GEMM.
@@ -227,28 +226,46 @@ struct FlatMMInvoker
             return ave_time;
         };
 
-        const auto RunSplitk = [&](const auto has_hot_loop_, const auto tail_number_) {
-            if(args.k_batch == 1)
-            {
-                Run(has_hot_loop_,
-                    tail_number_,
-                    ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                               ck_tile::memory_operation_enum::set>{});
-            }
-            else
-            {
-                Run(has_hot_loop_,
-                    tail_number_,
-                    ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                               ck_tile::memory_operation_enum::atomic_add>{});
-            }
-        };
-        BaseGemmPipeline::TailHandler(RunSplitk, has_hot_loop, tail_num);
+        BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
         return ave_time;
     }
 };
 
 namespace ck {
+
+template <typename CkDataType>
+constexpr auto GetCkTileDataType()
+{
+    if constexpr(is_same_v<CkDataType, ck::half_t>)
+    {
+        return ck_tile::fp16_t{};
+    }
+    else if constexpr(is_same_v<CkDataType, ck::bhalf_t>)
+    {
+        return ck_tile::bf16_t{};
+    }
+    else if constexpr(is_same_v<CkDataType, ck::f8_t>)
+    {
+        return ck_tile::fp8_t{};
+    }
+    else if constexpr(is_same_v<CkDataType, ck::bf8_t>)
+    {
+        return ck_tile::bf8_t{};
+    }
+    else if constexpr(is_same_v<CkDataType, ck::pk_i4_t>)
+    {
+        return ck_tile::pk_int4_t{};
+    }
+    else if constexpr(is_same_v<CkDataType, ck::f4x2_pk_t>)
+    {
+        return ck_tile::pk_fp4_t{};
+    }
+    else
+    {
+        return CkDataType{};
+    }
+}
+
 namespace tensor_operation {
 namespace device {
 
@@ -311,38 +328,6 @@ struct DeviceGemm_Xdl_CkTileWrap : public
         else
         {
             static_assert(false);
-        }
-    }
-    template <typename CkDataType>
-    static constexpr auto GetCkTileDataType()
-    {
-        if constexpr(is_same_v<CkDataType, ck::half_t>)
-        {
-            return ck_tile::fp16_t{};
-        }
-        else if constexpr(is_same_v<CkDataType, ck::bhalf_t>)
-        {
-            return ck_tile::bf16_t{};
-        }
-        else if constexpr(is_same_v<CkDataType, ck::f8_t>)
-        {
-            return ck_tile::fp8_t{};
-        }
-        else if constexpr(is_same_v<CkDataType, ck::bf8_t>)
-        {
-            return ck_tile::bf8_t{};
-        }
-        else if constexpr(is_same_v<CkDataType, ck::pk_i4_t>)
-        {
-            return ck_tile::pk_int4_t{};
-        }
-        else if constexpr(is_same_v<CkDataType, ck::f4x2_pk_t>)
-        {
-            return ck_tile::pk_fp4_t{};
-        }
-        else
-        {
-            return CkDataType{};
         }
     }
 
@@ -430,12 +415,14 @@ struct DeviceGemm_Xdl_CkTileWrap : public
             Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
             Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V2 ||
             Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_V2 ||
-            Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_FLATMM;
+            Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_FLATMM ||
+            Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_TDM;
 
         static constexpr bool PermuteA   = false;
         static constexpr bool PermuteB   = false;
         static constexpr bool Preshuffle = Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_V2 ||
-                                           Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_FLATMM;
+                                           Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_FLATMM ||
+                                           Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_TDM;
         static constexpr bool TiledMMAPermuteN = false;
 
         static constexpr ck_tile::index_t TileParitionerGroupNum = 8;
@@ -476,7 +463,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public
             return 3 * (AVgprSize + BVgprSize) + AccVgprSize;
         }
         else if constexpr(PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
-                          PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V2)
+                          PipelineVer == ck_tile::GemmPipeline::COMPUTE_TDM_V2 ||
+                          PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_TDM)
         {
             return math::min(2 * (AVgprSize + BVgprSize), 256) + AccVgprSize;
         }
@@ -502,7 +490,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public
             return 2 * (MSize + NSize);
         }
         else if constexpr(PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_V2 ||
-                          PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_FLATMM)
+                          PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_FLATMM ||
+                          PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_TDM)
         {
             return 2 * MSize;
         }
@@ -529,6 +518,25 @@ struct DeviceGemm_Xdl_CkTileWrap : public
     template <typename DeviceArch_>
     static constexpr bool IsValidCompilationParameter(DeviceArch_ arch)
     {
+        if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V2 ||
+                     GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V1 ||
+                     GemmConfig::Pipeline == ck_tile::GemmPipeline::PRESHUFFLE_TDM)
+        {
+            if constexpr(!(is_same_v<DeviceArch_, gfx125_t>))
+            {
+                return false;
+            }
+        }
+        if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC ||
+                     GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC_V2)
+        {
+            if constexpr(!(is_same_v<DeviceArch_, gfx125_t> || is_same_v<DeviceArch_, gfx950_t> ||
+                           is_same_v<DeviceArch_, gfx9_t>))
+            {
+                return false;
+            }
+        }
+
         if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_TDM_V2)
         {
             if constexpr(GemmConfig::M_Warp * GemmConfig::N_Warp != 4)
@@ -567,9 +575,11 @@ struct DeviceGemm_Xdl_CkTileWrap : public
 
         if constexpr(MinimumOccupancy != 0)
         {
-            constexpr auto EstimateVgprCount  = GetEstimateVgprCount(arch);
-            constexpr auto AvailableVgprCount = get_max_vgpr_count(arch) / MinimumOccupancy /
-                                                (math::integer_divide_ceil(MWarp * NWarp, 4));
+            constexpr auto EstimateVgprCount = GetEstimateVgprCount(arch);
+            constexpr auto AvailableVgprCount =
+                math::min(get_vgpr_count_per_simd(arch) / MinimumOccupancy /
+                              (math::integer_divide_ceil(MWarp * NWarp, 4)),
+                          get_max_vgpr_count(arch));
             if constexpr(EstimateVgprCount > (AvailableVgprCount + AvailableVgprCount / 4))
             {
                 return false;
@@ -691,7 +701,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public
 
     index_t GetKPerBlock() override
     {
-        if constexpr(PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_V2)
+        if constexpr(PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_V2 ||
+                     PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_TDM)
         {
             return KPerBlock | IsPreShuffleMM | DisableGfx9I4ToF32;
         }
@@ -780,7 +791,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public
             {ck_tile::GemmPipeline::COMPUTE_TDM_V1, "COMPUTE_TDM_V1"},
             {ck_tile::GemmPipeline::COMPUTE_TDM_V2, "COMPUTE_TDM_V2"},
             {ck_tile::GemmPipeline::COMPUTE_ASYNC_V2, "COMPUTE_ASYNC_V2"},
-            {ck_tile::GemmPipeline::PRESHUFFLE_FLATMM, "PRESHUFFLE_FLATMM"}};
+            {ck_tile::GemmPipeline::PRESHUFFLE_FLATMM, "PRESHUFFLE_FLATMM"},
+            {ck_tile::GemmPipeline::PRESHUFFLE_TDM, "PRESHUFFLE_TDM"}};
 
         auto str = std::stringstream();
         // clang-format off

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle_v3_b_preshuffle.hpp"
 #define CK_TILE_WRAP_ENABLE_BPRESHUFFLE 1
@@ -260,7 +260,8 @@ using gemm_rcr_instances = std::tuple<
     GEMM_RCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v2, 1),              // 10
     GEMM_RCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v3, 1),              // 20
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_V2,  1, 1, 1),   // 30
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_FLATMM,  1, 1, 1) // 40
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_FLATMM,  1, 1, 1), // 40
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_TDM,  1, 1, 1), // 50
     >;
 
 using gemm_rrr_instances = std::tuple<

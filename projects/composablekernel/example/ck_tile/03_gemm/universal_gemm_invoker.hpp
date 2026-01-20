@@ -17,7 +17,8 @@ struct UniversalInvoker
               typename DsLayout,
               typename ELayout,
               bool Persistent,
-              typename CDEElementWise>
+              typename CDEElementWise,
+              typename ComputeDataType = void>
     static float gemm(const ck_tile::GemmHostArgs& args,
                       const ck_tile::stream_config& s,
                       bool check_arg_only = false)
@@ -68,10 +69,14 @@ struct UniversalInvoker
 
         constexpr auto scheduler = GemmConfig::Scheduler;
 
-        using AComputeDataType =
-            std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>;
-        using BComputeDataType =
-            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>;
+        using AComputeDataType = std::conditional_t<
+            std::is_same_v<ComputeDataType, void>,
+            std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>,
+            ComputeDataType>;
+        using BComputeDataType = std::conditional_t<
+            std::is_same_v<ComputeDataType, void>,
+            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>,
+            ComputeDataType>;
 
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataType,
@@ -118,9 +123,18 @@ struct UniversalInvoker
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
         auto kargs = Kernel::MakeKernelArgs(args);
+        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_FLAGS)))
+        {
+            kargs.flags = 1;
+        }
 
-        const dim3 grids  = Persistent ? Kernel::MaxOccupancyGridSize(s)
-                                       : Kernel::GridSize(args.M, args.N, args.k_batch);
+        const dim3 grids = [&]() {
+            if constexpr(Persistent)
+                return Kernel::MaxOccupancyGridSize(s);
+            else
+                return Kernel::GridSize(args.M, args.N, args.k_batch);
+        }();
+
         const dim3 blocks = Kernel::BlockSize();
 
         if(check_arg_only)
@@ -180,21 +194,44 @@ struct UniversalInvoker
         {
             preprocess = clear_gemm_output;
         }
+        static_assert(sizeof(kargs) == 7 * sizeof(uint64_t),
+                      "The size of kargs is expected to be 7 uint64_t!");
+        const uint64_t* args_ptr = reinterpret_cast<const uint64_t*>(&kargs);
         if constexpr(ClusterLaunch)
         {
             dim3 clusters = Kernel::ClusterSize();
             return ck_tile::launch_kernel_time_mask(
                 s,
                 preprocess,
-                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(
-                    Kernel{}, clusters, grids, blocks, 0, kargs));
+                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{},
+                                                              clusters,
+                                                              grids,
+                                                              blocks,
+                                                              0,
+                                                              args_ptr[0],
+                                                              args_ptr[1],
+                                                              args_ptr[2],
+                                                              args_ptr[3],
+                                                              args_ptr[4],
+                                                              args_ptr[5],
+                                                              args_ptr[6]));
         }
         else
         {
             return ck_tile::launch_kernel_time_mask(
                 s,
                 preprocess,
-                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+                ck_tile::make_kernel<GemmConfig::kBlockPerCu>(Kernel{},
+                                                              grids,
+                                                              blocks,
+                                                              0,
+                                                              args_ptr[0],
+                                                              args_ptr[1],
+                                                              args_ptr[2],
+                                                              args_ptr[3],
+                                                              args_ptr[4],
+                                                              args_ptr[5],
+                                                              args_ptr[6]));
         }
     }
 };

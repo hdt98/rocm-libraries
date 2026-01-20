@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle_v3_mx.hpp"
 // #include "gemm_xdl_ck_tile_wrap.hpp"
@@ -131,14 +131,14 @@ using GemmV3 = ck::tensor_operation::device::DeviceGemmMX_Xdl_CShuffleV3<
     ABlockTransferSrcVectorDim,
     ABlockTransferSrcScalarPerVector,
     ABlockTransferDstScalarPerVector_AK1,
-    0,
+    1,
     BBlockTransferThreadClusterLengths_BK0_N_BK1,
     BBlockTransferThreadClusterArrangeOrder,
     BBlockTransferSrcAccessOrder,
     BBlockTransferSrcVectorDim,
     BBlockTransferSrcScalarPerVector,
     BBlockTransferDstScalarPerVector_BK1,
-    0,
+    1,
     CShuffleMXdlPerWavePerShuffle,
     CShuffleNXdlPerWavePerShuffle,
     CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,

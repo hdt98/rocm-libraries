@@ -523,6 +523,16 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V2>
     using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<PipelineProblem>;
 };
 
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::PRESHUFFLE_TDM>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegTDM<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline =
+        ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegTDM<PipelineProblem>;
+};
+
 template <ck_tile::GemmPipeline PipelineId, typename Problem>
 struct EpilogueTypeTraits
 {
