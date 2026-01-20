@@ -32,6 +32,7 @@
 #include <miopen/prelu/invoke_params.hpp>
 #include <miopen/prelu/solvers.hpp>
 #include <miopen/prelu/utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define VIEW_DIMS 5
 
@@ -58,10 +59,13 @@ bool SingleWeightBackward::IsApplicable(
     const ExecutionContext& /*context*/,
     const miopen::prelu::BackwardProblemDescription& problem) const
 {
-    if(problem.GetdInputDesc().GetVectorLength() > VIEW_DIMS)
-        return false;
-    if(!problem.IsSingleWeight())
-        return false;
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetdInputDesc().GetVectorLength() > VIEW_DIMS),
+                                  "Input vector length exceeds the limit.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSingleWeight(),
+                                  "Multi weight PReLU is not supported.");
+
     return true;
 }
 
