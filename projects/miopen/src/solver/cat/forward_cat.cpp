@@ -31,6 +31,7 @@
 #include <miopen/cat.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -62,12 +63,10 @@ bool IsImprovementOverROCm(const miopen::cat::ProblemDescription& problem)
 bool CatForward::IsApplicable([[maybe_unused]] const ExecutionContext& context,
                               const miopen::cat::ProblemDescription& problem) const
 {
-    if(!IsUnderXCountLimit(problem))
-        return false;
-    if(!problem.IsAllPacked())
-        return false;
-    if(!IsImprovementOverROCm(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsUnderXCountLimit(problem), "Exceeds max tensor x count");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllPacked(), inapplicable_msg::IsAllPacked);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsImprovementOverROCm(problem),
+                                  inapplicable_msg::IsImprovementOverROCm);
     return true;
 }
 
