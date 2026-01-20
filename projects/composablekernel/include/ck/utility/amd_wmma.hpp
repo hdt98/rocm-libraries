@@ -1138,8 +1138,8 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                 wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 // N=laneId % 16 [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24] K=96..127
                 bit_cast<int32_t>(scale_b),
-                0,  // NEG: 0-E8M0
-                0); // NEG_HI: 0-E8M0
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1363,7 +1363,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                wmma_impl::InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1, // OPSEL
                 arg_type{arg_a[0],
                          arg_a[1],
                          arg_a[2],
@@ -1380,7 +1380,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                wmma_impl::InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1, // OPSEL_HI
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1399,14 +1399,14 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,
-                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int32_t>(scale_a),
-                ScaleOpselB,
-                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int32_t>(scale_b),
-                0,
-                0);
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1435,9 +1435,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                wmma_impl::InputFormat::E4M3,
+                wmma_impl::InputFormat::E4M3, // OPSEL
                 reg_a,
-                wmma_impl::InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1, // OPSEL_HI
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1456,14 +1456,14 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,
-                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int32_t>(scale_a),
-                ScaleOpselB,
-                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int32_t>(scale_b),
-                0,
-                0);
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1512,14 +1512,12 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,                                     // SCALE_OPSEL[0]
                 wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
-                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                ScaleOpselB,                // SCALE_OPSEL[1]
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
                 wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
-                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                0,                          // NEG
-                0);                         // NEG_HI
+                bit_cast<int64_t>(scale_b),
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1549,14 +1547,12 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,                                     // SCALE_OPSEL[0]
                 wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
-                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                ScaleOpselB,                // SCALE_OPSEL[1]
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
                 wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
-                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                0,                          // NEG
-                0);                         // NEG_HI
+                bit_cast<int64_t>(scale_b),
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1622,14 +1618,12 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,                                     // SCALE_OPSEL[0]
                 wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
-                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                ScaleOpselB,                // SCALE_OPSEL[1]
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
                 wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
-                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                0,                          // NEG
-                0);                         // NEG_HI
+                bit_cast<int64_t>(scale_b),
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1695,14 +1689,12 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,                                     // SCALE_OPSEL[0]
                 wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
-                bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                ScaleOpselB,                // SCALE_OPSEL[1]
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
                 wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
-                bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
-                                            // K=64..95; [31:24] K=96..127
-                0,                          // NEG
-                0);                         // NEG_HI
+                bit_cast<int64_t>(scale_b),
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1733,7 +1725,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                wmma_impl::InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1, // OPSEL
                 arg_type{arg_a[0],
                          arg_a[1],
                          arg_a[2],
@@ -1750,7 +1742,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                wmma_impl::InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1, // OPSEL_HI
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1769,14 +1761,14 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,
-                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int64_t>(scale_a),
-                ScaleOpselB,
-                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int64_t>(scale_b),
-                0,
-                0);
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
@@ -1803,9 +1795,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                wmma_impl::InputFormat::E4M3,
+                wmma_impl::InputFormat::E4M3, // OPSEL
                 reg_a,
-                wmma_impl::InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1, // OPSEL_HI
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1824,14 +1816,14 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,
-                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int64_t>(scale_a),
-                ScaleOpselB,
-                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int64_t>(scale_b),
-                0,
-                0);
+                0,  // NEG
+                0); // NEG_HI
 #else
         ignore = reg_a;
         ignore = scale_a;
