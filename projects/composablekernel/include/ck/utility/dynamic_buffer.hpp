@@ -278,12 +278,13 @@ struct DynamicBuffer
         static_assert(is_same_v<remove_cvref_t<typename DstBuffer::type>, remove_cvref_t<T>>,
                       "Source and destination buffer must have the same data type.");
 
+        auto p_uniform_ptr = amd_wave_read_first_lane(p_data_);
         amd_async_load_global_to_lds<remove_cvref_t<typename DstBuffer::type>,
                                      NumElemsPerThread,
                                      static_dst_offset,
                                      true,
                                      coherence>(
-            p_data_, src_offset, dst_buf.p_data_, dst_offset, is_valid_element);
+            p_uniform_ptr, src_offset, dst_buf.p_data_, dst_offset, is_valid_element);
     }
 
     template <typename X,
