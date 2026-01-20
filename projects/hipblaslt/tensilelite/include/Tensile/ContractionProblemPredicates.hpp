@@ -2098,6 +2098,7 @@ namespace TensileLite
                         return true;
                     if(value == ActivationType::Hipblaslt_all
                        && (problem.activationType() == ActivationType::DGelu
+                           || problem.activationType() == ActivationType::DRelu
                            || problem.activationType() == ActivationType::Gelu
                            || problem.activationType() == ActivationType::Relu
                            || problem.activationType() == ActivationType::Silu

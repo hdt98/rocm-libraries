@@ -303,6 +303,9 @@ namespace
         case ROCBLASLT_EPILOGUE_DGELU:
         case ROCBLASLT_EPILOGUE_DGELU_BGRAD:
             return TensileLite::ActivationType::DGelu;
+        case ROCBLASLT_EPILOGUE_DRELU:
+        case ROCBLASLT_EPILOGUE_DRELU_BGRAD:
+            return TensileLite::ActivationType::DRelu;
         case ROCBLASLT_EPILOGUE_SWISH_EXT:
         case ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT:
             return TensileLite::ActivationType::Silu;
@@ -653,6 +656,7 @@ namespace
         case TensileLite::ActivationType::Gelu:
             return "gelu";
             break;
+        case TensileLite::ActivationType::DRelu:
         case TensileLite::ActivationType::Relu:
             return "relu";
             break;

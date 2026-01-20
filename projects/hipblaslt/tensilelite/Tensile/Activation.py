@@ -860,7 +860,8 @@ class ActivationModule:
         if cDataType.isSingle():
             # v_cmp_ge_f32_e32 vcc, v0, 1      ; VCC = (x >= 1) ? 1 : 0
             # v_cndmask_b32_e64 v2, 0.0, 1.0, vcc ; v2 = VCC ? 1.0 : 0.0
-            pass
+            module.add(VCmpGEF32(dst=VCC(), src0=self.vgprPrefix(vgprIn), src1=0, comment=" VCC = (x >= 1) ? 1 : 0 @Siavash" ))
+            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprOut), src0=0, src1=1, src2=VCC(), comment=" y = VCC ? 1.0 : 0.0 @Siavash" ))
         else:
             raise RuntimeError("Unsupported data type %s."%cDataType.toDevice("HIP"))
         return module
