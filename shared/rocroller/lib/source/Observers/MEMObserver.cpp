@@ -43,6 +43,10 @@ namespace rocRoller
     {
         bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
+            Log::info("{} {}",
+                      inst.toString(LogLevel::Terse),
+                      inst.getAddresses().value_or(std::vector<size_t>{}));
+
             AssertFatal(context != nullptr);
 
             const DSObserverType observerType = context->kernelOptions()->dsObserver;
