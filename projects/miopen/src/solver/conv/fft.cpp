@@ -117,10 +117,10 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     MIOPEN_SOLVER_INAPPLICABLE_IF((problem.IsDirectionBackwardWrW() || !problem.IsFp32()),
                                   "Direction and data type combination not supported");
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), a_msg::Layout);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
-                                  inapplicable_msg::NonPackedTensors);
+                                  inapplicable_msg::HasNonPackedTensors);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
                                   inapplicable_msg::AllTensorsDimsFitIntoInt);
@@ -134,7 +134,7 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         (conv.GetSpatialDimension() != 2 || conv.group_count != 1 ||
          !miopen::all_of(conv.GetConvDilations(), [](auto v) { return v == 1; })),
-        a_msg::Generic);
+        inapplicable_msg::Generic);
 
     int in_n, in_c, in_h, in_w;
     int out_n, out_c, out_h, out_w;
@@ -169,7 +169,7 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         !(std::tie(wei_h, wei_w) == std::make_tuple(5, 5) && cparam == std::make_tuple(2, 2, 1, 1)),
-        a_msg::NoKernelForConfig);
+        inapplicable_msg::NoKernelForConfig);
 
     return true;
 }
