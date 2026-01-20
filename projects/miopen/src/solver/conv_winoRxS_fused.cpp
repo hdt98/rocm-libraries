@@ -156,10 +156,9 @@ bool ConvBinWinogradRxSf2x3g1Fused::IsApplicable(const FusionContext& context,
     const auto conv_ctx     = context.GetConvContext(conv_problem);
 
     const std::string name = conv_ctx.GetStream().GetDeviceName();
-    MIOPEN_SOLVER_INAPPLICABLE_IF(
-        !(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11") ||
-          StartsWith(name, "gfx12")),
-        inapplicable_msg::UnsupportedDevice);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") ||
+                                    StartsWith(name, "gfx11") || StartsWith(name, "gfx12")),
+                                  inapplicable_msg::UnsupportedDevice);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         (conv_problem.IsFp16() &&
