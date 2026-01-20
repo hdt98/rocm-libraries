@@ -32,6 +32,7 @@
 #include <miopen/convolution_fft.hpp>
 #include <miopen/env.hpp>
 #include <miopen/tensor.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_FFT)
 
@@ -113,14 +114,13 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     std::ignore = ctx;
 
     // disable running any FFT based convolutions by checking this env variable
-    if(problem.IsDirectionBackwardWrW() || !problem.IsFp32())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.IsDirectionBackwardWrW() || !problem.IsFp32()),
+                                  "Direction and data type combination not supported");
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
     const auto is_fwd    = problem.IsDirectionForward();
     decltype(auto) conv  = problem.GetConv();
@@ -128,9 +128,10 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     decltype(auto) yDesc = is_fwd ? problem.GetOut() : problem.GetIn();
     decltype(auto) wDesc = problem.GetWeights();
 
-    if(conv.GetSpatialDimension() != 2 || conv.group_count != 1 ||
-       !miopen::all_of(conv.GetConvDilations(), [](auto v) { return v == 1; }))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (conv.GetSpatialDimension() != 2 || conv.group_count != 1 ||
+         !miopen::all_of(conv.GetConvDilations(), [](auto v) { return v == 1; })),
+        inapplicable_msg::Generic);
 
     int in_n, in_c, in_h, in_w;
     int out_n, out_c, out_h, out_w;
@@ -142,22 +143,27 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     // FFT convolutions only works for specific config(s)
     // coverage to expand gradually
 
-    if((in_n < 1) || (in_n > 512) || (wei_k < 1) || (wei_k > 512) || ((in_c * in_n) % 16 != 0) ||
-       (wei_c * wei_k) % 16 != 0 || (out_c * out_n) % 16 != 0)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(((in_n < 1) || (in_n > 512) || (wei_k < 1) || (wei_k > 512) ||
+                                   ((in_c * in_n) % 16 != 0) || (wei_c * wei_k) % 16 != 0 ||
+                                   (out_c * out_n) % 16 != 0),
+                                  "Config not supported by FFT convolution 1");
 
-    if((std::tie(in_h, in_w) != std::make_tuple(28, 28)) &&
-       (std::tie(in_h, in_w) != std::make_tuple(27, 27)) &&
-       (std::tie(in_h, in_w) != std::make_tuple(14, 14)) &&
-       (std::tie(in_h, in_w) != std::make_tuple(7, 7)))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(((std::tie(in_h, in_w) != std::make_tuple(28, 28)) &&
+                                   (std::tie(in_h, in_w) != std::make_tuple(27, 27)) &&
+                                   (std::tie(in_h, in_w) != std::make_tuple(14, 14)) &&
+                                   (std::tie(in_h, in_w) != std::make_tuple(7, 7))),
+                                  "Input H and W not supported by FFT convolution");
 
     const auto cparam = std::make_tuple(conv.GetConvPads()[0],
                                         conv.GetConvPads()[1],
                                         conv.GetConvStrides()[0],
                                         conv.GetConvStrides()[1]);
 
-    return std::tie(wei_h, wei_w) == std::make_tuple(5, 5) && cparam == std::make_tuple(2, 2, 1, 1);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(std::tie(wei_h, wei_w) == std::make_tuple(5, 5) && cparam == std::make_tuple(2, 2, 1, 1)),
+        inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 size_t fft::GetWorkspaceSize(const ExecutionContext&, const ProblemDescription& problem) const
