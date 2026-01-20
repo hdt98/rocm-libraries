@@ -3612,6 +3612,126 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
 
         opt1 = ScheduleInfo(2, n_mfma, optSchedule, syncCode, nglshift, nllshift)
         return True, opt1
+    elif isNT(kernel):
+        gr_inc_step = 0
+        kernel["UseMFMAF32XEmulation"] = True
+        kernel["UsePLRPack"] = True
 
+        grinca = [0,0,1,1,2,2,3,3,4]
+        grincb = [4,5,5,6,6,7,7,8,8]
+        lrsa   = [58]
+        lrsb   = [59]
+        lwsa   = [118]
+        lwsb   = [118]
+
+        pack_b = [0,0,1,1, 8,8, 9,9,10,10,
+                  2,2,3,3, 8,8, 11,11,12,12,
+                  4,4,5,5, 8,8, 13,13,14,14,
+                  6,6,7,7, 8,8, 15,15,16,16
+                  ]
+        pack_a = [0,0,1,1, 10,10, 11,11,12,12,
+                  2,2,3,3, 10,10, 13,13,14,14,
+                  4,4,5,5, 10,10, 15,15,16,16,
+                  6,6,7,7, 10,10, 17,17,18,18,
+                  8,8,9,9, 10,10, 19,19,20,20
+                  ]
+        lrb0   = [0,1,2,3,4,5,6,7]
+        lrb0   = duplicate_list_items(lrb0,4) 
+        syncs.add(                 12, dscnt=4, barrier=True, comment="wait for LRA0 before pack to complete + barrier for GRA")
+        pack_b0 = [                i+13 for i in pack_b]  ## last element = 13 + 16 = 29
+
+        lra0   = [               8,9,10,11, 13,14,15,16, 18,19]
+        lra0   = duplicate_list_items(lra0,4) 
+        syncs.add(                                               24, dscnt=0, comment="wait for LRB0 before pack to complete")
+        pack_a0 = [                                                  i+30 for i in pack_a]  ## last element = 30 + 20 = 50
+
+        grb    = [                                    17,22,27,32, 42,47,52,57] # one index for two instructions
+        gra    = [                                                               67,71,75,79, 89,93,97,101, 112,116] # one index for two instructions
+        num_gr = len(gra) + len(grb)
+
+        syncs.add(                                                            59, vlcnt=8, barrier=True, comment="wait for previous set of global reads + barrier for GRB")
+
+        lrb1   = [60,61,62,63,64,65,66,67]
+        lrb1   = duplicate_list_items(lrb1,4) 
+        syncs.add(                          72, dscnt=4, comment="wait for LRA1 before pack to complete")
+        pack_b1 = [                         i+73 for i in pack_b]  ## last element = 73 + 16 = 89
+
+        lra1   = [                        68,69,70,71, 73,74,75,76, 78,79]
+        lra1   = duplicate_list_items(lra1,4) 
+        syncs.add(                                                            85, dscnt=0, comment="wait for LRB1 before pack to complete")
+        pack_a1 = [                                                           i+90 for i in pack_a]  ## last element = 90 + 20 = 110
+
+        optSchedule = {
+            'SYNC':   [syncs.get_indicies()],
+            'GRIncA': [grinca],
+            'GRIncB': [grincb],
+            'LRA0':   [lra0],
+            'LRB0':   [lrb0],
+            'PackA0': [pack_a0],
+            'PackB0': [pack_b0],
+            'GRA':    [duplicate_list_items(gra, 2, gr_inc_step),
+                       duplicate_list_items([x+1 for x in gra], 2, gr_inc_step)],
+            'GRB':    [duplicate_list_items(grb, 2, gr_inc_step),
+                       duplicate_list_items([x+1 for x in grb], 2, gr_inc_step)],
+            'LRSA':   [lrsa],
+            'LRSB':   [lrsb],
+            'LWSA':   [lwsa],
+            'LWSB':   [lwsb],
+            'LRA1':   [lra1],
+            'LRB1':   [lrb1],
+            'PackB1': [pack_b1],
+            'PackA1': [pack_a1],
+            'LCC':    [[n_mfma-2, n_mfma-1]],
+        }
+
+        syncCode = syncs.get_code()
+        nglshift = nllshift = num_gr
+
+        opt1 = ScheduleInfo(2, n_mfma, optSchedule, syncCode, nglshift, nllshift)
+        return True, opt1
+
+#         kernel["UseMFMAF32XEmulation"] = True
+#         kernel["UsePLRPack"] = True
+#         optSchedule = {
+#             'SYNC': [[13, 13, 17, 24, 59, 59, 74, 85]],
+
+#             'GRIncB': [[0, 1, 2, 3, 4, 6, 7, 8, 9]],
+#             # create_range(100, 5,200, 1, 2) => [100, 100, 101, 101, 102, 102, 103, 103, 104, 104]
+#             'LRB0': [create_range(0,16,8,1,2)],
+#             'GRIncA': [[10, 11, 12, 13, 14, 15, 15, 16, 16]],
+#             'PackB0': [[13, 13, 14, 14, 21, 21, 22, 22, 23, 23, 15, 15, 16, 16, 21, 21, 24, 24, 25, 25, 17, 17, 18, 18, 21, 21, 26, 26, 27, 27, 19, 19, 20, 20, 21, 21, 28, 28, 29, 29]],
+#             'LRA0': [[0,0,  2,2,  4,4,  5,5,  7,7,  8,8,  10,10, 12,12, 13, 13, 13, 13, 14, 14, 14, 14, 16,16,16,16, 18,18,18,18, 20,20,20,20, 22,22,22,22],
+#                      [0,0,  1,1,  3,3,  5,5,  7,7,  9,9,  11,11, 12,12, 13, 13, 13, 13, 15, 15, 15, 15, 17,17,17,17, 19,19,19,19, 21,21,21,21, 23,23,23,23]],
+#             'PackA0': [[30, 30, 31, 31, 40, 40, 41, 41, 42, 42, 32, 32, 33, 33, 40, 40, 43, 43, 44, 44, 34, 34, 35, 35, 40, 40, 45, 45, 46, 46, 36, 36, 37, 37, 40, 40, 47, 47, 48, 48, 38, 38
+# , 39, 39, 40, 40, 49, 49, 50, 50]],
+#             'GRA': [[67, 67, 71, 71, 75, 75, 79, 79, 89, 89, 93, 93, 97, 97, 101, 101, 112, 112, 116, 116], 
+#                     [68, 68, 72, 72, 76, 76, 80, 80, 90, 90, 94, 94, 98, 98, 102, 102, 113, 113, 117, 117]],
+#             'GRB': [[17, 17, 22, 22, 27, 27, 32, 32, 42, 42, 47, 47, 52, 52, 57, 57], 
+#                     [18, 18, 23, 23, 28, 28, 33, 33, 43, 43, 48, 48, 53, 53, 58, 58]],
+#             'LRSA': [[58]],
+#             'LRSB': [[59]],
+#             'LWSA': [[118]],
+#             'LWSB': [[118]],
+#             'LRB1': [create_range(59,32,90,1,1)],
+#             'LRA1': [[59, 59, 61, 61, 63, 63, 65, 65, 67, 67, 69, 69, 71, 71, 73, 73, 74, 74, 74, 74, 75, 75, 75, 75, 77, 77, 77, 77, 79, 79, 79, 79, 81, 81, 81, 81, 83, 83, 83, 83],
+#                     [60, 60, 62, 62, 64, 64, 65, 65, 66, 66, 68, 68, 70, 70, 72, 72, 74, 74, 74, 74, 76, 76, 76, 76, 78, 78, 78, 78, 80, 80, 80, 80, 81, 81, 81, 81, 82, 82, 82, 82]],
+#             'PackB1': [[73, 73, 74, 74, 81, 81, 82, 82, 83, 83, 75, 75, 76, 76, 81, 81, 84, 84, 85, 85, 77, 77, 78, 78, 81, 81, 86, 86, 87, 87, 79, 79, 80, 80, 81, 81, 88, 88, 89, 89]],            
+#             'PackA1': [[90, 90, 91, 91, 100, 100, 101, 101, 102, 102, 92, 92, 93, 93, 100, 100, 103, 103, 104, 104, 94, 94, 95, 95, 100, 100, 105, 105, 106, 106, 96, 96, 97, 97, 100, 100, 107, 107, 108, 108, 98, 98, 99, 99, 100, 100, 109, 109, 110, 110]],
+#             'LCC': [[118, 119]]
+#         }
+
+#         syncs.add(13, dscnt=4, barrier=True, comment="wait for LRA0 before pack to complete + barrier for GRA")
+#         syncs.add(17, dscnt=0, comment="wait for LRB0 before pack to complete")
+#         syncs.add(24, dscnt=0, comment="wait for LRB0 before pack to complete")
+#         syncs.add(59, vlcnt=8, barrier=True, comment="wait for previous set of global reads + barrier for GRB")
+#         syncs.add(74, dscnt=4, comment="wait for LRA1 before pack to complete")
+#         syncs.add(85, dscnt=0, comment="wait for LRB1 before pack to complete")
+
+#         syncCode = syncs.get_code()
+#         nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2
+#         opt1 = ScheduleInfo(2, n_mfma, optSchedule, syncCode, nglshift, nllshift)
+#         for key, value in optSchedule.items():
+#             print ("{}: {}".format(key, value))
+#         return True, opt1
     else:
         return False, None
