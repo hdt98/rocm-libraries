@@ -630,89 +630,170 @@ struct tile_window_with_static_distribution
         const auto& bottom_tensor_view = lds_tile.get_bottom_tensor_view();
         const auto& tensor_descriptor  = bottom_tensor_view.get_tensor_descriptor();
         auto lds_base_ptr              = bottom_tensor_view.get_buffer_view().p_data_;
-
-        static_for<0, NumCoord, 1>{}([&](auto iCoord) {
-            auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
-            auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
-
-            auto window_adaptor_warp_coord = pre_computed_warp_coords_[iCoord][I0];
-            auto bottom_tensor_warp_coord  = pre_computed_warp_coords_[iCoord][I1];
-
-            static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
-                constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
-
-                constexpr auto idx_ys_offset = [&]() {
-                    constexpr auto idx_off_ys = SFC_Ys::get_step_between(number<0>{}, iAccess);
-                    constexpr auto adapter_ys_offset = make_tensor_adaptor_coordinate(
-                        StaticTileDistribution_{}.get_ps_ys_to_xs_adaptor(),
-                        container_concat(array<index_t, Base::NDimP>{0},
-                                         to_array<index_t, idx_off_ys.size()>(idx_off_ys)));
-                    return adapter_ys_offset.get_bottom_index();
-                }();
-                const auto lds_ys_offset = [&]() {
-                    if constexpr(static_move_ys)
-                    {
-                        const auto coord_ys_offset =
-                            make_tensor_coordinate(tensor_descriptor, idx_ys_offset);
-                        return coord_ys_offset.get_offset();
-                    }
-                    else
-                        return 0;
-                }();
-
-                // Use precomputed window origin & tensor descriptor
 #if defined(__gfx125__)
+        // this is an optimization used in gfx125 where lds descriptor don't include xor swizzle
+        if constexpr(!remove_cvref_t<decltype(tensor_descriptor)>::template has_transform<
+                         coord_transform_enum::xor_t>() &&
+                     static_move_ys == false)
+        {
+            static_assert(
+                []() constexpr {
+                    [[maybe_unused]] constexpr auto desc =
+                        LdsTileWindow{}.get_bottom_tensor_view().get_tensor_descriptor();
+                    return true;
+                }(),
+                "LdsTileWindow::get_tensor_descriptor() must be constexpr");
+
+            // For LDS, compute offsets at compile time to optimize LDS access
+            static_for<0, NumCoord, 1>{}([&](auto iCoord) {
+                /// TODO: use structure binding (to be captured later) if compiled in C++20
+                auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
+                auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
+                constexpr index_t dram_ys_offset = 0;
+                constexpr index_t lds_ys_offset  = 0;
+
                 auto lds_bottom_tensor_thread_idx =
                     window_origin + window_adaptor_thread_coord.get_bottom_index();
-#else // else branch for gfx950
-                auto lds_bottom_tensor_thread_idx =
-                    window_origin + window_adaptor_warp_coord.get_bottom_index();
-#endif
-                const auto lds_coord =
+                const auto lds_origin_coord =
                     make_tensor_coordinate(tensor_descriptor, lds_bottom_tensor_thread_idx);
 
                 // Calculate SMEM address using base pointer
-                CK_TILE_LDS_ADDR LdsDataType* smem = lds_base_ptr +
-                                                     lds_coord.get_offset() / Traits::PackedSize +
-                                                     lds_ys_offset / Traits::PackedSize;
+                CK_TILE_LDS_ADDR LdsDataType* smem =
+                    lds_base_ptr + lds_origin_coord.get_offset() / Traits::PackedSize +
+                    lds_ys_offset / Traits::PackedSize;
 
-                const auto dram_ys_offset = [&]() {
-                    if constexpr(static_move_ys)
-                    {
-                        const auto coord_ys_offset = make_tensor_coordinate(
-                            this->get_bottom_tensor_view().get_tensor_descriptor(), idx_ys_offset);
+                static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
+                    constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
+
+                    // Compute compile-time offset from access 0 to current access
+                    constexpr auto tile_dstr         = typename Base::TileDstr{};
+                    constexpr auto lds_access_offset = [&]() {
+                        constexpr auto idx_off_ys = SFC_Ys::get_step_between(number<0>{}, iAccess);
+                        constexpr auto adapter_ys_offset = make_tensor_adaptor_coordinate(
+                            tile_dstr.get_ps_ys_to_xs_adaptor(),
+                            container_concat(array<index_t, Base::NDimP>{0},
+                                             to_array<index_t, idx_off_ys.size()>(idx_off_ys)));
+                        constexpr auto coord_ys_offset = make_tensor_coordinate(
+                            LdsTileWindow{}.get_bottom_tensor_view().get_tensor_descriptor(),
+                            adapter_ys_offset.get_bottom_index());
                         return coord_ys_offset.get_offset();
-                    }
-                    else
-                        return 0;
-                }();
+                    }();
 
-                this->get_bottom_tensor_view().template async_get_vectorized_elements<vector_t>(
-                    smem,
-                    bottom_tensor_thread_coord,
-                    offset + dram_ys_offset,
-                    bool_constant<oob_conditional_check>{});
+                    this->get_bottom_tensor_view()
+                        .template async_get_vectorized_elements<vector_t, lds_access_offset>(
+                            smem,
+                            bottom_tensor_thread_coord,
+                            offset + dram_ys_offset,
+                            bool_constant<oob_conditional_check>{});
 
-                // Move thread coordinate if not last access
-                if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
-                {
-                    constexpr auto idx_diff_ys    = SFC_Ys::get_forward_step(iAccess);
-                    constexpr auto idx_diff_ps_ys = container_concat(
-                        generate_tuple([&](auto) { return number<0>{}; }, number<Base::NDimP>{}),
-                        idx_diff_ys);
+                    // Move thread coordinate if not last access
+                    if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
+                    {
+                        constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
+                        constexpr auto idx_diff_ps_ys =
+                            container_concat(generate_tuple([&](auto) { return number<0>{}; },
+                                                            number<Base::NDimP>{}),
+                                             idx_diff_ys);
 
-                    if constexpr(!static_move_ys)
                         Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
                             window_adaptor_thread_coord,
                             bottom_tensor_thread_coord,
                             idx_diff_ps_ys);
-
-                    if constexpr(!static_move_ys)
-                        Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
-                            window_adaptor_warp_coord, bottom_tensor_warp_coord, idx_diff_ps_ys);
-                }
+                    }
+                });
             });
-        });
+        }
+        else
+#endif
+        {
+            static_for<0, NumCoord, 1>{}([&](auto iCoord) {
+                auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
+                auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
+#if !defined(__gfx125__)
+                auto window_adaptor_warp_coord = pre_computed_warp_coords_[iCoord][I0];
+                auto bottom_tensor_warp_coord  = pre_computed_warp_coords_[iCoord][I1];
+#endif
+                static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
+                    constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
+
+                    constexpr auto idx_ys_offset = [&]() {
+                        constexpr auto idx_off_ys = SFC_Ys::get_step_between(number<0>{}, iAccess);
+                        constexpr auto adapter_ys_offset = make_tensor_adaptor_coordinate(
+                            StaticTileDistribution_{}.get_ps_ys_to_xs_adaptor(),
+                            container_concat(array<index_t, Base::NDimP>{0},
+                                             to_array<index_t, idx_off_ys.size()>(idx_off_ys)));
+                        return adapter_ys_offset.get_bottom_index();
+                    }();
+                    const auto lds_ys_offset = [&]() {
+                        if constexpr(static_move_ys)
+                        {
+                            const auto coord_ys_offset =
+                                make_tensor_coordinate(tensor_descriptor, idx_ys_offset);
+                            return coord_ys_offset.get_offset();
+                        }
+                        else
+                            return 0;
+                    }();
+
+                    // Use precomputed window origin & tensor descriptor
+#if defined(__gfx125__)
+                    auto lds_bottom_tensor_thread_idx =
+                        window_origin + window_adaptor_thread_coord.get_bottom_index();
+#else // else branch for gfx950
+                    auto lds_bottom_tensor_thread_idx =
+                        window_origin + window_adaptor_warp_coord.get_bottom_index();
+#endif
+                    const auto lds_coord =
+                        make_tensor_coordinate(tensor_descriptor, lds_bottom_tensor_thread_idx);
+
+                    // Calculate SMEM address using base pointer
+                    CK_TILE_LDS_ADDR LdsDataType* smem =
+                        lds_base_ptr + lds_coord.get_offset() / Traits::PackedSize +
+                        lds_ys_offset / Traits::PackedSize;
+
+                    const auto dram_ys_offset = [&]() {
+                        if constexpr(static_move_ys)
+                        {
+                            const auto coord_ys_offset = make_tensor_coordinate(
+                                this->get_bottom_tensor_view().get_tensor_descriptor(),
+                                idx_ys_offset);
+                            return coord_ys_offset.get_offset();
+                        }
+                        else
+                            return 0;
+                    }();
+
+                    this->get_bottom_tensor_view().template async_get_vectorized_elements<vector_t>(
+                        smem,
+                        bottom_tensor_thread_coord,
+                        offset + dram_ys_offset,
+                        bool_constant<oob_conditional_check>{});
+
+                    // Move thread coordinate if not last access
+                    if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
+                    {
+                        constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
+                        constexpr auto idx_diff_ps_ys =
+                            container_concat(generate_tuple([&](auto) { return number<0>{}; },
+                                                            number<Base::NDimP>{}),
+                                             idx_diff_ys);
+
+                        if constexpr(!static_move_ys)
+                            Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
+                                window_adaptor_thread_coord,
+                                bottom_tensor_thread_coord,
+                                idx_diff_ps_ys);
+#if !defined(__gfx125__)
+                        if constexpr(!static_move_ys)
+                            Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
+                                window_adaptor_warp_coord,
+                                bottom_tensor_warp_coord,
+                                idx_diff_ps_ys);
+#endif
+                    }
+                });
+            });
+        }
     }
 
     template <typename TDMConfig_,

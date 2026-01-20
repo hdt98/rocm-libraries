@@ -2641,9 +2641,12 @@ CK_TILE_DEVICE auto make_async_load_ptrs(const CK_TILE_GLOBAL_ADDR SourceType* g
 
 template <typename T,
           index_t N,
+          index_t static_offset               = 0,
+          bool is_uniform_global_ptr          = true,
           amd_buffer_coherence_enum coherence = amd_buffer_coherence_enum::coherence_default>
 __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
                                              const CK_TILE_GLOBAL_ADDR T* global_ptr,
+                                             index_t global_offset,
                                              bool is_valid_element)
 {
     // currently only support to b8, b32, b64, b128 when one async copy
@@ -2659,20 +2662,41 @@ __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
                   "wrong! not implemented");
 
 #if defined(__gfx125__)
+#if CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM
+    constexpr bool use_asm_path = is_uniform_global_ptr;
+#else
+    constexpr bool use_asm_path = false;
+#endif
     constexpr index_t bytes_in_instr = N * sizeof(T);
     if constexpr(bytes_in_instr == 1)
     {
         auto [glb_ptr, lds_ptr] =
             async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<1>>(
-                global_ptr, smem_ptr);
+                global_ptr + global_offset - static_offset, smem_ptr);
         if(is_valid_element)
         {
-            __builtin_amdgcn_global_load_async_to_lds_b8(
-                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+            if constexpr(use_asm_path)
+            {
+                asm volatile(
+                    "global_load_async_to_lds_b8 %0, %1, %2, offset:%3\n\t" ::"v"(
+                        static_cast<uint32_t>(reinterpret_cast<uint64_t>(lds_ptr))),
+                    "v"(static_cast<uint32_t>((global_offset - static_offset) * sizeof(T))),
+                    "s"(reinterpret_cast<uint64_t>(global_ptr)),
+                    "n"(static_cast<uint32_t>(static_offset * sizeof(T)))
+                    : "memory");
+            }
+            else
+            {
+                __builtin_amdgcn_global_load_async_to_lds_b8(
+                    glb_ptr, lds_ptr, static_offset, static_cast<index_t>(coherence));
+            }
         }
         else
         {
-            *lds_ptr = 0;
+            auto [unused, lds_write_ptr] =
+                async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<1>>(
+                    global_ptr, smem_ptr + static_offset);
+            *lds_write_ptr = 0;
         }
         return;
     }
@@ -2680,15 +2704,31 @@ __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
     {
         auto [glb_ptr, lds_ptr] =
             async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<4>>(
-                global_ptr, smem_ptr);
+                global_ptr + global_offset - static_offset, smem_ptr);
         if(is_valid_element)
         {
-            __builtin_amdgcn_global_load_async_to_lds_b32(
-                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+            if constexpr(use_asm_path)
+            {
+                asm volatile(
+                    "global_load_async_to_lds_b32 %0, %1, %2, offset:%3\n\t" ::"v"(
+                        static_cast<uint32_t>(reinterpret_cast<uint64_t>(lds_ptr))),
+                    "v"(static_cast<uint32_t>((global_offset - static_offset) * sizeof(T))),
+                    "s"(reinterpret_cast<uint64_t>(global_ptr)),
+                    "n"(static_cast<uint32_t>(static_offset * sizeof(T)))
+                    : "memory");
+            }
+            else
+            {
+                __builtin_amdgcn_global_load_async_to_lds_b32(
+                    glb_ptr, lds_ptr, static_offset * sizeof(T), static_cast<index_t>(coherence));
+            }
         }
         else
         {
-            *lds_ptr = 0;
+            auto [unused, lds_write_ptr] =
+                async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<4>>(
+                    global_ptr, smem_ptr + static_offset);
+            *lds_write_ptr = 0;
         }
         return;
     }
@@ -2696,15 +2736,31 @@ __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
     {
         auto [glb_ptr, lds_ptr] =
             async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<8>>(
-                global_ptr, smem_ptr);
+                global_ptr + global_offset - static_offset, smem_ptr);
         if(is_valid_element)
         {
-            __builtin_amdgcn_global_load_async_to_lds_b64(
-                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+            if constexpr(use_asm_path)
+            {
+                asm volatile(
+                    "global_load_async_to_lds_b64 %0, %1, %2, offset:%3\n\t" ::"v"(
+                        static_cast<uint32_t>(reinterpret_cast<uint64_t>(lds_ptr))),
+                    "v"(static_cast<uint32_t>((global_offset - static_offset) * sizeof(T))),
+                    "s"(reinterpret_cast<uint64_t>(global_ptr)),
+                    "n"(static_cast<uint32_t>(static_offset * sizeof(T)))
+                    : "memory");
+            }
+            else
+            {
+                __builtin_amdgcn_global_load_async_to_lds_b64(
+                    glb_ptr, lds_ptr, static_offset * sizeof(T), static_cast<index_t>(coherence));
+            }
         }
         else
         {
-            *lds_ptr = 0;
+            auto [unused, lds_write_ptr] =
+                async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<8>>(
+                    global_ptr, smem_ptr + static_offset);
+            *lds_write_ptr = 0;
         }
         return;
     }
@@ -2712,15 +2768,31 @@ __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
     {
         auto [glb_ptr, lds_ptr] =
             async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<16>>(
-                global_ptr, smem_ptr);
+                global_ptr + global_offset - static_offset, smem_ptr);
         if(is_valid_element)
         {
-            __builtin_amdgcn_global_load_async_to_lds_b128(
-                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+            if constexpr(use_asm_path)
+            {
+                asm volatile(
+                    "global_load_async_to_lds_b128 %0, %1, %2, offset:%3\n\t" ::"v"(
+                        static_cast<uint32_t>(reinterpret_cast<uint64_t>(lds_ptr))),
+                    "v"(static_cast<uint32_t>((global_offset - static_offset) * sizeof(T))),
+                    "s"(reinterpret_cast<uint64_t>(global_ptr)),
+                    "n"(static_cast<uint32_t>(static_offset * sizeof(T)))
+                    : "memory");
+            }
+            else
+            {
+                __builtin_amdgcn_global_load_async_to_lds_b128(
+                    glb_ptr, lds_ptr, static_offset * sizeof(T), static_cast<index_t>(coherence));
+            }
         }
         else
         {
-            *lds_ptr = 0;
+            auto [unused, lds_write_ptr] =
+                async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<16>>(
+                    global_ptr, smem_ptr + static_offset);
+            *lds_write_ptr = 0;
         }
         return;
     }
@@ -2728,6 +2800,7 @@ __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
     ignore = is_valid_element;
     ignore = global_ptr;
     ignore = smem_ptr;
+    ignore = global_offset;
 #endif
 }
 
@@ -2908,6 +2981,7 @@ CK_TILE_DEVICE void amd_direct_load_global_to_lds(const T* global_base_ptr,
                                                   const bool is_valid,
                                                   const index_t src_element_space_size)
 {
+#if defined(__gfx9__)
     const uint32_t* global_ptr =
         reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(global_base_ptr));
     const int32x4_t src_resource =
@@ -2924,9 +2998,7 @@ CK_TILE_DEVICE void amd_direct_load_global_to_lds(const T* global_base_ptr,
                  : "memory");
 #else
     // Direct loads require that each thread reads and writes exactly a single DWORD.
-#if defined(__gfx9__)
     constexpr auto bytes_per_thread = sizeof(T) * NumElemsPerThread;
-#endif
     // Direct loads require that each thread reads and writes a multiple of DWORDs (4 bytes).
     // For gfx950: supports 1, 3, or 4 DWORDs per thread
     // For gfx942: supports exactly 1 DWORD per thread
@@ -2944,6 +3016,14 @@ CK_TILE_DEVICE void amd_direct_load_global_to_lds(const T* global_base_ptr,
 
     llvm_amdgcn_raw_buffer_load_lds(
         src_resource, lds_ptr, bytes_per_thread, global_offset_bytes, 0, 0, 0);
+#endif
+#else
+    ignore = global_base_ptr;
+    ignore = global_offset;
+    ignore = lds_base_ptr;
+    ignore = lds_offset;
+    ignore = is_valid;
+    ignore = src_element_space_size;
 #endif
 }
 

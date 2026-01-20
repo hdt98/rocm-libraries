@@ -264,7 +264,7 @@ struct DynamicBuffer
                                                             element_space_size_ / PackedSize);
     }
 
-    template <typename DstBuffer, index_t NumElemsPerThread>
+    template <typename DstBuffer, index_t NumElemsPerThread, index_t static_dst_offset>
     __host__ __device__ void AsyncCopyToLds(DstBuffer& dst_buf,
                                             IndexType src_offset,
                                             IndexType dst_offset,
@@ -280,12 +280,10 @@ struct DynamicBuffer
 
         amd_async_load_global_to_lds<remove_cvref_t<typename DstBuffer::type>,
                                      NumElemsPerThread,
-                                     coherence>(p_data_,
-                                                src_offset,
-                                                dst_buf.p_data_,
-                                                dst_offset,
-                                                is_valid_element,
-                                                element_space_size_ / PackedSize);
+                                     static_dst_offset,
+                                     true,
+                                     coherence>(
+            p_data_, src_offset, dst_buf.p_data_, dst_offset, is_valid_element);
     }
 
     template <typename X,

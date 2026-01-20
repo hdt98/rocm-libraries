@@ -15,7 +15,6 @@
 #include "ck/utility/common_header.hpp"
 #include "ck/utility/env.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_direct_load.hpp"
-#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async_load.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
 
 namespace ck {
@@ -1258,7 +1257,6 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         constexpr auto b_block_desc_bk0_n_bk1 =
             GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
 
-#if defined(__gfx950__)
         auto a_blockwise_copy =
             ThreadGroupTensorSliceTransfer_DirectLoad<ThisThreadBlock,
                                                       Sequence<AK0Number, MPerBlock, AK1Number>,
@@ -1295,47 +1293,6 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                 make_multi_index(0, n_block_data_idx_on_grid, 0),
                 b_block_desc_bk0_n_bk1,
                 make_multi_index(0, 0, 0));
-
-#else
-        // Direct global to LDS load is specific to gfx95x architecture and can not be easily
-        // generalized by substituting device-specific intrinsics with gfx1250 async load
-        // instructions. Therefore, we use separate ThreadGroupTensorSliceTransfer implementations
-        // for gfx95x and gfx1250.
-        auto a_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
-            ThisThreadBlock,
-            Sequence<AK0Number, MPerBlock, AK1Number>,    // typename BlockSliceLengths,
-            ABlockTransferThreadClusterLengths_AK0_M_AK1, // typename ThreadClusterLengths
-            ABlockTransferThreadClusterArrangeOrder,      // ThreadClusterArrangeOrder
-            ADataType,                                    // SrcData
-            ADataType,                                    // DstData
-            decltype(a_grid_desc_ak0_m_ak1),              // SrcDesc
-            decltype(a_block_desc_ak0_m_ak1),             // DstDesc
-            ABlockTransferSrcVectorDim,                   // SrcVectorDim
-            2,                                            // DstVectorDim
-            ABlockTransferSrcScalarPerVector>             // SrcScalarPerVector
-            (a_grid_desc_ak0_m_ak1,
-             make_multi_index(0, m_block_data_idx_on_grid, 0),
-             a_block_desc_ak0_m_ak1,
-             make_multi_index(0, 0, 0));
-
-        // B matrix blockwise copy
-        auto b_blockwise_copy =
-            ThreadGroupTensorSliceTransfer_AsyncLoad<ThisThreadBlock,
-                                                     Sequence<BK0Number, NPerBlock, BK1Number>,
-                                                     BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                                                     BBlockTransferThreadClusterArrangeOrder,
-                                                     BDataType,
-                                                     BDataType,
-                                                     decltype(b_grid_desc_bk0_n_bk1),
-                                                     decltype(b_block_desc_bk0_n_bk1),
-                                                     BBlockTransferSrcVectorDim,
-                                                     2,
-                                                     BBlockTransferSrcScalarPerVector>(
-                b_grid_desc_bk0_n_bk1,
-                make_multi_index(0, n_block_data_idx_on_grid, 0),
-                b_block_desc_bk0_n_bk1,
-                make_multi_index(0, 0, 0));
-#endif
 
         // LDS allocation for A and B: be careful of alignment
         constexpr auto a_block_space_size_aligned = math::integer_least_multiple(
@@ -1601,7 +1558,6 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         constexpr auto b_block_desc_bk0_n_bk1 =
             GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
 
-#if defined(__gfx950__)
         auto a_blockwise_copy =
             ThreadGroupTensorSliceTransfer_DirectLoad<ThisThreadBlock,
                                                       Sequence<AK0Number, MPerBlock, AK1Number>,
@@ -1638,46 +1594,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                 make_multi_index(0, n_block_data_idx_on_grid, 0),
                 b_block_desc_bk0_n_bk1,
                 make_multi_index(0, 0, 0));
-#else
-        // Direct global to LDS load is specific to gfx95x architecture and can not be easily
-        // generalized by substituting device-specific intrinsics with gfx1250 async load
-        // instructions. Therefore, we use separate ThreadGroupTensorSliceTransfer implementations
-        // for gfx95x and gfx1250.
-        auto a_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
-            ThisThreadBlock,
-            Sequence<AK0Number, MPerBlock, AK1Number>,    // typename BlockSliceLengths,
-            ABlockTransferThreadClusterLengths_AK0_M_AK1, // typename ThreadClusterLengths
-            ABlockTransferThreadClusterArrangeOrder,      // ThreadClusterArrangeOrder
-            ADataType,                                    // SrcData
-            ADataType,                                    // DstData
-            decltype(a_grid_desc_ak0_m_ak1),              // SrcDesc
-            decltype(a_block_desc_ak0_m_ak1),             // DstDesc
-            ABlockTransferSrcVectorDim,                   // SrcVectorDim
-            2,                                            // DstVectorDim
-            ABlockTransferSrcScalarPerVector>             // SrcScalarPerVector
-            (a_grid_desc_ak0_m_ak1,
-             make_multi_index(0, m_block_data_idx_on_grid, 0),
-             a_block_desc_ak0_m_ak1,
-             make_multi_index(0, 0, 0));
 
-        // B matrix blockwise copy
-        auto b_blockwise_copy =
-            ThreadGroupTensorSliceTransfer_AsyncLoad<ThisThreadBlock,
-                                                     Sequence<BK0Number, NPerBlock, BK1Number>,
-                                                     BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                                                     BBlockTransferThreadClusterArrangeOrder,
-                                                     BDataType,
-                                                     BDataType,
-                                                     decltype(b_grid_desc_bk0_n_bk1),
-                                                     decltype(b_block_desc_bk0_n_bk1),
-                                                     BBlockTransferSrcVectorDim,
-                                                     2,
-                                                     BBlockTransferSrcScalarPerVector>(
-                b_grid_desc_bk0_n_bk1,
-                make_multi_index(0, n_block_data_idx_on_grid, 0),
-                b_block_desc_bk0_n_bk1,
-                make_multi_index(0, 0, 0));
-#endif
         // LDS allocation for A and B: be careful of alignment
         constexpr auto a_block_space_size_aligned = math::integer_least_multiple(
             a_block_desc_ak0_m_ak1.GetElementSpaceSize(), max_lds_align);

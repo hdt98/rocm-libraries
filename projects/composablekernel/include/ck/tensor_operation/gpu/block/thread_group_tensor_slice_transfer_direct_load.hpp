@@ -62,9 +62,8 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
     using SrcCoordStep = decltype(make_tensor_coordinate_step(SrcDesc{}, Index{}));
     using DstCoordStep = decltype(make_tensor_coordinate_step(DstDesc{}, Index{}));
 
-    static constexpr auto I0 = Number<0>{};
-    static constexpr auto I1 = Number<1>{};
-
+    static constexpr auto I0                     = Number<0>{};
+    static constexpr auto I1                     = Number<1>{};
     static constexpr auto block_slice_lengths    = BlockSliceLengths{};
     static constexpr auto thread_cluster_lengths = ThreadClusterLengths{};
 
@@ -237,7 +236,42 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
         static_assert(
             ck::is_same_v<remove_cvref_t<typename DstBuffer::type>, remove_cvref_t<DstData>>,
             "DstBuffer and DstData data types must be consistent.");
+#if defined(__gfx125__)
+        ignore = dst_desc;
+        constexpr auto scalar_per_access =
+            generate_sequence(detail::lambda_scalar_per_access<DstVectorDim, 1>{}, Number<nDim>{});
 
+        using SpaceFillingCurve   = SpaceFillingCurve<decltype(thread_slice_lengths),
+                                                      SrcDimAccessOrder,
+                                                      remove_cv_t<decltype(scalar_per_access)>>;
+        constexpr auto num_access = SpaceFillingCurve::GetNumOfAccess();
+
+        // loop over space-filling curve
+        static_for<0, num_access, 1>{}([&](auto idx_1d) {
+            const auto src_offset = src_coord_.GetOffset();
+            const bool is_src_valid =
+                coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
+
+            constexpr auto lds_access_offset = [&]() {
+                constexpr auto coord_offset = SpaceFillingCurve::GetIndex(idx_1d) * thread_steps;
+                return make_tensor_coordinate(DstDesc{}, coord_offset).GetOffset();
+            }();
+
+            src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>,
+                                            ScalarPerVector,
+                                            lds_access_offset>(
+                dst_buf, src_offset, dst_coord_.GetOffset(), is_src_valid);
+
+            // move coordinate
+            if constexpr(idx_1d.value != num_access - 1)
+            {
+                constexpr auto forward_step =
+                    SpaceFillingCurve::GetForwardStep(idx_1d) * thread_steps;
+                move_tensor_coordinate(
+                    src_desc, src_coord_, make_tensor_coordinate_step(src_desc, forward_step));
+            }
+        });
+#else
         constexpr auto dst_access_lengths = thread_slice_lengths;
 
         const auto dst_forward_steps  = generate_steps(dst_desc, 1);
@@ -252,14 +286,9 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
             const bool is_src_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
 
-#if defined(__gfx125__)
-            src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
-                dst_buf, src_offset, dst_coord_.GetOffset(), is_src_valid);
-#else
             const auto dst_offset = __builtin_amdgcn_readfirstlane(dst_coord_.GetOffset());
             src_buf.template DirectCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
                 dst_buf, src_offset, dst_offset, is_src_valid);
-#endif
             constexpr auto move_on_dim = [&]() constexpr {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
 
@@ -312,6 +341,7 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
 
         // Reset the destination slice since the entire buffer has been already filled.
         ResetDstSliceWindow(dst_desc);
+#endif
     }
 
     __device__ void MoveSrcSliceWindow(const SrcDesc& src_desc, const Index& step)

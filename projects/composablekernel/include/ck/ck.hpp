@@ -166,7 +166,11 @@
 #define CK_USE_AMD_V_DOT_DPP8_INLINE_ASM 1
 
 // LDS direct loads using inline assembly
+#if defined(__gfx125__)
+#define CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 1
+#else
 #define CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 0
+#endif
 
 // set rounding to nearest even as default for bf16 conversions
 #define CK_USE_RNE_BF16_CONVERSION 1

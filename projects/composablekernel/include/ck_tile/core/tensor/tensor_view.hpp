@@ -165,6 +165,7 @@ struct tensor_view
     }
 
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -176,7 +177,7 @@ struct tensor_view
                                   index_t linear_offset,
                                   bool_constant<oob_conditional_check> = {}) const
     {
-        return buf_.template async_get<X>(
+        return buf_.template async_get<X, static_offset / PackedSize>(
             smem,
             coord.get_offset() / PackedSize + linear_offset / PackedSize,
             0, // linear_offset need to be imm and is not supported currently
@@ -185,6 +186,7 @@ struct tensor_view
     }
 
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -197,11 +199,12 @@ struct tensor_view
                                   bool is_valid_element,
                                   bool_constant<oob_conditional_check> = {}) const
     {
-        return buf_.template async_get<X>(smem,
-                                          coord.get_offset() / PackedSize,
-                                          linear_offset / PackedSize,
-                                          is_valid_element,
-                                          bool_constant<oob_conditional_check>{});
+        return buf_.template async_get<X, static_offset / PackedSize>(
+            smem,
+            coord.get_offset() / PackedSize,
+            linear_offset / PackedSize,
+            is_valid_element,
+            bool_constant<oob_conditional_check>{});
     }
 
     template <typename X,

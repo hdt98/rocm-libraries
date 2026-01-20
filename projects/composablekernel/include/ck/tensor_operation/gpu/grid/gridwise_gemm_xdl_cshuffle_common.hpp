@@ -311,11 +311,11 @@ struct GridwiseGemm_xdl_cshuffle_base
         constexpr index_t MLdsLayer = (EnableLdsLayer == false) || (LdsSize < 1) ? 1 : LdsSize;
         constexpr index_t MPerThread =
             MPerBlock / ABlockTransferThreadClusterLengths_AK0_M_AK1{}[1];
-        constexpr index_t MPerThreadLayer = (MPerThread >= 16) ? 4 : MPerThread;
+        constexpr index_t MPerThreadLayer = DirectLoad ? 1 : (MPerThread >= 16) ? 4 : MPerThread;
 
         static_assert(MLdsLayer == 1 || MPerBlock % (MLdsLayer * MPerThreadLayer) == 0);
         // A matrix in LDS memory, dst of blockwise copy
-        if constexpr(ABlockLdsExtraM || ForceNaiveLdsLayout)
+        if constexpr(ABlockLdsExtraM || ForceNaiveLdsLayout || DirectLoad)
         {
             // 16 is the byte size of ds_load_b128 and ds_write_b128.
             constexpr auto PaddingSize = 16 / sizeof(ADataType);
@@ -662,10 +662,10 @@ struct GridwiseGemm_xdl_cshuffle_base
         constexpr index_t NLdsLayer = (EnableLdsLayer == false) || (LdsSize < 1) ? 1 : LdsSize;
         constexpr index_t NPerThread =
             EnableLdsLayer ? NPerBlock / BBlockTransferThreadClusterLengths_BK0_N_BK1{}[1] : 1;
-        constexpr index_t NPerThreadLayer = (NPerThread >= 16) ? 4 : NPerThread;
+        constexpr index_t NPerThreadLayer = DirectLoad ? 1 : (NPerThread >= 16) ? 4 : NPerThread;
         static_assert(NLdsLayer == 1 || NPerBlock % (NLdsLayer * NPerThreadLayer) == 0);
         // B matrix in LDS memory, dst of blockwise copy
-        if constexpr(BBlockLdsExtraN || ForceNaiveLdsLayout)
+        if constexpr(BBlockLdsExtraN || ForceNaiveLdsLayout || DirectLoad)
         {
             // 16 is the byte size of ds_load_b128 and ds_write_b128.
             constexpr auto PaddingSize = 16 / sizeof(BDataType);

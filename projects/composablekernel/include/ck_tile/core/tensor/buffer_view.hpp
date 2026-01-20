@@ -414,6 +414,7 @@ struct buffer_view<address_space_enum::global,
 
     // i is offset of T, not X. i should be aligned to X
     template <typename X,
+              index_t static_offset      = 0,
               bool oob_conditional_check = true,
               typename std::enable_if<
                   std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
@@ -434,9 +435,11 @@ struct buffer_view<address_space_enum::global,
 
         constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
 #if defined(__gfx125__) // for gfx125; there uses another instruction to do async load
-        amd_async_global_load_to_lds<remove_cvref_t<T>, t_per_x, Coherence>(
-            smem, p_data_ + i + linear_offset, is_valid_element);
+        auto p_uniform_ptr = amd_wave_read_first_lane(p_data_);
+        amd_async_global_load_to_lds<remove_cvref_t<T>, t_per_x, static_offset, true, Coherence>(
+            smem, p_uniform_ptr, i + linear_offset, is_valid_element);
 #else
+        static_assert(static_offset == 0);
         const int32x4_t src_wave_buffer_resource =
             make_wave_buffer_resource(p_data_, (buffer_size_) * sizeof(type));
 

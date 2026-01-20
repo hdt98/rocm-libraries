@@ -870,6 +870,8 @@ __device__ void amd_direct_load_global_to_lds(const T* global_base_ptr,
 #elif defined(__gfx942__)
     constexpr auto dword_bytes = 4;
     static_assert(bytes_per_thread == dword_bytes);
+#else
+    ignore = bytes_per_thread;
 #endif
 
     const int32x4_t src_resource =
@@ -908,8 +910,11 @@ __device__ void amd_direct_load_global_to_lds(const T* global_base_ptr,
 
 template <typename T,
           index_t NumBytesPerThread,
+          index_t static_dst_offset        = 0,
+          bool is_uniform_src_ptr          = true,
           AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
 __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1))) const T* src_ptr,
+                                               index_t src_offset,
                                                __attribute__((address_space(3))) T* dst_ptr)
 {
     static_assert(NumBytesPerThread == 1 || NumBytesPerThread == 4 || NumBytesPerThread == 8 ||
@@ -919,56 +924,115 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
     // ROCm 7.0.1 compiler flags unsupported builtins even though the function is never instantiated
     // for gfx9xx architectures
 #if defined(__gfx125__)
+#if CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM
+    constexpr bool use_asm_path = is_uniform_src_ptr;
+#else
+    constexpr bool use_asm_path = false;
+#endif
+
     if constexpr(NumBytesPerThread == 1)
     {
-        __attribute__((address_space(1))) char* cv_ptr =
-            const_cast<__attribute__((address_space(1))) char*>(
-                reinterpret_cast<const __attribute__((address_space(1))) char*>(src_ptr));
-        __attribute__((address_space(3))) char* lds_ptr =
-            reinterpret_cast<__attribute__((address_space(3))) char*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b8(
-            cv_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        if constexpr(use_asm_path)
+        {
+            asm volatile("global_load_async_to_lds_b8 %0, %1, %2, offset:%3\n\t" ::"v"(
+                             static_cast<uint32_t>(reinterpret_cast<uint64_t>(dst_ptr))),
+                         "v"(static_cast<uint32_t>((src_offset - static_dst_offset) * sizeof(T))),
+                         "s"(reinterpret_cast<uint64_t>(src_ptr)),
+                         "n"(static_cast<uint32_t>(static_dst_offset * sizeof(T)))
+                         : "memory");
+        }
+        else
+        {
+            __attribute__((address_space(1))) char* cv_ptr =
+                const_cast<__attribute__((address_space(1))) char*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) char*>(
+                        src_ptr + src_offset - static_dst_offset));
+            __attribute__((address_space(3))) char* lds_ptr =
+                reinterpret_cast<__attribute__((address_space(3))) char*>(dst_ptr);
+            __builtin_amdgcn_global_load_async_to_lds_b8(
+                cv_ptr, lds_ptr, static_dst_offset * sizeof(T), static_cast<index_t>(coherence));
+        }
         return;
     }
 
     if constexpr(NumBytesPerThread == 4)
     {
-        __attribute__((address_space(1))) int* cv_ptr =
-            const_cast<__attribute__((address_space(1))) int*>(
-                reinterpret_cast<const __attribute__((address_space(1))) int*>(src_ptr));
-        __attribute__((address_space(3))) int* lds_ptr =
-            reinterpret_cast<__attribute__((address_space(3))) int*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b32(
-            cv_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        if constexpr(use_asm_path)
+        {
+            asm volatile("global_load_async_to_lds_b32 %0, %1, %2, offset:%3\n\t" ::"v"(
+                             static_cast<uint32_t>(reinterpret_cast<uint64_t>(dst_ptr))),
+                         "v"(static_cast<uint32_t>((src_offset - static_dst_offset) * sizeof(T))),
+                         "s"(reinterpret_cast<uint64_t>(src_ptr)),
+                         "n"(static_cast<uint32_t>(static_dst_offset * sizeof(T)))
+                         : "memory");
+        }
+        else
+        {
+            __attribute__((address_space(1))) int* cv_ptr =
+                const_cast<__attribute__((address_space(1))) int*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int*>(
+                        src_ptr + src_offset - static_dst_offset));
+            __attribute__((address_space(3))) int* lds_ptr =
+                reinterpret_cast<__attribute__((address_space(3))) int*>(dst_ptr);
+            __builtin_amdgcn_global_load_async_to_lds_b32(
+                cv_ptr, lds_ptr, static_dst_offset * sizeof(T), static_cast<index_t>(coherence));
+        }
         return;
     }
 
     if constexpr(NumBytesPerThread == 8)
     {
-        __attribute__((address_space(1))) int32x2_t* cv_ptr =
-            const_cast<__attribute__((address_space(1))) int32x2_t*>(
-                reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(src_ptr));
-        __attribute__((address_space(3))) int32x2_t* lds_ptr =
-            reinterpret_cast<__attribute__((address_space(3))) int32x2_t*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b64(
-            cv_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        if constexpr(use_asm_path)
+        {
+            asm volatile("global_load_async_to_lds_b64 %0, %1, %2, offset:%3\n\t" ::"v"(
+                             static_cast<uint32_t>(reinterpret_cast<uint64_t>(dst_ptr))),
+                         "v"(static_cast<uint32_t>((src_offset - static_dst_offset) * sizeof(T))),
+                         "s"(reinterpret_cast<uint64_t>(src_ptr)),
+                         "n"(static_cast<uint32_t>(static_dst_offset * sizeof(T)))
+                         : "memory");
+        }
+        else
+        {
+            __attribute__((address_space(1))) int32x2_t* cv_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(
+                        src_ptr + src_offset - static_dst_offset));
+            __attribute__((address_space(3))) int32x2_t* lds_ptr =
+                reinterpret_cast<__attribute__((address_space(3))) int32x2_t*>(dst_ptr);
+            __builtin_amdgcn_global_load_async_to_lds_b64(
+                cv_ptr, lds_ptr, static_dst_offset * sizeof(T), static_cast<index_t>(coherence));
+        }
         return;
     }
 
     if constexpr(NumBytesPerThread == 16)
     {
-        __attribute__((address_space(1))) int32x4_t* cv_ptr =
-            const_cast<__attribute__((address_space(1))) int32x4_t*>(
-                reinterpret_cast<const __attribute__((address_space(1))) int32x4_t*>(src_ptr));
-        __attribute__((address_space(3))) int32x4_t* lds_ptr =
-            reinterpret_cast<__attribute__((address_space(3))) int32x4_t*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b128(
-            cv_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        if constexpr(use_asm_path)
+        {
+            asm volatile("global_load_async_to_lds_b128 %0, %1, %2, offset:%3\n\t" ::"v"(
+                             static_cast<uint32_t>(reinterpret_cast<uint64_t>(dst_ptr))),
+                         "v"(static_cast<uint32_t>((src_offset - static_dst_offset) * sizeof(T))),
+                         "s"(reinterpret_cast<uint64_t>(src_ptr)),
+                         "n"(static_cast<uint32_t>(static_dst_offset * sizeof(T)))
+                         : "memory");
+        }
+        else
+        {
+            __attribute__((address_space(1))) int32x4_t* cv_ptr =
+                const_cast<__attribute__((address_space(1))) int32x4_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x4_t*>(
+                        src_ptr + src_offset - static_dst_offset));
+            __attribute__((address_space(3))) int32x4_t* lds_ptr =
+                reinterpret_cast<__attribute__((address_space(3))) int32x4_t*>(dst_ptr);
+            __builtin_amdgcn_global_load_async_to_lds_b128(
+                cv_ptr, lds_ptr, static_dst_offset * sizeof(T), static_cast<index_t>(coherence));
+        }
         return;
     }
 #else
     ignore = src_ptr;
     ignore = dst_ptr;
+    ignore = src_offset;
 #endif
 }
 
@@ -1042,8 +1106,11 @@ __device__ void amd_async_store_to_global_impl_raw(__attribute__((address_space(
 
 template <typename T,
           index_t N,
+          index_t static_dst_offset        = 0,
+          bool is_uniform_src_ptr          = true,
           AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
 __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) const T* src_ptr,
+                                           index_t src_offfset,
                                            __attribute__((address_space(3))) T* dst_ptr)
 {
 #if defined(__gfx125__)
@@ -1060,16 +1127,22 @@ __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) con
                       (is_same<T, uint8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)),
                   "wrong! not yet supported");
 
-    amd_async_copy_to_lds_impl_raw<T, sizeof(T) * N, coherence>(src_ptr, dst_ptr);
+    amd_async_copy_to_lds_impl_raw<T,
+                                   sizeof(T) * N,
+                                   static_dst_offset,
+                                   is_uniform_src_ptr,
+                                   coherence>(src_ptr, src_offfset, dst_ptr);
 #else
     ignore = src_ptr;
     ignore = dst_ptr;
+    ignore = src_offfset;
 #endif
     return;
 }
 
 template <typename T,
           index_t N,
+          index_t static_dst_offset        = 0,
           AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
 __device__ void amd_async_store_to_global_impl(__attribute__((address_space(3))) const T* src_ptr,
                                                __attribute__((address_space(1))) T* dst_ptr)
@@ -1098,33 +1171,35 @@ __device__ void amd_async_store_to_global_impl(__attribute__((address_space(3)))
 
 template <typename T,
           index_t NumElemsPerThread,
+          index_t static_dst_offset,
+          bool is_uniform_src_ptr          = true,
           AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
 __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
                                              const index_t global_offset,
                                              T* lds_base_ptr,
                                              const index_t lds_offset,
-                                             const bool is_src_valid,
-                                             const bool is_dst_valid)
+                                             const bool is_src_valid)
 {
-    if(is_src_valid && is_dst_valid)
+    if(is_src_valid)
     {
         __attribute__((address_space(1))) const T* global_ptr =
             reinterpret_cast<__attribute__((address_space(1))) T*>(
-                reinterpret_cast<uintptr_t>(global_base_ptr + global_offset));
+                reinterpret_cast<uintptr_t>(global_base_ptr));
         __attribute__((address_space(3))) T* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) T*>(
                 reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
-        amd_async_copy_to_lds_impl<T, NumElemsPerThread, coherence>(global_ptr, lds_ptr);
-    }
-    else if(is_dst_valid)
-    {
-        using DstVecType    = typename vector_type_maker<T, NumElemsPerThread>::type;
-        DstVecType* lds_ptr = reinterpret_cast<DstVecType*>(lds_base_ptr + lds_offset);
-        *lds_ptr            = {};
+        amd_async_copy_to_lds_impl<T,
+                                   NumElemsPerThread,
+                                   static_dst_offset,
+                                   is_uniform_src_ptr,
+                                   coherence>(global_ptr, global_offset, lds_ptr);
     }
     else
     {
-        return; // do nothing
+        using DstVecType = typename vector_type_maker<T, NumElemsPerThread>::type;
+        DstVecType* lds_ptr =
+            reinterpret_cast<DstVecType*>(lds_base_ptr + lds_offset + static_dst_offset);
+        *lds_ptr = {};
     }
 }
 

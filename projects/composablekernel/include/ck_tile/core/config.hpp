@@ -145,7 +145,11 @@
 #endif
 
 #ifndef CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM
+#if defined(__gfx125__)
 #define CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 1
+#else
+#define CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 1
+#endif
 #endif
 
 #ifndef CK_TILE_USE_AMD_BUFFER_LOAD
