@@ -33,6 +33,7 @@
 #include <miopen/fusion_plan.hpp>
 #include <miopen/fusion/solvers.hpp>
 #include <miopen/fusion/utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_AMD_FUSED_WINOGRAD)
 
@@ -55,19 +56,19 @@ namespace fusion {
 bool ConvBinWinogradRxSFused::IsApplicable(const FusionContext& context,
                                            const FusionDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_AMD_FUSED_WINOGRAD))
-        return false;
-    if(!context.use_asm_kernels)
-        return false;
-    if(!WinoCommonIsApplicable(context, problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_FUSED_WINOGRAD),
+                                  inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!context.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!WinoCommonIsApplicable(context, problem),
+                                  "Failed Windograd common checks");
 
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
     const auto conv_ctx     = context.GetConvContext(conv_problem);
 
     const std::string name = conv_ctx.GetStream().GetDeviceName();
-    if(name != "gfx803")
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name != "gfx803", inapplicable_msg::UnsupportedDevice);
 
     const auto W           = conv_problem.GetInWidth();
     const auto H           = conv_problem.GetInHeight();
@@ -85,14 +86,15 @@ bool ConvBinWinogradRxSFused::IsApplicable(const FusionContext& context,
     size_t padded_y = 0;
     size_t padded_x = 0;
 
-    if(conv_problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(conv_problem.IsTensorsCasted(),
+                                  inapplicable_msg::IsTensorsCasted);
+
     if(conv_problem.GetKernelStrideH() == 1)
     {
         if(y <= 3)
         {
-            if(!(C % 2 == 0))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(!(C % 2 == 0),
+                                          "C must be multiple of 2 for kernel with stride 1");
             padded_y = 3;
             padded_x = Ceiling(x, 3);
         }
@@ -111,13 +113,13 @@ bool ConvBinWinogradRxSFused::IsApplicable(const FusionContext& context,
             padded_x = Ceiling(x, 6);
     }
     else
-        return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(true, "Kernel Stride H not supported");
 
-    if(!(((padded_x / 3) * (padded_y * 3) * C) >= 18))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(((padded_x / 3) * (padded_y * 3) * C) >= 18),
+                                  "Fused Winograd RxS requires (Ceil(W/3)*Ceil(H/3)*C)>=18");
 
     // clang-format off
-    return conv_problem.GetKernelStrideH() == conv_problem.GetKernelStrideW()
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(conv_problem.GetKernelStrideH() == conv_problem.GetKernelStrideW()
         && conv_problem.GetDilationH() == 1
         && conv_problem.GetDilationW() == 1
         && (C * x * y) <= std::pow(2, 28)
@@ -135,8 +137,9 @@ bool ConvBinWinogradRxSFused::IsApplicable(const FusionContext& context,
         && C <= std::pow(2, 16)
         && K <= std::pow(2, 16)
         && N <= std::pow(2, 16)
-        && group_count == 1;
+        && group_count == 1), inapplicable_msg::NoKernelForConfig);
     // clang-format on
+    return true;
 }
 
 ConvSolution ConvBinWinogradRxSFused::GetSolution(const FusionContext& context,

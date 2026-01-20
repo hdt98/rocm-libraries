@@ -35,6 +35,7 @@
 #include <miopen/fusion/utils.hpp>
 
 #include <tuple>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1)
 
@@ -145,38 +146,39 @@ namespace fusion {
 bool ConvBinWinogradRxSf2x3g1Fused::IsApplicable(const FusionContext& context,
                                                  const FusionDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1))
-        return false;
-    if(!WinoCommonIsApplicable(context, problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1),
+                                  inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!WinoCommonIsApplicable(context, problem),
+                                  "Failed Windograd common checks");
 
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
     const auto conv_ctx     = context.GetConvContext(conv_problem);
 
     const std::string name = conv_ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11")),
+        inapplicable_msg::UnsupportedDevice);
 
-    if(conv_problem.IsFp16() &&
-       !(StartsWith(name, "gfx906") || StartsWith(name, "gfx908") || StartsWith(name, "gfx90a") ||
-         StartsWith(name, "gfx942") || StartsWith(name, "gfx1011") || StartsWith(name, "gfx1012") ||
-         StartsWith(name, "gfx103") || StartsWith(name, "gfx11")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (conv_problem.IsFp16() &&
+         !(StartsWith(name, "gfx906") || StartsWith(name, "gfx908") || StartsWith(name, "gfx90a") ||
+           StartsWith(name, "gfx942") || StartsWith(name, "gfx1011") ||
+           StartsWith(name, "gfx1012") || StartsWith(name, "gfx103") || StartsWith(name, "gfx11"))),
+        inapplicable_msg::UnsupportedDevice);
 
     // clang-format off
-    if (!((conv_problem.GetKernelStrideW() == 1 || conv_problem.GetKernelStrideW() == 2)
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!((conv_problem.GetKernelStrideW() == 1 || conv_problem.GetKernelStrideW() == 2)
         && conv_problem.GetKernelStrideW() == conv_problem.GetKernelStrideH()
         && conv_problem.GetDilationW() == 1
-        && conv_problem.GetDilationH() == 1))
-        return false;
+        && conv_problem.GetDilationH() == 1), inapplicable_msg::Generic);
     // clang-format on
 
-    if(conv_problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(conv_problem.IsTensorsCasted(),
+                                  inapplicable_msg::IsTensorsCasted);
 
     const auto group_count = conv_problem.GetGroupCount();
-    if(group_count != 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(group_count != 1, inapplicable_msg::GetGroupCount);
 
     const auto W  = conv_problem.GetInWidth();
     const auto H  = conv_problem.GetInHeight();
@@ -188,9 +190,12 @@ bool ConvBinWinogradRxSf2x3g1Fused::IsApplicable(const FusionContext& context,
     const auto OH = conv_problem.GetOutHeight();
     const auto OW = conv_problem.GetOutWidth();
 
-    return IsWinogradV21Preferred<2, 3>(name, conv_problem)
-               ? IsShaderConstraintsMetV21(conv_problem, R, S, C, K, H, W, OH, OW, N)
-               : IsShaderConstraintsMetV30(conv_problem, R, S, C, K, H, W, OH, OW, N);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(IsWinogradV21Preferred<2, 3>(name, conv_problem)
+              ? IsShaderConstraintsMetV21(conv_problem, R, S, C, K, H, W, OH, OW, N)
+              : IsShaderConstraintsMetV30(conv_problem, R, S, C, K, H, W, OH, OW, N)),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 ConvSolution ConvBinWinogradRxSf2x3g1Fused::GetSolution(const FusionContext& context,

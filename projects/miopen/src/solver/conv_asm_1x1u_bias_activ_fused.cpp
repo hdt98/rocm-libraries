@@ -39,6 +39,7 @@
 #include <miopen/fusion/utils.hpp>
 
 #include <half/half.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 using half_float::half;
 
@@ -220,55 +221,63 @@ float ConvBiasActivAsm1x1U::GetWti(const FusionContext&, const FusionDescription
 bool ConvBiasActivAsm1x1U::IsApplicable(const FusionContext& context,
                                         const FusionDescription& problem) const
 {
-    if(IsCKFusionSolverApplicable(context, problem))
-    {
-        return false;
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(IsCKFusionSolverApplicable(context, problem),
+                                  "CK Fusion Solver is applicable");
 
     const auto& desc = *problem.fusion_plan_desc;
     if(desc.op_map.empty())
     {
         MIOPEN_THROW("");
     }
-    if(!context.use_asm_kernels)
-        return false;
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!context.use_asm_kernels, inapplicable_msg::UseAsmKernels);
     // check the sequence of prims
-    if(desc.op_map.size() > 3)
-        return false;
-    if(desc.op_map[0]->kind() != miopenFusionOpConvForward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map.size() > 3), "Too many fusion ops");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[0]->kind() != miopenFusionOpConvForward),
+                                  inapplicable_msg::NotFWDFusion);
+
     if(desc.op_map.size() >= 2)
     {
         const auto prim = desc.op_map[1]->kind();
-        if(!(prim == miopenFusionOpBiasForward || prim == miopenFusionOpActivForward))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !(prim == miopenFusionOpBiasForward || prim == miopenFusionOpActivForward),
+            "Second op is neither bias nor activation.");
     }
+
     if(desc.op_map.size() == 3)
     {
         const auto prim = desc.op_map[2]->kind();
-        if(prim != miopenFusionOpActivForward)
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF((prim != miopenFusionOpActivForward),
+                                      "Third op is not activation.");
     }
 
     conv::ConvAsm1x1U sol{};
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
     const auto conv_ctx     = context.GetConvContext(conv_problem);
 
-    if(conv_problem.GetPadH() != conv_problem.GetPadW())
-        return false;
-    if(conv_problem.GetPadH() != 0)
-        return false;
-    if(conv_problem.GetKernelStrideH() != conv_problem.GetKernelStrideW())
-        return false;
-    if(conv_problem.GetKernelStrideH() != 1)
-        return false;
-    if(conv_problem.GetDilationH() != conv_problem.GetDilationW())
-        return false;
-    if(conv_problem.GetDilationH() != 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((conv_problem.GetPadH() != conv_problem.GetPadW()),
+                                  "Asymmetric padding not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((conv_problem.GetPadH() != 0), "Non-zero padding not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (conv_problem.GetKernelStrideH() != conv_problem.GetKernelStrideW()),
+        "Asymmetric stride not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((conv_problem.GetKernelStrideH() != 1),
+                                  "Strides greater than 1 not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((conv_problem.GetDilationH() != conv_problem.GetDilationW()),
+                                  "Asymmetric dilation not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((conv_problem.GetDilationH() != 1),
+                                  "Dilation greater than 1 not supported");
 
     // Check if the conovlution part is applicable
-    return sol.IsApplicable(conv_ctx, conv_problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!sol.IsApplicable(conv_ctx, conv_problem),
+                                  inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 } // namespace fusion

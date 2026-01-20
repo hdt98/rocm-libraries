@@ -36,6 +36,7 @@
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_clamp.hpp"
+#include <miopen/solver/solver_utils.hpp>
 #endif
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_CK_IGEMM_GRP_FWD_ACTIV)
 
@@ -601,44 +602,57 @@ bool ConvCKIgemmGrpFwdActivFused::IsApplicable(const FusionContext& ctx,
     {
         MIOPEN_THROW(miopenStatusInternalError, "desc.op_map.empty()");
     }
-    if(desc.op_map.size() != 2)
-        return false;
-    if(desc.op_map[0]->kind() != miopenFusionOpConvForward)
-        return false;
-    if(desc.op_map[1]->kind() != miopenFusionOpActivForward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.size() != 2, inapplicable_msg::FusionOpCount);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[0]->kind() != miopenFusionOpConvForward),
+                                  inapplicable_msg::NotFWDFusion);
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[1]->kind() != miopenFusionOpActivForward),
+                                  "Second fusion op is not activation forward");
     const auto& activationType =
         dynamic_cast<ActivFwdFusionOpDescriptor&>(*desc.op_map[1]).activMode;
-    if(activationType != miopenActivationRELU && activationType != miopenActivationCLIPPEDRELU &&
-       activationType != miopenActivationCLAMP)
-        return false;
-    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::Forward);
-    if(env::disabled(MIOPEN_DEBUG_CONV_CK_IGEMM_GRP_FWD_ACTIV))
-        return false;
-    if(!conv_problem.IsBfp16() && !conv_problem.IsFp16() && !conv_problem.IsFp32())
-        return false;
-    if(conv_problem.IsTensorsCasted())
-        return false;
-    if(conv_problem.GetConv().attribute.deterministic)
-        return false;
-    if(conv_problem.HasNonPackedTensors())
-        return false;
-    if(!conv_problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(conv_problem.HasMixedDataTypes())
-        return false;
-    if(!(conv_problem.Is2d() || conv_problem.Is3d()))
-        return false;
-    if(!ck_utility::is_ck_whitelist(ctx.GetStream().GetDeviceName()))
-        return false;
-    if(!conv_problem.IsLayoutNHWC() && !conv_problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((activationType != miopenActivationRELU &&
+                                   activationType != miopenActivationCLIPPEDRELU &&
+                                   activationType != miopenActivationCLAMP),
+                                  "Unsupported activation type");
 
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::Forward);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_CK_IGEMM_GRP_FWD_ACTIV),
+                                  inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (!conv_problem.IsBfp16() && !conv_problem.IsFp16() && !conv_problem.IsFp32()),
+        inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(conv_problem.IsTensorsCasted(),
+                                  inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(conv_problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(conv_problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!conv_problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(conv_problem.HasMixedDataTypes(),
+                                  inapplicable_msg::MixedDatatype);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(conv_problem.Is2d() || conv_problem.Is3d()),
+                                  inapplicable_msg::Not2Dor3D);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ck_utility::is_ck_whitelist(ctx.GetStream().GetDeviceName()),
+                                  inapplicable_msg::CKWhitelist);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((!conv_problem.IsLayoutNHWC() && !conv_problem.IsLayoutDefault()),
+                                  inapplicable_msg::Layout);
+
+    bool CKApplicable = false;
     switch(conv_problem.GetInDataType())
     {
-    case miopenBFloat16: return CheckCKApplicability<ck::bhalf_t>(conv_problem);
-    case miopenHalf: return CheckCKApplicability<ck::half_t>(conv_problem);
-    case miopenFloat: return CheckCKApplicability<float>(conv_problem);
+    case miopenBFloat16: CKApplicable = CheckCKApplicability<ck::bhalf_t>(conv_problem); break;
+    case miopenHalf: CKApplicable = CheckCKApplicability<ck::half_t>(conv_problem); break;
+    case miopenFloat: CKApplicable = CheckCKApplicability<float>(conv_problem); break;
     case miopenFloat8_fnuz:
     case miopenBFloat8_fnuz:
     case miopenInt8:
@@ -647,7 +661,8 @@ bool ConvCKIgemmGrpFwdActivFused::IsApplicable(const FusionContext& ctx,
     case miopenDouble:
     default: MIOPEN_THROW("Unsupported datatype");
     }
-    return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!CKApplicable, inapplicable_msg::CKNotApplicable);
+    return true;
 #endif
 }
 

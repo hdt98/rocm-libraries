@@ -35,6 +35,7 @@
 #include <miopen/fusion_plan.hpp>
 #include <miopen/fusion/utils.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD)
 
@@ -68,10 +69,8 @@ ConvOclDirectFwdFused::Search(const FusionContext& context,
 bool ConvOclDirectFwdFused::IsApplicable(const FusionContext& context,
                                          const FusionDescription& problem) const
 {
-    if(IsCKFusionSolverApplicable(context, problem))
-    {
-        return false;
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(IsCKFusionSolverApplicable(context, problem),
+                                  "CK Fusion Solver is applicable");
 
     const auto& desc = *problem.fusion_plan_desc;
     if(desc.op_map.empty())
@@ -79,35 +78,39 @@ bool ConvOclDirectFwdFused::IsApplicable(const FusionContext& context,
         MIOPEN_THROW("No operators added to fusion plan");
     }
     // check the sequence of prims
-    if(desc.op_map.size() > 4)
-        return false;
-    if(desc.op_map[0]->kind() != miopenFusionOpConvForward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.size() > 4, inapplicable_msg::FusionOpCount);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[0]->kind() != miopenFusionOpConvForward),
+                                  inapplicable_msg::NotFWDFusion);
     if(desc.op_map.size() >= 2)
     {
         const auto prim = desc.op_map[1]->kind();
-        if(!(prim == miopenFusionOpBatchNormInference || prim == miopenFusionOpBiasForward ||
-             prim == miopenFusionOpActivForward))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!(prim == miopenFusionOpBatchNormInference ||
+                                        prim == miopenFusionOpBiasForward ||
+                                        prim == miopenFusionOpActivForward),
+                                      "Unsupported 2nd fusion op");
     }
     if(desc.op_map.size() >= 3)
     {
         const auto prim = desc.op_map[2]->kind();
-        if(!(prim == miopenFusionOpActivForward || prim == miopenFusionOpBatchNormInference))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !(prim == miopenFusionOpActivForward || prim == miopenFusionOpBatchNormInference),
+            "Unsupported 3rd fusion op");
     }
     if(desc.op_map.size() == 4)
     {
         const auto prim = desc.op_map[3]->kind();
-        if(!(prim == miopenFusionOpActivForward))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!(prim == miopenFusionOpActivForward),
+                                      "Unsupported 4th fusion op");
     }
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
-    if(!conv_problem.IsFp32())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!conv_problem.IsFp32(), inapplicable_msg::DataType);
+
     const auto base     = conv::ConvOclDirectFwd{};
     const auto conv_ctx = context.GetConvContext(conv_problem);
-    return base.IsApplicable(conv_ctx, conv_problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!base.IsApplicable(conv_ctx, conv_problem),
+                                  inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 ConvSolution
