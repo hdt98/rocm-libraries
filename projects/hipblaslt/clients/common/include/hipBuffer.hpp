@@ -266,7 +266,7 @@ inline void copy_buf(HipHostBuffer& src, HipHostBuffer& dst, hipDataType type)
         copy_buf<hipblasLtInt8>(src, dst);
         break;
     default:
-        hipblaslt_cerr << "Error type in copy_buf : " << type << std::endl;
+        hipblaslt_cerr << "Error type in copy_buf "<< std::endl;
         break;
     }
 }
@@ -286,12 +286,12 @@ inline void transform_buf(HipHostBuffer& src, HipHostBuffer& dst)
             std::transform(static_cast<T1*>(src.buf()),
                            static_cast<T1*>(src.end()),
                            static_cast<Tc*>(dst.buf()),
-                           // FIX APPLIED IN LAMBDA:
+
                            [](T1 c) -> Tc {
                                if constexpr(requires_real_extraction)
                                {
                                    // If T1 is complex and Tc is real, cast the real part
-                                   return static_cast<Tc>(c.real()); // FIX
+                                   return static_cast<Tc>(c.real()); 
                                }
                                else
                                {

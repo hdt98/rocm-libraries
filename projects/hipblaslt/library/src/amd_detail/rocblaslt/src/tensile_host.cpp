@@ -586,8 +586,8 @@ namespace
         if(opB == HIPBLAS_OP_C)
             bOps = {TensileLite::TensorOp::ComplexConjugate()};
 
-        bool isComplexInput = (typeATensile == rocisa::DataType::ComplexFloat || 
-                           typeATensile == rocisa::DataType::ComplexDouble);
+        bool isComplexInput = (typeATensile == rocisa::DataType::ComplexFloat
+                               || typeATensile == rocisa::DataType::ComplexDouble);
 
         auto alphaBetaType = isComplexInput ? typeATensile : roc2TensileType(typeCompute);
 
@@ -1631,11 +1631,11 @@ namespace
         tensileProblem.setComputeInputType(
             roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
 
-        bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat || 
-                               a_type == rocisa::DataType::ComplexDouble);
+        bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat
+                               || a_type == rocisa::DataType::ComplexDouble);
 
         auto alphaBetaType = isComplexInput ? a_type : compute_type;
-        
+
         tensileProblem.setAlphaType(alphaBetaType);
         tensileProblem.setBetaType(alphaBetaType);
 
@@ -1822,9 +1822,9 @@ namespace
 
         tensileProblem.setComputeInputType(
             roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
-        
-        bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat || 
-                               a_type == rocisa::DataType::ComplexDouble);
+
+        bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat
+                               || a_type == rocisa::DataType::ComplexDouble);
 
         auto alphaBetaType = isComplexInput ? a_type : compute_type;
 
@@ -1892,7 +1892,7 @@ namespace
             tensileProblem.setAlphaRestriction(alpha_restriction);
         }
 
-        //set beta restrictions 
+        //set beta restrictions
         auto beta_restriction = get_scalar_value_from_void_ptr(prob.beta, prob.d_type);
         tensileProblem.setBetaRestriction(beta_restriction);
 
@@ -1962,28 +1962,26 @@ namespace
         tensileProblem.setSwizzleTensorB(prob.swizzleB);
     }
 
-rocisa::DataType computeTypeToRocisaDataType(rocblaslt_compute_type compute_type)
-{
-    switch(compute_type)
+    rocisa::DataType computeTypeToRocisaDataType(rocblaslt_compute_type compute_type)
     {
+        switch(compute_type)
+        {
         case rocblaslt_compute_f16:
             return rocisa::DataType::Half;
-        
+
         case rocblaslt_compute_f32:
-        // Case f32 is often the base type for f32_r compute
+            // Case f32 is often the base type for f32_r compute
             return rocisa::DataType::Float;
-        
+
         case rocblaslt_compute_f32_fast_xf32:
             return rocisa::DataType::XFloat32;
-        
+
         case rocblaslt_compute_f64:
             return rocisa::DataType::Double;
-        
+
         case rocblaslt_compute_i32:
             return rocisa::DataType::Int32;
-        
-        // --- Add other specific fast/mix-precision modes here ---
-        // We use float as the default C++ type for the scalar value in these fast modes.
+
         case rocblaslt_compute_f32_fast_f16:
         case rocblaslt_compute_f32_fast_bf16:
         case rocblaslt_compute_f32_fast_f8_fnuz:
@@ -1994,15 +1992,12 @@ rocisa::DataType computeTypeToRocisaDataType(rocblaslt_compute_type compute_type
         case rocblaslt_compute_f32_fast_bf8:
         case rocblaslt_compute_f32_fast_f8bf8:
         case rocblaslt_compute_f32_fast_bf8f8:
-            return rocisa::DataType::Float; 
+            return rocisa::DataType::Float;
 
         default:
-            // This indicates an unsupported compute type passed to Tensile, 
-            // matching the error logic in your original code.
-            return rocisa::DataType::None; 
+            return rocisa::DataType::None;
+        }
     }
-}
-
 
     /***************************************************************
  * Construct the inputs to a Tensile ContractionProblemGemm        *
@@ -3839,7 +3834,8 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
         for(size_t i = 0; i < algoCount; ++i)
         {
             auto& solution = solutions[i];
-            msg << "getBestSolutions(): sol-idx = " << solution->index << ", sol-tag = " << solution->matchingTag() << std::endl;
+            msg << "getBestSolutions(): sol-idx = " << solution->index
+                << ", sol-tag = " << solution->matchingTag() << std::endl;
         }
         log_info(__func__, msg.str());
     }
@@ -3915,7 +3911,7 @@ rocblaslt_status getAllSolutions(MyProblem&                                     
 
     heuristicResults.resize(solutions.size());
 
-    int i = 0;
+    int i                 = 0;
     int duplicated_counts = 0;
     for(auto solution : solutions)
     {
@@ -3944,7 +3940,8 @@ rocblaslt_status getAllSolutions(MyProblem&                                     
         if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
         {
             std::ostringstream msg;
-            msg << "getAllSolutions(): sol-idx = " << solution->index << ", sol-tag = " << solution->matchingTag() << std::endl;
+            msg << "getAllSolutions(): sol-idx = " << solution->index
+                << ", sol-tag = " << solution->matchingTag() << std::endl;
             log_info(__func__, msg.str());
         }
 
@@ -4431,7 +4428,8 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
             for(size_t i = 0; i < algoCount; ++i)
             {
                 auto& solution = solutions[i];
-                msg << "getBestSolutions(): sol-idx = " << solution->index << ", sol-tag = " << solution->matchingTag() << std::endl;
+                msg << "getBestSolutions(): sol-idx = " << solution->index
+                    << ", sol-tag = " << solution->matchingTag() << std::endl;
             }
             log_info(__func__, msg.str());
         }
