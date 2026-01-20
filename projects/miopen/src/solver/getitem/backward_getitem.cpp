@@ -32,6 +32,7 @@
 #include <miopen/mlo_internal.hpp>
 #include <miopen/target_properties.hpp>
 #include <miopen/tensor_view_utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -58,10 +59,10 @@ bool IsLargeIndex(const miopen::getitem::ProblemDescription& problem)
 bool GetitemBackward::IsApplicable(const ExecutionContext& /*context*/,
                                    const miopen::getitem::ProblemDescription& problem) const
 {
-    if(!problem.IsSameType())
-        return false;
-    if(!IsLargeIndex(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameType(), inapplicable_msg::DataTypeMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsLargeIndex(problem), "Not a large index problem");
+
     return true;
 }
 
