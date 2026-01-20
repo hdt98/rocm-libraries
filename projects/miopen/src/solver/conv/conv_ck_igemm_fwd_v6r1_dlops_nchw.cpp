@@ -33,6 +33,7 @@
 
 #include "../legacy_composable_kernel/host/solver/include/solver_common.hpp"
 #include "../legacy_composable_kernel/host/solver/include/conv_igemm_fwd_v6r1_dlops_nchw_kcyx_nkhw.hpp"
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_SWDEV_411729 1
 
@@ -90,43 +91,53 @@ bool ConvCkIgemmFwdV6r1DlopsNchw::IsApplicable(const ExecutionContext& ctx,
                                                const ProblemDescription& problem) const
 {
 #if WORKAROUND_SWDEV_411729
-    if(!env::enabled(MIOPEN_DEBUG_CONV_CK_IGEMM_FWD_V6R1_DLOPS_NCHW))
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!env::enabled(MIOPEN_DEBUG_CONV_CK_IGEMM_FWD_V6R1_DLOPS_NCHW),
+                                  inapplicable_msg::Workaround);
 #else
-    if(env::disabled(MIOPEN_DEBUG_CONV_CK_IGEMM_FWD_V6R1_DLOPS_NCHW))
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_CK_IGEMM_FWD_V6R1_DLOPS_NCHW),
+                                  inapplicable_msg::EnvDisabled);
 #endif
-    {
-        return false;
-    }
-    const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(!ctx.use_hip_kernels)
-        return false;
-    if(!legacy_ck::is_ck_supported_hardware(ctx.GetStream()))
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(!problem.IsDirectionForward())
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!(problem.IsFp32() or problem.IsFp16()))
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(problem.GetGroupCount() != 1)
-        return false;
-    if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
-    if(!legacy_ck::IsIndexRangeLargeEnough(problem))
-        return false;
 
-    return ck::driver::ConvIgemmFwdV6r1DlopsNchwKcyxNkhw::IsApplicable(
-        legacy_ck::get_ck_convolution_problem_descriptor(problem));
+    const std::string name = ctx.GetStream().GetDeviceName();
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_hip_kernels, inapplicable_msg::HIPDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!legacy_ck::is_ck_supported_hardware(ctx.GetStream()),
+                                  "Legacy CK does not support HW");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() or problem.IsFp16()),
+                                  inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetGroupCount() != 1), inapplicable_msg::GetGroupCount);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                  inapplicable_msg::IsGfx90aFp16altRequired);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!legacy_ck::IsIndexRangeLargeEnough(problem),
+                                  "Index range not large enough");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ck::driver::ConvIgemmFwdV6r1DlopsNchwKcyxNkhw::IsApplicable(
+                                      legacy_ck::get_ck_convolution_problem_descriptor(problem)),
+                                  inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 PerformanceConvCkIgemmFwdV6r1DlopsNchw
