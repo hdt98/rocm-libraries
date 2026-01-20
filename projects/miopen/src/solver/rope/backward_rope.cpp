@@ -30,6 +30,7 @@
 #include <miopen/rope/invoke_params.hpp>
 #include <miopen/rope/solvers.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -42,12 +43,12 @@ namespace rope {
 bool RoPEBackward::IsApplicable(const ExecutionContext& /*context*/,
                                 const miopen::rope::ProblemDescriptionBwd& problem) const
 {
-    if(!problem.IsValidLength())
-        return false;
-    if(!problem.IsSameType())
-        return false;
-    if(!problem.IsAllContiguous())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsValidLength(), inapplicable_msg::IsValidLength);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameType(), inapplicable_msg::DataTypeMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllContiguous(), inapplicable_msg::NotContiguous);
+
     return true;
 }
 
