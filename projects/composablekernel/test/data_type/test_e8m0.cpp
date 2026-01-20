@@ -220,7 +220,6 @@ TEST(E8M0, ZeroExponentSpecialCase)
     // Exponent 0 represents denormal/zero in float
     e8m0_bexp_t exp(0x00);
     float value = type_convert<float>(exp);
-    // Zero exponent should produce a special value (denormal representation)
-    EXPECT_TRUE(std::isnan(value) || value == std::powf(2.0f, -127.0f) ||
-                std::fpclassify(value) == FP_SUBNORMAL);
+    // Zero exponent should produce 2^-127
+    EXPECT_EQ(value, std::powf(2.0f, -127.0f));
 }
