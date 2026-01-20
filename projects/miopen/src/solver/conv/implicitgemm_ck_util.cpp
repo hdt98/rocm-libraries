@@ -146,7 +146,7 @@ std::vector<std::string> parseDeviceInstanceArguments(const std::string& instanc
     return arguments;
 }
 
-int IndexOf(std::vector<std::string> vec, std::string val)
+int IndexOf(const std::vector<std::string>& vec, const std::string& val)
 {
     auto it = std::find(vec.begin(), vec.end(), val);
     if(it != vec.end())
@@ -154,6 +154,52 @@ int IndexOf(std::vector<std::string> vec, std::string val)
         return std::distance(vec.begin(), it);
     }
     return -1;
+}
+
+std::vector<std::string> parseXSplit(const std::string& line, const size_t len)
+{
+    std::string parsing = line;
+    std::vector<std::string> vals{};
+    size_t val_end = 0, line_end = len;
+    while(line_end > 0)
+    {
+        val_end = parsing.find('x');
+        if(val_end > line_end || val_end == std::string::npos)
+            val_end = line_end;
+        line_end -= std::min(line_end, (val_end + 1));
+
+        vals.push_back(std::string(parsing.substr(0, val_end)));
+        if(line_end > 0)
+            parsing = parsing.substr(val_end + 1);
+    }
+    return vals;
+}
+
+std::vector<std::string> parseDeviceInstanceInlineArgs(const std::string& instance_str)
+{
+    // DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR>
+    // BlkSize: 256, BlkTile: 256x16x64, WaveTile: 16x16, WaveMap: 4x1, VmemReadVec: 2x2,
+    // BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2,
+    // BlkGemmPipelinePrefetchStages: 2> fields = {"MPerBlock", "NPerBlock", "KPerBlock", "MPerOp",
+    // "NPerOp"};
+
+    size_t start_pos, len;
+    std::string parsing;
+    start_pos       = instance_str.find("BlkTile: ");
+    parsing         = instance_str.substr(start_pos + 9);
+    len             = parsing.find(',');
+    auto block_tile = parseXSplit(parsing, len);
+
+    start_pos      = instance_str.find("WaveTile: ");
+    parsing        = instance_str.substr(start_pos + 10);
+    len            = parsing.find(',');
+    auto wave_tile = parseXSplit(parsing, len);
+
+    auto ret = block_tile;
+    for(auto val : wave_tile)
+        ret.push_back(val);
+
+    return ret;
 }
 
 } // namespace solver
