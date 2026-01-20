@@ -846,6 +846,18 @@ class ActivationModule:
         else:
             raise RuntimeError("Unsupported data type %s."%cDataType.toDevice("HIP"))
         return module
+    
+    def getDReluModule(self, cDataType, vgprIn, vgprOut):
+        ti = rocIsa.getInstance()
+        self.needCombine = True
+        module = Module("Gradient Relu")
+        if cDataType.isSingle():
+            # v_cmp_ge_f32_e32 vcc, v0, 1      ; VCC = (x >= 1) ? 1 : 0
+            # v_cndmask_b32_e64 v2, 0.0, 1.0, vcc ; v2 = VCC ? 1.0 : 0.0
+            pass
+        else:
+            raise RuntimeError("Unsupported data type %s."%cDataType.toDevice("HIP"))
+        return module
 
     def getSiluModule(self, cDataType, vgprIn, vgprOut):
         self.needCombine = True
