@@ -5,6 +5,10 @@ Documentation for rocFFT is available at
 
 ## (Unreleased) rocFFT 1.0.37
 
+### Added
+
+* Added optional RCCL (ROCm Collective Communications Library) backend for single-node multi-GPU communication.
+
 ### Changed
 
 * Moved library to C++20 standard.
