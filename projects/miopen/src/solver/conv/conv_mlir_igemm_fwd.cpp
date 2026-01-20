@@ -31,6 +31,7 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/solver/implicitgemm_util.hpp>
 #include <miopen/solver/mlir_common.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_MLIR_IGEMM_FWD)
 
@@ -164,31 +165,37 @@ bool ConvMlirIgemmFwd::IsApplicable(const ExecutionContext& ctx,
                                     const ProblemDescription& problem) const
 {
 #if MIOPEN_USE_MLIR
-    if(env::disabled(MIOPEN_DEBUG_CONV_MLIR_IGEMM_FWD))
-        return false;
-    if(problem.GetConv().attribute.deterministic)
-        return false;
-    if(!problem.IsDirectionForward())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!mlir::IsMlirSupportedHardware(ctx))
-        return false;
-    if(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_MLIR_IGEMM_FWD),
+                                  inapplicable_msg::EnvDisabled);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!mlir::IsMlirSupportedHardware(ctx),
+                                  inapplicable_msg::NoMLIRSupport);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8()),
+        inapplicable_msg::DataType);
     // Note: ConvMlirIgemmFwd can run on a machine with xdlops support, however, it is
     // guaranteed to be slower than its xdlops alternative, therefore disabling it to
     // save compilation overhead
-    if(IsXdlopsSupport(ctx))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(IsXdlopsSupport(ctx), inapplicable_msg::Xdlops);
     // Refer to https://github.com/ROCm/llvm-project-private/issues/389
     const auto device_name = ctx.GetStream().GetDeviceName();
-    if(StartsWith(device_name, "gfx900"))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(StartsWith(device_name, "gfx900"),
+                                  inapplicable_msg::UnsupportedDevice);
 
-    return MiirIsConfigApplicable(mlir::ConstructBuildOptions(ctx, problem, false));
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !MiirIsConfigApplicable(mlir::ConstructBuildOptions(ctx, problem, false)),
+        inapplicable_msg::NoKernelForConfig);
+
+    return true;
 #else
     std::ignore = ctx;
     std::ignore = problem;
