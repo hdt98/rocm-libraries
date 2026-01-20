@@ -90,8 +90,10 @@ namespace rocRoller
 
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
         {
+            auto context = m_context.lock();
+            AssertFatal(context != nullptr);
             return GPUInstructionInfo::isLDS(inst.getOpCode())
-                   && !useWeightlessObserver(inst, m_context.lock());
+                   && context->kernelOptions()->dsObserver == DSObserverType::DSMEMObserver;
         }
 
         int DSMEMObserver::getWait(Instruction const& inst) const

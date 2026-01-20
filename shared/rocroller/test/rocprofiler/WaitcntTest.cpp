@@ -53,6 +53,7 @@
 #include "../catch/TestContext.hpp"
 #include "../catch/TestKernels.hpp"
 #include "Agent.hpp"
+#include "LDSTestUtils.hpp"
 #include "Utils.hpp"
 
 #include <catch2/catch_all.hpp>
