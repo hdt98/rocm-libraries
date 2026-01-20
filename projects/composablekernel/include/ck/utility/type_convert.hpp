@@ -2931,22 +2931,7 @@ template <>
 inline __host__ __device__ e4m3_scale_t type_convert<e4m3_scale_t, float>(float x)
 {
 #if defined(__gfx1250__)
-    union
-    {
-        float fval;
-        uint32_t i32val;
-        uint8_t i8val[4];
-    } val;
-    val.fval             = x;
-    uint32_t ival        = 0;
-    const float max_e4m3 = 448.0f;
-    // if x is not +/- infinity or nan
-    if((val.i32val & NumericUtils<float>::nan_mask) != NumericUtils<float>::Inf)
-        // clip float value
-        val.fval = __builtin_amdgcn_fmed3f(val.fval, max_e4m3, -max_e4m3);
-    ival       = __builtin_amdgcn_cvt_pk_fp8_f32(val.fval, val.fval, ival, false);
-    val.i32val = ival;
-    return e4m3_scale_t{val.i8val[0]};
+    return e4m3_scale_t{type_convert<f8_ocp_t>(x).data & 0x7F}; // convert and apply a 7-bit mask
 #else
     return e4m3_scale_t(x);
 #endif
