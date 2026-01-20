@@ -34,6 +34,7 @@
 #include <miopen/target_properties.hpp>
 
 #include <cstddef>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -48,14 +49,14 @@ bool GLUForward::IsApplicable(const ExecutionContext& context,
 {
     std::ignore = context;
 
-    if(!problem.IsAllContiguous())
-        return false;
-    if(problem.GetDim() != 0)
-        return false;
-    if(!(problem.GetInputDesc().GetType() == miopenFloat ||
-         problem.GetInputDesc().GetType() == miopenHalf ||
-         problem.GetInputDesc().GetType() == miopenBFloat16))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllContiguous(), inapplicable_msg::NotContiguous);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetDim() != 0), "Only dim=0 is supported.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetInputDesc().GetType() == miopenFloat ||
+                                    problem.GetInputDesc().GetType() == miopenHalf ||
+                                    problem.GetInputDesc().GetType() == miopenBFloat16),
+                                  inapplicable_msg::NoKernelForConfig);
     return true;
 }
 
