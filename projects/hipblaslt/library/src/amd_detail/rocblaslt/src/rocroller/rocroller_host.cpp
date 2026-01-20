@@ -290,6 +290,8 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
                 solutionParams->prefetchLDSFactor,
                 "prefetch_mix_mem_ops",
                 solutionParams->prefetchMixMemOps,
+                "beta_in_fma",
+                solutionParams->betaInFma,
                 "stream_K",
                 solutionParams->streamK,
                 "stream_K_two_tile",
@@ -341,6 +343,27 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
     if(preSwizzleB.empty())
         preSwizzleB = "none";
 
+    // Format preTile vectors as strings
+    std::string preTileA;
+    for(size_t i = 0; i < kt.scaleTypeA.preTile.size(); ++i)
+    {
+        if(i > 0)
+            preTileA += "x";
+        preTileA += std::to_string(kt.scaleTypeA.preTile[i]);
+    }
+    if(preTileA.empty())
+        preTileA = "none";
+
+    std::string preTileB;
+    for(size_t i = 0; i < kt.scaleTypeB.preTile.size(); ++i)
+    {
+        if(i > 0)
+            preTileB += "x";
+        preTileB += std::to_string(kt.scaleTypeB.preTile[i]);
+    }
+    if(preTileB.empty())
+        preTileB = "none";
+
     log_profile("matmul: type_parameters",
                 "transA",
                 kt.transA ? "T" : "N",
@@ -365,6 +388,8 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
                     + std::to_string(kt.scaleTypeA.blockColSize),
                 "scaleA_preSwizzle",
                 preSwizzleA,
+                "scaleA_preTile",
+                preTileA,
                 "scaleB_mode",
                 scaleModeToString(kt.scaleTypeB.mode),
                 "scaleB_type",
@@ -373,7 +398,9 @@ inline void logExtendedProfile(const RocblasltContractionProblem&        prob,
                 std::to_string(kt.scaleTypeB.blockRowSize) + "x"
                     + std::to_string(kt.scaleTypeB.blockColSize),
                 "scaleB_preSwizzle",
-                preSwizzleB);
+                preSwizzleB,
+                "scaleB_preTile",
+                preTileB);
 
     // Problem
     log_profile("matmul",
