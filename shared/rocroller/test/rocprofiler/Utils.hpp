@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2025 AMD ROCm(TM) Software
+ * Copyright 2025-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -37,14 +37,14 @@ namespace rocRoller
 {
     /**
      * @brief Number of runs for profiling tests
-     * 
+     *
      * Should be odd, as median is used for statistical analysis
      */
     constexpr int NUM_RUNS = 5;
 
     /**
      * @brief Formats a comparison between model predictions and profiler measurements
-     * 
+     *
      * @param filteredInstructions The list of instructions to compare
      * @param latencies The median latencies for each instruction
      * @return Formatted string comparing model predictions with profiler measurements
@@ -55,7 +55,7 @@ namespace rocRoller
 
     /**
      * @brief Filters instructions to exclude comments and verifies alignment with profiler data
-     * 
+     *
      * @param instructions Raw instructions from the kernel
      * @param latencies Profiler latencies to verify against
      * @return Vector of filtered instructions (non-comment only)

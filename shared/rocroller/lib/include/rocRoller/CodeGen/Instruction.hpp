@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2021-2025 AMD ROCm(TM) Software
+ * Copyright 2021-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -230,9 +230,9 @@ namespace rocRoller
         /**
          * Get the total number of cycles for this instruction.
          * This includes executed instructions, stall cycles, and additional cycles.
-         * 
+         *
          * An estimation as stall cycles are an estimation.
-         * 
+         *
          * Used for observers to keep track of cycles (in terms of time).
          */
         int totalCycles() const;

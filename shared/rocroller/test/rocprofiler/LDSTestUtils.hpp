@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2025 AMD ROCm(TM) Software
+ * Copyright 2025-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -110,7 +110,7 @@ namespace rocRoller
 
     /**
      * @brief Analyzes latency deltas between model predictions and profiler measurements
-     * 
+     *
      * @param filteredInstructions The list of instructions to analyze
      * @param medianLatencies The measured latencies for each instruction
      * @return Structure containing total delta, absolute delta, and incorrect prediction count

@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2025 AMD ROCm(TM) Software
+ * Copyright 2025-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -543,7 +543,7 @@ namespace rocRoller::Scheduling::LDSModel
         }
 
         /*
-        Consider the case where at least 2 SIMDs are active (workgroup size >128). 
+        Consider the case where at least 2 SIMDs are active (workgroup size >128).
         For each SP, at most 16 threads are processed per cycle (regardless of instr dwords).
         This totals to 32 threads per cycle. If these 32 threads access conflicting banks, then stalls will occur.
         This type of bank conflict does not occur with workgroup size of 64, where only one SP is active.
@@ -553,7 +553,7 @@ namespace rocRoller::Scheduling::LDSModel
         The way to reproduce this behavior is to write a microkernel that uses ds_read_b64 with two cases:
             1) each thread accesses unique banks, e.g. thread 0 accesses bank 0 and 1, thread 1 accesses bank 2 and 3, etc.
             2) each thread accesses every other bank pairs, e.g. thread 0 accesses bank 0 and 1, thread 1 accesses bank 4, 5, etc.
-            
+
             Compare the change in latency numbers from workgroup size of 64 to 128 for both cases.
             Notice only in case 2) do the latency numbers increase (gradually reach double).
         */
