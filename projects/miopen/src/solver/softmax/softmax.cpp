@@ -33,6 +33,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/target_properties.hpp>
 #include <miopen/float_equal.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_OCL_SOFTMAX)
 
@@ -127,7 +128,9 @@ bool Softmax::IsApplicable(
     [[maybe_unused]] const ExecutionContext& context,
     [[maybe_unused]] const miopen::softmax::ProblemDescription& problem) const
 {
-    return !env::disabled(MIOPEN_DEBUG_OCL_SOFTMAX);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_OCL_SOFTMAX),
+                                  inapplicable_msg::EnvDisabled);
+    return true;
 }
 
 std::size_t
