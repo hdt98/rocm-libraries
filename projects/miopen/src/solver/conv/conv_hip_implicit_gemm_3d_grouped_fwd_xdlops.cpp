@@ -888,9 +888,8 @@ bool ConvHipImplicitGemm3DGroupFwdXdlops::IsApplicable(
     {
     case miopenHalf: CKApplicable = CheckCKApplicability<ck::half_t>(problem); break;
     case miopenFloat:
-        CKApplicable = CKApplicable = problem.UseTF32()
-                                          ? CheckCKApplicability<float, ck::tf32_t>(problem)
-                                          : CheckCKApplicability<float>(problem);
+        CKApplicable = problem.UseTF32() ? CheckCKApplicability<float, ck::tf32_t>(problem)
+                                         : CheckCKApplicability<float>(problem);
         break;
     case miopenInt8: CKApplicable = CheckCKApplicability<int8_t>(problem); break;
     case miopenBFloat16: CKApplicable = CheckCKApplicability<ck::bhalf_t>(problem); break;
