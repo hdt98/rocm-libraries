@@ -38,6 +38,7 @@
 #endif
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 #include <miopen/solver/implicitgemm_util.hpp>
+#include <miopen/solver/solver_utils.hpp>
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_GROUP_CONV_IMPLICIT_GEMM_HIP_WRW_XDLOPS)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_GROUP_CONV_IMPLICIT_GEMM_HIP_WRW_XDLOPS_AI_HEUR)
 
@@ -611,42 +612,54 @@ bool ConvHipImplicitGemmGroupWrwXdlops::IsApplicable(
     [[maybe_unused]] const ProblemDescription& problem) const
 {
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-    if(env::disabled(MIOPEN_DEBUG_GROUP_CONV_IMPLICIT_GEMM_HIP_WRW_XDLOPS))
-        return false;
-    if(problem.GetConv().attribute.deterministic)
-        return false;
-    if(problem.HasMixedDataTypes())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!(problem.IsLayoutNHWC() || problem.IsLayoutDefault()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        env::disabled(MIOPEN_DEBUG_GROUP_CONV_IMPLICIT_GEMM_HIP_WRW_XDLOPS),
+        inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasMixedDataTypes(), inapplicable_msg::MixedDatatype);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsLayoutNHWC() || problem.IsLayoutDefault()),
+                                  inapplicable_msg::Layout);
+
     // needed because layout transpose kernel does not support non-packed tensors
-    if(problem.IsLayoutDefault() && problem.HasNonPackedTensors())
-        return false;
-    if(!ck_utility::is_ck_whitelist(ctx.GetStream().GetDeviceName()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsLayoutDefault() && problem.HasNonPackedTensors(),
+                                  inapplicable_msg::TransposeNonPacked);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ck_utility::is_ck_whitelist(ctx.GetStream().GetDeviceName()),
+                                  inapplicable_msg::CKWhitelist);
+
+    bool CKApplicable = false;
     switch(problem.GetInDataType())
     {
-    case miopenHalf: return CheckCKApplicability<ck::half_t>(problem);
-    case miopenFloat: return CheckCKApplicability<float>(problem);
-    case miopenInt8: return CheckCKApplicability<int8_t>(problem);
+    case miopenHalf: CKApplicable = CheckCKApplicability<ck::half_t>(problem); break;
+    case miopenFloat: CKApplicable = CheckCKApplicability<float>(problem); break;
+    case miopenInt8: CKApplicable = CheckCKApplicability<int8_t>(problem); break;
     case miopenBFloat16:
-        return (ctx.GetStream().GetDeviceName() == "gfx942" ||
-                StartsWith(ctx.GetStream().GetDeviceName(), "gfx95")) &&
-               CheckCKApplicability<ck::bhalf_t>(problem);
+        CKApplicable = (ctx.GetStream().GetDeviceName() == "gfx942" ||
+                        StartsWith(ctx.GetStream().GetDeviceName(), "gfx95")) &&
+                       CheckCKApplicability<ck::bhalf_t>(problem);
+        break;
     case miopenInt64:
     case miopenInt32:
     case miopenFloat8_fnuz:
     case miopenBFloat8_fnuz:
     case miopenDouble: break;
     }
-#endif
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!CKApplicable, inapplicable_msg::CKNotApplicable);
+    return true;
+#else
     return false;
+#endif
 }
 
 ConvSolution ConvHipImplicitGemmGroupWrwXdlops::GetSolution(

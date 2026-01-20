@@ -38,6 +38,7 @@
 #endif
 #include <miopen/solver/implicitgemm_util.hpp>
 #include <miopen/solver/implicitgemm_ck_util.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS)
 
@@ -275,49 +276,60 @@ bool ConvHipImplicitGemmFwdXdlops::IsApplicable(
     [[maybe_unused]] const ProblemDescription& problem) const
 {
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS))
-        return false;
-    if(problem.GetConv().attribute.deterministic)
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.HasMixedDataTypes())
-        return false;
-    if(!problem.IsDirectionForward())
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!IsXdlopsSupport(ctx))
-        return false;
-    if(!ck_utility::is_ck_whitelist(ctx.GetStream()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS),
+                                  inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasMixedDataTypes(), inapplicable_msg::MixedDatatype);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsXdlopsSupport(ctx), inapplicable_msg::Xdlops);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ck_utility::is_ck_whitelist(ctx.GetStream()),
+                                  inapplicable_msg::CKWhitelist);
+
     const std::string& arch = ctx.GetStream().GetDeviceName();
-    if(arch == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
-    if(!IsIndexRangeLargeEnough(problem))
-        return false;
-    if(!problem.IsLayoutNHWC())
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(problem.GetGroupCount() > 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(arch == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                  inapplicable_msg::IsGfx90aFp16altRequired);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsIndexRangeLargeEnough(problem), inapplicable_msg::IndexRange);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutNHWC(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetGroupCount() > 1), inapplicable_msg::GetGroupCount);
+
+    bool CKApplicable = false;
+
     switch(problem.GetInDataType())
     {
-    case miopenInt8: return CheckCKApplicability<int8_t>(problem);
-    case miopenHalf: return CheckCKApplicability<ck::half_t>(problem);
-    case miopenFloat: return CheckCKApplicability<float>(problem);
-    case miopenBFloat16: return CheckCKApplicability<ck::bhalf_t>(problem);
+    case miopenInt8: CKApplicable = CheckCKApplicability<int8_t>(problem); break;
+    case miopenHalf: CKApplicable = CheckCKApplicability<ck::half_t>(problem); break;
+    case miopenFloat: CKApplicable = CheckCKApplicability<float>(problem); break;
+    case miopenBFloat16: CKApplicable = CheckCKApplicability<ck::bhalf_t>(problem); break;
     case miopenFloat8_fnuz:
     case miopenBFloat8_fnuz:
     case miopenInt64:
     case miopenInt32:
     case miopenDouble: break;
     }
-#endif
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!CKApplicable, inapplicable_msg::CKNotApplicable);
+    return true;
+#else
     return false;
+#endif
 }
 
 ConvSolution ConvHipImplicitGemmFwdXdlops::GetSolution(

@@ -30,6 +30,7 @@
 #include <miopen/generic_search.hpp>
 #include <miopen/solver/implicitgemm_static_ck_util.hpp>
 #include <miopen/solver/static_ck_common.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 /// Disable ConvHipImplicitGemmBwdDataV4R1Xdlops for FP32 by default.
 /// \ref https://github.com/ROCm/MIOpen/issues/1206.
@@ -820,65 +821,79 @@ bool ConvHipImplicitGemmBwdDataV4R1Xdlops::IsApplicable(const ExecutionContext& 
 #if WORKAROUND_ISSUE_1206
     if(problem.IsFp32())
     {
-        if(!env::enabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !env::enabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS),
+            inapplicable_msg::Workaround);
     }
 #endif
 #if WORKAROUND_SWDEV_329642
     if(problem.IsBfp16() && ctx.GetStream().GetDeviceName() == "gfx90a")
     {
-        if(!env::enabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !env::enabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS),
+            inapplicable_msg::Workaround);
     }
 #endif
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS))
-        return false;
-    const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(problem.GetConv().attribute.deterministic)
-        return false;
-    if(!static_ck::IsComposableKernelSupportedHardware(ctx))
-        return false;
-    // Missing intrinsic: llvm.amdgcn.mfma.f32.16x16x8bf16
-    if(problem.IsBfp16() && static_ck::GfxHasMissingBf16Intrinsics(name))
-        return false;
-    if(!problem.IsDirectionBackwardData())
-        return false;
-    if(!ctx.use_hip_kernels)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!static_ck::IsApplicableXdlops(ctx, problem))
-        return false;
-    if(!static_ck::IsIndexRangeLargeEnough(problem))
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS),
+        inapplicable_msg::EnvDisabled);
 
-    bool is_applicable = true;
-    int gemm_g         = 0;
-    int gemm_m         = 0;
-    int gemm_n         = 0;
-    int gemm_k_total   = 0;
+    const std::string name = ctx.GetStream().GetDeviceName();
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!static_ck::IsComposableKernelSupportedHardware(ctx),
+                                  inapplicable_msg::NoCKSupport);
+
+    // Missing intrinsic: llvm.amdgcn.mfma.f32.16x16x8bf16
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsBfp16() && static_ck::GfxHasMissingBf16Intrinsics(name),
+                                  inapplicable_msg::MissingIntrinsic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardData(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_hip_kernels, inapplicable_msg::HIPDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!static_ck::IsApplicableXdlops(ctx, problem),
+                                  inapplicable_msg::Xdlops);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!static_ck::IsIndexRangeLargeEnough(problem),
+                                  inapplicable_msg::IndexRange);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                  inapplicable_msg::IsGfx90aFp16altRequired);
+
+    int gemm_g       = 0;
+    int gemm_m       = 0;
+    int gemm_n       = 0;
+    int gemm_k_total = 0;
 
     for(int gemm_id = 0; gemm_id < CalculateNumberOfGemm(problem); ++gemm_id)
     {
         std::tie(gemm_g, gemm_m, gemm_n, gemm_k_total) = CalculateGemmSize(problem, gemm_id);
-        if(!static_ck::IsValidGridGemmXdlops(gemm_m, gemm_n, gemm_k_total))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !static_ck::IsValidGridGemmXdlops(gemm_m, gemm_n, gemm_k_total),
+            inapplicable_msg::InvalidGridGemm);
     }
-    return is_applicable;
+    return true;
 }
 
 PerformanceImplicitGemmBwdDataV4R1Xdlops

@@ -30,6 +30,7 @@
 #include <miopen/generic_search.hpp>
 #include <miopen/solver/implicitgemm_static_ck_util.hpp>
 #include <miopen/solver/static_ck_common.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_ISSUE_309 1
 
@@ -634,51 +635,59 @@ size_t ConvHipImplicitGemmBwdDataV1R1::GetWorkspaceSize(const ExecutionContext&,
 bool ConvHipImplicitGemmBwdDataV1R1::IsApplicable(const ExecutionContext& ctx,
                                                   const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V1R1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V1R1),
+                                  inapplicable_msg::EnvDisabled);
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(problem.GetConv().attribute.deterministic)
-        return false;
-    if(!ctx.use_hip_kernels)
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(!static_ck::IsComposableKernelSupportedHardware(ctx))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.GetConv().attribute.deterministic,
+                                  inapplicable_msg::Deterministic);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_hip_kernels, inapplicable_msg::HIPDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!static_ck::IsComposableKernelSupportedHardware(ctx),
+                                  inapplicable_msg::NoCKSupport);
+
     // Missing instruction: v_mac_f32
-    if(problem.IsFp32() && static_ck::GfxHasMissingFp32Intrinsics(name))
-        return false;
-    if(!problem.IsDirectionBackwardData())
-        return false;
-    if(!problem.Is2d() && !(problem.Is3d() && problem.IsFp32()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsFp32() && static_ck::GfxHasMissingFp32Intrinsics(name),
+                                  inapplicable_msg::MissingIntrinsic);
 
-    if(!(problem.IsFp32() || problem.IsBfp16()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardData(), inapplicable_msg::Direction);
 
-    if(problem.IsTensorsCasted())
-        return false;
-    if(problem.GetGroupCount() != 1)
-        return false;
-    if(!static_ck::IsIndexRangeLargeEnough(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d() && !(problem.Is3d() && problem.IsFp32()),
+                                  "Shape and datatype combination not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsBfp16()),
+                                  inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetGroupCount() != 1), inapplicable_msg::GetGroupCount);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!static_ck::IsIndexRangeLargeEnough(problem),
+                                  inapplicable_msg::IndexRange);
+
 #if WORKAROUND_ISSUE_309
     if(problem.IsBfp16())
     {
-        if(!env::enabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V1R1))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!env::enabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V1R1),
+                                      inapplicable_msg::Workaround);
     }
 #endif
 
     const auto k = ProblemInterpreter::GetOutputChannelK(problem);
-    if(k % GetEPackLength(ctx, problem, false) != 0)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((k % GetEPackLength(ctx, problem, false) != 0),
+                                  "Output channel dim not supported");
 
     int gemm_m = 0;
     int gemm_n = 0;
@@ -686,7 +695,10 @@ bool ConvHipImplicitGemmBwdDataV1R1::IsApplicable(const ExecutionContext& ctx,
 
     std::tie(gemm_m, gemm_n, gemm_k) = CalculateGemmSize(ctx, problem);
 
-    return gemm_m % 32 == 0 && gemm_n % 32 == 0 && gemm_k % 4 == 0;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(gemm_m % 32 == 0 && gemm_n % 32 == 0 && gemm_k % 4 == 0),
+                                  inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 PerformanceImplicitGemmBwdDataV1R1
