@@ -305,11 +305,10 @@ struct UniversalGemmBasePolicy
             }
             else // A is in RowMajor
             {
-                constexpr auto DataTypeSize    = sizeof(ADataType);
-                constexpr uint64_t MinLdsLayer = 1ULL;
-                constexpr auto MLdsLayer =
-                    max(MinLdsLayer,
-                        get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+                constexpr auto DataTypeSize = sizeof(ADataType);
+                constexpr index_t MLdsLayerRequired =
+                    get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+                constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
 
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
@@ -385,8 +384,10 @@ struct UniversalGemmBasePolicy
             // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
             constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigA[I1] : -1;
 
-            constexpr auto MLdsLayer =
-                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+            constexpr index_t MLdsLayerRequired =
+                get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+
+            constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
 
             constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
 
@@ -574,13 +575,12 @@ struct UniversalGemmBasePolicy
             }
             else // B is Column Major
             {
-                constexpr index_t KPack        = GetSmemPackB<Problem>();
-                constexpr auto BK0             = number<KPerBlock / KPack>{};
-                constexpr auto DataTypeSize    = sizeof(BDataType);
-                constexpr uint64_t MinLdsLayer = 1ULL;
-                constexpr auto NLdsLayer =
-                    max(MinLdsLayer,
-                        get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+                constexpr index_t KPack     = GetSmemPackB<Problem>();
+                constexpr auto BK0          = number<KPerBlock / KPack>{};
+                constexpr auto DataTypeSize = sizeof(BDataType);
+                constexpr index_t NLdsLayerRequired =
+                    get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+                constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
 
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
@@ -653,8 +653,9 @@ struct UniversalGemmBasePolicy
             // set to -1 to make sure PaddingDataAmount = 0 when IsNeedPadding = false
             constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigB[I1] : -1;
 
-            constexpr auto NLdsLayer =
-                max(1UL, get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize);
+            constexpr index_t NLdsLayerRequired =
+                get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+            constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
 
             constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
 
@@ -1184,8 +1185,9 @@ struct UniversalGemmBasePolicy
             // which means lds bank number > MPerBlock
             if constexpr(PaddingStride > MPerBlock)
             {
-                constexpr auto KLdsLayer = max(
-                    1UL, get_n_lds_banks() * BytesPerDword / MPerBlock / DataTypeSize * PackedSize);
+                constexpr index_t KLdsLayerRequired =
+                    get_n_lds_banks() * BytesPerDword / MPerBlock / DataTypeSize * PackedSize;
+                constexpr auto KLdsLayer = max(1, KLdsLayerRequired);
 
                 constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
                     make_tuple(number<KPerBlock / KLdsLayer>{},
@@ -1284,8 +1286,9 @@ struct UniversalGemmBasePolicy
             // which means lds bank number > NPerBlock
             if constexpr(PaddingStride > NPerBlock)
             {
-                constexpr auto KLdsLayer = max(
-                    1UL, get_n_lds_banks() * BytesPerDword / NPerBlock / DataTypeSize * PackedSize);
+                constexpr index_t KLdsLayerRequired =
+                    get_n_lds_banks() * BytesPerDword / NPerBlock / DataTypeSize * PackedSize;
+                constexpr auto KLdsLayer = max(1, KLdsLayerRequired);
 
                 constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
                     make_tuple(number<KPerBlock / KLdsLayer>{},

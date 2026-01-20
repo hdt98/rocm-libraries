@@ -322,8 +322,9 @@ struct CShuffleEpilogue
         // N is contiguous dimension
         if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)
         {
-            constexpr auto MLdsLayer =
-                max(1UL, get_n_lds_banks() * BytesPerBank / NPerIterationShuffle / DataTypeSize);
+            constexpr index_t MLdsLayerRequired =
+                get_n_lds_banks() * BytesPerBank / NPerIterationShuffle / DataTypeSize;
+            constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
@@ -358,8 +359,9 @@ struct CShuffleEpilogue
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
         {
-            constexpr auto NLdsLayer =
-                max(1UL, get_n_lds_banks() * BytesPerBank / MPerIterationShuffle / DataTypeSize);
+            constexpr index_t NLdsLayerRequired =
+                get_n_lds_banks() * BytesPerBank / MPerIterationShuffle / DataTypeSize;
+            constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<NPerIterationShuffle / NLdsLayer>{},
