@@ -173,6 +173,10 @@ class ActivationType:
                           ('dgelu', { \
                             'instance': ActivationTypeRegister('dgelu', True, 0,       False,  True, False,   False, False, False, False), \
                             'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
+                          # @Siavash
+                          ('drelu', { \
+                            'instance': ActivationTypeRegister('drelu', True, 0,       False,  True, False,   False, False, False, False), \
+                            'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
                           ('geluscaling', { \
                             'instance': ActivationTypeRegister('geluscaling', False, 1, True,  True, False,   False, False, False, False), \
                             'supported_by': SupportedBy.TENSILE}), \
@@ -371,6 +375,8 @@ class ActivationModule:
             module = self.getTanhModule(cDataType, vgprIn, vgprOut, "activationAlpha", "activationBeta")
         elif (activationType == 'dgelu'):
             module = self.getDGeluModule(cDataType, vgprIn, vgprOut)
+        elif (activationType == 'drelu'):
+            module = self.getDReluModule(cDataType, vgprIn, vgprOut)    
         elif (activationType == 'silu'):
             module = self.getSiluModule(cDataType, vgprIn, vgprOut)
         elif (activationType == 'swish'):
