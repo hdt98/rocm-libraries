@@ -31,6 +31,7 @@
 #include <miopen/datatype.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -41,8 +42,7 @@ namespace adam {
 bool TransformersAdamW::IsApplicable([[maybe_unused]] const ExecutionContext& context,
                                      const miopen::adam::ProblemDescription& problem) const
 {
-    if(!problem.IsAllContiguous())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllContiguous(), inapplicable_msg::NotContiguous);
     return true;
 }
 
