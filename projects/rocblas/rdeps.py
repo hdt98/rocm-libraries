@@ -209,8 +209,6 @@ def run_install_script(script, xml):
 
 def install_msgpack_from_source():
     """Install msgpack-c 3.0.1 from source on Windows (Boost-free, same as Linux)"""
-    import pathlib
-    
     build_dir = pathlib.Path.cwd() / "build"
     msgpack_dir = build_dir / "deps" / "msgpack-c"
     
@@ -227,15 +225,16 @@ def install_msgpack_from_source():
     deps_dir.mkdir(parents=True, exist_ok=True)
     
     cwd = pathlib.Path.cwd()
-    os.chdir(deps_dir)
     
     try:
+        os.chdir(deps_dir)
+        
         # Clone msgpack-c 3.0.1 (same version as Linux)
         print("Cloning msgpack-c 3.0.1...")
         run_cmd("git -c advice.detachedHead=false clone --quiet --depth 1 --branch cpp-3.0.1 https://github.com/msgpack/msgpack-c.git")
         os.chdir("msgpack-c")
         
-        # Configure and install (header-only library)
+        # Configure and install msgpack-c (Boost-free C++ package)
         print("Configuring msgpack-c...")
         run_cmd("cmake -DMSGPACK_BUILD_TESTS=OFF -DMSGPACK_BUILD_EXAMPLES=OFF -DMSGPACK_USE_BOOST=OFF -DCMAKE_INSTALL_PREFIX=install .")
         
@@ -243,12 +242,15 @@ def install_msgpack_from_source():
         run_cmd("cmake --build . --config Release --target install")
         
         print(f"✓ msgpack-c 3.0.1 installed successfully (Boost-free)")
-        os.chdir(cwd)
         return 0
-    except Exception as e:
-        print(f"ERROR installing msgpack-c: {e}")
-        os.chdir(cwd)
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR installing msgpack-c (subprocess failed): {e}")
         return 1
+    except OSError as e:
+        print(f"ERROR installing msgpack-c (OS error): {e}")
+        return 1
+    finally:
+        os.chdir(cwd)
 
 def installation():
     global vcpkg_script

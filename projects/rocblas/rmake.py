@@ -393,6 +393,7 @@ def config_cmd():
     # Add msgpack install directory to CMAKE_PREFIX_PATH on Windows
     # Put msgpack FIRST to prioritize our Boost-free build over any vcpkg installation
     prefix_paths = []
+    msgpack_install = None  # Initialize to avoid undefined variable
     if os.name == "nt":
         msgpack_install = os.path.join(src_path, args.build_dir, "deps", "msgpack-c", "install")
         if os.path.exists(msgpack_install):
@@ -403,7 +404,7 @@ def config_cmd():
     cmake_options.append(cmake_base_options)
     
     # Explicitly tell CMake where to find our Boost-free msgpack (overrides any vcpkg version)
-    if os.name == "nt":
+    if os.name == "nt" and msgpack_install:
         msgpack_config_dir = os.path.join(msgpack_install, "lib", "cmake", "msgpack-cxx")
         if os.path.exists(msgpack_config_dir):
             cmake_options.append(f"-Dmsgpackc-cxx_DIR={cmake_path(msgpack_config_dir)}")
