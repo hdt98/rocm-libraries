@@ -10,6 +10,19 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
     * LANGE
     * LANGE_64
 
+## (Unreleased) rocSOLVER
+
+### Added
+### Changed
+### Removed
+### Optimized
+### Resolved issues
+
+* Fixed synchronization issue in GETF2.
+
+### Known issues
+### Upcoming changes
+
 
 
 ## rocSOLVER 3.32.0 for ROCm 7.2.0
