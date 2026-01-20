@@ -35,6 +35,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/stringutils.hpp>
 #include <miopen/fusion/utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_SWDEV_453577 1
 
@@ -365,53 +366,68 @@ template <uint32_t Winodata, uint32_t Winofilter>
 bool ConvWinoFuryRxSCommon<Winodata, Winofilter>::IsApplicable(const ExecutionContext& ctx,
                                                                const ProblemDescription& problem)
 {
+    std::string context = "ConvWinoFuryRxSCommon"; // for logging
     if constexpr(IS2X3)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_FURY_RXS_F2X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+            env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_FURY_RXS_F2X3),
+            context,
+            inapplicable_msg::EnvDisabled);
     }
     if constexpr(IS3X2)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_FURY_RXS_F3X2))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+            env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_FURY_RXS_F3X2),
+            context,
+            inapplicable_msg::EnvDisabled);
     }
 
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!problem.IsFp16())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !ctx.use_asm_kernels, context, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        problem.IsTensorsCasted(), context, inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(!problem.IsFp16(), context, inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        problem.HasNonPackedTensors(), context, inapplicable_msg::HasNonPackedTensors);
 
     const auto dev_name = ctx.GetStream().GetDeviceName();
     // All gfx11/gfx12 ASICs are supported
-    if(!(StartsWith(dev_name, "gfx11") || StartsWith(dev_name, "gfx12")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(StartsWith(dev_name, "gfx11") || StartsWith(dev_name, "gfx12")),
+        context,
+        inapplicable_msg::UnsupportedDevice);
 
-    if(StartsWith(dev_name, "gfx115"))
-    {
-        // Triggers this error on gfx1151
-        // kernel: [drm:gfx_v11_0_bad_op_irq [amdgpu]] *ERROR* Illegal opcode in command stream
-        // stderr: HSA_STATUS_ERROR_INVALID_ISA: The instruction set architecture is invalid. code:
-        // 0x100f
-        return false;
-    }
+    // Triggers this error on gfx1151
+    // kernel: [drm:gfx_v11_0_bad_op_irq [amdgpu]] *ERROR* Illegal opcode in command stream
+    // stderr: HSA_STATUS_ERROR_INVALID_ISA: The instruction set architecture is invalid. code:
+    // 0x100f
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        StartsWith(dev_name, "gfx115"), context, inapplicable_msg::Workaround);
 
-    if(!(problem.GetKernelStrideH() == 1 && problem.GetKernelStrideW() == 1))
-        return false;
-    if(!(problem.GetDilationH() == 1 && problem.GetDilationW() == 1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(problem.GetKernelStrideH() == 1 && problem.GetKernelStrideW() == 1),
+        context,
+        "Kernel stride must be 1.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(problem.GetDilationH() == 1 && problem.GetDilationW() == 1),
+        context,
+        "Dilation must be 1.");
 
     WinoShaderArgsV2 args;
-    if(!args.SetConvParams(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !args.SetConvParams(problem), context, "Convolution parameters not set.");
 
     const auto cu_count = ctx.GetStream().GetMaxHardwareComputeUnits();
     const auto n_groups = GetNGroups(cu_count);
 
-    return IsShaderConstraintsMet(args, n_groups, dev_name);
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(!IsShaderConstraintsMet(args, n_groups, dev_name),
+                                          context,
+                                          inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 template <uint32_t Winodata, uint32_t Winofilter>
@@ -646,22 +662,24 @@ bool ConvWinoFuryRxSFused<Winodata, Winofilter>::IsApplicable(
         MIOPEN_THROW(miopenStatusInternalError);
     }
 
-    if(desc.op_map.size() > 3)
-        return false;
-    if(desc.op_map[0]->kind() != miopenFusionOpConvForward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map.size() > 3), "Too many ops in fusion plan.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[0]->kind() != miopenFusionOpConvForward),
+                                  "First op is not FWD convolution.");
+
     if(desc.op_map.size() == 2)
     {
         const auto prim = desc.op_map[1]->kind();
-        if(!(prim == miopenFusionOpBiasForward || prim == miopenFusionOpActivForward))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !(prim == miopenFusionOpBiasForward || prim == miopenFusionOpActivForward),
+            "Second op is neither bias nor activation.");
     }
     if(desc.op_map.size() == 3)
     {
-        if(desc.op_map[1]->kind() != miopenFusionOpBiasForward)
-            return false;
-        if(desc.op_map[2]->kind() != miopenFusionOpActivForward)
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[1]->kind() != miopenFusionOpBiasForward),
+                                      "Second op is not bias.");
+        MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[2]->kind() != miopenFusionOpActivForward),
+                                      "Third op is not activation.");
     }
 
     const int activ_idx = GetOpIdx(desc.op_map, miopenFusionOpActivForward);
@@ -674,12 +692,15 @@ bool ConvWinoFuryRxSFused<Winodata, Winofilter>::IsApplicable(
         case miopenActivationLOGISTIC:
         case miopenActivationTANH:
         case miopenActivationLEAKYRELU: break;
-        default: return false;
+        default: MIOPEN_SOLVER_INAPPLICABLE_IF(true, "Unsupported activation mode.");
         }
     }
 
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
-    return ConvWinoFuryRxSCommon<Winodata, Winofilter>::IsApplicable(ctx, conv_problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(ConvWinoFuryRxSCommon<Winodata, Winofilter>::IsApplicable(ctx, conv_problem)),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 template <uint32_t Winodata, uint32_t Winofilter>

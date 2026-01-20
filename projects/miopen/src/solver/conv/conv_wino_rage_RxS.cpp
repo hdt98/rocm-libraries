@@ -34,6 +34,7 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/fusion/solvers.hpp>
 #include <miopen/fusion/utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -71,41 +72,51 @@ template <uint32_t Winodata, uint32_t Winofilter>
 bool ConvWinoRageRxSCommon<Winodata, Winofilter>::IsApplicable(const ExecutionContext& ctx,
                                                                const ProblemDescription& problem)
 {
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!problem.IsFp16())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
+    std::string context = "ConvWinoRageRxSCommon"; // for logging
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !ctx.use_asm_kernels, context, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        problem.IsTensorsCasted(), context, inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(!problem.IsFp16(), context, inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        problem.HasNonPackedTensors(), context, inapplicable_msg::HasNonPackedTensors);
 
     const auto devName = ctx.GetStream().GetDeviceName();
-    if(!(devName == "gfx942"))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(devName == "gfx942"), context, inapplicable_msg::UnsupportedDevice);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        target.isXnackEnabled(), context, inapplicable_msg::isXnackEnabled);
 
-    if(!(problem.GetKernelStrideH() == 1 && problem.GetKernelStrideW() == 1))
-        return false;
-    if(!(problem.GetDilationH() == 1 && problem.GetDilationW() == 1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(problem.GetKernelStrideH() == 1 && problem.GetKernelStrideW() == 1),
+        context,
+        "Kernel stride must be 1.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(problem.GetDilationH() == 1 && problem.GetDilationW() == 1),
+        context,
+        "Dilation must be 1.");
 
     WinoShaderArgs args;
-    if(!args.SetConvParams(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !args.SetConvParams(problem), context, "Convolution parameters not set.");
 
     args.n_groups = getNGroups(ctx);
 
     // clang-format off
-    return args.dimsFit16bit()
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(!(args.dimsFit16bit()
         && args.R_S_fit16bit()
         && args.batchTensorSizesFit31bits()
         && args.paddedSizesFit16bits()
-        && DivCeil(args.Kg, 32) <= args.n_groups;
+        && DivCeil(args.Kg, 32) <= args.n_groups), context, inapplicable_msg::NoKernelForConfig);
     // clang-format on
+    return true;
 }
 
 template <uint32_t Winodata, uint32_t Winofilter>
@@ -273,22 +284,24 @@ bool ConvWinoRageRxSFused<Winodata, Winofilter>::IsApplicable(
         MIOPEN_THROW(miopenStatusInternalError);
     }
 
-    if(desc.op_map.size() > 3)
-        return false;
-    if(desc.op_map[0]->kind() != miopenFusionOpConvForward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map.size() > 3), "Too many ops in fusion plan.");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[0]->kind() != miopenFusionOpConvForward),
+                                  inapplicable_msg::NotFWDFusion);
+
     if(desc.op_map.size() == 2)
     {
         const auto prim = desc.op_map[1]->kind();
-        if(!(prim == miopenFusionOpBiasForward || prim == miopenFusionOpActivForward))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            !(prim == miopenFusionOpBiasForward || prim == miopenFusionOpActivForward),
+            "Second op is neither bias nor activation.");
     }
     if(desc.op_map.size() == 3)
     {
-        if(desc.op_map[1]->kind() != miopenFusionOpBiasForward)
-            return false;
-        if(desc.op_map[2]->kind() != miopenFusionOpActivForward)
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[1]->kind() != miopenFusionOpBiasForward),
+                                      "Second op is not bias.");
+        MIOPEN_SOLVER_INAPPLICABLE_IF((desc.op_map[2]->kind() != miopenFusionOpActivForward),
+                                      "Third op is not activation.");
     }
 
     const int activ_idx = GetOpIdx(desc.op_map, miopenFusionOpActivForward);
@@ -302,12 +315,15 @@ bool ConvWinoRageRxSFused<Winodata, Winofilter>::IsApplicable(
         case miopenActivationTANH:
         case miopenActivationRELU:
         case miopenActivationLEAKYRELU: break;
-        default: return false;
+        default: MIOPEN_SOLVER_INAPPLICABLE_IF(true, "Unsupported activation mode.");
         }
     }
 
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
-    return ConvWinoRageRxSCommon<Winodata, Winofilter>::IsApplicable(ctx, conv_problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(ConvWinoRageRxSCommon<Winodata, Winofilter>::IsApplicable(ctx, conv_problem)),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 template <uint32_t Winodata, uint32_t Winofilter>

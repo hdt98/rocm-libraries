@@ -40,6 +40,7 @@
 
 #include <optional>
 #include <tuple>
+#include <miopen/solver/solver_utils.hpp>
 
 // ConvBinWinoRxS<2,3> is intended to handle group convolutions, but
 // it is able to work with non-group convolutions and shows quite good performance,
@@ -654,57 +655,66 @@ static float GetWtiBase(const ExecutionContext& ctx, const ProblemDescription& p
 template <int Winodata, int Winofilter>
 static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescription& problem)
 {
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16()))
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!ctx.rmv.IsV3())
-        return false;
+    std::string context = "Winograd RxS IsApplicableBase"; // for logging
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(!problem.Is2d(), context, inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        problem.HasNonPackedTensors(), context, inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !problem.AllTensorsDimsFitIntoInt(), context, inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(problem.IsFp32() || problem.IsFp16()), context, inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        problem.IsTensorsCasted(), context, inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !ctx.use_asm_kernels, context, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(!ctx.rmv.IsV3(), context, inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        target.isXnackEnabled(), context, inapplicable_msg::isXnackEnabled);
 
     const auto name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11")))
-        return false;
-    if(problem.IsFp16() &&
-       !(name == "gfx906" || name == "gfx908" || name == "gfx90a" || name == "gfx942" ||
-         StartsWith(name, "gfx95") || name == "gfx1011" || name == "gfx1012" ||
-         StartsWith(name, "gfx103") || StartsWith(name, "gfx11")))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        !(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11")),
+        context,
+        inapplicable_msg::UnsupportedDevice);
 
-    if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+        (problem.IsFp16() &&
+         !(name == "gfx906" || name == "gfx908" || name == "gfx90a" || name == "gfx942" ||
+           StartsWith(name, "gfx95") || name == "gfx1011" || name == "gfx1012" ||
+           StartsWith(name, "gfx103") || StartsWith(name, "gfx11"))),
+        context,
+        "Data type and HW combination not supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                          context,
+                                          inapplicable_msg::IsGfx90aFp16altRequired);
 
     // clang-format off
-    if (!((problem.GetKernelStrideW() == 1 || problem.GetKernelStrideW() == 2)
+    MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT((!((problem.GetKernelStrideW() == 1 || problem.GetKernelStrideW() == 2)
         && problem.GetKernelStrideW() == problem.GetKernelStrideH()
         && problem.GetDilationW() == 1
         && problem.GetDilationH() == 1
         && problem.GetBias() == 0
-        && problem.GetInLayout() == "NCHW"))
-        return false;
-        // clang-format on
+        && problem.GetInLayout() == "NCHW")), context, inapplicable_msg::Workaround);
+    // clang-format on
 
 #if WORKAROUND_ISSUE_2492_GRANULARITY_LOSS
     if(!env::disabled(MIOPEN_DEBUG_WORKAROUND_ISSUE_2492) && !miopen::debug::IsWarmupOngoing)
     {
         constexpr double max_perf_drop_due_to_granularity = 200; // Times.
         const auto gl = ShaderModel(ctx, problem, Winodata, Winofilter).GetGranularityLoss();
-        if(gl > (1.0 - 1.0 / max_perf_drop_due_to_granularity))
-        {
-            MIOPEN_LOG_I("granularity_loss =" << gl);
-            return false;
-        }
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT((gl > (1.0 - 1.0 / max_perf_drop_due_to_granularity)),
+                                              context,
+                                              "Granularity loss too high =" << gl);
     }
 #endif
 
@@ -712,11 +722,12 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
     if(!env::disabled(MIOPEN_DEBUG_WORKAROUND_ISSUE_2492) && !miopen::debug::IsWarmupOngoing)
     {
         // Group count is not taken into account intentionally.
-        if(problem.GetInHeight() <= 6     //
-           && problem.GetInWidth() <= 6   //
-           && problem.GetBatchSize() <= 4 //
-           && problem.GetInChannels() <= 4)
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT((problem.GetInHeight() <= 6     //
+                                               && problem.GetInWidth() <= 6   //
+                                               && problem.GetBatchSize() <= 4 //
+                                               && problem.GetInChannels() <= 4),
+                                              context,
+                                              inapplicable_msg::Workaround);
     }
 #endif
 
@@ -725,34 +736,43 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
 
     if(problem.IsDirectionBackwardWrW())
     {
-        if(problem.GetKernelStrideW() == 2)
-            return false;
-        return IsShaderConstraintsMet<Winodata, Winofilter>(problem,
-                                                            problem.GetInHeight(),
-                                                            problem.GetInWidth(),
-                                                            problem.GetBatchSize(), // N
-                                                            n_inputs_per_group,     // K
-                                                            problem.GetOutHeight(),
-                                                            problem.GetOutWidth(),
-                                                            problem.GetWeightsHeight(),
-                                                            problem.GetWeightsWidth(),
-                                                            n_outputs_per_group, // C
-                                                            name);
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+            (problem.GetKernelStrideW() == 2), context, "Stride 2 not supported for WrW");
+
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+            !(IsShaderConstraintsMet<Winodata, Winofilter>(problem,
+                                                           problem.GetInHeight(),
+                                                           problem.GetInWidth(),
+                                                           problem.GetBatchSize(), // N
+                                                           n_inputs_per_group,     // K
+                                                           problem.GetOutHeight(),
+                                                           problem.GetOutWidth(),
+                                                           problem.GetWeightsHeight(),
+                                                           problem.GetWeightsWidth(),
+                                                           n_outputs_per_group, // C
+                                                           name)),
+            context,
+            inapplicable_msg::NoKernelForConfig);
     }
     else
     {
-        return IsShaderConstraintsMet<Winodata, Winofilter>(problem,
-                                                            problem.GetWeightsHeight(), // RxS
-                                                            problem.GetWeightsWidth(),
-                                                            n_inputs_per_group,    // C
-                                                            n_outputs_per_group,   // K
-                                                            problem.GetInHeight(), // HxW
-                                                            problem.GetInWidth(),
-                                                            problem.GetOutHeight(), // OHxOW
-                                                            problem.GetOutWidth(),
-                                                            problem.GetBatchSize(), // N
-                                                            name);
+        MIOPEN_SOLVER_INAPPLICABLE_IF_CONTEXT(
+            !(IsShaderConstraintsMet<Winodata, Winofilter>(problem,
+                                                           problem.GetWeightsHeight(), // RxS
+                                                           problem.GetWeightsWidth(),
+                                                           n_inputs_per_group,    // C
+                                                           n_outputs_per_group,   // K
+                                                           problem.GetInHeight(), // HxW
+                                                           problem.GetInWidth(),
+                                                           problem.GetOutHeight(), // OHxOW
+                                                           problem.GetOutWidth(),
+                                                           problem.GetBatchSize(), // N
+                                                           name)),
+            context,
+            inapplicable_msg::NoKernelForConfig);
     }
+
+    return true;
 }
 
 template <int Winodata, int Winofilter>
@@ -761,19 +781,22 @@ bool ConvBinWinoRxS<Winodata, Winofilter>::IsApplicable(const ExecutionContext& 
 {
     if(IS2X3)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3),
+                                      inapplicable_msg::EnvDisabled);
 #if !WORKAROUND_ISSUE_1681
-        if(problem.GetGroupCount() == 1 && !problem.IsDirectionBackwardWrW())
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(
+            (problem.GetGroupCount() == 1 && !problem.IsDirectionBackwardWrW()),
+            "Only non-WRW grouped convs are supported");
 #endif
     }
     if(IS3X2)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F3X2))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F3X2),
+                                      inapplicable_msg::EnvDisabled);
     }
-    return IsApplicableBase<Winodata, Winofilter>(ctx, problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(IsApplicableBase<Winodata, Winofilter>(ctx, problem)),
+                                  inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 template <int Winodata, int Winofilter>
@@ -1137,9 +1160,12 @@ ConvSolution ConvBinWinoRxS<Winodata, Winofilter>::GetSolution(
 bool ConvBinWinogradRxSf2x3g1::IsApplicable(const ExecutionContext& ctx,
                                             const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1))
-        return false;
-    return IsApplicableBase<2, 3>(ctx, problem) && problem.GetGroupCount() == 1;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1),
+                                  inapplicable_msg::EnvDisabled);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(IsApplicableBase<2, 3>(ctx, problem) && problem.GetGroupCount() == 1),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 float ConvBinWinogradRxSf2x3g1::GetWti(const ExecutionContext& ctx,

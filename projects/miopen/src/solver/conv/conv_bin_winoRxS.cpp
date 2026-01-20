@@ -32,6 +32,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/tensors.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 /// Global switch
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_AMD_WINOGRAD_RXS)
@@ -217,108 +218,114 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool ConvBinWinogradRxS::IsApplicable(const ExecutionContext& ctx,
                                       const ProblemDescription& problem) const
 {
-    if(!problem.Is2d())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16()))
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16()),
+                                  inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS),
+                                  inapplicable_msg::EnvDisabled);
     if(problem.IsDirectionBackwardWrW())
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_WRW))
-            return false;
-        if(!(problem.IsFp32() && problem.GetKernelStrideW() == 1 &&
-             problem.GetKernelStrideH() == 1))
-            return false; // WrW is only for fp32 and no stride for now.
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_WRW),
+                                      inapplicable_msg::EnvDisabled);
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() && problem.GetKernelStrideW() == 1 &&
+                                        problem.GetKernelStrideH() == 1),
+                                      "WrW only supports FP32 with unit stride");
     }
     else
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_FWD_BWD))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_FWD_BWD),
+                                      inapplicable_msg::EnvDisabled);
     }
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     const auto name = ctx.GetStream().GetDeviceName();
     const bool fp16 = problem.IsFp16();
     if(fp16)
     {
-        if(!(name == "gfx906" || name == "gfx908"))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!(name == "gfx906" || name == "gfx908"),
+                                      inapplicable_msg::UnsupportedDevice);
     }
     else
     {
         if(problem.IsDirectionBackwardWrW())
         {
-            if(!(name == "gfx900" || name == "gfx906" || name == "gfx908"))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(
+                !(name == "gfx900" || name == "gfx906" || name == "gfx908"),
+                inapplicable_msg::UnsupportedDevice);
         }
         else
         {
-            if(!(name == "gfx803" || name == "gfx900" || name == "gfx906" || name == "gfx908"))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(
+                !(name == "gfx803" || name == "gfx900" || name == "gfx906" || name == "gfx908"),
+                inapplicable_msg::UnsupportedDevice);
         }
     }
 
     // clang-format off
-    if (! (problem.GetKernelStrideW() <= 2 // -u inp_u 1 or 2
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetKernelStrideW() <= 2 // -u inp_u 1 or 2
         && problem.GetKernelStrideW() == problem.GetKernelStrideH()
         && problem.GetDilationW() == 1
         && problem.GetDilationH() == 1
         && problem.GetBias() == 0
         && problem.GetGroupCount() == 1
-        && problem.GetInLayout() == "NCHW"))
-        return false;
+        && problem.GetInLayout() == "NCHW"), inapplicable_msg::Generic);
     // clang-format on
 
     if(problem.IsDirectionBackwardWrW())
     {
-        return IsShaderContraintsMet(ctx,
-                                     problem,
-                                     problem.GetInHeight(),
-                                     problem.GetInWidth(),
-                                     problem.GetDilationH(),
-                                     problem.GetDilationW(),
-                                     problem.GetBatchSize(),  // N
-                                     problem.GetInChannels(), // K
-                                     problem.GetOutHeight(),
-                                     problem.GetOutWidth(),
-                                     problem.GetWeightsHeight(),
-                                     problem.GetWeightsWidth(),
-                                     problem.GetOutChannels(), // C
-                                     fp16,
-                                     2);
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!IsShaderContraintsMet(ctx,
+                                                             problem,
+                                                             problem.GetInHeight(),
+                                                             problem.GetInWidth(),
+                                                             problem.GetDilationH(),
+                                                             problem.GetDilationW(),
+                                                             problem.GetBatchSize(),  // N
+                                                             problem.GetInChannels(), // K
+                                                             problem.GetOutHeight(),
+                                                             problem.GetOutWidth(),
+                                                             problem.GetWeightsHeight(),
+                                                             problem.GetWeightsWidth(),
+                                                             problem.GetOutChannels(), // C
+                                                             fp16,
+                                                             2),
+                                      inapplicable_msg::NoKernelForConfig);
     }
     else
     {
-        return IsShaderContraintsMet(ctx,
-                                     problem,
-                                     problem.GetWeightsHeight(), // RxS
-                                     problem.GetWeightsWidth(),
-                                     problem.GetKernelStrideH(),
-                                     problem.GetKernelStrideW(),
-                                     problem.GetInChannels(),  // C
-                                     problem.GetOutChannels(), // K
-                                     problem.GetInHeight(),    // HxW
-                                     problem.GetInWidth(),
-                                     problem.GetOutHeight(), // OHxOW
-                                     problem.GetOutWidth(),
-                                     problem.GetBatchSize(), // N
-                                     fp16,
-                                     3);
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!IsShaderContraintsMet(ctx,
+                                                             problem,
+                                                             problem.GetWeightsHeight(), // RxS
+                                                             problem.GetWeightsWidth(),
+                                                             problem.GetKernelStrideH(),
+                                                             problem.GetKernelStrideW(),
+                                                             problem.GetInChannels(),  // C
+                                                             problem.GetOutChannels(), // K
+                                                             problem.GetInHeight(),    // HxW
+                                                             problem.GetInWidth(),
+                                                             problem.GetOutHeight(), // OHxOW
+                                                             problem.GetOutWidth(),
+                                                             problem.GetBatchSize(), // N
+                                                             fp16,
+                                                             3),
+                                      inapplicable_msg::NoKernelForConfig);
     }
+
+    return true;
 }
 
 ConvSolution ConvBinWinogradRxS::GetSolution(const ExecutionContext& ctx,

@@ -37,6 +37,7 @@
 #include <miopen/handle.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/conv/solvers.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #if(MIOPEN_BACKEND_HIP && MIOPEN_USE_ROCBLAS)
 #define WORKAROUND_SWDEV_203031 1 // See also issues #2075, #2067
@@ -423,63 +424,63 @@ bool ConvWinograd3x3MultipassWrW<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>
     {
         if(wino_data_tile == 3 && wino_filter_tile == 4)
         {
-            if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F3X4))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F3X4),
+                                          inapplicable_msg::EnvDisabled);
         }
         if(wino_data_tile == 3 && wino_filter_tile == 5)
         {
-            if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F3X5))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F3X5),
+                                          inapplicable_msg::EnvDisabled);
         }
         if(wino_data_tile == 3 && wino_filter_tile == 6)
         {
-            if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F3X6))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F3X6),
+                                          inapplicable_msg::EnvDisabled);
         }
     }
 
     if(wino_data_tile == 7 && wino_filter_tile == 2)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F7X2))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F7X2),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 7 && wino_filter_tile == 3)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F7X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F7X3),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 5 && wino_filter_tile == 3)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F5X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F5X3),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 5 && wino_filter_tile == 4)
     {
-        if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F5X4))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_F5X4),
+                                      inapplicable_msg::EnvDisabled);
     }
-    if(!ctx.use_asm_kernels)
-        return false;
-    if(!ctx.rmv.IsV2orV3())
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     if(!(InTransform<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>::IsApplicable(ctx, problem) &&
          OutTransform<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>::IsApplicable(problem) &&
@@ -490,8 +491,8 @@ bool ConvWinograd3x3MultipassWrW<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>
     if(!(StartsWith(name, "gfx8") || name == "gfx900" || name == "gfx906" || name == "gfx908" ||
          name == "gfx90a"))
         return false;
-    if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
+                                  inapplicable_msg::IsGfx90aFp16altRequired);
 
     {
         std::size_t limit = env::value(MIOPEN_DEBUG_AMD_WINOGRAD_MPASS_WORKSPACE_MAX);
@@ -524,8 +525,7 @@ bool ConvWinograd3x3MultipassWrW<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>
     {
         return false;
     }
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     // clang-format off
     {

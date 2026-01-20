@@ -32,6 +32,7 @@
 #include <miopen/conv/compiled_in_parameters.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/tensors.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_AMD_WINOGRAD_3X3)
 
@@ -44,41 +45,44 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
                                        const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_3X3))
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
-        return false;
-    if(!(ctx.rmv.IsV2orV3() && ctx.use_asm_kernels))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_3X3),
+                                  inapplicable_msg::EnvDisabled);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()),
+        inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.rmv.IsV2orV3(), inapplicable_msg::MetaData);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_asm_kernels, inapplicable_msg::UseAsmKernels);
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(target.isXnackEnabled(), inapplicable_msg::isXnackEnabled);
 
     const auto name = ctx.GetStream().GetDeviceName();
-    if(!(name == "gfx803" || name == "gfx900" || name == "gfx906" || name == "gfx908"))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(name == "gfx803" || name == "gfx900" || name == "gfx906" || name == "gfx908"),
+        inapplicable_msg::UnsupportedDevice);
 
     // Check if kernel is suitable for the problem description
     // and able to correctly run with given parameters.
     const auto device_is_gfx8         = StartsWith(name, "gfx8");
     const auto grid_workgroup_count_x = ctx.GetStream().GetMaxComputeUnits();
 
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
     // clang-format off
-    return problem.GetPadW() == 1
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetPadW() == 1
         && problem.GetPadH() == 1
         && problem.GetWeightsWidth() == 3
         && problem.GetWeightsHeight() == 3
@@ -100,11 +104,12 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
         && problem.GetInChannels() >= (device_is_gfx8 ? 16 : 18)
         && problem.IsFp32()
         && problem.GetGroupCount() == 1
-        && problem.GetInLayout() == "NCHW";
+        && problem.GetInLayout() == "NCHW"), inapplicable_msg::NoKernelForConfig);
         /// && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
         /// Actually, K<->C flpping is controlled by separate flag, so we can support either
         /// layout in both directions.
     // clang-format on
+    return true;
 }
 
 ConvSolution ConvBinWinograd3x3U::GetSolution(const ExecutionContext& ctx,

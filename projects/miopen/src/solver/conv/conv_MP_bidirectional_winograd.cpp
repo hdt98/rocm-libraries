@@ -40,6 +40,7 @@
 #include <miopen/conv/invokers/impl_gemm.hpp>
 
 #include <miopen/conv/data_invoke_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #if MIOPEN_BACKEND_HIP
 
@@ -320,51 +321,53 @@ bool ConvMPBidirectWinograd<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>::IsA
 {
     // HIP backend required for sending ptr (buffer + offset)
     // ROCBLAS for GEMM step
-    if(problem.HasNonPackedTensors())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    if(!IsApplicableGEMM<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>(problem))
-        return false;
-
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(IsApplicableGEMM<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>(problem)),
+        "Failed GEMM applicability");
     static const int wino_data_tile   = std::max(WinoDataH, WinoDataW);
     static const int wino_filter_tile = std::max(WinoFilterH, WinoFilterW);
 
     if(wino_data_tile == 6 && wino_filter_tile == 3)
     {
-        if(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F6X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F6X3),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 5 && wino_filter_tile == 3)
     {
-        if(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F5X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F5X3),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 4 && wino_filter_tile == 3)
     {
-        if(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F4X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F4X3),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 3 && wino_filter_tile == 3)
     {
-        if(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F3X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F3X3),
+                                      inapplicable_msg::EnvDisabled);
     }
     if(wino_data_tile == 2 && wino_filter_tile == 3)
     {
-        if(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F2X3))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(IS_DISABLED(MIOPEN_DEBUG_AMD_MP_BD_WINOGRAD_F2X3),
+                                      inapplicable_msg::EnvDisabled);
     }
 
-    return IsApplicableTransform<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>(ctx, problem);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (!IsApplicableTransform<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>(ctx, problem)),
+        "Failed Transform applicability");
+
+    return true;
 }
 
 template <int WinoDataH, int WinoFilterH, int WinoDataW, int WinoFilterW>
