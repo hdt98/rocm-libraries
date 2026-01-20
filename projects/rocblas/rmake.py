@@ -367,8 +367,8 @@ def config_cmd():
         cmake_platform_opts.append(f'-DCMAKE_INSTALL_PREFIX="C:/hipSDK"')
         toolchain = os.path.join(src_path, "toolchain-windows.cmake")
     else:
-        rocm_raw_path = os.getenv('ROCM_PATH', "/opt/rocm")
-        rocm_path = rocm_raw_path
+        raw_rocm_path = os.getenv('ROCM_PATH', "/opt/rocm")
+        rocm_path = raw_rocm_path
         if (args.ninja):
             cmake_platform_opts.append(f"-G Ninja")
         cmake_platform_opts.append(f"-DROCM_DIR:PATH={rocm_path} -DCPACK_PACKAGING_INSTALL_PREFIX={rocm_path}")
@@ -393,18 +393,18 @@ def config_cmd():
     # Add msgpack install directory to CMAKE_PREFIX_PATH on Windows
     # Put msgpack FIRST to prioritize our Boost-free build over any vcpkg installation
     prefix_paths = []
+    msgpack_install = None  # Initialize to avoid undefined variable
     if os.name == "nt":
         msgpack_install = os.path.join(src_path, args.build_dir, "deps", "msgpack-c", "install")
         if os.path.exists(msgpack_install):
             prefix_paths.append(cmake_path(msgpack_install))
-    prefix_paths.append(rocm_path)
+    prefix_paths.append(raw_rocm_path)  # Use raw_rocm_path (without quotes) for path list
     
-    cmake_base_options = f"-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH={';'.join(prefix_paths)}"
+    cmake_base_options = f"-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH={os.pathsep.join(prefix_paths)}"
     cmake_options.append(cmake_base_options)
     
     # Explicitly tell CMake where to find our Boost-free msgpack (overrides any vcpkg version)
-    if os.name == "nt":
-        msgpack_install = os.path.join(src_path, args.build_dir, "deps", "msgpack-c", "install")
+    if os.name == "nt" and msgpack_install:
         msgpack_config_dir = os.path.join(msgpack_install, "lib", "cmake", "msgpack-cxx")
         if os.path.exists(msgpack_config_dir):
             cmake_options.append(f"-Dmsgpackc-cxx_DIR={cmake_path(msgpack_config_dir)}")

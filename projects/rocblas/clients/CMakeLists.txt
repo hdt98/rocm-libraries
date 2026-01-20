@@ -399,11 +399,10 @@ rocm_install(
 
 # On Windows custom builds, install vcpkg DLLs required by clients
 if(CREATE_TEST_APP_LOCAL_DEPLOY AND WIN32)
-  # Find vcpkg installation directory
-  if(DEFINED ENV{VCPKG_ROOT})
+  # Find vcpkg installation directory via VCPKG_ROOT environment variable
+  set(VCPKG_INSTALLED_DIR "")  # Initialize to avoid undefined variable
+  if(DEFINED ENV{VCPKG_ROOT} AND EXISTS "$ENV{VCPKG_ROOT}/installed/x64-windows/bin")
     set(VCPKG_INSTALLED_DIR "$ENV{VCPKG_ROOT}/installed/x64-windows/bin")
-  elseif(EXISTS "C:/github/vcpkg/installed/x64-windows/bin")
-    set(VCPKG_INSTALLED_DIR "C:/github/vcpkg/installed/x64-windows/bin")
   endif()
 
   if(VCPKG_INSTALLED_DIR)
