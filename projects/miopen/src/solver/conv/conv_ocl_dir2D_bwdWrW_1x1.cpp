@@ -30,6 +30,7 @@
 #include <miopen/env.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1)
 
@@ -50,33 +51,37 @@ bool ConvOclBwdWrW1x1::IsApplicable(const ExecutionContext& ctx,
     if(StartsWith(ctx.GetStream().GetDeviceName(), "gfx10") ||
        StartsWith(ctx.GetStream().GetDeviceName(), "gfx11"))
     {
-        if(!env::enabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1))
-            return false;
+        MIOPEN_SOLVER_INAPPLICABLE_IF(!env::enabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1),
+                                      inapplicable_msg::Workaround);
     }
 #endif
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1),
+                                  inapplicable_msg::EnvDisabled);
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(!ctx.use_opencl_convolutions)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, inapplicable_msg::NoOCLConv);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
     bool result = (problem.GetWeightsWidth() == 1 && problem.GetWeightsHeight() == 1 &&
                    problem.GetDilationW() == 1 && problem.GetDilationH() == 1 &&
@@ -86,7 +91,9 @@ bool ConvOclBwdWrW1x1::IsApplicable(const ExecutionContext& ctx,
     if((problem.GetInChannels() & 0xF) > 0 || (problem.GetOutChannels() & 0xF) > 0)
         result = false;
 
-    return result;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!result, inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 static inline int GetNPasses(const ProblemDescription& problem)

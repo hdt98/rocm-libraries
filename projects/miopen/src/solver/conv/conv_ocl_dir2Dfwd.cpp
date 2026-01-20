@@ -43,41 +43,44 @@ bool ConvOclDirectFwd::IsApplicable(const ExecutionContext& ctx,
                                     const ProblemDescription& problem) const
 {
 
-    const std::string name   = ctx.GetStream().GetDeviceName();
+    const std::string name = ctx.GetStream().GetDeviceName();
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD),
-                                  a_msg::EnvDisable);
+                                  inapplicable_msg::EnvDisabled);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
-        a_msg::UnsupportedGPU);
+        inapplicable_msg::UnsupportedDevice);
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, a_msg::NoOCLConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, inapplicable_msg::NoOCLConv);
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), a_msg::Not2DConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(
-        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()), a_msg::ConvDir);
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()),
+        inapplicable_msg::Direction);
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(), a_msg::NonPacked);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(), a_msg::DimsLargerThanInt);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
-                                  a_msg::AsymmPad);
+                                  inapplicable_msg::IsAsymmetricPad);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
-                                  a_msg::DType);
+                                  inapplicable_msg::DataType);
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), a_msg::TensorCast);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), a_msg::Layout);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     // Cases when dy has negative padding are not supported (issue 918)
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         problem.IsDirectionBackwardData() &&
             (problem.GetBackwardPadW() < 0 || problem.GetBackwardPadH() < 0),
-        a_msg::NegPad);
+        inapplicable_msg::NegPad);
 
     // clang-format off
     // Factored out from ConvolutionDescriptor::IsDirectSupported(), which is now dissmissed:
@@ -106,7 +109,7 @@ bool ConvOclDirectFwd::IsApplicable(const ExecutionContext& ctx,
                 && p.GetPadW() == 0);
 
         MIOPEN_SOLVER_INAPPLICABLE_IF(!supported,
-                                              a_msg::Workaround);
+                                              inapplicable_msg::Workaround);
     }
 
     MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetKernelStrideW() == problem.GetKernelStrideH()
@@ -125,7 +128,7 @@ bool ConvOclDirectFwd::IsApplicable(const ExecutionContext& ctx,
             && problem.IsFp16()
             && problem.GetKernelStrideW() == 2)
         && IsValidPerformanceConfig(ctx, problem, GetDefaultPerformanceConfig(ctx, problem))),
-        a_msg::NoKernel
+        inapplicable_msg::NoKernelForConfig
     );
     // clang-format on
 

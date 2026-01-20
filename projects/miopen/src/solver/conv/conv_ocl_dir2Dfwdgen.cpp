@@ -29,6 +29,7 @@
 #include <miopen/env.hpp>
 #include <miopen/conv/invokers/gen_x_w_y_pad.hpp>
 #include <numbers>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWDGEN)
 
@@ -41,39 +42,46 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 bool ConvOclDirectFwdGen::IsApplicable(const ExecutionContext& ctx,
                                        const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWDGEN))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWDGEN),
+                                  inapplicable_msg::EnvDisabled);
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(!ctx.use_opencl_convolutions)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(problem.GetGroupCount() > 1)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
 
-    return problem.IsDirectionForward()                                                 //
-           && problem.GetKernelStrideW() == problem.GetKernelStrideH()                  //
-           && problem.GetPadW() == problem.GetPadH()                                    //
-           && problem.GetDilationW() == 1                                               //
-           && problem.GetDilationH() == 1                                               //
-           && (problem.GetWeightsWidth() > 11                                           //
-               || problem.GetWeightsHeight() > 11                                       //
-               || (!(problem.GetWeightsWidth() == 1 && problem.GetWeightsHeight() == 1) //
-                   && (problem.GetKernelStrideW() > 1 || problem.GetKernelStrideH() > 1)));
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, inapplicable_msg::NoOCLConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF((problem.GetGroupCount() > 1), inapplicable_msg::GetGroupCount);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward()                                                 //
+          && problem.GetKernelStrideW() == problem.GetKernelStrideH()                  //
+          && problem.GetPadW() == problem.GetPadH()                                    //
+          && problem.GetDilationW() == 1                                               //
+          && problem.GetDilationH() == 1                                               //
+          && (problem.GetWeightsWidth() > 11                                           //
+              || problem.GetWeightsHeight() > 11                                       //
+              || (!(problem.GetWeightsWidth() == 1 && problem.GetWeightsHeight() == 1) //
+                  && (problem.GetKernelStrideW() > 1 || problem.GetKernelStrideH() > 1)))),
+        inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 ConvSolution ConvOclDirectFwdGen::GetSolution(const ExecutionContext& ctx,

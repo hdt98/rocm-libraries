@@ -35,6 +35,7 @@
 #include <miopen/visit_float.hpp>
 
 #include <algorithm>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW2_SEARCH_OPTIMIZED)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW2)
@@ -461,60 +462,72 @@ template <int N_BATCH_LOOPS>
 bool ConvOclBwdWrW2<N_BATCH_LOOPS>::IsApplicableBase(const ExecutionContext& ctx,
                                                      const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW2))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW2),
+                                  inapplicable_msg::EnvDisabled);
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(!ctx.use_opencl_convolutions)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
 
-    return problem.GetDilationW() == 1 && problem.GetDilationH() == 1 &&
-#if 0
-           // There is a stronger restriction than this one, which make this one unnecessary.
-           // The kernel read stripes (in height direction, one stripe at a time) of input into LDS,
-           // the height of stripe is (MLO_N_ALIGNED_OUT_SCAN_BLK - 1) * MLO_FILTER_STRIDE1 +
-           // MLO_FILTER_SIZE1, (MLO_FILTER_SIZE1 - MLO_FILTER_STRIDE1) of it is reusable from
-           // previous read, (MLO_N_ALIGNED_OUT_SCAN_BLK * MLO_FILTER_STRIDE1) of it is fresh read
-           // from device memory. So (MLO_FILTER_SIZE1 - MLO_FILTER_STRIDE1) need no less than 0.
-           // TODO: chao: revisit this if failure is encountered.
-           problem.GetWeightsHeight() >= problem.GetKernelStrideH() &&
-#endif
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, inapplicable_msg::NoOCLConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
-           // The first scan of stripe of the input into LDS will read a strip of height
-           // (kernel_size_h - kernel_stride_h), this stripe should include the whole lower bound
-           // padding, as well as some or none of the input.
-           static_cast<int>(problem.GetWeightsHeight()) - problem.GetKernelStrideH() >=
-               problem.GetPadH() &&
-           problem.GetBatchSize() >= N_BATCH_LOOPS &&
-           /// \todo Workaround for issue 1693
-           !(problem.GetWeightsWidth() >= 8 && problem.GetWeightsWidth() % 2 == 0 &&
-             !( // Allow these configs to avoid perf drops:
-                 (problem.GetKernelStrideH() == 2 && problem.GetKernelStrideW() == 2) &&
-                 (problem.GetWeightsHeight() == 5 &&
-                  (problem.GetWeightsWidth() == 10 || problem.GetWeightsWidth() == 20)) &&
-                 ((problem.GetOutHeight() == 79 && problem.GetOutWidth() == 341) ||
-                  (problem.GetOutHeight() == 161 && problem.GetOutWidth() == 700)))) &&
-           /// Avoid LDS & Workspace over-allocation.
-           /// \note Required LDS depends on PerformanceConfig.
-           /// We use the default PerformanceConfig here. This guarantees that at least
-           /// one config will pass the LDS constraint check during auto-tuning.
-           /// This works also for non-tunable solver.
-           IsValidPerformanceConfig(ctx, problem, GetDefaultPerformanceConfig(ctx, problem));
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.GetDilationW() == 1 && problem.GetDilationH() == 1 &&
+          // #if 0
+          //            // There is a stronger restriction than this one, which make this one
+          //            unnecessary.
+          //            // The kernel read stripes (in height direction, one stripe at a time) of
+          //            input into LDS,
+          //            // the height of stripe is (MLO_N_ALIGNED_OUT_SCAN_BLK - 1) *
+          //            MLO_FILTER_STRIDE1 +
+          //            // MLO_FILTER_SIZE1, (MLO_FILTER_SIZE1 - MLO_FILTER_STRIDE1) of it is
+          //            reusable from
+          //            // previous read, (MLO_N_ALIGNED_OUT_SCAN_BLK * MLO_FILTER_STRIDE1) of it is
+          //            fresh read
+          //            // from device memory. So (MLO_FILTER_SIZE1 - MLO_FILTER_STRIDE1) need no
+          //            less than 0.
+          //            // TODO: chao: revisit this if failure is encountered.
+          //            problem.GetWeightsHeight() >= problem.GetKernelStrideH() &&
+          // #endif
+
+          // The first scan of stripe of the input into LDS will read a strip of height
+          // (kernel_size_h - kernel_stride_h), this stripe should include the whole lower bound
+          // padding, as well as some or none of the input.
+          static_cast<int>(problem.GetWeightsHeight()) - problem.GetKernelStrideH() >=
+              problem.GetPadH() &&
+          problem.GetBatchSize() >= N_BATCH_LOOPS &&
+          /// \todo Workaround for issue 1693
+          !(problem.GetWeightsWidth() >= 8 && problem.GetWeightsWidth() % 2 == 0 &&
+            !( // Allow these configs to avoid perf drops:
+                (problem.GetKernelStrideH() == 2 && problem.GetKernelStrideW() == 2) &&
+                (problem.GetWeightsHeight() == 5 &&
+                 (problem.GetWeightsWidth() == 10 || problem.GetWeightsWidth() == 20)) &&
+                ((problem.GetOutHeight() == 79 && problem.GetOutWidth() == 341) ||
+                 (problem.GetOutHeight() == 161 && problem.GetOutWidth() == 700)))) &&
+          /// Avoid LDS & Workspace over-allocation.
+          /// \note Required LDS depends on PerformanceConfig.
+          /// We use the default PerformanceConfig here. This guarantees that at least
+          /// one config will pass the LDS constraint check during auto-tuning.
+          /// This works also for non-tunable solver.
+          IsValidPerformanceConfig(ctx, problem, GetDefaultPerformanceConfig(ctx, problem))),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 template <int N_BATCH_LOOPS>

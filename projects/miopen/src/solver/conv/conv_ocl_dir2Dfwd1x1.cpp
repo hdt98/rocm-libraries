@@ -30,6 +30,7 @@
 #include <miopen/env.hpp>
 #include <miopen/conv/invokers/gen_x_w_y_pad.hpp>
 #include <miopen/stringutils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 /// WORKAROUND_SWDEV_271887 disables ConvOclDirectFwd1x1 solver on gfx10 and gfx11 due to precision
 /// issues.
@@ -51,40 +52,47 @@ bool ConvOclDirectFwd1x1::IsApplicable(const ExecutionContext& ctx,
         if(StartsWith(ctx.GetStream().GetDeviceName(), "gfx10") ||
            StartsWith(ctx.GetStream().GetDeviceName(), "gfx11"))
         {
-            if(!env::enabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD1X1))
-                return false;
+            MIOPEN_SOLVER_INAPPLICABLE_IF(!env::enabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD1X1),
+                                          inapplicable_msg::EnvDisabled);
         }
     }
 #endif
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD1X1))
-        return false;
-    if(!ctx.use_opencl_convolutions)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
 
-    return problem.GetDilationW() == 1 && problem.GetDilationH() == 1 &&
-           problem.GetWeightsWidth() == 1 && problem.GetWeightsHeight() == 1 &&
-           problem.GetGroupCount() == 1 &&
-           // TODO: update 1x1 fwd kernel to support padding
-           problem.GetPadW() == 0 && problem.GetPadH() == 0;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD1X1),
+                                  inapplicable_msg::EnvDisabled);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, inapplicable_msg::NoOCLConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.IsDirectionForward() || problem.IsDirectionBackwardData()),
+        inapplicable_msg::Direction);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetDilationW() == 1 && problem.GetDilationH() == 1 &&
+                                    problem.GetWeightsWidth() == 1 &&
+                                    problem.GetWeightsHeight() == 1 &&
+                                    problem.GetGroupCount() == 1 &&
+                                    // TODO: update 1x1 fwd kernel to support padding
+                                    problem.GetPadW() == 0 && problem.GetPadH() == 0),
+                                  inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 ConvSolution ConvOclDirectFwd1x1::GetSolution(const ExecutionContext& ctx,

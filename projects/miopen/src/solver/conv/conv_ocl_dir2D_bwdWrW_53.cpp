@@ -30,6 +30,7 @@
 #include <miopen/mlo_internal.hpp>
 #include <miopen/stringutils.hpp>
 #include <miopen/env.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53)
 
@@ -47,30 +48,32 @@ static bool WorkaroundSwdev168168() { return true; }
 bool ConvOclBwdWrW53::IsApplicable(const ExecutionContext& ctx,
                                    const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53),
+                                  inapplicable_msg::EnvDisabled);
     const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
-        return false;
-    if(!ctx.use_opencl_convolutions)
-        return false;
-    if(!problem.Is2d())
-        return false;
-    if(problem.HasNonPackedTensors())
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
-    if(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW())
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")),
+        inapplicable_msg::UnsupportedDevice);
 
-    if(problem.IsTensorsCasted())
-        return false;
-    if(!problem.IsDirectionBackwardWrW())
-        return false;
-    if(!problem.IsLayoutDefault())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!ctx.use_opencl_convolutions, inapplicable_msg::NoOCLConv);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
+                                  inapplicable_msg::AllTensorsDimsFitIntoInt);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsAsymmetricPadH() || problem.IsAsymmetricPadW(),
+                                  inapplicable_msg::IsAsymmetricPad);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16() || problem.IsBfp16()),
+                                  inapplicable_msg::UnsupportedDevice);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.IsTensorsCasted(), inapplicable_msg::IsTensorsCasted);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionBackwardWrW(), inapplicable_msg::Direction);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
     bool workaround = false;
 
@@ -120,35 +123,40 @@ bool ConvOclBwdWrW53::IsApplicable(const ExecutionContext& ctx,
         workaround || (problem.IsFp16() && (name == "gfx908") && problem.GetWeightsWidth() == 7 &&
                        problem.GetWeightsHeight() == 7 && problem.GetPadW() == 1);
 
-    return (problem.GetDilationW() == 1 && problem.GetDilationH() == 1) &&
-           (problem.GetKernelStrideW() == 1 && problem.GetKernelStrideH() == 1) &&
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!workaround, inapplicable_msg::Workaround);
 
-           // This limitation is because of the way the kernel process data at lower vertical
-           // boundary (including padding).
-           (static_cast<int>(problem.GetWeightsHeight()) >=
-            problem.GetPadH() + problem.GetKernelStrideH()) &&
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !((problem.GetDilationW() == 1 && problem.GetDilationH() == 1) &&
+          (problem.GetKernelStrideW() == 1 && problem.GetKernelStrideH() == 1) &&
 
-           // Input image height plus vertical paddings should be no less than filter vertical size.
-           // TODO: chao: revisit this to make sure this is the actual limitation.
-           // Remind that input is output, output is input.
-           (static_cast<int>(problem.GetWeightsHeight()) <=
-            static_cast<int>(problem.GetOutHeight()) + 2 * problem.GetPadH()) &&
+          // This limitation is because of the way the kernel process data at lower vertical
+          // boundary (including padding).
+          (static_cast<int>(problem.GetWeightsHeight()) >=
+           problem.GetPadH() + problem.GetKernelStrideH()) &&
 
-           // Input and output width and height need to match exactly,
-           // meaning, filter's moving range should be the same as input plus padding.
-           // TODO: chao: in order to remove this limitation, need to rewrite how kernel handle
-           // right padding, when reading an input row into LDS. Also need to rewrite the vertical
-           // loop.
-           // Remind that input is output, output is input.
-           (problem.GetInHeight() == static_cast<int>(problem.GetOutHeight()) +
-                                         2 * problem.GetPadH() -
-                                         static_cast<int>(problem.GetWeightsHeight()) + 1) &&
-           (problem.GetInWidth() == static_cast<int>(problem.GetOutWidth()) +
-                                        2 * problem.GetPadW() -
-                                        static_cast<int>(problem.GetWeightsWidth()) + 1) &&
+          // Input image height plus vertical paddings should be no less than filter vertical size.
+          // TODO: chao: revisit this to make sure this is the actual limitation.
+          // Remind that input is output, output is input.
+          (static_cast<int>(problem.GetWeightsHeight()) <=
+           static_cast<int>(problem.GetOutHeight()) + 2 * problem.GetPadH()) &&
 
-           // Avoid LDS over-allocation
-           GetSolution(ctx, problem).Succeeded() && !workaround;
+          // Input and output width and height need to match exactly,
+          // meaning, filter's moving range should be the same as input plus padding.
+          // TODO: chao: in order to remove this limitation, need to rewrite how kernel handle
+          // right padding, when reading an input row into LDS. Also need to rewrite the vertical
+          // loop.
+          // Remind that input is output, output is input.
+          (problem.GetInHeight() == static_cast<int>(problem.GetOutHeight()) +
+                                        2 * problem.GetPadH() -
+                                        static_cast<int>(problem.GetWeightsHeight()) + 1) &&
+          (problem.GetInWidth() == static_cast<int>(problem.GetOutWidth()) + 2 * problem.GetPadW() -
+                                       static_cast<int>(problem.GetWeightsWidth()) + 1) &&
+
+          // Avoid LDS over-allocation
+          GetSolution(ctx, problem).Succeeded()),
+        inapplicable_msg::NoKernelForConfig);
+
+    return true;
 }
 
 /*! @brief ComputeInputParams
