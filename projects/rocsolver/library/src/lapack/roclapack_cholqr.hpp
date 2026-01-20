@@ -5,7 +5,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     November 2019
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -61,9 +61,12 @@ static inline void adjust_for_alignment(size_t* p_size_work)
     *p_size_work = size_work;
 }
 
+#ifndef IS_POINTER_BATCHED
 #define IS_POINTER_BATCHED(A, T) \
     (std::is_pointer_v<std::remove_cv_t<std::remove_cv_t<std::remove_reference_t<decltype((A)[0])>>>>)
+#endif
 
+#ifndef MEM_CHECK
 #define MEM_CHECK(pfree)                                        \
     {                                                           \
         bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
@@ -72,7 +75,9 @@ static inline void adjust_for_alignment(size_t* p_size_work)
             return (rocblas_status_memory_error);               \
         }                                                       \
     }
+#endif
 
+#ifndef MEM_CHECK_THROW
 #define MEM_CHECK_THROW(pfree)                                  \
     {                                                           \
         bool const is_mem_ok_ = (pfree <= (pwork + size_work)); \
@@ -82,6 +87,7 @@ static inline void adjust_for_alignment(size_t* p_size_work)
             throw(istat);                                       \
         }                                                       \
     }
+#endif
 
 static int get_num_cu(int deviceId = 0)
 {
