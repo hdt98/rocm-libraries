@@ -49,7 +49,7 @@ namespace rocRoller
 
             if(observerType == DSObserverType::WeightlessDSMemObserver)
             {
-                const auto addrs = inst.getAddresses();
+                const auto addrs = inst.getModelledAddresses();
                 AssertFatal(addrs.has_value(), ShowValue(inst.toString(LogLevel::Terse)));
                 AssertFatal(addrs->size() % 64 == 0, ShowValue(addrs->size()));
                 AssertFatal(LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode()).has_value(),
@@ -129,7 +129,7 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
-                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    std::vector<size_t> addresses = inst.getModelledAddresses().value();
                     auto [stallCycles, additionalCycles]
                         = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
 
@@ -179,7 +179,7 @@ namespace rocRoller
                 {
                     auto [direction, dwords] = *ldsInfo;
 
-                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    std::vector<size_t> addresses = inst.getModelledAddresses().value();
                     m_scheduler.value().scheduleInstruction({{direction}, dwords, addresses});
                 }
             }

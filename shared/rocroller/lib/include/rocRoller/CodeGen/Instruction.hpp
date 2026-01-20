@@ -230,6 +230,10 @@ namespace rocRoller
         /**
          * Get the total number of cycles for this instruction.
          * This includes executed instructions, stall cycles, and additional cycles.
+         * 
+         * An estimation as stall cycles are an estimation.
+         * 
+         * Used for observers to keep track of cycles (in terms of time).
          */
         int totalCycles() const;
 
@@ -239,17 +243,17 @@ namespace rocRoller
         AllocationArray allocations() const;
 
         /**
-         * Get the addresses for this instruction (if any)
+         * Set the modelled per-workitem addresses (only for select LDS instructions for now)
          */
-        const std::optional<std::vector<size_t>>& getAddresses() const
+        const std::optional<std::vector<size_t>>& getModelledAddresses() const
         {
             return m_addresses;
         }
 
         /**
-         * Set the addresses for this instruction
+         * Set the modelled per-workitem addresses
          */
-        void setAddresses(const std::vector<size_t>& addresses)
+        void setModelledAddresses(const std::vector<size_t>& addresses)
         {
             m_addresses = addresses;
         }

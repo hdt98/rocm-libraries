@@ -182,7 +182,7 @@ namespace rocRoller
         for(auto inst : kb())
         {
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                inst.setAddresses(m_baseAddresses);
+                inst.setModelledAddresses(m_baseAddresses);
             m_context->schedule(inst);
             m_instructions.push_back(inst);
         }
@@ -249,7 +249,7 @@ namespace rocRoller
             {
                 latenciesPerRun.push_back(runLatencies[i].meanLatency());
             }
-            auto       medianLatency = median_of_odd_elements(latenciesPerRun);
+            auto       medianLatency = MedianOfOddElements(latenciesPerRun);
             const auto instrString   = allLatencies[0][i].instruction;
             medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
         }

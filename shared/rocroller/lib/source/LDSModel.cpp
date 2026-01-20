@@ -160,7 +160,7 @@ namespace rocRoller::Scheduling::LDSModel
             const auto waitCompletionCycle = m_waitcntQueue[commandsToWaitFor];
             stallCycles                    = waitCompletionCycle - m_programCycle;
         }
-
+        AssertFatal(stallCycles >= 0, ShowValue(stallCycles));
         return stallCycles;
     }
 

@@ -58,7 +58,7 @@ namespace rocRoller
      * @return T Median value
      */
     template <typename T>
-    T median_of_odd_elements(std::vector<T> values)
+    T MedianOfOddElements(std::vector<T> values)
     {
         AssertFatal(!values.empty(), "vector must not be empty");
         AssertFatal(values.size() % 2 == 1, "vector size must be odd");

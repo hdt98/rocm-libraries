@@ -269,9 +269,8 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu][lds-model]")
                                             lastSWaitcntCycles);
                     }
 
-                    uint64_t actualMaxLdsInstrCycles = median_of_odd_elements(ldsInstrCyclesPerRun);
-                    uint64_t actualLastSWaitcntCycles
-                        = median_of_odd_elements(sWaitcntCyclesPerRun);
+                    uint64_t actualMaxLdsInstrCycles  = MedianOfOddElements(ldsInstrCyclesPerRun);
+                    uint64_t actualLastSWaitcntCycles = MedianOfOddElements(sWaitcntCyclesPerRun);
                     info << fmt::format("  Median s_waitcnt Cycles: {}\n",
                                         actualLastSWaitcntCycles);
                     info << fmt::format("  Median LDS Instruction Cycles: {}\n",
