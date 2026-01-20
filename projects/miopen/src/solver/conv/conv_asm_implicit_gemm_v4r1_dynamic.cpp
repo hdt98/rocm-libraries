@@ -345,6 +345,9 @@ bool ConvAsmImplicitGemmV4R1DynamicFwd_1x1::IsApplicable(const ExecutionContext&
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsDirectionForward(), inapplicable_msg::Direction);
 
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
     MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2d(), inapplicable_msg::Is2d);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),

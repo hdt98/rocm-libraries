@@ -142,6 +142,9 @@ bool ConvHipImplicitGemmV4R1WrW::IsApplicable(const ExecutionContext& ctx,
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
 
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::HasNonPackedTensors);
+
     MIOPEN_SOLVER_INAPPLICABLE_IF(name == "gfx90a" && problem.IsGfx90aFp16altRequired(),
                                   inapplicable_msg::IsGfx90aFp16altRequired);
 

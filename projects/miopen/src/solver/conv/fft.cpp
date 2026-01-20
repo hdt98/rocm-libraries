@@ -117,7 +117,10 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     MIOPEN_SOLVER_INAPPLICABLE_IF((problem.IsDirectionBackwardWrW() || !problem.IsFp32()),
                                   "Direction and data type combination not supported");
 
-    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), inapplicable_msg::Layout);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLayoutDefault(), a_msg::Layout);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(problem.HasNonPackedTensors(),
+                                  inapplicable_msg::NonPackedTensors);
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.AllTensorsDimsFitIntoInt(),
                                   inapplicable_msg::AllTensorsDimsFitIntoInt);
@@ -131,7 +134,7 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         (conv.GetSpatialDimension() != 2 || conv.group_count != 1 ||
          !miopen::all_of(conv.GetConvDilations(), [](auto v) { return v == 1; })),
-        inapplicable_msg::Generic);
+        a_msg::Generic);
 
     int in_n, in_c, in_h, in_w;
     int out_n, out_c, out_h, out_w;
@@ -154,6 +157,11 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
                                    (std::tie(in_h, in_w) != std::make_tuple(7, 7))),
                                   "Input H and W not supported by FFT convolution");
 
+    // TODO: These cases produce incorrect results. Fix if possible. For now don't allow to run them
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (!is_fwd && std::tie(in_h, in_w) == std::make_tuple(7, 7) && wei_k < 16),
+        inapplicable_msg::Workaround);
+
     const auto cparam = std::make_tuple(conv.GetConvPads()[0],
                                         conv.GetConvPads()[1],
                                         conv.GetConvStrides()[0],
@@ -161,7 +169,7 @@ bool fft::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& pr
 
     MIOPEN_SOLVER_INAPPLICABLE_IF(
         !(std::tie(wei_h, wei_w) == std::make_tuple(5, 5) && cparam == std::make_tuple(2, 2, 1, 1)),
-        inapplicable_msg::NoKernelForConfig);
+        a_msg::NoKernelForConfig);
 
     return true;
 }
