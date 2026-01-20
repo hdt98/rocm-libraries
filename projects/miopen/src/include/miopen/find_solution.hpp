@@ -66,15 +66,20 @@ auto FindOrigamiSolution(const Solver& s,
     -> decltype(s.GetSolution(context, problem, s.Search(context, problem, invoke_ctx)))
 {
     PerformanceConfig config{};
-    auto tmp_all_configs = GetAllConfigs(s, context, problem);
-    std::vector<PerformanceConfig> all_configs;
-    std::copy(tmp_all_configs.begin(), tmp_all_configs.end(), std::back_inserter(all_configs));
-    auto ranked_configs = GetOrigamiPerformanceConfig(s, problem, all_configs);
-    if(!ranked_configs.empty())
+
+    bool enable_origami = env::value(MIOPEN_ENABLE_ORIGAMI);
+    if(enable_origami)
     {
-        config = ranked_configs[0];
-        MIOPEN_LOG_I("Origami selected config: " << s.SolverDbId() << ": " << config);
-        return s.GetSolution(context, problem, config);
+        auto tmp_all_configs = GetAllConfigs(s, context, problem);
+        std::vector<PerformanceConfig> all_configs;
+        std::copy(tmp_all_configs.begin(), tmp_all_configs.end(), std::back_inserter(all_configs));
+        auto ranked_configs = GetOrigamiPerformanceConfig(s, problem, all_configs);
+        if(!ranked_configs.empty())
+        {
+            config = ranked_configs[0];
+            MIOPEN_LOG_I("Origami selected config: " << s.SolverDbId() << ": " << config);
+            return s.GetSolution(context, problem, config);
+        }
     }
 
     config = default_cfg;
