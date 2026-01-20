@@ -31,6 +31,7 @@
 #include <miopen/stringutils.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -41,11 +42,11 @@ namespace batchnorm {
 bool BnFwdTrainingPerActivation::IsApplicable(
     const ExecutionContext&, const miopen::batchnorm::ProblemDescription& problem) const
 {
-    if(problem.GetDirection() != miopen::batchnorm::Direction::ForwardTraining ||
-       problem.GetMode() != miopenBNPerActivation)
-        return false;
-    if(!IsOCLFwdTrainTypeValid(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (problem.GetDirection() != miopen::batchnorm::Direction::ForwardTraining ||
+         problem.GetMode() != miopenBNPerActivation),
+        "Only forward training per-activation batchnorm is supported.");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsOCLFwdTrainTypeValid(problem), inapplicable_msg::DataType);
     return true;
 }
 

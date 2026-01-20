@@ -31,6 +31,7 @@
 #include <miopen/stringutils.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -41,13 +42,16 @@ namespace batchnorm {
 bool BnBwdTrainingPerActivation::IsApplicable(
     const ExecutionContext&, const miopen::batchnorm::ProblemDescription& problem) const
 {
-    if(!problem.Is2D())
-        return false;
-    if(problem.GetDirection() != miopen::batchnorm::Direction::Backward &&
-       problem.GetMode() != miopenBNPerActivation)
-        return false;
-    if(!::miopen::batchnorm::IsOCLBwdTypeValid(problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.Is2D(), inapplicable_msg::Is2d);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (problem.GetDirection() != miopen::batchnorm::Direction::Backward &&
+         problem.GetMode() != miopenBNPerActivation),
+        "Only backward per-activation batchnorm is supported");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!::miopen::batchnorm::IsOCLBwdTypeValid(problem),
+                                  inapplicable_msg::DataType);
+
     return true;
 }
 

@@ -33,6 +33,7 @@
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/fusion/solvers.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_BN_FWDTRG_ACTIV_FUSED)
 
@@ -47,14 +48,13 @@ bool BnFwdTrgActivationFused::IsApplicable(const FusionContext& /*context*/,
     const auto& desc = *problem.fusion_plan_desc;
     if(desc.op_map.empty())
         MIOPEN_THROW("");
-    if(env::disabled(MIOPEN_DEBUG_BN_FWDTRG_ACTIV_FUSED))
-        return false;
-    if(desc.op_map.size() != 2)
-        return false;
-    if(desc.op_map.at(0)->kind() != miopenFusionOpBatchNormFwdTrain)
-        return false;
-    if(desc.op_map.at(1)->kind() != miopenFusionOpActivForward)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_BN_FWDTRG_ACTIV_FUSED),
+                                  inapplicable_msg::EnvDisabled);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.size() != 2, inapplicable_msg::FusionOpCount);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.at(0)->kind() != miopenFusionOpBatchNormFwdTrain,
+                                  inapplicable_msg::FirstFusionOp);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.at(1)->kind() != miopenFusionOpActivForward,
+                                  inapplicable_msg::SecondFusionOp);
     return true;
 }
 

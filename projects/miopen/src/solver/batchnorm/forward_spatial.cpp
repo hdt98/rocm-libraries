@@ -33,6 +33,7 @@
 #include <miopen/stringutils.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -134,22 +135,20 @@ bool PerformanceConfigBnFwdTraining::IsValidValue() const
 bool BnFwdTrainingSpatial::IsApplicable(
     const ExecutionContext&, const miopen::batchnorm::ProblemDescription& bn_problem) const
 {
-    if(bn_problem.GetDirection() != miopen::batchnorm::Direction::ForwardTraining ||
-       bn_problem.GetMode() != miopenBNSpatial)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (bn_problem.GetDirection() != miopen::batchnorm::Direction::ForwardTraining ||
+         bn_problem.GetMode() != miopenBNSpatial),
+        "Only forward training spatial batchnorm is supported.");
 
-    if(!bn_problem.Is2D())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!bn_problem.Is2D(), inapplicable_msg::Is2d);
 
-    if(!IsOCLFwdTrainTypeValid(bn_problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsOCLFwdTrainTypeValid(bn_problem), inapplicable_msg::DataType);
 
     int activ_mode = bn_problem.GetActivationDesc().GetMode();
-    if(activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
-       activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP)
-    {
-        return false;
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
+         activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP),
+        inapplicable_msg::InvalidActivation);
 
     return true;
 }

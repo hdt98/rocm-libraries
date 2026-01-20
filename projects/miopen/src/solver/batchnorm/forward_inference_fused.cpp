@@ -33,6 +33,7 @@
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/fusion/solvers.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_BN_FWDINFER_ACTIV_FUSED)
 
@@ -48,18 +49,17 @@ bool BnFwdInferActivationFused::IsApplicable(const FusionContext& /*context*/,
     const auto& desc = *problem.fusion_plan_desc;
     if(desc.op_map.empty())
         MIOPEN_THROW("");
-    if(env::disabled(MIOPEN_DEBUG_BN_FWDINFER_ACTIV_FUSED))
-        return false;
-    if(desc.op_map.size() != 2)
-        return false;
-    if(desc.op_map.at(0)->kind() != miopenFusionOpBatchNormInference)
-        return false;
-    if(desc.op_map.at(1)->kind() != miopenFusionOpActivForward)
-        return false;
-    if(!(problem.IsFp32() || problem.IsFp16()))
-        return false;
-    if(!(problem.Is2D() && problem.IsLayoutContiguous()))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(env::disabled(MIOPEN_DEBUG_BN_FWDINFER_ACTIV_FUSED),
+                                  inapplicable_msg::EnvDisabled);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.size() != 2, inapplicable_msg::FusionOpCount);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.at(0)->kind() != miopenFusionOpBatchNormInference,
+                                  inapplicable_msg::FirstFusionOp);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(desc.op_map.at(1)->kind() != miopenFusionOpActivForward,
+                                  inapplicable_msg::SecondFusionOp);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.IsFp32() || problem.IsFp16()),
+                                  inapplicable_msg::DataType);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.Is2D() && problem.IsLayoutContiguous()),
+                                  inapplicable_msg::NoKernelForConfig);
     return true;
 }
 

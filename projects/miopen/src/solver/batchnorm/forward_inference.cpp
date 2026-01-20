@@ -31,6 +31,7 @@
 #include <miopen/stringutils.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -41,20 +42,20 @@ namespace batchnorm {
 bool BnFwdInference::IsApplicable(const ExecutionContext&,
                                   const miopen::batchnorm::ProblemDescription& bn_problem) const
 {
-    if(bn_problem.GetDirection() != miopen::batchnorm::Direction::ForwardInference)
-        return false;
-    if(!(bn_problem.IsFp32() or bn_problem.IsFp16() or bn_problem.IsBFp16()))
-        return false;
-    if(!bn_problem.Is2D())
-        return false;
-    if(!IsOCLInferTypeValid(bn_problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(bn_problem.GetDirection() !=
+                                      miopen::batchnorm::Direction::ForwardInference,
+                                  "Only forward inference is supported.");
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(bn_problem.IsFp32() or bn_problem.IsFp16() or bn_problem.IsBFp16()),
+        inapplicable_msg::DataType);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!bn_problem.Is2D(), inapplicable_msg::Is2d);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsOCLInferTypeValid(bn_problem), inapplicable_msg::DataType);
 
     int activ_mode = bn_problem.GetActivationDesc().GetMode();
-    if(activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
-       activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP)
-        return false;
-
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
+         activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP),
+        inapplicable_msg::InvalidActivation);
     return true;
 }
 

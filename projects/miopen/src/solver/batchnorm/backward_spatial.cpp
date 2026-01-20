@@ -33,6 +33,7 @@
 #include <miopen/stringutils.hpp>
 #include <miopen/visit_float.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -136,32 +137,28 @@ bool PerformanceConfigBnBwdBackward::IsValidValue() const
 bool BnBwdTrainingSpatial::IsApplicable(
     const ExecutionContext&, const miopen::batchnorm::ProblemDescription& bn_problem) const
 {
-    if(bn_problem.GetDirection() != miopen::batchnorm::Direction::Backward ||
-       bn_problem.GetMode() != miopenBNSpatial)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (bn_problem.GetDirection() != miopen::batchnorm::Direction::Backward ||
+         bn_problem.GetMode() != miopenBNSpatial),
+        "Only backward spatial batchnorm is supported.");
 
-    if(!bn_problem.Is2D())
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!bn_problem.Is2D(), inapplicable_msg::Is2d);
 
 #if WORKAROUND_ISSUE_1549_FP16_BUILD_ERROR
-    if(bn_problem.GetXDesc().GetType() == miopenHalf &&
-       bn_problem.GetBnScale().GetType() == miopenHalf)
-    {
-        // bfp16parm = true;
-        // Unsupported kernel mode, error in kernel code
-        // MIOpenBatchNormBwdSpatial.cl:526 issue#1549
-        return false;
-    }
+    // bfp16parm = true;
+    // Unsupported kernel mode, error in kernel code
+    // MIOpenBatchNormBwdSpatial.cl:526 issue#1549
+    MIOPEN_SOLVER_INAPPLICABLE_IF((bn_problem.GetXDesc().GetType() == miopenHalf &&
+                                   bn_problem.GetBnScale().GetType() == miopenHalf),
+                                  inapplicable_msg::Workaround);
 #endif
-    if(!IsOCLBwdTypeValid(bn_problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsOCLBwdTypeValid(bn_problem), inapplicable_msg::DataType);
 
     int activ_mode = bn_problem.GetActivationDesc().GetMode();
-    if(activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
-       activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP)
-    {
-        return false;
-    }
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        (activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
+         activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP),
+        inapplicable_msg::InvalidActivation);
 
     return true;
 }
