@@ -1541,55 +1541,10 @@ struct FmhaFwdKernel
                     number<1>{});
 
                 constexpr bool kPadSeqLenK_ = kUseAsyncCopy ? kPadSeqLenK : false;
-                const auto k_dram_pad       = pad_tensor_view(
+                return pad_tensor_view(
                     k_dram_naive,
                     make_tuple(number<FmhaPipeline::kN0>{}, number<FmhaPipeline::kK0>{}),
                     sequence<kPadSeqLenK_, kPadHeadDimQ>{});
-
-                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
-                {
-                    // Shuffle N dim of K in such a way that C of the first GEMM can be used as
-                    // A for the second GEMM
-                    // TODO: hardcoded, make it generic somehow. See also k_scale_dram
-                    const index_t padded_seqlen_k =
-                        k_dram_pad.get_tensor_descriptor().get_lengths()[number<0>{}];
-
-                    using BlockGemm =
-                        remove_cvref_t<decltype(FmhaPipeline::Policy::template GetQKBlockGemm<
-                                                typename FmhaPipeline::Problem>())>;
-                    constexpr auto config = BlockGemm::Policy::template GetWarpGemmMWarpNWarp<
-                        typename FmhaPipeline::Problem>();
-                    using WG = remove_cvref_t<decltype(config.template at<0>())>;
-
-                    constexpr index_t N3 = WG::WarpGemmAttribute::Impl::kCM1PerLane;
-                    // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
-                    // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
-                    constexpr index_t N2 = WG::WarpGemmAttribute::Impl::kABKPerLane /
-                                           WG::WarpGemmAttribute::AttrNumAccessV / N3;
-                    constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
-
-                    const index_t N0 = padded_seqlen_k / (N1 * N2 * N3);
-
-                    const auto k_dram_unmerged = transform_tensor_view(
-                        k_dram_pad,
-                        make_tuple(make_unmerge_transform(
-                                       make_tuple(N0, number<N1>{}, number<N2>{}, number<N3>{})),
-                                   make_pass_through_transform(number<FmhaPipeline::kK0>{})),
-                        make_tuple(sequence<0>{}, sequence<1>{}),
-                        make_tuple(sequence<0, 2, 1, 3>{}, sequence<4>{}));
-
-                    return transform_tensor_view(
-                        k_dram_unmerged,
-                        make_tuple(make_merge_transform(
-                                       make_tuple(N0, number<N2>{}, number<N1>{}, number<N3>{})),
-                                   make_pass_through_transform(number<FmhaPipeline::kK0>{})),
-                        make_tuple(sequence<0, 1, 2, 3>{}, sequence<4>{}),
-                        make_tuple(sequence<0>{}, sequence<1>{}));
-                }
-                else
-                {
-                    return k_dram_pad;
-                }
             }();
             const auto v_dram = [&]() {
                 if constexpr(std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::RowMajor>)
@@ -1998,51 +1953,11 @@ struct FmhaFwdKernel
                                 make_tuple(kargs.stride_k_descale, 1),
                                 number<1>{}, // FIX
                                 number<1>{});
-                        const auto k_scale_dram_pad = pad_tensor_view(
+                        return pad_tensor_view(
                             k_scale_dram_naive,
                             make_tuple(number<FmhaPipeline::kN0>{},
                                        number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
                             sequence<false, kPadHeadDimQ>{});
-
-                        // Shuffle N dim of K in such a way that C of the first GEMM can be used as
-                        // A for the second GEMM
-                        // TODO: hardcoded, make it generic somehow. See also k_dram
-                        const index_t padded_seqlen_k =
-                            k_scale_dram_pad.get_tensor_descriptor().get_lengths()[number<0>{}];
-
-                        using BlockGemm =
-                            remove_cvref_t<decltype(FmhaPipeline::Policy::template GetQKBlockGemm<
-                                                    typename FmhaPipeline::Problem>())>;
-                        constexpr auto config = BlockGemm::Policy::template GetWarpGemmMWarpNWarp<
-                            typename FmhaPipeline::Problem>();
-                        using WG = remove_cvref_t<decltype(config.template at<0>())>;
-
-                        constexpr index_t N3 = WG::WarpGemmAttribute::Impl::kCM1PerLane;
-                        // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
-                        // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
-                        constexpr index_t N2 = WG::WarpGemmAttribute::Impl::kABKPerLane /
-                                               WG::WarpGemmAttribute::AttrNumAccessV / N3;
-                        constexpr index_t N1 = WG::WarpGemmAttribute::Impl::kCMLane;
-
-                        const index_t N0 = padded_seqlen_k / (N1 * N2 * N3);
-
-                        const auto k_scale_dram_unmerged = transform_tensor_view(
-                            k_scale_dram_pad,
-                            make_tuple(make_unmerge_transform(make_tuple(
-                                           N0, number<N1>{}, number<N2>{}, number<N3>{})),
-                                       make_pass_through_transform(
-                                           number<FmhaPipeline::kK0 / kQKScaleGranularity>{})),
-                            make_tuple(sequence<0>{}, sequence<1>{}),
-                            make_tuple(sequence<0, 2, 1, 3>{}, sequence<4>{}));
-
-                        return transform_tensor_view(
-                            k_scale_dram_unmerged,
-                            make_tuple(make_merge_transform(make_tuple(
-                                           N0, number<N2>{}, number<N1>{}, number<N3>{})),
-                                       make_pass_through_transform(
-                                           number<FmhaPipeline::kK0 / kQKScaleGranularity>{})),
-                            make_tuple(sequence<0, 1, 2, 3>{}, sequence<4>{}),
-                            make_tuple(sequence<0>{}, sequence<1>{}));
                     }();
                     const auto v_scale_dram = [&]() {
                         static_assert(
