@@ -1030,12 +1030,12 @@ struct intrin_wmma_f64_16x16x4_f64<16, 16>
     }
 };
 
+namespace wmma_impl {
 #ifndef CK_CODE_GEN_RTC
 // utils for f8f6f4 instructions
 template <typename T>
 struct ScaleTypeSelector
 {
-    static constexpr int value = 0xFF; // default
 };
 
 // use int32_t for backward compatibility
@@ -1090,6 +1090,7 @@ enum InputFormat : uint8_t
     E2M1 = 0x4
 };
 #endif // #ifndef CK_CODE_GEN_RTC
+} // namespace wmma_impl
 
 template <index_t MPerWave,
           index_t NPerWave,
@@ -1123,18 +1124,18 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                InputFormat::E4M3, // OPSEL
+                wmma_impl::InputFormat::E4M3, // OPSEL
                 reg_a,
-                InputFormat::E4M3, // OPSEL_HI
+                wmma_impl::InputFormat::E4M3, // OPSEL_HI
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 // M=laneId % 16 [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24] K=96..127
                 bit_cast<int32_t>(scale_a),
-                ScaleOpselB,                          // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                ScaleOpselB,                                     // SCALE_OPSEL[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 // N=laneId % 16 [7:0] K=0..31; [15:8] K=32..63; [23:16] K=64..95; [31:24] K=96..127
                 bit_cast<int32_t>(scale_b),
                 0,  // NEG: 0-E8M0
@@ -1163,18 +1164,18 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                InputFormat::E5M2, // OPSEL
+                wmma_impl::InputFormat::E5M2, // OPSEL
                 reg_a,
-                InputFormat::E5M2, // OPSEL_HI
+                wmma_impl::InputFormat::E5M2, // OPSEL_HI
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int32_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int32_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1209,7 +1210,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
         using arg_type    = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                InputFormat::E2M3, // OPSEL
+                wmma_impl::InputFormat::E2M3, // OPSEL
                 arg_type{arg_a_0[0],
                          arg_a_0[1],
                          arg_a_0[2],
@@ -1226,7 +1227,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                InputFormat::E2M3, // OPSEL_HI
+                wmma_impl::InputFormat::E2M3, // OPSEL_HI
                 arg_type{arg_b_0[0],
                          arg_b_0[1],
                          arg_b_0[2],
@@ -1245,12 +1246,12 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int32_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int32_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1285,7 +1286,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
         using arg_type    = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                InputFormat::E3M2, // OPSEL
+                wmma_impl::InputFormat::E3M2, // OPSEL
                 arg_type{arg_a_0[0],
                          arg_a_0[1],
                          arg_a_0[2],
@@ -1302,7 +1303,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                InputFormat::E3M2, // OPSEL_HI
+                wmma_impl::InputFormat::E3M2, // OPSEL_HI
                 arg_type{arg_b_0[0],
                          arg_b_0[1],
                          arg_b_0[2],
@@ -1321,12 +1322,12 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int32_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int32_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1362,7 +1363,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1,
                 arg_type{arg_a[0],
                          arg_a[1],
                          arg_a[2],
@@ -1379,7 +1380,7 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1,
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1399,10 +1400,10 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
-                ScaleTypeSelector<ScaleTypeA>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
                 bit_cast<int32_t>(scale_a),
                 ScaleOpselB,
-                ScaleTypeSelector<ScaleTypeB>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
                 bit_cast<int32_t>(scale_b),
                 0,
                 0);
@@ -1434,9 +1435,9 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
-                InputFormat::E4M3,
+                wmma_impl::InputFormat::E4M3,
                 reg_a,
-                InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1,
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1456,10 +1457,10 @@ struct intrin_wmma_scale_f32_16x16x128_f8f6f4<16,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
-                ScaleTypeSelector<ScaleTypeA>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
                 bit_cast<int32_t>(scale_a),
                 ScaleOpselB,
-                ScaleTypeSelector<ScaleTypeB>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
                 bit_cast<int32_t>(scale_b),
                 0,
                 0);
@@ -1503,18 +1504,18 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                InputFormat::E4M3, // OPSEL
+                wmma_impl::InputFormat::E4M3, // OPSEL
                 reg_a,
-                InputFormat::E4M3, // OPSEL_HI
+                wmma_impl::InputFormat::E4M3, // OPSEL_HI
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1540,18 +1541,18 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                InputFormat::E5M2, // OPSEL
+                wmma_impl::InputFormat::E5M2, // OPSEL
                 reg_a,
-                InputFormat::E5M2, // OPSEL_HI
+                wmma_impl::InputFormat::E5M2, // OPSEL_HI
                 reg_b,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1583,7 +1584,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
         using arg_type    = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                InputFormat::E2M3, // OPSEL
+                wmma_impl::InputFormat::E2M3, // OPSEL
                 arg_type{arg_a_0[0],
                          arg_a_0[1],
                          arg_a_0[2],
@@ -1600,7 +1601,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                InputFormat::E2M3, // OPSEL_HI
+                wmma_impl::InputFormat::E2M3, // OPSEL_HI
                 arg_type{arg_b_0[0],
                          arg_b_0[1],
                          arg_b_0[2],
@@ -1619,12 +1620,12 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1656,7 +1657,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
         using arg_type    = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                InputFormat::E3M2, // OPSEL
+                wmma_impl::InputFormat::E3M2, // OPSEL
                 arg_type{arg_a_0[0],
                          arg_a_0[1],
                          arg_a_0[2],
@@ -1673,7 +1674,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                InputFormat::E3M2, // OPSEL_HI
+                wmma_impl::InputFormat::E3M2, // OPSEL_HI
                 arg_type{arg_b_0[0],
                          arg_b_0[1],
                          arg_b_0[2],
@@ -1692,12 +1693,12 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0},
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
-                ScaleOpselA,                          // SCALE_OPSEL[0]
-                ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
+                ScaleOpselA,                                     // SCALE_OPSEL[0]
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value, // SCALE_OPSEL_HI[0]
                 bit_cast<int64_t>(scale_a), // M=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 ScaleOpselB,                // SCALE_OPSEL[1]
-                ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value, // SCALE_OPSEL_HI[1]
                 bit_cast<int64_t>(scale_b), // N=laneId [7:0] K=0..31; [15:8] K=32..63; [23:16]
                                             // K=64..95; [31:24] K=96..127
                 0,                          // NEG
@@ -1732,7 +1733,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1,
                 arg_type{arg_a[0],
                          arg_a[1],
                          arg_a[2],
@@ -1749,7 +1750,7 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                          0,
                          0,
                          0},
-                InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1,
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1769,10 +1770,10 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
-                ScaleTypeSelector<ScaleTypeA>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
                 bit_cast<int64_t>(scale_a),
                 ScaleOpselB,
-                ScaleTypeSelector<ScaleTypeB>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
                 bit_cast<int64_t>(scale_b),
                 0,
                 0);
@@ -1802,9 +1803,9 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
         using arg_type  = int32x16_t;
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_scale16_f32_16x16x128_f8f6f4(
-                InputFormat::E4M3,
+                wmma_impl::InputFormat::E4M3,
                 reg_a,
-                InputFormat::E2M1,
+                wmma_impl::InputFormat::E2M1,
                 arg_type{arg_b[0],
                          arg_b[1],
                          arg_b[2],
@@ -1824,10 +1825,10 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
                 0,
                 reg_c.template AsType<float8_t>()[Number<0>{}],
                 ScaleOpselA,
-                ScaleTypeSelector<ScaleTypeA>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
                 bit_cast<int64_t>(scale_a),
                 ScaleOpselB,
-                ScaleTypeSelector<ScaleTypeB>::value,
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
                 bit_cast<int64_t>(scale_b),
                 0,
                 0);
