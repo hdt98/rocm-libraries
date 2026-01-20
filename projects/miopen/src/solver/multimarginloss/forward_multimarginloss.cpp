@@ -34,6 +34,7 @@
 #include <miopen/multimarginloss.hpp>
 #include <miopen/target_properties.hpp>
 #include <miopen/tensor_view_utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE_MULTIMARGINLOSS 256
 #define LOCAL_SIZE_REDUCE 256
@@ -75,12 +76,14 @@ bool MultiMarginLossForward::IsApplicable(
     const ExecutionContext& context,
     const miopen::multimarginloss::ForwardProblemDescription& problem) const
 {
-    if(!(problem.GetiDesc().GetType() == miopenFloat ||
-         problem.GetiDesc().GetType() == miopenHalf ||
-         problem.GetiDesc().GetType() == miopenBFloat16))
-        return false;
-    if(!IsImprovementOverROCm(context, problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetiDesc().GetType() == miopenFloat ||
+                                    problem.GetiDesc().GetType() == miopenHalf ||
+                                    problem.GetiDesc().GetType() == miopenBFloat16),
+                                  inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsImprovementOverROCm(context, problem),
+                                  inapplicable_msg::IsImprovementOverROCm);
+
     return true;
 }
 
