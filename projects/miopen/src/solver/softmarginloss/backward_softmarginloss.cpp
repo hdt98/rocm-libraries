@@ -32,6 +32,7 @@
 #include <miopen/softmarginloss.hpp>
 #include <miopen/target_properties.hpp>
 #include <miopen/tensor_view_utils.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -45,10 +46,11 @@ bool SoftMarginLossBackward::IsApplicable(
     const ExecutionContext& /*context*/,
     const miopen::softmarginloss::BackwardProblemDescription& problem) const
 {
-    if(!(problem.GetiDesc().GetType() == miopenFloat ||
-         problem.GetiDesc().GetType() == miopenHalf ||
-         problem.GetiDesc().GetType() == miopenBFloat16))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!(problem.GetiDesc().GetType() == miopenFloat ||
+                                    problem.GetiDesc().GetType() == miopenHalf ||
+                                    problem.GetiDesc().GetType() == miopenBFloat16),
+                                  inapplicable_msg::DataType);
+
     return true;
 }
 
