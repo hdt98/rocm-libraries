@@ -31,6 +31,7 @@
 #include <miopen/groupnorm.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 1024
 
@@ -54,15 +55,19 @@ std::size_t sizeof_local_memory(const miopen::groupnorm::ProblemDescription& pro
 bool GroupNormForward::IsApplicable(const ExecutionContext&,
                                     const miopen::groupnorm::ProblemDescription& problem) const
 {
-    if(!problem.IsValidType())
-        return false;
-    if(!problem.IsAllPacked())
-        return false;
-    if(!(sizeof_local_memory(problem) <= TargetProperties::GetMaxLocalMemorySize()))
-        return false;
-    if(problem.GetXDesc().GetLengths()[0] * problem.GetNumGroups() < 32 ||
-       problem.GetXDesc().GetLengths()[1] / problem.GetNumGroups() >= 64)
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsValidType(), inapplicable_msg::DataType);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllPacked(), inapplicable_msg::IsAllPacked);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(sizeof_local_memory(problem) <= TargetProperties::GetMaxLocalMemorySize()),
+        inapplicable_msg::NotEnoughLDS);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.GetXDesc().GetLengths()[0] * problem.GetNumGroups() < 32 ||
+          problem.GetXDesc().GetLengths()[1] / problem.GetNumGroups() >= 64),
+        inapplicable_msg::NoKernelForConfig);
+
     return true;
 }
 
