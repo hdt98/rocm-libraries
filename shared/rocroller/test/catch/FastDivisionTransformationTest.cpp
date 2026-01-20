@@ -86,7 +86,7 @@ namespace FastDivisionTest
 
         auto expr      = a / Ex::literal(8u);
         auto expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, IdenticalTo(a >> Ex::literal(3u)));
+        CHECK_THAT(expr_fast, IdenticalTo(convert(DataType::UInt32, a) >> Ex::literal(3u)));
 
         expr      = a / Ex::literal(8);
         expr_fast = fastDivision(expr, context.get());
@@ -100,8 +100,8 @@ namespace FastDivisionTest
         {
             auto magic   = getUnsignedInt(getMagicMultiple(7u));
             auto shifts  = getUnsignedInt(getMagicShifts(7u));
-            auto mulHigh = multiplyHigh(b, Ex::literal(magic));
-            auto t       = ((b - mulHigh) >> Ex::literal(1u)) + mulHigh;
+            auto mulHigh = multiplyHigh(convert(DataType::UInt32, b), Ex::literal(magic));
+            auto t       = ((convert(DataType::UInt32, b) - mulHigh) >> Ex::literal(1u)) + mulHigh;
 
             CHECK_THAT(expr_fast, EquivalentTo(t >> Ex::literal(shifts & 0x1F)));
         }
@@ -124,15 +124,15 @@ namespace FastDivisionTest
 
         expr      = a / Ex::literal(8u);
         expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, EquivalentTo(a >> Ex::literal(3u)));
+        CHECK_THAT(expr_fast, EquivalentTo(convert(DataType::UInt32, a) >> Ex::literal(3u)));
 
         expr      = a / Ex::literal(128u);
         expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, EquivalentTo(a >> Ex::literal(7u)));
+        CHECK_THAT(expr_fast, EquivalentTo(convert(DataType::UInt32, a) >> Ex::literal(7u)));
 
         expr      = a / (Ex::literal(43u) + Ex::literal(85u));
         expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, EquivalentTo(a >> Ex::literal(7u)));
+        CHECK_THAT(expr_fast, EquivalentTo(convert(DataType::UInt32, a) >> Ex::literal(7u)));
 
         auto argsAfter = context->kernel()->arguments().size();
         CHECK(argsBefore == argsAfter);
@@ -238,7 +238,7 @@ namespace FastDivisionTest
 
         auto expr      = a % Ex::literal(8u);
         auto expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, EquivalentTo(a & Ex::literal(7u)));
+        CHECK_THAT(expr_fast, EquivalentTo(convert(DataType::UInt32, a) & Ex::literal(7u)));
 
         expr      = a % Ex::literal(8);
         expr_fast = fastDivision(expr, context.get());
@@ -249,9 +249,11 @@ namespace FastDivisionTest
 
         expr      = a % Ex::literal(7u);
         expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(
-            expr_fast,
-            EquivalentTo(a - (fastDivision(a / Ex::literal(7u), context.get()) * Ex::literal(7u))));
+        CHECK_THAT(expr_fast,
+                   EquivalentTo(convert(DataType::UInt32, a)
+                                - (fastDivision(convert(DataType::UInt32, a) / Ex::literal(7u),
+                                                context.get())
+                                   * Ex::literal(7u))));
 
         expr      = a % Ex::literal(1);
         expr_fast = fastDivision(expr, context.get());
@@ -269,11 +271,11 @@ namespace FastDivisionTest
 
         expr      = a % Ex::literal(8u);
         expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, EquivalentTo(a & Ex::literal(7u)));
+        CHECK_THAT(expr_fast, EquivalentTo(convert(DataType::UInt32, a) & Ex::literal(7u)));
 
         expr      = a % Ex::literal(128u);
         expr_fast = fastDivision(expr, context.get());
-        CHECK_THAT(expr_fast, EquivalentTo(a & Ex::literal(127u)));
+        CHECK_THAT(expr_fast, EquivalentTo(convert(DataType::UInt32, a) & Ex::literal(127u)));
 
         auto argsAfter = context->kernel()->arguments();
         CHECK(argsBefore == argsAfter);

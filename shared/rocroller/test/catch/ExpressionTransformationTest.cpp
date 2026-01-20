@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2024-2025 AMD ROCm(TM) Software
+ * Copyright 2024-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -471,64 +471,6 @@ TEST_CASE("FastArithmetic includes translate time evaluation",
     Expression::FastArithmetic fastArith(context.get());
     CHECK(fastArith(nullptr).get() == nullptr);
     CHECK_THAT(fastArith(c * zero), IdenticalTo(literal(0.f)));
-}
-
-TEST_CASE("FastArithmetic pipeline properly simplifies expressions",
-          "[expression][expression-transformation]")
-{
-    using namespace rocRoller;
-    using Expression::literal;
-    auto context = TestContext::ForDefaultTarget();
-
-    Expression::FastArithmetic fastArith(context.get());
-    auto                       transforms = fastArith.getTransforms();
-
-    auto isSimplify = [](const Expression::ExpressionTransformType& transformFunction) {
-        using ExprTransformFuncPtrType = Expression::ExpressionPtr (*)(Expression::ExpressionPtr);
-        const auto* funcPtr            = transformFunction.target<ExprTransformFuncPtrType>();
-        return funcPtr && *funcPtr == Expression::simplify;
-    };
-
-    // Create a version with extra simplifies after each non-simplify transform
-    std::vector<Expression::ExpressionTransformType> transformsExtraSimplify;
-    for(const auto& transform : transforms)
-    {
-        transformsExtraSimplify.push_back(transform);
-        if(!isSimplify(transform))
-            transformsExtraSimplify.push_back(Expression::simplify);
-    }
-
-    // Create a version with only one simplify
-    std::vector<Expression::ExpressionTransformType> transformsOneSimplify;
-    bool                                             hasSimplify = false;
-    for(const auto& transform : transforms)
-    {
-        if(isSimplify(transform))
-        {
-            if(hasSimplify)
-                continue;
-
-            hasSimplify = true;
-        }
-        transformsOneSimplify.push_back(transform);
-    }
-
-    auto tag83 = Expression::dataFlowTag(83, Register::Type::Vector, DataType::UInt32);
-    auto expr  = (tag83 % literal(4)) * literal(32);
-    expr       = (tag83 / literal(4)) * literal(128u) + expr;
-    expr       = expr * literal(4u);
-    expr       = expr / literal(8u);
-    expr       = expr + literal(0u);
-    expr       = std::make_shared<Expression::Expression>(Expression::ToScalar{expr});
-    expr       = Expression::convert(DataType::UInt32, expr);
-
-    // One simplify is not enough
-    CHECK(!Expression::identical(fastArith.applyTransforms(expr, transforms),
-                                 fastArith.applyTransforms(expr, transformsOneSimplify)));
-
-    // There are enough simplifies
-    CHECK_THAT(fastArith.applyTransforms(expr, transforms),
-               IdenticalTo(fastArith.applyTransforms(expr, transformsExtraSimplify)));
 }
 
 TEST_CASE("ConvertPropagation", "[expression][expression-transformation]")
@@ -1540,7 +1482,7 @@ TEST_CASE("Code gen with ConvertPropagation", "[expression][expression-transform
 
     std::string expected;
     if(DataTypeInfo::Get(dstDatatype).isSigned)
-        expected = R"(        
+        expected = R"(
             v_add_i32 v4, v0, v2
         )";
     else

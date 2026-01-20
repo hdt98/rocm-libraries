@@ -302,8 +302,8 @@ namespace rocRoller
         }
 
         // Power Of Two division for unsigned integers
-        template <>
-        ExpressionPtr powerOfTwoDivision(ExpressionPtr lhs, unsigned int rhs)
+        template <std::unsigned_integral T>
+        ExpressionPtr powerOfTwoDivision(ExpressionPtr lhs, T rhs)
         {
             uint shiftAmount = std::countr_zero(rhs);
             auto new_rhs     = literal(shiftAmount);
@@ -311,7 +311,7 @@ namespace rocRoller
         }
 
         // Power of Two division for signed integers
-        template <>
+        template <std::signed_integral T>
         ExpressionPtr powerOfTwoDivision(ExpressionPtr lhs, int rhs)
         {
             int          shiftAmount        = std::countr_zero(static_cast<unsigned int>(rhs));
@@ -333,22 +333,27 @@ namespace rocRoller
         }
 
         // Power of Two Modulo for unsigned integers
-        template <>
-        ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, unsigned int rhs)
+        //template <>
+        template <std::unsigned_integral T>
+        ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, T rhs)
+        //ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, unsigned int rhs)
         {
-            unsigned int mask    = rhs - 1u;
-            auto         new_rhs = literal(mask);
+            T    mask    = rhs - 1u;
+            auto new_rhs = literal(mask);
             return lhs & new_rhs;
         }
 
         // Power of Two Modulo for signed integers
-        template <>
-        ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, int rhs)
+        //template <>
+        //ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, int rhs)
+        template <std::signed_integral T>
+        ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, T rhs)
         {
-            int          shiftAmount        = std::countr_zero(static_cast<unsigned int>(rhs));
-            unsigned int signBits           = sizeof(int) * 8 - 1;
-            unsigned int reverseShiftAmount = sizeof(int) * 8 - shiftAmount;
-            int          mask               = ~(rhs - 1);
+            using UnsignedT                 = std::make_unsigned_t<T>;
+            int          shiftAmount        = std::countr_zero(static_cast<UnsignedT>(rhs));
+            unsigned int signBits           = sizeof(T) * 8 - 1;
+            unsigned int reverseShiftAmount = sizeof(T) * 8 - shiftAmount;
+            T            mask               = ~(rhs - 1);
 
             auto maskExpr               = literal(mask);
             auto signBitsExpr           = literal(signBits);
@@ -521,9 +526,24 @@ namespace rocRoller
 
             ExpressionPtr operator()(Divide const& expr) const
             {
+                auto origResultType     = resultVariableType(expr);
+                auto origResultTypeInfo = DataTypeInfo::Get(origResultType);
+
                 auto lhs          = call(expr.lhs);
                 auto rhs          = call(expr.rhs);
                 auto rhsEvalTimes = evaluationTimes(rhs);
+
+                if(origResultTypeInfo.isIntegral)
+                {
+                    if(resultVariableType(lhs) != origResultType)
+                    {
+                        lhs = convert(origResultType, lhs);
+                    }
+                    if(resultVariableType(rhs) != origResultType)
+                    {
+                        rhs = convert(origResultType, rhs);
+                    }
+                }
 
                 std::string extraComment;
 
@@ -560,11 +580,25 @@ namespace rocRoller
 
             ExpressionPtr operator()(Modulo const& expr) const
             {
+                auto origResultType     = resultVariableType(expr);
+                auto origResultTypeInfo = DataTypeInfo::Get(origResultType);
 
                 auto        lhs          = call(expr.lhs);
                 auto        rhs          = call(expr.rhs);
                 auto        rhsEvalTimes = evaluationTimes(rhs);
                 std::string extraComment;
+
+                if(origResultTypeInfo.isIntegral)
+                {
+                    if(resultVariableType(lhs) != origResultType)
+                    {
+                        lhs = convert(origResultType, lhs);
+                    }
+                    if(resultVariableType(rhs) != origResultType)
+                    {
+                        rhs = convert(origResultType, rhs);
+                    }
+                }
 
                 // Obtain a CommandArgumentValue from rhs. If there is one,
                 // attempt to replace the modulo with faster operations.
