@@ -32,6 +32,7 @@
 #include <miopen/reduce/utils.hpp>
 #include <miopen/reducecalculation.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -44,18 +45,19 @@ namespace reduce {
 bool SumForward::IsApplicable(const ExecutionContext& context,
                               const miopen::reduce::ProblemDescriptionCalculation& problem) const
 {
-    if(!problem.IsSameType())
-        return false;
-    if(!problem.IsValidDim())
-        return false;
-    if(!problem.IsValidLength())
-        return false;
-    if(!problem.IsAllContiguous())
-        return false;
-    if(!problem.IsNotLastDim())
-        return false;
-    if(!IsImprovementOverROCm(context, problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsSameType(), inapplicable_msg::DataTypeMismatch);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsValidDim(), inapplicable_msg::InvalidDim);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsValidLength(), inapplicable_msg::IsValidLength);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllContiguous(), inapplicable_msg::NotContiguous);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsNotLastDim(), inapplicable_msg::NotLastDim);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!IsImprovementOverROCm(context, problem),
+                                  inapplicable_msg::IsImprovementOverROCm);
+
     return true;
 }
 

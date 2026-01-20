@@ -30,6 +30,7 @@
 #include <miopen/reduce/invoke_params.hpp>
 #include <miopen/reduce/solvers.hpp>
 #include <miopen/target_properties.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define LOCAL_SIZE 256
 
@@ -59,18 +60,19 @@ bool MaxForward::OverMaxGridSize(const ExecutionContext& context,
 bool MaxForward::IsApplicable(const ExecutionContext& context,
                               const miopen::reduce::ProblemDescriptionExtreme& problem) const
 {
-    if(!problem.IsValidDim())
-        return false;
-    if(!problem.IsValidLength())
-        return false;
-    if(!problem.IsAllContiguousWithIndice())
-        return false;
-    if(!problem.IsNotLastDim())
-        return false;
-    if(!problem.IsLargeReduceSize())
-        return false;
-    if(!OverMaxGridSize(context, problem))
-        return false;
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsValidDim(), inapplicable_msg::InvalidDim);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsValidLength(), inapplicable_msg::IsValidLength);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsAllContiguousIndice(), "Indices are not contiguous");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsNotLastDim(), inapplicable_msg::NotLastDim);
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!problem.IsLargeReduceSize(), "Reduce size is too small");
+
+    MIOPEN_SOLVER_INAPPLICABLE_IF(!OverMaxGridSize(context, problem),
+                                  inapplicable_msg::GridTooLarge);
+
     return true;
 }
 
