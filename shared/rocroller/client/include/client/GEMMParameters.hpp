@@ -190,7 +190,7 @@ namespace rocRoller
                 unsigned int unrollY = 0;
 
                 std::string scheduler;
-                std::string schedulerCost;
+                std::string schedulerCost = "LinearWeightedSimple";
                 bool        matchMemoryAccess;
 
                 // TODO Use StreamKConfig

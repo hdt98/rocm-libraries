@@ -32,12 +32,12 @@ import functools
 import itertools
 import os
 import pathlib
+import shutil
 import subprocess
 from dataclasses import dataclass
 
 import pytest
 import yaml
-import shutil
 
 SOLUTION_NOT_SUPPORTED_ON_ARCH = 3
 
@@ -257,7 +257,7 @@ prefetchLDSFactor: 0
 prefetchMixMemOps: false
 betaInFma: true
 scheduler: Priority
-schedulerCost: LinearWeighted
+schedulerCost: LinearWeightedSimple
 types:
   trans_A: N
   trans_B: N
@@ -322,7 +322,7 @@ prefetchLDSFactor: 0
 prefetchMixMemOps: false
 betaInFma: true
 scheduler: Priority
-schedulerCost: LinearWeighted
+schedulerCost: LinearWeightedSimple
 matchMemoryAccess: true
 types:
   trans_A: N
@@ -386,7 +386,7 @@ prefetchLDSFactor: 0
 prefetchMixMemOps: false
 betaInFma: true
 scheduler: Priority
-schedulerCost: LinearWeighted
+schedulerCost: LinearWeightedSimple
 matchMemoryAccess: true
 types:
   trans_A: N

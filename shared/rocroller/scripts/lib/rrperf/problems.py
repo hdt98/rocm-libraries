@@ -225,7 +225,7 @@ class GEMMSolution:
     betaInFma: bool = True
 
     scheduler: str = "Priority"
-    schedulerCost: str = "LinearWeighted"
+    schedulerCost: str = "LinearWeightedSimple"
 
     prefetch: bool = True
     prefetchInFlight: int = 2
