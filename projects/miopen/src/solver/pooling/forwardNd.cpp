@@ -31,6 +31,7 @@
 #include <miopen/pooling.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/mlo_internal.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -109,23 +110,25 @@ bool PoolingForwardNd::IsApplicable(const ExecutionContext& context,
 {
     static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
 
-    return problem.GetDirection() == miopen::pooling::Direction::Forward                      //
-           && problem.GetXDesc().GetNumDims() == 5                                            //
-           && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)                        //
-           && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict)                        //
-           && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()                    //
-           && (problem.GetXDesc().GetType() == miopenFloat                                    //
-               || problem.GetXDesc().GetType() == miopenHalf)                                 //
-           && (problem.GetPooling().GetMode() == miopenPoolingMax                             //
-               || problem.GetPooling().GetMode() == miopenPoolingAverage                      //
-               || problem.GetPooling().GetMode() == miopenPoolingAverageInclusive)            //
-           && sizeof_private_memory(problem) <= TargetProperties::GetMaxWaveScratchSize()     //
-                                                    / context.GetStream().GetWavefrontWidth() //
-           /// \todo This solver does not support workspace index mask mode yet.
-           &&
-           !(problem.GetPooling().GetMode() == miopenPoolingMax                                 //
-             && problem.GetPooling().GetWorkspaceIndexMode() == miopenPoolingWorkspaceIndexMask //
-             && problem.SaveIndex() == true);
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.GetDirection() == miopen::pooling::Direction::Forward                      //
+          && problem.GetXDesc().GetNumDims() == 5                                            //
+          && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)                        //
+          && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict)                        //
+          && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()                    //
+          && (problem.GetXDesc().GetType() == miopenFloat                                    //
+              || problem.GetXDesc().GetType() == miopenHalf)                                 //
+          && (problem.GetPooling().GetMode() == miopenPoolingMax                             //
+              || problem.GetPooling().GetMode() == miopenPoolingAverage                      //
+              || problem.GetPooling().GetMode() == miopenPoolingAverageInclusive)            //
+          && sizeof_private_memory(problem) <= TargetProperties::GetMaxWaveScratchSize()     //
+                                                   / context.GetStream().GetWavefrontWidth() //
+          /// \todo This solver does not support workspace index mask mode yet.
+          && !(problem.GetPooling().GetMode() == miopenPoolingMax                                 //
+               && problem.GetPooling().GetWorkspaceIndexMode() == miopenPoolingWorkspaceIndexMask //
+               && problem.SaveIndex() == true)),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 ConvSolution PoolingForwardNd::GetSolution(const ExecutionContext&,

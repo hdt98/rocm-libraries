@@ -30,6 +30,7 @@
 #include <miopen/pooling.hpp>
 #include <miopen/pooling/invoke_params.hpp>
 #include <miopen/pooling/solvers.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 #define WORKAROUND_ISSUE_MIFIN_80 1 // https://github.com/ROCm/MIFin/issues/80
 
@@ -71,22 +72,25 @@ bool PoolingForwardNaive::IsApplicable(const ExecutionContext&,
 {
     static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
 
-    return problem.GetDirection() == miopen::pooling::Direction::Forward           //
-           && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()         //
-           && (problem.GetXDesc().GetType() == miopenFloat                         //
-               || problem.GetXDesc().GetType() == miopenHalf)                      //
-           && (problem.GetPooling().GetMode() == miopenPoolingMax                  //
-               || problem.GetPooling().GetMode() == miopenPoolingAverage           //
-               || problem.GetPooling().GetMode() == miopenPoolingAverageInclusive) //
-           && (                                                                    //
-                  (problem.GetXDesc().GetNumDims() == 5                            //
-                   && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)     //
-                   && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict))    //
-                  ||                                                               //
-                  (problem.GetXDesc().GetNumDims() == 4                            //
-                   && problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict)      //
-                   && problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict))     //
-              );
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.GetDirection() == miopen::pooling::Direction::Forward           //
+          && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()         //
+          && (problem.GetXDesc().GetType() == miopenFloat                         //
+              || problem.GetXDesc().GetType() == miopenHalf)                      //
+          && (problem.GetPooling().GetMode() == miopenPoolingMax                  //
+              || problem.GetPooling().GetMode() == miopenPoolingAverage           //
+              || problem.GetPooling().GetMode() == miopenPoolingAverageInclusive) //
+          && (                                                                    //
+                 (problem.GetXDesc().GetNumDims() == 5                            //
+                  && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)     //
+                  && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict))    //
+                 ||                                                               //
+                 (problem.GetXDesc().GetNumDims() == 4                            //
+                  && problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict)      //
+                  && problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict))     //
+                 )),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 ConvSolution

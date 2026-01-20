@@ -31,6 +31,7 @@
 #include <miopen/pooling.hpp>
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/mlo_internal.hpp>
+#include <miopen/solver/solver_utils.hpp>
 
 namespace miopen {
 
@@ -138,15 +139,18 @@ bool PoolingForward2d::IsApplicable(const ExecutionContext& context,
 {
     static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
 
-    return problem.GetDirection() == miopen::pooling::Direction::Forward &&
-           problem.GetXDesc().GetNumDims() == 4 &&
-           problem.GetXDesc().GetType() == problem.GetYDesc().GetType() &&
-           (problem.GetXDesc().GetType() == miopenFloat ||
-            problem.GetXDesc().GetType() == miopenHalf) &&
-           problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict) &&
-           problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict) &&
-           sizeof_private_memory(problem) <=
-               TargetProperties::GetMaxWaveScratchSize() / context.GetStream().GetWavefrontWidth();
+    MIOPEN_SOLVER_INAPPLICABLE_IF(
+        !(problem.GetDirection() == miopen::pooling::Direction::Forward &&
+          problem.GetXDesc().GetNumDims() == 4 &&
+          problem.GetXDesc().GetType() == problem.GetYDesc().GetType() &&
+          (problem.GetXDesc().GetType() == miopenFloat ||
+           problem.GetXDesc().GetType() == miopenHalf) &&
+          problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict) &&
+          problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict) &&
+          sizeof_private_memory(problem) <=
+              TargetProperties::GetMaxWaveScratchSize() / context.GetStream().GetWavefrontWidth()),
+        inapplicable_msg::NoKernelForConfig);
+    return true;
 }
 
 ConvSolution PoolingForward2d::GetSolution(const ExecutionContext&,
