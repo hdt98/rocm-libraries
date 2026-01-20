@@ -564,7 +564,7 @@ struct NumericLimits<e4m3_scale_t>
     static constexpr e4m3_scale_t binary_max  = e4m3_scale_t(0x7E); // 0b01111110
     static constexpr e4m3_scale_t binary_qnan = e4m3_scale_t(0x7F); // 0b01111111
     static constexpr e4m3_scale_t binary_1    = e4m3_scale_t(0x38); // 0b00111000
-    static constexpr e4m3_scale_t binary_2    = e4m3_scale_t(0x40); // 0b1000000
+    static constexpr e4m3_scale_t binary_2    = e4m3_scale_t(0x40); // 0b01000000
 
     __host__ __device__ static constexpr e4m3_scale_t Min() { return binary_min; }
     __host__ __device__ static constexpr e4m3_scale_t Max() { return binary_max; }
