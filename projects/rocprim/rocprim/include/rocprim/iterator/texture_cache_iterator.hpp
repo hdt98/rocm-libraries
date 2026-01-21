@@ -21,9 +21,9 @@
 #ifndef ROCPRIM_ITERATOR_TEXTURE_CACHE_ITERATOR_HPP_
 #define ROCPRIM_ITERATOR_TEXTURE_CACHE_ITERATOR_HPP_
 
-#include <iterator>
 #include <cstddef>
 #include <cstring>
+#include <iterator>
 #include <type_traits>
 
 #include "../config.hpp"
