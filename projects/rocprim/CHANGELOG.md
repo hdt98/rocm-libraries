@@ -16,7 +16,7 @@ Full documentation for rocPRIM is available at [https://rocm.docs.amd.com/projec
 
 * Changed various APIs with undefined behaviors to abort with a trap instead of printing a runtime error with `ROCPRIM_PRINT_ERROR_ONCE` 
 * Various CMake changes. This only impacts users who build and install rocPRIM from source.
-  * Changed dependency fetching behaviour. Downloading any dependency is now gated behind `ALLOW_DOWNLOADING_DEPS` which defaults to off.
+  * Changed dependency fetching behavior. Downloading any dependency is now gated behind `ALLOW_DOWNLOADING_DEPS` which defaults to off.
   * Bumped the minimum CMake version to 3.21
   * Enforce usage of CMake's HIP-language support.
 
