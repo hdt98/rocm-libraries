@@ -13,6 +13,8 @@
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scale.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward.hpp"
 
+#include <miopen/logger.hpp>
+
 namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 struct DefaultAlgorithm
@@ -28,7 +30,7 @@ struct DefaultAlgorithm
         struct TileSize
         {
             unsigned int m = 64;
-            unsigned int n = 16;
+            unsigned int n = 64;
             unsigned int k = 16;
         } tile_size;
     } thread_block;
@@ -41,10 +43,10 @@ struct DefaultAlgorithm
         unsigned int bk1 = 4;
         struct XdlParams
         {
-            unsigned int m_per_xdl      = 16;
-            unsigned int n_per_xdl      = 16;
-            unsigned int m_xdl_per_wave = 4;
-            unsigned int n_xdl_per_wave = 1;
+            unsigned int m_per_xdl      = 32;
+            unsigned int n_per_xdl      = 32;
+            unsigned int m_xdl_per_wave = 2;
+            unsigned int n_xdl_per_wave = 2;
         } xdl_params;
         static_assert(ckb::GridwiseXdlGemmDescriptor<XdlParams>);
     } gridwise_gemm;
@@ -63,26 +65,26 @@ struct DefaultAlgorithm
             } block_transfer;
             struct LdsTransfer
             {
-                unsigned int src_vector_dim            = 1;
-                unsigned int src_scalar_per_vector     = 4;
+                unsigned int src_vector_dim            = 2;
+                unsigned int src_scalar_per_vector     = 1;
                 unsigned int lds_dst_scalar_per_vector = 4;
                 bool is_direct_load                    = false;
                 bool lds_padding                       = true;
             } lds_transfer;
             struct BlockTransferAccessOrder
             {
-                std::array<size_t, 3> order{0, 2, 1};
-            } block_transfer_access_order;
+                std::array<size_t, 3> order{1, 0, 2};
+            } thread_cluster_arrange_order;
             struct SrcAccessOrder
             {
-                std::array<size_t, 3> order{0, 2, 1};
+                std::array<size_t, 3> order{1, 0, 2};
             } src_access_order;
         };
         TransferAB a;
         TransferAB b{
             .block_transfer = {},
             .lds_transfer   = {.src_vector_dim = 2, .src_scalar_per_vector = 1},
-            .block_transfer_access_order =
+            .thread_cluster_arrange_order =
                 {
                     .order = {1, 0, 2},
                 },
@@ -96,9 +98,9 @@ struct DefaultAlgorithm
             struct ThreadClusterDims
             {
                 unsigned int m_block        = 1;
-                unsigned int m_wave_per_xdl = 16;
+                unsigned int m_wave_per_xdl = 8;
                 unsigned int n_block        = 1;
-                unsigned int n_wave_per_xdl = 4;
+                unsigned int n_wave_per_xdl = 8;
             } thread_cluster_dims;
             struct Epilogue
             {
@@ -114,7 +116,7 @@ struct DefaultAlgorithm
     GemmSpecial gemm_specialization = GemmSpecial::MNKPadding;
 
     std::size_t num_gemm_k_prefetch_stages = 1;
-    std::size_t num_conv_groups_to_merge   = 8;
+    std::size_t num_conv_groups_to_merge   = 1;
     PipeSched loop_scheduler               = PipeSched::DEFAULT;
 };
 
@@ -126,7 +128,7 @@ struct Signature
     {
         struct Config
         {
-            ckb::TensorLayout layout   = ckb::TensorLayout::NGCHW;
+            ckb::TensorLayout layout   = ckb::TensorLayout::NHWGC;
             ckb::DataType data_type    = ckb::DataType::FP32;
             ckb::DataType compute_type = ckb::DataType::FP32;
         } config;
@@ -136,7 +138,7 @@ struct Signature
     {
         struct Config
         {
-            ckb::TensorLayout layout   = ckb::TensorLayout::GKCYX;
+            ckb::TensorLayout layout   = ckb::TensorLayout::GKYXC;
             ckb::DataType data_type    = ckb::DataType::FP32;
             ckb::DataType compute_type = ckb::DataType::FP32;
         } config;
@@ -146,7 +148,7 @@ struct Signature
     {
         struct Config
         {
-            ckb::TensorLayout layout   = ckb::TensorLayout::NGKHW;
+            ckb::TensorLayout layout   = ckb::TensorLayout::NHWGK;
             ckb::DataType data_type    = ckb::DataType::FP32;
             ckb::DataType compute_type = ckb::DataType::FP32;
         } config;
@@ -155,9 +157,9 @@ struct Signature
     ckb::DataType accumulation_data_type = ckb::DataType::FP32;
 };
 
-using InLayout                             = ck::tensor_layout::convolution::NGCHW;
-using WeiLayout                            = ck::tensor_layout::convolution::GKCYX;
-using OutLayout                            = ck::tensor_layout::convolution::NGKHW;
+using InLayout                             = ck::tensor_layout::convolution::NHWGC;
+using WeiLayout                            = ck::tensor_layout::convolution::GKYXC;
+using OutLayout                            = ck::tensor_layout::convolution::NHWGK;
 using PassThrough                          = ck::tensor_operation::element_wise::PassThrough;
 using EmptyTuple                           = ck::Tuple<>;
 static constexpr ck::index_t NumDimSpatial = 2;
@@ -245,7 +247,18 @@ TEST(CKBuilderXdl, CreateExistingInstance)
                          return kernelPtr->GetInstanceString() == builderKernelInstanceString;
                      });
 
-    ASSERT_TRUE(result != factoryInstances.end())
-        << "Instance string " << builderKernelInstanceString
-        << " not found in list of instances returned by factory.";
+    EXPECT_TRUE(result != factoryInstances.end())
+        << "Instance string\n\t" << builderKernelInstanceString
+        << "\nnot found in list of instances returned by factory. Run test with MIOpen log trace "
+           "enabled for list of instances returned by factory.";
+
+    if(result == factoryInstances.end())
+    {
+        MIOPEN_LOG_T("List of instances returned by factory: ");
+        for(auto&& instance : factoryInstances)
+        {
+            auto instanceString = instance->GetInstanceString();
+            MIOPEN_LOG_T("\t" << instanceString);
+        }
+    }
 }

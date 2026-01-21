@@ -13,6 +13,8 @@
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scale.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward.hpp"
 
+#include <miopen/logger.hpp>
+
 namespace ckb      = ck_tile::builder;
 using BaseOperator = ck::tensor_operation::device::BaseOperator;
 struct DefaultAlgorithm
@@ -24,11 +26,11 @@ struct DefaultAlgorithm
 
     struct ThreadBlock
     {
-        unsigned int block_size = 128;
+        unsigned int block_size = 64;
         struct TileSize
         {
-            unsigned int m = 32;
-            unsigned int n = 64;
+            unsigned int m = 16;
+            unsigned int n = 16;
             unsigned int k = 64;
         } tile_size;
     } thread_block;
@@ -40,8 +42,8 @@ struct DefaultAlgorithm
         unsigned int bk1 = 8;
         struct XdlParams
         {
-            unsigned int m_per_xdl      = 32;
-            unsigned int n_per_xdl      = 32;
+            unsigned int m_per_xdl      = 16;
+            unsigned int n_per_xdl      = 16;
             unsigned int m_xdl_per_wave = 1;
             unsigned int n_xdl_per_wave = 1;
         } xdl_params;
@@ -57,7 +59,7 @@ struct DefaultAlgorithm
             struct BlockTransfer
             {
                 unsigned int k0  = 8;
-                unsigned int m_n = 16;
+                unsigned int m_n = 8;
                 unsigned int k1  = 1;
             } block_transfer;
             struct LdsTransfer
@@ -71,7 +73,7 @@ struct DefaultAlgorithm
             struct BlockTransferAccessOrder
             {
                 std::array<size_t, 3> order{1, 0, 2};
-            } block_transfer_access_order;
+            } thread_cluster_arrange_order;
             struct SrcAccessOrder
             {
                 std::array<size_t, 3> order{1, 0, 2};
@@ -86,13 +88,13 @@ struct DefaultAlgorithm
                 unsigned int m_block        = 1;
                 unsigned int m_wave_per_xdl = 16;
                 unsigned int n_block        = 1;
-                unsigned int n_wave_per_xdl = 8;
+                unsigned int n_wave_per_xdl = 4;
             } thread_cluster_dims;
             struct Epilogue
             {
                 unsigned int m_xdl_per_wave_per_shuffle = 1;
                 unsigned int n_per_wave_per_shuffle     = 1;
-                unsigned int scalar_per_vector          = 8;
+                unsigned int scalar_per_vector          = 4;
             } epilogue;
         } c;
     } transfer;
@@ -212,5 +214,18 @@ TEST(CKBuilderXdlV3, CreateExistingInstance)
                          return kernelPtr->GetInstanceString() == builderKernelInstanceString;
                      });
 
-    ASSERT_NE(result, factoryInstances.end());
+       EXPECT_TRUE(result != factoryInstances.end())
+        << "Instance string\n\t" << builderKernelInstanceString
+        << "\nnot found in list of instances returned by factory. Run test with MIOpen log trace "
+           "enabled for list of instances returned by factory.";
+
+    if(result == factoryInstances.end())
+    {
+        MIOPEN_LOG_T("List of instances returned by factory: ");
+        for(auto&& instance : factoryInstances)
+        {
+            auto instanceString = instance->GetInstanceString();
+            MIOPEN_LOG_T("\t" << instanceString);
+        }
+    }
 }
