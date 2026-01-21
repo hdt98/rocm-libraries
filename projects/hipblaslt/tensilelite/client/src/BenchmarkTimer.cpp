@@ -33,14 +33,108 @@
 #include <Tensile/hip/HipUtils.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <csignal>
 #include <cstddef>
+#include <numeric>
 #include <thread>
 
 namespace TensileLite
 {
     namespace Client
     {
+        // ============================================================================
+        // Modified Z-Score based outlier removal (borrowed from MIOpen)
+        // Used to remove high outliers and get a more accurate mean timing
+        // ============================================================================
+        namespace
+        {
+            inline double timing_mean(const std::vector<double>& data)
+            {
+                if(data.empty())
+                    return 0.0;
+                double sum = std::accumulate(data.begin(), data.end(), 0.0);
+                return sum / data.size();
+            }
+
+            inline double timing_median_of_sorted(const std::vector<double>& sortedData)
+            {
+                if(sortedData.empty())
+                    return 0.0;
+                size_t size = sortedData.size();
+                return (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / 2.0
+                                       : sortedData[size / 2];
+            }
+
+            inline std::vector<double>
+                timing_median_absolute_deviation(const std::vector<double>& sortedData)
+            {
+                double              med = timing_median_of_sorted(sortedData);
+                std::vector<double> absDeviation;
+                absDeviation.reserve(sortedData.size());
+                for(const auto& value : sortedData)
+                {
+                    absDeviation.push_back(std::abs(value - med));
+                }
+                return absDeviation;
+            }
+
+            inline std::vector<double> timing_modified_z_scores(const std::vector<double>& sortedData)
+            {
+                double medianValue = timing_median_of_sorted(sortedData);
+
+                std::vector<double> absolute_deviation
+                    = timing_median_absolute_deviation(sortedData);
+                std::sort(absolute_deviation.begin(), absolute_deviation.end());
+                double mad = timing_median_of_sorted(absolute_deviation);
+
+                // If MAD is 0, then we cannot calculate the ModifiedZScore
+                if(mad == 0.0)
+                {
+                    return std::vector<double>(sortedData.size(), 0.0);
+                }
+
+                std::vector<double> modZScores;
+                modZScores.reserve(sortedData.size());
+                for(const auto& value : sortedData)
+                {
+                    modZScores.push_back(0.6745 * (value - medianValue) / mad);
+                }
+                return modZScores;
+            }
+
+            // Remove high outliers using Modified Z-Score and return mean of filtered data
+            // z_threshold: data points with z-score > z_threshold are considered outliers
+            inline double removeHighOutliersAndGetMean(std::vector<double> data,
+                                                       double              z_threshold = 2.0)
+            {
+                if(data.empty())
+                    return 0.0;
+                if(data.size() == 1)
+                    return data[0];
+
+                std::sort(data.begin(), data.end());
+
+                std::vector<double> modZScores = timing_modified_z_scores(data);
+                std::vector<double> filteredData;
+
+                for(size_t i = 0; i < data.size(); ++i)
+                {
+                    if(modZScores[i] <= z_threshold)
+                    {
+                        filteredData.push_back(data[i]);
+                    }
+                }
+
+                // If all data was filtered out, return mean of original data
+                if(filteredData.empty())
+                    return timing_mean(data);
+
+                return timing_mean(filteredData);
+            }
+        } // anonymous namespace
+        // ============================================================================
+
         static_assert(BenchmarkTimer::clock::is_steady, "Clock must be steady.");
 
         BenchmarkTimer::BenchmarkTimer(po::variables_map const& args,
@@ -169,19 +263,15 @@ namespace TensileLite
 
             if(timingAvailable)
             {
-                auto beginSample = m_syncDurations.begin();
-                auto endSample   = beginSample + m_syncDurationCount;
-                std::sort(beginSample, endSample, std::less<double_millis>());
+                // Convert m_syncDurations to std::vector<double> for timing calculation
+                std::vector<double> syncDurationsMs;
+                syncDurationsMs.reserve(m_syncDurationCount);
+                for(size_t i = 0; i < m_syncDurationCount; i++)
+                    syncDurationsMs.push_back(m_syncDurations[i].count());
 
-                size_t takeCount = (m_syncDurationCount * 8) / 10;
-                if(takeCount == 0)
-                    takeCount = 1;
-
-                double_millis trimmedTotal(0.0);
-                for(size_t i = 0; i < takeCount; i++)
-                    trimmedTotal += m_syncDurations[i];
-
-                double_millis trimmedMean    = trimmedTotal / takeCount;
+                // Use Modified Z-Score to remove high outliers and get mean
+                double        trimmedMeanMs   = removeHighOutliersAndGetMean(syncDurationsMs, 2.0);
+                double_millis trimmedMean(trimmedMeanMs);
                 double        enqueuesPerSync = static_cast<double>(m_numEnqueuesInSolution)
                                           / static_cast<double>(m_syncDurationCount);
 
