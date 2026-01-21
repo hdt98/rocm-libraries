@@ -34,8 +34,8 @@
 
 #include "ideal_sizes.hpp"
 #include "lapack/roclapack_getrs.hpp"
+#include "lapack_device_functions.hpp"
 #include "lib_device_helpers.hpp"
-#include "rocauxiliary_lacn2.hpp"
 #include "rocblas.hpp"
 #include "rocblas_utility.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
