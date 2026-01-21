@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle_v3.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle_lds_direct_load.hpp"
@@ -197,7 +197,7 @@ using GemmAsync = ck::tensor_operation::device::DeviceGemm_Xdl_CShuffle_LdsDirec
     PassThrough,
     PassThrough,
     GemmSpec,
-    2,
+    1,
     BlockSize,
     MPerBlock,
     NPerBlock,
@@ -212,12 +212,12 @@ using GemmAsync = ck::tensor_operation::device::DeviceGemm_Xdl_CShuffle_LdsDirec
     ABlockTransferSrcAccessOrder,
     ABlockTransferSrcVectorDim,
     ABlockTransferSrcScalarPerVector,
-    0,
+    1,
     BBlockTransferThreadClusterLengths_BK0_N_BK1,
     BBlockTransferSrcAccessOrder,
     BBlockTransferSrcVectorDim,
     BBlockTransferSrcScalarPerVector,
-    0,
+    1,
     CShuffleMXdlPerWavePerShuffle,
     CShuffleNXdlPerWavePerShuffle,
     CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -375,7 +375,7 @@ using gemm_rcr_instances = std::tuple<
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1), // 80
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1), // 90
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1), // 100
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC,  1, 1, 1), // 110
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC_V2,  1, 1, 1), // 110
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 1, 1, 1), // 120
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 2, 2, 1), // 130
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V2, 1, 1, 1), // 140
@@ -394,7 +394,7 @@ using gemm_rrr_instances = std::tuple<
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1),
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC,  1, 1, 1),
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC_V2,  1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 2, 2, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V2, 1, 1, 1),
@@ -413,7 +413,7 @@ using gemm_crr_instances = std::tuple<
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1),
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC,  1, 1, 1),
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC_V2,  1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 2, 2, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V2, 1, 1, 1),
@@ -432,7 +432,7 @@ using gemm_ccr_instances = std::tuple<
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1),
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC,  1, 1, 1),
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_ASYNC_V2,  1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V1, 2, 2, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_TDM_V2, 1, 1, 1),

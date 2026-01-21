@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 #include "common.hpp"
 
@@ -27,7 +27,7 @@ using DeviceGemmV2Instance = ck::tensor_operation::device::DeviceGemm_Xdl_CkTile
     ADataType, BDataType, CDataType, AccDataType, CShuffleDataType,
     AElementOp, BElementOp, CElementOp,
     GemmDefault,
-    128,   128,  128,  16,   16,  get_k_warp_tile<ck_tile::fp16_t, 16>(),  2,   2,     1, 4,
+    256,   256,  64,  16,   16,  ck_tile::get_k_warp_tile<ck_tile::fp16_t, 16>(),  2,   2,     1, 4,
     ADataType,
     1,
     1,

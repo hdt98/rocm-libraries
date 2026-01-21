@@ -1,9 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 set(EXAMPLE_GEMM_COMPILE_OPTIONS)
 #list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS "SHELL: -mllvm -greedy-reverse-local-assignment=1 -mllvm -enable-noalias-to-md-conversion=0")
 #list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -Wno-unused-local-typedef)
 list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS --save-temps=obj -Wno-gnu-line-marker)
 list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -mllvm -amdgpu-hard-clause-length-limit=1)
+list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -Xarch_device -mllvm=-amdgpu-kernarg-preload-count=16)
 #list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS "SHELL: -Rpass-analysis=kernel-resource-usage ")
 
 set(GEMM_XDL_BENCHMARK gemm_xdl_benchmark)
@@ -39,7 +42,7 @@ generate_sharded_instantiations(
 generate_sharded_instantiations(
   INSTANCES_NAME wp_gemm_xdl_benchmark_instances
   TEMPLATE_FILE wp_gemm_xdl_benchmark_instances.in
-  NUM_SHARDS 50
+  NUM_SHARDS 60
   SRC_LIST WP_GEMM_XDL_BENCHMARK_SRC
   OUTPUT_DIR ${GENERATED_DIR}
 )

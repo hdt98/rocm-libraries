@@ -146,7 +146,7 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 
             bool useGfx9Result =
                 (ck::is_same_v<ADataType, ck::pk_i4_t> && ck::is_same_v<BDataType, ck::pk_i4_t> &&
-                 (gemm->GetKPerBlock() & DisableGfx9I4ToF32) == 0);
+                 (gemm.GetKPerBlock() & DisableGfx9I4ToF32) == 0);
 
             using PkInt4ReferenceGemmInstance =
                 ck::tensor_operation::host::ReferenceGemm<float,

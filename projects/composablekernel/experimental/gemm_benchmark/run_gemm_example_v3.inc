@@ -89,7 +89,7 @@ bool run_gemm(GemmInstance& op_ptrs, const ProblemType& problem_size, const Exec
 
     if constexpr(ck::is_same_v<BDataType, ck::pk_i4_t>)
     {
-        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, a_m_k_gfx9_f32);
+        permute_b_pk_i4(b_k_n, N, K, b_k_n_f32, b_k_n_gfx9_f32);
     }
 
     Tensor<CDataType> c_m_n_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));

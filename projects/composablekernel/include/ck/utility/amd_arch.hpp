@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 #pragma once
 
@@ -103,6 +103,23 @@ template <>
 constexpr index_t get_max_vgpr_count<gfx125_t>(gfx125_t)
 {
     return 1024;
+}
+
+template <typename DeviceArch>
+static constexpr index_t get_vgpr_count_per_simd(DeviceArch)
+{
+    return 1024;
+}
+
+template <>
+constexpr index_t get_vgpr_count_per_simd<gfx9_t>(gfx9_t)
+{
+    return 512;
+}
+template <>
+constexpr index_t get_vgpr_count_per_simd<gfx950_t>(gfx950_t)
+{
+    return 512;
 }
 
 } // namespace ck
