@@ -353,7 +353,7 @@ struct kernel_cache_t {
   /// data loaded from a single tile of B (MT_K x MT_N elements), in bytes
   double b_loads_bytes;
 
-  std::size_t Ld_CU_bytes;
+  double Ld_CU_bytes;
 };
 
 /**

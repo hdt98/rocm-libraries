@@ -24,7 +24,7 @@
  *
  *******************************************************************************/
 
-#include <catch2/catch_approx.hpp>
+ #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "common.hpp"
@@ -251,41 +251,49 @@ TEST_CASE("GEMM: estimate_mall_hit", "[gemm]") {
 TEST_CASE("GEMM: calculate_work_utilization unit test", "[gemm]") {
   for (int gpu_arch : test_architectures) {
     DYNAMIC_SECTION("gfx" << gpu_arch << " - calculate_work_utilization unit test") {
-      auto problem = make_problem(4096, 4096, 1024);
-      auto config  = make_config(256, 256, 64, 32, 32, 8, false, 1);
+      auto problem  = make_problem(4096, 4096, 1024);
+      auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
+      auto hardware = make_hardware(gpu_arch);
+      auto cache    = create_origami_cache(problem, hardware, config, hardware.N_CU);
 
       // Test 1: Test with perfect tile alignment (should return 1.0)
-      auto result = origami::calculate_work_utilization(problem, config);
+      auto result = origami::calculate_work_utilization(problem, config, cache);
       REQUIRE(result == 1.0);
 
       // Test 2: Test with non-aligned dimensions
       auto problem_non_aligned = make_problem(4351, 3839, 959);
-      auto result_non_aligned  = origami::calculate_work_utilization(problem_non_aligned, config);
+      cache = create_origami_cache(problem_non_aligned, hardware, config, hardware.N_CU);
+      auto result_non_aligned  = origami::calculate_work_utilization(problem_non_aligned, config, cache);
       REQUIRE(result_non_aligned == Approx(0.998).epsilon(1e-3));
 
       // Test 3: Test with zero dimensions (should return 1.0)
       auto problem_zero_dimensions = make_problem(0, 3839, 959);
+      cache = create_origami_cache(problem_zero_dimensions, hardware, config, hardware.N_CU);
       auto result_zero_dimensions =
-          origami::calculate_work_utilization(problem_zero_dimensions, config);
+          origami::calculate_work_utilization(problem_zero_dimensions, config, cache);
       REQUIRE(result_zero_dimensions == 1.0);
 
       // Test 4: Test with very small problems
       auto problem_very_small = make_problem(10, 20, 15);
-      auto result_very_small  = origami::calculate_work_utilization(problem_very_small, config);
+      cache = create_origami_cache(problem_very_small, hardware, config, hardware.N_CU);
+      auto result_very_small  = origami::calculate_work_utilization(problem_very_small, config, cache);
       REQUIRE(result_very_small == Approx(0.0007152).epsilon(1e-4));
 
       // Test 5: Test with very large problems
       auto problem_very_large = make_problem(409601, 409601, 4095);
-      auto result_very_large  = origami::calculate_work_utilization(problem_very_large, config);
+      cache = create_origami_cache(problem_very_large, hardware, config, hardware.N_CU);
+      auto result_very_large  = origami::calculate_work_utilization(problem_very_large, config, cache);
       REQUIRE(result_very_large == Approx(0.998).epsilon(1e-3));
 
       // Test 6: Test with skinny matrices
       auto problem_skinny = make_problem(128, 81920, 1024);  // Small M, Big N
-      auto result_skinny  = origami::calculate_work_utilization(problem_skinny, config);
+      cache = create_origami_cache(problem_skinny, hardware, config, hardware.N_CU);
+      auto result_skinny  = origami::calculate_work_utilization(problem_skinny, config, cache);
       REQUIRE(result_skinny == 0.5);
 
       problem_skinny = make_problem(81920, 128, 1024);  // Small N, Big M
-      result_skinny  = origami::calculate_work_utilization(problem_skinny, config);
+      cache = create_origami_cache(problem_skinny, hardware, config, hardware.N_CU);
+      result_skinny  = origami::calculate_work_utilization(problem_skinny, config, cache);
       REQUIRE(result_skinny == 0.5);
     }
   }
@@ -704,30 +712,34 @@ TEST_CASE("GEMM: compute_l2_hit_rate_global unit test", "[gemm]") {
       auto hardware = make_hardware(gpu_arch);
       auto problem  = make_problem(2047, 2047, 4096);
       auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
+      auto cache    = create_origami_cache(problem, hardware, config, hardware.N_CU);
 
       // Test 1: Test with various problem sizes
       auto result_various_problem_sizes = origami::compute_l2_hit_rate_global(
-          problem, hardware, config, hardware.L2_capacity * 1024);
+          problem, hardware, config, cache, hardware.L2_capacity * 1024);
       REQUIRE(result_various_problem_sizes == 0.875);
 
       auto problem_small           = make_problem(331, 4077, 547);
+      cache                        = create_origami_cache(problem_small, hardware, config, hardware.N_CU);
       result_various_problem_sizes = origami::compute_l2_hit_rate_global(
-          problem_small, hardware, config, hardware.L2_capacity * 1024);
+          problem_small, hardware, config, cache, hardware.L2_capacity * 1024);
       REQUIRE(result_various_problem_sizes == 0.71875);
 
       auto problem_large           = make_problem(8193, 4077, 7453);
+      cache                        = create_origami_cache(problem_large, hardware, config, hardware.N_CU);
       result_various_problem_sizes = origami::compute_l2_hit_rate_global(
-          problem_large, hardware, config, hardware.L2_capacity * 1024);
+          problem_large, hardware, config, cache, hardware.L2_capacity * 1024);
       REQUIRE(result_various_problem_sizes == Approx(0.953).epsilon(1e-3));
 
       // Test 2: Test with different splitting factors (TODO)(is this a valid test case as this
       // function does not use splitting factors) Test 3: Test edge cases
-      REQUIRE_THROWS_WITH(origami::compute_l2_hit_rate_global(problem, hardware, config, 0UL),
+      REQUIRE_THROWS_WITH(origami::compute_l2_hit_rate_global(problem, hardware, config, cache, 0UL),
                           "L2 Capacity is zero");
 
       auto problem_zero = make_problem(0, 0, 7453);
+      cache             = create_origami_cache(problem_zero, hardware, config, hardware.N_CU);
       REQUIRE_THROWS_WITH(origami::compute_l2_hit_rate_global(
-                              problem_zero, hardware, config, hardware.L2_capacity * 1024),
+                              problem_zero, hardware, config, cache, hardware.L2_capacity * 1024),
                           "estimate_l2_hit grid dimensions can not be zero");
     }
   }
@@ -985,44 +997,58 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       auto hardware = make_hardware(gpu_arch);
       auto problem  = make_problem(2047, 2047, 4096);
       auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
+      auto cache    = create_origami_cache(problem, hardware, config, hardware.N_CU);
 
       // Test 1: Test with different workgroup_mapping values (TODO)
 
       // Test 2: Test with various splitting factors
+      cache.splitting_factor = 0;
       auto result_different_splitting_factors =
-          origami::estimate_l2_hit(problem, hardware, config, 0);
+          origami::estimate_l2_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.0);
 
-      result_different_splitting_factors = origami::estimate_l2_hit(problem, hardware, config, 1);
+      cache.splitting_factor = 1;
+      result_different_splitting_factors = origami::estimate_l2_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.4375);
 
-      result_different_splitting_factors = origami::estimate_l2_hit(problem, hardware, config, -1);
+      cache.splitting_factor = -1;
+      result_different_splitting_factors = origami::estimate_l2_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.0);
 
-      result_different_splitting_factors =
-          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 0);
+      cache.splitting_factor = 0;
+      size_t mall_m, mall_n;
+      std::tie(result_different_splitting_factors, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.875);
 
-      result_different_splitting_factors =
-          origami::estimate_mall_hit(problem, hardware, config, 256, 1);
+      cache = create_origami_cache(problem, hardware, config, 256);
+      cache.splitting_factor = 1;
+      std::tie(result_different_splitting_factors, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.875);
 
-      result_different_splitting_factors =
-          origami::estimate_mall_hit(problem, hardware, config, 200, -1);
+      cache = create_origami_cache(problem, hardware, config, 200);
+      cache.splitting_factor = -1;
+      std::tie(result_different_splitting_factors, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.875);
 
       // Test 3: Test with different problem sizes and different config
-      problem                             = make_problem(8193, 2047, 4096);
-      config                              = make_config(128, 128, 128, 32, 32, 8, 1);
-      auto result_different_problem_sizes = origami::estimate_l2_hit(problem, hardware, config, 1);
+      problem = make_problem(8193, 2047, 4096);
+      config  = make_config(128, 128, 128, 32, 32, 8, 1);
+      cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      auto result_different_problem_sizes = origami::estimate_l2_hit(problem, hardware, config, cache);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.4868).epsilon(1e-3));
       else if (gpu_arch == 950)
         REQUIRE(result_different_problem_sizes == Approx(0.484).epsilon(1e-3));
 
-      problem                        = make_problem(8193, 4093, 1024);
-      config                         = make_config(64, 128, 128, 32, 32, 8, 1);
-      result_different_problem_sizes = origami::estimate_l2_hit(problem, hardware, config, 1);
+      problem = make_problem(8193, 4093, 1024);
+      config  = make_config(64, 128, 128, 32, 32, 8, 1);
+      cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      result_different_problem_sizes = origami::estimate_l2_hit(problem, hardware, config, cache);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.649).epsilon(1e-3));
       else if (gpu_arch == 950)
@@ -1030,8 +1056,10 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
 
       problem = make_problem(8193, 2047, 4096);
       config  = make_config(256, 128, 64, 32, 32, 8, 1);
-      result_different_problem_sizes =
-          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
+      cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      std::tie(result_different_problem_sizes, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.923).epsilon(1e-3));
       else if (gpu_arch == 950)
@@ -1039,8 +1067,10 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
 
       problem = make_problem(8193, 4093, 1024);
       config  = make_config(128, 256, 128, 32, 32, 8, 1);
-      result_different_problem_sizes =
-          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
+      cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      std::tie(result_different_problem_sizes, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.923).epsilon(1e-3));
       else if (gpu_arch == 950)
@@ -1049,22 +1079,32 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       // Test 4: Test edge cases (very small/large problems)
       problem                = make_problem(10, 11, 253);
       config                 = make_config(256, 256, 64, 32, 32, 8, 1);
-      auto result_edge_cases = origami::estimate_l2_hit(problem, hardware, config, 1);
+      cache                  = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      auto result_edge_cases = origami::estimate_l2_hit(problem, hardware, config, cache);
       REQUIRE(result_edge_cases == 0.0);
 
-      problem           = make_problem(81930, 40930, 10240);
-      result_edge_cases = origami::estimate_l2_hit(problem, hardware, config, 1);
+      problem                = make_problem(81930, 40930, 10240);
+      cache                  = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      result_edge_cases = origami::estimate_l2_hit(problem, hardware, config, cache);
       if (gpu_arch == 942)
         REQUIRE(result_edge_cases == Approx(0.4868).epsilon(1e-3));
       else if (gpu_arch == 950)
         REQUIRE(result_edge_cases == Approx(0.484).epsilon(1e-3));
 
-      problem           = make_problem(10, 11, 253);
-      result_edge_cases = origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
+      problem = make_problem(10, 11, 253);
+      cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      std::tie(result_edge_cases, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_edge_cases == 0.0);
 
-      problem           = make_problem(81930, 40930, 10240);
-      result_edge_cases = origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
+      problem = make_problem(81930, 40930, 10240);
+      cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
+      cache.splitting_factor = 1;
+      std::tie(result_edge_cases, mall_m, mall_n) =
+          origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_edge_cases == Approx(0.498).epsilon(1e-3));
     }
   }
