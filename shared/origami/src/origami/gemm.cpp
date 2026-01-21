@@ -470,9 +470,6 @@ std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
   mall_tile_n = std::max(std::min(workgroups_n, mall_tile_n), static_cast<size_t>(1));
 
   // --- CRITICAL: Shrink tile to fit into MALL Capacity ---
-  const auto a_bytes = cache.kernel_cache.a_bytes;
-  const auto b_bytes = cache.kernel_cache.b_bytes;
-
   auto calculate_footprint = [&](auto tile_m, auto tile_n) {
     auto a_footprint = tile_m * cache.kernel_cache.a_loads_bytes;
     auto b_footprint = tile_n * cache.kernel_cache.b_loads_bytes;

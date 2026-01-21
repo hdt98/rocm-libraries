@@ -1016,6 +1016,7 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       REQUIRE(result_different_splitting_factors == 0.0);
 
       cache.splitting_factor = 0;
+      cache.num_active_cus   = hardware.N_CU;
       size_t mall_m, mall_n;
       std::tie(result_different_splitting_factors, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
@@ -1023,12 +1024,14 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
 
       cache = create_origami_cache(problem, hardware, config, 256);
       cache.splitting_factor = 1;
+      cache.num_active_cus   = 256;
       std::tie(result_different_splitting_factors, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.875);
 
       cache = create_origami_cache(problem, hardware, config, 200);
       cache.splitting_factor = -1;
+      cache.num_active_cus   = 200;
       std::tie(result_different_splitting_factors, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_different_splitting_factors == 0.875);
@@ -1058,8 +1061,11 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       config  = make_config(256, 128, 64, 32, 32, 8, false, 1);
       cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
       cache.splitting_factor = 1;
+      cache.num_active_cus   = hardware.N_CU;
       std::tie(result_different_problem_sizes, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
+      result_different_problem_sizes =
+          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.923).epsilon(1e-3));
       else if (gpu_arch == 950)
@@ -1069,6 +1075,7 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       config  = make_config(128, 256, 128, 32, 32, 8, false, 1);
       cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
       cache.splitting_factor = 1;
+      cache.num_active_cus   = hardware.N_CU;
       std::tie(result_different_problem_sizes, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
       if (gpu_arch == 942)
@@ -1096,6 +1103,7 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       problem = make_problem(10, 11, 253);
       cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
       cache.splitting_factor = 1;
+      cache.num_active_cus   = hardware.N_CU;
       std::tie(result_edge_cases, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_edge_cases == 0.0);
@@ -1103,6 +1111,7 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       problem = make_problem(81930, 40930, 10240);
       cache   = create_origami_cache(problem, hardware, config, hardware.N_CU);
       cache.splitting_factor = 1;
+      cache.num_active_cus   = hardware.N_CU;
       std::tie(result_edge_cases, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
       REQUIRE(result_edge_cases == Approx(0.498).epsilon(1e-3));
