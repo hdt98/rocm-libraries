@@ -482,6 +482,11 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
                 benchmarkTestFails += 1
                 printWarning("BenchmarkProblems: Benchmark Process exited with code {}" \
                         .format(returncode))
+                # Early exit on first failure to avoid long test runs
+                if globalParameters["ExitOnFails"]:
+                    printWarning("Exiting early due to benchmark failure (ExitOnFails={})" \
+                            .format(globalParameters["ExitOnFails"]))
+                    sys.exit(1)
         else:
             print1("# Already benchmarked; skipping.")
 
