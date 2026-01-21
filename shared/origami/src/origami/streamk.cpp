@@ -332,6 +332,8 @@ size_t grid_k_split_aware(const problem_t& problem,
                           size_t max_cus) {
   size_t tiles = compute_number_of_output_tiles(
       config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
+  if (tiles == 0)
+    return 0;
 
   size_t sk_grid = tiles;  // Fallback if no good fractional tile is found
   if (max_cus > 0) sk_grid = std::min(sk_grid, max_cus);
