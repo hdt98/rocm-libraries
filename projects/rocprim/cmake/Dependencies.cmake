@@ -144,6 +144,21 @@ endmacro(fetch_rocmcmake)
 
 # Google Test
 macro(fetch_googletest)
+  # NOTE1: Google Test has created a mess with legacy FindGTest.cmake and newer GTestConfig.cmake
+  #
+  # FindGTest.cmake defines:   GTest::GTest, GTest::Main, GTEST_FOUND
+  #
+  # GTestConfig.cmake defines: GTest::gtest, GTest::gtest_main, GTest::gmock, GTest::gmock_main
+  #
+  # NOTE2: Finding GTest in MODULE mode, one cannot invoke find_package in CONFIG mode, because targets
+  #        will be duplicately defined.
+  #
+  # NOTE3: The following snippet first tries to find Google Test binary either in MODULE or CONFIG modes.
+  #        If neither succeeds it goes on to import Google Test into this build either from a system
+  #        source package (apt install googletest on Ubuntu 18.04 only) or GitHub and defines the MODULE
+  #        mode targets. Otherwise if MODULE or CONFIG succeeded, then it prints the result to the
+  #        console via a non-QUIET find_package call and if CONFIG succeeded, creates ALIAS targets
+  #        with the MODULE IMPORTED names.
   # Try to find package first.
   if(NOT DEPENDENCIES_FORCE_DOWNLOAD)
     if(WIN32)
@@ -185,6 +200,12 @@ macro(fetch_googletest)
     # Add build targets.
     add_library(GTest::GTest ALIAS gtest)
     add_library(GTest::Main  ALIAS gtest_main)
+  else()
+    find_package(GTest REQUIRED)
+    if(TARGET GTest::gtest_main AND NOT TARGET GTest::Main)
+      add_library(GTest::GTest ALIAS GTest::gtest)
+      add_library(GTest::Main  ALIAS GTest::gtest_main)
+    endif()
   endif()
 endmacro(fetch_googletest)
 
