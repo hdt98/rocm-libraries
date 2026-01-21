@@ -43,8 +43,8 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
 
-        using ALayout = remove_cvref_t<
-            std::tuple_element_t<number<0>{}, remove_cvref_t<typename Problem::AsLayoutTuple>>>;
+        using ALayout =
+            remove_cvref_t<std::tuple_element_t<number<0>{}, problem_as_layout_t<Problem>>>;
 
         // Tile : MPerBlock X KPerBlock
         if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::RowMajor>)
@@ -93,8 +93,8 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
         constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
 
-        using BLayout = remove_cvref_t<
-            std::tuple_element_t<number<0>{}, remove_cvref_t<typename Problem::BsLayoutTuple>>>;
+        using BLayout =
+            remove_cvref_t<std::tuple_element_t<number<0>{}, problem_bs_layout_t<Problem>>>;
 
         // Tile : KPerBlock X NPerBlock
         if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)

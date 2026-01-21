@@ -24,10 +24,10 @@ struct has_get_pipeline_subtile_params<
 template <typename Problem, typename Policy>
 struct GemmPipelineAgBgCrImplBase
 {
-    using AsDataType     = remove_cvref_t<typename Problem::AsDataTypeTuple>;
-    using BsDataType     = remove_cvref_t<typename Problem::BsDataTypeTuple>;
-    using AsLayout       = remove_cvref_t<typename Problem::AsLayoutTuple>;
-    using BsLayout       = remove_cvref_t<typename Problem::BsLayoutTuple>;
+    using AsDataType     = problem_as_data_type_t<Problem>;
+    using BsDataType     = problem_bs_data_type_t<Problem>;
+    using AsLayout       = problem_as_layout_t<Problem>;
+    using BsLayout       = problem_bs_layout_t<Problem>;
     using BlockGemmShape = remove_cvref_t<typename Problem::BlockGemmShape>;
 
     using ADataType   = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataType>>;

@@ -71,16 +71,17 @@ struct WeightPreshufflePipelineAGmemBGmemCRegTDM
     using Base             = BaseWeightPreshufflePipelineAGmemBGmemCRegTDM<Problem>;
     using PipelineImplBase = GemmPipelineAgBgCrImplBase<Problem, PipelinePolicy>;
 
-    using AsDataType = remove_cvref_t<typename Problem::AsDataTypeTuple>;
-    using BsDataType = remove_cvref_t<typename Problem::BsDataTypeTuple>;
-    using CDataType  = remove_cvref_t<typename Problem::CDataType>;
+    using AsDataType = problem_as_data_type_t<Problem>;
+    using BsDataType = problem_bs_data_type_t<Problem>;
 
-    using AElementWise   = remove_cvref_t<typename Problem::AElementWise>;
-    using BElementWise   = remove_cvref_t<typename Problem::BElementWise>;
+    using CDataType = remove_cvref_t<typename Problem::CDataType>;
+
+    using AElementWise   = element_wise::PassThrough;
+    using BElementWise   = element_wise::PassThrough;
     using BlockGemmShape = remove_cvref_t<typename Problem::BlockGemmShape>; // TileFlatmmShape
 
-    using AsLayout = remove_cvref_t<typename Problem::AsLayoutTuple>;
-    using BsLayout = remove_cvref_t<typename Problem::BsLayoutTuple>;
+    using AsLayout = problem_as_layout_t<Problem>;
+    using BsLayout = problem_bs_layout_t<Problem>;
     using CLayout  = remove_cvref_t<typename Problem::CLayout>;
 
     using ALayout = remove_cvref_t<std::tuple_element_t<0, AsLayout>>;
@@ -164,7 +165,7 @@ struct WeightPreshufflePipelineAGmemBGmemCRegTDM
         // clang-format on
     }
 
-    static constexpr bool DoubleSmemBuffer = Problem::DoubleSmemBuffer;
+    static constexpr bool DoubleSmemBuffer = true;
 
     static constexpr index_t Preshuffle = Problem::Preshuffle;
     using Base::UsePersistentKernel;
