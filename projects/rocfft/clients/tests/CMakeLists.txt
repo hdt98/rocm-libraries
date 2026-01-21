@@ -208,6 +208,7 @@ if(AMDCLANGPP)
     endfunction()
     # Build all callback variants
     add_spirv_callback(load_callback)
+    add_spirv_callback(load_callback_scale)
     # Create a target that builds all SPIR-V callbacks
     if(SPIRV_CALLBACK_FILES)
         add_custom_target(jit_callback_spirv DEPENDS ${SPIRV_CALLBACK_FILES})

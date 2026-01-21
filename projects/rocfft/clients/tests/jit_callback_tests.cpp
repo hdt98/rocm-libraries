@@ -23,6 +23,7 @@
 #include "jit_callback_helpers.h"
 #include "rocfft/rocfft.h"
 #include <cmath>
+#include <fstream>
 #include <gtest/gtest.h>
 
 // verify SPIR-V callback can be loaded
@@ -171,6 +172,167 @@ TEST(rocfft_UnitTest, jit_callback_c2c_single_load)
     rocfft_execution_info_destroy(info);
     rocfft_plan_destroy(plan);
     rocfft_plan_description_destroy(desc);
+}
+
+// helper to check if scaling callback is available
+static bool scale_callback_available()
+{
+    static bool checked   = false;
+    static bool available = false;
+    if(!checked)
+    {
+        std::ifstream f("load_callback_scale.spv", std::ios::binary);
+        available = f.good();
+        checked   = true;
+    }
+    return available;
+}
+
+// scaling callback to verify JIT callback is actually applied.
+// FFT is linear, so FFT(2*x) = 2*FFT(x). We verify output is scaled by 2.
+TEST(rocfft_UnitTest, jit_callback_scaling_verification)
+{
+    if(!scale_callback_available())
+        GTEST_SKIP() << "Scaling callback not available (load_callback_scale.spv missing)";
+
+    const size_t N = 256;
+
+    // use constant input so that we can predict the output
+    // input: all ones -> output[0] (sum of inputs) should be N after FFT
+    // with 2x scaling callback: output[0] should be 2*N
+    std::vector<rocfft_complex<float>> host_input(N, {1.0f, 0.0f});
+
+    // run FFT without scaling callback to get reference result
+    std::vector<rocfft_complex<float>> reference_output(N);
+    {
+        rocfft_plan plan = nullptr;
+        ASSERT_EQ(rocfft_plan_create(&plan,
+                                     rocfft_placement_inplace,
+                                     rocfft_transform_type_complex_forward,
+                                     rocfft_precision_single,
+                                     1,
+                                     &N,
+                                     1,
+                                     nullptr),
+                  rocfft_status_success);
+
+        gpubuf_t<rocfft_complex<float>> data;
+        ASSERT_EQ(data.alloc(N * sizeof(rocfft_complex<float>)), hipSuccess);
+        ASSERT_EQ(hipMemcpy(data.data(),
+                            host_input.data(),
+                            N * sizeof(rocfft_complex<float>),
+                            hipMemcpyHostToDevice),
+                  hipSuccess);
+
+        void* buffers[] = {data.data()};
+        ASSERT_EQ(rocfft_execute(plan, buffers, nullptr, nullptr), rocfft_status_success);
+        ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
+
+        ASSERT_EQ(hipMemcpy(reference_output.data(),
+                            data.data(),
+                            N * sizeof(rocfft_complex<float>),
+                            hipMemcpyDeviceToHost),
+                  hipSuccess);
+
+        rocfft_plan_destroy(plan);
+    }
+
+    // next, run FFT with 2x scaling callback
+    std::vector<rocfft_complex<float>> scaled_output(N);
+    {
+        auto scale_code = load_spirv("load_callback_scale.spv");
+        ASSERT_TRUE(is_valid_spirv(scale_code));
+
+        rocfft_plan_description desc = nullptr;
+        ASSERT_EQ(rocfft_plan_description_create(&desc), rocfft_status_success);
+        ASSERT_EQ(rocfft_plan_description_set_load_callback(
+                      desc, "load_callback", scale_code.data(), scale_code.size(), nullptr, 0),
+                  rocfft_status_success);
+
+        rocfft_plan plan = nullptr;
+        ASSERT_EQ(rocfft_plan_create(&plan,
+                                     rocfft_placement_inplace,
+                                     rocfft_transform_type_complex_forward,
+                                     rocfft_precision_single,
+                                     1,
+                                     &N,
+                                     1,
+                                     desc),
+                  rocfft_status_success);
+
+        gpubuf_t<rocfft_complex<float>> data;
+        ASSERT_EQ(data.alloc(N * sizeof(rocfft_complex<float>)), hipSuccess);
+        ASSERT_EQ(hipMemcpy(data.data(),
+                            host_input.data(),
+                            N * sizeof(rocfft_complex<float>),
+                            hipMemcpyHostToDevice),
+                  hipSuccess);
+
+        size_t work_buffer_size = 0;
+        ASSERT_EQ(rocfft_plan_get_work_buffer_size(plan, &work_buffer_size), rocfft_status_success);
+
+        gpubuf_t<char>        work_buffer;
+        void*                 work_buffer_ptr = nullptr;
+        rocfft_execution_info info            = nullptr;
+        ASSERT_EQ(rocfft_execution_info_create(&info), rocfft_status_success);
+
+        if(work_buffer_size > 0)
+        {
+            ASSERT_EQ(work_buffer.alloc(work_buffer_size), hipSuccess);
+            work_buffer_ptr = work_buffer.data();
+            ASSERT_EQ(
+                rocfft_execution_info_set_work_buffer(info, work_buffer_ptr, work_buffer_size),
+                rocfft_status_success);
+        }
+
+        void* buffers[] = {data.data()};
+        ASSERT_EQ(rocfft_execute(plan, buffers, nullptr, info), rocfft_status_success);
+        ASSERT_EQ(hipDeviceSynchronize(), hipSuccess);
+
+        ASSERT_EQ(hipMemcpy(scaled_output.data(),
+                            data.data(),
+                            N * sizeof(rocfft_complex<float>),
+                            hipMemcpyDeviceToHost),
+                  hipSuccess);
+
+        rocfft_execution_info_destroy(info);
+        rocfft_plan_destroy(plan);
+        rocfft_plan_description_destroy(desc);
+    }
+
+    // verify that scaled_output should be approximately 2 * reference_output
+    // due to the 2x scaling in the load callback
+    const float tolerance        = 1e-4f;
+    bool        scaling_verified = true;
+    for(size_t i = 0; i < N; ++i)
+    {
+        float expected_real = 2.0f * reference_output[i].x;
+        float expected_imag = 2.0f * reference_output[i].y;
+        float actual_real   = scaled_output[i].x;
+        float actual_imag   = scaled_output[i].y;
+
+        if(std::abs(actual_real - expected_real) > tolerance * std::abs(expected_real) + tolerance
+           || std::abs(actual_imag - expected_imag)
+                  > tolerance * std::abs(expected_imag) + tolerance)
+        {
+            std::cerr << "Mismatch at index " << i << ": expected (" << expected_real << ", "
+                      << expected_imag << "), got (" << actual_real << ", " << actual_imag << ")"
+                      << std::endl;
+            scaling_verified = false;
+            break;
+        }
+    }
+
+    EXPECT_TRUE(scaling_verified)
+        << "JIT callback scaling verification failed - output should be 2x reference";
+
+    // check output[0] specifically (sum of all inputs, easiest to verify)
+    // for input of all 1s: output[0] = N without scaling, output[0] = 2*N with scaling
+    float ref_bin0    = reference_output[0].x;
+    float scaled_bin0 = scaled_output[0].x;
+    EXPECT_NEAR(scaled_bin0, 2.0f * ref_bin0, tolerance * std::abs(ref_bin0) + tolerance)
+        << "output[0] should be 2x with scaling callback. "
+        << "Reference: " << ref_bin0 << ", Scaled: " << scaled_bin0;
 }
 
 // test with callback_data
