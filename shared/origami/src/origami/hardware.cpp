@@ -121,19 +121,19 @@ size_t hardware_t::get_mi_latency(size_t MI_M,
                                   size_t MI_N,
                                   size_t MI_K,
                                   data_type_t mi_input_type) const {
-  const auto& instruction_map = INSTRUCTION_MAP.at(arch);
-  auto key                    = matrix_instruction(MI_M, MI_N, MI_K, mi_input_type);
-
-  auto it = instruction_map.find(key);
-  if (it != instruction_map.end()) {
-    return it->second / parallel_mi_cu;
-  } else {
-    if (origami::runtime_options().get().debug_enabled)
-      std::cerr << "Warning: Latency not found for MI_M=" << MI_M << ", MI_N=" << MI_N
-                << ", MI_K=" << MI_K << ", mi_input_type=" << datatype_to_string(mi_input_type)
-                << ". Returning latency value of 32 (really slow).\n";
-    return 32 / parallel_mi_cu;  // Default latency if instruction is not found
+  auto it_arch_map = INSTRUCTION_MAP.find(arch);
+  if (it_arch_map != INSTRUCTION_MAP.end()) {
+    const auto& instruction_map = it_arch_map->second;
+    auto key                    = matrix_instruction(MI_M, MI_N, MI_K, mi_input_type);
+    auto it = instruction_map.find(key);
+    if (it != instruction_map.end())
+      return it->second / parallel_mi_cu;
   }
+  if (origami::runtime_options().get().debug_enabled)
+    std::cerr << "Warning: Latency not found for MI_M=" << MI_M << ", MI_N=" << MI_N
+              << ", MI_K=" << MI_K << ", mi_input_type=" << datatype_to_string(mi_input_type)
+              << ". Returning latency value of 32 (really slow).\n";
+  return 32 / parallel_mi_cu;  // Default latency if instruction is not found
 }
 
 double hardware_t::get_adjusted_main_loop_efficiency(transpose_t transA,
@@ -142,17 +142,19 @@ double hardware_t::get_adjusted_main_loop_efficiency(transpose_t transA,
                                                      size_t MT_N,
                                                      size_t MT_K,
                                                      data_type_t mi_input_type) const {
-  const auto& cms_map = CMS_MAP.at(arch);
-  auto key            = CMS_kernel(mi_input_type, transA, transB, MT_M, MT_N, MT_K);
-  auto it = cms_map.find(key);
-  if (it != cms_map.end()) {
-    if (origami::runtime_options().get().debug_enabled) {
-      std::cout << "Found " << key.to_string() << " with efficiency " << it->second << "\n";
+  auto it_arch_map = CMS_MAP.find(arch);
+  if (it_arch_map != CMS_MAP.end()) {
+    const auto& cms_map = it_arch_map->second;
+    auto key            = CMS_kernel(mi_input_type, transA, transB, MT_M, MT_N, MT_K);
+    auto it = cms_map.find(key);
+    if (it != cms_map.end()) {
+      if (origami::runtime_options().get().debug_enabled) {
+        std::cout << "Found " << key.to_string() << " with efficiency " << it->second << "\n";
+      }
+      return it->second;
     }
-    return it->second;
-  } else {
-    return 1.0;  // Default main loop efficiency
   }
+  return 1.0;  // Default main loop efficiency
 }
 
 std::string hardware_t::get_before_first_colon(const std::string& input) {
