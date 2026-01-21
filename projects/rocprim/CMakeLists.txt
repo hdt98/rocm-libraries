@@ -94,8 +94,8 @@ override_cache_variable(ROCM_WARN_TOOLCHAIN_VAR OFF BOOL)
 # We ignore warning-as-errors when building dependencies.
 remove_warning_flags(CMAKE_CXX_FLAGS CXX_FLAGS_FILTERED)
 remove_warning_flags(CMAKE_HIP_FLAGS HIP_FLAGS_FILTERED)
-override_cache_variable(CMAKE_CXX_FLAGS CXX_FLAGS_FILTERED STRING)
-override_cache_variable(CMAKE_HIP_FLAGS HIP_FLAGS_FILTERED STRING)
+override_cache_variable(CMAKE_CXX_FLAGS "${CXX_FLAGS_FILTERED}" STRING)
+override_cache_variable(CMAKE_HIP_FLAGS "${HIP_FLAGS_FILTERED}" STRING)
 
 fetch_rocmcmake()
 if(BUILD_TEST)
@@ -109,9 +109,9 @@ if(WITH_ROCRAND)
 endif()
 
 restore_cache_variable(BUILD_SHARED_LIBS BOOL)
-restore_cache_variable(ROCM_WARN_TOOLCHAIN_VAR BOOL)
 restore_cache_variable(CMAKE_CXX_FLAGS STRING)
 restore_cache_variable(CMAKE_HIP_FLAGS STRING)
+restore_cache_variable(ROCM_WARN_TOOLCHAIN_VAR BOOL)
 
 find_package(hip REQUIRED CONFIG PATHS ${HIP_DIR} ${ROCM_PATH})
 

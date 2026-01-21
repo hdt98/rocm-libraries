@@ -64,22 +64,54 @@ macro(get_gpu_targets)
   if(GPU_TARGETS STREQUAL "all")
     if(BUILD_ADDRESS_SANITIZER)
       # ASAN builds require xnack
-      rocm_check_target_ids(VERIFIED_GPU_TARGETS
+      check_target_ids(VERIFIED_GPU_TARGETS
         TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+"
       )
     else()
-      rocm_check_target_ids(VERIFIED_GPU_TARGETS
+      check_target_ids(VERIFIED_GPU_TARGETS
         TARGETS "gfx906:xnack-;gfx908:xnack-;gfx90a:xnack-;gfx90a:xnack+;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1152;gfx1153;gfx1200;gfx1201"
       )
     endif()
   else()
-    rocm_check_target_ids(VERIFIED_GPU_TARGETS TARGETS "${GPU_TARGETS}")
+    check_target_ids(VERIFIED_GPU_TARGETS TARGETS "${GPU_TARGETS}")
   endif()
 
   # Overwrite the targets with the subset of supported archs.
   # HIP_ARCHITECTURES and CMAKE_HIP_ARCHITECTURES are new CMake
   # cache variables. Unfortunately most of the ROCm ecosystem
   # still uses GPU_TARGETS. We'll set both, just in case.
+  set(CMAKE_HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE INTERNAL "" FORCE)
   set(HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE INTERNAL "" FORCE)
   set(GPU_TARGETS "${VERIFIED_GPU_TARGETS}" CACHE STRING "" FORCE)
 endmacro(get_gpu_targets)
+
+include(CheckCompilerFlag)
+include(CMakeParseArguments)
+
+# rocm_check_target_ids(...) from
+#   https://github.com/ROCm/rocm-cmake/blob/develop/share/rocmcmakebuildtools/cmake/ROCMCheckTargetIds.cmake
+# does not support CMake's HIP language since it uses 'check_cxx_compiler_flag'...
+function(check_target_ids VARIABLE)
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs TARGETS)
+
+  cmake_parse_arguments(PARSE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  if(PARSE_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "Unknown keywords given to rocm_check_target_ids(): \"${PARSE_UNPARSED_ARGUMENTS}\"")
+  endif()
+
+  foreach(_target_id ${PARSE_TARGETS})
+    if(${_target_id} IN_LIST _supported_target_ids)
+      continue()
+    endif()
+    _rocm_sanitize_target_id("${_target_id}" _result_var)
+    set(_result_var "COMPILER_HAS_TARGET_ID_${_result_var}")
+    check_compiler_flag(HIP "--offload-arch=${_target_id}" "${_result_var}")
+    if(${_result_var})
+        list(APPEND _supported_target_ids "${_target_id}")
+    endif()
+  endforeach()
+  set(${VARIABLE} "${_supported_target_ids}" PARENT_SCOPE)
+endfunction()
