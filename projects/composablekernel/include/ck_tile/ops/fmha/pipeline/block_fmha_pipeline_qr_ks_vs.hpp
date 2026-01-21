@@ -6,6 +6,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_dropout.hpp"
+#include "ck_tile/ops/fmha/block/cast_tile_mx.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_pipeline_qr_ks_vs_default_policy.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
 
@@ -64,8 +65,6 @@ struct BlockFmhaPipelineQRKSVS
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
     static constexpr bool kHasSink          = Problem::kHasSink;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
-
-    static constexpr bool kIsMxType = QScaleEnum == BlockAttentionQuantScaleEnum::MX;
 
     static constexpr ck_tile::index_t kQKScaleGranularity = Problem::kQKScaleGranularity;
     static constexpr ck_tile::index_t kVScaleGranularity  = Problem::kVScaleGranularity;
@@ -188,12 +187,12 @@ struct BlockFmhaPipelineQRKSVS
                const float* k_descale_ptr,
                const float* v_descale_ptr,
                const index_t block_scale_size_kv,
-               const QScaleDramBlockWindowTmp&
-                   q_scale_dram_block_window_tmp, // M0*(K0/kQKScaleGranularity) tile
-               const KScaleDramBlockWindowTmp&
-                   k_scale_dram_block_window_tmp, // N0*(K0/kQKScaleGranularity) tile
-               const VScaleDramBlockWindowTmp&
-                   v_scale_dram_block_window_tmp // N1*(K1/kVScaleGranularity) tile
+               const QScaleDramBlockWindowTmp& q_scale_dram_block_window_tmp =
+                   ignore, // M0*(K0/kQKScaleGranularity) tile
+               const KScaleDramBlockWindowTmp& k_scale_dram_block_window_tmp =
+                   ignore, // N0*(K0/kQKScaleGranularity) tile
+               const VScaleDramBlockWindowTmp& v_scale_dram_block_window_tmp =
+                   ignore, // N1*(K1/kVScaleGranularity) tile
                const float sink_v) const
     {
         static_assert(
@@ -211,7 +210,7 @@ struct BlockFmhaPipelineQRKSVS
                           kN0 == BiasDramBlockWindowTmp{}.get_window_lengths()[number<1>{}],
                       "wrong!");
 
-        if constexpr(kIsMxType)
+        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
         {
             static_assert(std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::ColumnMajor>);
 
@@ -232,7 +231,7 @@ struct BlockFmhaPipelineQRKSVS
         }
 
         auto if_mx = [&](auto f) {
-            if constexpr(kIsMxType)
+            if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 return f();
             else
                 return ignore;
@@ -484,7 +483,7 @@ struct BlockFmhaPipelineQRKSVS
             auto run_gemm_0 = [&](auto i_k0) {
                 auto q_slice = get_slice_tile(
                     q_tile, sequence<0, i_k0 * kK0>{}, sequence<kM0, (i_k0 + 1) * kK0>{});
-                if constexpr(kIsMxType)
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
                     auto q_scale_slice =
                         get_slice_tile(q_scale,
@@ -827,176 +826,27 @@ struct BlockFmhaPipelineQRKSVS
             }
 
             const auto [p, p_scale] = [&] {
-                const auto p_ = tile_elementwise_in(p_compute_element_func, p_compute);
-                if constexpr(kIsMxType)
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
-                    auto p_result =
-                        make_static_distributed_tensor<PDataType>(p_.get_tile_distribution());
+                    auto p_result = make_static_distributed_tensor<PDataType>(
+                        p_compute.get_tile_distribution());
                     auto p_scale_result = make_static_distributed_tensor<PScaleDataType>(
                         Policy::template MakePScaleRegTileDistribution<Problem>());
-                    static_assert(p_compute.get_thread_buffer().size() ==
-                                  p_scale_result.get_thread_buffer().size() * kVScaleGranularity);
 
-                    using BlockGemm =
-                        remove_cvref_t<decltype(Policy::template GetQKBlockGemm<Problem>())>;
                     constexpr auto config =
-                        BlockGemm::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+                        decltype(gemm_1)::Policy::template GetWarpGemmMWarpNWarp<Problem>();
                     using WG = remove_cvref_t<decltype(config.template at<0>())>;
 
-                    constexpr index_t kABKLane = WG::WarpGemmAttribute::Impl::kABKLane;
-                    constexpr index_t kAMLane  = WG::WarpGemmAttribute::Impl::kAMLane;
-
-                    if constexpr(std::is_same_v<PDataType, pk_fp4_t>)
-                    {
-                        static_for<0, p_.get_thread_buffer().size() / 32, 1>{}([&](auto i) {
-                            // Maximum of consecutive kVScaleGranularity values
-                            // (1 lane, 32 per lane for fp4)
-                            SMPLComputeDataType p_max{0};
-                            static_for<0, 32, 1>{}([&](auto j) {
-                                p_max = max(p_max, p_compute.get_thread_buffer()[i * 32 + j]);
-                            });
-                            p_max = min(SMPLComputeDataType{1}, p_max);
-
-                            static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
-                            // For e8m0 round up to the next power of 2
-                            SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
-
-                            // Convert using scales
-
-                            // These builtins require the old value, and will generate a v_mov_b32
-                            // vxxx [old] before cvt, which result in unwanted ISA so we prepare an
-                            // uninitialized variable dummy_old purposely, and turn off the warning
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-                            static_for<0, 32 / 8, 1>{}([&](auto j) {
-                                using vec_t = uint32_t;
-                                vec_t dummy_old;
-                                vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                                    dummy_old,
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 0>{}],
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 1>{}],
-                                    scale,
-                                    0); // byte 0
-                                vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                                    x,
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 2>{}],
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 3>{}],
-                                    scale,
-                                    1); // byte 1
-                                vec_t z = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                                    y,
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 4>{}],
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 5>{}],
-                                    scale,
-                                    2); // byte 2
-                                vec_t w = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                                    z,
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 6>{}],
-                                    p_.get_thread_buffer()[number<i * 32 + 8 * j + 7>{}],
-                                    scale,
-                                    3); // byte 3
-                                p_result.get_thread_buffer().template set_as<vec_t>(
-                                    number<i * 4 + j>{}, w);
-                            });
-#pragma clang diagnostic pop
-
-                            // Save scale for the corresponding lane
-                            p_scale_result.get_thread_buffer()(i) =
-                                type_convert<PScaleDataType>(scale);
-                        });
-                    }
-                    else
-                    {
-                        const index_t lane = __lane_id();
-                        SMPLComputeDataType scale_result{0};
-                        static_for<0, p_.get_thread_buffer().size() / 16, 1>{}([&](auto i) {
-                            // Maximum of consecutive kVScaleGranularity values
-                            // (2 lanes, 16 per lane for fp8/bf8)
-                            SMPLComputeDataType p_max{0};
-                            static_for<0, 16, 1>{}([&](auto j) {
-                                p_max = max(p_max, p_compute.get_thread_buffer()[i * 16 + j]);
-                            });
-                            p_max = max(p_max, warp_shuffle(p_max, lane ^ kAMLane));
-                            p_max = min(SMPLComputeDataType{1}, p_max);
-
-                            static_assert(std::is_same_v<PScaleDataType, e8m0_t>);
-                            // For e8m0 round up to the next power of 2
-                            SMPLComputeDataType scale = exp2(ceil(log2(p_max)));
-
-                            // Convert using scales
-
-                            // These builtins require the old value, and will generate a v_mov_b32
-                            // vxxx [old] before cvt, which result in unwanted ISA so we prepare an
-                            // uninitialized variable dummy_old purposely, and turn off the warning
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-                            if constexpr(std::is_same_v<PDataType, fp8_t>)
-                            {
-                                static_for<0, 16 / 4, 1>{}([&](auto j) {
-                                    using vec_t = ext_vector_t<short, 2>;
-                                    vec_t dummy_old;
-                                    vec_t x = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
-                                        dummy_old,
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
-                                        scale,
-                                        false); // false -> WORD0
-                                    vec_t y = __builtin_amdgcn_cvt_scalef32_pk_fp8_f32(
-                                        x,
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
-                                        scale,
-                                        true); // true -> WORD1
-                                    p_result.get_thread_buffer().template set_as<vec_t>(
-                                        number<i * 4 + j>{}, y);
-                                });
-                            }
-                            else if constexpr(std::is_same_v<PDataType, bf8_t>)
-                            {
-                                static_for<0, 16 / 4, 1>{}([&](auto j) {
-                                    using vec_t = ext_vector_t<short, 2>;
-                                    vec_t dummy_old;
-                                    vec_t x = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
-                                        dummy_old,
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 0>{}],
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 1>{}],
-                                        scale,
-                                        false); // false -> WORD0
-                                    vec_t y = __builtin_amdgcn_cvt_scalef32_pk_bf8_f32(
-                                        x,
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 2>{}],
-                                        p_.get_thread_buffer()[number<i * 16 + 4 * j + 3>{}],
-                                        scale,
-                                        true); // true -> WORD1
-                                    p_result.get_thread_buffer().template set_as<vec_t>(
-                                        number<i * 4 + j>{}, y);
-                                });
-                            }
-#pragma clang diagnostic pop
-
-                            // Save scale for the corresponding lane
-                            if constexpr(kABKLane == 4)
-                            {
-                                scale =
-                                    warp_shuffle(scale, (lane % kAMLane) | ((lane & kAMLane) << 1));
-                            }
-                            if((i % 2 == 0) == (lane < 32))
-                            {
-                                scale_result = scale;
-                            }
-                            if(i % 2 == 1)
-                            {
-                                p_scale_result.get_thread_buffer()(i / 2) =
-                                    type_convert<PScaleDataType>(scale_result);
-                            }
-                        });
-                    }
+                    cast_tile_mx<kVScaleGranularity, WG::WarpGemmAttribute::Impl::kAMLane>(
+                        p_compute, p_compute_element_func, p_result, p_scale_result);
 
                     return make_tuple(p_result, p_scale_result);
                 }
                 else
                 {
-                    return make_tuple(cast_tile<PDataType>(p_), ignore);
+                    return make_tuple(cast_tile<PDataType>(
+                                          tile_elementwise_in(p_compute_element_func, p_compute)),
+                                      ignore);
                 }
             }();
 
@@ -1007,7 +857,7 @@ struct BlockFmhaPipelineQRKSVS
             auto run_gemm_1 = [&](auto i_k1) {
                 auto p_slice =
                     get_slice_tile(p, sequence<0, i_k1 * kK1>{}, sequence<kM0, (i_k1 + 1) * kK1>{});
-                if constexpr(kIsMxType)
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
                     auto p_scale_slice =
                         get_slice_tile(p_scale,
