@@ -69,6 +69,6 @@ endfunction()
 # rocPRIM examples
 # ****************************************************************************
 
-add_example(extra/example_temporary_storage.cpp)
-add_example(extra/example_type_traits_interface.cpp)
-add_example(rocprim/device/example_device_search.cpp)
+add_example(extra/example_temporary_storage.hip)
+add_example(extra/example_type_traits_interface.hip)
+add_example(rocprim/device/example_device_search.hip)
