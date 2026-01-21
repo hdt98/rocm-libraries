@@ -848,7 +848,7 @@ origami_cache_t create_origami_cache(const problem_t& problem,
                                      size_t max_cus) {
   // Find CU occupancy
   auto [num_wgs, num_active_cus, numWaves, splitting_factor] = compute_cu_occupancy(
-      problem, hardware, config, grid_selection_t::k_split_aware, max_cus);
+      problem, hardware, config, config.grid_selection, max_cus);
 
   auto grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
   auto grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
