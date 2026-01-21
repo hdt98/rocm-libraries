@@ -14,9 +14,12 @@ namespace origami {
  *
  * @param problem Problem description (M, N, K, etc.)
  * @param config Kernel configuration.
+ * @param cache Precomputed quantities, grid_m, etc.
  * @return double ratio of the useful problem volume to the total scheduled volume.
  */
-double calculate_work_utilization(const problem_t& problem, const config_t& config);
+double calculate_work_utilization(const problem_t& problem,
+                                  const config_t& config,
+                                  const origami_cache_t& cache);
 
 /**
  * @brief calculate the output utilization which is the ratio of the useful problem volume to the total scheduled volume.
@@ -70,12 +73,14 @@ size_t round_elements_to_128B(size_t elements, size_t element_size_bits);
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
+ * @param cache Precomputed quantities, grid_m, etc.
  * @param l2_capacity_bytes l2 capacity in bytes
  * @return double
  */
 double compute_l2_hit_rate_global(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config,
+                                  const origami_cache_t& cache,
                                   size_t l2_capacity_bytes);
 
 /**

@@ -832,14 +832,14 @@ kernel_cache_t create_kernel_cache(const problem_t& problem_type,
   // Logic for block scaled datatypes (Assuming BS=32 and 8-bit scales)
   // TODO This is technically wrong, need separate flag to enable MX so we can differentiate FP8
   // and MX8
-  if (a_bits < 8 && problem.a_mx_block_size != 0) {
+  if (a_bits < 8 && problem_type.a_mx_block_size != 0) {
     // Number of scales per tile
-    size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem.a_mx_block_size);
+    size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem_type.a_mx_block_size);
     Ld_CU_bytes += num_scales_A;  // One Byte per scale
   }
-  if (b_bits < 8 && problem.b_mx_block_size != 0) {
+  if (b_bits < 8 && problem_type.b_mx_block_size != 0) {
     // Number of scales per tile
-    size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem.b_mx_block_size);
+    size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem_type.b_mx_block_size);
     Ld_CU_bytes += num_scales_B;  // One Byte per scale
   }
 
@@ -865,6 +865,7 @@ kernel_cache_t create_kernel_cache(const problem_t& problem_type,
 origami_cache_t create_origami_cache(const problem_t& problem,
                                      const hardware_t& hardware,
                                      const config_t& config,
+                                     const kernel_cache_t& kernel_cache,
                                      size_t max_cus) {
   // Find CU occupancy
   auto [num_wgs, num_active_cus, numWaves, splitting_factor] = compute_cu_occupancy(
@@ -883,7 +884,16 @@ origami_cache_t create_origami_cache(const problem_t& problem,
     .num_active_cus = num_active_cus,
     .splitting_factor = splitting_factor,
     .achievable_mem_bandwidth = compute_mem_bw_from_occupancy(hardware, num_active_cus),
+    .kernel_cache = kernel_cache
   };
+}
+
+origami_cache_t create_origami_cache(const problem_t& problem,
+                                     const hardware_t& hardware,
+                                     const config_t& config,
+                                     size_t max_cus) {
+  auto kernel_cache = create_kernel_cache(problem, hardware, config);
+  return create_origami_cache(problem, hardware, config, kernel_cache, max_cus);
 }
 
 // Compute the total latency of a gemm based on the latency of one wave multiplied by the number of
@@ -957,8 +967,7 @@ double compute_total_latency(const problem_t& problem,
   config_with_default_wgm.workgroup_mapping = std::max(defaultWGM, 1);
 
   // 1-2) Find CU occupancy, etc, store in cache
-  auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, max_cus);
-  cache.kernel_cache = kernel_cache;
+  auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, kernel_cache, max_cus);
 
   // 2) Compute latency of a wave
   // Compute latency of a wave
