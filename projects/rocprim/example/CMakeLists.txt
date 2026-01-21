@@ -23,9 +23,10 @@
 function(add_example EXAMPLE_SOURCE)
   get_filename_component(EXAMPLE_TARGET ${EXAMPLE_SOURCE} NAME_WE)
 
-  if(USE_HIPCXX)
-    set_source_files_properties(${EXAMPLE_SOURCE} PROPERTIES LANGUAGES HIP)
-  endif()
+  # We currently have a lot of .cpp-files. Technically these need to 
+  # be renamed to .hip. Because we're treating these files as HIP, we
+  # do not have to link against 'hip::host' or 'hip::device'.
+  set_source_files_properties(${EXAMPLE_SOURCE} PROPERTIES LANGUAGES HIP)
 
   add_executable(${EXAMPLE_TARGET} ${EXAMPLE_SOURCE})
 
@@ -33,17 +34,6 @@ function(add_example EXAMPLE_SOURCE)
     PRIVATE
     rocprim
   )
-
-  if(USE_HIPCXX)
-    target_link_libraries(${EXAMPLE_TARGET}
-      PRIVATE
-      $<IF:$<LINK_LANGUAGE:HIP>,hip::host,hip::device>
-    )
-  else()
-    target_link_libraries(${EXAMPLE_TARGET}
-      PRIVATE
-      hip::device)
-  endif()
 
   set_target_properties(${EXAMPLE_TARGET}
     PROPERTIES

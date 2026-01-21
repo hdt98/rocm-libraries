@@ -53,9 +53,11 @@ function(add_rocprim_test TEST_NAME TEST_SOURCES)
 endfunction()
 
 function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
-  if(USE_HIPCXX)
-    set_source_files_properties(${TEST_SOURCES} PROPERTIES LANGUAGE HIP)
-  endif()
+  # We currently have a lot of .cpp-files. Technically these need to 
+  # be renamed to .hip. Because we're treating these files as HIP, we
+  # do not have to link against 'hip::host' or 'hip::device'.
+  set_source_files_properties(${TEST_SOURCES} PROPERTIES LANGUAGE HIP)
+
   add_executable(${TEST_TARGET} ${TEST_SOURCES})
   if (ROCPRIM_INSTALL)
     rocm_install(TARGETS ${TEST_TARGET} COMPONENT tests)
@@ -78,17 +80,6 @@ function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
       GTest::GTest
       GTest::Main
   )
-
-  if(USE_HIPCXX)
-    target_link_libraries(${TEST_TARGET}
-      PRIVATE
-      $<IF:$<LINK_LANGUAGE:HIP>,hip::host,hip::device>
-    )
-  else()
-    target_link_libraries(${TEST_TARGET}
-      PRIVATE
-      hip::device)
-  endif()
 
   target_compile_options(${TEST_TARGET}
     PRIVATE
@@ -263,13 +254,9 @@ function(add_rocprim_cpp_standard_test STANDARD EXTENSIONS TARGET_SUFFIX TEST_NA
   set_target_properties(${TEST_TARGET}
     PROPERTIES
     CXX_STANDARD ${STANDARD}
-    CXX_EXTENSIONS ${EXTENSIONS})
-  if(USE_HIPCXX)
-    set_target_properties(${TEST_TARGET}
-      PROPERTIES
-      HIP_STANDARD ${STANDARD}
-      HIP_EXTENSIONS ${EXTENSIONS})
-  endif()
+    CXX_EXTENSIONS ${EXTENSIONS}
+    HIP_STANDARD ${STANDARD}
+    HIP_EXTENSIONS ${EXTENSIONS})
 endfunction()
 
 # ****************************************************************************

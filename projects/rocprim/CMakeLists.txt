@@ -68,26 +68,12 @@ register_set(ROCRAND_FETCH_BRANCH develop STRING "Branch to fetch rocRAND from."
 # C++/HIP #
 ###########
 
-# Set C++/HIP default language options.
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+include(cmake/Config.cmake)
+setup_languages()
 
-set(CMAKE_HIP_STANDARD 17)
-set(CMAKE_HIP_STANDARD_REQUIRED ON)
-set(CMAKE_HIP_EXTENSIONS OFF)
-
-# Verify C++/HIP language standard.
-if(NOT CMAKE_CXX_STANDARD EQUAL 17)
-  message(FATAL_ERROR "Only C++17 is supported (C++)")
-endif()
-if(NOT CMAKE_HIP_STANDARD EQUAL 17)
-  message(FATAL_ERROR "Only C++17 is supported (HIP)")
-endif()
-
-###############
-# dependencies #
-###############
+################
+# Dependencies #
+################
 
 include(cmake/Dependencies.cmake)
 
@@ -169,44 +155,7 @@ endif()
 # Architectures #
 #################
 
-# Derive the device architecture we need to compile for. We prioritize the
-# the following:
-# 1. GPU_TARGETS (user defined, used by hip-config)
-# 2. HIP_ARCHITECTURES (user defined)
-# 3. CMAKE_HIP_ARCHITECTURES (inferred, requires CMake HIP support)
-# 4. 'all' (default, no CMake HIP support)
-if (NOT DEFINED GPU_TARGETS)
-  if (DEFINED HIP_ARCHITECTURES)
-    set(GPU_TARGETS ${HIP_ARCHITECTURES})
-  elseif(DEFINED CMAKE_HIP_ARCHITECTURES)
-    set(GPU_TARGETS ${CMAKE_HIP_ARCHITECTURES})
-  else()
-    set(GPU_TARGETS "all")
-  endif()
-endif()
-
-# Handle 'all'-keyword in architectures.
-if(GPU_TARGETS STREQUAL "all")
-  if(BUILD_ADDRESS_SANITIZER)
-    # ASAN builds require xnack
-    rocm_check_target_ids(VERIFIED_GPU_TARGETS
-      TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+"
-    )
-  else()
-    rocm_check_target_ids(VERIFIED_GPU_TARGETS
-      TARGETS "gfx906:xnack-;gfx908:xnack-;gfx90a:xnack-;gfx90a:xnack+;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1152;gfx1153;gfx1200;gfx1201"
-    )
-  endif()
-else()
-  rocm_check_target_ids(VERIFIED_GPU_TARGETS TARGETS "${GPU_TARGETS}")
-endif()
-
-# Overwrite the targets with the subset of supported archs.
-# HIP_ARCHITECTURES and CMAKE_HIP_ARCHITECTURES are new CMake
-# cache variables. Unfortunately most of the ROCm ecosystem
-# still uses GPU_TARGETS. We'll set both, just in case.
-set(HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE INTERNAL "" FORCE)
-set(GPU_TARGETS "${VERIFIED_GPU_TARGETS}" CACHE STRING "" FORCE)
+get_gpu_targets()
 
 ###########
 # Targets #

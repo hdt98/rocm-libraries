@@ -38,9 +38,10 @@ endif()
 function(add_rocprim_benchmark BENCHMARK_SOURCE)
   get_filename_component(BENCHMARK_TARGET ${BENCHMARK_SOURCE} NAME_WE)
 
-  if(USE_HIPCXX)
-    set_source_files_properties(${BENCHMARK_SOURCE} PROPERTIES LANGUAGE HIP)
-  endif()
+  # We currently have a lot of .cpp-files. Technically these need to 
+  # be renamed to .hip. Because we're treating these files as HIP, we
+  # do not have to link against 'hip::host' or 'hip::device'.
+  set_source_files_properties(${BENCHMARK_SOURCE} PROPERTIES LANGUAGE HIP)
 
   if(BENCHMARK_CONFIG_TUNING)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${BENCHMARK_TARGET}.parallel.cpp.in")
@@ -89,17 +90,6 @@ function(add_rocprim_benchmark BENCHMARK_SOURCE)
       rocprim
       benchmark::benchmark
   )
-
-  if(USE_HIPCXX)
-    target_link_libraries(${BENCHMARK_TARGET}
-      PRIVATE
-      $<IF:$<LINK_LANGUAGE:HIP>,hip::host,hip::device>
-    )
-  else()
-    target_link_libraries(${BENCHMARK_TARGET}
-      PRIVATE
-      hip::device)
-  endif()
 
   if(BENCHMARK_USE_AMDSMI)
     find_library(AMDSMI_LIB NAMES amd_smi)

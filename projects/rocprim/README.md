@@ -9,7 +9,7 @@ develop performant GPU-accelerated code on AMD ROCm platforms.
 ## Requirements
 
 * Git
-* CMake (3.16 or later)
+* CMake (3.21 or later)
 * AMD [ROCm](https://rocm.docs.amd.com/en/latest/) platform (1.8.2 or later)
   * Including
     [HIP-clang](https://github.com/ROCm/HIP/blob/master/INSTALL.md#hip-clang)
@@ -97,28 +97,24 @@ Include the `<rocprim/rocprim.hpp>` header:
 #include <rocprim/rocprim.hpp>
 ```
 
-We recommended including rocPRIM into a CMake project by using the package configuration files.
-The rocPRIM package name is `rocprim`.
+We recommended including rocPRIM into a CMake project by using the package configuration files using
+the HIP language support in CMake 3.21 or later. Because rocPRIM is a header-only library, we can
+follow the HIP single-source programming model from the [ROCm documentation](https://rocm.docs.amd.com/en/latest/conceptual/cmake-packages.html#using-the-hip-single-source-programming-model).
+
+The rocPRIM package name is `rocprim`, providing the target `roc::rocprim`.
 
 ```cmake
-# "/opt/rocm" - default install prefix
-find_package(rocprim REQUIRED CONFIG PATHS "/opt/rocm/rocprim")
+cmake_minimum_required(VERSION 3.21) # HIP language support requires 3.21
+project(MyProj LANGUAGES HIP)
 
-...
+find_package(rocprim REQUIRED)
 
-# Includes only rocPRIM headers, HIP libraries have
-# to be linked manually by user
-target_link_libraries(<your_target> roc::rocprim)
-
-# Include rocPRIM headers and required HIP dependencies
-# - If using HIP language support (USE_HIPCXX=ON):
-target_link_libraries(<your_target> hip::host)
-
-# - Otherwise:
-target_link_libraries(<your_target> hip::device)
+add_executable(MyApp Main.hip)
+target_link_libraries(MyApp roc::rocprim)
 ```
 
-For more information on `hip::host` and `hip::device`, please see the [ROCm documentation](https://rocm.docs.amd.com/en/latest/conceptual/cmake-packages.html#consuming-the-hip-api-in-c-code).
+When consuming HIP or rocPRIM API in C++ or compiling device-side HIP in C++ language mode, please refer 
+to the [ROCm documentation](https://rocm.docs.amd.com/en/latest/conceptual/cmake-packages.html#consuming-the-hip-api-in-c-code).
 
 ## Running unit tests
 

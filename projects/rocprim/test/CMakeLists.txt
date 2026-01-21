@@ -64,9 +64,10 @@ function(add_hip_test TEST_NAME TEST_SOURCES)
 
   get_filename_component(TEST_TARGET ${TEST_MAIN_SOURCE} NAME_WE)
 
-  if(USE_HIPCXX)
-    set_source_files_properties(${TEST_SOURCES} PROPERTIES LANGUAGE HIP)
-  endif()
+  # We currently have a lot of .cpp-files. Technically these need to 
+  # be renamed to .hip. Because we're treating these files as HIP, we
+  # do not have to link against 'hip::host' or 'hip::device'.
+  set_source_files_properties(${TEST_SOURCES} PROPERTIES LANGUAGE HIP)
 
   add_executable(${TEST_TARGET} ${TEST_SOURCES})
 
@@ -91,17 +92,6 @@ function(add_hip_test TEST_NAME TEST_SOURCES)
     target_link_libraries(${TEST_TARGET} PRIVATE roc::rocprim)
   else()
     target_link_libraries(${TEST_TARGET} PRIVATE rocprim)
-  endif()
-
-  if(USE_HIPCXX)
-    target_link_libraries(${TEST_TARGET}
-      PRIVATE
-      $<IF:$<LINK_LANGUAGE:HIP>,hip::host,hip::device>
-    )
-  else()
-    target_link_libraries(${TEST_TARGET}
-      PRIVATE
-      hip::device)
   endif()
 
   target_compile_options(${TEST_TARGET}
