@@ -1064,8 +1064,6 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       cache.num_active_cus   = hardware.N_CU;
       std::tie(result_different_problem_sizes, mall_m, mall_n) =
           origami::estimate_mall_hit(problem, hardware, config, cache);
-      result_different_problem_sizes =
-          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.923).epsilon(1e-3));
       else if (gpu_arch == 950)
