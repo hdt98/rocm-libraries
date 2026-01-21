@@ -444,7 +444,7 @@ endif()
 
 target_link_libraries( rocfft-test
   PRIVATE
-  hiprtc
+  hiprtc::hiprtc
 )
 
 if( ROCFFT_MPI_ENABLE )
