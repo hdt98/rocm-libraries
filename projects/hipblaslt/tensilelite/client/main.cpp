@@ -835,7 +835,7 @@ int main(int argc, const char* argv[])
                                 size_t eventCount = gpuTimer ? kernels[0].size() : 0;
 
                                 auto size = static_cast<ContractionProblemGemm*>(problem)->problemSizes();
-                                std::cout << "per-run-timer,"
+                                std::cout << "per-run-timer-sync-" << syncs << "-enq-" << enq << "-" << solution->KernelName() << ","
                                     << size[0] << "-" << size[1] << "-" << size[2] << "-" << size[3]
                                     << "," << solution->name() << ",";
                                 listeners.preSyncs();
@@ -865,7 +865,7 @@ int main(int argc, const char* argv[])
                                         float eventMs = -0.1f;
                                         HIP_CHECK_EXC(hipEventElapsedTime(&eventMs, benchmarkTimer->start, benchmarkTimer->stop));
                                         auto totalTime = TensileLite::Client::BenchmarkTimer::double_millis(eventMs);
-                                        std::cout << TensileLite::Client::BenchmarkTimer::double_micros(totalTime).count()/enq << ",";
+                                        std::cout << TensileLite::Client::BenchmarkTimer::double_micros(totalTime).count()/enq - (icacheFlush ? flushTimeMs * 1000 : 0) << ",";
 
                                         listeners.validateEnqueues(inputs, startEvents, stopEvents);
                                     }
