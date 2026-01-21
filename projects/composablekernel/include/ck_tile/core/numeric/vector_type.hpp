@@ -4,9 +4,7 @@
 #pragma once
 
 #include "ck_tile/core/config.hpp"
-#include "ck_tile/core/container/array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/core/numeric/integral_constant.hpp"
 #include "ck_tile/core/numeric/float8.hpp"
 #include "ck_tile/core/numeric/half.hpp"
 #include "ck_tile/core/numeric/bfloat16.hpp"
@@ -88,13 +86,10 @@ using ext_vector_t = typename impl::ext_vector<T, N>::type;
 template <typename T, typename = void>
 struct vector_traits
 {
-    using scalar_type =
-        std::conditional_t<std::is_same_v<remove_cvref_t<T>, pk_int4_t>,
-                           int8_t,
-                           std::conditional_t<std::is_same_v<remove_cvref_t<T>, pk_fp4_t> ||
-                                                  std::is_same_v<remove_cvref_t<T>, e8m0_t>,
-                                              uint8_t,
-                                              remove_cvref_t<T>>>;
+    using scalar_type = std::conditional_t<
+        std::is_same_v<remove_cvref_t<T>, pk_int4_t>,
+        int8_t,
+        std::conditional_t<std::is_same_v<remove_cvref_t<T>, e8m0_t>, uint8_t, remove_cvref_t<T>>>;
     static constexpr index_t vector_size = 1;
 };
 
@@ -102,12 +97,10 @@ struct vector_traits
 template <typename T, index_t N>
 struct vector_traits<T __attribute__((ext_vector_type(N))), void>
 {
-    using scalar_type = std::conditional_t<
-        std::is_same_v<T, pk_int4_t>,
-        int8_t,
-        std::conditional_t<std::is_same_v<T, pk_fp4_t> || std::is_same_v<remove_cvref_t<T>, e8m0_t>,
-                           uint8_t,
-                           T>>;
+    using scalar_type =
+        std::conditional_t<std::is_same_v<T, pk_int4_t>,
+                           int8_t,
+                           std::conditional_t<std::is_same_v<T, e8m0_t>, uint8_t, T>>;
     static constexpr index_t vector_size = N;
 };
 

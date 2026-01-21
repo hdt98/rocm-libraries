@@ -109,7 +109,62 @@ CK_TILE_SCALED_TYPE_CONVERT(pk_fp4_t, pk_fp4, bf16_t, bf16)
 CK_TILE_SCALED_TYPE_CONVERT(bf16_t, bf16, pk_fp4_t, pk_fp4)
 CK_TILE_SCALED_TYPE_CONVERT(pk_fp4_t, pk_fp4, fp16_t, fp16)
 CK_TILE_SCALED_TYPE_CONVERT(fp16_t, fp16, pk_fp4_t, pk_fp4)
+
+// 8-element vector conversions for pk_fp4x4_t
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp4x4_t, pk_fp4, fp32x8_t, fp32x8)
+CK_TILE_SCALED_TYPE_CONVERT(fp32x8_t, fp32x8, pk_fp4x4_t, pk_fp4)
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp4x4_t, pk_fp4, fp16x8_t, fp16x8)
+CK_TILE_SCALED_TYPE_CONVERT(fp16x8_t, fp16x8, pk_fp4x4_t, pk_fp4)
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp4x4_t, pk_fp4, bf16x8_t, bf16x8)
+CK_TILE_SCALED_TYPE_CONVERT(bf16x8_t, bf16x8, pk_fp4x4_t, pk_fp4)
 #undef CK_TILE_SCALED_TYPE_CONVERT
+
+#if defined(__gfx125__)
+// Declare a template function for wave-wise scaled conversion
+/* scale is packed 4 form, see details for FP8/BF8, FP4, FP6 */
+template <typename Y, typename X, int Scale_sel>
+struct pk4scaled_type_convert_impl
+{
+    CK_TILE_DEVICE static constexpr Y run(X x, Packed4Scale_E8M0 scale);
+};
+
+template <typename Y, typename X, int Scale_sel = 0>
+CK_TILE_DEVICE constexpr Y pk4scaled_type_convert(X x, Packed4Scale_E8M0 scale)
+{
+    return pk4scaled_type_convert_impl<Y, X, Scale_sel>::run(x, scale);
+}
+
+/* scale is packed 4 form [FP4]
+ * Scale_sel: select different scale set and apply to the tensor[16x16] represented by a wave,
+ *            th[0-15]: 16x8 and th[16-31]: 16x8
+ *      Block 32 :
+ *      0(000): src[th[0-15]]  * scale[th[0-15]][7:0]
+                src[th[16-31]] * scale[th[0-15]][15:8]
+ *      1(001): src[th[0-15]]  * scale[th[16-31]][7:0]
+                src[th[16-31]] * scale[th[16-31]][15:8]
+ *      2(010): src[th[0-15]]  * scale[th[0-15]][23:16]
+                src[th[16-31]] * scale[th[0-15]][31:24]
+ *      3(011): src[th[0-15]]  * scale[th[16-31]][23:16]
+                src[th[16-31]] * scale[th[16-31]][31:24]
+ *      Block 16 : Available for certain revision
+ *      4(100): src[th[0-15]]  * scale[th[0-15]][7:0]
+                src[th[16-31]] * scale[th[0-15]][23:16]
+ *      5(101): src[th[0-15]]  * scale[th[16-31]][7:0]
+                src[th[16-31]] * scale[th[16-31]][23:16]
+ *      6(110): src[th[0-15]]  * scale[th[0-15]][15:8]
+                src[th[16-31]] * scale[th[0-15]][31:24]
+ *      7(111): src[th[0-15]]  * scale[th[16-31]][15:8]
+                src[th[16-31]] * scale[th[16-31]][31:24]
+ */
+template <typename Y, int Scale_sel>
+struct pk4scaled_type_convert_impl<Y, pk_fp4x4_t, Scale_sel>
+{
+    CK_TILE_DEVICE static Y run(pk_fp4x4_t x, Packed4Scale_E8M0 scale)
+    {
+        return impl::_from_f4x8_pkscale<Y, Scale_sel>(bit_cast<uint32_t>(x), scale.data());
+    }
+};
+#endif
 
 #endif
 
