@@ -61,7 +61,7 @@ auto create_args(int argc, char* argv[])
                 "n or 0, no bias\n"
                 "e(lementwise) or 1, elementwise bias with 1*1*s*s. e:1, 1*h*s*s. e:2, b*h*s*s\n"
                 "a(libi) or 2, alibi with 1*h. a:1, b*h")
-        .insert("prec", "fp16", "data type: fp32/fp16/bf16/fp8/fp8bf16/fp8fp32/mxfp8")
+        .insert("prec", "fp16", "data type: fp32/fp16/bf16/fp8/fp8bf16/fp8fp32/mxfp8/mxfp4")
         .insert("mask",
                 "0",
                 "0: no mask, 1: top-left(same as 't'), 2:bottom-right(same as 'b')\n"
@@ -246,6 +246,10 @@ int main(int argc, char* argv[])
         else if(data_type == "mxfp8")
         {
             return run<FmhaFwdMxFp8>(arg_parser) == fwd_result::success ? 0 : -2;
+        }
+        else if(data_type == "mxfp4")
+        {
+            return run<FmhaFwdMxFp4>(arg_parser) == fwd_result::success ? 0 : -2;
         }
         std::cerr << "Unsupported precision: " << data_type << std::endl;
         return -1;

@@ -92,6 +92,14 @@ auto get_elimit<FmhaFwdMxFp8>(std::string /*init_method*/)
     return ck_tile::make_tuple(rtol, atol);
 }
 
+template <>
+auto get_elimit<FmhaFwdMxFp4>(std::string /*init_method*/)
+{
+    double rtol = 1e-1;
+    double atol = 2.6e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
 int num_splits_heuristic(int batch_nhead_mblocks, int num_SMs, int max_splits)
 {
     // If we have enough to almost fill the SMs, then just use 1 split
@@ -240,6 +248,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
             return "fp8fp32";
         else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdMxFp8>)
             return "mxfp8";
+        else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdMxFp4>)
+            return "mxfp4";
         else
             static_assert(false);
     }();
@@ -420,7 +430,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     quant_scale_info qscale = quant_scale_info::decode(qscale_str);
 
-    constexpr bool is_mx_type = std::is_same_v<DataTypeConfig, FmhaFwdMxFp8>;
+    constexpr bool is_mx_type =
+        ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
 
     if(is_mx_type && qscale.type != quant_scale_enum::mx)
     {
@@ -827,14 +838,13 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
     else if(qscale.type == quant_scale_enum::mx)
     {
-        auto gen_scales = [&](auto& scales, auto data) {
+        auto gen_scales = [&](auto& scales, auto data, float range) {
             using DataType  = decltype(data);
             using ScaleType = ck_tile::remove_cvref_t<decltype(*scales.begin())>;
             if constexpr(std::is_same_v<ScaleType, ck_tile::e8m0_t>)
             {
                 const float base =
                     -std::log2(ck_tile::type_convert<float>(ck_tile::numeric<DataType>::max()));
-                const float range = 3;
                 // e8m0_t is basically an exponent of float32
                 // When scales are applied to tensor values, value * exp2(base - range) is around
                 // 0.125 and value * exp2(base + range) is around 8 for all types (fp8/bf8/fp4)
@@ -850,9 +860,15 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 static_assert(false);
             }
         };
-        gen_scales(q_descale_host, QDataType{});
-        gen_scales(k_descale_host, KDataType{});
-        gen_scales(v_descale_host, VDataType{});
+        gen_scales(q_descale_host, QDataType{}, 3);
+        gen_scales(k_descale_host, KDataType{}, 3);
+        // When P is fp4, only 8 values (0, 0.5, 1, 1.5, 2, 3, 4, 6) are used to quantize P.
+        // Too large V values can create rare error outliers between host (no quantization) and
+        // device ("running" FA softmax + quantization), here we reduce max value by using smaller
+        // range of V scales.
+        gen_scales(v_descale_host,
+                   VDataType{},
+                   std::is_same_v<typename TypeConfig::PDataType, ck_tile::pk_fp4_t> ? 1 : 3);
     }
 
     iota_shuffle(block_table_host.begin(), block_table_host.end(), 0, random_engine);
@@ -2131,12 +2147,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                                          OaccDataType>(
                     v_host_ref, v_descale_host_ref, kVScaleGranularity);
 
-                // TODO: P is not quantized and then dequantized here (PDataType = float).
-                // Check if it's worth doing it.
+                // P is not quantized and then dequantized here (PDataType = float).
+                // On host softmax is computed for the whole row of S, while on device FA computes
+                // softmax and quantizes it in blocks of N0 values. Quantization on host would make
+                // reference results **less** precise than the device results for large seqlen_k!
 
-                // p_host_ref.ForEach(
-                //     [&](auto& self, auto i) { self(i) = ck_tile::type_convert<PDataType>(1.0f);
-                //     });
                 ck_tile::reference_batched_gemm<PDataType, OaccDataType, OaccDataType, ODataType>(
                     p_host_ref,
                     v_host_ref2,
