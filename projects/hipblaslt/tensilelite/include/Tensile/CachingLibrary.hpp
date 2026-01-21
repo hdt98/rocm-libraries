@@ -165,7 +165,7 @@ namespace TensileLite
 
         CachingLibrary(std::shared_ptr<Library> subLibrary)
             : m_subLibrary(subLibrary)
-            , m_cache(std::make_tuple(nullptr, std::numeric_limits<double>::max()))
+            , m_cache(std::make_tuple(nullptr, (std::numeric_limits<double>::max)()))
             , m_caches(SolutionVector<MySolution>{})
             , m_cachesGroupedGemm(SolutionVector<MySolution>{})
         {
@@ -185,7 +185,7 @@ namespace TensileLite
         {
             try
             {
-                double cachedFitness = std::numeric_limits<double>::max();
+                double cachedFitness = (std::numeric_limits<double>::max)();
                 fitness              = (fitness) ? fitness : &cachedFitness;
 
                 auto const&                 amdgpu = dynamic_cast<AMDGPU const&>(hardware);

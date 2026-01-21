@@ -228,8 +228,8 @@ namespace TensileLite
         int         computeUnitCount = 0;
         int         skDynamicGrid    = 6;
         int         skDynamicWGM     = 0;
-        int         fixedWGM         = std::numeric_limits<int>::max();
-        int         fixedWGMXCC      = std::numeric_limits<int>::max();
+        int         fixedWGM         = (std::numeric_limits<int>::max)();
+        int         fixedWGMXCC      = (std::numeric_limits<int>::max)();
         int         skMaxCUs         = 0;
         int         skGridMultiplier = 1;
         int         skFixedGrid      = 0;
@@ -268,14 +268,14 @@ namespace TensileLite
         const int getFixedWGM() const
         {
             static const char* envStr = std::getenv("TENSILE_FIXED_WGM");
-            static const int   value  = (envStr == NULL ? std::numeric_limits<int>::max() : std::atoi(envStr));
+            static const int   value  = (envStr == NULL ? (std::numeric_limits<int>::max)() : std::atoi(envStr));
             return value;
         }
 
         const int getFixedWGMXCC() const
         {
             static const char* envStr = std::getenv("TENSILE_FIXED_WGMXCC");
-            static const int   value  = (envStr == NULL ? std::numeric_limits<int>::max() : std::atoi(envStr));
+            static const int   value  = (envStr == NULL ? (std::numeric_limits<int>::max)() : std::atoi(envStr));
             return value;
         }
 
