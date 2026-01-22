@@ -426,7 +426,7 @@ struct WmmaTraits<gfx125_t, bf8_t, bf8_t, fp16_t, 16, 16, 64>
 
 template <>
 struct WmmaTraits<gfx125_t, fp8_t, fp8_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, fp8_t, fp8_t, float, 128, false>
+    : WmmaTraitsBase<gfx12_t, fp8_t, fp8_t, float, 128>
 {
     using ArchType = gfx125_t;
 
@@ -453,7 +453,7 @@ struct WmmaTraits<gfx125_t, fp8_t, fp8_t, float, 16, 16, 128>
 
 template <>
 struct WmmaTraits<gfx125_t, bf8_t, bf8_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, bf8_t, bf8_t, float, 128, false>
+    : WmmaTraitsBase<gfx12_t, bf8_t, bf8_t, float, 128>
 {
     using ArchType = gfx125_t;
 
@@ -480,7 +480,7 @@ struct WmmaTraits<gfx125_t, bf8_t, bf8_t, float, 16, 16, 128>
 
 template <>
 struct WmmaTraits<gfx125_t, fp8_t, bf8_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, fp8_t, bf8_t, float, 128, false>
+    : WmmaTraitsBase<gfx12_t, fp8_t, bf8_t, float, 128>
 {
     using ArchType = gfx125_t;
 
@@ -507,7 +507,7 @@ struct WmmaTraits<gfx125_t, fp8_t, bf8_t, float, 16, 16, 128>
 
 template <>
 struct WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 128>
-    : WmmaTraitsBase<gfx12_t, bf8_t, fp8_t, float, 128, false>
+    : WmmaTraitsBase<gfx12_t, bf8_t, fp8_t, float, 128>
 {
     using ArchType = gfx125_t;
 
@@ -523,6 +523,29 @@ struct WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 128>
                                                            bit_cast<fp32x8_t>(c_vec),
                                                            P::reuse_a,  // matrix_a_reuse
                                                            P::reuse_b); // matrix_b_reuse
+#else
+        ck_tile::ignore = a_vec;
+        ck_tile::ignore = b_vec;
+        ck_tile::ignore = c_vec;
+        return CVecType{0};
+#endif
+    }
+};
+
+// 32x16x128 f4 specialization - GFX125
+template <>
+struct WmmaTraits<gfx125_t, pk_fp4_t, pk_fp4_t, float, 32, 16, 128>
+    : WmmaTraitsBase<gfx12_t, pk_fp4_t, pk_fp4_t, float, 128, false, 32, 16>
+{
+    using ArchType = gfx125_t;
+
+    template <typename... Params>
+    CK_TILE_DEVICE static CVecType
+    wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
+    {
+#ifdef __gfx125__
+        return __builtin_amdgcn_wmma_f32_32x16x128_f4(
+            bit_cast<int32x16_t>(a_vec), bit_cast<int32x8_t>(b_vec), 0, bit_cast<fp32x16_t>(c_vec));
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;

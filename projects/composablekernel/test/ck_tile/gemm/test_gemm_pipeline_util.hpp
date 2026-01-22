@@ -246,7 +246,9 @@ class TestCkTileGemmPipeline : public ::testing::Test
 #if defined(CK_USE_GFX1250)
         // this setting is related to wmma layout in gfx1250; will improve performance when C is
         // RowMajor
-        constexpr bool TransposeC = std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor>;
+        constexpr bool TransposeC =
+            std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor> &&
+            M_Warp_Tile == N_Warp_Tile;
 #else
         constexpr bool TransposeC = false;
 #endif
