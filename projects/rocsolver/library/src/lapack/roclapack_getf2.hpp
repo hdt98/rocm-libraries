@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -534,6 +534,14 @@ rocblas_status rocsolver_getf2_getrf_argCheck(rocblas_handle handle,
     // 2. invalid size
     if(m < 0 || n < 0 || lda < m || batch_count < 0)
         return rocblas_status_invalid_size;
+
+    // 2b. check for index overflow: (m-1) + (n-1)*lda must fit in type I
+    // This prevents undefined behavior when indexing large matrices
+    if(matrix_index_overflow(m, n, lda))
+    {
+        printf("index overflow\n"); // uncomment to test overflow check correctly detects
+        return rocblas_status_invalid_size; // TODO: is rocblas_invalid_size appropriate for overflow?
+    }
 
     // skip pointer check if querying memory size
     if(rocblas_is_device_memory_size_query(handle))

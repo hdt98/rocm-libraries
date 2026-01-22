@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -383,6 +383,11 @@ void testing_getf2_getrf(Arguments& argus)
 
     I bc = argus.batch_count;
     int hot_calls = argus.iters;
+
+    // uncomment to test overflow check
+    EXPECT_ROCBLAS_STATUS(rocsolver_getf2_getrf(STRIDED, GETRF, handle, m, n, (T*)nullptr, lda, stA,
+                                                (I*)nullptr, stP, (I*)nullptr, bc),
+                          rocblas_status_success);
 
     rocblas_stride stARes = (argus.unit_check || argus.norm_check || argus.hash_check) ? stA : 0;
     rocblas_stride stPRes = (argus.unit_check || argus.norm_check || argus.hash_check) ? stP : 0;

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 #include <fmt/core.h>
 #include <fmt/ostream.h>
 #include <hip/hip_runtime.h>
+#include <limits>
 #include <rocblas/rocblas.h>
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -48,6 +49,41 @@ ROCSOLVER_BEGIN_NAMESPACE
 __device__ __host__ inline int64_t idx2D(const int64_t i, const int64_t j, const int64_t lda)
 {
     return j * lda + i;
+}
+
+// for an m x n matrix with leading dimension lda, the maximum index is: (m - 1) + (n - 1) * lda
+// check if that overflows for given type I
+template <typename I>
+__host__ inline bool matrix_index_overflow(const I m, const I n, const I lda)
+{
+    if(m <= 0 || n <= 0)
+        return false;
+
+    // calculate max index: (m - 1) + (n - 1) * lda
+    // while checking for overflow at each step
+    if(n > 1)
+    {
+        I n_minus_1 = n - 1;
+        if(lda > std::numeric_limits<I>::max() / n_minus_1)
+            return true;
+    }
+
+    I col_offset = (n > 1) ? (n - 1) * lda : I(0);
+
+    I row_max = m - 1;
+    if(row_max > std::numeric_limits<I>::max() - col_offset)
+        return true;
+
+    return false;
+}
+
+// simple wrapper that returns rocblas_status code for matrix index overflow results
+template <typename I>
+__host__ inline rocblas_status check_matrix_index_overflow(const I m, const I n, const I lda)
+{
+    return matrix_index_overflow(m, n, lda)
+        ? rocblas_status_invalid_size // TODO: is rocblas_invalid_size appropriate for overflow?
+        : rocblas_status_continue;
 }
 
 __device__ __host__ inline int64_t
