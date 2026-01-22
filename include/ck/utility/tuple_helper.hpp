@@ -37,8 +37,19 @@ __host__ __device__ constexpr auto generate_tie(F&& f, Number<N>)
                   typename arithmetic_sequence_gen<0, N, 1>::type{});
 }
 
-// Optimized helper for common pattern: generate_tuple([](auto i) { return Sequence<i.value>{}; },
-// N) Creates Tuple<Sequence<0>, Sequence<1>, ..., Sequence<N-1>> without lambda instantiation
+// generate_identity_sequences - creates Tuple<Sequence<0>, Sequence<1>, ..., Sequence<N-1>>
+//
+// Optimization: Uses pack expansion with named functor to avoid per-element lambda instantiation
+//
+// Why this approach:
+// - Common pattern: creating identity permutations for tensor dimensions
+// - Lambda approach: N unique lambda types for N sequences → O(N) instantiations
+// - Named functor approach: Single functor type → O(1) instantiation overhead
+//
+// The detail::make_identity_sequences_impl creates a Sequence<I> for each index I via pack expansion
+//
+// Impact: Reduces instantiation overhead for identity sequence generation (common in transforms)
+//
 namespace detail {
 template <index_t... Is>
 __host__ __device__ constexpr auto make_identity_sequences_impl(Sequence<Is...>)
@@ -59,8 +70,21 @@ __host__ __device__ constexpr auto generate_identity_sequences(Number<N>)
     return generate_identity_sequences<N>();
 }
 
-// Optimized helper for common pattern: generate_tuple([&](auto) { return value; }, Number<N>{})
-// Creates Tuple<T, T, ..., T> (N copies) without lambda instantiation
+// make_uniform_tuple - generates a tuple of N identical values without lambda instantiation
+//
+// Optimization: Uses named functor with pack expansion instead of generate_tuple with lambda
+//
+// Why this approach:
+// - generate_tuple with lambda: each Size instantiates a unique lambda type → O(N) instantiations
+// - make_uniform_tuple with named functor: single functor type reused → O(1) instantiations
+// - Pack expansion ((void)Is, Value)... creates N copies of Value without recursion
+//
+// Example: make_uniform_tuple<4>(42) generates Tuple<42, 42, 42, 42>
+// - Old way: generate_tuple<4>([](auto) { return 42; }) → 4+ lambda instantiations
+// - New way: make_uniform_tuple<4>(42) → 1 functor instantiation
+//
+// Impact: Reduces instantiation count when creating uniform tuples (common in tensor ops)
+//
 namespace detail {
 template <typename T, index_t... Is>
 __host__ __device__ constexpr auto make_uniform_tuple_impl(T&& value, Sequence<Is...>)
