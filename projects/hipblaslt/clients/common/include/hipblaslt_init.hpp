@@ -246,12 +246,18 @@ inline void hipblaslt_init_sin(
             size_t offsetValue = j * M + i_batch * M * N;
             for(size_t i = 0; i < M; ++i)
             {
-                double val = std::sin(static_cast<double>(i + offsetValue)); // Use std::sin
+                // Real part uses sin()
+                double val = std::sin(static_cast<double>(i + offsetValue));
+
                 if constexpr(is_std_complex_v<T>)
                 {
-                    // Complex Case: Set real part to sin(x), imaginary part to 0.0
-                    using RealT   = typename T::value_type;
-                    A[i + offset] = T(static_cast<RealT>(val), static_cast<RealT>(0.0));
+                    using RealT = typename T::value_type;
+
+                    // Imaginary part uses cos() to be distinct and non-zero.
+                    // This ensures (a+bi)*(c+di) computes full complex arithmetic.
+                    double val_imag = std::cos(static_cast<double>(i + offsetValue));
+
+                    A[i + offset] = T(static_cast<RealT>(val), static_cast<RealT>(val_imag));
                 }
                 else
                 {
@@ -894,8 +900,8 @@ inline void hipblaslt_init_nan_tri(bool        upper,
             upper, static_cast<std::complex<float>*>(A), M, N, lda, stride, batch_count);
         break;
     case HIP_C_64F:
-        hipblaslt_init_nan_tri<std::complex<double>>(upper,
-            static_cast<std::complex<double>*>(A), M, N, lda, stride, batch_count);
+        hipblaslt_init_nan_tri<std::complex<double>>(
+            upper, static_cast<std::complex<double>*>(A), M, N, lda, stride, batch_count);
         break;
     case HIP_R_16F:
         hipblaslt_init_nan_tri(
