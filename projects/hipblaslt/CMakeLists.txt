@@ -139,6 +139,7 @@ if(HIPBLASLT_ENABLE_CLIENT)
 
     # There is an implicit find_package(BLAS) when finding lapack
     find_package(LAPACK REQUIRED)
+    find_package(cblas REQUIRED)
 endif()
 
 if(HIPBLASLT_ENABLE_OPENMP)
