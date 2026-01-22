@@ -33,9 +33,44 @@ struct e4m3_scale_t
         : data{static_cast<type>(static_cast<type>(init) & value_mask)}
     {
     }
-    __host__ __device__ explicit e4m3_scale_t(float scale) : data{Format::encode(scale)} {}
+    __host__ __device__ explicit e4m3_scale_t(float scale)
+    {
+#if defined(__gfx1250__)
+        union
+        {
+            float fval;
+            uint32_t i32val;
+            uint8_t i8val[4];
+        } val;
+        val.fval             = scale;
+        uint32_t ival        = 0;
+        const float max_e4m3 = 448.0f;
+        // if x is not +/- infinity or nan
+        if((val.i32val & 0x7F800000) != 0x7F800000)
+            // clip float value
+            val.fval = __builtin_amdgcn_fmed3f(val.fval, max_e4m3, -max_e4m3);
+        ival       = __builtin_amdgcn_cvt_pk_fp8_f32(val.fval, val.fval, ival, false);
+        val.i32val = ival;
+        data       = val.i8val[0] & value_mask; // apply a 7-bit mask
+#else
+        data = Format::encode(scale);
+#endif
+    }
 
-    __host__ __device__ explicit operator float() const { return Format::decode(data); }
+    __host__ __device__ explicit operator float() const
+    {
+#if defined(__gfx1250__)
+        union
+        {
+            unsigned int i32val;
+            uint8_t i8val[4];
+        } val;
+        val.i8val[0] = this->data;
+        return __builtin_amdgcn_cvt_f32_fp8(val.i32val, false);
+#else
+        return Format::decode(data);
+#endif
+    }
 
     __host__ __device__ constexpr bool operator==(const e4m3_scale_t& other) const
     {

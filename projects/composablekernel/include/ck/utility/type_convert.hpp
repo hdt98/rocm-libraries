@@ -2920,47 +2920,6 @@ inline __host__ __device__ bhalf16_t type_convert<bhalf16_t, bf6x16_pk_t>(bf6x16
 {
     return type_convert<bhalf16_t>(static_cast<bf6x16_t>(x));
 }
-
-template <>
-inline __host__ __device__ e8m0_bexp_t type_convert<e8m0_bexp_t, float>(float x)
-{
-    return e8m0_bexp_t(x);
-}
-
-template <>
-inline __host__ __device__ e4m3_scale_t type_convert<e4m3_scale_t, float>(float x)
-{
-#if defined(__gfx1250__)
-    return e4m3_scale_t{type_convert<f8_ocp_t>(x).data & 0x7F}; // convert and apply a 7-bit mask
-#else
-    return e4m3_scale_t(x);
-#endif
-}
-
-template <>
-inline __host__ __device__ e5m3_scale_t type_convert<e5m3_scale_t, float>(float x)
-{
-#if defined(__gfx1250__)
-    union
-    {
-        float fval;
-        uint32_t i32val;
-        uint8_t i8val[4];
-    } val;
-    val.fval             = x;
-    uint32_t ival        = 0;
-    const float max_e5m3 = 114688.0f;
-    // if x is not +/- infinity or nan
-    if((val.i32val & NumericUtils<float>::nan_mask) != NumericUtils<float>::Inf)
-        // clip float value
-        val.fval = __builtin_amdgcn_fmed3f(val.fval, max_e5m3, -max_e5m3);
-    ival       = __builtin_amdgcn_cvt_pk_fp8_f32(val.fval, val.fval, ival, true);
-    val.i32val = ival;
-    return e5m3_scale_t{val.i8val[0]};
-#else
-    return e5m3_scale_t(x);
-#endif
-}
 #endif
 
 #if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
