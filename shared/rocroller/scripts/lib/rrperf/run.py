@@ -67,6 +67,7 @@ def run_problems(
     env: Dict[str, str],
     id_filter: list[str],
     l2: bool,
+    banks: bool,
 ) -> bool:
 
     SOLUTION_NOT_SUPPORTED_ON_ARCH = 3
@@ -92,11 +93,16 @@ def run_problems(
         rr_env = {k: str(v) for k, v in env.items() if k.startswith("ROC")}
         rr_env_str = " ".join([f"{k}={v}" for k, v in rr_env.items()])
 
-        if l2:
+        if l2 or banks:
             counters = str(yaml.resolve().parent / yaml.stem)
+            pmc_counters = []
+            if l2:
+                pmc_counters.extend(["TCC_HIT", "TCC_MISS"])
+            if banks:
+                pmc_counters.append("SQ_LDS_BANK_CONFLICT")
             cmd = [
                 "rocprofv3",
-                "--pmc=TCC_HIT,TCC_MISS",
+                "--pmc=" + ",".join(pmc_counters),
                 "--output-file=" + counters,
                 "--output-format=json",
                 "--",
@@ -208,6 +214,11 @@ def get_args(parser: argparse.ArgumentParser):
         help="Collect L2 performance counters (TCC_HIT and TCC_MISS).",
     )
     parser.add_argument(
+        "--banks",
+        action="store_true",
+        help="Collect LDS bank conflict counters (SQ_LDS_BANK_CONFLICT).",
+    )
+    parser.add_argument(
         "--dump_csv",
         help="Dump benchmark CSV with included headers.",
         action="store_true",
@@ -231,6 +242,7 @@ def run_cli(  # noqa: C901
     pin_clocks: bool = False,
     recast: bool = False,
     l2: bool = False,
+    banks: bool = False,
     **kwargs,
 ) -> Tuple[bool, Path]:
     """Run benchmarks!
@@ -281,7 +293,7 @@ def run_cli(  # noqa: C901
     timestamp = rundir / "timestamp.txt"
     timestamp.write_text(str(datetime.datetime.now().timestamp()) + "\n")
 
-    result = run_problems(generator, build_dir, rundir, env, id_filter, l2)
+    result = run_problems(generator, build_dir, rundir, env, id_filter, l2, banks)
 
     if submit:
         ptsdir = rundir / "rocRoller"
