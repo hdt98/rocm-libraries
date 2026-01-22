@@ -83,8 +83,10 @@ struct TensorDescriptor
 
         constexpr index_t idim_hidden = VisibleDimensionIds::At(idim_visible);
 
-        // Use compile-time search helper instead of nested static_for with lambdas
-        // This eliminates ~918 applier::operator() instantiations
+        // Use compile-time search helper instead of nested static_for loops
+        // This optimization significantly reduces applier::operator() template instantiations
+        // by replacing nested lambda-based loops with a single constexpr search function.
+        // See sequence_helper.hpp::find_in_tuple_of_sequences for implementation details.
         constexpr auto result = find_in_tuple_of_sequences<idim_hidden>(UpperDimensionIdss{});
 
         return make_tuple(result.itran, result.idim_up, result.found);
