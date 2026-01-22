@@ -105,6 +105,18 @@ struct BlockwiseGemmXdlops_mx_pipeline_base
     static constexpr auto a_scale_thread_vec_size = sizeof(int32_t) / scale_pack_size_a;
     static constexpr auto b_scale_thread_vec_size = sizeof(int32_t) / scale_pack_size_b;
 
+    // Detect FP4/FP6 separately for A and B based on packed_size_v:
+    // FP4: packed_size_v = 2 (f4x2_pk_t)
+    // FP6: packed_size_v = 16 or 32 (f6x16_pk_t, f6x32_pk_t, bf6x16_pk_t, bf6x32_pk_t)
+    // FP8: packed_size_v = 1 or other small values
+    // Note: 2x MFMA speedup requires BOTH operands to be the right type
+    static constexpr bool IsF4_A = (packed_size_v<ComputeTypeA> == 2);
+    static constexpr bool IsF4_B = (packed_size_v<ComputeTypeB> == 2);
+    static constexpr bool IsF6_A =
+        (packed_size_v<ComputeTypeA> == 16 || packed_size_v<ComputeTypeA> == 32);
+    static constexpr bool IsF6_B =
+        (packed_size_v<ComputeTypeB> == 16 || packed_size_v<ComputeTypeB> == 32);
+
     using HotLoopInstList = ck::BlockwiseGemmXdlops_pipeline_hotloop_inst< //
         BlockSize,
         MPerBlock,
@@ -121,7 +133,10 @@ struct BlockwiseGemmXdlops_mx_pipeline_base
         MPerXDL,
         NPerXDL,
         xdlops_gemm.KPerXdlops,
-        (packed_size_v<ComputeTypeA> > 1 || packed_size_v<ComputeTypeB> > 1)>;
+        IsF4_A,
+        IsF4_B,
+        IsF6_A,
+        IsF6_B>;
 #if defined(__HIP_DEVICE_COMPILE__)
     static_assert(KPerThread % KPack == 0,
                   "Wrong KPack setting; try increasing KPerThread or decreasing KPack");

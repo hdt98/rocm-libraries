@@ -1951,7 +1951,9 @@ struct MfmaSelector
     template <>
     constexpr auto GetMfma<f6_t, 16, 16, f6_t, is_single_rate_mfma, true>()
     {
-#if defined(__gfx12__)
+#if defined(__gfx125__)
+        return MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125;
+#elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
@@ -1967,7 +1969,9 @@ struct MfmaSelector
     template <>
     constexpr auto GetMfma<bf6_t, 16, 16, bf6_t, is_single_rate_mfma, true>()
     {
-#if defined(__gfx12__)
+#if defined(__gfx125__)
+        return MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125;
+#elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;

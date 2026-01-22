@@ -1124,7 +1124,9 @@ __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) con
                       (is_same<T, bf8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
                       (is_same<T, f4x2_pk_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
                       (is_same<T, int8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
-                      (is_same<T, uint8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)),
+                      (is_same<T, uint8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
+                      (is_same<T, f6x16_pk_t>::value && (N == 1 || N == 2 || N == 4 || N == 8)) ||
+                      (is_same<T, bf6x16_pk_t>::value && (N == 1 || N == 2 || N == 4 || N == 8)),
                   "wrong! not yet supported");
 
     amd_async_copy_to_lds_impl_raw<T,
