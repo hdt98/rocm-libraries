@@ -5281,7 +5281,8 @@ struct DataPerVGPR<T, enable_if_t<is_same_v<T, half_t> || is_same_v<T, bhalf_t>>
 };
 
 template <typename T>
-struct DataPerVGPR<T, enable_if_t<is_same_v<T, f8_t> || is_same_v<T, bf8_t>>>
+struct DataPerVGPR<T,
+                   enable_if_t<is_same_v<T, f8_t> || is_same_v<T, bf8_t> || is_same_v<T, int8_t>>>
 {
     static constexpr index_t value = 4;
 };

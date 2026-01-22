@@ -12,7 +12,7 @@
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/device/device_batched_gemm.hpp"
 #include "ck/tensor_operation/gpu/device/gemm_specialization.hpp"
-#include "ck/tensor_operation/gpu/grid/gridwise_gemm_wmma_cshuffle_v3_b_scale.hpp"
+#include "ck/tensor_operation/gpu/grid/gridwise_gemm_wmma_cshuffle_v3_ab_scale.hpp"
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/flush_cache.hpp"
@@ -37,7 +37,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
                                               // argument through implicit conversion to base class!
         const ComputePtrOffsetOfStridedBatch compute_ptr_offset_of_batch)
 {
-#if(defined(__gfx11__) || defined(__gfx12__))
+#if(defined(__gfx11__) || defined(__gfx12__) || defined(__gfx13__))
 #if defined(__gfx11__)
     // gfx11 does not support *_atomic_pk_add_f16/bf16 instructions
     using c_data_type = remove_cvref_t<remove_pointer_t<decltype(karg.p_e_grid)>>;
@@ -93,7 +93,8 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
             p_bs_grid_shift,
             karg.p_ds_grid,
             karg.p_e_grid + splitk_batch_offset.c_reduce_offset + c_batch_offset,
-            karg.p_b_scale_grid + b_scale_batch_offset + splitk_batch_offset.scale_k_split_offset,
+            karg.p_a_scale_grid,
+            karg.p_b_scale_grid + b_scale_batch_offset + splitk_batch_offset.scale_b_k_split_offset,
             p_shared,
             karg,
             karg.a_element_op,
@@ -315,12 +316,13 @@ struct DeviceBatchedGemm_Wmma_CShuffleV3_BScale
     };
 
     // GridwiseGemm
-    using GridwiseGemm = GridwiseGemm_wmma_cshuffle_v3_b_scale<
+    using GridwiseGemm = GridwiseGemm_wmma_cshuffle_v3_ab_scale<
         ALayout,
         BLayout,
         Tuple<>, // DsLayout
         CLayout,
         Tuple<ADataType>,
+        void, // AScaleType
         Tuple<BDataType>,
         BScaleDataType,
         AccDataType,
@@ -332,6 +334,7 @@ struct DeviceBatchedGemm_Wmma_CShuffleV3_BScale
         CElementwiseOperation,
         GemmSpec,
         BlockSize,
+        0, // ScaleBlockM
         ScaleBlockN,
         ScaleBlockK,
         MPerBlock,
@@ -405,7 +408,9 @@ struct DeviceBatchedGemm_Wmma_CShuffleV3_BScale
                                      std::array<index_t, 1>{StrideB_},
                                      std::array<index_t, 0>{}, // StrideDs_
                                      StrideC_,
+                                     0, // StrideScaleA
                                      StrideScaleB_,
+                                     nullptr,
                                      p_b_scale_grid_,
                                      k_batch_,
                                      a_element_op_,
@@ -651,7 +656,7 @@ struct DeviceBatchedGemm_Wmma_CShuffleV3_BScale
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_gfx11_supported() && !ck::is_gfx12_supported())
+        if(!ck::is_gfx11_supported() && !ck::is_gfx12_supported() && !ck::is_gfx13_supported())
         {
             return false;
         }

@@ -161,7 +161,7 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
     __device__ static constexpr auto HotLoopScheduler()
     {
-#if !defined(__gfx11__) && !defined(__gfx12__)
+#if !defined(__gfx11__) && !defined(__gfx12__) && !defined(__gfx13__)
         // A/B split schedule
         // compiler is likely to use ds_read2 when instruction width smaller than 16bytes
         constexpr auto num_ds_read_inst_a =

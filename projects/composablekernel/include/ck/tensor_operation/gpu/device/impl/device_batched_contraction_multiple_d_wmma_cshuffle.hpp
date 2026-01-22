@@ -520,11 +520,13 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
 
         __host__ __device__ constexpr auto GetDsPtrOffset(index_t g_idx) const
         {
-            Array<long_index_t, NumDTensor> ds_offset;
+            std::array<long_index_t, NumDTensor> ds_offset;
+
             static_for<0, NumDTensor, 1>{}([&](auto i) {
-                ds_offset(i) = static_cast<long_index_t>(g_idx) *
+                ds_offset[i] = static_cast<long_index_t>(g_idx) *
                                ds_grid_desc_g_m_n_[i].CalculateOffset(make_multi_index(1, 0, 0));
             });
+
             return ds_offset;
         }
 
@@ -834,7 +836,7 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(ck::is_gfx11_supported() || ck::is_gfx13_supported())
+        if(ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported())
         {
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, int32_t>))
             {

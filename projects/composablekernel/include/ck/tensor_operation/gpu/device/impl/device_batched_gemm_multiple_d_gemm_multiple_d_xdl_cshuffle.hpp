@@ -68,7 +68,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         const index_t batch_count,
         const ComputeBasePtrOfStridedBatch compute_base_ptr_of_batch)
 {
-#if defined(__gfx9__) || defined(__gfx11__) || defined(__gfx12__)
+#if defined(__gfx9__) || defined(__gfx11__) || defined(__gfx12__) || defined(__gfx13__)
     if constexpr(GridwiseGemm::template IsValidCompilationParameter<>())
     {
         __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
@@ -235,20 +235,20 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
 {
     using DeviceOp = DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle;
 
-    static constexpr auto Gemm0MXdlPerWave64 = GetNXdlPerWave2<BlockSize,
-                                                               Gemm0NPerBlock,
-                                                               Gemm0MPerBlock,
-                                                               Gemm0NPerXdl,
-                                                               Gemm0MPerXdl,
-                                                               Gemm0NXdlPerWave,
-                                                               true>();
-    static constexpr auto Gemm0MXdlPerWave32 = GetNXdlPerWave2<BlockSize,
-                                                               Gemm0NPerBlock,
-                                                               Gemm0MPerBlock,
-                                                               Gemm0NPerXdl,
-                                                               Gemm0MPerXdl,
-                                                               Gemm0NXdlPerWave,
-                                                               false>();
+    static constexpr auto Gemm0MXdlPerWave64 = GetXdlPerWave2<BlockSize,
+                                                              Gemm0NPerBlock,
+                                                              Gemm0MPerBlock,
+                                                              Gemm0NPerXdl,
+                                                              Gemm0MPerXdl,
+                                                              Gemm0NXdlPerWave,
+                                                              true>();
+    static constexpr auto Gemm0MXdlPerWave32 = GetXdlPerWave2<BlockSize,
+                                                              Gemm0NPerBlock,
+                                                              Gemm0MPerBlock,
+                                                              Gemm0NPerXdl,
+                                                              Gemm0MPerXdl,
+                                                              Gemm0NXdlPerWave,
+                                                              false>();
 
     static constexpr index_t NumD0Tensor = D0sDataType::Size();
     static constexpr index_t NumD1Tensor = D1sDataType::Size();
