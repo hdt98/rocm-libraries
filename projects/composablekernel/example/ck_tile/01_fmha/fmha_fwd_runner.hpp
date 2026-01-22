@@ -430,20 +430,19 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     quant_scale_info qscale = quant_scale_info::decode(qscale_str);
 
-    constexpr bool is_mx_type =
-        ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
+    constexpr bool is_mx = ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
 
-    if(is_mx_type && qscale.type != quant_scale_enum::mx)
+    if(is_mx && qscale.type != quant_scale_enum::mx)
     {
         std::cerr << "The value of qscale_str must be 'mx' for MX data types" << std::endl;
         return fwd_result::invalid_args;
     }
-    else if(!is_mx_type && qscale.type == quant_scale_enum::mx)
+    else if(!is_mx && qscale.type == quant_scale_enum::mx)
     {
         std::cerr << "The value of qscale_str cannot be 'mx' for non-MX data types" << std::endl;
         return fwd_result::invalid_args;
     }
-    if(is_mx_type && is_v_rowmajor)
+    if(is_mx && is_v_rowmajor)
     {
         std::cerr << "The value of is_v_rowmajor must be 'false' for MX data types" << std::endl;
         return fwd_result::invalid_args;
@@ -507,25 +506,22 @@ fwd_result fmha_fwd_run(mode_enum mode,
     using LSEDataType           = typename TypeConfig::LSEDataType;
     using SaccDataType          = typename TypeConfig::SaccDataType;
     using SMPLComputeDataType   = typename TypeConfig::SMPLComputeDataType;
-    using PDataType    = std::conditional_t<is_mx_type, float, typename TypeConfig::PDataType>;
-    using OaccDataType = typename TypeConfig::OaccDataType;
-    using ODataType    = typename TypeConfig::ODataType;
+    using PDataType             = std::conditional_t<is_mx, float, typename TypeConfig::PDataType>;
+    using OaccDataType          = typename TypeConfig::OaccDataType;
+    using ODataType             = typename TypeConfig::ODataType;
 
-    using QScaleDataType =
-        std::conditional_t<is_mx_type, typename TypeConfig::QScaleDataType, float>;
-    using KScaleDataType =
-        std::conditional_t<is_mx_type, typename TypeConfig::KScaleDataType, float>;
-    using VScaleDataType =
-        std::conditional_t<is_mx_type, typename TypeConfig::VScaleDataType, float>;
+    using QScaleDataType = std::conditional_t<is_mx, typename TypeConfig::QScaleDataType, float>;
+    using KScaleDataType = std::conditional_t<is_mx, typename TypeConfig::KScaleDataType, float>;
+    using VScaleDataType = std::conditional_t<is_mx, typename TypeConfig::VScaleDataType, float>;
 
     constexpr ck_tile::index_t kQKScaleGranularity = []() {
-        if constexpr(is_mx_type)
+        if constexpr(is_mx)
             return TypeConfig::kQKScaleGranularity;
         else
             return 1;
     }();
     constexpr ck_tile::index_t kVScaleGranularity = []() {
-        if constexpr(is_mx_type)
+        if constexpr(is_mx)
             return TypeConfig::kVScaleGranularity;
         else
             return 1;
@@ -686,16 +682,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::HostTensor<QScaleDataType> q_descale_host({1});
     ck_tile::HostTensor<KScaleDataType> k_descale_host({1});
     ck_tile::HostTensor<VScaleDataType> v_descale_host({1});
-    if(qscale.type == quant_scale_enum::blockscale)
-    {
-        q_descale_host = ck_tile::HostTensor<float>(
-            std::array<ck_tile::index_t, 3>{shape_batch, nhead, num_block_scale_q});
-        k_descale_host = ck_tile::HostTensor<float>(
-            std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_kv});
-        v_descale_host = ck_tile::HostTensor<float>(
-            std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_kv});
-    }
-    else if(qscale.type == quant_scale_enum::mx)
+    if constexpr(is_mx)
     {
         // TODO: group mode
         q_descale_host = ck_tile::HostTensor<QScaleDataType>(
@@ -704,6 +691,15 @@ fwd_result fmha_fwd_run(mode_enum mode,
             get_lengths(i_perm, shape_batch, nhead_k, shape_seqlen_k, hdim_q_scale));
         v_descale_host = ck_tile::HostTensor<VScaleDataType>(
             get_lengths(i_perm, shape_batch, nhead_k, hdim_v, shape_seqlen_v_scale));
+    }
+    else if(qscale.type == quant_scale_enum::blockscale)
+    {
+        q_descale_host = ck_tile::HostTensor<QScaleDataType>(
+            std::array<ck_tile::index_t, 3>{shape_batch, nhead, num_block_scale_q});
+        k_descale_host = ck_tile::HostTensor<KScaleDataType>(
+            std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_kv});
+        v_descale_host = ck_tile::HostTensor<VScaleDataType>(
+            std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_kv});
     }
 
     // batch mode of lse data layout is [batch, nhead, seqlen_q]
@@ -807,36 +803,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             }
         }
     }
-    if(qscale.type == quant_scale_enum::pertensor)
-    {
-        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
-        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
-        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
-
-        float qkv_max     = 3.f;
-        q_descale_host(0) = qkv_max / q_dtype_max;
-        k_descale_host(0) = qkv_max / k_dtype_max;
-        v_descale_host(0) = qkv_max / v_dtype_max;
-    }
-    else if(qscale.type == quant_scale_enum::blockscale)
-    {
-        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
-        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
-        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
-
-        float qkv_max       = 3.f;
-        float max_descale_q = qkv_max / q_dtype_max;
-        float max_descale_k = qkv_max / k_dtype_max;
-        float max_descale_v = qkv_max / v_dtype_max;
-
-        ck_tile::FillUniformDistribution<float>{max_descale_q * 0.8f, max_descale_q, next_seed()}(
-            q_descale_host);
-        ck_tile::FillUniformDistribution<float>{max_descale_k * 0.8f, max_descale_k, next_seed()}(
-            k_descale_host);
-        ck_tile::FillUniformDistribution<float>{max_descale_v * 0.8f, max_descale_v, next_seed()}(
-            v_descale_host);
-    }
-    else if(qscale.type == quant_scale_enum::mx)
+    if constexpr(is_mx)
     {
         auto gen_scales = [&](auto& scales, auto data, float range) {
             using DataType  = decltype(data);
@@ -869,6 +836,35 @@ fwd_result fmha_fwd_run(mode_enum mode,
         gen_scales(v_descale_host,
                    VDataType{},
                    std::is_same_v<typename TypeConfig::PDataType, ck_tile::pk_fp4_t> ? 1 : 3);
+    }
+    else if(qscale.type == quant_scale_enum::pertensor)
+    {
+        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
+        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
+        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
+
+        float qkv_max     = 3.f;
+        q_descale_host(0) = qkv_max / q_dtype_max;
+        k_descale_host(0) = qkv_max / k_dtype_max;
+        v_descale_host(0) = qkv_max / v_dtype_max;
+    }
+    else if(qscale.type == quant_scale_enum::blockscale)
+    {
+        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
+        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
+        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
+
+        float qkv_max       = 3.f;
+        float max_descale_q = qkv_max / q_dtype_max;
+        float max_descale_k = qkv_max / k_dtype_max;
+        float max_descale_v = qkv_max / v_dtype_max;
+
+        ck_tile::FillUniformDistribution<float>{max_descale_q * 0.8f, max_descale_q, next_seed()}(
+            q_descale_host);
+        ck_tile::FillUniformDistribution<float>{max_descale_k * 0.8f, max_descale_k, next_seed()}(
+            k_descale_host);
+        ck_tile::FillUniformDistribution<float>{max_descale_v * 0.8f, max_descale_v, next_seed()}(
+            v_descale_host);
     }
 
     iota_shuffle(block_table_host.begin(), block_table_host.end(), 0, random_engine);
@@ -1494,8 +1490,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
         fmha_fwd_args fmha_args;
         init_args(fmha_args);
 
-        if(is_mx_type && ck_tile::get_device_name() != "gfx950")
-            return 1.0f;
         return fmha_fwd(fmha_traits, fmha_args, sc);
     };
     const float fwd_ave_time = run_fwd(stream_config);
@@ -1595,7 +1589,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         float scale_p_host = 1.0f;
         float scale_o_host = 1.0f;
 
-        if constexpr(!is_mx_type)
+        if constexpr(!is_mx)
         {
             if(qscale.type == quant_scale_enum::pertensor)
             {
@@ -1816,32 +1810,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
 #endif
 
             // reference
-            if(qscale.type == quant_scale_enum::blockscale)
-            {
-                const ck_tile::index_t q_offset =
-                    (mode == mode_enum::batch) ? 0 : block_scale_seqstart_q_host[wb];
-                const ck_tile::index_t k_offset =
-                    (mode == mode_enum::batch) ? 0 : block_scale_seqstart_k_host[wb];
-                ck_tile::reference_batched_quant_gemm<QDataType,
-                                                      KDataType,
-                                                      SaccDataType,
-                                                      SMPLComputeDataType>(
-                    q_host_ref,
-                    k_host_ref,
-                    s_host_ref,
-                    ck_tile::idx_identity{},
-                    ck_tile::idx_identity{},
-                    [&](auto idx, auto value) {
-                        return value * scale_s *
-                               q_descale_host(b_idx,
-                                              std::get<0>(idx),
-                                              q_offset + std::get<1>(idx) / block_scale_size_q_) *
-                               k_descale_host(b_idx,
-                                              std::get<0>(idx) / nr,
-                                              k_offset + std::get<2>(idx) / block_scale_size_kv_);
-                    });
-            }
-            else if(qscale.type == quant_scale_enum::mx)
+            if constexpr(is_mx)
             {
                 ck_tile::HostTensor<QScaleDataType> q_descale_host_ref(
                     {nhead, real_seqlen_q, hdim_q_scale});
@@ -1878,6 +1847,31 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                                      ck_tile::identity{},
                                                                      ck_tile::identity{},
                                                                      ck_tile::scales(scale_s_host));
+            }
+            else if(qscale.type == quant_scale_enum::blockscale)
+            {
+                const ck_tile::index_t q_offset =
+                    (mode == mode_enum::batch) ? 0 : block_scale_seqstart_q_host[wb];
+                const ck_tile::index_t k_offset =
+                    (mode == mode_enum::batch) ? 0 : block_scale_seqstart_k_host[wb];
+                ck_tile::reference_batched_quant_gemm<QDataType,
+                                                      KDataType,
+                                                      SaccDataType,
+                                                      SMPLComputeDataType>(
+                    q_host_ref,
+                    k_host_ref,
+                    s_host_ref,
+                    ck_tile::idx_identity{},
+                    ck_tile::idx_identity{},
+                    [&](auto idx, auto value) {
+                        return value * scale_s *
+                               q_descale_host(b_idx,
+                                              std::get<0>(idx),
+                                              q_offset + std::get<1>(idx) / block_scale_size_q_) *
+                               k_descale_host(b_idx,
+                                              std::get<0>(idx) / nr,
+                                              k_offset + std::get<2>(idx) / block_scale_size_kv_);
+                    });
             }
             else
             {
@@ -2109,26 +2103,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 pass &= cur_pass;
             }
 
-            if(qscale.type == quant_scale_enum::blockscale)
-            {
-                const ck_tile::index_t v_offset =
-                    (mode == mode_enum::batch) ? 0 : block_scale_seqstart_k_host[wb];
-                ck_tile::
-                    reference_batched_quant_gemm<PDataType, VDataType, OaccDataType, ODataType>(
-                        p_host_ref,
-                        v_host_ref,
-                        o_host_ref,
-                        ck_tile::idx_identity{},
-                        [&](auto idx, auto value) {
-                            return ck_tile::type_convert<float>(value) *
-                                   v_descale_host(b_idx,
-                                                  std::get<0>(idx) / nr,
-                                                  v_offset +
-                                                      std::get<2>(idx) / block_scale_size_kv_);
-                        },
-                        ck_tile::idx_identity{});
-            }
-            else if(qscale.type == quant_scale_enum::mx)
+            if constexpr(is_mx)
             {
                 const ck_tile::index_t real_seqlen_v_scale =
                     ck_tile::integer_divide_ceil(real_seqlen_k, kVScaleGranularity);
@@ -2159,6 +2134,25 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     ck_tile::identity{},
                     ck_tile::identity{},
                     oacc_element_func);
+            }
+            else if(qscale.type == quant_scale_enum::blockscale)
+            {
+                const ck_tile::index_t v_offset =
+                    (mode == mode_enum::batch) ? 0 : block_scale_seqstart_k_host[wb];
+                ck_tile::
+                    reference_batched_quant_gemm<PDataType, VDataType, OaccDataType, ODataType>(
+                        p_host_ref,
+                        v_host_ref,
+                        o_host_ref,
+                        ck_tile::idx_identity{},
+                        [&](auto idx, auto value) {
+                            return ck_tile::type_convert<float>(value) *
+                                   v_descale_host(b_idx,
+                                                  std::get<0>(idx) / nr,
+                                                  v_offset +
+                                                      std::get<2>(idx) / block_scale_size_kv_);
+                        },
+                        ck_tile::idx_identity{});
             }
             else
             {

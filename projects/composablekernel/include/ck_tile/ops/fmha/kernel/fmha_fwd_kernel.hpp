@@ -1894,6 +1894,9 @@ struct FmhaFwdKernel
                         k_descale_ptr,
                         v_descale_ptr,
                         kargs.block_scale_size_kv,
+                        ignore,
+                        ignore,
+                        ignore,
                         sink_value);
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)

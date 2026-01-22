@@ -64,7 +64,6 @@ struct BlockFmhaPipelineQRKSVS
     static constexpr bool kHasDropout       = Problem::kHasDropout;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
     static constexpr bool kHasSink          = Problem::kHasSink;
-    static constexpr auto QScaleEnum        = Problem::QScaleEnum;
 
     static constexpr ck_tile::index_t kQKScaleGranularity = Problem::kQKScaleGranularity;
     static constexpr ck_tile::index_t kVScaleGranularity  = Problem::kVScaleGranularity;
@@ -187,12 +186,12 @@ struct BlockFmhaPipelineQRKSVS
                const float* k_descale_ptr,
                const float* v_descale_ptr,
                const index_t block_scale_size_kv,
-               const QScaleDramBlockWindowTmp& q_scale_dram_block_window_tmp =
-                   ignore, // M0*(K0/kQKScaleGranularity) tile
-               const KScaleDramBlockWindowTmp& k_scale_dram_block_window_tmp =
-                   ignore, // N0*(K0/kQKScaleGranularity) tile
-               const VScaleDramBlockWindowTmp& v_scale_dram_block_window_tmp =
-                   ignore, // N1*(K1/kVScaleGranularity) tile
+               const QScaleDramBlockWindowTmp&
+                   q_scale_dram_block_window_tmp, // M0*(K0/kQKScaleGranularity) tile
+               const KScaleDramBlockWindowTmp&
+                   k_scale_dram_block_window_tmp, // N0*(K0/kQKScaleGranularity) tile
+               const VScaleDramBlockWindowTmp&
+                   v_scale_dram_block_window_tmp, // N1*(K1/kVScaleGranularity) tile
                const float sink_v) const
     {
         static_assert(
@@ -1048,6 +1047,9 @@ struct BlockFmhaPipelineQRKSVS
                           nullptr,
                           nullptr,
                           1,
+                          ignore,
+                          ignore,
+                          ignore,
                           sink_v);
     }
 };
