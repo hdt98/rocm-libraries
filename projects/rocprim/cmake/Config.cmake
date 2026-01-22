@@ -44,14 +44,18 @@ endmacro(setup_languages)
 # Derive the device architecture we need to compile for. We prioritize the
 # the following:
 # 1. GPU_TARGETS (user defined, used by hip-config)
-# 2. HIP_ARCHITECTURES (user defined)
-# 3. CMAKE_HIP_ARCHITECTURES (inferred, requires CMake HIP support)
-# 4. 'all' (default, no CMake HIP support)
+# 2. AMDGPU_TARGETS (user defined, used by hip-config, deprecated)
+# 3. HIP_ARCHITECTURES (user defined)
+# 4. CMAKE_HIP_ARCHITECTURES (inferred, requires CMake HIP support)
+# 5. 'all' (default, no CMake HIP support)
 #
 # Force sets cache variables 'HIP_ARCHITECTURES' and 'GPU_TARGETS'.
 macro(get_gpu_targets)
   if(NOT DEFINED GPU_TARGETS)
-    if(DEFINED HIP_ARCHITECTURES)
+    if(DEFINED AMDGPU_TARGETS)
+      message(DEPRECATION "The use of 'AMDGPU_TARGETS' is deprecated use 'GPU_TARGETS' or 'CMAKE_HIP_ARCHITECTURES'.")
+      set(GPU_TARGETS ${AMDGPU_TARGETS})
+    elseif(DEFINED HIP_ARCHITECTURES)
       set(GPU_TARGETS ${HIP_ARCHITECTURES})
     elseif(DEFINED CMAKE_HIP_ARCHITECTURES)
       set(GPU_TARGETS ${CMAKE_HIP_ARCHITECTURES})
