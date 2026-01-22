@@ -65,14 +65,25 @@ inline bool is_gfx11_supported()
            ck::get_device_name() == "gfx1152" || ck::get_device_name() == "gfx1153";
 }
 
+inline bool is_gfx13_supported()
+{
+    return ck::get_device_name() == "gfx1310" || ck::get_device_name() == "gfx1370" ||
+           ck::get_device_name() == "gfx130F";
+}
+
 inline bool is_xdl_supported()
 {
     return ck::get_device_name() == "gfx908" || ck::get_device_name() == "gfx90a" ||
            ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950" ||
-           is_gfx12_supported() || is_gfx11_supported();
+           is_gfx12_supported() || is_gfx11_supported() || is_gfx13_supported();
 }
 
-template <typename ADataType, typename BDataType, index_t MPerXDL, index_t NPerXDL>
+template <typename ADataType,
+          typename BDataType,
+          index_t MPerXDL64,
+          index_t NPerXDL64,
+          index_t MPerXDL32 = MPerXDL64,
+          index_t NPerXDL32 = NPerXDL64>
 inline bool is_xdl_wmma_supported()
 {
     if(ck::get_device_name() == "gfx908" || ck::get_device_name() == "gfx90a" ||
@@ -80,9 +91,9 @@ inline bool is_xdl_wmma_supported()
     {
         return true;
     }
-    else if(is_gfx12_supported() || is_gfx11_supported())
+    else if(is_gfx12_supported() || is_gfx11_supported() || is_gfx13_supported())
     {
-        if constexpr((MPerXDL != 16) || (NPerXDL != 16))
+        if constexpr((MPerXDL32 != 16) || (NPerXDL32 != 16))
         {
             return false;
         }
@@ -108,7 +119,7 @@ inline bool is_lds_direct_load_supported()
 inline bool is_bf16_atomic_supported()
 {
     return ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950" ||
-           is_gfx12_supported();
+           is_gfx12_supported() || is_gfx13_supported();
 }
 
 inline bool is_gfx101_supported()
@@ -122,12 +133,6 @@ inline bool is_gfx103_supported()
     return ck::get_device_name() == "gfx1030" || ck::get_device_name() == "gfx1031" ||
            ck::get_device_name() == "gfx1032" || ck::get_device_name() == "gfx1034" ||
            ck::get_device_name() == "gfx1035" || ck::get_device_name() == "gfx1036";
-}
-
-inline bool is_gfx13_supported()
-{
-    return ck::get_device_name() == "gfx1310" || ck::get_device_name() == "gfx1370" ||
-           ck::get_device_name() == "gfx130F";
 }
 
 inline bool is_wmma_supported()
