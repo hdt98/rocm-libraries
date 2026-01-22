@@ -162,16 +162,6 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
       set(BLAS_LIBRARY)
       set(BLIS_INCLUDE_DIR)
       
-      # Try AOCL 5.x unified library (static only)
-      if(NOT BLAS_LIBRARY)
-        # Check build dependencies
-        if(EXISTS "${BUILD_DIR}/deps/aocl/install_package/lib/libaocl.a")
-          set(BLAS_LIBRARY "${BUILD_DIR}/deps/aocl/install_package/lib/libaocl.a")
-          set(BLIS_INCLUDE_DIR "${BUILD_DIR}/deps/aocl/install_package/include")
-          message(STATUS "Found AOCL 5.x unified library at: ${BLAS_LIBRARY}")
-        endif()
-      endif()
-      
       # Try find_package(aocl) for CMake-based builds (e.g., TheRock)
       if(NOT BLAS_LIBRARY)
         find_package(aocl QUIET)
@@ -179,6 +169,16 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
           get_target_property(BLAS_LIBRARY AOCL::aocl IMPORTED_LOCATION)
           get_target_property(BLIS_INCLUDE_DIR AOCL::aocl INTERFACE_INCLUDE_DIRECTORIES)
           message(STATUS "Found AOCL 5.x via CMake package at: ${BLAS_LIBRARY}")
+        endif()
+      endif()
+      
+      # Try AOCL 5.x unified library (static only)
+      if(NOT BLAS_LIBRARY)
+        # Check build dependencies
+        if(EXISTS "${BUILD_DIR}/deps/aocl/install_package/lib/libaocl.a")
+          set(BLAS_LIBRARY "${BUILD_DIR}/deps/aocl/install_package/lib/libaocl.a")
+          set(BLIS_INCLUDE_DIR "${BUILD_DIR}/deps/aocl/install_package/include")
+          message(STATUS "Found AOCL 5.x unified library at: ${BLAS_LIBRARY}")
         endif()
       endif()
       
