@@ -48,12 +48,18 @@ GetOrigamiPerformanceConfig(const Solver s,
     auto hardware = origami::hardware_t::get_hardware_for_device(0);
 
     // Create a problem description
+    auto in_chan = ProblemInterpreter::GetInputChannelC(problem);
+    auto fil_h = ProblemInterpreter::GetAdjustedConvolutionDilationH(problem);
+    auto fil_w = ProblemInterpreter::GetAdjustedConvolutionDilationW(problem);
+    auto fil_d = ProblemInterpreter::GetAdjustedConvolutionDilationD(problem);
+    auto batch = ProblemInterpreter::GetBatchN(problem);
+    auto out_h = ProblemInterpreter::GetOutputHeightHo(problem);
+    auto out_w = ProblemInterpreter::GetOutputWidthWo(problem);
+    auto out_d = ProblemInterpreter::GetOutputDepthDo(problem);
     origami::problem_t ori_prob;
-    ori_prob.size.m = ProblemInterpreter::GetBatchN(problem); // M dimension // batch size
-    ori_prob.size.n =
-        ProblemInterpreter::GetOutputChannelK(problem); // N dimension // output channels
-    ori_prob.size.k =
-        ProblemInterpreter::GetInputChannelC(problem); // K dimension // input channels
+    ori_prob.size.m = 1; // number of filters 
+    ori_prob.size.n = batch * out_h * out_w * out_d; // batch x out height x out width x out depth 
+    ori_prob.size.k = in_chan * fil_h * fil_w * fil_d; // channels x filter height x filter width x filter depth 
     // TBD
     ori_prob.batch = 1;
     // TransA T and TransB N is both K Contiguous (Ks next to each other in memory)

@@ -2928,6 +2928,7 @@ origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& pro
         fields = {"MPerBlock", "NPerBlock", "KPerBlock", "MPerOp", "NPerOp"};
     }
 
+/*
     std::string fieldlist;
     for(auto field : fields)
         fieldlist += ", " + field;
@@ -2937,6 +2938,7 @@ origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& pro
     MIOPEN_LOG_T("fields: " << fieldlist);
     MIOPEN_LOG_T("args: " << arglist);
     MIOPEN_LOG_T("kernel_id: " << id_string);
+*/
 
     ori_cfg.mt.m = std::stoi(args[size_t(IndexOf(fields, "MPerBlock"))]); // Macro tile M
     ori_cfg.mt.n = std::stoi(args[size_t(IndexOf(fields, "NPerBlock"))]); // Macro tile N
@@ -2962,9 +2964,11 @@ origami::config_t GetOrigamiConfig(const ::miopen::conv::ProblemDescription& pro
 
     ori_cfg.occupancy = 4;
 
+/*
     MIOPEN_LOG_T("MT.M(" << ori_cfg.mt.m << ") MT.N(" << ori_cfg.mt.n << ") MT.K(" << ori_cfg.mt.k
                          << ") MI.M(" << ori_cfg.mi.m << ") MI.N(" << ori_cfg.mi.n << ") MI.K("
                          << ori_cfg.mi.k << ")");
+*/
     return ori_cfg;
 }
 

@@ -458,11 +458,6 @@ auto GenericSearch(const Solver s,
     std::vector<PerformanceConfig> all_configs;
     std::copy(tmp_all_configs.begin(), tmp_all_configs.end(), std::back_inserter(all_configs));
 
-    // shuffle the configs
-    std::random_device rd{};
-    auto rng = std::default_random_engine{rd()};
-    std::shuffle(all_configs.begin(), all_configs.end(), rng);
-
     // rank order configs
     bool enable_origami           = env::value(MIOPEN_ENABLE_ORIGAMI);
     const size_t origami_ret_size = env::value(MIOPEN_NUM_ORIGAMI_CFG);
@@ -471,7 +466,7 @@ auto GenericSearch(const Solver s,
         auto ranked_configs = GetOrigamiPerformanceConfig(s, problem, all_configs);
         if(!ranked_configs.empty())
         {
-            MIOPEN_LOG_I2("Using Origami ranked configs.");
+            MIOPEN_LOG_I("Using Origami ranked configs.");
             if(ranked_configs.size() > origami_ret_size)
             {
                 ranked_configs.resize(origami_ret_size);
@@ -479,6 +474,11 @@ auto GenericSearch(const Solver s,
             all_configs = ranked_configs;
         }
     }
+
+    // shuffle the configs
+    std::random_device rd{};
+    auto rng = std::default_random_engine{rd()};
+    std::shuffle(all_configs.begin(), all_configs.end(), rng);
 
     std::size_t n_runs_total = std::min(all_configs.size(), GetTuningIterationsMax());
     all_configs.resize(n_runs_total);
