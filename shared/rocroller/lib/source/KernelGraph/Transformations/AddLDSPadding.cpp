@@ -99,10 +99,51 @@ workitems within a workgroup.
 #include <rocRoller/KernelGraph/Transforms/AddLDSPadding_detail.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 
+#include <fmt/format.h>
+
 namespace rocRoller
 {
     namespace KernelGraph
     {
+        namespace AddLDSPaddingDetail
+        {
+            uint CalculateAutomaticContiguousBlockSize(LDSPaddingInfo const& info)
+            {
+                // Typical configuration:
+                //
+                // - loadInstructionByteWidth = globalReadVectorWidth * bytesPerElement
+                // - loadLaneWidth = wavefrontSize (e.g., 64 lanes)
+                //
+                // Example: 4 elements/load * 4 bytes/element * 64 lanes = 1024 bytes
+
+                return info.loadInstructionByteWidth * info.loadLaneWidth;
+            }
+
+            std::string toString(LDSPaddingInfo const& info)
+            {
+                return fmt::format(
+                    "LDSPaddingInfo{{ldsTag={}, upstreamEdge={}, downstreamEdge={}, "
+                    "upstreamTags=[{}, {}], downstreamTags=[{}, {}], "
+                    "dataType={}, layoutType={}, loadInstructionByteWidth={}, loadLaneWidth={}}}",
+                    info.ldsTag,
+                    info.upstreamEdge,
+                    info.downstreamEdge,
+                    info.upstreamTags[0],
+                    info.upstreamTags[1],
+                    info.downstreamTags[0],
+                    info.downstreamTags[1],
+                    rocRoller::toString(info.dataType),
+                    rocRoller::toString(info.layoutType),
+                    info.loadInstructionByteWidth,
+                    info.loadLaneWidth);
+            }
+
+            std::ostream& operator<<(std::ostream& stream, LDSPaddingInfo const& info)
+            {
+                return stream << toString(info);
+            }
+        }
+
         using GD = Graph::Direction;
 
         using namespace Expression;
@@ -197,8 +238,6 @@ namespace rocRoller
          *
          * This determines the load width for each load instruction,
          * and the number of lanes that "participate" in the load.
-         * For Direct2LDS loads, this is the workgroup size; for other
-         * loads, this is the wavefront size.
          */
         std::pair<uint, uint> GetLoadAndLaneWidth(KernelGraph const& graph,
                                                   int                ldsTag,
@@ -332,18 +371,14 @@ namespace rocRoller
         {
             if(m_params->ldsPadding.contains(info.layoutType))
             {
+                Log::debug("KernelGraph::AddLDSPadding: {}", toString(info));
                 int contiguousBytes, paddingBytes;
                 std::tie(contiguousBytes, paddingBytes) = m_params->ldsPadding.at(info.layoutType);
                 if(contiguousBytes == -1)
                 {
-                    Throw<FatalError>("Automatic padding not implemented yet.");
-                    // Note: For direct-to-lds, this is correct:
-                    //
-                    //     contiguousBytes = info.loadInstructionByteWidth * info.loadLaneWidth;
-                    //
-                    // For other loads, this makes blocks as wide as a
-                    // wave will load, which might not be optimal.  It
-                    // may not be proportional to the loadLaneWidth.
+                    contiguousBytes = CalculateAutomaticContiguousBlockSize(info);
+                    Log::debug("KernelGraph::AddLDSPadding: Automatic block size: {}",
+                               contiguousBytes);
                 }
                 if(paddingBytes == -1)
                 {

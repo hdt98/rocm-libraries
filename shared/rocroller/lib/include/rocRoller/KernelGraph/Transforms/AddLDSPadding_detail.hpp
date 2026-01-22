@@ -27,6 +27,9 @@
 #pragma once
 #include <rocRoller/KernelGraph/Transforms/AddLDSPadding.hpp>
 
+#include <iosfwd>
+#include <string>
+
 namespace rocRoller
 {
     namespace KernelGraph
@@ -38,9 +41,6 @@ namespace rocRoller
              *
              * Information about LDS padding that is being added to
              * the graph.
-             *
-             * For direct-to-LDS loads, the loadLaneWidth field is the
-             * workgroup size (usually 256 lanes).
              */
             struct LDSPaddingInfo
             {
@@ -55,6 +55,21 @@ namespace rocRoller
                     loadInstructionByteWidth; //< Byte-width of the instructions used to load data destined for LDS.
                 uint loadLaneWidth; //< Number of lanes that should be considered contiguous.
             };
+
+            /**
+             * @brief Calculate automatic contiguous block size for LDS padding.
+             */
+            uint CalculateAutomaticContiguousBlockSize(LDSPaddingInfo const& info);
+
+            /**
+             * @brief Convert LDSPaddingInfo to string representation.
+             */
+            std::string toString(LDSPaddingInfo const& info);
+
+            /**
+             * @brief Stream output operator for LDSPaddingInfo.
+             */
+            std::ostream& operator<<(std::ostream& stream, LDSPaddingInfo const& info);
         }
     }
 }

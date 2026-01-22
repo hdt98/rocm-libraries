@@ -31,6 +31,7 @@
 #include <rocRoller/KernelGraph/ControlToCoordinateMapper.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddLDSPadding.hpp>
+#include <rocRoller/KernelGraph/Transforms/AddLDSPadding_detail.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 
 #include "TestContext.hpp"
@@ -121,6 +122,37 @@ namespace AddLDSPaddingTest
 
             int ldsElements = GetNumLDSElements(graph, ldsTag);
             CHECK(ldsElements == strideY * sizeY);
+        }
+    }
+
+    TEST_CASE("CalculateAutomaticContiguousBlockSize", "[kernel-graph][utils]")
+    {
+        using namespace rocRoller::KernelGraph;
+        using namespace rocRoller::KernelGraph::AddLDSPaddingDetail;
+        using namespace rocRoller::Expression;
+
+        auto testContext = TestContext::ForDefaultTarget();
+        auto context     = testContext.get();
+        auto params      = std::make_shared<CommandParameters>();
+
+        SECTION("Simple automatic contiguous block width")
+        {
+            auto loadWidth     = GENERATE(4u, 8u, 16u);
+            auto loadLaneWidth = GENERATE(32u, 64u, 256u);
+
+            LDSPaddingInfo info{.ldsTag                   = 0,
+                                .upstreamEdge             = 1,
+                                .downstreamEdge           = 2,
+                                .upstreamTags             = {3, 4},
+                                .downstreamTags           = {5, 6},
+                                .dataType                 = DataType::Float,
+                                .layoutType               = LayoutType::MATRIX_A,
+                                .loadInstructionByteWidth = loadWidth,
+                                .loadLaneWidth            = loadLaneWidth};
+
+            uint expectedContiguousBytes   = loadWidth * loadLaneWidth;
+            uint calculatedContiguousBytes = CalculateAutomaticContiguousBlockSize(info);
+            CHECK(calculatedContiguousBytes == expectedContiguousBytes);
         }
     }
 }
