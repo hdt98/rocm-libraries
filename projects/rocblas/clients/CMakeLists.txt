@@ -164,11 +164,34 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
       
       # Try find_package(aocl) for CMake-based builds (e.g., TheRock)
       if(NOT BLAS_LIBRARY)
-        find_package(aocl QUIET)
+        # Try uppercase package name first (canonical for AOCL::aocl target)
+        find_package(AOCL CONFIG QUIET)
+        if(NOT TARGET AOCL::aocl)
+          # Fallback to lowercase for compatibility
+          find_package(aocl CONFIG QUIET)
+        endif()
+        
         if(TARGET AOCL::aocl)
+          # Extract library location with config-aware fallback
           get_target_property(BLAS_LIBRARY AOCL::aocl IMPORTED_LOCATION)
+          if(NOT BLAS_LIBRARY)
+            # Many CMake packages only set IMPORTED_LOCATION_<CONFIG>
+            get_target_property(BLAS_LIBRARY AOCL::aocl IMPORTED_LOCATION_RELEASE)
+          endif()
+          if(NOT BLAS_LIBRARY)
+            get_target_property(BLAS_LIBRARY AOCL::aocl IMPORTED_LOCATION_DEBUG)
+          endif()
+          
+          # Extract include directories (normalize if it's a list)
           get_target_property(BLIS_INCLUDE_DIR AOCL::aocl INTERFACE_INCLUDE_DIRECTORIES)
-          message(STATUS "Found AOCL 5.x via CMake package at: ${BLAS_LIBRARY}")
+          if(BLIS_INCLUDE_DIR)
+            # Take first entry if INTERFACE_INCLUDE_DIRECTORIES returns a list
+            list(GET BLIS_INCLUDE_DIR 0 BLIS_INCLUDE_DIR)
+          endif()
+          
+          if(BLAS_LIBRARY)
+            message(STATUS "Found AOCL via CMake package at: ${BLAS_LIBRARY}")
+          endif()
         endif()
       endif()
       
