@@ -36,6 +36,20 @@ endif()
 set(CMAKE_INSTALL_PREFIX ${ROCM_PATH} CACHE PATH "Install path prefix, prepended onto install directories")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker search and installed rpath")
 
+# On some build systems, CMAKE_HIP_COMPILER is not available but is instead set via CMAKE_CXX_COMPILER.
+# We work around it by falling back to the CMAKE_CXX_COMPILER if it supports HIP.
+include(CheckLanguage)
+include(CheckCXXCompilerFlag)
+if (NOT DEFINED CMAKE_HIP_COMPILER)
+  check_language(CXX)
+  enable_language(CXX)
+  check_cxx_compiler_flag("-xhip" CXX_COMPILER_SUPPORTS_XHIP)
+  if(CXX_COMPILER_SUPPORTS_XHIP)
+    message(WARNING "No HIP-compiler set or found, falling back to CXX-compiler. Please set 'CMAKE_HIP_COMPILER'!")
+    set(CMAKE_HIP_COMPILER ${CMAKE_CXX_COMPILER})
+  endif()
+endif()
+
 # Declare project.
 project(rocprim LANGUAGES CXX HIP)
 set(VERSION_STRING "4.2.0")

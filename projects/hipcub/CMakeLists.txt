@@ -73,9 +73,27 @@ option(BUILD_OFFLOAD_COMPRESS "Build hipCUB with offload compression" ON)
 option(BUILD_COMPUTE_SANITIZER "Build tests with cuda's compute sanitizer enabled" OFF)
 cmake_dependent_option(USE_SYSTEM_LIB "Use installed hipCUB when building tests" OFF BUILD_TEST OFF)
 
-# Check and test cuda compiler, defines 'CMAKE_HIP_COMPILER'
+# On some build systems, CMAKE_HIP_COMPILER is not available but is instead set via CMAKE_CXX_COMPILER.
+# We work around it by falling back to the CMAKE_CXX_COMPILER if it supports HIP.
+include(CheckLanguage)
+include(CheckCXXCompilerFlag)
+if (NOT DEFINED CMAKE_HIP_COMPILER)
+  check_language(CXX)
+  enable_language(CXX)
+  check_cxx_compiler_flag("-xhip" CXX_COMPILER_SUPPORTS_XHIP)
+  if(CXX_COMPILER_SUPPORTS_XHIP)
+    message(WARNING "No HIP-compiler set or found, falling back to CXX-compiler. Please set 'CMAKE_HIP_COMPILER'!")
+    set(CMAKE_HIP_COMPILER ${CMAKE_CXX_COMPILER})
+  endif()
+endif()
+# Check and test HIP compiler, defines 'CMAKE_HIP_COMPILER'
 check_language(HIP)
 cmake_dependent_option(USE_HIPCXX "Use CMake HIP language support" ON CMAKE_HIP_COMPILER OFF)
+
+if (USE_HIPCXX AND NOT DEFINED CMAKE_HIP_COMPILER)
+  message(WARNING "No HIP-compiler set or found, falling back to CXX-compiler. Please set 'CMAKE_HIP_COMPILER'!")
+  set(CMAKE_HIP_COMPILER ${CMAKE_CXX_COMPILER})
+endif()
 
 # Check and test cuda compiler, defines 'CMAKE_CUDA_COMPILER'
 check_language(CUDA)
