@@ -92,8 +92,8 @@ struct FindTransformResult
 //
 // Why this approach:
 // - Nested static_for (OLD): Creates lambda closure for each iteration level
-//   Example: Searching Tuple<Seq<0,1>, Seq<2,3>, Seq<4,5>> creates multiple applier::operator() instantiations
-//   Result: Many applier instantiations for typical tensor descriptor operations
+//   Example: Searching Tuple<Seq<0,1>, Seq<2,3>, Seq<4,5>> creates multiple applier::operator()
+//   instantiations Result: Many applier instantiations for typical tensor descriptor operations
 //
 // - Pack expansion + constexpr (NEW): Single function with compile-time array search
 //   Example: Same search creates constexpr array, single search function
