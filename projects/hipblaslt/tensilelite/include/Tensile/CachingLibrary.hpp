@@ -135,12 +135,7 @@ namespace TensileLite
         template <typename SubMap, typename K>
         void add_impl(SubMap& map, Value const& value, K const& key)
         {
-            auto iter = map.find(key);
-
-            if(iter == map.end())
-                map.emplace(key, value);
-            else
-                iter->second = value;
+            map.insert_or_assign(key, value);
         }
 
         template <typename SubMap, typename K, typename... Ks>
