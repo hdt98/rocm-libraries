@@ -46,7 +46,8 @@ __host__ __device__ constexpr auto generate_tie(F&& f, Number<N>)
 // - Lambda approach: N unique lambda types for N sequences → O(N) instantiations
 // - Named functor approach: Single functor type → O(1) instantiation overhead
 //
-// The detail::make_identity_sequences_impl creates a Sequence<I> for each index I via pack expansion
+// The detail::make_identity_sequences_impl creates a Sequence<I> for each index I via pack
+// expansion
 //
 // Impact: Reduces instantiation overhead for identity sequence generation (common in transforms)
 //
