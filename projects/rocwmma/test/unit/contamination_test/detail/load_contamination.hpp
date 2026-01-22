@@ -121,29 +121,31 @@ namespace rocwmma
     ROCWMMA_SWITCH_BODY2_ARG2(         \
         waveSize, CASE_IMPL_ASSIGN2, HipDevice::Wave32, HipDevice::Wave64, ARCH_ID)
 
-#define DISPATCH_GUARD_BODY                           \
-    ROCWMMA_SWITCH_BODY14_ARG1(deviceArch,            \
-                               SWITCH_BODY_WAVE_SIZE, \
-                               HipDevice::GFX908,     \
-                               HipDevice::GFX90A,     \
-                               HipDevice::GFX942,     \
-                               HipDevice::GFX950,     \
-                               HipDevice::GFX1100,    \
-                               HipDevice::GFX1101,    \
-                               HipDevice::GFX1102,    \
-                               HipDevice::GFX1103,    \
-                               HipDevice::GFX1150,    \
-                               HipDevice::GFX1151,    \
-                               HipDevice::GFX1152,    \
-                               HipDevice::GFX1153,    \
-                               HipDevice::GFX1200,    \
-                               HipDevice::GFX1201)
+#define CASE_BODY(CASE_LABEL)                                        \
+    ROCWMMA_CASE_BODY_ARG1(CASE_LABEL, SWITCH_BODY_WAVE_SIZE, CASE_LABEL)
 
-                DISPATCH_GUARD_BODY
+            switch (deviceArch)
+            {
+                CASE_BODY(HipDevice::GFX908)
+                CASE_BODY(HipDevice::GFX90A)
+                CASE_BODY(HipDevice::GFX942)
+                CASE_BODY(HipDevice::GFX950)
+                CASE_BODY(HipDevice::GFX1100)
+                CASE_BODY(HipDevice::GFX1101)
+                CASE_BODY(HipDevice::GFX1102)
+                CASE_BODY(HipDevice::GFX1103)
+                CASE_BODY(HipDevice::GFX1150)
+                CASE_BODY(HipDevice::GFX1151)
+                CASE_BODY(HipDevice::GFX1152)
+                CASE_BODY(HipDevice::GFX1153)
+                CASE_BODY(HipDevice::GFX1200)
+                CASE_BODY(HipDevice::GFX1201)
+                default:;
+            }
 
 #undef CASE_IMPL_ASSIGN2
 #undef SWITCH_BODY_WAVE_SIZE
-#undef DISPATCH_GUARD_BODY
+#undef CASE_BODY
 
                 return dispatchResult;
             };
