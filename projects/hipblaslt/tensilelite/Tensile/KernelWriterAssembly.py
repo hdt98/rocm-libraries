@@ -2921,7 +2921,6 @@ class KernelWriterAssembly(KernelWriter):
                 module.add(singleModule)
     # DTVA/B always go this way, including swizzled
     elif (not swapPerpPara):
-      #module.add(self.graFinalOffsetsSingleLoopGNLC(kernel, tP, tc))
       if kernel["UseGeneralizedNLCOne%s"%tc] and not self.states.inTailLoop:
         module.add(self.graFinalOffsetsSingleLoopGNLC(kernel, tP, tc))
       else:
@@ -3013,9 +3012,13 @@ class KernelWriterAssembly(KernelWriter):
     perpStride = abMatrixInfo.gNLCPerpStride
     permBlock = abMatrixInfo.gNLCPermBlock
     usePerpPerm = perpStride > 1
-
+    perpBlockSize = abMatrixInfo.gRDtlSwizzlePerpBlockSize
+    
     tmpv = self.vgprPool.checkOutAligned(2,2)
     tmpv2 = self.vgprPool.checkOut(1)
+    tmpv3 = self.vgprPool.checkOut(1)
+    tmpv4 = self.vgprPool.checkOut(1)
+    tmpv5 = self.vgprPool.checkOut(1)
     tmps = self.sgprPool.checkOut(1)
     tmps2 = self.sgprPool.checkOut(1)
     divsor = numThreadsCoalesced
@@ -3050,6 +3053,7 @@ class KernelWriterAssembly(KernelWriter):
       strideChar = 'L' if tc == 'A' else 'K'
       grov = "GlobalReadOffset%s+%u" % (tc, perp)
       # Compute division
+      # tmpv = vgprSerial // divsor
       if useMagicDiv:
         if ee > 0:
           module.add(VLShiftRightB32(dst=vgpr(tmpv2), shiftHex=ee, src=vgpr(grov), comment="division"))
@@ -3063,12 +3067,35 @@ class KernelWriterAssembly(KernelWriter):
         module.add(VLShiftRightB32(dst=vgpr(tmpv), shiftHex=log2(divsor), src=vgpr(grov), comment="division"))
 
       # Compute remainder
+      # tmpv2 = vgprSerial % divsor
       if useMagicDiv:
         module.add(VMulLOU32(dst=vgpr(tmpv2), src0=sgpr(tmps2), src1=vgpr(tmpv)))
         module.add(VLShiftLeftB32(dst=vgpr(tmpv2), shiftHex=ee, src=vgpr(tmpv2), comment="remainder"))
         module.add(VSubU32(dst=vgpr(tmpv2), src0=vgpr(grov), src1=vgpr(tmpv2)))
       else:
+        #pass
+        # tmpv2 = serial % ntc
+        # tmpv = serial / ntc
+        print("Applying rotation")
         module.add(VAndB32(dst=vgpr(tmpv2), src0=hex(divsor - 1), src1=vgpr(grov)))
+
+        applyRotation = True
+        bS = 4
+        if applyRotation:
+          # Computes {0,1,2,..bS-1, 0,1,2,..bS-1, ...}
+          module.add(VAndB32(dst=vgpr(tmpv3), src0=hex(bS - 1), src1=vgpr(tmpv2)))
+
+          module.add(VAndB32(dst=vgpr(tmpv4), src0=hex(bS - 1), src1=vgpr(tmpv), comment="compute rotation offset")) # apply rotation
+          module.add(VSubU32(dst=vgpr(tmpv4), src0=bS, src1=vgpr(tmpv4), comment="NTC - row")) # apply rotation
+          module.add(VAddU32(dst=vgpr(tmpv3), src0=vgpr(tmpv2), src1=vgpr(tmpv3), comment="apply rotation")) # apply rotation
+          module.add(VAndB32(dst=vgpr(tmpv3), src0=hex(bS - 1), src1=vgpr(tmpv3), comment="compute rotation offset")) # apply rotation
+
+          # Compute subgroup ids of each {0,...bS-1}
+          module.add(VLshiftRightB32(dst=vgpr(tmpv5), src0=2, src1=vgpr(tmpv2), comment="apply rotation")) # apply rotation
+          module.add(VAddU32(dst=vgpr(tmpv2), src0=vgpr(tmpv2), src1=vgpr(tmpv5), comment="apply rotation")) # apply rotation
+          
+        
+
 
       # Permute logic perp dim
       if usePerpPerm:
@@ -3104,6 +3131,9 @@ class KernelWriterAssembly(KernelWriter):
 
     self.vgprPool.checkIn(tmpv)
     self.vgprPool.checkIn(tmpv2)
+    self.vgprPool.checkIn(tmpv3)
+    self.vgprPool.checkIn(tmpv4)
+    self.vgprPool.checkIn(tmpv5)
     self.sgprPool.checkIn(tmps)
     self.sgprPool.checkIn(tmps2)
 

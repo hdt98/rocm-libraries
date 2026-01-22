@@ -104,7 +104,8 @@ class ABMatrixInfo(MatrixInfo):
 
   gNLCPermBlock: int             = -1
   gNLCPerpStride: int            = -1
-
+  gRDtlSwizzlePerpBlockSize: int    = -1
+  
 # States
 @dataclass
 class StateValues:
@@ -4523,9 +4524,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     def GNLCOInit(tc):
       abmatrixinfo = self.states.a if tc == 'A' else self.states.b
+
+      abmatrixinfo.gRDtlSwizzlePerpBlockSize = 1
+
+      
       if kernel["DirectToLds%s"%tc] and kernel["UseGeneralizedNLCOne%s"%tc]:
         ntpl = kernel["NumTotalPackedLoads%s"%tc]
         # TODOBS: Determine logic to calculate best permStride..
+
+
+        
         if kernel["ProblemType"]["TLU%s"%tc] == 1 and not kernel["enableLDSTr%s"%tc]:
           usePerpPerm = False
         elif kernel["ProblemType"]["TLU%s"%tc] == 1 and kernel["enableLDSTr%s"%tc]:
@@ -4538,6 +4546,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
           # calculations
           usePerpPerm = False if kernel["VectorWidth%s"%tc] > 2 else True
 
+        usePerpPerm = False
+          
         permBlock = kernel["MatrixInstK"] if kernel["ProblemType"]["TLU%s"%tc] == 1 \
           else kernel["VectorWidth%s"%tc] * kernel["MatrixInstM"]
         abmatrixinfo.gNLCPermBlock  = permBlock

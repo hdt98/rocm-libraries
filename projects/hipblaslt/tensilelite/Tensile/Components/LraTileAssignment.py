@@ -194,7 +194,8 @@ class LraTileAssignmentMFMA(LraTileAssignment):
         abmatrixinfo = writer.states.a if tc == 'A' else writer.states.b
         perpStride = abmatrixinfo.gNLCPerpStride
         permBlock  = abmatrixinfo.gNLCPermBlock
-
+        perpBlockSize  = abmatrixinfo.gRDtlSwizzlePerpBlockSize
+        
         # strider for each type of index
         umlds            = kernel["UnrollMajorLDS%s" % tc]
         mt               = kernel["MacroTile%u" % tile01]
@@ -260,6 +261,10 @@ class LraTileAssignmentMFMA(LraTileAssignment):
            writer.vgprPool.checkIn(reMap1)
 
         with writer.allocTmpSgpr(1) as tmpSgprInfo:
+
+            rotVgpr = writer.vgprPool.checkOut(1) # remainder
+
+           
             # tile offset
             module.add(vectorStaticRemainder(dummy, kReg, dividendReg, waveWidth, tmpVgprRes, tmpSgprInfo, \
                 "0. thread id in wave: wtid = tid %% wavelength(%u)" % waveWidth))
@@ -284,6 +289,11 @@ class LraTileAssignmentMFMA(LraTileAssignment):
                                                "1. apply VectorWidth: bnOffset = bnOffset * vw(%u)" % vectorWidth))
                perpPerm(tReg)
 
+
+            module.add(vectorStaticDivide(rotVgpr, tReg, perpBlockSize, tmpVgprRes, \
+                                                "Test rotating"))
+            
+               
             module.add(vectorStaticMultiply(vgpr(tReg), vgpr(tReg), strideTile, tmpSgprInfo, \
                 "1. N offset: nOffset = nIdx * nStride(%u)" % strideTile))
             if enableLDSTr:
@@ -317,6 +327,18 @@ class LraTileAssignmentMFMA(LraTileAssignment):
                   # DTVAB case, add this regardless of dividendForKId != waveWidth
                     module.add(vectorStaticDivide(kReg, kReg, dividendForKId, tmpVgprRes, \
                         "5. K offset: kIdx = wtid / (MIN(%u) * MIBB(%u))" % (kernel["MatrixInstN"], kernel["MatrixInstB"])))
+
+
+                module.add(VAddU32(dst=vgpr(kReg), src0=vgpr(kReg), src1=vgpr(rotVgpr), \
+                                  comment="rotate"))
+
+                parDimSize = kernel["MacroTile%s"%tc] if kernel["ProblemType"]["TLU%s"%tc] == 1 else kernel["DepthU"]
+                numThreadsCoalesced = (parDimSize // kernel["GlobalReadVectorWidth%s"%tc])
+                numThreadsCoalesced = min(numThreadsCoalesced, 4)
+                
+                module.add(VAndB32(dst=vgpr(kReg), src0=(numThreadsCoalesced - 1), src1=vgpr(kReg), \
+                                   comment="rotate: numThreadsCoalesced: %u"%(numThreadsCoalesced)))
+               
                 if (dividendForKId != waveWidth) and (not isDTVAB):
 
                     if enableLDSTr:
@@ -350,6 +372,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
                     "7. wave offset in M dimen: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideWave, vgpr(tReg), tmpSgprInfo, \
                                              "7. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u); 7. final local read offset: flrOffset = lrOffset + WOffset" % strideWave))
+            writer.vgprPool.checkIn(rotVgpr)
 
         # release register
         writer.vgprPool.checkIn(dummy)
