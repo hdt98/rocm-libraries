@@ -214,7 +214,7 @@ TEST(CKBuilderXdlV3, CreateExistingInstance)
                          return kernelPtr->GetInstanceString() == builderKernelInstanceString;
                      });
 
-       EXPECT_TRUE(result != factoryInstances.end())
+    EXPECT_TRUE(result != factoryInstances.end())
         << "Instance string\n\t" << builderKernelInstanceString
         << "\nnot found in list of instances returned by factory. Run test with MIOpen log trace "
            "enabled for list of instances returned by factory.";

@@ -182,24 +182,6 @@ using DeviceOpGFwdDefaultPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdDefault<DataType>>;
 
-std::size_t FirstDifference(const std::string& a, const std::string& b)
-{
-    for(auto i = 0; i < min(a.size(), b.size()); i++)
-    {
-        if(a[i] != b[i])
-        {
-            return i;
-        }
-    }
-
-    if(a.size() == b.size())
-    {
-        return a.size();
-    }
-
-    return min(a.size(), b.size());
-}
-
 TEST(CKBuilderXdl, CreateExistingInstance)
 {
     // Verify that the signature structure conforms to the signature concept.
