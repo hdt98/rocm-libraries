@@ -604,7 +604,7 @@ namespace TensileLite
             struct Range
             {
                 size_t min = 0;
-                size_t max = std::numeric_limits<size_t>::max();
+                size_t max = (std::numeric_limits<size_t>::max)();
             };
 
             inline std::ostream& operator<<(std::ostream& stream, Range const& range)
