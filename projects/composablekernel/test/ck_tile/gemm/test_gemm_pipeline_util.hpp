@@ -244,8 +244,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                            PipelineType == GemmPipelineType::CompTDMV2);
 
 #if defined(CK_USE_GFX1250)
-        // this setting is related to wmma layout in gfx1250; will improve performance when C is
-        // RowMajor
+        // gfx1250 only. Improve performance when C is RowMajor
+        // Note: TransposeC is not compatible with asymetric GEMM i.e. M_Warp_Tile != N_Warp_Tile
         constexpr bool TransposeC =
             std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor> &&
             M_Warp_Tile == N_Warp_Tile;

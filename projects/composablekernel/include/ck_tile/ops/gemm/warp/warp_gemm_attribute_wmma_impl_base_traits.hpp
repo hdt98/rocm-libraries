@@ -33,6 +33,7 @@ struct LayoutFromDataType<pk_fp4_t, 128, true> : LayoutFromNon8BitMixPrec
 {
 };
 
+// fp4_t is the only format that has the same data layout for MixPrec and non-MixPrec
 template <>
 struct LayoutFromDataType<pk_fp4_t, 128, false> : LayoutFromNon8BitMixPrec
 {
