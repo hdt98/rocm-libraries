@@ -1367,8 +1367,26 @@ namespace rocRoller::Client::GEMMClient::CLI
 
         // Workgroup size
 
-        update(SN(&SP::workgroupSizeX), solution.workgroupSizeX);
-        update(SN(&SP::workgroupSizeY), solution.workgroupSizeY);
+        bool wgsSet = false;
+        if(app.get_option("--wgs")->count())
+        {
+            std::pair<int, int> wgs;
+            if(!ParseIntPair(app.get_option("--wgs")->as<std::string>(), wgs))
+                Throw<FatalError>("Failed to parse WGS argument.");
+            solution.workgroupSizeX = wgs.first;
+            solution.workgroupSizeY = wgs.second;
+            wgsSet                  = true;
+        }
+
+        bool workgroupSizeSet = false;
+        workgroupSizeSet |= update(SN(&SP::workgroupSizeX), solution.workgroupSizeX);
+        workgroupSizeSet |= update(SN(&SP::workgroupSizeY), solution.workgroupSizeY);
+
+        if(wgsSet && workgroupSizeSet)
+        {
+            Throw<FatalError>("Workgroup size was overspecified.  Please use only --wgs or "
+                              "the --workgroup_size_x/y arguments; but not both.");
+        }
 
         // Workgroup mapping
 
@@ -1728,6 +1746,7 @@ int main(int argc, const char* argv[])
 
     app.add_option(SN(&SP::workgroupSizeX), "Workgroup size in the x dimension.");
     app.add_option(SN(&SP::workgroupSizeY), "Workgroup size in the y dimension.");
+    app.add_option("--wgs", "Workgroup size (x/y pair).");
 
     app.add_option(SN(&SP::workgroupMappingDim),
                    "Workgroup mapping dimension (-1, 0, 1). Default: -1")

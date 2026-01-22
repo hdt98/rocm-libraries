@@ -677,6 +677,19 @@ def test_gemm_options(tmp_path):
     assert post["wave_k"] == 8
     assert post["wave_b"] == 1
 
+    # setting workgroup size via shortcut
+    post = run_and_load_example_yaml(
+        [gemm, "example", example, "--arch=gfx950", "--wgs=33x22"]
+    )
+    assert post["workgroup_size_x"] == 33
+    assert post["workgroup_size_y"] == 22
+
+    post = run_and_load_example_yaml(
+        [gemm, "example", example, "--arch=gfx950", "--wgs=33,22"]
+    )
+    assert post["workgroup_size_x"] == 33
+    assert post["workgroup_size_y"] == 22
+
     post = run_and_load_example_yaml(
         [gemm, "example", example, "--arch=gfx950", "--mi=4x8x16x2"]
     )

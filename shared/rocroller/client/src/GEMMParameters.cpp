@@ -320,7 +320,7 @@ namespace rocRoller::Client::GEMMClient::CLI
         if(arg.empty())
             return PARSE_FAILURE;
 
-        std::regex  pattern(R"((-?\d+),(-?\d+))");
+        std::regex  pattern(R"((-?\d+)[,x](-?\d+))");
         std::smatch match;
 
         bool matched = std::regex_match(arg, match, pattern);
