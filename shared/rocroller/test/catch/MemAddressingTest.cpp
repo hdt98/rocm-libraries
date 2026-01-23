@@ -2,7 +2,11 @@
  *
  * MIT License
  *
+<<<<<<< HEAD
  * Copyright 2025-2026 AMD ROCm(TM) Software
+=======
+ * Copyright 2025 AMD ROCm(TM) Software
+>>>>>>> users/kerrwang/graph-test
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +33,7 @@
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/CodeGen/LoadStoreTileGenerator.hpp>
+#include <rocRoller/CommandSolution_detail.hpp>
 #include <rocRoller/Context.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/KernelArguments.hpp>
@@ -76,8 +81,12 @@ namespace MemAddressingTest
             commandKernel.generateKernelGraph("");
             auto graph = commandKernel.getKernelGraph();
 
-            const auto insts = kernelInstructions(context.get(), command, graph).to<std::vector>();
-            // TODO: assert on instructions
+            for(auto inst : kernelInstructions(context.get(), command, graph))
+            {
+                context.get()->schedule(inst);
+                if(inst.getModelledAddresses().has_value())
+                    Log::info("addresses {}", inst.getModelledAddresses().value());
+            }
         }
     }
 }

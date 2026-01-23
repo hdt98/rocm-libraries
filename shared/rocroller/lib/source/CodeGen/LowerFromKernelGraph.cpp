@@ -831,16 +831,16 @@ namespace rocRoller
                             m_context, m_kernelWorkgroupIndexes, m_kernelWorkitemIndexes);
                         auto index = coords.reverse({ldsTag})[0];
 
-                        Log::info("LoadLDSTile: tag {}, numBits {}, numElements {}, numBytes {}",
-                                  tag,
-                                  numBits,
-                                  numElements,
-                                  numBytes);
+                        Log::debug("LoadLDSTile: tag {}, numBits {}, numElements {}, numBytes {}",
+                                   tag,
+                                   numBits,
+                                   numElements,
+                                   numBytes);
 
                         const auto byteIndex = index * Expression::literal(numBytes)
                                                / Expression::literal(numElements);
 
-                        Log::info("Offset expression: {}", toString(byteIndex));
+                        Log::debug("Offset expression: {}", toString(byteIndex));
 
                         for(uint wg = 0; wg < 1; ++wg)
                         {
@@ -874,15 +874,15 @@ namespace rocRoller
                     }
                     else
                     {
-                        Log::info("Skipping LDS address annotations due to",
-                                  ShowValue(tile.memoryType));
+                        Log::debug("Skipping LDS address annotations due to",
+                                   ShowValue(tile.memoryType));
                     }
                 }()
                                                     .to<std::vector>();
 
                 std::stringstream ss;
                 streamJoin(ss, addresses, ", ");
-                Log::info("LDS addresses: {}", ss.str());
+                Log::debug("LDS addresses: {}", ss.str());
 
                 for(auto instr : m_loadStoreTileGenerator.genLoadLDSTile(
                         tag, load, m_graph->buildTransformer(tag)))
