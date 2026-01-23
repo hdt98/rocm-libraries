@@ -304,7 +304,7 @@ namespace rocRoller
                 }
 
                 std::visit(
-                    [&io, &ctx](auto& theVal) {
+                    [&io](auto& theVal) {
                         using U = std::decay_t<decltype(theVal)>;
 
                         if constexpr(std::is_pointer_v<U>)

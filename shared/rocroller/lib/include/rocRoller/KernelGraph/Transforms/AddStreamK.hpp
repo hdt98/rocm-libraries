@@ -109,11 +109,6 @@ namespace rocRoller
             std::string m_accumulatorLoop;
 
             /**
-             * Use two-tile SK + DP variant?
-             */
-            bool m_twoTile;
-
-            /**
              * Number of Workgroups.
              *
              * An Expression that either:

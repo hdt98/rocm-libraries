@@ -66,7 +66,6 @@ namespace rocRoller
             }
 
         private:
-            bool      m_checkACCVGPR;
             int const m_maxNops = 2;
         };
 
