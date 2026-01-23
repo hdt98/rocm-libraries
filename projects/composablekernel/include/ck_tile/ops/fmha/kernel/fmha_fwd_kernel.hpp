@@ -209,17 +209,16 @@ struct FmhaFwdKernel
         ck_tile::index_t nhead_stride_v_descale;
     };
 
-    struct FmhaFwdBatchModeMXKargs : FmhaFwdCommonMXKargs
+    struct FmhaFwdBatchMXKargs : FmhaFwdCommonMXKargs
     {
         ck_tile::index_t batch_stride_q_descale;
         ck_tile::index_t batch_stride_k_descale;
         ck_tile::index_t batch_stride_v_descale;
     };
 
-    struct FmhaFwdGroupModeMXKargs : FmhaFwdCommonMXKargs
+    struct FmhaFwdGroupMXKargs : FmhaFwdCommonMXKargs
     {
-        // TODO: seqstart for scales?
-        static_assert(false);
+        const int32_t* seqstart_v_scale_ptr;
     };
 
     struct FmhaFwdCommonLSEKargs
@@ -303,7 +302,7 @@ struct FmhaFwdKernel
               std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
                                  FmhaFwdBatchBlockScaleKargs,
                                  std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
-                                                    FmhaFwdBatchModeMXKargs,
+                                                    FmhaFwdBatchMXKargs,
                                                     FmhaFwdEmptyKargs<3>>>>,
           std::conditional_t<kHasDropout, FmhaFwdBatchModeDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>
@@ -334,7 +333,7 @@ struct FmhaFwdKernel
               std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
                                  FmhaFwdGroupBlockScaleKargs,
                                  std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
-                                                    FmhaFwdGroupModeMXKargs,
+                                                    FmhaFwdGroupMXKargs,
                                                     FmhaFwdEmptyKargs<3>>>>,
           std::conditional_t<kHasDropout, FmhaFwdCommonDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>,
@@ -822,6 +821,7 @@ struct FmhaFwdKernel
                   const void* seqlen_k_ptr,
                   const void* block_scale_seqstart_q_ptr,
                   const void* block_scale_seqstart_k_ptr,
+                  const void* seqstart_v_scale_ptr,
                   ck_tile::index_t hdim_q,
                   ck_tile::index_t hdim_v,
                   ck_tile::index_t num_head_q,
@@ -958,6 +958,8 @@ struct FmhaFwdKernel
             kargs.nhead_stride_q_descale = nhead_stride_q_descale;
             kargs.nhead_stride_k_descale = nhead_stride_k_descale;
             kargs.nhead_stride_v_descale = nhead_stride_v_descale;
+
+            kargs.seqstart_v_scale_ptr = reinterpret_cast<const int32_t*>(seqstart_v_scale_ptr);
         }
         if constexpr(kHasDropout)
         {
@@ -1392,14 +1394,19 @@ struct FmhaFwdKernel
                 {
                     batch_offset_randval = query_start * kargs.stride_randval;
                 }
-                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
                 {
                     const long_index_t bquery_start = kargs.block_scale_seqstart_q_ptr[i_batch];
                     const long_index_t bkey_start   = kargs.block_scale_seqstart_k_ptr[i_batch];
                     batch_offset_q_descale          = bquery_start;
                     batch_offset_k_descale          = bkey_start;
                     batch_offset_v_descale          = bkey_start;
+                }
+                else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    batch_offset_q_descale = query_start * kargs.stride_q_descale;
+                    batch_offset_k_descale = key_start * kargs.stride_k_descale;
+                    batch_offset_v_descale = kargs.seqstart_v_scale_ptr[i_batch];
                 }
                 batch_offset_o = query_start * kargs.stride_o;
 
