@@ -28,6 +28,10 @@
 #include <rocRoller/Expression_evaluate_detail.hpp>
 #include <rocRoller/Expression_evaluate_detail_binary.hpp>
 
+// Comparison operators intentionally support mixed-sign comparisons
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-compare"
+
 namespace rocRoller::Expression::EvaluateDetail
 {
     SIMPLE_BINARY_OP(GreaterThan, >);
@@ -44,3 +48,5 @@ namespace rocRoller::Expression::EvaluateDetail
     INSTANTIATE_BINARY_OP(Equal);
     INSTANTIATE_BINARY_OP(NotEqual);
 }
+
+#pragma clang diagnostic pop

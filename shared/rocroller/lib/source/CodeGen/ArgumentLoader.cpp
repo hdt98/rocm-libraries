@@ -60,7 +60,7 @@ namespace rocRoller
         co_yield Instruction::Comment(
             concatenate("Kernel arguments: Loading ", sizeBytes, " bytes"));
 
-        if(value == nullptr || value->registerCount() < totalRegisters)
+        if(value == nullptr || value->registerCount() < static_cast<size_t>(totalRegisters))
         {
             value = Register::Value::Placeholder(m_context.lock(),
                                                  Register::Type::Scalar,

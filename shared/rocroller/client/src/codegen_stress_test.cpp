@@ -220,7 +220,7 @@ CodeGenResult CodeGen(CodeGenProblem const& prob)
     }
 
     auto Program = [&](ContextPtr m_context) -> Generator<Instruction> {
-        for(size_t i = 0; i < prob.instCount; i++)
+        for(int i = 0; i < prob.instCount; i++)
         {
             for(auto& inst : generator(m_context))
             {
@@ -236,13 +236,13 @@ CodeGenResult CodeGen(CodeGenProblem const& prob)
 
     const std::string kernelName{"CodeGen"};
 
-    for(size_t i = 0; i < prob.numWarmUp; i++)
+    for(int i = 0; i < prob.numWarmUp; i++)
     {
         auto m_context = Context::ForDefaultHipDevice(kernelName);
         m_context->schedule(Program(m_context));
     }
 
-    for(size_t i = 0; i < prob.numRuns; i++)
+    for(int i = 0; i < prob.numRuns; i++)
     {
         auto  m_context = Context::ForDefaultHipDevice(kernelName);
         Timer timer(kernelName);

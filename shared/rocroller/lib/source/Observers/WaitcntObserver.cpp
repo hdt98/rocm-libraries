@@ -273,7 +273,7 @@ namespace rocRoller
                     retval << "\n----Type In Queue  : " << m_typeInQueue.at(waitQueue).toString();
                     retval << "\n----Registers      : ";
 
-                    for(int queue_i = 0; queue_i < m_instructionQueues.at(waitQueue).size();
+                    for(size_t queue_i = 0; queue_i < m_instructionQueues.at(waitQueue).size();
                         queue_i++)
                     {
                         retval << "\n------Dst: {";

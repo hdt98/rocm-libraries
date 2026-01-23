@@ -78,7 +78,7 @@ namespace rocRoller
             for(auto& regType : SUPPORTED_REG_TYPES)
             {
                 entry.registerStates[regType] = {};
-                for(size_t i = 0; i < context->allocator(regType)->useCount(); i++)
+                for(int i = 0; i < context->allocator(regType)->useCount(); i++)
                 {
                     if(!(context->allocator(regType)->isFree(i)))
                     {

@@ -234,7 +234,8 @@ namespace rocRoller
         auto ctx = m_context.lock();
 
         // TODO: consider multiple load case
-        AssertFatal(numBytes == bytesPerTrLoad, "TODO: consider multiple transpose loads!");
+        AssertFatal(static_cast<uint>(numBytes) == bytesPerTrLoad,
+                    "TODO: consider multiple transpose loads!");
 
         auto offsetModifier = genOffsetModifier(offset);
         co_yield_(Instruction(dsReadTrMnemonic,
@@ -320,10 +321,10 @@ namespace rocRoller
                                               *packed,
                                               toPack->valueCount() / valuesPerWord,
                                               Register::AllocationOptions::FullyContiguous());
-        for(int i = 0; i < result->registerCount(); i++)
+        for(size_t i = 0; i < result->registerCount(); i++)
         {
             std::vector<Register::ValuePtr> values;
-            for(int j = 0; j < valuesPerWord; j++)
+            for(size_t j = 0; j < valuesPerWord; j++)
             {
                 values.push_back(toPack->element({i * valuesPerWord + j}));
             }

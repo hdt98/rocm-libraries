@@ -186,14 +186,14 @@ namespace rocRoller
                 if constexpr(std::same_as<Tile, T>)
                 {
                     auto loc = m_graph.coordinates.getLocation(tag);
-                    for(int i = 1; i < loc.outgoing.size(); i++)
+                    for(size_t i = 1; i < loc.outgoing.size(); i++)
                         divideBySize(loc.outgoing[i]);
                 }
 
                 if constexpr(std::same_as<Flatten, T>)
                 {
                     auto loc = m_graph.coordinates.getLocation(tag);
-                    for(int i = 1; i < loc.incoming.size(); i++)
+                    for(size_t i = 1; i < loc.incoming.size(); i++)
                         divideBySize(loc.incoming[i]);
                 }
                 return edge;

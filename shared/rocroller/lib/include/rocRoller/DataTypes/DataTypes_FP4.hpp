@@ -142,9 +142,8 @@ namespace rocRoller
                 // scaled number is in f4 subnorm range,
                 //  adjust mantissa such that unbiased_exp_f32 is
                 //  max_subnorm_uexp_f4 and apply rne
-                int32_t  exp_shift       = max_subnorm_uexp_f4 - unbiased_exp_f32;
-                int32_t  unbiased_exp_f4 = unbiased_exp_f32 + exp_shift;
-                uint32_t trail_sig_f4    = (1u << 31) | (trailing_significand_f32 << 8);
+                int32_t  exp_shift    = max_subnorm_uexp_f4 - unbiased_exp_f32;
+                uint32_t trail_sig_f4 = (1u << 31) | (trailing_significand_f32 << 8);
                 trail_sig_f4 >>= exp_shift;
                 trail_sig_f4 = round_f4_significand_rne(trail_sig_f4);
                 fp4.val      = (sign_f32 << 3)
@@ -288,9 +287,8 @@ namespace rocRoller
             {
                 // scaled number is in f32 subnorm range,
                 //  adjust mantissa such that unbiased_exp_fp4 is -126 and apply rne
-                int32_t  exp_shift        = -126 - unbiased_exp_fp4;
-                int32_t  unbiased_exp_f32 = unbiased_exp_fp4 + exp_shift;
-                uint32_t trail_sig_fp32   = (1u << 31) | (trailing_significand_fp4 << 30);
+                int32_t  exp_shift      = -126 - unbiased_exp_fp4;
+                uint32_t trail_sig_fp32 = (1u << 31) | (trailing_significand_fp4 << 30);
                 trail_sig_fp32 >>= exp_shift;
                 trail_sig_fp32 = round_fp32_f4_significand_rne(trail_sig_fp32);
                 f32            = (sign_fp4 << 31) | ((is_sig_ovf ? 0x01 : 0x00) << 23)

@@ -385,8 +385,8 @@ namespace TransposeLoadsTest
             auto const& arch = m_context->targetArchitecture();
 
             std::vector<StoredAsType> data(m_MN * m_K);
-            for(int i = 0; i < m_MN; i++)
-                for(int j = 0; j < m_K; j++)
+            for(uint i = 0; i < m_MN; i++)
+                for(uint j = 0; j < m_K; j++)
                     data[i * m_K + j] = rand() % 10;
 
             auto packedData = pack<StoredAsType>(data, m_elementBits);

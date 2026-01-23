@@ -138,7 +138,7 @@ namespace MemoryInstructionsTest
 
             for(int i = 0; i < N; i++)
                 EXPECT_EQ(result[i], a[i]);
-            for(int i = N; i < result.size(); i++)
+            for(size_t i = N; i < result.size(); i++)
                 EXPECT_EQ(result[i], 2 * i);
         }
 
@@ -277,7 +277,7 @@ namespace MemoryInstructionsTest
 
             for(int i = 0; i < N; i++)
                 EXPECT_EQ(result[i], a[i]);
-            for(int i = N; i < result.size(); i++)
+            for(size_t i = N; i < result.size(); i++)
                 EXPECT_EQ(result[i], 2 * i);
         }
 
@@ -1396,7 +1396,7 @@ namespace MemoryInstructionsTest
 
             for(int i = 0; i < N; i++)
                 EXPECT_EQ(result[i], a[i]);
-            for(int i = N; i < result.size(); i++)
+            for(size_t i = N; i < result.size(); i++)
                 EXPECT_EQ(result[i], 2 * i);
         }
     };

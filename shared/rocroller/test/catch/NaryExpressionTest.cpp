@@ -62,10 +62,10 @@ namespace ExpressionTest
             , m_resultRegisterType(resultRegisterType)
             , m_operandNumber(operandNumber)
         {
-            REQUIRE(operandDataTypes.size() == m_operandNumber);
-            REQUIRE(operandRegisterTypes.size() == m_operandNumber);
+            REQUIRE(operandDataTypes.size() == static_cast<size_t>(m_operandNumber));
+            REQUIRE(operandRegisterTypes.size() == static_cast<size_t>(m_operandNumber));
 
-            auto operandTotalRegisters = 0;
+            auto operandTotalRegisters = 0u;
             for(int i = 0; i < m_operandNumber; ++i)
             {
                 operandTotalRegisters += DataTypeInfo::Get(m_operandDataTypes[i]).registerCount;

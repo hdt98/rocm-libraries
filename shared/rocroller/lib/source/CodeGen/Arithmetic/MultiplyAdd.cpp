@@ -84,7 +84,7 @@ namespace rocRoller
 
             if(!operation.empty())
             {
-                for(size_t k = 0; k < valueCount; ++k)
+                for(size_t k = 0; k < static_cast<size_t>(valueCount); ++k)
                 {
                     auto aVal = a->regType() == Register::Type::Literal || a->valueCount() == 1
                                     ? a
@@ -146,7 +146,7 @@ namespace rocRoller
                                               ",",
                                               std::to_string(yType),
                                               "]");
-            int         hValueCount = valueCount / 2;
+            size_t      hValueCount = static_cast<size_t>(valueCount) / 2;
             for(size_t k = 0; k < hValueCount; ++k)
             {
                 auto iter0  = 2 * k;
@@ -185,7 +185,7 @@ namespace rocRoller
             co_return;
         }
 
-        for(size_t k = 0; k < valueCount; ++k)
+        for(size_t k = 0; k < static_cast<size_t>(valueCount); ++k)
         {
             auto aVal = a->regType() == Register::Type::Literal || a->valueCount() == 1
                             ? a

@@ -61,7 +61,7 @@ namespace rocRoller
 
     HIPTimer::~HIPTimer()
     {
-        for(int i = 0; i < m_hipStart.size(); i++)
+        for(size_t i = 0; i < m_hipStart.size(); i++)
         {
             HIP_CHECK(hipEventDestroy(m_hipStart[i]));
             HIP_CHECK(hipEventDestroy(m_hipStop[i]));
@@ -92,7 +92,7 @@ namespace rocRoller
     {
         HIP_CHECK(hipEventSynchronize(m_hipStop.back()));
         m_hipElapsedTime.clear();
-        for(int i = 0; i < m_hipStart.size(); i++)
+        for(size_t i = 0; i < m_hipStart.size(); i++)
         {
             float elapsed = 0.f;
 
@@ -123,7 +123,7 @@ namespace rocRoller
     {
         std::vector<size_t> result(m_hipElapsedTime.size());
 
-        for(int i = 0; i < result.size(); i++)
+        for(size_t i = 0; i < result.size(); i++)
         {
             result[i]
                 = std::chrono::duration_cast<std::chrono::nanoseconds>(m_hipElapsedTime[i]).count();

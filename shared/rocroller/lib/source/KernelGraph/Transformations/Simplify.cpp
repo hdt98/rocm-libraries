@@ -126,7 +126,7 @@ namespace rocRoller::KernelGraph
 
                 depth[successor] = std::max(depth[successor], depth.at(node) + 1);
                 hit[successor]++;
-                if(hit.at(successor) == predecessors.at(successor).size())
+                if(static_cast<size_t>(hit.at(successor)) == predecessors.at(successor).size())
                 {
                     readyQueue.push(successor);
                     visited.insert(successor);
@@ -351,7 +351,7 @@ namespace rocRoller::KernelGraph
 
                 depth[successor] = std::max(depth[successor], depth.at(node) + 1);
                 hit[successor]++;
-                if(hit.at(successor) == predecessors.at(successor).size())
+                if(static_cast<size_t>(hit.at(successor)) == predecessors.at(successor).size())
                 {
                     readyQueue.push(successor);
                     visited.insert(successor);

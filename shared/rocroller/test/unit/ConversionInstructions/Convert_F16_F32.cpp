@@ -182,7 +182,7 @@ namespace ConvertInstructionsTest
                 RandomGenerator    random(9861u);
                 auto               nHalf = random.vector<T>(numElements, -65504.f, 65504.f);
                 std::vector<float> input(numElements, 0.0);
-                for(int i = 0; i < numElements; i++)
+                for(unsigned int i = 0; i < numElements; i++)
                     input[i] = nHalf[i];
                 std::vector<T> output(numElements, 0.0);
 
@@ -204,7 +204,7 @@ namespace ConvertInstructionsTest
                                       hipMemcpyDeviceToHost),
                             HasHipSuccess(0));
 
-                for(int i = 0; i < numElements; i++)
+                for(unsigned int i = 0; i < numElements; i++)
                 {
                     EXPECT_EQ(output[i], nHalf[i]);
                 }

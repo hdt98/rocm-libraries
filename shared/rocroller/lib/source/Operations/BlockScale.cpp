@@ -51,7 +51,7 @@ namespace rocRoller
                 m_strides.push_back(32);
             }
 
-            if(m_strides.size() != dimensions)
+            if(m_strides.size() != static_cast<size_t>(dimensions))
             {
                 m_strides.resize(dimensions, 1);
             }

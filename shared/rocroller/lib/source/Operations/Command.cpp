@@ -289,10 +289,10 @@ namespace rocRoller
 
         bool equal = true;
         equal &= m_sync == rhs.m_sync;
-        for(auto i = 0; i < m_operations.size(); ++i)
+        for(size_t i = 0; i < m_operations.size(); ++i)
             equal &= (*m_operations[i]) == (*rhs.m_operations[i]);
         equal &= m_argOffsetMap == rhs.m_argOffsetMap;
-        for(auto i = 0; i < m_commandArgs.size(); ++i)
+        for(size_t i = 0; i < m_commandArgs.size(); ++i)
             equal &= (*m_commandArgs[i]) == (*rhs.m_commandArgs[i]);
         equal &= m_nextTagValue == rhs.m_nextTagValue;
         return equal;

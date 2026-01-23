@@ -137,7 +137,7 @@ namespace rocRollerTest
                 co_yield context->mem()->loadGlobal(v_a, a_ptr, i * bpi, bpi);
 
                 // Bitmask each F8 of F8x4, convert to float, then store
-                for(int f8_idx = 0; f8_idx < numF8PerElement; f8_idx++)
+                for(int f8_idx = 0; f8_idx < static_cast<int>(numF8PerElement); f8_idx++)
                 {
                     co_yield_(Instruction::Comment("Extract f8 from packed F8"));
                     co_yield generateOp<Expression::BitFieldExtract>(
@@ -196,7 +196,7 @@ namespace rocRollerTest
                 result.data(), d_result.get(), sizeof(float) * result.size(), hipMemcpyDefault),
             HasHipSuccess(0));
 
-        for(int i = 0; i < a.size(); i++)
+        for(size_t i = 0; i < a.size(); i++)
         {
             union
             {
@@ -205,7 +205,7 @@ namespace rocRollerTest
             } u;
             u.word = a[i];
 
-            for(int f8_idx = 0; f8_idx < numF8PerElement; f8_idx++)
+            for(size_t f8_idx = 0; f8_idx < numF8PerElement; f8_idx++)
             {
                 T expected_f8;
                 expected_f8.data = u.bytes[f8_idx];

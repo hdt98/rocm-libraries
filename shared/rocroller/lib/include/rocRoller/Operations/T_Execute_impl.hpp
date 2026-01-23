@@ -292,7 +292,7 @@ namespace rocRoller
                 return false;
 
             bool equal = true;
-            for(auto i = 0; i < m_xops.size(); ++i)
+            for(size_t i = 0; i < m_xops.size(); ++i)
                 equal &= (*m_xops[i]) == (*rhs.m_xops[i]);
             equal &= m_inputs == rhs.m_inputs;
             equal &= m_outputs == rhs.m_outputs;

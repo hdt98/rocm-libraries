@@ -438,7 +438,7 @@ namespace rocRollerTest
 
     Generator<int> testWithRef(std::vector<int> const& v)
     {
-        for(int i = 0; i < v.size(); i++)
+        for(size_t i = 0; i < v.size(); i++)
         {
             co_yield v[i];
         }
@@ -447,7 +447,7 @@ namespace rocRollerTest
     // cppcheck-suppress passedByValue
     Generator<int> testWithoutRef(std::vector<int> v)
     {
-        for(int i = 0; i < v.size(); i++)
+        for(size_t i = 0; i < v.size(); i++)
         {
             co_yield v[i];
         }

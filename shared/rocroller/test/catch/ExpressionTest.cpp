@@ -2154,12 +2154,12 @@ namespace ExpressionTest
         CHECK(std::get<int>(evaluate(vals_shiftL, args)) == (aVal << bVal));
 
         CHECK(std::get<int>(evaluate(vals_shiftR, args))
-              == (static_cast<unsigned int>(aVal) >> bVal));
+              == static_cast<int>(static_cast<unsigned int>(aVal) >> bVal));
         CHECK(std::get<int>(evaluate(vals_signedShiftR, args)) == (aVal >> bVal));
 
         CHECK(std::get<int>(evaluate(expr_shiftL, args)) == ((aVal + bVal) << bVal));
         CHECK(std::get<int>(evaluate(expr_shiftR, args))
-              == (static_cast<unsigned int>(aVal + bVal) >> bVal));
+              == static_cast<int>(static_cast<unsigned int>(aVal + bVal) >> bVal));
         CHECK(std::get<int>(evaluate(expr_signedShiftR, args)) == ((aVal + bVal) >> bVal));
     }
 

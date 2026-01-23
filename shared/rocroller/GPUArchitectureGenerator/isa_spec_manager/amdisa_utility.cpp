@@ -78,7 +78,7 @@ namespace amdisa
     std::string AmdIsaUtility::Strip(const std::string& str)
     {
         std::string stripped_str;
-        int32_t     pos_start = 0;
+        size_t      pos_start = 0;
         size_t      pos_end   = str.length() - 1;
 
         // Skip leading whitespaces and special chars.
@@ -89,7 +89,7 @@ namespace amdisa
         }
 
         // Skip trailing whitespaces and special chars.
-        while (pos_end - pos_start >= 0 && should_skip(str[pos_end]))
+        while (pos_end >= pos_start && should_skip(str[pos_end]))
         {
             --pos_end;
         }

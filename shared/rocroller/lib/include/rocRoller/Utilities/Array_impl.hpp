@@ -58,7 +58,7 @@ namespace rocRoller
 
         if constexpr(std::ranges::sized_range<C>)
         {
-            auto remainingSlots = array.end() - arrayIter;
+            auto remainingSlots = static_cast<size_t>(array.end() - arrayIter);
             auto numValues      = std::ranges::size(values);
             AssertFatal(remainingSlots >= numValues,
                         "Array is full!",

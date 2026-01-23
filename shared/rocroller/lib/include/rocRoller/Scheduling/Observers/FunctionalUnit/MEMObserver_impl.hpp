@@ -91,7 +91,7 @@ namespace rocRoller
         {
             InstructionStatus rv;
             const auto*       derived = static_cast<const Derived*>(this);
-            if(derived->isMEMInstruction(inst) && m_incomplete.size() >= m_queueAllotment)
+            if(derived->isMEMInstruction(inst) && m_incomplete.size() >= static_cast<size_t>(m_queueAllotment))
             {
                 auto complete  = m_incomplete.front().expectedCompleteCycle;
                 rv.stallCycles = std::max(complete - m_programCycle, 0);
@@ -119,7 +119,7 @@ namespace rocRoller
             auto        wait    = derived->getWait(inst);
             if(wait >= 0)
             {
-                while(queueLen() > wait)
+                while(queueLen() > static_cast<size_t>(wait))
                 {
                     auto info      = queuePop();
                     m_programCycle = std::max(m_programCycle, info.expectedCompleteCycle);
@@ -130,7 +130,7 @@ namespace rocRoller
 
             if(derived->isMEMInstruction(inst))
             {
-                while(m_incomplete.size() >= m_queueAllotment)
+                while(m_incomplete.size() >= static_cast<size_t>(m_queueAllotment))
                     queueShift();
 
                 m_programCycle += instCycles;

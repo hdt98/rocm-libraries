@@ -92,23 +92,23 @@ namespace ConnectWorkgroupsTest
         auto graph     = graph0;
         auto remapping = connectWorkgroups(graph);
 
-        for(uint wg = 0; wg < vX; ++wg)
+        for(int wg = 0; wg < vX; ++wg)
         {
             auto exprs = graph.coordinates.forward(
                 {literal(wg)}, {remapping[{0, GD::Downstream}]}, {tileNumAD});
             auto tileNumA = getUnsignedInt(evaluate(exprs[0]));
 
-            auto expectedA = wg;
+            auto expectedA = static_cast<unsigned int>(wg);
             CHECK(tileNumA == expectedA);
         }
 
-        for(uint wg = 0; wg < vY; ++wg)
+        for(int wg = 0; wg < vY; ++wg)
         {
             auto exprs = graph.coordinates.forward(
                 {literal(wg)}, {remapping[{1, GD::Downstream}]}, {tileNumBD});
             auto tileNumB = getUnsignedInt(evaluate(exprs[0]));
 
-            auto expectedB = wg;
+            auto expectedB = static_cast<unsigned int>(wg);
             CHECK(tileNumB == expectedB);
         }
     }

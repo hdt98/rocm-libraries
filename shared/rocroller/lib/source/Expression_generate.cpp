@@ -58,7 +58,7 @@ namespace rocRoller
             bool operator()(Expr const& expr) const
             {
                 return std::ranges::any_of(expr.operands,
-                                           [this](auto const& operand) { return call(operand); });
+                                           [this](auto const& operand) { return this->call(operand); });
             }
 
             template <CTernary Expr>
@@ -172,7 +172,7 @@ namespace rocRoller
             {
                 AssertFatal(!regs.empty());
                 auto rtype = regs[0]->regType();
-                for(int i = 1; i < regs.size(); ++i)
+                for(size_t i = 1; i < regs.size(); ++i)
                 {
                     rtype = Register::PromoteType(rtype, regs[i]->regType());
                 }
@@ -183,7 +183,7 @@ namespace rocRoller
             {
                 AssertFatal(!regs.empty());
                 auto vtype = regs[0]->variableType();
-                for(int i = 1; i < regs.size(); ++i)
+                for(size_t i = 1; i < regs.size(); ++i)
                 {
                     vtype = VariableType::Promote(vtype, regs[i]->variableType());
                 }
@@ -220,7 +220,7 @@ namespace rocRoller
                     return m;
                 }();
 
-                for(auto i = 0; i < exprs.size(); i++)
+                for(size_t i = 0; i < exprs.size(); i++)
                 {
                     resultTypes[i]     = resultType(exprs[i]);
                     auto const regType = resultTypes[i].regType;
@@ -231,7 +231,7 @@ namespace rocRoller
                 // An SPR may only hold one temporary value at a time.
                 // If there is more than one use, a placeholder register needs to
                 // be created in place.
-                for(auto i = 0; i < exprs.size(); i++)
+                for(size_t i = 0; i < exprs.size(); i++)
                 {
                     auto const resType = resultTypes[i];
                     auto const regType = resType.regType;
@@ -244,7 +244,7 @@ namespace rocRoller
 
                 // Schedule all sub-expressions storing to general-purpose registers.
                 std::vector<Generator<Instruction>> schedulable;
-                for(auto i = 0; i < exprs.size(); i++)
+                for(size_t i = 0; i < exprs.size(); i++)
                 {
                     if(!IsWriteableSpecial(resultTypes[i].regType) || results[i] != nullptr)
                     {
@@ -270,7 +270,7 @@ namespace rocRoller
 
                 // Schedule all sub-expressions storing to special-purpose registers.
                 std::optional<size_t> maybeSccExprIdx = std::nullopt;
-                for(auto i = 0; i < exprs.size(); i++)
+                for(size_t i = 0; i < exprs.size(); i++)
                 {
                     if(!done[i])
                     {
@@ -448,7 +448,7 @@ namespace rocRoller
 
                     auto conversion = resultPlaceholder(resType, true, packingRatio);
 
-                    for(size_t i = 0; i < valueCount; i += packingRatio)
+                    for(size_t i = 0; i < static_cast<size_t>(valueCount); i += packingRatio)
                     {
                         Register::ValuePtr lhsVal, rhsVal;
                         if(lhsInfo.packing < rhsInfo.packing)
@@ -466,7 +466,7 @@ namespace rocRoller
 
                         auto result = dest->element({i, i + packingRatio - 1});
 
-                        for(size_t j = 0; j < packingRatio; j++)
+                        for(size_t j = 0; j < static_cast<size_t>(packingRatio); j++)
                         {
                             if(lhsInfo.packing < rhsInfo.packing)
                             {
@@ -647,7 +647,7 @@ namespace rocRoller
                                             arch.target().toString(),
                                             "does not use Accumulator registers."));
                     regType = Register::Type::Vector;
-                    for(int i = 0; i < results.size(); ++i)
+                    for(size_t i = 0; i < results.size(); ++i)
                     {
                         co_yield m_context->copier()->ensureType(results[i], results[i], regType);
                     }
@@ -660,7 +660,7 @@ namespace rocRoller
                     dest = resultPlaceholder({regType, varType}, true, valueCount);
                 }
 
-                for(size_t k = 0; k < valueCount; ++k)
+                for(size_t k = 0; k < static_cast<size_t>(valueCount); ++k)
                 {
                     auto lhsVal  = results[0]->regType() == Register::Type::Literal
                                           || results[0]->valueCount() == 1
@@ -704,7 +704,7 @@ namespace rocRoller
                                             arch.target().toString(),
                                             "does not use Accumulator registers."));
                     regType = Register::Type::Vector;
-                    for(int i = 0; i < results.size(); ++i)
+                    for(size_t i = 0; i < results.size(); ++i)
                     {
                         co_yield m_context->copier()->ensureType(results[i], results[i], regType);
                     }
@@ -744,7 +744,7 @@ namespace rocRoller
                     dest         = resultPlaceholder({regType, varType}, true, valueCount);
                 }
 
-                for(size_t k = 0; k < valueCount; ++k)
+                for(size_t k = 0; k < static_cast<size_t>(valueCount); ++k)
                 {
                     auto lhs    = results[0];
                     auto rhs    = results[1];
@@ -1221,7 +1221,7 @@ namespace rocRoller
                 node.expr = nullptr;
 
                 // Don't clear the last register as that is the destination for the expression.
-                if(idx + 1 != tree.size())
+                if(static_cast<size_t>(idx + 1) != tree.size())
                     node.reg = nullptr;
             };
 

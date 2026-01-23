@@ -200,7 +200,7 @@ namespace SettingsTest
             {
                 size_t iters = 0;
                 int    tid   = omp_get_thread_num();
-                while(std::chrono::high_resolution_clock::now() < end || iters <= minIters)
+                while(std::chrono::high_resolution_clock::now() < end || iters <= static_cast<size_t>(minIters))
                 {
                     iters++;
                     if(tid % 2 == 0)

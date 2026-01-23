@@ -293,7 +293,7 @@ namespace rocRoller
                     = graph.coordinates.getOutputNodeIndices(userTag, CT::isEdge<Split>)
                           .to<std::vector>();
                 std::vector<int> sDims;
-                for(int i = 0; i < existingSDims.size(); i++)
+                for(size_t i = 0; i < existingSDims.size(); i++)
                 {
                     sDims.push_back(graph.coordinates.addElement(
                         graph.coordinates.getElement(existingSDims[i])));

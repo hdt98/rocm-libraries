@@ -220,7 +220,7 @@ namespace rocRoller
                              .GetInstructionInfo(instruction)
                              .maxOffsetValue();
 
-        if(maxOffset != 0 && (offset > maxOffset || offset < 0))
+        if(maxOffset != 0 && (offset < 0 || static_cast<unsigned int>(offset) > maxOffset))
         {
             auto currentAddr = addr;
             addr             = nullptr;
@@ -281,10 +281,10 @@ namespace rocRoller
         else
         {
             // Generate enough load instructions to load numBytes
-            int numWords = numBytes / m_wordSize;
+            size_t numWords = numBytes / m_wordSize;
             AssertFatal(dest->registerCount() == numWords);
             std::vector<int> potentialWords = {4, 3, 2, 1};
-            int              count          = 0;
+            size_t           count          = 0;
             while(count < numWords)
             {
                 auto width = chooseWidth(
@@ -352,10 +352,10 @@ namespace rocRoller
         else
         {
             // Generate enough store instructions to store numBytes
-            int numWords = numBytes / m_wordSize;
+            size_t numWords = numBytes / m_wordSize;
             AssertFatal(data->registerCount() == numWords);
             std::vector<int> potentialWords = {4, 3, 2, 1};
-            int              count          = 0;
+            size_t           count          = 0;
             while(count < numWords)
             {
                 auto width = chooseWidth(
@@ -482,10 +482,10 @@ namespace rocRoller
         else
         {
             // Generate enough load instructions to load numBytes
-            int numWords = numBytes / m_wordSize;
+            size_t numWords = numBytes / m_wordSize;
             AssertFatal(dest->registerCount() == numWords);
             std::vector<int> potentialWords = {4, 3, 2, 1};
-            int              count          = 0;
+            size_t           count          = 0;
             while(count < numWords)
             {
                 auto width = chooseWidth(

@@ -340,7 +340,7 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         int src  = -1;
         int dest = -1;
-        for(int i = 0; (i < aControlStack.size()) && (i < bControlStack.size()); ++i)
+        for(size_t i = 0; (i < aControlStack.size()) && (i < bControlStack.size()); ++i)
         {
             if(aControlStack.at(i) != bControlStack.at(i))
             {

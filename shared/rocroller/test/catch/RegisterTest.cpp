@@ -602,9 +602,9 @@ TEST_CASE("Register::RegisterId and Register::RegisterIdHash() work for special 
         }
         CHECK(specialRegisterIDs.size() == specialRegisters.size());
 
-        for(int i = 0; i < specialRegisters.size(); i++)
+        for(size_t i = 0; i < specialRegisters.size(); i++)
         {
-            for(int j = 0; j < specialRegisters.size(); j++)
+            for(size_t j = 0; j < specialRegisters.size(); j++)
             {
                 if(specialRegisters[i]->toString() != specialRegisters[j]->toString())
                 {

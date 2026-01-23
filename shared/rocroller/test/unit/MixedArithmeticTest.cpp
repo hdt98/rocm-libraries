@@ -785,7 +785,7 @@ namespace MixedArithmeticTest
 
             auto result = getDeviceValues(d_result, numResultValues, param.resultVarType);
 
-            for(int idx = 0; idx < param.argValues.size(); idx++)
+            for(size_t idx = 0; idx < param.argValues.size(); idx++)
             {
                 auto const& [arg1Val, arg2Val, arg3Val] = param.argValues[idx];
                 auto arg1_rt  = castToResult(arg1Val, param.resultVarType);

@@ -294,7 +294,7 @@ TEST_CASE("ShuffleDims is reversible", "[utils][tensor-descriptor]")
                 while(!indices.empty())
                 {
                     auto idx = gen.next<size_t>(0, indices.size() - 1);
-                    REQUIRE(idx < dims);
+                    REQUIRE(idx < static_cast<size_t>(dims));
                     order.push_back(indices.at(idx));
                     indices.erase(next(indices.begin(), idx));
                 }

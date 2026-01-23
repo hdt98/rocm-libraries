@@ -790,13 +790,13 @@ namespace rocRoller
             }
 
             graph.control.addElement(Body(), {top}, {setChain.front()});
-            for(int i = 1; i < setChain.size(); ++i)
+            for(size_t i = 1; i < setChain.size(); ++i)
             {
                 graph.control.addElement(Body(), {setChain[i - 1]}, {setChain[i]});
             }
 
             graph.control.addElement(Body(), {setChain.back()}, {assignChain.front()});
-            for(int i = 1; i < assignChain.size(); ++i)
+            for(size_t i = 1; i < assignChain.size(); ++i)
             {
                 graph.control.addElement(Sequence(), {assignChain[i - 1]}, {assignChain[i]});
             }

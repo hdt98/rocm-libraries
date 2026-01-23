@@ -134,9 +134,9 @@ namespace rocRoller
                 std::unordered_set<int> seenIndices;
                 for(auto const& segment : indices)
                 {
-                    for(int idx : segment)
+                    for(auto idx : segment)
                     {
-                        AssertFatal(idx < m_allocationCoord.size());
+                        AssertFatal(static_cast<size_t>(idx) < m_allocationCoord.size());
                         AssertFatal(!seenIndices.contains(idx), ShowValue(idx));
 
                         seenIndices.insert(idx);
@@ -168,7 +168,7 @@ namespace rocRoller
             coords.reserve(m_allocationCoord.size());
             indices.reserve(m_allocationCoord.size());
 
-            for(int i = 0; i < m_allocationCoord.size(); i++)
+            for(size_t i = 0; i < m_allocationCoord.size(); i++)
             {
                 coords.push_back(i);
                 indices.push_back(m_allocation->m_registerIndices[m_allocationCoord[i]]);

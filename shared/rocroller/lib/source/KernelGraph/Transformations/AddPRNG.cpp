@@ -123,7 +123,7 @@ namespace rocRoller
             auto const& ws            = context->kernel()->workgroupSize();
 
             std::vector<int> subdims;
-            for(size_t i = 0; i < numDimensions; i++)
+            for(int i = 0; i < numDimensions; i++)
             {
                 auto wg_tag = coordinates.addElement(Workgroup(i));
                 auto wi_tag = coordinates.addElement(Workitem(i, Expression::literal(ws[i])));

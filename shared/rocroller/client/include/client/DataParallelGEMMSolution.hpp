@@ -355,11 +355,11 @@ namespace rocRoller
 
                     AssertFatal(solutionParams.macM * solutionParams.macK
                                         * DataTypeInfo::Get(typeA).elementBytes
-                                    > wave_m * wave_k,
+                                    > static_cast<unsigned int>(wave_m * wave_k),
                                 "Not enough elements (A).");
                     AssertFatal(solutionParams.macN * solutionParams.macK
                                         * DataTypeInfo::Get(typeA).elementBytes
-                                    > wave_n * wave_k,
+                                    > static_cast<unsigned int>(wave_n * wave_k),
                                 "Not enough elements (B).");
 
                     auto const arch = GPUArchitectureLibrary::getInstance()->GetArch(

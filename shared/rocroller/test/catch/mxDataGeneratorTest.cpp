@@ -70,7 +70,7 @@ namespace mxDataGeneratorTest
             std::vector<uint8_t>& byteData1 = reinterpret_cast<std::vector<uint8_t>&>(rrVector1);
             std::vector<uint8_t>& byteData2 = reinterpret_cast<std::vector<uint8_t>&>(rrVector2);
 
-            for(int i = 0; i < ref.size(); i++)
+            for(size_t i = 0; i < ref.size(); i++)
             {
                 int scale_i = i / blockScaling;
                 CHECK(toFloatPacked<DGenDT>(&scale[0], &byteData[0], scale_i, i) == ref[i]);

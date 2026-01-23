@@ -126,9 +126,9 @@ namespace rocRoller
                 equal &= (*m_pointer) == (*rhs.m_pointer);
             if(m_extent)
                 equal &= (*m_extent) == *(rhs.m_extent);
-            for(auto i = 0; i < m_sizes.size(); ++i)
+            for(size_t i = 0; i < m_sizes.size(); ++i)
                 equal &= (*m_sizes[i]) == (*rhs.m_sizes[i]);
-            for(auto i = 0; i < m_strides.size(); ++i)
+            for(size_t i = 0; i < m_strides.size(); ++i)
                 equal &= (*m_strides[i]) == (*rhs.m_strides[i]);
             equal &= m_literalStrides == rhs.m_literalStrides;
 

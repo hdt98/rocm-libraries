@@ -1441,7 +1441,7 @@ namespace rocRoller
             auto numWorkitems = product(workgroupSizes);
             auto numElements  = product(sizes);
             AssertFatal(
-                numElements >= numWorkitems && numElements % numWorkitems == 0,
+                static_cast<unsigned int>(numElements) >= numWorkitems && numElements % numWorkitems == 0,
                 "The number of elements must be an integer multiple of the number of workitems",
                 ShowValue(numElements),
                 ShowValue(numWorkitems));
@@ -1915,7 +1915,7 @@ namespace rocRoller
                 auto sdims
                     = original.coordinates.getOutputNodeIndices(originalUserTag, CT::isEdge<Split>)
                           .to<std::vector>();
-                for(int i = 0; i < sdims.size(); i++)
+                for(size_t i = 0; i < sdims.size(); i++)
                     sdims[i] = reindexer.coordinates.at(sdims[i]);
                 AssertFatal(sdims.size() >= 2);
 
@@ -2106,7 +2106,7 @@ namespace rocRoller
                 auto sdims
                     = original.coordinates.getInputNodeIndices(originalUserTag, CT::isEdge<Join>)
                           .to<std::vector>();
-                for(int i = 0; i < sdims.size(); i++)
+                for(size_t i = 0; i < sdims.size(); i++)
                     sdims[i] = reindexer.coordinates.at(sdims[i]);
                 AssertFatal(sdims.size() >= 2);
 

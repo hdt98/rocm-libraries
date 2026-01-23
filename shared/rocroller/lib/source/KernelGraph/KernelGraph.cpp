@@ -89,7 +89,7 @@ namespace rocRoller
             KernelGraph::checkConstraints(const std::vector<GraphConstraint>& constraints) const
         {
             ConstraintStatus retval;
-            for(int i = 0; i < constraints.size(); i++)
+            for(size_t i = 0; i < constraints.size(); i++)
             {
                 auto check = constraints[i](*this);
                 if(!check.satisfied)

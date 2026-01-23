@@ -125,9 +125,9 @@ TEST_CASE("Colour by Unroll value", "[kernel-graph]")
     // missing entries in a map get default constructed, and therefore
     // missing colours are 0.
 
-    auto cX = exclude ? 0 : vX;
-    auto cY = vY;
-    auto cK = exclude ? 0 : vK;
+    int cX = exclude ? 0 : static_cast<int>(vX);
+    int cY = static_cast<int>(vY);
+    int cK = exclude ? 0 : static_cast<int>(vK);
 
     CHECK(colouring.operationColour[setCoordX][unrollX] == cX);
     CHECK(colouring.operationColour[setCoordX][unrollY] == 0);

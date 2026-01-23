@@ -392,7 +392,7 @@ namespace rocRoller::KernelGraph::ControlGraph
                         // If this is a common ancestor, compare the types of both edges to
                         // know the order
                         auto const edgeBTypeIndex = getEdge(edge).index();
-                        if(A_ancestors.at(parent) != edgeBTypeIndex)
+                        if(static_cast<size_t>(A_ancestors.at(parent)) != edgeBTypeIndex)
                         {
                             return getOrderOfDescendants(A_ancestors.at(parent), edgeBTypeIndex);
                         }

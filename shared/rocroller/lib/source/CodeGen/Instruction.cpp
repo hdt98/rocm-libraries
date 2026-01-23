@@ -56,7 +56,7 @@ namespace rocRoller
         if(level >= LogLevel::Terse && m_comments.size() > 1)
         {
             // Only include everything but the first comment in the coda string.
-            for(int i = 1; i < m_comments.size(); i++)
+            for(size_t i = 1; i < m_comments.size(); i++)
             {
                 for(auto const& line : EscapeComment(m_comments[i]))
                 {

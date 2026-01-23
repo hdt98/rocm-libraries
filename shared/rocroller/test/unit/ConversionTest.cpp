@@ -237,7 +237,7 @@ namespace rocRollerTest
 
         std::vector<TypeD> cpu_D;
         cpu_D.reserve(M * N);
-        for(size_t i = 0; i < M * N; i++)
+        for(int i = 0; i < M * N; i++)
             cpu_D.emplace_back(TypeD(tmp_D[i]));
 
         auto tol = gemmAcceptableError<TypeAB, TypeAB, TypeD>(
@@ -350,7 +350,7 @@ namespace rocRollerTest
 
         std::vector<TypeD> cpu_D;
         cpu_D.reserve(M * N);
-        for(size_t i = 0; i < M * N; i++)
+        for(int i = 0; i < M * N; i++)
             cpu_D.emplace_back(TypeD(tmp_D[i]));
 
         auto tol = gemmAcceptableError<TypeAB, TypeAB, TypeD>(

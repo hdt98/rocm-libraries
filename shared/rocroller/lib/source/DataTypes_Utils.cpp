@@ -98,7 +98,7 @@ namespace rocRoller
     {
         auto rv = std::vector<T>(n * 8);
 
-        for(int i = 0; i < n * 8; ++i)
+        for(size_t i = 0; i < n * 8; ++i)
         {
             uint8_t value = getFp4(reinterpret_cast<uint8_t const*>(x), i);
             if constexpr(std::is_same_v<T, uint8_t>)
@@ -130,7 +130,7 @@ namespace rocRoller
     {
         AssertFatal(n % 8 == 0, "Number of F4 values must be a multiple of 8.");
         std::memset(out, 0, 4 * n / 8);
-        for(int i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             setFp4(reinterpret_cast<uint8_t*>(out), data[i], i);
         return;
     }
@@ -235,7 +235,7 @@ namespace rocRoller
     {
         AssertFatal(n % 3 == 0, "Number of F6x16 registers must be a multiple of 3.");
         auto rv = std::vector<DstType>(n / 3 * 16);
-        for(int i = 0; i < n / 3 * 16; ++i)
+        for(size_t i = 0; i < n / 3 * 16; ++i)
         {
             auto v = getF6(reinterpret_cast<uint8_t const*>(x), i);
             if constexpr(std::is_same_v<DstType, uint8_t>)
@@ -269,7 +269,7 @@ namespace rocRoller
     {
         AssertFatal(n % 16 == 0, "Number of F6 values must be a multiple of 16.");
         std::memset(out, 0, 6 * n / 8);
-        for(int i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             setF6(reinterpret_cast<uint8_t*>(out), data[i], i);
     }
 
@@ -285,7 +285,7 @@ namespace rocRoller
         auto n = x.size();
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(x[i]);
         return rv;
     }
@@ -296,7 +296,7 @@ namespace rocRoller
         auto halfptr = reinterpret_cast<Half const*>(halfx2.data());
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(halfptr[i]);
         return rv;
     }
@@ -306,7 +306,7 @@ namespace rocRoller
         auto n = x.size();
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(x[i]);
         return rv;
     }
@@ -316,7 +316,7 @@ namespace rocRoller
         auto n = f8.size();
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(f8[i]);
         return rv;
     }
@@ -326,7 +326,7 @@ namespace rocRoller
         auto n = f8.size();
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(f8[i]);
         return rv;
     }
@@ -337,7 +337,7 @@ namespace rocRoller
         auto f8ptr = reinterpret_cast<FP8 const*>(f8x4.data());
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(f8ptr[i]);
         return rv;
     }
@@ -348,7 +348,7 @@ namespace rocRoller
         auto f8ptr = reinterpret_cast<BF8 const*>(f8x4.data());
 
         std::vector<float> rv(n);
-        for(auto i = 0; i < n; ++i)
+        for(size_t i = 0; i < n; ++i)
             rv[i] = float(f8ptr[i]);
         return rv;
     }

@@ -325,12 +325,15 @@ namespace rocRoller
                 {
                     return m_lhs;
                 }
-                else if(rhs == -1)
+                else if constexpr(std::is_signed_v<T>)
                 {
-                    return std::make_shared<Expression>(Multiply({m_lhs, literal(rhs)}));
+                    if(rhs == static_cast<T>(-1))
+                    {
+                        return std::make_shared<Expression>(Multiply({m_lhs, literal(rhs)}));
+                    }
                 }
                 // Power of 2 Division
-                else if(std::has_single_bit(cast_to_unsigned(rhs)))
+                if(std::has_single_bit(cast_to_unsigned(rhs)))
                 {
                     return powerOfTwoDivision<T>(m_lhs, cast_to_unsigned(rhs));
                 }
@@ -376,12 +379,19 @@ namespace rocRoller
                 {
                     Throw<FatalError>("Attempting to perform modulo by 0 in expression");
                 }
-                else if(rhs == 1 || rhs == -1)
+                else if(rhs == 1)
                 {
                     return literal<T>(0);
                 }
+                else if constexpr(std::is_signed_v<T>)
+                {
+                    if(rhs == static_cast<T>(-1))
+                    {
+                        return literal<T>(0);
+                    }
+                }
                 // Power of 2 Modulo
-                else if(std::has_single_bit(cast_to_unsigned(rhs)))
+                if(std::has_single_bit(cast_to_unsigned(rhs)))
                 {
                     return powerOfTwoModulo(m_lhs, rhs);
                 }

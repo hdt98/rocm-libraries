@@ -1087,7 +1087,7 @@ namespace rocRoller
             auto end   = potentialFactors.end();
             auto factorPred
                 = [numDwordsPerWorkitem, maxWidth, t_n, macTileFastMovingDimSize](int factor) {
-                      const auto n = t_n * factor;
+                      const auto n = static_cast<uint>(t_n * factor);
                       return factor <= maxWidth && numDwordsPerWorkitem % factor == 0
                              && (n <= macTileFastMovingDimSize);
                   };
@@ -1204,7 +1204,7 @@ namespace rocRoller
                             tag,
                             ")");
 
-                if(getUnsignedInt(evaluate(valueExpr)) == coordValue)
+                if(getUnsignedInt(evaluate(valueExpr)) == static_cast<unsigned int>(coordValue))
                 {
                     for(auto const& dst : graph.mapper.getConnections(tag))
                     {
@@ -1404,8 +1404,8 @@ namespace rocRoller
         {
             std::set<std::pair<int, int>> pairs;
             // Cartesian product; mimics the std::set version above
-            for(int i = 0; i < nodes.size(); ++i)
-                for(int j = 0; j < nodes.size(); ++j)
+            for(size_t i = 0; i < nodes.size(); ++i)
+                for(size_t j = 0; j < nodes.size(); ++j)
                     pairs.insert(std::make_pair(nodes[i], nodes[j]));
             orderMemoryNodes(graph, pairs, ordered);
         }

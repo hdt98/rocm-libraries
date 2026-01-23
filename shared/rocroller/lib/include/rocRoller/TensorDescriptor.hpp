@@ -128,11 +128,11 @@ namespace rocRoller
 
         inline void calculate();
 
-        const size_t size(size_t index) const;
+        size_t size(size_t index) const;
 
         const std::vector<size_t>& sizes() const;
 
-        const size_t stride(size_t index) const;
+        size_t stride(size_t index) const;
 
         const std::vector<size_t>& strides() const;
 

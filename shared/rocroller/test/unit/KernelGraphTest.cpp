@@ -2093,7 +2093,7 @@ namespace KernelGraphTest
         double rnorm = relativeNormL2(r, ref);
 
         std::ostringstream msg;
-        for(int i = 0; i < r.size(); i++)
+        for(size_t i = 0; i < r.size(); i++)
         {
             msg << i << " " << r[i] << " | " << ref[i];
             if(r[i] != ref[i])

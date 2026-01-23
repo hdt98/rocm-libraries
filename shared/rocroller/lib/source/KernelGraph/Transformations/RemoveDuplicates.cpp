@@ -466,7 +466,7 @@ namespace rocRoller
                                                 ControlGraph::StoreLDSTile,
                                                 ControlGraph::LoadLDSTile>(graph);
             std::unordered_map<int, int> nodeOrders;
-            for(int i = 0; i < orderedNodes.size(); i++)
+            for(size_t i = 0; i < orderedNodes.size(); i++)
                 nodeOrders.emplace(orderedNodes[i], i);
 
             // Two passes:

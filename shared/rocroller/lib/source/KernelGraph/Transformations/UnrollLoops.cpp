@@ -219,7 +219,7 @@ namespace rocRoller
         void makeSequential(KernelGraph&                         graph,
                             const std::vector<std::vector<int>>& sequentialOperations)
         {
-            for(int i = 0; i < sequentialOperations.size() - 1; i++)
+            for(size_t i = 0; i < sequentialOperations.size() - 1; i++)
             {
                 auto a    = getTopSetCoordinate(graph, sequentialOperations[i].back());
                 auto b    = getTopSetCoordinate(graph, sequentialOperations[i + 1].front());
@@ -613,7 +613,7 @@ namespace rocRoller
             std::optional<std::pair<int, int>> previousLDSStores;
 
             auto name = getForLoopName(graph, tag);
-            for(int i = 0; i < unrollAmount; i++)
+            for(unsigned int i = 0; i < unrollAmount; i++)
             {
                 duplicatedBodies[i]   = connectWithSetCoord(duplicatedBodies[i], i);
                 auto currentLoads     = getTops(isLoadTiled, duplicatedBodies[i]);

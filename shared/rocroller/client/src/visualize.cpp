@@ -105,7 +105,7 @@ namespace rocRoller
                             ElementNumbers const& fixedElements)
         {
             elementCoords.resize(fixedElements.size());
-            for(int coordIdx = 0; coordIdx < fixedElements.size(); coordIdx++)
+            for(size_t coordIdx = 0; coordIdx < fixedElements.size(); coordIdx++)
             {
                 auto coord              = std::get<0>(fixedElements[coordIdx]);
                 auto thisSize           = std::get<1>(fixedElements[coordIdx]);
@@ -178,7 +178,7 @@ namespace rocRoller
                 totalElements *= std::get<1>(tup);
             std::vector<size_t> elementCoords(fixedElements.size(), 0);
 
-            for(int i = 0; i < totalWorkgroupSize; i++)
+            for(unsigned int i = 0; i < totalWorkgroupSize; i++)
             {
                 gi.setCoordinate(workitemIndices, i);
 
@@ -245,11 +245,11 @@ namespace rocRoller
             std::vector<int> matrix(0, -10);
 
             auto totalWorkgroupSize = product(invocation.workgroupSize);
-            for(int i = 0; i < totalWorkgroupSize; i++)
+            for(size_t i = 0; i < totalWorkgroupSize; i++)
             {
                 gi.setCoordinate(workitemIndices, i);
 
-                for(int j = 0; j < totalElements; j++)
+                for(size_t j = 0; j < totalElements; j++)
                 {
                     setIndexCoords(gi, elementCoords, j, fixedElements);
 
@@ -333,11 +333,11 @@ namespace rocRoller
             {
                 setIndexCoords(gi, elementCoords, j, fixedElements);
 
-                for(int threadIdx = 0; threadIdx < totalWorkgroupSize; threadIdx++)
+                for(unsigned int threadIdx = 0; threadIdx < totalWorkgroupSize; threadIdx++)
                 {
                     gi.setCoordinate(workitemIndices, threadIdx);
 
-                    for(int workgroupIndex = 0; workgroupIndex < workgroupCount[hipWorkgroupIndex];
+                    for(unsigned int workgroupIndex = 0; workgroupIndex < workgroupCount[hipWorkgroupIndex];
                         workgroupIndex++)
                     {
                         gi.setCoordinate(workgroupIndices[hipWorkgroupIndex], workgroupIndex);
@@ -431,16 +431,16 @@ namespace rocRoller
             for(size_t j = 0; j < totalElements; j++)
             {
                 setIndexCoords(gi, elementCoords, j, fixedElements);
-                for(int threadIdx = 0; threadIdx < totalWorkgroupSize; threadIdx++)
+                for(unsigned int threadIdx = 0; threadIdx < totalWorkgroupSize; threadIdx++)
                 {
                     gi.setCoordinate(workitemIndices, threadIdx);
 
-                    for(int blockIdx_x = 0; blockIdx_x < workgroupCount[hipWorkgroupIndex];
+                    for(unsigned int blockIdx_x = 0; blockIdx_x < workgroupCount[hipWorkgroupIndex];
                         blockIdx_x++)
                     {
                         gi.setCoordinate(workgroupIndices[hipWorkgroupIndex], blockIdx_x);
 
-                        for(int i = 0; i < size1 / tileSizeK; i++)
+                        for(size_t i = 0; i < size1 / tileSizeK; i++)
                         {
                             gi.setCoordinate(forLoopIndices, i);
                             auto matIdx    = gi.getLoadIndex(loadDim);

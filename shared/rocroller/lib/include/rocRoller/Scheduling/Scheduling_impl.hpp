@@ -99,18 +99,18 @@ namespace rocRoller
 
             reusedOperands = std::max(reusedOperands, other.reusedOperands);
 
-            for(int i = 0; i < waitLengths.size(); i++)
+            for(size_t i = 0; i < waitLengths.size(); i++)
             {
                 waitLengths[i] = std::max(waitLengths[i], other.waitLengths[i]);
             }
 
-            for(int i = 0; i < allocatedRegisters.size(); i++)
+            for(size_t i = 0; i < allocatedRegisters.size(); i++)
             {
                 allocatedRegisters[i]
                     = std::max(allocatedRegisters[i], other.allocatedRegisters[i]);
             }
 
-            for(int i = 0; i < remainingRegisters.size(); i++)
+            for(size_t i = 0; i < remainingRegisters.size(); i++)
             {
                 if(remainingRegisters[i] < 0)
                     remainingRegisters[i] = other.remainingRegisters[i];
@@ -119,7 +119,7 @@ namespace rocRoller
                         = std::min(remainingRegisters[i], other.remainingRegisters[i]);
             }
 
-            for(int i = 0; i < highWaterMarkRegistersDelta.size(); i++)
+            for(size_t i = 0; i < highWaterMarkRegistersDelta.size(); i++)
             {
                 highWaterMarkRegistersDelta[i] = std::max(highWaterMarkRegistersDelta[i],
                                                           other.highWaterMarkRegistersDelta[i]);

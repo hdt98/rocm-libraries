@@ -212,7 +212,7 @@ namespace KernelGraphTest
         //
         // Chain the Body nodes with Sequence edges
         //
-        for(int i = 1; i < bodyNodes.size(); i++)
+        for(size_t i = 1; i < bodyNodes.size(); i++)
             graph0.control.addElement(Sequence(), {bodyNodes[i - 1]}, {bodyNodes[i]});
 
         auto graph1 = KernelGraph::Simplify().apply(graph0);
@@ -228,7 +228,7 @@ namespace KernelGraphTest
         //
         // Verify only the first Body edge remains
         //
-        for(int i = 1; i < bodyEdges.size(); i++)
+        for(size_t i = 1; i < bodyEdges.size(); i++)
             EXPECT_ANY_THROW(graph1.control.getEdge(bodyEdges[i]));
     }
 }

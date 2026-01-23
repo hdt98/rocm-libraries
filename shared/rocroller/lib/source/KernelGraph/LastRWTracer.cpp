@@ -78,11 +78,11 @@ namespace rocRoller::KernelGraph
 {
     int common(std::deque<int> const& a, std::deque<int> const& b)
     {
-        for(int i = 0; (i < a.size()) && (i < b.size()); ++i)
+        for(size_t i = 0; (i < a.size()) && (i < b.size()); ++i)
             if(a.at(i) != b.at(i))
-                return i - 1;
+                return static_cast<int>(i) - 1;
 
-        return std::min(a.size(), b.size()) - 1;
+        return static_cast<int>(std::min(a.size(), b.size())) - 1;
     }
 
     std::unordered_map<std::string, std::set<int>>
@@ -142,7 +142,7 @@ namespace rocRoller::KernelGraph
 
             // Find common body-parent of all operations.
             int c = std::numeric_limits<int>().max();
-            for(int i = 1; i < stacks.size(); ++i)
+            for(size_t i = 1; i < stacks.size(); ++i)
             {
                 c = std::min(c, common(stacks[i - 1], stacks[i]));
             }
@@ -151,13 +151,13 @@ namespace rocRoller::KernelGraph
             // so that ForLoopOps become leaf-like.
             for(auto const& stack : stacks)
             {
-                if(c + 1 >= stack.size())
+                if(static_cast<size_t>(c + 1) >= stack.size())
                     c = std::max(0, c - 1);
             }
 
             for(auto const& stack : stacks)
             {
-                AssertFatal(c + 1 < stack.size(),
+                AssertFatal(static_cast<size_t>(c + 1) < stack.size(),
                             "LastRWTracer::lastRWLocations: Stacks are identical");
                 rv[key].insert(stack.at(c + 1));
             }

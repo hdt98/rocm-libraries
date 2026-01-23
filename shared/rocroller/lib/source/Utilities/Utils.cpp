@@ -91,7 +91,7 @@ namespace rocRoller
         }
 
         auto numRead = file.gcount();
-        AssertFatal(numRead <= buffer.size());
+        AssertFatal(numRead >= 0 && static_cast<size_t>(numRead) <= buffer.size());
 
         rv.insert(rv.end(), buffer.begin(), buffer.begin() + numRead);
 

@@ -78,7 +78,7 @@ namespace rocRoller
             uint32_t                   combineEndBit   = expr.dstOffset + expr.width - 1;
             uint32_t                   numDwords       = (dstSize + dwordSize - 1) / dwordSize;
 
-            for(int i = 0; i < numDwords; ++i)
+            for(uint32_t i = 0; i < numDwords; ++i)
             {
                 uint32_t dwordStartBit = i * dwordSize;
                 uint32_t dwordEndBit   = dwordStartBit + dwordSize - 1;

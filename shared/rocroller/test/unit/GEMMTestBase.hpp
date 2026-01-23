@@ -173,9 +173,9 @@ namespace GEMMTests
 
             auto bpeA = DataTypeInfo::Get(dataTypeA).elementBytes;
             auto bpeB = DataTypeInfo::Get(dataTypeB).elementBytes;
-            AssertFatal(gemm.macM * gemm.macK * bpeA >= gemm.waveM * gemm.waveK,
+            AssertFatal(gemm.macM * gemm.macK * bpeA >= static_cast<unsigned int>(gemm.waveM * gemm.waveK),
                         "Not enough elements (A).");
-            AssertFatal(gemm.macN * gemm.macK * bpeB >= gemm.waveN * gemm.waveK,
+            AssertFatal(gemm.macN * gemm.macK * bpeB >= static_cast<unsigned int>(gemm.waveN * gemm.waveK),
                         "Not enough elements (B).");
 
             AssertFatal(gemm.workgroupSizeX % gemm.wavefrontSize == 0,
@@ -868,9 +868,9 @@ namespace GEMMTests
 
                 if(debuggable && !res.ok)
                 {
-                    for(size_t i = 0; i < M; i++)
+                    for(int i = 0; i < M; i++)
                     {
-                        for(size_t j = 0; j < N; j++)
+                        for(int j = 0; j < N; j++)
                         {
                             auto a = d_result[i * N + j];
                             auto b = h_result[i * N + j];

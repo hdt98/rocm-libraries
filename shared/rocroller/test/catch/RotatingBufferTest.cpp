@@ -188,10 +188,10 @@ TEST_CASE("RotatingBuffer: Multi-copy rotation cycles addresses deterministicall
     auto s2 = buf.next(); // offset 0 (wrap)
     auto s3 = buf.next(); // offset N
 
-    REQUIRE(s0.size() == N);
-    REQUIRE(s1.size() == N);
-    REQUIRE(s2.size() == N);
-    REQUIRE(s3.size() == N);
+    REQUIRE(s0.size() == static_cast<size_t>(N));
+    REQUIRE(s1.size() == static_cast<size_t>(N));
+    REQUIRE(s2.size() == static_cast<size_t>(N));
+    REQUIRE(s3.size() == static_cast<size_t>(N));
 
     //Discover the true base address (minimum of the three unique pointers)
     std::array<int*, 4> ptrs{s0.data(), s1.data(), s2.data(), s3.data()};

@@ -338,7 +338,7 @@ namespace rocRoller
                             && depTypeInfo.elementBits == 64 && expTypeInfo.elementBits == 32)
                     {
                         std::vector<int> indices;
-                        for(int i = 0; i < depTypeInfo.registerCount;
+                        for(size_t i = 0; i < static_cast<size_t>(depTypeInfo.registerCount);
                             i += depTypeInfo.elementBits / Register::bitsPerRegister)
                         {
                             indices.push_back(i);
@@ -878,7 +878,7 @@ namespace rocRoller
                         auto rhsIndex = rhsNodeIt - rhsTree.begin();
                         auto newIndex = it - tree.begin();
 
-                        if(rhsTree.size() - 1 == rhsIndex)
+                        if(static_cast<ptrdiff_t>(rhsTree.size() - 1) == rhsIndex)
                         {
                             // If we're on the last RHS node, the root is no longer the last element
                             rhsLoc = newIndex;
@@ -921,7 +921,7 @@ namespace rocRoller
                     // Update following RHS nodes if necessary
                     for(auto scanIt = rhsNodeIt + 1; scanIt != rhsTree.end(); scanIt++)
                     {
-                        if(rhsIndex + lhsSize != tree.size() - 1
+                        if(static_cast<size_t>(rhsIndex) + lhsSize != tree.size() - 1
                            && scanIt->deps.contains(rhsIndex + lhsSize))
                         {
                             scanIt->deps.erase(rhsIndex + lhsSize);
@@ -987,11 +987,11 @@ namespace rocRoller
             if(tree.size() < 2)
                 return;
 
-            for(int idx = 0; idx < tree.size(); idx++)
+            for(size_t idx = 0; idx < tree.size(); idx++)
             {
                 auto& node = tree[idx];
                 AssertFatal(
-                    node.deps.empty() || *node.deps.rbegin() < idx,
+                    node.deps.empty() || static_cast<size_t>(*node.deps.rbegin()) < idx,
                     "tree is no longer in topological order! This function needs to be updated!");
                 node.distanceFromRoot = 0;
             }
@@ -1015,7 +1015,7 @@ namespace rocRoller
 
             std::map<int, int> levelCounts;
             std::map<int, int> levelDeltas;
-            for(int idx = 0; idx < tree.size(); idx++)
+            for(size_t idx = 0; idx < tree.size(); idx++)
             {
                 auto d = tree[idx].distanceFromRoot;
                 levelCounts[d]++;

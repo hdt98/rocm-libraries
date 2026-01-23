@@ -367,9 +367,9 @@ namespace GEMMDriverTest
                              gemm.transA == "T",
                              gemm.transB == "T");
             // Host leaky relu
-            for(size_t i = 0; i < M; i++)
+            for(int i = 0; i < M; i++)
             {
-                for(size_t j = 0; j < N; j++)
+                for(int j = 0; j < N; j++)
                 {
                     auto b = h_result[i * N + j];
                     h_result[i * N + j]
@@ -425,9 +425,9 @@ namespace GEMMDriverTest
                 Log::info("RNorm is {}", res.relativeNormL2);
                 if(debuggable && !res.ok)
                 {
-                    for(size_t i = 0; i < M; i++)
+                    for(int i = 0; i < M; i++)
                     {
-                        for(size_t j = 0; j < N; j++)
+                        for(int j = 0; j < N; j++)
                         {
                             auto const a = d_result[i * N + j];
                             auto       b = h_result[i * N + j];

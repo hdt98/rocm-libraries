@@ -960,7 +960,7 @@ namespace rocRoller
             std::vector<int> coords;
             for(auto i : indices)
             {
-                for(auto j = 0; j < registersPerElement; ++j)
+                for(unsigned int j = 0; j < registersPerElement; ++j)
                 {
                     auto idx = i * registersPerElement + j;
                     AssertFatal(idx < m_allocationCoord.size(),
@@ -992,10 +992,11 @@ namespace rocRoller
             AssertFatal(!this->isBitfield());
 
             AssertFatal(bitWidth != 0);
-            AssertFatal(
-                bitWidth < bitsPerRegister, ShowValue(bitWidth), ShowValue(bitsPerRegister));
+            AssertFatal(static_cast<unsigned int>(bitWidth) < bitsPerRegister,
+                        ShowValue(bitWidth),
+                        ShowValue(bitsPerRegister));
 
-            AssertFatal(bitOffset < registerCount() * bitsPerRegister,
+            AssertFatal(static_cast<size_t>(bitOffset) < registerCount() * bitsPerRegister,
                         "bitOffset is greater than number of bits in this value.");
 
             uint registerOfBitOffset = bitOffset / bitsPerRegister;

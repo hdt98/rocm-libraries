@@ -89,9 +89,9 @@ namespace rocRoller
                        std::vector<size_t> const& literalStrides)
             : Tensor(numDims, variableType)
         {
-            AssertFatal(literalSizes.size() <= numDims,
+            AssertFatal(literalSizes.size() <= static_cast<size_t>(numDims),
                         "Cannot specify more literal sizes than dimensions.");
-            AssertFatal(literalStrides.size() <= numDims,
+            AssertFatal(literalStrides.size() <= static_cast<size_t>(numDims),
                         "Cannot specify more literal strides than dimensions.");
 
             m_literalSizes   = literalSizes;

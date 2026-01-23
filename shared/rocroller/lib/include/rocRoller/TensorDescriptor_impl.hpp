@@ -246,7 +246,7 @@ namespace rocRoller
         }
         m_totalLogicalElements = m_sizes[0];
 
-        for(int i = 1; i < m_sizes.size(); i++)
+        for(size_t i = 1; i < m_sizes.size(); i++)
         {
             m_totalLogicalElements *= m_sizes[i];
 
@@ -257,13 +257,13 @@ namespace rocRoller
         }
 
         m_totalAllocatedElements = 1;
-        for(int i = 0; i < m_sizes.size(); i++)
+        for(size_t i = 0; i < m_sizes.size(); i++)
             m_totalAllocatedElements += m_strides[i] * (m_sizes[i] - 1);
 
         m_totalAllocatedElements += m_offset;
     }
 
-    inline const size_t TensorDescriptor::size(size_t index) const
+    inline size_t TensorDescriptor::size(size_t index) const
     {
         return m_sizes[index];
     }
@@ -271,7 +271,7 @@ namespace rocRoller
     {
         return m_sizes;
     }
-    inline const size_t TensorDescriptor::stride(size_t index) const
+    inline size_t TensorDescriptor::stride(size_t index) const
     {
         return m_strides[index];
     }
@@ -350,7 +350,7 @@ namespace rocRoller
         if(indices.size() != dimensions())
             throw std::runtime_error("Incorrect number of indices.");
 
-        for(int i = 0; i < indices.size(); i++)
+        for(size_t i = 0; i < indices.size(); i++)
             if(indices[i] >= m_sizes[i])
                 throw std::runtime_error("Index out of bounds.");
 
@@ -365,7 +365,7 @@ namespace rocRoller
 
         for(auto i = std::make_pair(indices.begin(), m_sizes.begin()); i.first != indices.end();
             i.first++, i.second++)
-            if(*i.first >= *i.second)
+            if(static_cast<size_t>(*i.first) >= *i.second)
                 throw std::runtime_error("Index out of bounds.");
 
         return std::inner_product(indices.begin(), indices.end(), m_strides.begin(), m_offset);
@@ -461,7 +461,7 @@ namespace rocRoller
             rv += "\n";
 
             bool newDim = false;
-            for(int idx = 0; idx < desc.dimensions(); idx++)
+            for(size_t idx = 0; idx < desc.dimensions(); idx++)
             {
                 if(coord[idx] < prevCoord[idx])
                 {

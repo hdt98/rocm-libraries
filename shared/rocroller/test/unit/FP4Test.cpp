@@ -210,7 +210,7 @@ namespace rocRollerTest
                                   hipMemcpyDefault),
                         HasHipSuccess(0));
 
-            for(int i = 0; i < a.size(); i++)
+            for(size_t i = 0; i < a.size(); i++)
             {
                 EXPECT_EQ(result[i], a[i]);
             }
@@ -474,7 +474,7 @@ namespace rocRollerTest
 
         auto floats = fp4x8_to_f32(fp4x8);
 
-        for(int i = 0; i < floats.size(); i++)
+        for(size_t i = 0; i < floats.size(); i++)
             EXPECT_EQ(cases[i], floats[i]);
     }
 

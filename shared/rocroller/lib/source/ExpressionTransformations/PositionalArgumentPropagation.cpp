@@ -94,7 +94,7 @@ namespace rocRoller
 
             ExpressionPtr operator()(PositionalArgument const& expr)
             {
-                AssertFatal(expr.slot >= 0 && expr.slot < m_arguments.size(), ShowValue(expr.slot));
+                AssertFatal(expr.slot >= 0 && static_cast<size_t>(expr.slot) < m_arguments.size(), ShowValue(expr.slot));
 
                 auto replacement = m_arguments[expr.slot];
 

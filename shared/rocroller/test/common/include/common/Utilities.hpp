@@ -108,7 +108,7 @@ double normL2(std::vector<T> a)
     double r = 0.0;
 
 #pragma omp parallel for reduction(+ : r)
-    for(int i = 0; i < a.size(); ++i)
+    for(size_t i = 0; i < a.size(); ++i)
     {
         double t = double(a[i]);
         r        = r + t * t;
@@ -140,7 +140,7 @@ double normInf(std::vector<T> a)
     double r = 0.0;
 
 #pragma omp parallel for reduction(max : r)
-    for(int i = 0; i < a.size(); ++i)
+    for(size_t i = 0; i < a.size(); ++i)
     {
         double t = fabs(double(a[i]));
         if(t > r)

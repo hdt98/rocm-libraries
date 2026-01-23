@@ -124,11 +124,12 @@ namespace rocRoller
                     temp = Register::Value::Placeholder(
                         m_context, Register::Type::Vector, exchange.varType, numVgpr, allocOptions);
                 }
-                for(auto index = 0; index < numVgpr; index++)
+                for(size_t index = 0; index < numVgpr; index++)
                     co_yield generateOp<Expression::BitFieldExtract>(
                         temp->element({index}),
                         vgpr,
-                        Expression::BitFieldExtract{{}, exchange.varType.dataType, index * 8, 8});
+                        Expression::BitFieldExtract{
+                            {}, exchange.varType.dataType, static_cast<int>(index * 8), 8});
                 vgpr = temp;
             }
 

@@ -246,7 +246,7 @@ std::string createF6IdentityMatrix(float min, float max)
     auto        ptr = reinterpret_cast<uint8_t*>(mat.data());
     std::string bits;
     bits.reserve(numBits);
-    for(int i = 0; i < (numBits / 8); i++, ptr++)
+    for(size_t i = 0; i < (numBits / 8); i++, ptr++)
     {
         uint8_t        value = *ptr;
         std::bitset<8> valueBits(value);

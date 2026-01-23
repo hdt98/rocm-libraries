@@ -114,7 +114,7 @@ namespace rocRoller
                 AssertFatal(srcs.size() > 1, ShowValue(srcs.size()));
 
                 int index = getUnsignedInt(evaluate(indexes.back()));
-                AssertFatal(index >= 0 && index < (srcs.size() - 1));
+                AssertFatal(index >= 0 && static_cast<size_t>(index) < (srcs.size() - 1));
 
                 Expression::ExpressionPtr offset = nullptr;
 
@@ -146,7 +146,7 @@ namespace rocRoller
                 }
                 rv[0] = input;
 
-                for(int i = 0; i < rv.size(); i++)
+                for(size_t i = 0; i < rv.size(); i++)
                 {
                     setComment(rv[i], concatenate("Tile[", i, "]"));
                 }
@@ -202,7 +202,7 @@ namespace rocRoller
                 }
                 rv[0] = input;
 
-                for(int i = 0; i < rv.size(); i++)
+                for(size_t i = 0; i < rv.size(); i++)
                 {
                     setComment(rv[i], concatenate("Flatten[", i, "]"));
                 }
@@ -252,7 +252,7 @@ namespace rocRoller
                 AssertFatal(dsts.size() > 1, ShowValue(dsts.size()));
 
                 int index = getUnsignedInt(evaluate(indexes.back()));
-                AssertFatal(index >= 0 && index < (dsts.size() - 1));
+                AssertFatal(index >= 0 && static_cast<size_t>(index) < (dsts.size() - 1));
 
                 Expression::ExpressionPtr offset = nullptr;
 
@@ -426,7 +426,7 @@ namespace rocRoller
                 AssertFatal(dsts.size() == 1, ShowValue(dsts.size()));
 
                 int index = getUnsignedInt(evaluate(indexes.back()));
-                AssertFatal(index >= 0 && index < (srcs.size() - 1));
+                AssertFatal(index >= 0 && static_cast<size_t>(index) < (srcs.size() - 1));
 
                 Expression::ExpressionPtr offset = nullptr;
 
@@ -464,7 +464,7 @@ namespace rocRoller
                 deltas.emplace(dstTags[0], delta);
                 rv[0] = input;
 
-                for(int i = 0; i < rv.size(); i++)
+                for(size_t i = 0; i < rv.size(); i++)
                     setComment(rv[i], concatenate("DTile[", i, "]"));
                 return rv;
             }
@@ -569,7 +569,7 @@ namespace rocRoller
                 AssertFatal(srcs.size() == 1, ShowValue(srcs.size()));
 
                 int index = getUnsignedInt(evaluate(indexes.back()));
-                AssertFatal(index >= 0 && index < (dsts.size() - 1));
+                AssertFatal(index >= 0 && static_cast<size_t>(index) < (dsts.size() - 1));
 
                 Expression::ExpressionPtr offset = nullptr;
 
@@ -629,7 +629,7 @@ namespace rocRoller
                 }
                 deltas.emplace(srcTags[0], delta);
                 rv[0] = input;
-                for(int i = 0; i < rv.size(); i++)
+                for(size_t i = 0; i < rv.size(); i++)
                     setComment(rv[i], concatenate("DFlatten[", i, "]"));
                 return rv;
             }

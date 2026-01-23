@@ -75,17 +75,17 @@ namespace WMMAObserverUnitTests
 
             observer.observe(wmmaInst);
 
-            CHECK(latency == observer.peek(wmmaInst).stallCycles);
+            CHECK(latency == static_cast<int>(observer.peek(wmmaInst).stallCycles));
             CHECK(0 == observer.peek(valuInst).stallCycles);
 
             observer.observe(valuInst);
 
-            CHECK(latency - 1 == observer.peek(wmmaInst).stallCycles);
+            CHECK(latency - 1 == static_cast<int>(observer.peek(wmmaInst).stallCycles));
             CHECK(0 == observer.peek(valuInst).stallCycles);
 
             observer.observe(wmmaInst);
 
-            CHECK(latency == observer.peek(wmmaInst).stallCycles);
+            CHECK(latency == static_cast<int>(observer.peek(wmmaInst).stallCycles));
             CHECK(0 == observer.peek(valuInst).stallCycles);
         }
 
@@ -96,17 +96,17 @@ namespace WMMAObserverUnitTests
 
             ctx->schedule(wmmaInst);
 
-            CHECK(latency == ctx->peek(wmmaInst).stallCycles);
+            CHECK(latency == static_cast<int>(ctx->peek(wmmaInst).stallCycles));
             CHECK(0 == ctx->peek(valuInst).stallCycles);
 
             ctx->schedule(valuInst);
 
-            CHECK(latency - 1 == ctx->peek(wmmaInst).stallCycles);
+            CHECK(latency - 1 == static_cast<int>(ctx->peek(wmmaInst).stallCycles));
             CHECK(0 == ctx->peek(valuInst).stallCycles);
 
             ctx->schedule(wmmaInst);
 
-            CHECK(latency == ctx->peek(wmmaInst).stallCycles);
+            CHECK(latency == static_cast<int>(ctx->peek(wmmaInst).stallCycles));
             CHECK(0 == ctx->peek(valuInst).stallCycles);
         }
     }

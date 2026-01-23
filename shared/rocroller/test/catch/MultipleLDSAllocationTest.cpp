@@ -258,7 +258,7 @@ namespace multipleLDSAllocTest
         std::vector<int> a((numBytes1 * numLoads1 + numBytes2 * numLoads2 + numBytes3 * numLoads3)
                            / 4);
         std::cout << "total size: " << a.size();
-        for(int i = 0; i < a.size(); i++)
+        for(size_t i = 0; i < a.size(); i++)
             a[i] = i + 11;
 
         auto d_a      = make_shared_device(a);

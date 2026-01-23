@@ -196,7 +196,7 @@ namespace GEMMTests
         auto ldsB            = gemm.macK * gemm.macN * bytesPerElement * gemm.prefetchInFlight;
         auto ldsD            = gemm.waveM * gemm.waveN * bytesPerElement;
 
-        if(ldsA + ldsB + ldsD <= maxLDS)
+        if(ldsA + ldsB + ldsD <= static_cast<size_t>(maxLDS))
         {
             basicGEMM<float>(gemm);
         }

@@ -656,7 +656,7 @@ namespace rocRoller
                     loadsByUnroll[u].push_back(info);
             }
 
-            AssertFatal(loadsByUnroll.size() == numUnroll);
+            AssertFatal(loadsByUnroll.size() == static_cast<size_t>(numUnroll));
 
             //
             // Add Scope above the ForLoop
@@ -766,7 +766,7 @@ namespace rocRoller
             //
 
             // Update SetCoordinates for LoadTile operations
-            for(uint u = 0; u < numUnroll; ++u)
+            for(int u = 0; u < numUnroll; ++u)
             {
                 auto prefetchGlobalU   = (u + numInFlight) % numUnroll;
                 auto prefetchCoordExpr = literal(u + numInFlight);
@@ -795,13 +795,13 @@ namespace rocRoller
 
             // Build Unroll segment boundaries
             std::vector<int> segmentBoundaries = {forLoop};
-            for(uint u = 0; u < numUnroll; ++u)
+            for(int u = 0; u < numUnroll; ++u)
                 segmentBoundaries.push_back(graph.control.addElement(NOP()));
 
             auto separateMemOps = !m_params->prefetchMixMemOps;
 
             // Unrolled loop over prefetch segments
-            for(uint u = 0; u < numUnroll; ++u)
+            for(int u = 0; u < numUnroll; ++u)
             {
                 logger->debug("  prefetch: in-loop: segment {}", u);
 
@@ -864,7 +864,7 @@ namespace rocRoller
                               globalPrefetchU,
                               globalLoads[0].user);
 
-                for(int i = 1; i < globalLoads.size(); i++)
+                for(size_t i = 1; i < globalLoads.size(); i++)
                 {
                     graph.control.addElement(
                         Sequence(), {globalLoads[i - 1].globalChain}, {globalLoads[i].globalChain});
@@ -906,7 +906,7 @@ namespace rocRoller
                 auto ldsTileTag = graph.mapper.get<LDS>(globalStores[0].ldsChain);
                 graph.mapper.connect<LDS>(barrier, ldsTileTag, 0);
 
-                for(int i = 1; i < globalStores.size(); i++)
+                for(size_t i = 1; i < globalStores.size(); i++)
                 {
                     trackStores(graph, globalStores[i].ldsChain);
                     graph.control.addElement(
@@ -1054,7 +1054,7 @@ namespace rocRoller
                 }
             }
 
-            for(uint u = 0; u < numUnroll; ++u)
+            for(int u = 0; u < numUnroll; ++u)
             {
                 orderMemoryNodes(graph, m_deferredToOrder[forLoop][u], false);
             }

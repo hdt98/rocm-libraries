@@ -200,7 +200,7 @@ namespace rocRollerTest
         auto result = (*cost)(iterators);
 
         EXPECT_EQ(result.size(), n);
-        for(int i = 0; i < n; i++)
+        for(size_t i = 0; i < n; i++)
         {
             EXPECT_EQ(std::get<0>(result[i]), i);
             EXPECT_EQ(std::get<1>(result[i]), 0.0);

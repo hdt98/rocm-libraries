@@ -83,8 +83,8 @@ namespace rocRoller
 
             AssertFatal(arg != nullptr);
             AssertFatal(dstType.dataType == expr.outputDataType);
-            AssertFatal(expr.offset + expr.width <= srcInfo.elementBits);
-            AssertFatal(expr.width <= dstInfo.elementBits);
+            AssertFatal(static_cast<unsigned int>(expr.offset + expr.width) <= srcInfo.elementBits);
+            AssertFatal(static_cast<unsigned int>(expr.width) <= dstInfo.elementBits);
             AssertFatal(!dst->isBitfield(),
                         "Cannot write to a bitfield, the whole register is written.");
             AssertFatal(dst->valueCount() == 1);
@@ -102,7 +102,7 @@ namespace rocRoller
             }
             else
             {
-                if(dstInfo.elementBits == expr.width)
+                if(dstInfo.elementBits == static_cast<unsigned int>(expr.width))
                 {
                     // if the bitfield is the exact width of the output datatype, no sign extension is required
                     // therefore we should use the unsigned version of the instructions
@@ -201,7 +201,7 @@ namespace rocRoller
                                       ShowValue(dstInfo.elementBits));
                 }
             }
-            if(dstInfo.elementBits > expr.width)
+            if(dstInfo.elementBits > static_cast<unsigned int>(expr.width))
             {
                 auto resultExpr = dst->expression();
                 // only need sign extension logic if the value extracted is narrower than the width of the type extracted
@@ -247,17 +247,21 @@ namespace rocRoller
                     " or packed ",
                     dstType.dataType);
 
-        AssertFatal(expr.width == dstInfo.elementBits && expr.offset % dstInfo.elementBits == 0);
+        AssertFatal(static_cast<unsigned int>(expr.width) == dstInfo.elementBits
+                    && static_cast<unsigned int>(expr.offset) % dstInfo.elementBits == 0);
         AssertFatal(dst->valueCount() <= srcInfo.packing);
 
         if(dst->valueCount() > 1)
         {
-            for(int i = 0; i < dst->valueCount(); i++)
+            for(size_t i = 0; i < dst->valueCount(); i++)
             {
                 co_yield generate(dst->element({i}),
                                   arg,
                                   Expression::BitFieldExtract{
-                                      {}, expr.outputDataType, expr.offset + dwidth * i, dwidth});
+                                      {},
+                                      expr.outputDataType,
+                                      expr.offset + dwidth * static_cast<int>(i),
+                                      dwidth});
             }
             co_return;
         }

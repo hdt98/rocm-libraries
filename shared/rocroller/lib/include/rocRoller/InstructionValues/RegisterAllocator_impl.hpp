@@ -201,7 +201,7 @@ namespace rocRoller
 
             int idx = 0;
 
-            while(rv.size() < count)
+            while(rv.size() < static_cast<size_t>(count))
             {
                 auto [start, blockSize] = findContiguousRange(idx, width, options, rv);
                 idx                     = start;
@@ -244,7 +244,7 @@ namespace rocRoller
 
             // Loop through register collection and pick out appropriate free blocks
             int candidateIdx = 0;
-            while(candidateIdx >= 0 && candidateIdx < m_registers.size())
+            while(candidateIdx >= 0 && static_cast<size_t>(candidateIdx) < m_registers.size())
             {
                 auto candidate = findContiguousRange(candidateIdx, width, options, rv);
                 candidateIdx   = candidate.first;
@@ -298,7 +298,7 @@ namespace rocRoller
                         // Check if chunk is outside of block, or if it runs up against the end of the total number of registers
                         // The equal check in `start + width >= m_registers.size()`
                         // is to avoid increasing register high-water mark by not allocating the last register
-                        if(start + width > idx + blockSize || start + width >= m_registers.size())
+                        if(start + width > idx + blockSize || static_cast<size_t>(start + width) >= m_registers.size())
                         {
                             // Should not use end of block, revert to using beginning
                             start = idx;
@@ -342,12 +342,12 @@ namespace rocRoller
             // The start should always be aligned
             start = align(start, options);
 
-            while(start < m_registers.size())
+            while(static_cast<size_t>(start) < m_registers.size())
             {
                 // Number of free registers in this block
                 int blockSize = 0;
 
-                for(int i = start; i < m_registers.size(); i++)
+                for(int i = start; static_cast<size_t>(i) < m_registers.size(); i++)
                 {
                     // Check if register is not free, or if it's in our reserved list
                     if(!isFree(i)
@@ -413,8 +413,8 @@ namespace rocRoller
         inline int Allocator::currentlyFree() const
         {
             int rv = 0;
-            for(int idx = 0; idx < size(); idx++)
-                if(isFree(idx))
+            for(size_t idx = 0; idx < size(); idx++)
+                if(isFree(static_cast<int>(idx)))
                     rv++;
 
             return rv;

@@ -106,7 +106,7 @@ namespace GlobalLoadStoreInstructionsTest
                 co_yield m_context->copier()->copy(v_result, s_result, "Move result pointer.");
                 co_yield m_context->copier()->copy(v_data, s_data, "Move input data pointer.");
 
-                for(int i = 0; i < m_numBytes / 4; i++)
+                for(size_t i = 0; i < m_numBytes / 4; i++)
                 {
                     // Each iteration writes and reads 4 bytes (one register)
                     const auto offset = i * 4;

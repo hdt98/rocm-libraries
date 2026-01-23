@@ -96,7 +96,7 @@ namespace TopologicalCompareTest
 
                 std::ranges::sort(nodes, comp);
 
-                for(int idx = 0; idx + 1 < nodes.size(); ++idx)
+                for(size_t idx = 0; idx + 1 < nodes.size(); ++idx)
                 {
                     CHECK(graph.control.compareNodes(
                               rocRoller::UpdateCache, nodes[idx], nodes[idx + 1])

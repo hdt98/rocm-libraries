@@ -258,7 +258,7 @@ namespace rocRollerTest
         void executeF6x16LoadAndStore(int num_f6, DataType F6x16Type, int isGlobal)
         {
             std::vector<uint8_t> data(num_f6);
-            for(uint32_t i = 0; i < num_f6; i++)
+            for(int i = 0; i < num_f6; i++)
             {
                 data[i] = (i + 10) % 64;
             }
@@ -291,7 +291,7 @@ namespace rocRollerTest
                         HasHipSuccess(0));
 
             auto actual_f6 = unpackF6x16(result);
-            for(int i = 0; i < data.size(); i++)
+            for(size_t i = 0; i < data.size(); i++)
             {
                 EXPECT_EQ(actual_f6[i], data[i]);
             }
@@ -324,7 +324,7 @@ namespace rocRollerTest
 
             // generate fp6 values
             std::vector<uint8_t> data(numF6);
-            for(uint32_t i = 0; i < numF6; i++)
+            for(int i = 0; i < numF6; i++)
             {
                 data[i] = (i + 10) % 64;
             }
@@ -541,14 +541,14 @@ namespace rocRollerTest
     TEST_F(CPUF6Test, CPUPack)
     {
         std::vector<uint8_t> f6bytes(64);
-        for(int i = 0; i < f6bytes.size(); i++)
+        for(size_t i = 0; i < f6bytes.size(); i++)
         {
             f6bytes[i] = (i + 10) % 64;
         }
 
         auto f6x16  = packF6x16(f6bytes);
         auto result = unpackF6x16(f6x16);
-        for(int i = 0; i < f6bytes.size(); i++)
+        for(size_t i = 0; i < f6bytes.size(); i++)
         {
             EXPECT_EQ(result[i], f6bytes[i]);
         }

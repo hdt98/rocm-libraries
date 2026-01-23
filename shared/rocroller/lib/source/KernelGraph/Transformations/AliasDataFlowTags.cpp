@@ -256,9 +256,9 @@ namespace rocRoller
                     graphIndices.push_back(ordering.addElement(rec));
                 }
 
-                for(int a = 0; a < records.size(); a++)
+                for(size_t a = 0; a < records.size(); a++)
                 {
-                    for(int b = a + 1; b < records.size(); b++)
+                    for(size_t b = a + 1; b < records.size(); b++)
                     {
                         auto const& aRec = records[a];
                         auto const& bRec = records[b];

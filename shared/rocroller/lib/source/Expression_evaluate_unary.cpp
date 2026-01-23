@@ -340,7 +340,7 @@ namespace rocRoller::Expression::EvaluateDetail
         requires(CIntegral<ARG>) CommandArgumentValue operator()(ARG const& arg) const
         {
             auto argBits = resultVariableType(arg).getElementSize() * 8u;
-            AssertFatal(argBits >= expr.offset + expr.width,
+            AssertFatal(argBits >= static_cast<size_t>(expr.offset + expr.width),
                         "BitFieldExtract out of bounds: offset={} + width={} > argBits={}",
                         expr.offset,
                         expr.width,
@@ -350,7 +350,7 @@ namespace rocRoller::Expression::EvaluateDetail
             UnsignedARG unsignedArg = static_cast<UnsignedARG>(arg);
 
             UnsignedARG mask = 0;
-            if(argBits == this->expr.width)
+            if(argBits == static_cast<size_t>(this->expr.width))
             {
                 mask = std::numeric_limits<UnsignedARG>::max();
             }
@@ -372,7 +372,8 @@ namespace rocRoller::Expression::EvaluateDetail
                 }
             }
 
-            AssertFatal(expr.width <= DataTypeInfo::Get(expr.outputDataType).elementBits,
+            AssertFatal(static_cast<unsigned int>(expr.width)
+                            <= DataTypeInfo::Get(expr.outputDataType).elementBits,
                         fmt::format("BitFieldExtract: width {} exceeds output type size {} bits",
                                     expr.width,
                                     DataTypeInfo::Get(expr.outputDataType).elementBits));

@@ -123,7 +123,7 @@ namespace rocRoller
             if(transA)
             {
 #pragma omp parallel for
-                for(size_t mk = 0; mk < M * K; ++mk)
+                for(int mk = 0; mk < M * K; ++mk)
                 {
                     auto  m      = mk / K;
                     auto  k      = mk % K;
@@ -135,7 +135,7 @@ namespace rocRoller
             else
             {
 #pragma omp parallel for
-                for(size_t mk = 0; mk < M * K; ++mk)
+                for(int mk = 0; mk < M * K; ++mk)
                 {
                     auto  m      = mk % M;
                     auto  k      = mk / M;
@@ -149,7 +149,7 @@ namespace rocRoller
         {
             float aScale = scaleToFloat(scaleTypeA, AX[0]);
 #pragma omp parallel for
-            for(size_t mk = 0; mk < M * K; ++mk)
+            for(int mk = 0; mk < M * K; ++mk)
             {
                 scaledA[mk] *= aScale;
             }
@@ -171,7 +171,7 @@ namespace rocRoller
             if(transB)
             {
 #pragma omp parallel for
-                for(size_t kn = 0; kn < K * N; ++kn)
+                for(int kn = 0; kn < K * N; ++kn)
                 {
                     auto  k      = kn / N;
                     auto  n      = kn % N;
@@ -183,7 +183,7 @@ namespace rocRoller
             else
             {
 #pragma omp parallel for
-                for(size_t kn = 0; kn < K * N; ++kn)
+                for(int kn = 0; kn < K * N; ++kn)
                 {
                     auto  k      = kn % K;
                     auto  n      = kn / K;
@@ -197,7 +197,7 @@ namespace rocRoller
         {
             float bScale = scaleToFloat(scaleTypeB, BX[0]);
 #pragma omp parallel for
-            for(size_t kn = 0; kn < K * N; ++kn)
+            for(int kn = 0; kn < K * N; ++kn)
             {
                 scaledB[kn] *= bScale;
             }

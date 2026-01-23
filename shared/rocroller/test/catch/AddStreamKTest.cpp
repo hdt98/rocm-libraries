@@ -266,7 +266,7 @@ TEST_CASE("AddStreamK BasicStreamKStore", "[streamk][kernel-graph][gpu]")
             kargs.append("result", deviceResult.get());
 
             auto assemblyArgs = context->kernel()->arguments();
-            for(int i = 1; i < assemblyArgs.size(); i++)
+            for(size_t i = 1; i < assemblyArgs.size(); i++)
                 kargs.append(assemblyArgs[i].name, evaluate(assemblyArgs[i].expression));
 
             KernelInvocation kinv;
@@ -465,7 +465,7 @@ TEST_CASE("AddStreamK BasicStreamKLoad", "[streamk][kernel-graph][gpu]")
             kargs.append("out", deviceA.get());
 
             auto assemblyArgs = context->kernel()->arguments();
-            for(int i = 2; i < assemblyArgs.size(); i++)
+            for(size_t i = 2; i < assemblyArgs.size(); i++)
                 kargs.append(assemblyArgs[i].name, evaluate(assemblyArgs[i].expression));
 
             KernelInvocation kinv;
@@ -599,7 +599,7 @@ TEST_CASE("AddStreamK with unroll K", "[streamk][kernel-graph]")
     {
         auto forLoopTags = kgraph.control.findElements(loopPredicate).to<std::vector>();
 
-        CHECK(forLoopTags.size() == expectForKLoops);
+        CHECK(forLoopTags.size() == static_cast<size_t>(expectForKLoops));
         for(auto& tag : forLoopTags)
         {
             auto [lhs, rhs] = getForLoopIncrement(kgraph, tag);
