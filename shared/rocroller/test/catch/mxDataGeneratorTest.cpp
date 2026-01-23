@@ -115,7 +115,6 @@ namespace mxDataGeneratorTest
             const int   blockScaling = 32;
 
             using rrDT   = TestType;
-            using DGenDT = typename rrDT2DGenDT<rrDT>::type;
 
             auto             dataType = TypeInfo<rrDT>::Var.dataType;
             TensorDescriptor desc(dataType, {dim1, dim2}, "T");

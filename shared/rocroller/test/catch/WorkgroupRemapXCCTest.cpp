@@ -53,7 +53,6 @@ namespace WorkgroupRemapXCCTest
     class RemapWorkgroupXCCKernel : public AssemblyTestKernel
     {
         using GD = rocRoller::Graph::Direction;
-
     public:
         RemapWorkgroupXCCKernel(rocRoller::ContextPtr context, uint numXCC, uint size)
             : AssemblyTestKernel(context)
@@ -76,7 +75,6 @@ namespace WorkgroupRemapXCCTest
         rocRoller::Expression::ExpressionPtr kernelRemapWorkgroupExpression()
         {
             using namespace rocRoller::KernelGraph::CoordinateGraph;
-            using GD = rocRoller::Graph::Direction;
 
             auto transformer = Transformer(&m_graph->coordinates);
             transformer.fillExecutionCoordinates(m_context);

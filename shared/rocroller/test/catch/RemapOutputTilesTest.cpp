@@ -59,8 +59,6 @@ namespace RemapOutputTilesTest
         using namespace rocRoller::KernelGraph::CoordinateGraph;
         using namespace rocRoller::KernelGraph::RemapOutputTilesDetail;
 
-        using GD = rocRoller::Graph::Direction;
-
         KernelGraph graph0;
 
         int vX = 5, vY = 7;
@@ -116,7 +114,6 @@ namespace RemapOutputTilesTest
         std::vector<rocRoller::Expression::ExpressionPtr> kernelRemapWorkgroupExpression()
         {
             using namespace rocRoller::KernelGraph::CoordinateGraph;
-            using GD = rocRoller::Graph::Direction;
 
             auto transformer = Transformer(&m_graph->coordinates);
             transformer.fillExecutionCoordinates(m_context);

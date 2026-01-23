@@ -86,7 +86,6 @@ namespace rocRoller
         {
             TIMER(t, "Constraint::NoRedundantSetCoordinates");
             using namespace ControlGraph;
-            using GD = rocRoller::Graph::Direction;
             ConstraintStatus retval;
 
             for(const auto& op : k.control.leaves())

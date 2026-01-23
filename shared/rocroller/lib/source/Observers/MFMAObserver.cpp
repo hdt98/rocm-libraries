@@ -201,7 +201,6 @@ namespace rocRoller
 
         InstructionStatus MFMACoexecObserver::peek(Instruction const& inst) const
         {
-            using bs = EnumBitset<CoexecCategory>;
             InstructionStatus rv;
             if(isTargetedInstruction(inst))
             {

@@ -422,9 +422,6 @@ namespace GEMMTests
     static auto FilterOutNonDirectLDSParamValues(
         ::testing::internal::ParamGenerator<DirectLDSTestType>&& inputParamGenerator)
     {
-        using LP = SolutionParams::LoadPath;
-        using SM = rocRoller::Operations::ScaleMode;
-
         std::vector<DirectLDSTestType> filtered;
         for(auto const& inputParam : inputParamGenerator)
         {
