@@ -1501,17 +1501,20 @@ struct FmhaFwdKernel
             }
 
             // for simplicity, batch stride we just modify the pointer
-            const QDataType* q_ptr = reinterpret_cast<const QDataType*>(kargs.q_ptr) +
-                                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q +
-                                     batch_offset_q;
+            const index_t i_nhead_k = i_nhead / kargs.nhead_ratio_qk;
+
+            const QDataType* q_ptr =
+                reinterpret_cast<const QDataType*>(kargs.q_ptr) +
+                (static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q + batch_offset_q) /
+                    numeric_traits<QDataType>::PackedSize;
             const KDataType* k_ptr =
                 reinterpret_cast<const KDataType*>(kargs.k_ptr) +
-                static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) * kargs.nhead_stride_k +
-                batch_offset_k;
+                (static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_k + batch_offset_k) /
+                    numeric_traits<KDataType>::PackedSize;
             const VDataType* v_ptr =
                 reinterpret_cast<const VDataType*>(kargs.v_ptr) +
-                static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) * kargs.nhead_stride_v +
-                batch_offset_v;
+                (static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_v + batch_offset_v) /
+                    numeric_traits<VDataType>::PackedSize;
             ODataType* o_ptr = reinterpret_cast<ODataType*>(kargs.o_ptr) +
                                static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_o +
                                batch_offset_o;
@@ -1804,7 +1807,7 @@ struct FmhaFwdKernel
                 }
             }();
 
-            BlockIndices block_indices{i_batch, i_nhead, i_nhead / kargs.nhead_ratio_qk};
+            BlockIndices block_indices{i_batch, i_nhead, i_nhead_k};
 
             auto o_acc_tile = [&, i_nhead_ = i_nhead]() {
                 if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERTENSOR)
@@ -1914,13 +1917,11 @@ struct FmhaFwdKernel
                         batch_offset_q_descale;
                     const KScaleDataType* k_descale_ptr =
                         reinterpret_cast<const KScaleDataType*>(kargs.k_descale_ptr) +
-                        static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) *
-                            kargs.nhead_stride_k_descale +
+                        static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_k_descale +
                         batch_offset_k_descale;
                     const VScaleDataType* v_descale_ptr =
                         reinterpret_cast<const VScaleDataType*>(kargs.v_descale_ptr) +
-                        static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) *
-                            kargs.nhead_stride_v_descale +
+                        static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_v_descale +
                         batch_offset_v_descale;
 
                     const ck_tile::index_t hdim_q_scale =
@@ -2218,15 +2219,18 @@ struct FmhaFwdKernel
             // for simplicity, batch stride we just modify the pointer
             const index_t i_nhead_k = i_nhead / kargs.nhead_ratio_qk;
 
-            const QDataType* q_ptr = reinterpret_cast<const QDataType*>(kargs.q_ptr) +
-                                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q +
-                                     batch_offset_q;
-            const KDataType* k_ptr = reinterpret_cast<const KDataType*>(kargs.k_ptr) +
-                                     static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_k +
-                                     batch_offset_k;
-            const VDataType* v_ptr = reinterpret_cast<const VDataType*>(kargs.v_ptr) +
-                                     static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_v +
-                                     batch_offset_v;
+            const QDataType* q_ptr =
+                reinterpret_cast<const QDataType*>(kargs.q_ptr) +
+                (static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q + batch_offset_q) /
+                    numeric_traits<QDataType>::PackedSize;
+            const KDataType* k_ptr =
+                reinterpret_cast<const KDataType*>(kargs.k_ptr) +
+                (static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_k + batch_offset_k) /
+                    numeric_traits<KDataType>::PackedSize;
+            const VDataType* v_ptr =
+                reinterpret_cast<const VDataType*>(kargs.v_ptr) +
+                (static_cast<long_index_t>(i_nhead_k) * kargs.nhead_stride_v + batch_offset_v) /
+                    numeric_traits<VDataType>::PackedSize;
 
             ODataType* o_ptr = reinterpret_cast<ODataType*>(kargs.o_ptr) +
                                static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_o +
