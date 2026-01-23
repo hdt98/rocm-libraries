@@ -891,10 +891,18 @@ namespace rocRoller
                     {
                         if(addresses.size() > 0)
                         {
+                            // Normalize addresses
+                            std::vector<size_t> normalizedAddresses;
+                            auto minAddress = *std::min_element(addresses.begin(), addresses.end());
+                            for(auto addr : addresses)
+                            {
+                                normalizedAddresses.push_back(addr - minAddress);
+                            }
+
                             AssertFatal(not instr.getModelledAddresses().has_value(),
                                         "Should be unset",
                                         ShowValue(instr.getModelledAddresses().value()));
-                            instr.setModelledAddresses(addresses);
+                            instr.setModelledAddresses(normalizedAddresses);
                         }
                         else
                         {
