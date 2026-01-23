@@ -1921,43 +1921,39 @@ struct FmhaFwdKernel
                     const ck_tile::index_t seqlen_v_scale =
                         ck_tile::integer_divide_ceil(kargs.seqlen_k, kVScaleGranularity);
 
+                    // Custom invalid_element_value is required for e8m0_t scales because
+                    // the default (numeric<e8m0_t>>::zero()) is NaN
                     const auto q_scale_dram = [&]() {
-                        const auto q_scale_dram_naive =
-                            make_naive_tensor_view<address_space_enum::global>(
-                                q_descale_ptr,
-                                make_tuple(kargs.seqlen_q, hdim_q_scale),
-                                make_tuple(kargs.stride_q_descale, 1),
-                                number<1>{}, // FIX
-                                number<1>{});
-                        if constexpr(FmhaPipeline::kQLoadOnce)
-                        {
-                            return pad_tensor_view(
-                                q_scale_dram_naive,
-                                make_tuple(
-                                    number<FmhaPipeline::kM0>{},
-                                    number<FmhaPipeline::kSubQKHeaddim / kQKScaleGranularity>{}),
-                                sequence<kPadSeqLenQ, kPadHeadDimQ>{});
-                        }
-                        else
-                        {
-                            static_assert(false);
-                            return pad_tensor_view(
-                                q_scale_dram_naive,
-                                make_tuple(number<FmhaPipeline::kM0>{},
-                                           number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
-                                sequence<kPadSeqLenQ, kPadHeadDimQ>{});
-                        }
+                        auto desc =
+                            make_naive_tensor_descriptor(make_tuple(kargs.seqlen_q, hdim_q_scale),
+                                                         make_tuple(kargs.stride_q_descale, 1),
+                                                         number<1>{},
+                                                         number<1>{});
+                        auto buffer_view = make_buffer_view<address_space_enum::global>(
+                            q_descale_ptr,
+                            desc.get_element_space_size(),
+                            type_convert<QScaleDataType>(1.0f));
+                        return pad_tensor_view(
+                            tensor_view<decltype(buffer_view), decltype(desc)>{buffer_view, desc},
+                            make_tuple(
+                                number<FmhaPipeline::kM0>{},
+                                number<(FmhaPipeline::kQLoadOnce ? FmhaPipeline::kSubQKHeaddim
+                                                                 : FmhaPipeline::kK0) /
+                                       kQKScaleGranularity>{}),
+                            sequence<kPadSeqLenQ, kPadHeadDimQ>{});
                     }();
                     const auto k_scale_dram = [&]() {
-                        const auto k_scale_dram_naive =
-                            make_naive_tensor_view<address_space_enum::global>(
-                                k_descale_ptr,
-                                make_tuple(kargs.seqlen_k, hdim_q_scale),
-                                make_tuple(kargs.stride_k_descale, 1),
-                                number<1>{}, // FIX
-                                number<1>{});
+                        auto desc =
+                            make_naive_tensor_descriptor(make_tuple(kargs.seqlen_k, hdim_q_scale),
+                                                         make_tuple(kargs.stride_k_descale, 1),
+                                                         number<1>{},
+                                                         number<1>{});
+                        auto buffer_view = make_buffer_view<address_space_enum::global>(
+                            k_descale_ptr,
+                            desc.get_element_space_size(),
+                            type_convert<KScaleDataType>(1.0f));
                         return pad_tensor_view(
-                            k_scale_dram_naive,
+                            tensor_view<decltype(buffer_view), decltype(desc)>{buffer_view, desc},
                             make_tuple(number<FmhaPipeline::kN0>{},
                                        number<FmhaPipeline::kK0 / kQKScaleGranularity>{}),
                             sequence<false, kPadHeadDimQ>{});
@@ -1965,15 +1961,17 @@ struct FmhaFwdKernel
                     const auto v_scale_dram = [&]() {
                         static_assert(
                             std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::ColumnMajor>);
-                        const auto v_scale_dram_naive =
-                            make_naive_tensor_view<address_space_enum::global>(
-                                v_descale_ptr,
-                                make_tuple(kargs.hdim_v, seqlen_v_scale),
-                                make_tuple(kargs.stride_v_descale, 1),
-                                number<1>{}, // FIX
-                                number<1>{});
+                        auto desc =
+                            make_naive_tensor_descriptor(make_tuple(kargs.hdim_v, seqlen_v_scale),
+                                                         make_tuple(kargs.stride_v_descale, 1),
+                                                         number<1>{},
+                                                         number<1>{});
+                        auto buffer_view = make_buffer_view<address_space_enum::global>(
+                            v_descale_ptr,
+                            desc.get_element_space_size(),
+                            type_convert<VScaleDataType>(1.0f));
                         return pad_tensor_view(
-                            v_scale_dram_naive,
+                            tensor_view<decltype(buffer_view), decltype(desc)>{buffer_view, desc},
                             make_tuple(number<FmhaPipeline::kN1>{},
                                        number<FmhaPipeline::kK1 / kVScaleGranularity>{}),
                             sequence<false, kPadSeqLenK>{});
@@ -1981,16 +1979,10 @@ struct FmhaFwdKernel
 
                     auto q_scale_dram_window = make_tile_window(
                         q_scale_dram,
-                        [&]() {
-                            if constexpr(FmhaPipeline::kQLoadOnce)
-                                return make_tuple(
-                                    number<FmhaPipeline::kM0>{},
-                                    number<FmhaPipeline::kSubQKHeaddim / kQKScaleGranularity>{});
-                            else
-                                return make_tuple(
-                                    number<FmhaPipeline::kM0>{},
-                                    number<FmhaPipeline::kK0 / kQKScaleGranularity>{});
-                        }(),
+                        make_tuple(number<FmhaPipeline::kM0>{},
+                                   number<(FmhaPipeline::kQLoadOnce ? FmhaPipeline::kSubQKHeaddim
+                                                                    : FmhaPipeline::kK0) /
+                                          kQKScaleGranularity>{}),
                         {i_m0, 0});
                     auto k_scale_dram_window = make_tile_window(
                         k_scale_dram,
