@@ -226,6 +226,39 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         const ck_tile::stream_config& stream_config,
                         std::optional<std::string> json = std::nullopt)
 {
+    using TypeConfig = FmhaFwdTypeConfig<DataTypeConfig>;
+
+    constexpr bool is_mx = ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
+
+    using QDataType             = typename TypeConfig::QDataType;
+    using KDataType             = typename TypeConfig::KDataType;
+    using VDataType             = typename TypeConfig::VDataType;
+    using BiasDataType          = typename TypeConfig::BiasDataType;
+    using RandValOutputDataType = typename TypeConfig::RandValOutputDataType;
+    using LSEDataType           = typename TypeConfig::LSEDataType;
+    using SaccDataType          = typename TypeConfig::SaccDataType;
+    using SMPLComputeDataType   = typename TypeConfig::SMPLComputeDataType;
+    using PDataType             = std::conditional_t<is_mx, float, typename TypeConfig::PDataType>;
+    using OaccDataType          = typename TypeConfig::OaccDataType;
+    using ODataType             = typename TypeConfig::ODataType;
+
+    using QScaleDataType = std::conditional_t<is_mx, typename TypeConfig::QScaleDataType, float>;
+    using KScaleDataType = std::conditional_t<is_mx, typename TypeConfig::KScaleDataType, float>;
+    using VScaleDataType = std::conditional_t<is_mx, typename TypeConfig::VScaleDataType, float>;
+
+    constexpr ck_tile::index_t kQKScaleGranularity = []() {
+        if constexpr(is_mx)
+            return TypeConfig::kQKScaleGranularity;
+        else
+            return 1;
+    }();
+    constexpr ck_tile::index_t kVScaleGranularity = []() {
+        if constexpr(is_mx)
+            return TypeConfig::kVScaleGranularity;
+        else
+            return 1;
+    }();
+
     // Note: block_scale_size_q_ and block_scale_size_kv_ should be greater than or equal to the
     // compute block size
     constexpr ck_tile::index_t block_scale_size_q_  = 128;
@@ -260,6 +293,19 @@ fwd_result fmha_fwd_run(mode_enum mode,
     {
         std::cerr << "nhead:" << nhead << " must be multiple of nhead_k:" << nhead_k << std::endl;
         return fwd_result::invalid_args;
+    }
+
+    if(hdim_q % ck_tile::numeric_traits<QDataType>::PackedSize != 0)
+    {
+        std::cerr << "hdim_q is made even for fp4 Q data type" << std::endl;
+        hdim_q =
+            ck_tile::integer_least_multiple(hdim_q, ck_tile::numeric_traits<QDataType>::PackedSize);
+    }
+    if(hdim_q % ck_tile::numeric_traits<KDataType>::PackedSize != 0)
+    {
+        std::cerr << "hdim_q is made even for fp4 K data type" << std::endl;
+        hdim_q =
+            ck_tile::integer_least_multiple(hdim_q, ck_tile::numeric_traits<KDataType>::PackedSize);
     }
 
     std::mt19937 random_engine(seed != 0 ? seed : std::random_device{}());
@@ -391,6 +437,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                  /*seqlen_k_min=*/0 < seqlen_knew ? seqlen_knew : 0,
                                  need_append_kvcache,
                                  random_engine);
+
+    if(ck_tile::numeric_traits<VDataType>::PackedSize != 0)
+    {
+        // Ensure that all seqlens are even if V has packed data type
+        for(auto& s : seqlen_ks)
+        {
+            s = ck_tile::integer_least_multiple(s, ck_tile::numeric_traits<VDataType>::PackedSize);
+        }
+    }
+
     for(ck_tile::index_t wb = 0; wb < batch; ++wb)
     {
         if(seqlen_kpads[wb] > 0 && seqlen_kpads[wb] < seqlen_ks[wb])
@@ -429,8 +485,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
         mask_info::decode(mask_str, seqlen_qs[0], seqlen_ks[0]); // TODO: we don't need x/y anymore
 
     quant_scale_info qscale = quant_scale_info::decode(qscale_str);
-
-    constexpr bool is_mx = ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
 
     if(is_mx && qscale.type != quant_scale_enum::mx)
     {
@@ -495,37 +549,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
         calculate_cumulative(q_eff_lens_per_batch, cuq_cum);
         calculate_cumulative(kv_eff_lens_per_batch, cukv_cum);
     }
-
-    using TypeConfig = FmhaFwdTypeConfig<DataTypeConfig>;
-
-    using QDataType             = typename TypeConfig::QDataType;
-    using KDataType             = typename TypeConfig::KDataType;
-    using VDataType             = typename TypeConfig::VDataType;
-    using BiasDataType          = typename TypeConfig::BiasDataType;
-    using RandValOutputDataType = typename TypeConfig::RandValOutputDataType;
-    using LSEDataType           = typename TypeConfig::LSEDataType;
-    using SaccDataType          = typename TypeConfig::SaccDataType;
-    using SMPLComputeDataType   = typename TypeConfig::SMPLComputeDataType;
-    using PDataType             = std::conditional_t<is_mx, float, typename TypeConfig::PDataType>;
-    using OaccDataType          = typename TypeConfig::OaccDataType;
-    using ODataType             = typename TypeConfig::ODataType;
-
-    using QScaleDataType = std::conditional_t<is_mx, typename TypeConfig::QScaleDataType, float>;
-    using KScaleDataType = std::conditional_t<is_mx, typename TypeConfig::KScaleDataType, float>;
-    using VScaleDataType = std::conditional_t<is_mx, typename TypeConfig::VScaleDataType, float>;
-
-    constexpr ck_tile::index_t kQKScaleGranularity = []() {
-        if constexpr(is_mx)
-            return TypeConfig::kQKScaleGranularity;
-        else
-            return 1;
-    }();
-    constexpr ck_tile::index_t kVScaleGranularity = []() {
-        if constexpr(is_mx)
-            return TypeConfig::kVScaleGranularity;
-        else
-            return 1;
-    }();
 
     // accumulation numbers for performance evaluation
     std::size_t flop = 0, num_byte = 0;
