@@ -271,7 +271,7 @@ namespace rocRoller
             idx++;
         } while(m_argumentNames.contains(rv));
 
-        return std::move(rv);
+        return rv;
     }
 
     Expression::ExpressionPtr

@@ -406,7 +406,7 @@ namespace rocRollerTest
     TEST_F(GeneratorTest, MergeLess)
     {
         std::vector<Generator<int>> gens;
-        gens.push_back(std::move(range(5)));
+        gens.push_back(range(5));
         gens.push_back(Take(5, fibonacci<int>()));
 
         auto ref = std::vector{0, 1, 1, 1, 2, 2, 3, 3, 4, 5};
