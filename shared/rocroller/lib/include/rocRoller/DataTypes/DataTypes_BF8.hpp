@@ -55,7 +55,8 @@ namespace rocRoller
         {
         }
 
-        BF8(BF8 const& other) = default;
+        BF8(BF8 const& other)            = default;
+        BF8& operator=(BF8 const& other) = default;
 
         template <typename T>
         requires(!std::is_same_v<T, BF8> && std::is_convertible_v<T, float>) explicit BF8(

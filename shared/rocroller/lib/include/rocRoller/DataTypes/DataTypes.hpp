@@ -222,6 +222,7 @@ namespace rocRoller
     {
         constexpr VariableType();
         constexpr VariableType(VariableType const& v);
+        constexpr VariableType& operator=(VariableType const& v) = default;
 
         // cppcheck-suppress noExplicitConstructor
         constexpr VariableType(DataType d);

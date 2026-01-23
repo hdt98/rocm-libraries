@@ -50,7 +50,8 @@ namespace rocRoller
         {
         }
 
-        BF6(BF6 const& other) = default;
+        BF6(BF6 const& other)            = default;
+        BF6& operator=(BF6 const& other) = default;
 
         template <typename T>
         requires(!std::is_same_v<T, BF6> && std::is_convertible_v<T, float>) explicit BF6(

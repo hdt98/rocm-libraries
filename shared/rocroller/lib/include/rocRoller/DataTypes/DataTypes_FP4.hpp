@@ -337,7 +337,8 @@ namespace rocRoller
         {
         }
 
-        FP4(FP4 const& other) = default;
+        FP4(FP4 const& other)            = default;
+        FP4& operator=(FP4 const& other) = default;
 
         template <typename T>
         requires(!std::is_same_v<T, FP4> && std::is_convertible_v<T, float>) explicit FP4(

@@ -52,7 +52,8 @@ namespace rocRoller
         {
         }
 
-        FP6(FP6 const& other) = default;
+        FP6(FP6 const& other)            = default;
+        FP6& operator=(FP6 const& other) = default;
 
         template <typename T>
         requires(!std::is_same_v<T, FP6> && std::is_convertible_v<T, float>) explicit FP6(
