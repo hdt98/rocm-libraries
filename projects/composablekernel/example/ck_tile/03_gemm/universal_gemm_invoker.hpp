@@ -69,7 +69,9 @@ struct UniversalInvoker
                                              GemmConfig::UseStructuredSparsity,
                                              Persistent,
                                              GemmConfig::NumWaveGroups,
-                                             GemmConfig::Preshuffle>;
+                                             GemmConfig::Preshuffle,
+                                             16,
+                                             GemmConfig::UseDataCachePrefetch>;
 
         constexpr auto scheduler = GemmConfig::Scheduler;
 

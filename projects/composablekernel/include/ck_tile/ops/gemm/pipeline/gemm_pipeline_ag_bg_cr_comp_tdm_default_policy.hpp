@@ -18,11 +18,15 @@ enum class MultiCastDirection
 };
 
 // Default policy for GemmPipelineAgBgCrCompTDM
-template <bool WaveSpecialized = false>
+template <bool WaveSpecialized = false, bool UseDataCachePrefetch_ = false>
 struct GemmPipelineAgBgCrCompTDMDefaultPolicy
-    : public UniversalGemmBasePolicy<GemmPipelineAgBgCrCompTDMDefaultPolicy<WaveSpecialized>>
+    : public UniversalGemmBasePolicy<
+          GemmPipelineAgBgCrCompTDMDefaultPolicy<WaveSpecialized, UseDataCachePrefetch_>>
 {
-    using Base = UniversalGemmBasePolicy<GemmPipelineAgBgCrCompTDMDefaultPolicy<WaveSpecialized>>;
+    using Base = UniversalGemmBasePolicy<
+        GemmPipelineAgBgCrCompTDMDefaultPolicy<WaveSpecialized, UseDataCachePrefetch_>>;
+
+    static constexpr bool UseDataCachePrefetch = UseDataCachePrefetch_;
 
     template <typename Problem>
     using LdsADataType = typename Problem::ADataType;

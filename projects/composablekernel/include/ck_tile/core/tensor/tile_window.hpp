@@ -905,6 +905,114 @@ struct tile_window_with_static_distribution
         static_for<0, NumCoord, 1>{}(process_coord);
     }
 
+    // Prefetch DRAM memory that would be accessed by TDM load
+    // Similar to tdm_load_to_lds but issues cache prefetch hints instead of loading to LDS
+    // We try to fill entire wave with multiple rows and columns per single call to prefetch
+    // We expect global_strides[0] to be 1!
+    // For OOB we set is_valid to false
+    // For now TDMConfig_ is unused, but we keep it for future use when maybe TDM will have prefetch
+    // config
+    template <typename TDMConfig_>
+    CK_TILE_DEVICE void prefetch_for_tdm([[maybe_unused]] const TDMConfig_& tdm_config) const
+    {
+#if defined(__gfx125__)
+        // TODO: move it somewhere and call when we need these values
+        constexpr index_t L1_cacheline_size = 32;
+        constexpr index_t L2_cacheline_size = 256;
+
+        constexpr bool prefetch_L1       = false;
+        constexpr index_t cacheline_size = prefetch_L1 ? L1_cacheline_size : L2_cacheline_size;
+        constexpr auto preferred_coherence =
+            prefetch_L1 ? amd_buffer_coherence_enum::CU_RT : amd_buffer_coherence_enum::SE_RT;
+
+        using Traits             = typename Base::Traits;
+        constexpr auto tile_dstr = typename Base::TileDstr{};
+
+        // Use cached computation for global strides (same as tdm_load_to_lds)
+        auto&& global_strides = get_cached_global_strides();
+
+        const auto& glb_tensor_descriptor = this->get_bottom_tensor_view().get_tensor_descriptor();
+
+        static_for<0, NumCoord, 1>{}([&](auto iCoord) {
+            auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0]; // without origin
+            auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1]; // with origin
+
+            // Get tile dimensions
+            constexpr auto raw_box_dim =
+                to_sequence(tile_dstr.get_ys_to_d_descriptor().get_lengths()).reverse();
+            constexpr index_t x_len = raw_box_dim.at(number<0>{}) / Traits::PackedSize;
+            constexpr index_t y_len = (raw_box_dim.size() > 1 ? raw_box_dim.at(number<1>{}) : 1);
+
+            // Calculate remaining tensor dimensions, clamping negative values to 0
+            // This prevents out-of-bounds access when window_origin + bottom_index > tensor_length
+            auto&& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
+                transform_tuples([](auto x) { return max(index_t{0}, x); },
+                                 glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
+                                     window_adaptor_thread_coord.get_bottom_index())));
+            tensor_dims[0] /= Traits::PackedSize;
+
+            // Prefetch across the 2D tile using strides
+            // Distribute column prefetches across lanes - each lane prefetches different x
+            // positions
+            constexpr index_t col_prefetch_stride =
+                max(1,
+                    static_cast<index_t>(
+                        cacheline_size /
+                        (Traits::PackedSize *
+                         sizeof(typename Base::DataType)))); // prefetch every cacheline bytes in
+                                                             // packed element units
+            constexpr index_t num_lanes = get_warp_size();
+
+            // Calculate how many lanes needed to cover one row
+            constexpr index_t num_unique_x  = max(1, x_len / col_prefetch_stride);
+            constexpr index_t lanes_per_row = num_unique_x < num_lanes ? num_unique_x : num_lanes;
+            constexpr index_t num_rows_parallel =
+                num_lanes / lanes_per_row; // how many rows we can process in parallel
+
+            // Determine which row and column offset this lane handles
+            const index_t y_lane_offset = get_lane_id() / lanes_per_row;
+            const index_t x_lane_offset = (get_lane_id() % lanes_per_row) * col_prefetch_stride;
+
+            // Get base offset for this thread's starting position
+            const auto base_offset = bottom_tensor_thread_coord.get_offset();
+
+            // Hoist y dimension check outside the loop (wave-uniform for better codegen)
+            constexpr bool check_y_bounds = (Base::NDimBottomTensor > 1);
+
+            constexpr index_t num_y_iterations =
+                (y_len + num_rows_parallel - 1) / num_rows_parallel;
+            static_for<0, num_y_iterations, 1>{}([&](auto j) {
+                constexpr index_t y_base = j * num_rows_parallel;
+                index_t y_pos            = y_base + y_lane_offset;
+                // Check y bounds once per y-iteration (not per x)
+                const bool y_in_bounds = check_y_bounds ? (y_pos < tensor_dims[1]) : true;
+
+                // Fully unroll inner loop at compile time
+                constexpr index_t num_x_iterations =
+                    (x_len + lanes_per_row * col_prefetch_stride - 1) /
+                    (lanes_per_row * col_prefetch_stride);
+                static_for<0, num_x_iterations, 1>{}([&](auto i) {
+                    const index_t x_pos = x_lane_offset + i * lanes_per_row * col_prefetch_stride;
+
+                    const index_t prefetch_offset = base_offset + y_pos * global_strides[1] +
+                                                    x_pos * Traits::PackedSize * global_strides[0];
+
+                    // Only check x bounds (y already checked above)
+                    const bool is_valid = y_in_bounds && (x_pos < tensor_dims[0]);
+
+                    // Use buffer_view's prefetch method
+                    using DataType = typename Base::DataType;
+                    this->get_bottom_tensor_view()
+                        .get_buffer_view()
+                        .template prefetch<DataType, preferred_coherence>(
+                            0, prefetch_offset, is_valid);
+                });
+            });
+        });
+#else
+#endif
+    }
+
     template <typename TDMConfig_, typename LdsTileWindow_, index_t i_access_unsupport_ = -1>
     CK_TILE_DEVICE auto tdm_store_from_lds(const TDMConfig_& tdm_config,
                                            const LdsTileWindow_& lds_tile,

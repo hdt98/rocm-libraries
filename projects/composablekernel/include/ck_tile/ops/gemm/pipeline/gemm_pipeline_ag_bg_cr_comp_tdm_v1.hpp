@@ -363,6 +363,23 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
                                 c_block_tile, a_block_tile[compute_idx], b_block_tile[compute_idx]);
                             HotLoopScheduler();
                         });
+
+                        // Data cache prefetch for iteration i+2
+                        if constexpr(Policy::UseDataCachePrefetch)
+                        {
+                            __builtin_amdgcn_sched_barrier(0);
+                            auto a_prefetch_window = a_copy_dram_window;
+                            auto b_prefetch_window = b_copy_dram_window;
+                            if(i_global_read + 2 < num_loop)
+                            {
+                                move_tile_window(a_prefetch_window, a_dram_tile_window_step);
+                                move_tile_window(b_prefetch_window, b_dram_tile_window_step);
+                                move_tile_window(a_prefetch_window, a_dram_tile_window_step);
+                                move_tile_window(b_prefetch_window, b_dram_tile_window_step);
+                            }
+                            a_prefetch_window.prefetch_for_tdm(tdm_config_a);
+                            b_prefetch_window.prefetch_for_tdm(tdm_config_b);
+                        }
                         block_sync_lds();
 
                         Base::GlobalPrefetchTDM(tdm_config_a,
@@ -414,6 +431,22 @@ struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Proble
                             HotLoopScheduler();
                         });
 
+                        // Data cache prefetch for iteration i+2
+                        if constexpr(Policy::UseDataCachePrefetch)
+                        {
+                            __builtin_amdgcn_sched_barrier(0);
+                            auto a_prefetch_window = a_copy_dram_window;
+                            auto b_prefetch_window = b_copy_dram_window;
+                            if(i_global_read + 2 < num_loop)
+                            {
+                                move_tile_window(a_prefetch_window, a_dram_tile_window_step);
+                                move_tile_window(b_prefetch_window, b_dram_tile_window_step);
+                                move_tile_window(a_prefetch_window, a_dram_tile_window_step);
+                                move_tile_window(b_prefetch_window, b_dram_tile_window_step);
+                            }
+                            a_prefetch_window.prefetch_for_tdm(tdm_config_a);
+                            b_prefetch_window.prefetch_for_tdm(tdm_config_b);
+                        }
                         block_sync_lds();
 
                         Base::GlobalPrefetchTDM(tdm_config_a,
