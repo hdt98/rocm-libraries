@@ -27,12 +27,16 @@ enum class WMMA_SCALE
 };
 
 // WMMA scale type selector for 16x16 blocks
-template <int32_t BLOCK_M, int32_t BLOCK_N, int32_t BLOCK_X>
+template <int32_t BLOCK_M,
+          int32_t BLOCK_N,
+          int32_t BLOCK_X,
+          typename ScaleTypeA,
+          typename ScaleTypeB>
 struct wmma_scale_type_selector;
 
 // specialization for scale block size 32
-template <>
-struct wmma_scale_type_selector<16, 16, 32>
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<16, 16, 32, ScaleTypeA, ScaleTypeB>
 {
     template <typename AFragT,
               typename AScaleFragT,
@@ -46,13 +50,14 @@ struct wmma_scale_type_selector<16, 16, 32>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125>{};
-        op.template run<16, 16, 1, 0>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<16, 16, 1, 0, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
 // specialization for scale block size 16
-template <>
-struct wmma_scale_type_selector<16, 16, 16>
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<16, 16, 16, ScaleTypeA, ScaleTypeB>
 {
     template <typename AFragT,
               typename AScaleFragT,
@@ -66,7 +71,8 @@ struct wmma_scale_type_selector<16, 16, 16>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125>{};
-        op.template run<16, 16, 1, 0>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<16, 16, 1, 0, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
@@ -443,7 +449,8 @@ struct store_C_row_major<CType, CFragT, 16, 16>
 // WMMA scale kernel
 template <typename AType,
           typename BType,
-          typename ScaleType,
+          typename AScaleType,
+          typename BScaleType,
           typename CType,
           typename AccType,
           int32_t BLOCK_M,
@@ -454,9 +461,9 @@ template <typename AType,
           typename BLayout,
           typename CLayout>
 __global__ void matmul(const packed_type_t<AType>* a,
-                       const ScaleType* xa,
+                       const AScaleType* xa,
                        const packed_type_t<BType>* b,
-                       const ScaleType* xb,
+                       const BScaleType* xb,
                        CType* c)
 {
     using PackedAType            = packed_type_t<AType>;
@@ -476,10 +483,10 @@ __global__ void matmul(const packed_type_t<AType>* a,
     using AccumFragT    = vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>;
     using RawAccumFragT = typename vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
     using AScaleFragT =
-        typename vector_type<ScaleType,
+        typename vector_type<AScaleType,
                              BLOCK_K / BLOCK_X>::type; // packed BLOCK_K / BLOCK_X scale values
     using BScaleFragT =
-        typename vector_type<ScaleType,
+        typename vector_type<BScaleType,
                              BLOCK_K / BLOCK_X>::type; // packed BLOCK_K / BLOCK_X scale values
 
     // Create frags
@@ -495,7 +502,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
     {
         fragA = load_mx_A_row_major<PackedAType,
                                     AFragT,
-                                    ScaleType,
+                                    AScaleType,
                                     AScaleFragT,
                                     BLOCK_M,
                                     BLOCK_K,
@@ -514,7 +521,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
     {
         fragB = load_mx_B_col_major<PackedBType,
                                     BFragT,
-                                    ScaleType,
+                                    BScaleType,
                                     BScaleFragT,
                                     BLOCK_K,
                                     BLOCK_N,
@@ -522,7 +529,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
     }
 
     // Scaled Matrix multiply-accumulate using WMMA scale units
-    using wmma = wmma_scale_type_selector<BLOCK_M, BLOCK_N, BLOCK_X>;
+    using wmma = wmma_scale_type_selector<BLOCK_M, BLOCK_N, BLOCK_X, AScaleFragT, BScaleFragT>;
     wmma::template run<>(fragA, fragXa, fragB, fragXb, fragAcc);
 
     for(int i = 0; i < vectorSize(fragC); ++i)
@@ -543,11 +550,15 @@ __global__ void matmul(const packed_type_t<AType>* a,
 // Test structure for WMMA scale operations
 namespace mx_wmma_test {
 
-template <typename ADataType, typename BDataType, typename ScaleType, typename CDataType>
+template <typename ADataType,
+          typename BDataType,
+          typename AScaleType,
+          typename BScaleType,
+          typename CDataType>
 void RunHostGEMM(const Tensor<ADataType>& A,
-                 const Tensor<ScaleType>& a_scales,
+                 const Tensor<AScaleType>& a_scales,
                  const Tensor<BDataType>& B,
-                 const Tensor<ScaleType>& b_scales,
+                 const Tensor<BScaleType>& b_scales,
                  Tensor<CDataType>& C)
 {
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
@@ -556,12 +567,13 @@ void RunHostGEMM(const Tensor<ADataType>& A,
                                                                               BDataType,
                                                                               CDataType,
                                                                               float,
-                                                                              ScaleType,
+                                                                              AScaleType,
                                                                               PassThrough,
                                                                               PassThrough,
                                                                               PassThrough,
                                                                               float,
-                                                                              float>;
+                                                                              float,
+                                                                              BScaleType>;
     auto ref_gemm               = ReferenceGemmInstance{};
     auto ref_invoker            = ref_gemm.MakeInvoker();
 
@@ -574,19 +586,20 @@ void RunHostGEMM(const Tensor<ADataType>& A,
 template <typename KernelType,
           typename ADataType,
           typename BDataType,
-          typename ScaleType,
+          typename AScaleType,
+          typename BScaleType,
           typename CDataType>
 bool RunDeviceGEMM(KernelType kernel,
                    const Tensor<ADataType>& A,
-                   const Tensor<ScaleType>& a_scales,
+                   const Tensor<AScaleType>& a_scales,
                    const Tensor<BDataType>& B,
-                   const Tensor<ScaleType>& b_scales,
+                   const Tensor<BScaleType>& b_scales,
                    Tensor<CDataType>& C)
 {
     DeviceMem a_m_k_device_buf(sizeof(ADataType) * A.mDesc.GetElementSpaceSize());
-    DeviceMem a_scales_device_buf(sizeof(ScaleType) * a_scales.mDesc.GetElementSpaceSize());
+    DeviceMem a_scales_device_buf(sizeof(AScaleType) * a_scales.mDesc.GetElementSpaceSize());
     DeviceMem b_n_k_device_buf(sizeof(BDataType) * B.mDesc.GetElementSpaceSize());
-    DeviceMem b_scales_device_buf(sizeof(ScaleType) * b_scales.mDesc.GetElementSpaceSize());
+    DeviceMem b_scales_device_buf(sizeof(BScaleType) * b_scales.mDesc.GetElementSpaceSize());
     DeviceMem c_m_n_device_buf(sizeof(CDataType) * C.mDesc.GetElementSpaceSize());
 
     a_m_k_device_buf.ToDevice(A.mData.data());
@@ -595,9 +608,9 @@ bool RunDeviceGEMM(KernelType kernel,
     b_scales_device_buf.ToDevice(b_scales.mData.data());
 
     kernel<<<1, 32>>>(static_cast<const ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-                      static_cast<const ScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
+                      static_cast<const AScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
                       static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
-                      static_cast<const ScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
+                      static_cast<const BScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
                       static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
 
     c_m_n_device_buf.FromDevice(C.mData.data());
@@ -608,7 +621,8 @@ bool RunDeviceGEMM(KernelType kernel,
 template <typename DeviceWMMA,
           typename ADataType,
           typename BDataType,
-          typename ScaleType,
+          typename AScaleType,
+          typename BScaleType,
           typename CDataType,
           typename ALayout,
           typename BLayout,
@@ -653,11 +667,11 @@ struct TestMXWMMA
 
         Tensor<PackedAType> a_m_k(
             f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
-        Tensor<ScaleType> a_scales(
+        Tensor<AScaleType> a_scales(
             f_host_tensor_descriptor(params.M, params.K / BLOCK_X, params.K / BLOCK_X, ALayout{}));
         Tensor<PackedBType> b_n_k(
             f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
-        Tensor<ScaleType> b_scales(
+        Tensor<BScaleType> b_scales(
             f_host_tensor_descriptor(params.K / BLOCK_X, params.N, params.K / BLOCK_X, BLayout{}));
         Tensor<CDataType> c_m_n_host_result(
             f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
@@ -668,27 +682,27 @@ struct TestMXWMMA
         {
         case 0:
             a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{0.5f});
+            a_scales.GenerateTensorValue(GeneratorTensor_1<AScaleType>{0.5f});
             b_n_k.GenerateTensorValue(GeneratorTensor_Sequential<PackedBType, 1>{});
-            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{1.0f});
+            b_scales.GenerateTensorValue(GeneratorTensor_1<BScaleType>{1.0f});
             break;
         case 1:
             a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{512.0f});
+            a_scales.GenerateTensorValue(GeneratorTensor_1<AScaleType>{512.0f});
             b_n_k.GenerateTensorValue(GeneratorTensor_1<PackedBType>{1.0f});
-            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{1.0f / 512});
+            b_scales.GenerateTensorValue(GeneratorTensor_1<BScaleType>{1.0f / 512});
             break;
         case 2:
             a_m_k.GenerateTensorValue(GeneratorTensor_3<PackedAType>{-2.0, 2.0});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{126, 129});
+            a_scales.GenerateTensorValue(GeneratorTensor_2<AScaleType>{0, 4});
             b_n_k.GenerateTensorValue(GeneratorTensor_3<PackedBType>{-2.0, 2.0});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{126, 129});
+            b_scales.GenerateTensorValue(GeneratorTensor_2<BScaleType>{0, 4});
             break;
         default:
             a_m_k.GenerateTensorValue(GeneratorTensor_2<PackedAType>{-6, 7});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{122, 129});
+            a_scales.GenerateTensorValue(GeneratorTensor_3<AScaleType>{0.0625f, 8.0f});
             b_n_k.GenerateTensorValue(GeneratorTensor_2<PackedBType>{-6, 7});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{122, 129});
+            b_scales.GenerateTensorValue(GeneratorTensor_3<BScaleType>{0.0625f, 8.0f});
             break;
         }
 
@@ -729,12 +743,12 @@ struct TestMXWMMA
 
         auto host_tensors = PrepareGemmTensors(params, init);
 
-        const Tensor<PackedAType>& a      = std::get<0>(host_tensors);
-        const Tensor<ScaleType>& a_scales = std::get<1>(host_tensors);
-        const Tensor<PackedBType>& b      = std::get<2>(host_tensors);
-        const Tensor<ScaleType>& b_scales = std::get<3>(host_tensors);
-        Tensor<CDataType>& c_host         = std::get<4>(host_tensors);
-        Tensor<CDataType>& c_device       = std::get<5>(host_tensors);
+        const Tensor<PackedAType>& a       = std::get<0>(host_tensors);
+        const Tensor<AScaleType>& a_scales = std::get<1>(host_tensors);
+        const Tensor<PackedBType>& b       = std::get<2>(host_tensors);
+        const Tensor<BScaleType>& b_scales = std::get<3>(host_tensors);
+        Tensor<CDataType>& c_host          = std::get<4>(host_tensors);
+        Tensor<CDataType>& c_device        = std::get<5>(host_tensors);
 
         RunHostGEMM(a, a_scales, b, b_scales, c_host);
 

@@ -94,6 +94,18 @@ if(GPU_TARGETS MATCHES "gfx950|gfx125")
     target_link_libraries(test_e8m0 PRIVATE utility)
   endif()
   add_dependencies(test_mx_data_types test_e8m0)
+
+  add_gtest_executable(test_e4m3 test_e4m3.cpp)
+  if(result EQUAL 0)
+    target_link_libraries(test_e4m3 PRIVATE utility)
+  endif()
+  add_dependencies(test_mx_data_types test_e4m3)
+
+  add_gtest_executable(test_e5m3 test_e5m3.cpp)
+  if(result EQUAL 0)
+    target_link_libraries(test_e5m3 PRIVATE utility)
+  endif()
+  add_dependencies(test_mx_data_types test_e5m3)
   
   add_gtest_executable(test_mx_fp6 test_mx_fp6.cpp)
   if(result EQUAL 0)
