@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2024-2025 AMD ROCm(TM) Software
+ * Copyright 2024-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,17 +43,13 @@ namespace rocRoller
     {
         bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
-            Log::info("{} {}",
-                      inst.toString(LogLevel::Terse),
-                      inst.getAddresses().value_or(std::vector<size_t>{}));
-
             AssertFatal(context != nullptr);
 
             const DSObserverType observerType = context->kernelOptions()->dsObserver;
 
             if(observerType == DSObserverType::WeightlessDSMemObserver)
             {
-                const auto addrs = inst.getAddresses();
+                const auto addrs = inst.getModelledAddresses();
                 AssertFatal(addrs.has_value(), ShowValue(inst.toString(LogLevel::Terse)));
                 AssertFatal(addrs->size() % 64 == 0, ShowValue(addrs->size()));
                 AssertFatal(LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode()).has_value(),
@@ -94,8 +90,10 @@ namespace rocRoller
 
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
         {
+            auto context = m_context.lock();
+            AssertFatal(context != nullptr);
             return GPUInstructionInfo::isLDS(inst.getOpCode())
-                   && !useWeightlessObserver(inst, m_context.lock());
+                   && context->kernelOptions()->dsObserver == DSObserverType::DSMEMObserver;
         }
 
         int DSMEMObserver::getWait(Instruction const& inst) const
@@ -133,7 +131,7 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
-                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    std::vector<size_t> addresses = inst.getModelledAddresses().value();
                     auto [stallCycles, additionalCycles]
                         = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
 
@@ -183,7 +181,7 @@ namespace rocRoller
                 {
                     auto [direction, dwords] = *ldsInfo;
 
-                    std::vector<size_t> addresses = inst.getAddresses().value();
+                    std::vector<size_t> addresses = inst.getModelledAddresses().value();
                     m_scheduler.value().scheduleInstruction({{direction}, dwords, addresses});
                 }
             }

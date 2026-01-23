@@ -891,10 +891,10 @@ namespace rocRoller
                     {
                         if(addresses.size() > 0)
                         {
-                            AssertFatal(not instr.getAddresses().has_value(),
+                            AssertFatal(not instr.getModelledAddresses().has_value(),
                                         "Should be unset",
-                                        ShowValue(instr.getAddresses().value()));
-                            instr.setAddresses(addresses);
+                                        ShowValue(instr.getModelledAddresses().value()));
+                            instr.setModelledAddresses(addresses);
                         }
                         else
                         {

@@ -51,6 +51,7 @@ target_sources(rocroller-tests-rocprofiler
         "${CMAKE_CURRENT_SOURCE_DIR}/WaitcntTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Agent.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Utils.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/LDSTestUtils.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/../catch/TestContext.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/../catch/TestKernels.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/../catch/CustomAssertions.cpp"

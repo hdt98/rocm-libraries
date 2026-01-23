@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2025 AMD ROCm(TM) Software
+ * Copyright 2025-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -53,6 +53,7 @@
 #include "../catch/TestContext.hpp"
 #include "../catch/TestKernels.hpp"
 #include "Agent.hpp"
+#include "LDSTestUtils.hpp"
 #include "Utils.hpp"
 
 #include <catch2/catch_all.hpp>

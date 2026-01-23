@@ -73,6 +73,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/LDSModelTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LargerLDSTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LoadPackedTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/MemAddressingTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MEMObserverTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MFMACoexecObserverTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MultipleLDSAllocationTest.cpp"
