@@ -516,6 +516,7 @@ defaultBenchmarkCommonParameters = [
     {"UsePLRPack": [0]},
     {"TDMInst": [0]},
     {"TDMSplit": [False]},
+    {"ClusterDim": [[1, 1]]},
     {"Multicast": [False]},
 ]
 

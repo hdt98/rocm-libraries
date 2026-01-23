@@ -2922,6 +2922,7 @@ class KernelWriterAssembly(KernelWriter):
   def graWorkGroup(self, kernel, tPA, tPB):
     module = Module("graWorkGroup")
     module.addComment0("graWorkGroup mapping")
+    enableCluster = (kernel["ClusterDim"][0] * kernel["ClusterDim"][1]) != 1
 
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.graWorkGroup(self, kernel, tPA, tPB))
@@ -17625,6 +17626,7 @@ class KernelWriterAssembly(KernelWriter):
     unrolledMajor = not tlu
     ti: int = tP["idx"]
     tileChar: str = tP["tileChar"]
+    enableCluster = (kernel["ClusterDim"][0] * kernel["ClusterDim"][1]) != 1
     mod = Module(f"Init TDM Descriptor {tc}")
 
     def descSgprName(idx: int) -> str:
@@ -17661,7 +17663,7 @@ class KernelWriterAssembly(KernelWriter):
     mod.add(comp.initOperands(descSgprName(0), descSgprName(1), None, None))
     mod.add(comp.setDataType(dtype, descSgprName(1)))
     mod.add(comp.setGlobalAddr(descSgprName(0), f"Address{tc}"))
-    if kernel["Multicast"]:
+    if kernel["Multicast"] and enableCluster:
       mod.add(comp.setMulticastMask(descSgprName(1), maskSgprName(tc), self))
 
     with self.allocTmpSgpr(1) as tmpSgprRes:
@@ -17710,6 +17712,7 @@ class KernelWriterAssembly(KernelWriter):
     unrolledMajor = not tlu
     ti: int = tP["idx"]
     tileChar: str = tP["tileChar"]
+    enableCluster = (kernel["ClusterDim"][0] * kernel["ClusterDim"][1]) != 1
     mod = Module(f"Init TDM Descriptor {tc}")
 
     def descSgprName(idx: int) -> str:
@@ -17750,7 +17753,7 @@ class KernelWriterAssembly(KernelWriter):
     mod.add(comp.initOperands(descSgprName(0), descSgprName(1), None, None))
     mod.add(comp.setDataType(dtype, descSgprName(1)))
     mod.add(comp.setGlobalAddr(descSgprName(0), f"Address{tc}"))
-    if kernel["Multicast"]:
+    if kernel["Multicast"] and enableCluster:
       mod.add(comp.setMulticastMask(descSgprName(1), maskSgprName(tc), self))
 
     with self.allocTmpSgpr(1) as tmpSgprRes:
