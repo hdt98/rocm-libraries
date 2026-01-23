@@ -23,9 +23,6 @@ RUN git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libr
     && git sparse-checkout set projects/composablekernel projects/miopen cmake \
     && git checkout $ROCM_BRANCH 
 
-# Copy Composable Kernel (MIOpen expects this path)
-COPY projects/composablekernel projects/composable_kernel
-
 # Support multiarch
 RUN dpkg --add-architecture i386 && \
 # Install preliminary dependencies and add rocm gpg key
@@ -58,16 +55,14 @@ RUN mkdir build && cd build \
       -D GPU_ARCHS=${GPU_ARCHS} \
       -D MIOPEN_REQ_LIBS_ONLY=ON \
       -D CMAKE_CXX_FLAGS=" -O3 " \
-      ../projects/composable_kernel \
-    && make -j ${MAX_JOBS} install \   
-    && cd .. && rm -rf build && mkdir build && cd build \
-    && CXX=/opt/rocm/llvm/bin/clang++ CXXFLAGS='-Werror' cmake \
+      ../rocm-libraries/projects/composablekernel \
+    && make -j ${MAX_JOBS} install 
+
+RUN rm -rf build && mkdir build && cd build \
+    && CXX=/opt/rocm/bin/amdclang++ cmake \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_DEV=Off \
       -DCMAKE_INSTALL_PREFIX=/opt/rocm \
       -DCMAKE_PREFIX_PATH=/opt/rocm \
-      ../projects/miopen \
-    && make -j ${MAX_JOBS} install \
-    # Remove CK source once built and installed
-    && rm -rf /composable_kernel
-    
+      ../rocm-libraries/projects/miopen \
+    && make -j ${MAX_JOBS} install
