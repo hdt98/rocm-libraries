@@ -3808,7 +3808,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                             CHECK_HIP_ERROR(hipEventRecord(cold_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(cold_events_end[i]));
+                        }
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
@@ -3858,7 +3861,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
                         }
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+                        }
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                     
@@ -3913,7 +3919,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 stream),
                             HIPBLAS_STATUS_SUCCESS);
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(cold_events_end[i]));
+                        }
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
@@ -3989,7 +3998,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
                         }
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+                        }
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                     
@@ -4041,7 +4053,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(
                             d_userArgsVec[i % block_count], stream));
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(cold_events_end[i]));
+                        }
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
@@ -4087,7 +4102,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 d_userArgsVec[i % block_count], stream));
                         }
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+                        }
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                     
@@ -4126,7 +4144,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                             CHECK_HIP_ERROR(hipEventRecord(cold_events_start[i], stream));
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(cold_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(cold_events_end[i]));
+                        }
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
@@ -4171,7 +4192,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                             CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
                         }
                         if(arg.use_gpu_timer)
+                        {
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
+                            CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+                        }
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                     
