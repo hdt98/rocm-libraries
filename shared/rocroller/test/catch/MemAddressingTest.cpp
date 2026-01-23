@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2025 AMD ROCm(TM) Software
+ * Copyright 2025-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@
  *
  *******************************************************************************/
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 
 #include <rocRoller/AssemblyKernel.hpp>
@@ -42,6 +43,7 @@
 #include <rocRoller/Utilities/Settings.hpp>
 
 #include <common/CommonGraphs.hpp>
+#include <common/Scheduling.hpp>
 
 #include "CustomAssertions.hpp"
 #include "CustomSections.hpp"
@@ -58,7 +60,6 @@ namespace MemAddressingTest
     {
         SECTION("Create LoadLDSTile operations from GEMM graph")
         {
-            // TODO: eventually set to use WeightlessDSMemObserver via KernelOptions
             auto context = TestContext::ForTestDevice();
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
 
@@ -66,8 +67,10 @@ namespace MemAddressingTest
             example.setMFMA(32, 32, 2, 1);
             example.setUseLDS(true, false, false);
 
-            auto params  = example.getCommandParameters();
             auto command = example.getCommand();
+            auto params
+                = example
+                      .getCommandParameters(); // TODO: ensure this not required to be called after getCommand()
 
             CommandKernel commandKernel(command, context.KernelName());
             commandKernel.setContext(context.get());
@@ -76,8 +79,29 @@ namespace MemAddressingTest
             commandKernel.generateKernelGraph("");
             auto graph = commandKernel.getKernelGraph();
 
-            const auto insts = kernelInstructions(context.get(), command, graph).to<std::vector>();
-            // TODO: assert on instructions
+            for(auto inst : kernelInstructions(context.get(), command, graph))
+            {
+                context.get()->schedule(inst);
+                if(inst.getModelledAddresses().has_value())
+                {
+                    auto addresses = inst.getModelledAddresses().value();
+                    Log::info("addresses {}", addresses);
+
+                    REQUIRE(addresses.size() == 64); // TODO: should this be 64 or 256?
+
+                    for(auto addr : addresses)
+                    {
+                        REQUIRE(addr % 4 == 0);
+                    }
+
+                    for(size_t i = 1; i < addresses.size(); ++i)
+                    {
+                        int diff = addresses[i] - addresses[i - 1];
+                        REQUIRE(diff % 4 == 0);
+                        REQUIRE(diff > 0);
+                    }
+                }
+            }
         }
     }
 }
