@@ -1566,7 +1566,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
 
         if constexpr(NumGroupsToMerge > 1)
         {
-            if(!(ConvC == 1))
+            if(!(ConvC == 1 && ConvK == 1))
             {
                 return false;
             }
