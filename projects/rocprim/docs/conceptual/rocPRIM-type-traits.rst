@@ -46,9 +46,6 @@ Available traits
 .. doxygenstruct:: rocprim::traits::float_bit_mask
   :members:
 
-.. doxygenstruct:: rocprim::traits::is_fundamental
-  :members:
-
 Type traits wrappers
 ====================
 .. doxygengroup::  rocprim_type_traits_wrapper
