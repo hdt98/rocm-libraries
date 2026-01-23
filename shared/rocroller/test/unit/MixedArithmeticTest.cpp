@@ -803,8 +803,6 @@ namespace MixedArithmeticTest
                     auto reference = Expression::evaluate(expr);
                     compareResultValues(reference, result[idx], arg1Val, arg2Val, arg3Val);
                 }
-
-                idx++;
             }
         }
     };
