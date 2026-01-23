@@ -34,50 +34,46 @@
 #include <thread>
 #include <vector>
 
-//GPUArchitectureLibrary singleton is stable via its own API
 TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[utils][API]")
 {
-    auto a = rocRoller::GPUArchitectureLibrary::getInstance();
-    auto b = rocRoller::GPUArchitectureLibrary::getInstance();
+    auto* a = rocRoller::GPUArchitectureLibrary::getInstance();
+    auto* b = rocRoller::GPUArchitectureLibrary::getInstance();
     REQUIRE(a != nullptr);
     REQUIRE(b != nullptr);
     REQUIRE(a == b);
 }
 
-// Settings change is visible through library's read path (Settings::Get)
 TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[utils][API]")
 {
-    auto settings = rocRoller::Settings::getInstance();
+    const bool original = rocRoller::Settings::Get(rocRoller::Settings::LogConsole);
+
+    auto* settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
 
-    // Set through instance (simulating an API user's program)
-    settings->set(rocRoller::Settings::LogConsole, false);
+    const bool flipped = !original;
+    settings->set(rocRoller::Settings::LogConsole, flipped);
 
-    // Read back through the library's static read path (simulates "inside the library")
-    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == false);
+    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == flipped);
 
-    // Restore default to avoid cross-test pollution
-    settings->set(rocRoller::Settings::LogConsole, true);
+    settings->set(rocRoller::Settings::LogConsole, original);
+    CHECK(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == original);
 }
 
-// Settings string option change is globally visible and consistent
 TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[utils][API]")
 {
-    auto settings = rocRoller::Settings::getInstance();
+    auto* settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
 
     std::string customPath = "/tmp/rocm_custom";
     settings->set(rocRoller::Settings::ROCMPath, customPath);
 
-    // Read via instance and static path
-    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == customPath);
+    CHECK(settings->get(rocRoller::Settings::ROCMPath) == customPath);
     REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::ROCMPath) == customPath);
 }
 
-// Multiple options remain independent
 TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "[utils][API]")
 {
-    auto settings = rocRoller::Settings::getInstance();
+    auto* settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
 
     settings->set(rocRoller::Settings::LogConsole, false);
@@ -86,32 +82,26 @@ TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "
     REQUIRE(settings->get(rocRoller::Settings::LogConsole) == false);
     REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == std::string("/tmp/test_path"));
 
-    // Restore
     settings->set(rocRoller::Settings::LogConsole, true);
 }
 
-// Settings visibility across threads using only public API
 TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only)", "[utils][API]")
 {
-    // Writer toggles a setting; readers check via static Get()
     constexpr int writers = 2;
     constexpr int readers = 8;
 
-    auto settings = rocRoller::Settings::getInstance();
+    auto* settings = rocRoller::Settings::getInstance();
     REQUIRE(settings != nullptr);
 
-    // Start with true
     settings->set(rocRoller::Settings::LogConsole, true);
 
     std::vector<std::thread> ts;
 
-    // Readers
     for(int i = 0; i < readers; ++i)
     {
         ts.emplace_back([] { (void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole); });
     }
 
-    // Writers
     for(int i = 0; i < writers; ++i)
     {
         ts.emplace_back([settings, i] {
@@ -122,21 +112,21 @@ TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only
     for(auto& t : ts)
         t.join();
 
-    // Final state is whichever last writer set—exact truth value is not asserted here
-    // we only assert that public reads do not crash and are reachable.
     REQUIRE_NOTHROW((void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole));
 }
 
 TEST_CASE("LazySingletonAPI: Logging behavior reflects Settings toggles", "[utils][API]")
 {
-    // Snapshot so test is side-effect free
     const bool prevConsole            = rocRoller::Settings::Get(rocRoller::Settings::LogConsole);
     const rocRoller::LogLevel prevLvl = rocRoller::Settings::Get(rocRoller::Settings::LogLvl);
     const rocRoller::LogLevel prevCLvl
         = rocRoller::Settings::Get(rocRoller::Settings::LogConsoleLvl);
 
-    auto settings = rocRoller::Settings::getInstance();
-    auto logger   = rocRoller::Log::getLogger();
+    auto* settings = rocRoller::Settings::getInstance();
+    auto  logger   = rocRoller::Log::getLogger();
+
+    REQUIRE(settings != nullptr);
+    REQUIRE(logger != nullptr);
 
     settings->set(rocRoller::Settings::LogConsole, true);
     settings->set(rocRoller::Settings::LogLvl, rocRoller::LogLevel::Info);
@@ -148,6 +138,7 @@ TEST_CASE("LazySingletonAPI: Logging behavior reflects Settings toggles", "[util
     REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Trace));
 
     REQUIRE(settings->get(rocRoller::Settings::LogLvl) == rocRoller::LogLevel::Info);
+
     settings->set(rocRoller::Settings::LogLvl, rocRoller::LogLevel::Warning);
     settings->set(rocRoller::Settings::LogConsoleLvl, rocRoller::LogLevel::Warning);
 
@@ -160,4 +151,18 @@ TEST_CASE("LazySingletonAPI: Logging behavior reflects Settings toggles", "[util
     settings->set(rocRoller::Settings::LogConsole, prevConsole);
     settings->set(rocRoller::Settings::LogLvl, prevLvl);
     settings->set(rocRoller::Settings::LogConsoleLvl, prevCLvl);
+}
+
+TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary::resetState restores loaded library",
+          "[utils][API]")
+{
+    auto* lib = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(lib != nullptr);
+
+    auto before = lib->getAllSupportedISAs();
+
+    REQUIRE_NOTHROW(lib->resetState());
+
+    auto after = lib->getAllSupportedISAs();
+    REQUIRE(after == before);
 }

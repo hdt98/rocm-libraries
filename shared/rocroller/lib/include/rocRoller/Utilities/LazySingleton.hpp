@@ -26,19 +26,18 @@
 
 #pragma once
 
+#include <concepts>
 #include <type_traits>
 #include <utility>
 
 namespace rocRoller
 {
-    template <typename T, typename = void>
-    struct has_reset : std::false_type
-    {
-    };
-
     template <typename T>
-    struct has_reset<T, std::void_t<decltype(std::declval<T&>().reset())>> : std::true_type
+    concept ResettableState = requires(T& t)
     {
+        {
+            t.resetState()
+            } -> std::same_as<void>;
     };
 
     template <typename Class>
@@ -56,11 +55,9 @@ namespace rocRoller
             return &get();
         }
 
-        static void reset()
+        static void reset() requires ResettableState<Class>
         {
-            static_assert(has_reset<Class>::value,
-                          "LazySingleton<Class>::reset() requires Class to provide void reset().");
-            get().reset();
+            get().resetState();
         }
     };
 }

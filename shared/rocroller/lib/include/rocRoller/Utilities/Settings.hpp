@@ -254,7 +254,12 @@ namespace rocRoller
         Settings();
 
         // Reset all runtime overrides to defaults (env/default)
-        void reset();
+        void resetState();
+
+        static void reset()
+        {
+            LazySingleton<Settings>::reset();
+        }
 
         /**
          * @brief Gets the value of a SettingsOption.

@@ -71,12 +71,12 @@ namespace rocRoller
 
         std::map<GPUArchitectureTarget, GPUArchitecture> LoadLibrary();
 
-        GPUArchitectureLibrary()
-            : m_gpuArchitectures(LoadLibrary())
-        {
-        }
+        void resetState();
 
-        void reset();
+        GPUArchitectureLibrary()
+        {
+            resetState();
+        }
 
     private:
         std::map<GPUArchitectureTarget, GPUArchitecture> m_gpuArchitectures;

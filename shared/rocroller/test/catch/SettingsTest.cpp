@@ -85,7 +85,7 @@ namespace SettingsTest
                 }
             }
 
-            LazySingleton<Settings>::reset();
+            Settings::reset();
         }
 
     private:
@@ -167,7 +167,7 @@ namespace SettingsTest
 
             CHECK_THROWS_AS(settings->set(Settings::LogConsole, "invalidValue"), FatalError);
 
-            LazySingleton<Settings>::reset();
+            Settings::reset();
         }
 
         SECTION("Settings should be helpful")
@@ -225,7 +225,7 @@ namespace SettingsTest
             CHECK(numIters >= numTestThreads * minIters);
         }
 
-        LazySingleton<Settings>::reset();
+        Settings::reset();
     }
 
     TEST_CASE("Settings with associated envvars", "[settings]")
@@ -237,18 +237,18 @@ namespace SettingsTest
             // Settings ctor should not get from env,
             // otherwise it may throw without a prior settings instance
             // and infinitely recurse
-            LazySingleton<Settings>::reset();
+            Settings::reset();
             // unsetenv bitfield revert BreakOnThrow to false (default value)
             unsetenv(Settings::BitfieldName.c_str());
             auto settings = Settings::getInstance();
             CHECK_THROWS_AS(settings->get(Settings::Scheduler), FatalError);
 
-            LazySingleton<Settings>::reset();
+            Settings::reset();
         }
 
         SECTION("Environment variables take precedence")
         {
-            LazySingleton<Settings>::reset();
+            Settings::reset();
             auto settings = Settings::getInstance();
 
             // Env Var takes precedence over bitfield
@@ -257,12 +257,12 @@ namespace SettingsTest
             // bitfield takes precedence over default value
             CHECK(settings->get(Settings::SaveAssembly));
 
-            LazySingleton<Settings>::reset();
+            Settings::reset();
         }
 
         SECTION("Set and get from envvars-backed settings")
         {
-            LazySingleton<Settings>::reset();
+            Settings::reset();
             auto settings = Settings::getInstance();
             CHECK_FALSE(settings->get(Settings::LogConsole));
             CHECK(Settings::Get(Settings::SaveAssembly));
@@ -276,7 +276,7 @@ namespace SettingsTest
             CHECK_THAT(settings->get(Settings::AssemblyFile), Equals("differentFile.s"));
 
             // Values set in memory should not persist
-            LazySingleton<Settings>::reset();
+            Settings::reset();
             settings = Settings::getInstance();
 
             CHECK_FALSE(settings->get(Settings::LogConsole));
@@ -289,7 +289,7 @@ namespace SettingsTest
             // Fatal error reading unparseable env var
             CHECK_THROWS_AS(settings->get(Settings::Scheduler), FatalError);
 
-            LazySingleton<Settings>::reset();
+            Settings::reset();
         }
     }
 }
