@@ -78,6 +78,7 @@ CK_TILE_TYPE_CONVERT(bf16x2_t, bf16x2, fp32x2_t, fp32x2)
 } // namespace ck_tile
 
 #include "ck_tile/core/numeric/pk_fp4.hpp"
+#include "ck_tile/core/numeric/pk_fp6.hpp"
 
 namespace ck_tile {
 
@@ -117,6 +118,27 @@ CK_TILE_SCALED_TYPE_CONVERT(pk_fp4x4_t, pk_fp4, fp16x8_t, fp16x8)
 CK_TILE_SCALED_TYPE_CONVERT(fp16x8_t, fp16x8, pk_fp4x4_t, pk_fp4)
 CK_TILE_SCALED_TYPE_CONVERT(pk_fp4x4_t, pk_fp4, bf16x8_t, bf16x8)
 CK_TILE_SCALED_TYPE_CONVERT(bf16x8_t, bf16x8, pk_fp4x4_t, pk_fp4)
+
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp6_t, pk_fp6, float, float)
+CK_TILE_SCALED_TYPE_CONVERT(float, float, pk_fp6_t, pk_fp6)
+CK_TILE_SCALED_TYPE_CONVERT(pk_bf6_t, pk_bf6, float, float)
+CK_TILE_SCALED_TYPE_CONVERT(float, float, pk_bf6_t, pk_bf6)
+
+// 16-element vector conversions for pk_fp6_t and pk_bf6_t
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp6_t, pk_fp6, fp16x16_t, fp16x16)
+CK_TILE_SCALED_TYPE_CONVERT(fp16x16_t, fp16x16, pk_fp6_t, pk_fp6)
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp6_t, pk_fp6, bf16x16_t, bf16x16)
+CK_TILE_SCALED_TYPE_CONVERT(bf16x16_t, bf16x16, pk_fp6_t, pk_fp6)
+CK_TILE_SCALED_TYPE_CONVERT(pk_bf6_t, pk_bf6, fp16x16_t, fp16x16)
+CK_TILE_SCALED_TYPE_CONVERT(fp16x16_t, fp16x16, pk_bf6_t, pk_bf6)
+CK_TILE_SCALED_TYPE_CONVERT(pk_bf6_t, pk_bf6, bf16x16_t, bf16x16)
+CK_TILE_SCALED_TYPE_CONVERT(bf16x16_t, bf16x16, pk_bf6_t, pk_bf6)
+#if !CK_TILE_AVX512F_WA
+CK_TILE_SCALED_TYPE_CONVERT(pk_fp6_t, pk_fp6, fp32x16_t, fp32x16)
+CK_TILE_SCALED_TYPE_CONVERT(fp32x16_t, fp32x16, pk_fp6_t, pk_fp6)
+CK_TILE_SCALED_TYPE_CONVERT(pk_bf6_t, pk_bf6, fp32x16_t, fp32x16)
+CK_TILE_SCALED_TYPE_CONVERT(fp32x16_t, fp32x16, pk_bf6_t, pk_bf6)
+#endif
 #undef CK_TILE_SCALED_TYPE_CONVERT
 
 #if defined(__gfx125__)

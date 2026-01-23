@@ -1,6 +1,6 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
-
+set(TEST_DATA_TYPE_COMPILE_OPTIONS)
 if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
     add_gtest_executable(test_ck_tile_pk_int4 test_pk_int4.cpp)
 endif()
@@ -11,7 +11,40 @@ if(GPU_TARGETS MATCHES "gfx95|gfx125")
     endif()
     add_gtest_executable(test_ck_tile_mx_scale test_mx_scale.cpp)
 endif()
-
+if(GPU_TARGETS MATCHES "gfx125")
+    # Check if host CPU supports AVX-512
+    include(CheckCXXSourceRuns)
+    set(CMAKE_REQUIRED_FLAGS "-mavx512f")
+    check_cxx_source_runs("
+        #include <immintrin.h>
+        #include <cstring>
+        int main() {
+            // Create AVX-512 register and force actual execution
+            __m512 a = _mm512_set1_ps(1.0f);
+            __m512 b = _mm512_set1_ps(2.0f);
+            __m512 c = _mm512_add_ps(a, b);  // Actual AVX-512 operation
+            float result[16];
+            _mm512_storeu_ps(result, c);     // Store to memory to prevent optimization
+            // Use volatile to ensure the code isn't optimized away
+            volatile float check = result[0];
+            return (check == 3.0f) ? 0 : 1;
+        }
+    " HOST_HAS_AVX512F)
+    set(CMAKE_REQUIRED_FLAGS "")
+    
+    add_gtest_executable(test_ck_tile_pk_fp6 test_pk_fp6.cpp)
+    if(result EQUAL 0)
+      if(HOST_HAS_AVX512F)
+        message(STATUS "Host CPU supports AVX-512F, enabling -mavx512f for test_ck_tile_pk_fp6")
+        target_compile_options(test_ck_tile_pk_fp6 PRIVATE -mavx512f)
+        list(APPEND TEST_DATA_TYPE_COMPILE_OPTIONS -DCK_TILE_HOST_HAS_AVX512F)
+      else()
+        message(STATUS "Host CPU does not support AVX-512F, using -mavx2")
+        target_compile_options(test_ck_tile_pk_fp6 PRIVATE -mavx2)
+      endif()
+      target_compile_options(test_ck_tile_pk_fp6 PRIVATE ${TEST_DATA_TYPE_COMPILE_OPTIONS})
+    endif()
+endif()
 if(CK_USE_OCP_FP8 OR CK_USE_FNUZ_FP8)
     add_gtest_executable(test_ck_tile_fp8 test_fp8.cpp)
     target_compile_options(test_ck_tile_fp8 PRIVATE -Wno-float-equal)
