@@ -226,9 +226,9 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
                                                num_buffer_load_a_scale + num_buffer_load_b_scale;
 
         constexpr auto mfma_perstage_more =
-            math::integer_divide_ceil(num_mfma_stage1, num_buffer_load_total);
+            math::max(1, math::integer_divide_ceil(num_mfma_stage1, num_buffer_load_total));
         constexpr auto mfma_perstage_less =
-            math::integer_divide_floor(num_mfma_stage1, num_buffer_load_total);
+            math::max(1, math::integer_divide_floor(num_mfma_stage1, num_buffer_load_total));
 
         constexpr auto mfma_stages_more =
             num_mfma_stage1 - mfma_perstage_less * num_buffer_load_total;
