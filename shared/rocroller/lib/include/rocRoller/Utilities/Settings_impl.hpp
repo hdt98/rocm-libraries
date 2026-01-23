@@ -340,8 +340,32 @@ namespace rocRoller
 
     inline void Settings::resetState()
     {
-        this->~Settings();
-        new(this) Settings();
-    }
+        MapWriterLock writerLock{m_mapLock};
 
+        m_values.clear();
+        m_setBitOptions.clear();
+
+        // Populate m_values from bitfield env precedence for bit-indexed options
+        const char* bitfieldChars = std::getenv(Settings::BitfieldName.c_str());
+        if(!bitfieldChars)
+            return;
+
+        bitFieldType bitfield = bitFieldType{strtoull(bitfieldChars, nullptr, 0)};
+        auto         settings = SettingsOptionBase::instances();
+
+        for(auto const* setting : settings)
+        {
+            if(setting->getBitIndex() >= 0)
+            {
+                if(auto envVar = setting->getFromEnv())
+                {
+                    m_values[setting->name] = *envVar;
+                }
+                else
+                {
+                    m_values[setting->name] = bitfield.test(setting->getBitIndex());
+                }
+            }
+        }
+    }
 }

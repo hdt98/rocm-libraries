@@ -234,12 +234,11 @@ namespace SettingsTest
 
         SECTION("No infinite recursion")
         {
-            // Settings ctor should not get from env,
-            // otherwise it may throw without a prior settings instance
-            // and infinitely recurse
-            Settings::reset();
             // unsetenv bitfield revert BreakOnThrow to false (default value)
             unsetenv(Settings::BitfieldName.c_str());
+            // Reset to rebuild state from current defaults
+            Settings::reset();
+
             auto settings = Settings::getInstance();
             CHECK_THROWS_AS(settings->get(Settings::Scheduler), FatalError);
 
