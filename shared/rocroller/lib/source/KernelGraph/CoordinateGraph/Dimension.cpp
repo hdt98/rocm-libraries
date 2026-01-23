@@ -198,9 +198,9 @@ namespace rocRoller
                              std::vector<int> const& subTileSizes)
             : BaseDimension()
             , rank(sizes.size())
-            , sizes(sizes)
             , memoryType(memoryType)
             , layoutType(LayoutType::None)
+            , sizes(sizes)
             , subTileSizes(subTileSizes)
             , miTileSizes(subTileSizes)
             , swizzleTileSizes(subTileSizes)
@@ -215,9 +215,9 @@ namespace rocRoller
                              std::vector<int> const& swizzleTileSizes)
             : BaseDimension()
             , rank(sizes.size())
-            , sizes(sizes)
             , memoryType(memoryType)
             , layoutType(layoutType)
+            , sizes(sizes)
             , subTileSizes(subTileSizes)
             , miTileSizes{miTileSizes.empty() ? subTileSizes : miTileSizes}
             , swizzleTileSizes{swizzleTileSizes.empty() ? subTileSizes : swizzleTileSizes}

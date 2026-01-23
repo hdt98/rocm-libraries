@@ -385,8 +385,8 @@ namespace rocRoller
         }
 
         UnrollLoops::UnrollLoops(CommandParametersPtr params, ContextPtr context)
-            : m_params(params)
-            , m_context(context)
+            : m_context(context)
+            , m_params(params)
         {
         }
 

@@ -109,8 +109,8 @@ namespace rocRoller
                                        size_t   offset)
         : m_sizes(sizesBegin, sizesEnd)
         , m_strides(stridesBegin, stridesEnd)
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
     {
         this->calculate();
     }
@@ -118,8 +118,8 @@ namespace rocRoller
     template <typename Iter>
     TensorDescriptor::TensorDescriptor(DataType t, Iter sizesBegin, Iter sizesEnd, size_t offset)
         : m_sizes(sizesBegin, sizesEnd)
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
     {
         this->calculate();
     }
@@ -128,8 +128,8 @@ namespace rocRoller
                                               std::initializer_list<size_t> sizes,
                                               size_t                        offset)
         : m_sizes(sizes)
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
 
     {
         this->calculate();
@@ -137,8 +137,8 @@ namespace rocRoller
 
     inline TensorDescriptor::TensorDescriptor(DataType t, std::vector<size_t> sizes, size_t offset)
         : m_sizes(std::move(sizes))
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
     {
         this->calculate();
     }
@@ -149,8 +149,8 @@ namespace rocRoller
                                               size_t                        offset)
         : m_sizes(sizes)
         , m_strides(strides)
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
     {
         this->calculate();
     }
@@ -161,8 +161,8 @@ namespace rocRoller
                                               size_t              offset)
         : m_sizes(std::move(sizes))
         , m_strides(std::move(strides))
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
     {
         this->calculate();
     }
@@ -173,8 +173,8 @@ namespace rocRoller
                                               std::string const&    transpose,
                                               size_t                offset)
         : m_sizes(sizes.begin(), sizes.end())
-        , m_dataType(t)
         , m_offset(offset)
+        , m_dataType(t)
     {
         if(transpose == "T")
         {

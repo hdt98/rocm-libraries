@@ -821,8 +821,8 @@ namespace rocRoller
                                std::string const&   topLoop,
                                std::string const&   accumulatorLoop,
                                ExpressionPtr        numWGs)
-            : m_context(context)
-            , m_params(params)
+            : m_params(params)
+            , m_context(context)
             , m_dimensionIndices(params->loopOverOutputTilesDimensions)
             , m_topLoop(topLoop)
             , m_accumulatorLoop(accumulatorLoop)

@@ -17,8 +17,8 @@ namespace rocRoller
         using namespace Expression;
 
         ExchangeGenerator::ExchangeGenerator(KernelGraphPtr graph, ContextPtr context)
-            : m_graph(graph)
-            , m_context(context)
+            : m_context(context)
+            , m_graph(graph)
             , m_fastArith(FastArithmetic(context))
         {
         }

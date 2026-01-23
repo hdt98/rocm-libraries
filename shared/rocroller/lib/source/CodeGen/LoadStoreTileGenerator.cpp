@@ -89,8 +89,8 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileGenerator(KernelGraphPtr graph,
                                                        ContextPtr     context,
                                                        unsigned int   workgroupSizeTotal)
-            : m_graph(graph)
-            , m_context(context)
+            : m_context(context)
+            , m_graph(graph)
             , m_fastArith(FastArithmetic(context))
             , m_workgroupSizeTotal(workgroupSizeTotal)
         {

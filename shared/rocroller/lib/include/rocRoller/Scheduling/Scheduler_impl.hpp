@@ -35,8 +35,8 @@ namespace rocRoller
         static_assert(Component::ComponentBase<Scheduler>);
 
         inline Scheduler::Scheduler(ContextPtr ctx)
-            : m_ctx{ctx}
-            , m_lockstate{ctx}
+            : m_lockstate{ctx}
+            , m_ctx{ctx}
         {
         }
 

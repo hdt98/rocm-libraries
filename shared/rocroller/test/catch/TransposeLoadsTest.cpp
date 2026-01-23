@@ -56,8 +56,8 @@ namespace TransposeLoadsTest
                             uint       K)
             : AssemblyTestKernel(context)
             , m_elementType(elementType)
-            , m_dwordX(dwordX)
             , m_unalignedVGPRs(unalignedVGPRs)
+            , m_dwordX(dwordX)
             , m_MN(MN)
             , m_K(K)
         {

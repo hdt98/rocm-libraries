@@ -58,9 +58,9 @@ namespace rocRoller
         }
 
         inline Allocator::Allocator(Type regType, int count, AllocatorScheme scheme)
-            : m_regType(regType)
+            : m_scheme(scheme)
+            , m_regType(regType)
             , m_registers(count)
-            , m_scheme(scheme)
         {
         }
 

@@ -72,8 +72,8 @@ namespace rocRoller
                                  AssemblyKernelPtr                        kernel,
                                  std::optional<ControlFlowArgumentTracer> argTracer)
                 : m_graph(std::move(graph))
-                , m_kernel(kernel)
                 , m_context(kernel->context())
+                , m_kernel(kernel)
                 , m_fastArith{kernel->context()}
                 , m_loadStoreTileGenerator(
                       m_graph, kernel->context(), kernel->max_flat_workgroup_size())

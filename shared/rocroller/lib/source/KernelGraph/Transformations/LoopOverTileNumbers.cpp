@@ -53,9 +53,9 @@ namespace rocRoller
                                                  uint                     numIteratedTiles,
                                                  std::string const&       topLoop,
                                                  ContextPtr               context)
-            : m_dimensions(dims)
+            : m_context(context)
+            , m_dimensions(dims)
             , m_topLoop(topLoop)
-            , m_context(context)
         {
             for(auto s : tileNumberCoordSizes)
                 m_tileNumberCoordSizes.push_back(Expression::literal(s));

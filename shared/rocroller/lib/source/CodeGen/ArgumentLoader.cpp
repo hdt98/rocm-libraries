@@ -38,8 +38,8 @@
 namespace rocRoller
 {
     ArgumentLoader::ArgumentLoader(AssemblyKernelPtr kernel)
-        : m_kernel(kernel)
-        , m_context(kernel->context())
+        : m_context(kernel->context())
+        , m_kernel(kernel)
     {
     }
 

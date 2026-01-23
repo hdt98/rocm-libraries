@@ -66,8 +66,8 @@ namespace rocRoller
         {
         public:
             LowerLinearLoop(Expression::ExpressionPtr loopSize, ContextPtr context)
-                : m_loopSize(loopSize)
-                , m_context(context)
+                : m_context(context)
+                , m_loopSize(loopSize)
             {
             }
 

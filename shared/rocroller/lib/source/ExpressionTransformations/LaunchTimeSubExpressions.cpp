@@ -59,8 +59,8 @@ namespace rocRoller
         {
             LaunchTimeExpressionVisitor(ContextPtr ctx, bool allowNewArgs)
                 : m_context(ctx)
-                , m_allowNewArgs(allowNewArgs)
                 , m_minComplexity(ctx->kernelOptions()->minLaunchTimeExpressionComplexity)
+                , m_allowNewArgs(allowNewArgs)
             {
             }
 

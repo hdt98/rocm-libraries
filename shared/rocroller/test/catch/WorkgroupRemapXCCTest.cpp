@@ -57,8 +57,8 @@ namespace WorkgroupRemapXCCTest
     public:
         RemapWorkgroupXCCKernel(rocRoller::ContextPtr context, uint numXCC, uint size)
             : AssemblyTestKernel(context)
-            , m_numXCC(numXCC)
             , m_size(size)
+            , m_numXCC(numXCC)
         {
             makeGraph();
         }

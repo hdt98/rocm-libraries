@@ -1770,8 +1770,8 @@ namespace rocRoller
             LowerTileVisitor(CommandParametersPtr params, ContextPtr context)
 
                 : BaseGraphVisitor(context)
-                , m_params(params)
                 , m_kernel(context->kernel())
+                , m_params(params)
             {
             }
 

@@ -41,8 +41,8 @@ namespace rocRoller
                                             std::string   name)
         : m_command(std::move(com))
         , m_size(variableType.getElementSize())
-        , m_variableType(variableType)
         , m_offset(offset)
+        , m_variableType(variableType)
         , m_direction(direction)
         , m_name(std::move(name))
     {

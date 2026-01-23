@@ -79,10 +79,10 @@ namespace rocRoller
                                           std::string const& commentTag,
                                           int                cyclesPerInst,
                                           int                queueAllotment)
-            : m_context(ctx)
-            , m_commentTag(commentTag)
-            , m_cyclesPerInst(cyclesPerInst)
+            : m_cyclesPerInst(cyclesPerInst)
             , m_queueAllotment(queueAllotment)
+            , m_commentTag(commentTag)
+            , m_context(ctx)
         {
         }
 
