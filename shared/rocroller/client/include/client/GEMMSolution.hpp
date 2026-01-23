@@ -47,6 +47,7 @@ namespace rocRoller
                     : m_context(context)
                 {
                 }
+                virtual ~GEMMSolution() = default;
 
                 virtual CommandPtr makeCommand(SolutionParameters const&) = 0;
 

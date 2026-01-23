@@ -43,6 +43,8 @@ namespace rocRoller
         {
         }
 
+        virtual ~ArithmeticGenerator() = default;
+
     protected:
         ContextPtr m_context;
 

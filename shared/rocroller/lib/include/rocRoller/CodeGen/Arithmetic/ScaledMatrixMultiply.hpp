@@ -46,6 +46,8 @@ namespace rocRoller
             using Argument = std::tuple<ContextPtr, DataType, DataType>;
             using Base     = ScaledMatrixMultiply;
 
+            virtual ~ScaledMatrixMultiply() = default;
+
             static const std::string Basename;
 
             /**

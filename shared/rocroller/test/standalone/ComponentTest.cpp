@@ -45,6 +45,8 @@ struct Printer
 {
     using Argument = std::shared_ptr<TestArgument>;
 
+    virtual ~Printer() = default;
+
     static const std::string Basename;
 
     virtual void print() = 0;

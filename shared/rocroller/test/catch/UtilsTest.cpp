@@ -216,6 +216,9 @@ namespace
     struct TestComponentBase
     {
         using Argument = std::shared_ptr<TestArgument>;
+
+        virtual ~TestComponentBase() = default;
+
         static const std::string Basename;
         virtual unsigned         getValue() = 0;
     };

@@ -44,6 +44,8 @@ namespace rocRoller
             using Argument = ContextPtr;
             using Base     = MatrixMultiply;
 
+            virtual ~MatrixMultiply() = default;
+
             static const std::string Basename;
 
             /**

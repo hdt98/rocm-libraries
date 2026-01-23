@@ -64,6 +64,8 @@ namespace rocRoller
                           Expression::ExpressionPtr stride,
                           Expression::ExpressionPtr offset);
 
+            virtual ~BaseDimension() = default;
+
             virtual std::string toString() const;
 
             virtual std::string name() const = 0;

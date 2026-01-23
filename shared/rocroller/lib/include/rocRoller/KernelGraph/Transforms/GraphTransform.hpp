@@ -79,7 +79,7 @@ namespace rocRoller
         {
         public:
             GraphTransform()                                       = default;
-            ~GraphTransform()                                      = default;
+            virtual ~GraphTransform()                              = default;
             virtual KernelGraph apply(KernelGraph const& original) = 0;
             virtual std::string name() const                       = 0;
 

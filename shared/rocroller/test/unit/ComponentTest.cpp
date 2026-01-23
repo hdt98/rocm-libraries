@@ -47,6 +47,8 @@ namespace rocRollerTest
     {
         using Argument = std::shared_ptr<TestArgument>;
 
+        virtual ~Interface() = default;
+
         static const std::string Basename;
 
         virtual std::string name() = 0;

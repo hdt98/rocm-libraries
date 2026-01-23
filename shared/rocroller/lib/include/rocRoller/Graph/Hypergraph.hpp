@@ -94,6 +94,8 @@ namespace rocRoller
         public:
             using Element = std::variant<Node, Edge>;
 
+            virtual ~Hypergraph() = default;
+
             inline static constexpr bool IsHyper = Hyper;
 
             static std::string ElementName(Element const& el);

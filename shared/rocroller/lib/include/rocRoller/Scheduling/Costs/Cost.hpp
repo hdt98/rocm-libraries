@@ -59,6 +59,8 @@ namespace rocRoller
 
             Cost(ContextPtr);
 
+            virtual ~Cost() = default;
+
             static const std::string Basename;
 
             virtual std::string name() const                                                   = 0;

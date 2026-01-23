@@ -42,6 +42,8 @@ namespace rocRoller
     public:
         using Argument = AssemblerType;
 
+        virtual ~Assembler() = default;
+
         static const std::string Basename;
 
         static AssemblerPtr Get();
