@@ -49,17 +49,18 @@ GetOrigamiPerformanceConfig(const Solver s,
 
     // Create a problem description
     auto in_chan = ProblemInterpreter::GetInputChannelC(problem);
-    auto fil_h = ProblemInterpreter::GetAdjustedConvolutionDilationH(problem);
-    auto fil_w = ProblemInterpreter::GetAdjustedConvolutionDilationW(problem);
-    auto fil_d = ProblemInterpreter::GetAdjustedConvolutionDilationD(problem);
-    auto batch = ProblemInterpreter::GetBatchN(problem);
-    auto out_h = ProblemInterpreter::GetOutputHeightHo(problem);
-    auto out_w = ProblemInterpreter::GetOutputWidthWo(problem);
-    auto out_d = ProblemInterpreter::GetOutputDepthDo(problem);
+    auto fil_h   = ProblemInterpreter::GetFilterHeightY(problem);
+    auto fil_w   = ProblemInterpreter::GetFilterWidthX(problem);
+    auto fil_d   = ProblemInterpreter::GetFilterDepthZ(problem);
+    auto batch   = ProblemInterpreter::GetBatchN(problem);
+    auto out_h   = ProblemInterpreter::GetOutputHeightHo(problem);
+    auto out_w   = ProblemInterpreter::GetOutputWidthWo(problem);
+    auto out_d   = ProblemInterpreter::GetOutputDepthDo(problem);
     origami::problem_t ori_prob;
-    ori_prob.size.m = 1; // number of filters 
-    ori_prob.size.n = batch * out_h * out_w * out_d; // batch x out height x out width x out depth 
-    ori_prob.size.k = in_chan * fil_h * fil_w * fil_d; // channels x filter height x filter width x filter depth 
+    ori_prob.size.m = 1;                             // number of filters
+    ori_prob.size.n = batch * out_h * out_w * out_d; // batch x out height x out width x out depth
+    // channels x filter height x filter width x filter depth
+    ori_prob.size.k = in_chan * fil_h * fil_w * fil_d;
     // TBD
     ori_prob.batch = 1;
     // TransA T and TransB N is both K Contiguous (Ks next to each other in memory)
@@ -74,6 +75,12 @@ GetOrigamiPerformanceConfig(const Solver s,
     // TBD
     ori_prob.a_mx_block_size = 0;
     ori_prob.b_mx_block_size = 0;
+
+    MIOPEN_LOG_I2("config: channel("
+                  << in_chan << ") fil(" << fil_h << "x" << fil_w << "x" << fil_d << ") batch("
+                  << batch << ") out_dim(" << out_h << "x" << out_w << "x" << out_d << ")"
+                  << " gemm M(" << ori_prob.size.m << ") N(" << ori_prob.size.n << ") K("
+                  << ori_prob.size.k << ")");
 
     // Create candidate configurations
     std::vector<origami::config_t> ori_cfgs;
