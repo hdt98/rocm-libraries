@@ -33,7 +33,7 @@ namespace rocRoller
 {
     namespace Operations
     {
-        struct T_Execute;
+        class T_Execute;
         struct E_Unary;
         struct E_Binary;
         struct E_Ternary;

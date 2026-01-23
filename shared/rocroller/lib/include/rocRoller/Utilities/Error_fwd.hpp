@@ -28,8 +28,8 @@
 
 namespace rocRoller
 {
-    class Error;
+    struct Error;
 
-    class FatalError;
-    class RecoverableError;
+    struct FatalError;
+    struct RecoverableError;
 }

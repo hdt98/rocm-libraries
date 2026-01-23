@@ -34,7 +34,7 @@
 
 namespace rocRoller
 {
-    class Command;
+    struct Command;
     using CommandPtr = std::shared_ptr<Command>;
 
     std::ostream& operator<<(std::ostream& stream, Command const& command);

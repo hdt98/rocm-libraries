@@ -109,7 +109,7 @@ namespace rocRoller
          * Maintains a `shared_ptr` reference to the `Allocation` object.
          *
          */
-        struct Value : public std::enable_shared_from_this<Value>
+        class Value : public std::enable_shared_from_this<Value>
         {
         public:
             Value();
@@ -434,8 +434,9 @@ namespace rocRoller
          *
          * TODO: Make not copyable, enforce construction through shared_ptr
          */
-        struct Allocation : public std::enable_shared_from_this<Allocation>
+        class Allocation : public std::enable_shared_from_this<Allocation>
         {
+        public:
             Allocation(ContextPtr        context,
                        Type              regType,
                        VariableType      variableType,

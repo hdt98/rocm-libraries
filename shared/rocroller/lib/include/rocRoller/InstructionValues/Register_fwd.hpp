@@ -72,7 +72,7 @@ namespace rocRoller
         struct RegisterIdHash;
 
         class Allocation;
-        struct Value;
+        class Value;
 
         using AllocationPtr = std::shared_ptr<Allocation>;
         using ValuePtr      = std::shared_ptr<Value>;

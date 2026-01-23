@@ -39,7 +39,7 @@ namespace rocRoller
         /**
          * A block scale operation for MX datatypes
         */
-        class BlockScale;
+        class BlockScale; // Defined as class in BlockScale.hpp
 
         enum class ScaleMode
         {

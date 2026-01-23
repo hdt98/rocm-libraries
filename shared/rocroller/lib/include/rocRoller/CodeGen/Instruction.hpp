@@ -37,8 +37,9 @@
 
 namespace rocRoller
 {
-    struct Instruction
+    class Instruction
     {
+    public:
         enum
         {
             MaxDstRegisters   = 2,
