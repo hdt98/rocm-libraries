@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2024-2025 AMD ROCm(TM) Software
+ * Copyright 2024-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -67,8 +67,8 @@ namespace
 
 TEST_CASE("LazySingletonUnit: Same instance is returned", "[utils]")
 {
-    auto* a = rocRoller::LazySingleton<DummySingletonA>::getInstance();
-    auto* b = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* a = DummySingletonA::getInstance();
+    auto* b = DummySingletonA::getInstance();
 
     REQUIRE(a != nullptr);
     REQUIRE(b != nullptr);
@@ -77,14 +77,14 @@ TEST_CASE("LazySingletonUnit: Same instance is returned", "[utils]")
 
 TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-place)", "[utils]")
 {
-    auto* instance1 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* instance1 = DummySingletonA::getInstance();
     REQUIRE(instance1 != nullptr);
 
     instance1->value = 123; // mutate
 
-    rocRoller::LazySingleton<DummySingletonA>::reset();
+    DummySingletonA::reset();
 
-    auto* instance2 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* instance2 = DummySingletonA::getInstance();
     REQUIRE(instance2 != nullptr);
 
     REQUIRE(instance1 == instance2); // identity unchanged
@@ -93,8 +93,8 @@ TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-plac
 
 TEST_CASE("LazySingletonUnit: Different types have independent instances", "[utils]")
 {
-    auto* a = rocRoller::LazySingleton<DummySingletonA>::getInstance();
-    auto* b = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+    auto* a = DummySingletonA::getInstance();
+    auto* b = DummySingletonB::getInstance();
 
     REQUIRE(a != nullptr);
     REQUIRE(b != nullptr);
@@ -104,30 +104,30 @@ TEST_CASE("LazySingletonUnit: Different types have independent instances", "[uti
 
 TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "[utils]")
 {
-    auto* inst1 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* inst1 = DummySingletonA::getInstance();
     REQUIRE(inst1 != nullptr);
 
     {
-        auto* inst2 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+        auto* inst2 = DummySingletonA::getInstance();
         REQUIRE(inst2 == inst1);
     }
 
-    auto* inst3 = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* inst3 = DummySingletonA::getInstance();
     REQUIRE(inst3 == inst1);
 }
 
 TEST_CASE("LazySingletonUnit: Multiple resets keep same singleton instance", "[utils]")
 {
-    auto* prevInstance = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+    auto* prevInstance = DummySingletonB::getInstance();
     REQUIRE(prevInstance != nullptr);
 
     prevInstance->value = 100; // mutate
 
     for(int i = 0; i < 5; ++i)
     {
-        rocRoller::LazySingleton<DummySingletonB>::reset();
+        DummySingletonB::reset();
 
-        auto* newInstance = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+        auto* newInstance = DummySingletonB::getInstance();
         REQUIRE(newInstance != nullptr);
 
         REQUIRE(newInstance == prevInstance); // identity unchanged
@@ -147,9 +147,7 @@ TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[utils]")
 
     for(int i = 0; i < N; ++i)
     {
-        threads.emplace_back([&results, i] {
-            results[i] = rocRoller::LazySingleton<DummySingletonA>::getInstance();
-        });
+        threads.emplace_back([&results, i] { results[i] = DummySingletonA::getInstance(); });
     }
 
     for(auto& t : threads)
@@ -161,7 +159,7 @@ TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[utils]")
 
 TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[utils]")
 {
-    auto* baseline = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* baseline = DummySingletonA::getInstance();
     REQUIRE(baseline != nullptr);
 
     constexpr int            N = 16;
@@ -172,30 +170,30 @@ TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[u
     {
         threads.emplace_back([i] {
             if(i % 5 == 0)
-                rocRoller::LazySingleton<DummySingletonA>::reset();
+                DummySingletonA::reset();
             else
-                (void)rocRoller::LazySingleton<DummySingletonA>::getInstance();
+                (void)DummySingletonA::getInstance();
         });
     }
 
     for(auto& t : threads)
         t.join();
 
-    auto* after = rocRoller::LazySingleton<DummySingletonA>::getInstance();
+    auto* after = DummySingletonA::getInstance();
     REQUIRE(after != nullptr);
     REQUIRE(after == baseline); // identity unchanged
 }
 
 TEST_CASE("LazySingletonUnit: DummySingletonB reset keeps identity", "[utils]")
 {
-    auto* obj1 = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+    auto* obj1 = DummySingletonB::getInstance();
     REQUIRE(obj1 != nullptr);
 
     obj1->value = 777; // mutate
 
-    rocRoller::LazySingleton<DummySingletonB>::reset();
+    DummySingletonB::reset();
 
-    auto* obj2 = rocRoller::LazySingleton<DummySingletonB>::getInstance();
+    auto* obj2 = DummySingletonB::getInstance();
     REQUIRE(obj2 != nullptr);
 
     REQUIRE(obj1 == obj2); // identity unchanged
