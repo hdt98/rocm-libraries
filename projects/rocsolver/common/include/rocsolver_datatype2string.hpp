@@ -500,6 +500,18 @@ constexpr rocsolver_norm_type char2rocsolver_norm_type(char value)
     }
 }
 
+constexpr rocsolver_cholqr_algo char2rocsolver_cholqr_algo(char value)
+{
+    switch(std::toupper(value))
+    {
+    case '1': return rocsolver_cholqr_cholqr1;
+    case '2': return rocsolver_cholqr_cholqr2;
+    case '3': return rocsolver_cholqr_cholqr3_compute;
+    case '4': return rocsolver_cholqr_cholqr3_user;
+    case 'D': return rocsolver_cholqr_default;
+    default: return static_cast<rocsolver_cholqr_algo>(0);
+    }
+}
 #undef ROCSOLVER_ROCBLAS_HAS_F8_DATATYPES
 
 #ifdef ROCSOLVER_LIBRARY
