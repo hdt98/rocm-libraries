@@ -97,8 +97,7 @@ namespace MemAddressingTest
                     for(size_t i = 1; i < addresses.size(); ++i)
                     {
                         int diff = addresses[i] - addresses[i - 1];
-                        CHECK(diff % 4 == 0);
-                        CHECK(diff > 0);
+                        CHECK((diff == 4 || diff == 388));
                     }
                 }
             }
@@ -145,7 +144,7 @@ namespace MemAddressingTest
                     for(size_t i = 1; i < addresses.size(); ++i)
                     {
                         int diff = addresses[i] - addresses[i - 1];
-                        CHECK(diff % 4 == 0);
+                        CHECK((diff == 128 || diff == -1912 || diff == 2168));
                     }
                 }
             }
