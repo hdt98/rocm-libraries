@@ -71,7 +71,7 @@ namespace rocRoller
             requires(!std::same_as<T, U>) bool operator()(U const& expr)
             {
                 return std::ranges::any_of(expr.operands,
-                                           [this](auto const& operand) { return call(operand); });
+                                           [this](auto const& operand) { return this->call(operand); });
             }
 
             template <std::same_as<ScaledMatrixMultiply> U>
@@ -176,7 +176,7 @@ namespace rocRoller
             {
                 return identical(expr, subExpr)
                        || std::ranges::any_of(
-                           expr.operands, [this](auto const& operand) { return call(operand); });
+                           expr.operands, [this](auto const& operand) { return this->call(operand); });
             }
 
             template <CValue U>

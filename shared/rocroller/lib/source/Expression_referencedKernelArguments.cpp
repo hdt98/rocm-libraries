@@ -68,7 +68,7 @@ namespace rocRoller
 
             void operator()(CNary auto const& expr)
             {
-                std::ranges::for_each(expr.operands, [this](auto const& op) { call(op); });
+                std::ranges::for_each(expr.operands, [this](auto const& op) { this->call(op); });
             }
 
             void operator()(ScaledMatrixMultiply const& expr)
@@ -98,7 +98,7 @@ namespace rocRoller
 
             RegisterTagManager const& m_tagManager;
 
-            std::unordered_set<std::string> m_referencedArgs;
+            std::unordered_set<std::string> m_referencedArgs = {};
         };
 
         std::unordered_set<std::string>

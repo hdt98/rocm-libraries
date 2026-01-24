@@ -80,7 +80,7 @@ namespace rocRoller
                 stream << ExpressionInfo<Expr>::name() << '(';
 
                 auto operandToStrings = std::ranges::views::transform(
-                    expr.operands, [this](auto const& operand) { return call(operand); });
+                    expr.operands, [this](auto const& operand) { return this->call(operand); });
                 streamJoin(stream, operandToStrings, ", ");
 
                 stream << ')';
