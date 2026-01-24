@@ -89,7 +89,7 @@ namespace rocRoller
 
                         rv.outOfRegisters.set(alloc->regType(),
                                               rv.outOfRegisters[alloc->regType()]
-                                                  || alloc->registerCount() > 0 && newRegs.empty());
+                                                  || (alloc->registerCount() > 0 && newRegs.empty()));
                         rv.remainingRegisters[regIdx] -= alloc->registerCount();
                     }
                 }

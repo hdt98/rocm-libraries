@@ -3140,7 +3140,7 @@ namespace ExpressionTest
         {
             // Test conversion
             auto expr = std::make_shared<Expression::Expression>(
-                Expression::Convert{raw32One, "", rocRoller::DataType::UInt32});
+                Expression::Convert{{raw32One, ""}, rocRoller::DataType::UInt32});
             CHECK_NOTHROW(evaluate(expr + unsignedOne));
         }
 
@@ -3224,7 +3224,7 @@ namespace ExpressionTest
         SECTION("Lowering Basic")
         {
             auto bfc = std::make_shared<Expression::Expression>(
-                Expression::BitfieldCombine{srcExpr, dstExpr, "", srcOffset, dstOffset, width});
+                Expression::BitfieldCombine{{srcExpr, dstExpr, ""}, srcOffset, dstOffset, width});
 
             Register::ValuePtr dest;
             context.get()->schedule(Expression::generate(dest, bfc, context.get()));
@@ -3244,7 +3244,7 @@ namespace ExpressionTest
         SECTION("Lowering with srcIsZero")
         {
             auto bfc = std::make_shared<Expression::Expression>(Expression::BitfieldCombine{
-                srcExpr, dstExpr, "", srcOffset, dstOffset, width, true});
+                {srcExpr, dstExpr, ""}, srcOffset, dstOffset, width, true});
 
             Register::ValuePtr dest;
             context.get()->schedule(Expression::generate(dest, bfc, context.get()));
@@ -3261,7 +3261,7 @@ namespace ExpressionTest
         SECTION("Lowering with dstIsZero")
         {
             auto bfc = std::make_shared<Expression::Expression>(Expression::BitfieldCombine{
-                srcExpr, dstExpr, "", srcOffset, dstOffset, width, std::nullopt, true});
+                {srcExpr, dstExpr, ""}, srcOffset, dstOffset, width, std::nullopt, true});
 
             Register::ValuePtr dest;
             context.get()->schedule(Expression::generate(dest, bfc, context.get()));
@@ -3278,7 +3278,7 @@ namespace ExpressionTest
         SECTION("Lowering with srcIsZero & dstIsZero")
         {
             auto bfc = std::make_shared<Expression::Expression>(Expression::BitfieldCombine{
-                srcExpr, dstExpr, "", srcOffset, dstOffset, width, true, true});
+                {srcExpr, dstExpr, ""}, srcOffset, dstOffset, width, true, true});
 
             Register::ValuePtr dest;
             context.get()->schedule(Expression::generate(dest, bfc, context.get()));
