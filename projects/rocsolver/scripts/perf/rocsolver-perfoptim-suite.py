@@ -173,6 +173,22 @@ def geqrf_suite(*, suite, precision, sizenormal, sizebatch):
             row = {'name': precision+suite, 'name_test': suite, 'function': fn, 'precision': precision, 'cols': nn, 'n': s}
             yield (row, s, f'-f {fn} -r {precision} -n {n} -m {s} {common}')
 
+"""
+CHOLQR tests are run, for the given precision and number of rows,
+with 160, 576, 1088, 2176, and 4352 columns and also for the square case (#rows = #columns)
+"""
+def cholqr_suite(*, suite, precision, sizenormal, sizebatch):
+    fn = 'cholqr'
+    size=sizenormal
+    for nc in [0, 160, 576, 1088, 2176, 4352]:
+        if nc == 0: nn = 'sq'
+        else: nn = nc
+        for s in size:
+            if nc == 0: n = s
+            else: n = nc
+            row = {'name': precision+suite, 'name_test': suite, 'function': fn, 'precision': precision, 'cols': nn, 'n': s}
+            yield (row, s, f'-f {fn} -r {precision} -n {n} -m {s} {common}')
+
 suites = {
   'syevd': syevd_heevd_suite,
   'syevdx': syevdx_heevdx_suite,
@@ -183,7 +199,8 @@ suites = {
   'gesvdjBatch': gesvdjBatch_suite,
   'potrf': potrf_suite,
   'potrfBatch': potrfBatch_suite,
-  'geqrf': geqrf_suite}
+  'geqrf': geqrf_suite,
+  'cholqr': cholqr_suite}
 
 
 #################################################
