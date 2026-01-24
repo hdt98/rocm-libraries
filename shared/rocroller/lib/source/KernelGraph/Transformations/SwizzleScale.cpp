@@ -562,7 +562,7 @@ namespace rocRoller
 
                 // (slowDimVal1, slowDimVal0, fastDimVal, load)
                 std::map<int, std::map<int, std::map<int, int>>> unrollLoadMap;
-                for(auto const load : loadUnrollMap)
+                for(auto const& load : loadUnrollMap)
                 {
                     auto unrollMap = loadUnrollMap[load.first];
                     AssertFatal(
@@ -583,9 +583,9 @@ namespace rocRoller
                     }
                 }
 
-                for(auto const sDim1 : unrollLoadMap)
+                for(auto const& sDim1 : unrollLoadMap)
                 {
-                    for(auto const sDim0 : sDim1.second)
+                    for(auto const& sDim0 : sDim1.second)
                     {
                         int mergeOp = -1;
                         for(auto const fDim : sDim0.second)
@@ -790,7 +790,7 @@ namespace rocRoller
                 newLDSTags[originalLDSTag] = newLDSTag;
             }
 
-            for(auto const [load, redundantLoads] : mergeables)
+            for(auto const& [load, redundantLoads] : mergeables)
             {
                 auto maybeLoadLDSTile = graph.control.get<LoadLDSTile>(load);
                 if(maybeLoadLDSTile)

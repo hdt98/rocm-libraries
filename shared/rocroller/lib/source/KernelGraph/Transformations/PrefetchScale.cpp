@@ -338,7 +338,7 @@ namespace rocRoller
                 graph.coordinates.addElement(edge, {*exchangeTileTag}, {destMacTileTag});
 
                 std::optional<int> exchangeTag;
-                for(auto const c : graph.mapper.getCoordinateConnections(*exchangeTileTag))
+                for(auto const& c : graph.mapper.getCoordinateConnections(*exchangeTileTag))
                 {
                     auto maybeExchange = graph.control.get<Exchange>(c.control);
                     if(maybeExchange)
@@ -545,7 +545,7 @@ namespace rocRoller
                                  std::map<int, std::vector<int>> const& nextIterPrefetch,
                                  std::vector<int> const&                prefetchPosition)
         {
-            for(auto const [subiter, prefetchNodes] : nextIterPrefetch)
+            for(auto const& [subiter, prefetchNodes] : nextIterPrefetch)
             {
                 auto preNOP = graph.control.addElement(NOP());
                 auto prev   = preNOP;
@@ -574,7 +574,7 @@ namespace rocRoller
                                  std::map<int, std::vector<int>> const& copy,
                                  std::vector<int> const&                exchangePosition)
         {
-            for(auto const [subiter, exchangeNodes] : exchangePrefetch)
+            for(auto const& [subiter, exchangeNodes] : exchangePrefetch)
             {
                 auto preNOP = graph.control.addElement(NOP());
                 auto prev   = preNOP;
@@ -666,7 +666,7 @@ namespace rocRoller
                         graph.coordinates.deleteElement(input);
                         graph.coordinates.addElement(edge, {*exchangeTileTag}, {destMacTileTag});
 
-                        for(auto const c : graph.mapper.getCoordinateConnections(*exchangeTileTag))
+                        for(auto const& c : graph.mapper.getCoordinateConnections(*exchangeTileTag))
                         {
                             auto maybeExchange = graph.control.get<Exchange>(c.control);
                             if(maybeExchange)
