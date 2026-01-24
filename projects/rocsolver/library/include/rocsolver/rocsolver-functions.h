@@ -29562,9 +29562,9 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zhegvdx_strided_batched(rocblas_handle
         A = Q  R
     \f]
 
-    where R is upper triangular (upper trapezoidal if m < n), and Q is
-    a m-by-m orthogonal/unitary matrix. The factorization is computed using
-    one of several Cholesky QR algorithms selected by the algo parameter.
+    where R is upper triangular, and Q is a m-by-n orthogonal/unitary
+    matrix. The factorization is computed using one of several Cholesky
+    QR algorithms selected by the algo parameter.
 
     The algorithm choices are:
     - rocsolver_cholqr_cholqr1: Basic CholeskyQR1 algorithm
@@ -29574,8 +29574,9 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zhegvdx_strided_batched(rocblas_handle
 
     @param[in]
     handle      rocblas_handle.
+
     @param[in]
-    m           rocblas_int. m >= 0.
+    m           rocblas_int. m >= n.
                 The number of rows of the matrix A.
     @param[in]
     n           rocblas_int. n >= 0.
@@ -29584,22 +29585,28 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zhegvdx_strided_batched(rocblas_handle
     A           pointer to type. Array on the GPU of dimension lda*n.
                 On entry, the m-by-n matrix to be factored.
                 On exit, the orthogonal/unitary matrix Q (stored column-wise).
+
     @param[in]
     lda         rocblas_int. lda >= m.
                 Specifies the leading dimension of A.
+
     @param[out]
     R           pointer to type. Array on the GPU of dimension ldr*n.
                 The n-by-n upper triangular factor R.
+
     @param[in]
     ldr         rocblas_int. ldr >= n.
                 Specifies the leading dimension of R.
+
     @param[inout]
     sigma       pointer to real type. Array on the GPU of dimension batch_count.
                 For cholqr3_user: On entry, contains the user-provided shift values.
                 For cholqr3_compute: On exit, contains the computed shift values.
                 Not referenced for cholqr1 or cholqr2 algorithms.
+
     @param[in]
     algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
+
     @param[out]
     info        pointer to rocblas_int. Array of batch_count=1 integer on the GPU.
                 If info = 0, successful exit.
@@ -29706,41 +29713,51 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_64(rocblas_handle handle,
         A_l = Q_l  R_l
     \f]
 
-    where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix. The factorization is computed using
-    one of several Cholesky QR algorithms selected by the algo parameter.
+    where \f$R_l\f$ is upper triangular, and \f$Q_l\f$ is a m-by-n
+    orthogonal/unitary matrix. The factorization is computed using one
+    of several Cholesky QR algorithms selected by the algo parameter.
 
     @param[in]
     handle      rocblas_handle.
+
     @param[in]
-    m           rocblas_int. m >= 0.
+    m           rocblas_int. m >= n.
                 The number of rows of each matrix A_l in the batch.
+
     @param[in]
     n           rocblas_int. n >= 0.
                 The number of columns of each matrix A_l in the batch.
+
     @param[inout]
     A           array of pointers to type. Each pointer points to an array on the GPU of dimension lda*n.
                 On entry, the m-by-n matrices A_l to be factored.
                 On exit, the orthogonal/unitary matrices Q_l (stored column-wise).
+
     @param[in]
     lda         rocblas_int. lda >= m.
                 Specifies the leading dimension of matrices A_l.
+
     @param[out]
     R           pointer to type. Array on the GPU of dimension ldr*n*batch_count.
                 The n-by-n upper triangular factors R_l, stored with stride strideR.
+
     @param[in]
     ldr         rocblas_int. ldr >= n.
                 Specifies the leading dimension of matrices R_l.
+
     @param[in]
     strideR     rocblas_stride.
                 Stride from the start of one matrix R_l to the next R_(l+1).
+
     @param[inout]
     sigma       pointer to real type. Array on the GPU of dimension batch_count.
                 For cholqr3_user: On entry, contains the user-provided shift values.
                 For cholqr3_compute: On exit, contains the computed shift values.
                 Not referenced for cholqr1 or cholqr2 algorithms.
+
     @param[in]
     algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
+
     @param[out]
     info        pointer to rocblas_int. Array of batch_count integers on the GPU.
                 If info[l] = 0, successful exit for factorization of A_l.
@@ -29866,35 +29883,42 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_batched_64(rocblas_handle hand
         A_l = Q_l  R_l
     \f]
 
-    where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix. The factorization is computed using
-    one of several Cholesky QR algorithms selected by the algo parameter.
+    where \f$R_l\f$ is upper triangular, and \f$Q_l\f$ is a m-by-n
+    orthogonal/unitary matrix. The factorization is computed using one
+    of several Cholesky QR algorithms selected by the algo parameter.
 
     @param[in]
     handle      rocblas_handle.
+
     @param[in]
-    m           rocblas_int. m >= 0.
+    m           rocblas_int. m >= n.
                 The number of rows of each matrix A_l in the batch.
     @param[in]
     n           rocblas_int. n >= 0.
                 The number of columns of each matrix A_l in the batch.
+
     @param[inout]
     A           pointer to type. Array on the GPU (the size depends on the value of strideA).
                 On entry, the m-by-n matrices A_l to be factored.
                 On exit, the orthogonal/unitary matrices Q_l (stored column-wise).
+
     @param[in]
     lda         rocblas_int. lda >= m.
                 Specifies the leading dimension of matrices A_l.
+
     @param[in]
     strideA     rocblas_stride.
                 Stride from the start of one matrix A_l to the next one A_(l+1).
                 There is no restriction for the value of strideA. Normal use case is strideA >= lda*n.
+
     @param[out]
     R           pointer to type. Array on the GPU (the size depends on the value of strideR).
                 The n-by-n upper triangular factors R_l.
+
     @param[in]
     ldr         rocblas_int. ldr >= n.
                 Specifies the leading dimension of matrices R_l.
+
     @param[in]
     strideR     rocblas_stride.
                 Stride from the start of one matrix R_l to the next one R_(l+1).
@@ -29904,12 +29928,15 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_batched_64(rocblas_handle hand
                 For cholqr3_user: On entry, contains the user-provided shift values.
                 For cholqr3_compute: On exit, contains the computed shift values.
                 Not referenced for cholqr1 or cholqr2 algorithms.
+
     @param[in]
     algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
+
     @param[out]
     info        pointer to rocblas_int. Array of batch_count integers on the GPU.
                 If info[l] = 0, successful exit for factorization of A_l.
                 If info[l] = i > 0, the Cholesky factorization of A_l failed.
+
     @param[in]
     batch_count rocblas_int. batch_count >= 0.
                 Number of matrices in the batch.
