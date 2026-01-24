@@ -37,9 +37,26 @@
 #include "roclapack_potrf.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
-#define ASSERT(x) \
-    {             \
+
+template <typename T>
+__host__ __device__ static inline bool max_nan(T const x, T const y)
+{
+    if(std::isnan(x) && std::isnan(y))
+    {
+        return (std::numeric_limits<T>::quiet_NaN());
     }
+
+    if(std::isnan(x))
+    {
+        return (y);
+    }
+    if(std::isnan(y))
+    {
+        return (x);
+    }
+
+    return (std::max(x, y));
+}
 
 bool constexpr use_syrk = true;
 
@@ -955,10 +972,6 @@ static __global__ void cal_gnorm_sq_kernel(I const m,
     I const nby = gridDim.y;
     I const nbz = gridDim.z;
 
-    ASSERT(nbx == 1);
-    ASSERT(nx <= warpSize);
-    ASSERT(nz == 1);
-
     I const ibx = blockIdx.x;
     I const iby = blockIdx.y;
     I const ibz = blockIdx.z;
@@ -1012,7 +1025,7 @@ static __global__ void cal_gnorm_sq_kernel(I const m,
                     auto const aij = Ap[ij];
                     norm_j += std::norm(aij);
                 }
-                gnorm_j = std::max(gnorm_j, norm_j);
+                gnorm_j = max_nan(gnorm_j, norm_j);
             }
             atomicMax(&(gnorm_block[0]), gnorm_j);
             __syncthreads();
@@ -2988,5 +3001,4 @@ static rocblas_status rocsolver_cholqr_getMemorySize(I const m,
 #undef IS_POINTER_BATCHED
 #undef MEM_CHECK
 #undef MEM_CHECK_THROW
-#undef ASSERT
 ROCSOLVER_END_NAMESPACE
