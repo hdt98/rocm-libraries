@@ -6,14 +6,6 @@ namespace ck_tile {
 template <typename DataType, index_t K, bool MixPrec>
 struct LayoutFromDataType;
 
-template <typename DataType, index_t K>
-struct LayoutFromDataType<DataType, K, false>
-{
-    static constexpr index_t kKLane     = 2;
-    static constexpr index_t kK1PerLane = 8;
-    static constexpr index_t kK0PerLane = K / (kK1PerLane * kKLane);
-};
-
 struct LayoutFrom8BitMixPrec
 {
     static constexpr index_t kK1PerLane = 16;
@@ -39,6 +31,20 @@ struct LayoutFromDataType<bf8_t, 128, true> : LayoutFrom8BitMixPrec
 template <>
 struct LayoutFromDataType<pk_fp4_t, 128, true> : LayoutFromNon8BitMixPrec
 {
+};
+
+// fp4_t is the only format that has the same data layout for MixPrec and non-MixPrec
+template <>
+struct LayoutFromDataType<pk_fp4_t, 128, false> : LayoutFromNon8BitMixPrec
+{
+};
+
+template <typename DataType, index_t K>
+struct LayoutFromDataType<DataType, K, false>
+{
+    static constexpr index_t kKLane     = 2;
+    static constexpr index_t kK1PerLane = 8;
+    static constexpr index_t kK0PerLane = K / (kK1PerLane * kKLane);
 };
 
 template <typename Arch,

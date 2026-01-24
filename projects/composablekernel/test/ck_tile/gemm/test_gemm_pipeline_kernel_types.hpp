@@ -153,6 +153,9 @@ using KernelTypesCompV3 = ::testing::Types<
 #define MinK I32
 #endif
 using KernelTypesCompV3Wmma = ::testing::Types<
+#ifdef CK_USE_GFX1250
+    std::tuple<    Row,     Col,     Row,       F4,        F4,          F32,       F16,        I128,        I128,         I128,       I32,        I16, Intrawave,        CompV3>,
+#endif
     std::tuple<    Row,     Row,     Row,       INT8,      INT8,        INT32,     INT32,      I64,         I64,          MinK,       I16,        I16, Intrawave,        CompV3>,
     std::tuple<    Row,     Col,     Row,       INT8,      INT8,        INT32,     INT32,      I64,         I64,          MinK,       I16,        I16, Intrawave,        CompV3>,   
     std::tuple<    Col,     Row,     Row,       INT8,      INT8,        INT32,     INT32,      I64,         I64,          MinK,       I16,        I16, Intrawave,        CompV3>,

@@ -54,6 +54,7 @@
 #include "ck_tile/core/numeric/integral_constant.hpp"
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/numeric/mxfp_convert.hpp"
+#include "ck_tile/core/numeric/mxfp_scale.hpp"
 #include "ck_tile/core/numeric/null_type.hpp"
 #include "ck_tile/core/numeric/numeric.hpp"
 #include "ck_tile/core/numeric/pk_fp4.hpp"
