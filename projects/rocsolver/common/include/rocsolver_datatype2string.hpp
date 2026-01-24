@@ -265,6 +265,18 @@ constexpr auto rocsolver2char_norm_type(rocsolver_norm_type value)
     return '\0';
 }
 
+constexpr auto rocsolver2char_cholqr_algo(rocsolver_cholqr_algo value)
+{
+    switch(value)
+    {
+    case rocsolver_cholqr_cholqr1: return '1';
+    case rocsolver_cholqr_cholqr2: return '2';
+    case rocsolver_cholqr_cholqr3_compute: return '3';
+    case rocsolver_cholqr_cholqr3_user: return '4';
+    case rocsolver_cholqr_default: return 'D';
+    }
+    return '\0';
+}
 /* ============================================================================================
  */
 /*  Convert lapack char constants to rocblas type. */

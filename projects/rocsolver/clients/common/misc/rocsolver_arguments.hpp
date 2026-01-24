@@ -330,6 +330,17 @@ public:
             throw std::invalid_argument("Invalid value for " + name);
     }
 
+    void validate_cholqr_algo(const std::string name) const
+    {
+        auto val = find(name);
+        if(val == end())
+            return;
+
+        char algo = std::toupper(val->second.as<char>());
+        if(algo != '1' && algo != '2' && algo != '3' && algo != '4' && algo != 'D')
+            throw std::invalid_argument("Invalid value for " + name);
+    }
+
     void validate_consumed() const
     {
         if(!to_consume.empty())
