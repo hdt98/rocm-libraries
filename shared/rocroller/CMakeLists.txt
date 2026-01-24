@@ -6,6 +6,11 @@ set(ROCROLLER_VERSION 1.0.0)
 set(ROCROLLER_SOVERSION 1)
 project(rocroller VERSION ${ROCROLLER_VERSION} LANGUAGES CXX)
 
+# Compiler warning flags
+set(ROCROLLER_WARNING_FLAGS "-Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -Wno-missing-designated-field-initializers -Wno-missing-field-initializers -Wno-unused-but-set-variable -Wno-missing-braces -Wno-tautological-overlap-compare")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ROCROLLER_WARNING_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ROCROLLER_WARNING_FLAGS}")
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(CMakeRC)
