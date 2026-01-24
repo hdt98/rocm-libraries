@@ -58,7 +58,7 @@ namespace MemAddressingTest
 
     TEST_CASE("LoadLDSTile basic test", "[mem-addressing]")
     {
-        SECTION("Create LoadLDSTile operations from GEMM graph")
+        SECTION("Float")
         {
             auto context = TestContext::ForTestDevice();
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
@@ -91,14 +91,61 @@ namespace MemAddressingTest
 
                     for(auto addr : addresses)
                     {
-                        REQUIRE(addr % 4 == 0);
+                        CHECK(addr % 4 == 0);
                     }
 
                     for(size_t i = 1; i < addresses.size(); ++i)
                     {
                         int diff = addresses[i] - addresses[i - 1];
-                        REQUIRE(diff % 4 == 0);
-                        REQUIRE(diff > 0);
+                        CHECK(diff % 4 == 0);
+                        CHECK(diff > 0);
+                    }
+                }
+            }
+        }
+
+        SECTION("FP4")
+        {
+            auto context = TestContext::ForTestDevice();
+            auto example = rocRollerTest::Graphs::GEMM(rocRoller::DataType::FP4,
+                                                       rocRoller::DataType::FP4,
+                                                       rocRoller::DataType::Float,
+                                                       rocRoller::DataType::Float);
+
+            example.setTileSize(256, 256, 128);
+            example.setMFMA(32, 32, 64, 1);
+            example.setUseLDS(true, true, false);
+
+            auto command = example.getCommand();
+            // TODO: ensure this not required to be called after getCommand()
+            auto params = example.getCommandParameters();
+
+            CommandKernel commandKernel(command, context.KernelName());
+            commandKernel.setContext(context.get());
+            commandKernel.setCommandParameters(params);
+
+            commandKernel.generateKernelGraph("");
+            auto graph = commandKernel.getKernelGraph();
+
+            for(auto inst : kernelInstructions(context.get(), command, graph))
+            {
+                context.get()->schedule(inst);
+                if(inst.getModelledAddresses().has_value())
+                {
+                    auto addresses = inst.getModelledAddresses().value();
+                    Log::info("addresses {}", addresses);
+
+                    REQUIRE(addresses.size() == 64); // TODO: should this be 64 or 256?
+
+                    for(auto addr : addresses)
+                    {
+                        CHECK(addr % 4 == 0);
+                    }
+
+                    for(size_t i = 1; i < addresses.size(); ++i)
+                    {
+                        int diff = addresses[i] - addresses[i - 1];
+                        CHECK(diff % 4 == 0);
                     }
                 }
             }
