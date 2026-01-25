@@ -975,8 +975,6 @@ static __global__ void cal_gnorm_sq_kernel(I const m,
         };
     }
 
-    auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
-
     I const nx = blockDim.x;
     I const ny = blockDim.y;
     I const nz = blockDim.z;
@@ -1274,8 +1272,6 @@ static __global__ void add_shift_kernel(I const m,
     I const i_start = threadIdx.x + blockIdx.x * blockDim.x;
     I const i_inc = blockDim.x * gridDim.x;
 
-    auto const idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
-
     I const min_mn = std::min(m, n);
 
     S const zero = 0;
@@ -1379,8 +1375,6 @@ static __global__ void set_triangular_kernel(char const uplo,
 
     I const bid_start = blockIdx.z;
     I const bid_inc = gridDim.z;
-
-    auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
 
     for(I bid = bid_start; bid < batch_count; bid += bid_inc)
     {
@@ -1916,8 +1910,6 @@ static rocblas_status rocsolver_cholqr1_template(
     bool constexpr is_pointer_batched_R = IS_POINTER_BATCHED(R, T);
 
     bool constexpr is_both_same_type = (is_pointer_batched_A == is_pointer_batched_R);
-
-    auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
 
     {
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
