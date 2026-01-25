@@ -486,7 +486,11 @@ class KernelWriterAssembly(KernelWriter):
     # check if previous define sgprs are being used..
     for s in self.states.freeSgprVarPool:
       self.setSgprToInUseState(s)
-    ret = RegSet("s", "sgpr"+name, self.defineSgprIdx(name, numSgprs, align))
+    sgprIdx = self.defineSgprIdx(name, numSgprs, align)
+    if sgprIdx is None:
+      ret = None
+    else:
+      ret = RegSet("s", "sgpr"+name, sgprIdx)
     for s in self.states.freeSgprVarPool:
       self.setSgprToFreeState(s)
     return ret
@@ -597,10 +601,16 @@ class KernelWriterAssembly(KernelWriter):
       self.addSgprVarToPool("WrapUB")
 
 
-    module.add(self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs))
-    module.add(self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs))
+    result = self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs)
+    if result is not None:
+      module.add(result)
+    result = self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs)
+    if result is not None:
+      module.add(result)
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      module.add(self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs))
+      result = self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs)
+      if result is not None:
+        module.add(result)
     self.addSgprVarToPool("GlobalReadIncsA")
     self.addSgprVarToPool("GlobalReadIncsB")
 
@@ -1346,15 +1356,16 @@ class KernelWriterAssembly(KernelWriter):
             src1="v[\\vgprAddr+0]", \
             comment="add prepad for pointer shift"))
 
-      bpeGR = tP["bpeGR"] if not tP["isM"] else tP["bpe"]
-      # addr *= bytes/element
-      if justOffset32:
-        macro.add(vectorStaticMultiply(vgpr("Addr+0", isMacro=True), vgpr("Addr+0", isMacro=True), bpeGR, None, "offset *= bytes/element"))
-      else:
-        macro.add(VLShiftLeftB64(dst=vgpr("Addr+0", 2, isMacro=True), \
-            shiftHex=hex(log2(bpeGR)), \
-            src="v[\\vgprAddr+0:\\vgprAddr+1]", \
-            comment="offset *= bytes/element"))
+      if tP != None:
+        bpeGR = tP["bpeGR"] if not tP["isM"] else tP["bpe"]
+        # addr *= bytes/element
+        if justOffset32:
+          macro.add(vectorStaticMultiply(vgpr("Addr+0", isMacro=True), vgpr("Addr+0", isMacro=True), bpeGR, None, "offset *= bytes/element"))
+        else:
+          macro.add(VLShiftLeftB64(dst=vgpr("Addr+0", 2, isMacro=True), \
+              shiftHex=hex(log2(bpeGR)), \
+              src="v[\\vgprAddr+0:\\vgprAddr+1]", \
+              comment="offset *= bytes/element"))
       module.add(macro)
 
     if kernel["ProblemType"]["StochasticRounding"] and not self.states.asmCaps["v_prng_b32"] :
@@ -2088,22 +2099,40 @@ class KernelWriterAssembly(KernelWriter):
           module.add(moduleExternalArgs)
           module.add(extLabelEnd)
 
-      # Update label
+      # Update label - create unique names for second copy
+      # Labels are stored in nested modules, so we need to iterate recursively
       labels = []
-      for inst in moduleWg.items():
-        if isinstance(inst, Label):
-          self.labels.getNameInc(inst.label)
-          labels.append([inst.label, self.labels.getNameInc(inst.label)])
-          inst.label = labels[-1][1]
-      for inst in moduleWg.items():
-        if isinstance(inst, BranchInstruction):
-          removeIdx = -1
-          for idx, label in enumerate(labels):
-            if inst.labelName == Label(label=label[0],comment="").getLabelName():
-              inst.labelName = Label(label=label[1],comment="").getLabelName()
-              removeIdx = idx
-          if removeIdx != -1:
-            del labels[removeIdx]
+      
+      def collectAndRenameLabels(module):
+        """Recursively find and rename all Label objects in nested modules"""
+        for inst in module.items():
+          if isinstance(inst, Label):
+            oldLabel = inst.label
+            newLabel = self.labels.getNameInc(oldLabel)
+            labels.append([oldLabel, newLabel])
+            inst.label = newLabel
+          elif isinstance(inst, Module):
+            # Recursively process nested modules
+            collectAndRenameLabels(inst)
+      
+      collectAndRenameLabels(moduleWg)
+      
+      # Update branch instructions to use the new label names
+      def updateBranchInstructions(module):
+        """Recursively update all branch instructions in nested modules"""
+        for inst in module.items():
+          if isinstance(inst, BranchInstruction):
+            for oldLabel, newLabel in labels:
+              oldLabelFormatted = "label_" + oldLabel
+              if inst.labelName == oldLabelFormatted:
+                newLabelFormatted = "label_" + newLabel
+                inst.labelName = newLabelFormatted
+                break
+          elif isinstance(inst, Module):
+            # Recursively process nested modules
+            updateBranchInstructions(inst)
+      
+      updateBranchInstructions(moduleWg)
       module.add(moduleWg)
 
       earlyReturnModule = Module("Early stop if N(SizeFreeJ) == 0")
@@ -2403,8 +2432,8 @@ class KernelWriterAssembly(KernelWriter):
         # So don't add the static wg-related component here - save for later.
         module.add(vectorStaticMultiply(vgpr(tmpVgpr), sgpr(tP["wg"]), kernel[tP["mt"]], tmpSgprInfo))  # workgroup
         module.add(VAddCOU32(dst=vgpr(tReg2), dst1=VCC(), src0=vgpr(tmpVgpr), \
-            src1=vgpr(tReg), comment="gro%s-tile = serial%s%s*VW + (wg%s*MT%s)" \
-            % (tc, tOpStr, divisorName, tc, tc) ))
+            src1=vgpr(tReg), comment="gro%s-tile = serial + (wg%s*MT%s)" \
+            % (tc, tc, tc) ))
         self.vgprPool.checkIn(tmpVgpr)
 
     tP["gpr"]["tReg"] = tReg2
@@ -3595,7 +3624,7 @@ class KernelWriterAssembly(KernelWriter):
       tmp = self.vgprPool.checkOut(2, "tmp", self.states.preventVgprOverflowDuringNewTile)
 
       skComponent = Component.StreamK.find(self)
-      module.add(skComponent.graAddresses(self, kernel, tc, tmp))
+      module.add(skComponent.graAddresses(self, kernel, tP, tmp))
 
       for perp in range(0, tP["nrp"]):
         for sPerp in range(0, tP["nrpv"]):
