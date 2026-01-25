@@ -38,6 +38,20 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+//   ------------------------
+//   ceildiv( 9, 5)   is 2
+//   ceildiv( 10, 5)  is 2
+//   ceildiv( 11, 5)  is 3
+//   ------------------------
+template <typename I>
+__host__ __device__ static inline I ceildiv(I const n, I const base)
+{
+    return (((n - 1) / base) + 1);
+}
+
+// -----------------------------
+// max function that handles NaN
+// -----------------------------
 template <typename T>
 __host__ __device__ static inline bool max_nan(T const x, T const y)
 {
@@ -55,6 +69,9 @@ __host__ __device__ static inline bool max_nan(T const x, T const y)
         return (x);
     }
 
+    // ---------------------
+    // both x, y are not NaN
+    // ---------------------
     return (std::max(x, y));
 }
 
@@ -62,11 +79,9 @@ bool constexpr use_syrk = true;
 
 static inline void adjust_for_alignment(size_t& size_work)
 {
-    constexpr int ialign = 256;
+    constexpr size_t ialign = 256;
 
-    auto ceil = [](auto n, auto base) { return ((n - 1) / base + 1); };
-
-    size_work = ceil(size_work, ialign) * ialign;
+    size_work = ceildiv(size_work, ialign) * ialign;
 }
 
 static inline void adjust_for_alignment(size_t* p_size_work)
@@ -159,7 +174,7 @@ __device__ static T reduce_sum_shfl_wsize(I const wsize, T val)
 // convert from strided batched storage to pointer batch
 //
 // launch as <<< dim3( nbx, 1, 1), dim3(nx,1,1), 0, stream >>>
-// where nbx = ceil( batch_count, nx )
+// where nbx = ceildiv( batch_count, nx )
 // -----------------------------------------------------
 template <typename T, typename I, typename Istride>
 __global__ static void copy_array_to_ptrs_kernel(I batch_count,
@@ -192,13 +207,11 @@ static void copy_array_to_ptr(hipStream_t stream,
 
                               T** const B_ptr)
 {
-    auto ceil = [](auto n, auto base) { return ((n - 1) / base + 1); };
-
     // -----------------------------------------------
     // convert from strided batched to pointer batched
     // -----------------------------------------------
-    auto const nx = 64;
-    auto const nbx = ceil(batch_count, nx);
+    I const nx = 64;
+    I const nbx = ceildiv(batch_count, nx);
 
     copy_array_to_ptrs_kernel<T, I, Istride><<<dim3(nbx, 1, 1), dim3(nx, 1, 1), 0, stream>>>(
         batch_count, B, shiftB, ldb, strideB, B_ptr);
@@ -1123,8 +1136,6 @@ static void cal_gnorm_sq(hipStream_t stream,
         };
     }
 
-    auto ceil = [](auto n, auto base) { return ((n - 1) / base + 1); };
-
     auto const num_cu = get_num_cu();
     auto const warp_size = get_warp_size();
     I const lds_size = sizeof(S);
@@ -1137,7 +1148,7 @@ static void cal_gnorm_sq(hipStream_t stream,
 
     I const max_blocks = num_cu;
     I const nbx = 1; // !!! note nbx == 1 is necessary for correctness
-    I const nby = std::min(max_blocks, ceil(n, ny));
+    I const nby = std::min(max_blocks, ceildiv(n, ny));
     I const nbz = std::min(max_blocks, batch_count);
 
     cal_gnorm_sq_kernel<T, I, Istride>
@@ -1210,8 +1221,6 @@ static rocblas_status cal_sigma(hipStream_t stream,
 
                                 gnorm_array);
 
-    auto ceil = [](auto n, auto base) { return ((n - 1) / base + 1); };
-
     // --------------------------------------------
     // sigma = 11 * n * u (m + (n+1) ) * gnorm(A)^2
     // --------------------------------------------
@@ -1220,7 +1229,7 @@ static rocblas_status cal_sigma(hipStream_t stream,
 
     {
         I const nx = 64;
-        I const nbx = ceil(batch_count, nx);
+        I const nbx = ceildiv(batch_count, nx);
         scale_kernel<S, I><<<dim3(nbx, 1, 1), dim3(nx, 1, 1), 0, stream>>>(
 
             batch_count, dscale, gnorm_array);
@@ -1328,7 +1337,7 @@ static void add_shift(hipStream_t stream,
     I const max_blocks = get_num_cu();
     I const min_mn = std::min(m, n);
 
-    I const nbx = std::min(max_blocks, ceil(min_mn, nx));
+    I const nbx = std::min(max_blocks, ceildiv(min_mn, nx));
     I const nby = 1;
     I const nbz = std::min(max_blocks, batch_count);
 
@@ -1421,11 +1430,9 @@ static void set_triangular(hipStream_t stream,
     I const nx = 32;
     I const ny = 32;
 
-    auto ceil = [](auto n, auto b) { return ((n - 1) / b + 1); };
-
     I const max_blocks = get_num_cu();
-    I const nbx = std::min(max_blocks, ceil(m, nx));
-    I const nby = std::min(max_blocks, ceil(n, ny));
+    I const nbx = std::min(max_blocks, ceildiv(m, nx));
+    I const nby = std::min(max_blocks, ceildiv(n, ny));
     I const nbz = std::max(I{1}, std::min(max_blocks, batch_count));
 
     set_triangular_kernel<<<dim3(nbx, nby, nbz), dim3(nx, ny, 1), 0, stream>>>(uplo, m, n, alpha,
@@ -1455,11 +1462,21 @@ rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
         return (rocblas_status_invalid_size);
     }
 
-    // 3. invalid pointers
-    bool const isok_pointer = (A != nullptr) && (R != nullptr);
-    if(!isok_pointer)
+    bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+    if(has_work)
     {
-        return (rocblas_status_invalid_pointer);
+        // 3. invalid pointers
+        bool const isok_pointer = (A != nullptr) && (R != nullptr);
+        if(!isok_pointer)
+        {
+            return (rocblas_status_invalid_pointer);
+        }
+
+        bool const isok_mn = (m >= n);
+        if(!isok_mn)
+        {
+            return (rocblas_status_invalid_size);
+        }
     }
 
     return (rocblas_status_continue);
@@ -1526,11 +1543,21 @@ rocblas_status rocsolver_cholqr3_strided_batched_argCheck(rocblas_handle handle,
         return (rocblas_status_invalid_size);
     }
 
-    // 3. invalid pointers
-    bool const isok_pointer = (A != nullptr) && (R != nullptr);
-    if(!isok_pointer)
+    bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+    if(has_work)
     {
-        return (rocblas_status_invalid_pointer);
+        // 3. invalid pointers
+        bool const isok_pointer = (A != nullptr) && (R != nullptr);
+        if(!isok_pointer)
+        {
+            return (rocblas_status_invalid_pointer);
+        }
+
+        bool const isok_mn = (m >= n);
+        if(!isok_mn)
+        {
+            return (rocblas_status_invalid_size);
+        }
     }
 
     return (rocblas_status_continue);
@@ -1555,11 +1582,21 @@ static rocblas_status rocsolver_cholqr1_batched_argCheck(rocblas_handle handle,
         return (rocblas_status_invalid_size);
     }
 
-    // 3. invalid pointers
-    bool const isok_pointer = (A != nullptr) && (R != nullptr);
-    if(!isok_pointer)
+    bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+    if(has_work)
     {
-        return (rocblas_status_invalid_pointer);
+        // 3. invalid pointers
+        bool const isok_pointer = (A != nullptr) && (R != nullptr);
+        if(!isok_pointer)
+        {
+            return (rocblas_status_invalid_pointer);
+        }
+
+        bool const isok_mn = (m >= n);
+        if(!isok_mn)
+        {
+            return (rocblas_status_invalid_size);
+        }
     }
 
     return (rocblas_status_continue);
@@ -1584,11 +1621,21 @@ static rocblas_status rocsolver_cholqr2_batched_argCheck(rocblas_handle handle,
         return (rocblas_status_invalid_size);
     }
 
-    // 3. invalid pointers
-    bool const isok_pointer = (A != nullptr) && (R != nullptr);
-    if(!isok_pointer)
+    bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+    if(has_work)
     {
-        return (rocblas_status_invalid_pointer);
+        // 3. invalid pointers
+        bool const isok_pointer = (A != nullptr) && (R != nullptr);
+        if(!isok_pointer)
+        {
+            return (rocblas_status_invalid_pointer);
+        }
+
+        bool const isok_mn = (m >= n);
+        if(!isok_mn)
+        {
+            return (rocblas_status_invalid_size);
+        }
     }
 
     return (rocblas_status_continue);
@@ -1613,13 +1660,22 @@ static rocblas_status rocsolver_cholqr3_batched_argCheck(rocblas_handle handle,
         return (rocblas_status_invalid_size);
     }
 
-    // 3. invalid pointers
-    bool const isok_pointer = (A != nullptr) && (R != nullptr);
-    if(!isok_pointer)
+    bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+    if(has_work)
     {
-        return (rocblas_status_invalid_pointer);
-    }
+        // 3. invalid pointers
+        bool const isok_pointer = (A != nullptr) && (R != nullptr);
+        if(!isok_pointer)
+        {
+            return (rocblas_status_invalid_pointer);
+        }
 
+        bool const isok_mn = (m >= n);
+        if(!isok_mn)
+        {
+            return (rocblas_status_invalid_size);
+        }
+    }
     return (rocblas_status_continue);
 }
 
@@ -2782,30 +2838,36 @@ static rocblas_status rocsolver_cholqr_general_batched_argCheck(rocblas_handle h
         }
     }
 
-    // 3. invalid pointers
     {
         bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
         if(has_work)
         {
+            // 3. invalid pointers
             bool const is_valid_pointers = (A != nullptr) && (R != nullptr) && (info != nullptr);
             if(!is_valid_pointers)
             {
                 return (rocblas_status_invalid_pointer);
             }
-        }
 
-        // info pointer is always required when batch_count > 0
-        if(batch_count >= 1 && info == nullptr)
-        {
-            return (rocblas_status_invalid_pointer);
-        }
+            // info pointer is always required when batch_count > 0
+            if(info == nullptr)
+            {
+                return (rocblas_status_invalid_pointer);
+            }
 
-        // sigma is required for cholqr3 algorithms
-        bool const is_cholqr3
-            = (algo == rocsolver_cholqr_cholqr3_compute) || (algo == rocsolver_cholqr_cholqr3_user);
-        if(is_cholqr3 && has_work && sigma == nullptr)
-        {
-            return (rocblas_status_invalid_pointer);
+            // sigma is required for cholqr3 algorithms
+            bool const is_cholqr3 = (algo == rocsolver_cholqr_cholqr3_compute)
+                || (algo == rocsolver_cholqr_cholqr3_user);
+            if(is_cholqr3 && (sigma == nullptr))
+            {
+                return (rocblas_status_invalid_pointer);
+            }
+
+            bool const isok_mn = (m >= n);
+            if(!isok_mn)
+            {
+                return (rocblas_status_invalid_size);
+            }
         }
     }
 
