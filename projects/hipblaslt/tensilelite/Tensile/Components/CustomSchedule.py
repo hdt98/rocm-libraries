@@ -283,8 +283,59 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         idMap["PackA%u"%uIdx] = PackCodeA[uIdx]
         idMap["PackB%u"%uIdx] = PackCodeB[uIdx]
 
+    def _inst_len(inst_module):
+        if hasattr(inst_module, "flatitems"):
+            return len(inst_module.flatitems())
+        if isinstance(inst_module, list):
+            if len(inst_module) == 0:
+                return 0
+            if hasattr(inst_module[0], "flatitems"):
+                return len(inst_module[0].flatitems())
+            return len(inst_module)
+        return 0
+
+    def _normalize_schedule_len(schedule_lists, inst_module):
+        target_len = _inst_len(inst_module)
+        normalized = []
+        for idx_list in schedule_lists:
+            if len(idx_list) > target_len:
+                normalized.append(idx_list[:target_len])
+            elif len(idx_list) < target_len:
+                # Pad by repeating the last index so all instructions get scheduled.
+                fill_idx = idx_list[-1] if idx_list else 0
+                normalized.append(idx_list + [fill_idx] * (target_len - len(idx_list)))
+            else:
+                normalized.append(idx_list)
+        return normalized
+
+    # Keep customMainLoopSchedule generic: schedules must define Pack*/SNOP explicitly.
+    # Here we only clamp schedule lengths so we never index past instruction lists.
+    for key in list(opt1.optSchedule.keys()):
+        if key in ("SYNC",):
+            continue
+        if key in idMap:
+            opt1.optSchedule[key] = _normalize_schedule_len(opt1.optSchedule[key], idMap[key])
+
     idMap['SYNC'] = opt1.syncCode
     idMap['SNOP'] = opt1.snopCode
+
+    if kernel.get("MacroTile0") == 160 and kernel.get("MacroTile1") == 128 and kernel.get("DepthU") == 32:
+        def _summarize(key):
+            if key not in opt1.optSchedule:
+                return "none"
+            flat = [i for lst in opt1.optSchedule[key] for i in lst]
+            if not flat:
+                return "empty"
+            return f"len={len(flat)} min={min(flat)} max={max(flat)}"
+        print("CMS160x128x32 schedule summary:",
+              "LRA0", _summarize("LRA0"),
+              "LRB0", _summarize("LRB0"),
+              "LRA1", _summarize("LRA1"),
+              "LRB1", _summarize("LRB1"),
+              "PackA0", _summarize("PackA0"),
+              "PackB0", _summarize("PackB0"),
+              "PackA1", _summarize("PackA1"),
+              "PackB1", _summarize("PackB1"))
 
     status, message = cmsv.isValid(opt1, {'kernel' : kernel, "idMap": idMap})
     # create the case str (TN, NT, TT, or NN)
@@ -3466,6 +3517,123 @@ def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
 
     else:
         return False, None
+
+
+@RegisterSchedule(
+    tile_config=TileConfig(160, 128, 32, 2, 1, True, 0, 0),
+    dtype_predicate=isTF32,
+    vector_widths=[4, 4, 4],
+    matrix_inst=[32, 32, 16, 1],
+    mfma_wave_group=[1, 4]
+)
+def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+    kernel["UseMFMAF32XEmulation"] = True  # must be True for TF32 emulation
+    kernel["UsePLRPack"] = True  # must be True for PLR pack
+
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0
+    if isNT(kernel) and not useLDSTr and TLDS == 0:
+        num_loads_a = kernel["NumLoadsA"]
+        num_loads_b = kernel["NumLoadsB"]
+        num_mfma = 30
+
+        reads_per_iter_a = num_loads_a * kernel["MIInputPerThreadA"] // kernel["MIWaveGroup"][0]
+        reads_per_iter_b = num_loads_b * kernel["MIInputPerThreadB"] // kernel["MIWaveGroup"][1]
+
+        lw_start = 10
+        lw_end = 20
+        sync_plr = 21
+
+        # Keep LR schedules simple and early; Pack schedules are handled below
+        # (and must be "de-fused" to avoid mfma4x4x4 -> cvt hazard).
+        lra0 = [i % lw_start for i in range(reads_per_iter_a)]  # 0..9
+        lrb0 = [i % lw_start for i in range(reads_per_iter_b)]
+
+        grinca = [0, 0, 1, 1, 2, 2, 3, 3, 3]
+        grincb = [4, 4, 5, 5, 6, 6, 7, 7, 7]
+
+        # Align GR timing closer to non-CMS schedule: push DirectToLds loads later
+        # so they occur after the early LR phase.
+        gra = list(range(11, 11 + num_loads_a))
+        grb = list(range(17, 17 + num_loads_b))
+
+        # Keep the default PLR "next" LR stream so the double-buffered loop stays correct.
+        # Issue all "next buffer" local reads before pack1 starts at mfmaIndex 23.
+        # Concentrate reads at indices 21-22 so pack at 23 doesn't see same-index ds_read hazards.
+        lra1 = [sync_plr + (i % 2) for i in range(reads_per_iter_a)]  # 21 or 22
+        lrb1 = [sync_plr + (i % 2) for i in range(reads_per_iter_b)]  # 21 or 22
+
+        # Place barrier/swap closer to non-CMS timing (around mfmaIndex 11).
+        lrsa = [11]
+        lrsb = [11]
+        lwsa = [lw_end]
+        lwsb = [lw_end]
+
+        pack_wait0 = 12  # before starting TF32 pack for buffer1 (X1)
+        pack_wait1 = 23  # before starting TF32 pack for buffer0 (X0) for next iter
+        sync_indices = [-1, pack_wait0, pack_wait1, lrsa[0], lrsa[0], sync_plr, sync_plr]
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local reads before GR"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LR before TF32 pack (X1)"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LR before TF32 pack (X0 next)"),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment=""),
+            SWaitCnt(
+                dscnt=-1,
+                vlcnt=max(0, (len(gra) + len(grb)) // 2),
+                vscnt=-1,
+                comment="wait for previous set of global reads",
+            ),
+            SBarrier(comment=""),
+        ]
+
+        nglshift = nllshift = max(1, (len(gra) + len(grb)) // 2)
+
+        # TF32 emulation pack is scheduled explicitly here (like other CMS schedules):
+        # PackA: 5 groups * (10 instructions) = 50 indices
+        # PackB: 1 group * (10 instructions) = 10 indices
+        _pack_offsets_10 = [0, 0, 0, 0, 1, 1, 2, 2, 2, 2]
+        packA_offsets = _pack_offsets_10 * 5
+        packB_offsets = _pack_offsets_10
+        pack0_base = 12  # X1 pack starts
+        pack1_base = 23  # X0 (next) pack starts
+        pack_a0 = [pack0_base + o for o in packA_offsets]
+        pack_b0 = [pack0_base + o for o in packB_offsets]
+        pack_a1 = [pack1_base + o for o in packA_offsets]
+        pack_b1 = [pack1_base + o for o in packB_offsets]
+
+        # Need s_nop 4 after mfma4x4x4 within pack groups
+        snop_indices = [pack0_base + 1, pack1_base + 1]  # mfma4 slot per pack base
+        snopCode = [SNop(4) for _ in snop_indices]
+
+        optSchedule = {
+            "SYNC": [sync_indices],
+            "GRIncA": [grinca],
+            "GRIncB": [grincb],
+            "LRA0": [lra0],
+            "LRB0": [lrb0],
+            "GRA": [gra],
+            "GRB": [grb],
+            "LRSA": [lrsa],
+            "LRSB": [lrsb],
+            "LWSA": [lwsa],
+            "LWSB": [lwsb],
+            "LRA1": [lra1],
+            "LRB1": [lrb1],
+            "PackA0": [pack_a0],
+            "PackB0": [pack_b0],
+            "PackA1": [pack_a1],
+            "PackB1": [pack_b1],
+            "SNOP": [snop_indices],
+            "LCC": [[num_mfma - 2, num_mfma - 1]],
+        }
+        opt1 = ScheduleInfo(1, num_mfma, optSchedule, syncCode, nglshift, nllshift, snopCode=snopCode)
+        opt1.disableValidation()
+        return True, opt1
+
+    return False, None
 
 
 @RegisterSchedule(
