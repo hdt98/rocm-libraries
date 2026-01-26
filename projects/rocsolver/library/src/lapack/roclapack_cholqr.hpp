@@ -1306,63 +1306,20 @@ static void add_shift(hipStream_t stream,
                                                                B, shiftB, ldb, strideB);
 }
 
-template <typename T, typename I, typename Istride, typename UA>
-static __global__ void set_triangular_kernel(char const uplo,
-                                             I const m,
-                                             I const n,
-                                             T const alpha,
-
-                                             UA A_arg,
-                                             Istride shiftA,
-                                             I const lda,
-                                             Istride const strideA,
-
-                                             I const batch_count)
-{
-    {
-        bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
-        if(!has_work)
-        {
-            return;
-        }
-    }
-    bool const set_strictly_lower = (uplo == 'L') || (uplo == 'l');
-    bool const set_strictly_upper = (uplo == 'U') || (uplo == 'u');
-    bool const set_all = (!set_strictly_lower) && (!set_strictly_upper);
-
-    I const i_start = threadIdx.x + blockIdx.x * blockDim.x;
-    I const j_start = threadIdx.y + blockIdx.y * blockDim.y;
-
-    I const i_inc = blockDim.x * gridDim.x;
-    I const j_inc = blockDim.y * gridDim.y;
-
-    I const bid_start = blockIdx.z;
-    I const bid_inc = gridDim.z;
-
-    for(I bid = bid_start; bid < batch_count; bid += bid_inc)
-    {
-        T* const A = load_ptr_batch<T>(A_arg, bid, shiftA, strideA);
-
-        for(I j = j_start; j < n; j += j_inc)
-        {
-            for(I i = i_start; i < m; i += i_inc)
-            {
-                bool const is_strictly_lower = (i > j);
-                bool const is_strictly_upper = (i < j);
-
-                bool const do_assign = set_all || (set_strictly_lower && is_strictly_lower)
-                    || (set_strictly_upper && is_strictly_upper);
-                if(do_assign)
-                {
-                    auto const ij = idx2D(i, j, lda);
-                    A[ij] = alpha;
-                }
-            }
-        }
-
-    } // end for bid
-}
-
+// ----------------------------------------------------
+// set_triangular sets
+//
+// the  *strictly* lower triangular part if uplo == 'L'
+// similar to tri(A,-1) = alpha
+//
+// the  *strictly* upper triangular part if uplo == 'U'
+// similar to triu(A,1) = alpha
+//
+// the entire matrix otherwise
+// similar to A = alpha
+//
+// laset is used by adjusting the indices by 1
+// ----------------------------------------------------
 template <typename T, typename I, typename Istride, typename UA>
 static void set_triangular(rocblas_handle handle,
                            char const uplo,
@@ -1396,8 +1353,6 @@ static void set_triangular(rocblas_handle handle,
     I const nby = std::min(max_blocks, ceildiv(n, ny));
     I const nbz = std::min(max_blocks, batch_count);
 
-    bool constexpr use_laset = true;
-    if(use_laset)
     {
         bool const use_lower = (uplo == 'L') || (uplo == 'l');
         Istride const offset = (use_lower) ? idx2D(1, 0, lda) : 0;
@@ -1413,15 +1368,6 @@ static void set_triangular(rocblas_handle handle,
               A_arg, shiftA + offset, lda, strideA,
 
               batch_count);
-    }
-    else
-    {
-        set_triangular_kernel<<<dim3(nbx, nby, nbz), dim3(nx, ny, 1), 0, stream>>>(uplo, m, n, alpha,
-
-                                                                                   A_arg, shiftA,
-                                                                                   lda, strideA,
-
-                                                                                   batch_count);
     }
 }
 
