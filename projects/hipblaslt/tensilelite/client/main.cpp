@@ -837,7 +837,7 @@ int main(int argc, const char* argv[])
                                 auto size = static_cast<ContractionProblemGemm*>(problem)->problemSizes();
                                 std::cout << "per-run-timer-sync-" << syncs << "-enq-" << enq << "-" << solution->KernelName() << ","
                                     << size[0] << "-" << size[1] << "-" << size[2] << "-" << size[3]
-                                    << "," << solution->name() << ",";
+                                    << "," << solution->name() << "," << std::flush;
                                 listeners.preSyncs();
                                 if(enq)
                                     for(int i = 0; i < syncs; i++)
