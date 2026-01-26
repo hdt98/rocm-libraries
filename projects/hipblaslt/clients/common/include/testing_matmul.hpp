@@ -3752,7 +3752,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
 
         // Number of sub-iterations per hot call (for averaging)
-        const int num_sub_iterations = 5;
+        const int num_sub_iterations = 20;
 
         int    flush_iter      = 100000;
         double flush_time_used = 0;
