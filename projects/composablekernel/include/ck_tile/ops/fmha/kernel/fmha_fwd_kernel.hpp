@@ -60,13 +60,6 @@ struct FmhaFwdKernel
     static constexpr bool kSkipMinSeqlenQ   = FmhaPipeline::Problem::kSkipMinSeqlenQ;
     static constexpr bool kHasSink          = FmhaPipeline::kHasSink;
 
-    using QScaleDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::QScaleDataType>;
-    using KScaleDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::KScaleDataType>;
-    using VScaleDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::VScaleDataType>;
-
-    static constexpr ck_tile::index_t kQKScaleGranularity = FmhaPipeline::kQKScaleGranularity;
-    static constexpr ck_tile::index_t kVScaleGranularity  = FmhaPipeline::kVScaleGranularity;
-
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
     using FmhaMask         = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
     static constexpr bool kHasMask = FmhaMask::IsMasking;
@@ -1853,6 +1846,9 @@ struct FmhaFwdKernel
                                           nullptr,
                                           nullptr,
                                           1,
+                                          make_null_tile_window(make_tuple()),
+                                          make_null_tile_window(make_tuple()),
+                                          make_null_tile_window(make_tuple()),
                                           sink_value);
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
@@ -1904,13 +1900,22 @@ struct FmhaFwdKernel
                         k_descale_ptr,
                         v_descale_ptr,
                         kargs.block_scale_size_kv,
-                        ignore,
-                        ignore,
-                        ignore,
+                        make_null_tile_window(make_tuple()),
+                        make_null_tile_window(make_tuple()),
+                        make_null_tile_window(make_tuple()),
                         sink_value);
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
+                    using QScaleDataType = typename FmhaPipeline::QScaleDataType;
+                    using KScaleDataType = typename FmhaPipeline::KScaleDataType;
+                    using VScaleDataType = typename FmhaPipeline::VScaleDataType;
+
+                    constexpr ck_tile::index_t kQKScaleGranularity =
+                        FmhaPipeline::kQKScaleGranularity;
+                    constexpr ck_tile::index_t kVScaleGranularity =
+                        FmhaPipeline::kVScaleGranularity;
+
                     const QScaleDataType* q_descale_ptr =
                         reinterpret_cast<const QScaleDataType*>(kargs.q_descale_ptr) +
                         static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q_descale +

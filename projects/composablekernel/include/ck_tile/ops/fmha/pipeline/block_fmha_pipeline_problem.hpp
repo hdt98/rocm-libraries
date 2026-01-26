@@ -44,7 +44,8 @@ struct BlockFmhaPipelineProblem
     using FmhaMask              = remove_cvref_t<FmhaMask_>;
     using Traits                = remove_cvref_t<Traits_>;
 
-    // TODO: pass scale types and grnularity from FmhaFwdTypeConfig
+    // TODO: Pass scale types and granularity from FmhaFwdTypeConfig. It will be required for
+    // gfx1250 bacause it supports different types (e8m0, fp8, bf8) and granularities (16 and 32).
     using QScaleDataType = ck_tile::e8m0_t;
     using KScaleDataType = ck_tile::e8m0_t;
     using VScaleDataType = ck_tile::e8m0_t;

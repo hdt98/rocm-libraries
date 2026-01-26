@@ -187,6 +187,28 @@ void copy_attention_scores_with_sink(const ck_tile::HostTensor<SMPLComputeDataTy
     }
 }
 
+template <typename TypeConfig, bool IsMx>
+struct ScalesConfig
+{
+    using QScaleDataType = float;
+    using KScaleDataType = float;
+    using VScaleDataType = float;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = 1;
+    static constexpr ck_tile::index_t kVScaleGranularity  = 1;
+};
+
+template <typename TypeConfig>
+struct ScalesConfig<TypeConfig, true>
+{
+    using QScaleDataType = typename TypeConfig::QScaleDataType;
+    using KScaleDataType = typename TypeConfig::KScaleDataType;
+    using VScaleDataType = typename TypeConfig::VScaleDataType;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = TypeConfig::kQKScaleGranularity;
+    static constexpr ck_tile::index_t kVScaleGranularity  = TypeConfig::kVScaleGranularity;
+};
+
 template <typename DataTypeConfig>
 fwd_result fmha_fwd_run(mode_enum mode,
                         ck_tile::index_t batch,
@@ -242,22 +264,14 @@ fwd_result fmha_fwd_run(mode_enum mode,
     using OaccDataType          = typename TypeConfig::OaccDataType;
     using ODataType             = typename TypeConfig::ODataType;
 
-    using QScaleDataType = std::conditional_t<is_mx, typename TypeConfig::QScaleDataType, float>;
-    using KScaleDataType = std::conditional_t<is_mx, typename TypeConfig::KScaleDataType, float>;
-    using VScaleDataType = std::conditional_t<is_mx, typename TypeConfig::VScaleDataType, float>;
+    using QScaleDataType = typename ScalesConfig<TypeConfig, is_mx>::QScaleDataType;
+    using KScaleDataType = typename ScalesConfig<TypeConfig, is_mx>::KScaleDataType;
+    using VScaleDataType = typename ScalesConfig<TypeConfig, is_mx>::VScaleDataType;
 
-    constexpr ck_tile::index_t kQKScaleGranularity = []() {
-        if constexpr(is_mx)
-            return TypeConfig::kQKScaleGranularity;
-        else
-            return 1;
-    }();
-    constexpr ck_tile::index_t kVScaleGranularity = []() {
-        if constexpr(is_mx)
-            return TypeConfig::kVScaleGranularity;
-        else
-            return 1;
-    }();
+    constexpr ck_tile::index_t kQKScaleGranularity =
+        ScalesConfig<TypeConfig, is_mx>::kQKScaleGranularity;
+    constexpr ck_tile::index_t kVScaleGranularity =
+        ScalesConfig<TypeConfig, is_mx>::kVScaleGranularity;
 
     // Note: block_scale_size_q_ and block_scale_size_kv_ should be greater than or equal to the
     // compute block size

@@ -230,13 +230,6 @@ struct BlockFmhaPipelineQRKSVS
                                      kVScaleGranularity);
         }
 
-        auto if_mx = [&](auto f) {
-            if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
-                return f();
-            else
-                return ignore;
-        };
-
         // K tile in LDS
         KDataType* k_lds_ptr = static_cast<KDataType*>(static_cast<void*>(
             static_cast<char*>(smem_ptr) + Policy::template GetSmemSizeQ<Problem>()));
@@ -375,28 +368,32 @@ struct BlockFmhaPipelineQRKSVS
 
         auto q_tile = tile_elementwise_in(q_element_func, q);
 
-        auto q_scale = if_mx([&] {
-            auto q_scale_dram_window =
-                make_tile_window(q_scale_dram_block_window_tmp.get_bottom_tensor_view(),
-                                 q_scale_dram_block_window_tmp.get_window_lengths(),
-                                 q_scale_dram_block_window_tmp.get_window_origin(),
-                                 Policy::template MakeQScaleRegTileDistribution<Problem>());
+        auto [q_scale, k_scale_dram_block_window, v_scale_dram_window] = [&] {
+            if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+            {
+                auto q_scale_dram_window =
+                    make_tile_window(q_scale_dram_block_window_tmp.get_bottom_tensor_view(),
+                                     q_scale_dram_block_window_tmp.get_window_lengths(),
+                                     q_scale_dram_block_window_tmp.get_window_origin(),
+                                     Policy::template MakeQScaleRegTileDistribution<Problem>());
 
-            return load_tile(q_scale_dram_window);
-        });
-
-        auto k_scale_dram_block_window = if_mx([&] {
-            return make_tile_window(k_scale_dram_block_window_tmp.get_bottom_tensor_view(),
-                                    k_scale_dram_block_window_tmp.get_window_lengths(),
-                                    {seqlen_k_start, 0});
-        });
-
-        auto v_scale_dram_window = if_mx([&] {
-            return make_tile_window(v_scale_dram_block_window_tmp.get_bottom_tensor_view(),
-                                    v_scale_dram_block_window_tmp.get_window_lengths(),
-                                    {0, seqlen_k_start},
-                                    Policy::template MakeVScaleRegTileDistribution<Problem>());
-        });
+                return make_tuple(
+                    load_tile(q_scale_dram_window),
+                    make_tile_window(k_scale_dram_block_window_tmp.get_bottom_tensor_view(),
+                                     k_scale_dram_block_window_tmp.get_window_lengths(),
+                                     {seqlen_k_start, 0}),
+                    make_tile_window(v_scale_dram_block_window_tmp.get_bottom_tensor_view(),
+                                     v_scale_dram_block_window_tmp.get_window_lengths(),
+                                     {0, seqlen_k_start},
+                                     Policy::template MakeVScaleRegTileDistribution<Problem>()));
+            }
+            else
+            {
+                return make_tuple(null_tensor{},
+                                  make_null_tile_window(make_tuple()),
+                                  make_null_tile_window(make_tuple()));
+            }
+        }();
 
         // prefetch K tile
         index_t i_total_loops      = 0;
@@ -448,12 +445,32 @@ struct BlockFmhaPipelineQRKSVS
                 k_dram_block_window.get_window_origin(),
                 Policy::template MakeKDramTileDistribution<Problem>()); // K DRAM tile window for
                                                                         // load
-            auto k_scale_dram_window = if_mx([&] {
-                return make_tile_window(k_scale_dram_block_window.get_bottom_tensor_view(),
-                                        k_scale_dram_block_window.get_window_lengths(),
-                                        k_scale_dram_block_window.get_window_origin(),
-                                        Policy::template MakeKScaleRegTileDistribution<Problem>());
-            });
+            auto k_scale_dram_window = [&] {
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    return make_tile_window(
+                        k_scale_dram_block_window.get_bottom_tensor_view(),
+                        k_scale_dram_block_window.get_window_lengths(),
+                        k_scale_dram_block_window.get_window_origin(),
+                        Policy::template MakeKScaleRegTileDistribution<Problem>());
+                }
+                else
+                {
+                    return make_null_tile_window(make_tuple());
+                }
+            }();
+            auto load_k_scale_block_tile = [&] {
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    auto t = load_tile(k_scale_dram_window);
+                    move_tile_window(k_scale_dram_window, {0, kK0 / kQKScaleGranularity});
+                    return t;
+                }
+                else
+                {
+                    return make_null_tile_window(make_tuple());
+                }
+            };
 
             auto k_block_tile = load_tile(k_dram_window);
             {
@@ -462,11 +479,7 @@ struct BlockFmhaPipelineQRKSVS
                 store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
                 k_block_tile = load_tile(k_dram_window);
             }
-            auto k_scale_block_tile = if_mx([&] {
-                auto t = load_tile(k_scale_dram_window);
-                move_tile_window(k_scale_dram_window, {0, kK0 / kQKScaleGranularity});
-                return t;
-            });
+            auto k_scale_block_tile = load_k_scale_block_tile();
 
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
             {
@@ -511,11 +524,7 @@ struct BlockFmhaPipelineQRKSVS
                         tile_elementwise_in(k_element_func, k_block_tile)); // LDS write i + 1
                     k_block_tile = load_tile(k_dram_window);                // global read i + 2
 
-                    k_scale_block_tile = if_mx([&] {
-                        auto t = load_tile(k_scale_dram_window);
-                        move_tile_window(k_scale_dram_window, {0, kK0 / kQKScaleGranularity});
-                        return t;
-                    });
+                    k_scale_block_tile = load_k_scale_block_tile();
                 });
             }
 
@@ -527,11 +536,7 @@ struct BlockFmhaPipelineQRKSVS
 
                 store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
 
-                k_scale_block_tile = if_mx([&] {
-                    auto t = load_tile(k_scale_dram_window);
-                    move_tile_window(k_scale_dram_window, {0, kK0 / kQKScaleGranularity});
-                    return t;
-                });
+                k_scale_block_tile = load_k_scale_block_tile();
 
                 block_sync_lds();
 
@@ -811,11 +816,20 @@ struct BlockFmhaPipelineQRKSVS
             }
 
             move_tile_window(v_dram_window, {0, kK1});
-            auto v_scale_block_tile = if_mx([&] {
-                auto t = load_tile(v_scale_dram_window);
-                move_tile_window(v_scale_dram_window, {0, kK1 / kVScaleGranularity});
-                return t;
-            });
+
+            auto load_v_scale_block_tile = [&] {
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    auto t = load_tile(v_scale_dram_window);
+                    move_tile_window(v_scale_dram_window, {0, kK1 / kVScaleGranularity});
+                    return t;
+                }
+                else
+                {
+                    return make_null_tile_window(make_tuple());
+                }
+            };
+            auto v_scale_block_tile = load_v_scale_block_tile();
 
             float v_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
@@ -897,11 +911,7 @@ struct BlockFmhaPipelineQRKSVS
                                    tile_elementwise_in(v_element_func, v)); // store next v
                     }
                     move_tile_window(v_dram_window, {0, kK1});
-                    v_scale_block_tile = if_mx([&] {
-                        auto t = load_tile(v_scale_dram_window);
-                        move_tile_window(v_scale_dram_window, {0, kK1 / kVScaleGranularity});
-                        return t;
-                    });
+                    v_scale_block_tile = load_v_scale_block_tile();
                 });
             }
             // move K tile windows
@@ -914,7 +924,10 @@ struct BlockFmhaPipelineQRKSVS
                 }
             }
             move_tile_window(k_dram_block_window, {kN0, 0});
-            if_mx([&] { move_tile_window(k_scale_dram_block_window, {kN0, 0}); });
+            if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+            {
+                move_tile_window(k_scale_dram_block_window, {kN0, 0});
+            }
             // tail
             {
                 block_sync_lds();
@@ -1048,9 +1061,9 @@ struct BlockFmhaPipelineQRKSVS
                           nullptr,
                           nullptr,
                           1,
-                          ignore,
-                          ignore,
-                          ignore,
+                          make_null_tile_window(make_tuple()),
+                          make_null_tile_window(make_tuple()),
+                          make_null_tile_window(make_tuple()),
                           sink_v);
     }
 };
