@@ -109,13 +109,13 @@ RUN mkdir build && cd build \
       ../rocm-libraries/projects/composablekernel \
     && make -j ${MAX_JOBS} install 
 
-# Install SQLite3
-# RUN apt-get update && \
-#     DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
-#     libsqlite3-dev sqlite3 bzip2 libbz2-dev nlohmann-json3-dev libboost-all-dev && \
-#     apt-get clean && \
-#     rm -rf /var/lib/apt/lists/* 
-RUN cget install -f /requirements.txt
+# Install MIOpen dependencies
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
+    libsqlite3-dev sqlite3 bzip2 libbz2-dev nlohmann-json3-dev libboost-all-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* 
+#RUN cget install -f /requirements.txt
 
 RUN rm -rf build && mkdir build && cd build \
     && CXX=/opt/rocm/bin/amdclang++ cmake \
