@@ -111,3 +111,17 @@ inline void type_to_xdl_math_op_type(Ti* in, size_t s)
     for(size_t i = 0; i < s; i++)
         in[i] = static_cast<Ti>(static_cast<castType>(in[i]));
 }
+
+template <typename T>
+inline __host__ __device__ bool hipblaslt_isnan(std::complex<T> arg,
+                                                std::enable_if_t<!std::is_integral<T>::value, int> = 0)
+{
+    return std::isnan(arg.real()) || std::isnan(arg.imag());
+}
+
+template <typename T>
+inline __host__ __device__ bool hipblaslt_isnan(std::complex<T> arg,
+                                                std::enable_if_t<std::is_integral<T>::value, int> = 0)
+{
+    return false;
+}

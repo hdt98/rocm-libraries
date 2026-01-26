@@ -318,8 +318,12 @@ namespace TensileLite
 
         static float computeGranularity(float x);
 
-        Granularities computeGranularities(
-            Hardware const& hardware, double M, double N, double K, double NumBatches, uint32_t autoGsuVal) const;
+        Granularities computeGranularities(Hardware const& hardware,
+                                           double          M,
+                                           double          N,
+                                           double          K,
+                                           double          NumBatches,
+                                           uint32_t        autoGsuVal) const;
 
         StaticPerformanceModel staticPerformanceModel(double M,
                                                       double N,
@@ -538,11 +542,11 @@ namespace TensileLite
             std::vector<int>              biasSrcWhiteList;
             std::vector<rocisa::DataType> biasDataTypeWhiteList;
 
-            int  sparse                     = 0;
-            bool stochasticRounding         = false;
-            bool supportDeviceUserArguments = false;
-            bool swizzleTensorA             = false;
-            bool swizzleTensorB             = false;
+            int                    sparse                     = 0;
+            bool                   stochasticRounding         = false;
+            bool                   supportDeviceUserArguments = false;
+            bool                   swizzleTensorA             = false;
+            bool                   swizzleTensorB             = false;
         };
 
         struct LinearModel
