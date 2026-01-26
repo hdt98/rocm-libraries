@@ -283,59 +283,8 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         idMap["PackA%u"%uIdx] = PackCodeA[uIdx]
         idMap["PackB%u"%uIdx] = PackCodeB[uIdx]
 
-    def _inst_len(inst_module):
-        if hasattr(inst_module, "flatitems"):
-            return len(inst_module.flatitems())
-        if isinstance(inst_module, list):
-            if len(inst_module) == 0:
-                return 0
-            if hasattr(inst_module[0], "flatitems"):
-                return len(inst_module[0].flatitems())
-            return len(inst_module)
-        return 0
-
-    def _normalize_schedule_len(schedule_lists, inst_module):
-        target_len = _inst_len(inst_module)
-        normalized = []
-        for idx_list in schedule_lists:
-            if len(idx_list) > target_len:
-                normalized.append(idx_list[:target_len])
-            elif len(idx_list) < target_len:
-                # Pad by repeating the last index so all instructions get scheduled.
-                fill_idx = idx_list[-1] if idx_list else 0
-                normalized.append(idx_list + [fill_idx] * (target_len - len(idx_list)))
-            else:
-                normalized.append(idx_list)
-        return normalized
-
-    # Keep customMainLoopSchedule generic: schedules must define Pack*/SNOP explicitly.
-    # Here we only clamp schedule lengths so we never index past instruction lists.
-    for key in list(opt1.optSchedule.keys()):
-        if key in ("SYNC",):
-            continue
-        if key in idMap:
-            opt1.optSchedule[key] = _normalize_schedule_len(opt1.optSchedule[key], idMap[key])
-
     idMap['SYNC'] = opt1.syncCode
     idMap['SNOP'] = opt1.snopCode
-
-    if kernel.get("MacroTile0") == 160 and kernel.get("MacroTile1") == 128 and kernel.get("DepthU") == 32:
-        def _summarize(key):
-            if key not in opt1.optSchedule:
-                return "none"
-            flat = [i for lst in opt1.optSchedule[key] for i in lst]
-            if not flat:
-                return "empty"
-            return f"len={len(flat)} min={min(flat)} max={max(flat)}"
-        print("CMS160x128x32 schedule summary:",
-              "LRA0", _summarize("LRA0"),
-              "LRB0", _summarize("LRB0"),
-              "LRA1", _summarize("LRA1"),
-              "LRB1", _summarize("LRB1"),
-              "PackA0", _summarize("PackA0"),
-              "PackB0", _summarize("PackB0"),
-              "PackA1", _summarize("PackA1"),
-              "PackB1", _summarize("PackB1"))
 
     status, message = cmsv.isValid(opt1, {'kernel' : kernel, "idMap": idMap})
     # create the case str (TN, NT, TT, or NN)
@@ -3554,10 +3503,11 @@ def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
         grinca = [0, 0, 1, 1, 2, 2, 3, 3, 3]
         grincb = [4, 4, 5, 5, 6, 6, 7, 7, 7]
 
-        # Align GR timing closer to non-CMS schedule: push DirectToLds loads later
-        # so they occur after the early LR phase.
-        gra = list(range(11, 11 + num_loads_a))
-        grb = list(range(17, 17 + num_loads_b))
+        # DirectToLds global reads use 2 instructions per "load" (m0 + load),
+        # so the schedule must provide 2*num_loads indices. Keep timing close
+        # to the CMS-off reference by duplicating each slot.
+        gra = duplicate_list_items(list(range(11, 11 + num_loads_a)), 2)
+        grb = duplicate_list_items(list(range(17, 17 + num_loads_b)), 2)
 
         # Keep the default PLR "next" LR stream so the double-buffered loop stays correct.
         # Issue all "next buffer" local reads before pack1 starts at mfmaIndex 23.
@@ -3573,13 +3523,14 @@ def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
 
         pack_wait0 = 12  # before starting TF32 pack for buffer1 (X1)
         pack_wait1 = 23  # before starting TF32 pack for buffer0 (X0) for next iter
-        sync_indices = [-1, pack_wait0, pack_wait1, lrsa[0], lrsa[0], sync_plr, sync_plr]
+
+        # Keep SYNC indices non-decreasing (CMS validator requirement).
+        sync_indices = [-1, lrsa[0], lrsa[0], pack_wait0, sync_plr, sync_plr, pack_wait1]
         syncCode = [
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local reads before GR"),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LR before TF32 pack (X1)"),
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LR before TF32 pack (X0 next)"),
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
             SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LR before TF32 pack (X1)"),
             SWaitCnt(
                 dscnt=-1,
                 vlcnt=max(0, (len(gra) + len(grb)) // 2),
@@ -3587,6 +3538,7 @@ def _get_schedule_160x128x32_TF32(kernel, useLDSTr, TLDS):
                 comment="wait for previous set of global reads",
             ),
             SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LR before TF32 pack (X0 next)"),
         ]
 
         nglshift = nllshift = max(1, (len(gra) + len(grb)) // 2)
