@@ -1333,8 +1333,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
               iterCode.add(writeItem)
         if mfmaIndex == self.states.lwEndMfmaIndex:
           while writeItems:
-            if localWriteCodeCounts:  # Check if list is not empty before popping
-              localWriteCodeCounts.pop(0)
+            localWriteCodeCounts.pop(0)
             writeItem = writeItems.pop(0)
             # generate all remaining pre code before the first Store C
             iterCode.add(writeItem)

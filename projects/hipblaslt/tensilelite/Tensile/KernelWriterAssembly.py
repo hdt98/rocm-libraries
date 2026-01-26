@@ -30,7 +30,7 @@ from rocisa.code import KernelBody, Label, Macro, Module, RegSet, SrdUpperValue,
 from rocisa.container import DSModifiers, SDWAModifiers, VOP3PModifiers, \
                       MUBUFModifiers, SMEMModifiers, EXEC, VCC, RegisterContainer, \
                       DPPModifiers, vgpr, sgpr, accvgpr, mgpr, ContinuousRegister, \
-                      HWRegContainer, GLOBALModifiers, FLATModifiers
+                      HWRegContainer, GLOBALModifiers
 from rocisa.instruction import SGetPositivePCOffset, SLongBranchPositive, SCLongBranchScc0, SCLongBranchScc1, SCLongBranchVccnz, \
                         SMulInt64to32, VCvtBF16toFP32
 from rocisa.functions import vectorStaticDivide, vectorStaticRemainder, vectorUInt32CeilDivideAndRemainder, \
@@ -486,11 +486,7 @@ class KernelWriterAssembly(KernelWriter):
     # check if previous define sgprs are being used..
     for s in self.states.freeSgprVarPool:
       self.setSgprToInUseState(s)
-    sgprIdx = self.defineSgprIdx(name, numSgprs, align)
-    if sgprIdx is None:
-      ret = None
-    else:
-      ret = RegSet("s", "sgpr"+name, sgprIdx)
+    ret = RegSet("s", "sgpr"+name, self.defineSgprIdx(name, numSgprs, align))
     for s in self.states.freeSgprVarPool:
       self.setSgprToFreeState(s)
     return ret
@@ -601,16 +597,10 @@ class KernelWriterAssembly(KernelWriter):
       self.addSgprVarToPool("WrapUB")
 
 
-    result = self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs)
-    if result is not None:
-      module.add(result)
-    result = self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs)
-    if result is not None:
-      module.add(result)
+    module.add(self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs))
+    module.add(self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs))
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      result = self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs)
-      if result is not None:
-        module.add(result)
+      module.add(self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs))
     self.addSgprVarToPool("GlobalReadIncsA")
     self.addSgprVarToPool("GlobalReadIncsB")
 
@@ -1135,8 +1125,8 @@ class KernelWriterAssembly(KernelWriter):
 
     for (tc, indices, justOffset32, tP, isSwizzled) in GOList:
 
-      # BufferStore does not use this macro so don't generate it:
-      if tc == "C" and kernel["BufferStore"]:
+      # C tensor does not use this macro so don't generate it:
+      if tc == "C":
         continue
 
       # function name and comment
@@ -1356,16 +1346,15 @@ class KernelWriterAssembly(KernelWriter):
             src1="v[\\vgprAddr+0]", \
             comment="add prepad for pointer shift"))
 
-      if tP != None:
-        bpeGR = tP["bpeGR"] if not tP["isM"] else tP["bpe"]
-        # addr *= bytes/element
-        if justOffset32:
-          macro.add(vectorStaticMultiply(vgpr("Addr+0", isMacro=True), vgpr("Addr+0", isMacro=True), bpeGR, None, "offset *= bytes/element"))
-        else:
-          macro.add(VLShiftLeftB64(dst=vgpr("Addr+0", 2, isMacro=True), \
-              shiftHex=hex(log2(bpeGR)), \
-              src="v[\\vgprAddr+0:\\vgprAddr+1]", \
-              comment="offset *= bytes/element"))
+      bpeGR = tP["bpeGR"] if not tP["isM"] else tP["bpe"]
+      # addr *= bytes/element
+      if justOffset32:
+        macro.add(vectorStaticMultiply(vgpr("Addr+0", isMacro=True), vgpr("Addr+0", isMacro=True), bpeGR, None, "offset *= bytes/element"))
+      else:
+        macro.add(VLShiftLeftB64(dst=vgpr("Addr+0", 2, isMacro=True), \
+            shiftHex=hex(log2(bpeGR)), \
+            src="v[\\vgprAddr+0:\\vgprAddr+1]", \
+            comment="offset *= bytes/element"))
       module.add(macro)
 
     if kernel["ProblemType"]["StochasticRounding"] and not self.states.asmCaps["v_prng_b32"] :
@@ -3624,7 +3613,7 @@ class KernelWriterAssembly(KernelWriter):
       tmp = self.vgprPool.checkOut(2, "tmp", self.states.preventVgprOverflowDuringNewTile)
 
       skComponent = Component.StreamK.find(self)
-      module.add(skComponent.graAddresses(self, kernel, tP, tmp))
+      module.add(skComponent.graAddresses(self, kernel, tc, tmp))
 
       for perp in range(0, tP["nrp"]):
         for sPerp in range(0, tP["nrpv"]):
@@ -4562,9 +4551,7 @@ class KernelWriterAssembly(KernelWriter):
     imod = Module("calculateStagger")
     tc = tP["tensorChar"]
 
-    # Stagger only works with BufferLoad
-    if not kernel["BufferLoad"]:
-      return imod
+    assert (kernel["BufferLoad"])
 
     with self.allocTmpSgpr(3) as tmpSgprInfo:
       staggerTmp    = tmpSgprInfo.idx
@@ -9470,12 +9457,7 @@ class KernelWriterAssembly(KernelWriter):
 #                print(vgpr(destVgprPrefix + "+%u"%(self.vgprs.globalReadRegisters[tc][i]), blockWidth))
 #                print("i = ", i)
 #                print("_ = ", _)
-                # Check if index is within bounds (can be out of range with BufferLoad=0)
-                if i < len(self.vgprs.globalReadRegisters[tc]):
-                  paramList.append(vgpr(destVgprPrefix + "+%u"%(self.vgprs.globalReadRegisters[tc][i]), blockWidth))
-                else:
-                  paramList.append(vgpr(destVgprPrefix + "+%u"%(g2lIdx), blockWidth))
-                numsOfRegister.append(blockWidth)
+                paramList.append(vgpr(destVgprPrefix + "+%u"%(self.vgprs.globalReadRegisters[tc][i]), blockWidth))
 #                print("DONE")
               elif blockWidth == 1:
                 paramList.append(vgpr(destVgprPrefix + "+%u"%(g2lIdx)))
@@ -11764,15 +11746,14 @@ class KernelWriterAssembly(KernelWriter):
         numTmpVgpr = 2
         if len(kernel["PackedC0IndicesX"]) > 1:
           numTmpVgpr += 1
+        # BufferOOB
+        if kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
+          numTmpVgpr += 1
       else:
         numTmpVgpr = 2 + 3 # GLOBAL_OFFSET_C needs 3, plus 2 tmps?
-      # BufferOOB
-      if (kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") or kernel["BufferStore"]:
-        numTmpVgpr += 1
-      else:
-        # Set to 0 instead of None to avoid issues with max() calls later
-        if numTmpVgpr is None:
-          numTmpVgpr = 0
+        # BufferOOB
+        if kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
+          numTmpVgpr += 1
       # dot2: for WaveSplitK reduction
       if kernel["NumWaveSplitK"] > 1:
         numTmpVgpr += 1
@@ -11792,16 +11773,13 @@ class KernelWriterAssembly(KernelWriter):
           actPCMaxTempVgpr = max(actPCMaxTempVgpr, gprs["vgpr"])
           actPCMaxTempSgpr = max(actPCMaxTempSgpr, gprs["sgpr"])
         actPCGwvwVgpr = int(ceil(maxVw * kernel["ProblemType"]["ActivationComputeDataType"].numRegisters()))
-        numTmpVgpr = max(numTmpVgpr if numTmpVgpr is not None else 0, actPCMaxTempVgpr + actPCGwvwVgpr)
+        numTmpVgpr = max(numTmpVgpr, actPCMaxTempVgpr + actPCGwvwVgpr)
       if kernel["ProblemType"]["UseE"] and (not kernel["ProblemType"]["Gradient"]):
         maxVw = max(vectorWidths)
         gwvwVgpr = int(ceil(maxVw * kernel["ProblemType"]["ActivationComputeDataType"].numRegisters()))
         if kernel["ActivationFuncCall"]:
           gwvwVgpr += actPCMaxTempVgpr + actPCGwvwVgpr
-        numTmpVgpr = max(numTmpVgpr if numTmpVgpr is not None else 0, gwvwVgpr)
-      # Ensure numTmpVgpr is at least 0 before calling checkOutAligned
-      if numTmpVgpr is None or numTmpVgpr == 0:
-        numTmpVgpr = 1  # Need at least 1 register
+        numTmpVgpr = max(numTmpVgpr, gwvwVgpr)
       tmpVgpr = self.vgprPool.checkOutAligned(numTmpVgpr, maxAlign, "store tmps")
       tmpVgpr = ContinuousRegister(idx=tmpVgpr, size=numTmpVgpr)
 
