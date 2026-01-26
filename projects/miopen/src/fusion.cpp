@@ -1162,7 +1162,7 @@ miopenStatus_t FusionPlanDescriptor::Compile(const Handle& handle)
         }
 
         // add to cache
-        handle.RegisterInvoker(*invoker, network_config, id.ToString());
+        handle.RegisterInvoker(*invoker, network_config, id.ToString(), AlgorithmName{"fusion"});
         handle.SetAsFound1_0(network_config, AlgorithmName{"fusion"}, id.ToString());
 
         compiled_invoker = std::make_pair(result.GetWorkspaceSize(), std::move(*invoker));
