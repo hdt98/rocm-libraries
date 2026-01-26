@@ -99,7 +99,7 @@ namespace rocisa
     }
 
     // Helper functions
-    std::vector<std::shared_ptr<Item>> getMFMAs(const std::shared_ptr<Item>& item)
+    std::vector<std::shared_ptr<Item>> (const std::shared_ptr<Item>& item)
     {
         std::vector<std::shared_ptr<Item>> mfmaList;
         if(auto module = std::dynamic_pointer_cast<Module>(item))
@@ -111,7 +111,8 @@ namespace rocisa
             }
         }
         else if(std::dynamic_pointer_cast<MFMAInstruction>(item)
-                || std::dynamic_pointer_cast<SMFMAInstruction>(item))
+                || std::dynamic_pointer_cast<SMFMAInstruction>(item)
+                || std::dynamic_pointer_cast<MXMFMAInstruction>(item))
         {
             mfmaList.push_back(item);
         }

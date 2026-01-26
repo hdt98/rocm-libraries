@@ -387,6 +387,8 @@ _defaultProblemType = {
     # =TensorContraction  requires specifying
     "OperationType": "GEMM",  # GEMM, TensorContraction, ConvolutionForward, ConvolutionBackwardData, ConvolutionBackwardWeights
     "DataType": 0,  # data types can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
+    "MacDataTypeA": 0, # A data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
+    "MacDataTypeB": 0, # B data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
     "DataTypeA": 0,  # A data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
     "DataTypeB": 0,  # B data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
     "DataTypeE": 0,  # E data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
@@ -453,7 +455,9 @@ _defaultProblemType = {
     "SetConstStrideBias": [],
     # Summation dimension indices
     "MirrorDimsA": [],
+    "MirrorDimsMXSA": [],
     "MirrorDimsB": [],
+    "MirrorDimsMXSB": [],
     "MirrorDimsMetadata": [],
     # for LD description
     "NumIndicesLD": 4,
@@ -469,6 +473,9 @@ _defaultProblemType = {
     "SupportUserArgs": True,
     "SwizzleTensorA": False,
     "SwizzleTensorB": False,
+    # MX Block
+    "MXBlockA": 0,
+    "MXBlockB": 0,
 }
 
 # The supported typed GEMM, each entry is (Ti, To, Tc).
@@ -537,6 +544,19 @@ _validGEMMTypes = [
     ("B8N", "F8N", "S"),
     ("F8B8N", "F8N", "S"),
     ("B8F8N", "F8N", "S"),
+    ("F6", "F6", "S", "S"),
+    ("B6", "B6", "S", "S"),
+    ("F6", "B6", "S", "S"),
+    ("B6", "F6", "S", "S"),
+    ("F8", "F6", "S", "S"),
+    ("F6", "F8", "S", "S"),
+    ("F8", "F4", "S", "S"),
+    ("F4", "F8", "S", "S"),
+    ("F6", "F4", "S", "S"),
+    ("F4", "F6", "S", "S"),
+    ("B6", "F4", "S", "S"),
+    ("F4", "B6", "S", "S"),
+    ("F4", "F4", "S", "S"),
 ]
 
 
@@ -593,6 +613,19 @@ _HPATypes = [
     ("B8N", "F8N", "S"),
     ("F8B8N", "F8N", "S"),
     ("B8F8N", "F8N", "S"),
+    ("F6", "F6", "S", "S"),
+    ("B6", "B6", "S", "S"),
+    ("F6", "B6", "S", "S"),
+    ("B6", "F6", "S", "S"),
+    ("F8", "F6", "S", "S"),
+    ("F6", "F8", "S", "S"),
+    ("F8", "F4", "S", "S"),
+    ("F4", "F8", "S", "S"),
+    ("F6", "F4", "S", "S"),
+    ("F4", "F6", "S", "S"),
+    ("B6", "F4", "S", "S"),
+    ("F4", "B6", "S", "S"),
+    ("F4", "F4", "S", "S"),
 ]
 
 def problemTypeToEnum(problemType):
@@ -638,19 +671,37 @@ class ProblemType(Mapping):
     # adjusting all data types
     if "DataType" in config:
       self["DataType"]  = DataType(config["DataType"])
+      self["MacDataTypeA"] = self["DataType"]
+      self["MacDataTypeB"] = self["DataType"]
       self["DataTypeA"] = self["DataType"]
       self["DataTypeB"] = self["DataType"]
     else:
       raise Exception("NO data type specified")
       self["DataType"]  = DataType(0)
+      self["MacDataTypeA"] = DataType(0)
+      self["MacDataTypeB"] = DataType(0)
       self["DataTypeA"] = DataType(0)
       self["DataTypeB"] = DataType(0)
 
+    if "MacDataTypeA" in config:
+      self["MacDataTypeA"] = DataType(config["MacDataTypeA"])
+    self["MacDataTypeA"] = getRealDataTypeA(self["MacDataTypeA"])
+
+    if "MacDataTypeB" in config:
+      self["MacDataTypeB"] = DataType(config["MacDataTypeB"])
+    self["MacDataTypeB"] = getRealDataTypeB(self["MacDataTypeB"])
+
     if "DataTypeA" in config:
       self["DataTypeA"] = DataType(config["DataTypeA"])
+    else:
+      self["DataTypeA"] = self["MacDataTypeA"]
+    self["DataTypeA"] = getRealDataTypeA(self["DataTypeA"])
 
     if "DataTypeB" in config:
       self["DataTypeB"] = DataType(config["DataTypeB"])
+    else:
+      self["DataTypeB"] = self["MacDataTypeB"]
+    self["DataTypeB"] = getRealDataTypeB(self["DataTypeB"])
 
     if "DestDataType" in config:
       self["DestDataType"] = DataType(config["DestDataType"])
@@ -692,17 +743,17 @@ class ProblemType(Mapping):
         self["F32XdlMathOp"] = DataType(DataTypeEnum.Float)
 
     # Modifying ComputeDataType for HHH+HPA: if (HHH+HPA), convert it to HHS_BH by setting ComputeDataType to S.
-    if self["ComputeDataType"].isHalf() and self["DataType"].isHalf() and self["HighPrecisionAccumulate"]:
+    if self["ComputeDataType"].isHalf() and self["MacDataTypeA"].isHalf() and self["HighPrecisionAccumulate"]:
       printWarning("Inconsistent DataTypes: DataType == f16, DestType == f16, ComputeDataType == f16, but HPA == True (HHH+HPA, no such a type); Converting HHH+HPA to HHS_BH by setting compute data type to f32.")
       self["ComputeDataType"] = DataType('s')
 
     # Modifying ComputeDataType for BBB+HPA: if (BBB+HPA), convert it to BBS_BH by setting ComputeDataType to S.
-    if self["ComputeDataType"].isBFloat16() and self["DataType"].isBFloat16() and self["HighPrecisionAccumulate"]:
+    if self["ComputeDataType"].isBFloat16() and self["MacDataTypeA"].isBFloat16() and self["HighPrecisionAccumulate"]:
       printWarning("Inconsistent DataTypes: DataType == bf16, DestType == bf16, ComputeDataType == bf16, but HPA == True (BBB+HPA, no such a type); Converting BBB+HPA to BBS_BH by setting compute data type to f32.")
       self["ComputeDataType"] = DataType('s')
 
     # Modifying ComputeDataType for I8I8I_BH: if (I8I8I8+HPA), convert it to I8I8I_BH by setting ComputeDataType to i.
-    if self["ComputeDataType"].isInt8() and DataType(config["DataType"]).isInt8() and self["HighPrecisionAccumulate"]:
+    if self["ComputeDataType"].isInt8() and DataType(config["MacDataTypeA"]).isInt8() and self["HighPrecisionAccumulate"]:
       print2("DataType == i8 and HPA == True; setting compute data type to int32")
       self["ComputeDataType"] = DataType('i')
 
@@ -762,7 +813,7 @@ class ProblemType(Mapping):
                                                                                                 self["DestDataType"]))
         self["ActivationComputeDataType"] = self["ComputeDataType"]
       if (self["ActivationComputeDataType"].numRegisters() != self["ComputeDataType"].numRegisters()) and \
-        (self["DataType"].numRegisters() < self["DestDataType"].numRegisters()):
+        (self["MacDataTypeA"].numRegisters() < self["DestDataType"].numRegisters()):
         printWarning("TensileLite only supports ActivationComputeDataType = ComputeDataType if DestDataType > DataType. \
                       ActivationComputeDataType will be set to ComputeDataType automatically.")
         self["ActivationComputeDataType"] = self["ComputeDataType"]
@@ -822,11 +873,12 @@ class ProblemType(Mapping):
   #   See the discussion in ValidParameters.py for validGEMMTypes
   ################################################################################
   def _checkIfSupportedGEMMType(self):
-    inType = self["DataType"]
+    inTypeA = self["MacDataTypeA"]
+    inTypeB = self["MacDataTypeB"]
     outType = self["DestDataType"]
     computeType = self["ComputeDataType"]
 
-    gemmType = ( inType.toChar(), outType.toChar(), computeType.toChar() )
+    gemmType = ( inTypeA.toChar(), inTypeB.toChar(), outType.toChar(), computeType.toChar() )
     if gemmType not in _validGEMMTypes:
       raise Exception("This typed-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet."%(gemmType[0], gemmType[1], gemmType[2]))
 
@@ -850,6 +902,11 @@ class ProblemType(Mapping):
       self["NumIndicesC"] = 3
     else:
       self["NumIndicesC"] = 2
+
+    if self["MXBlockA"]:
+      self["IndexAssignmentsMXSA"] = deepcopy(self["IndexAssignmentsA"])
+    if self["MXBlockB"]:
+      self["IndexAssignmentsMXSB"] = deepcopy(self["IndexAssignmentsB"])
 
     self["NumIndicesLD"] = 4
     self["IndexAssignmentsLD"][0] = self["NumIndicesC"] + 1
@@ -921,10 +978,20 @@ class ProblemType(Mapping):
       if state["IndexAssignmentsA"][i] == state["IndexUnroll"]:
         state["IndexUnrollA"] = i
         break
+    if state["MXBlockA"]:
+      for i in range(0, len(state["IndexAssignmentsMXSA"])):
+        if state["IndexAssignmentsMXSA"][i] == state["IndexUnroll"]:
+          state["IndexUnrollMXSA"] = i
+          break
     for i in range(0, len(state["IndexAssignmentsB"])):
       if state["IndexAssignmentsB"][i] == state["IndexUnroll"]:
         state["IndexUnrollB"] = i
         break
+    if state["MXBlockB"]:
+      for i in range(0, len(state["IndexAssignmentsMXSB"])):
+        if state["IndexAssignmentsMXSB"][i] == state["IndexUnroll"]:
+          state["IndexUnrollMXSB"] = i
+          break
     for i in range(0, len(state["IndexAssignmentsMetadata"])):
       if state["IndexAssignmentsMetadata"][i] == state["IndexUnroll"]:
         state["IndexUnrollM"] = i
@@ -938,7 +1005,11 @@ class ProblemType(Mapping):
     else:
       dimList = state["IndicesFree"]
     state["Index01A"] = [i for i in state["IndexAssignmentsA"] if i in dimList][0]
+    if state["MXBlockA"]:
+      state["Index01MXSA"] = [i for i in state["IndexAssignmentsMXSA"] if i in dimList][0]
     state["Index01B"] = [i for i in state["IndexAssignmentsB"] if i in dimList][0]
+    if state["MXBlockB"]:
+      state["Index01MXSB"] = [i for i in state["IndexAssignmentsMXSB"] if i in dimList][0]
     #print2("Index01A: %u" % state["Index01A"])
     #print2("Index01B: %u" % state["Index01B"])
     # Store code is optimized for 0 as the fastest-moving in memory
@@ -964,7 +1035,11 @@ class ProblemType(Mapping):
     unrollIdxA = state["IndexAssignmentsA"].index(state["IndexUnroll"])
     unrollIdxB = state["IndexAssignmentsB"].index(state["IndexUnroll"])
     state["TLUA"] = strideIdxA < unrollIdxA
+    if state["MXBlockA"]:
+      state["TLUMXSA"] = state["TLUA"]
     state["TLUB"] = strideIdxB < unrollIdxB
+    if state["MXBlockB"]:
+      state["TLUMXSB"] = state["TLUB"]
     #state["TLUB"] = True # hack
 
     if printIndexAssignmentInfo:
@@ -1005,25 +1080,40 @@ class ProblemType(Mapping):
       name.append("C")
 
     # DataTypes
-    if self["DataType"] != self["DataTypeA"] or self["DataType"] != self["DataTypeB"]:
-      name.append(self["DataTypeA"].toChar() + self["DataTypeB"].toChar())
-    name.append(self["DataType"].toChar()) # Type of A/B
+    macTypeStr = self["MacDataTypeA"].toChar()
+    if self["MacDataTypeA"] != self["MacDataTypeB"]:
+      macTypeStr = self["MacDataTypeA"].toChar() + self["MacDataTypeB"].toChar()
+    if self["MacDataTypeA"] != self["DataTypeA"] or self["MacDataTypeB"] != self["DataTypeB"]:
+      name += "_"
+      name += self["DataTypeA"].toChar() + self["DataTypeB"].toChar()
+    name += "_"
+    name += macTypeStr # Type of A/B
 
     # Special condition for some newly supported kernels:
     #   HHS, HSS, BSS and I8II kernels, use a clearer naming _TiToTc_
     # TODO: Distinguish all kernels by _TiToTc_ to be more consistent with rocblas
-    gemmType = (self["DataType"].toChar(),self["DestDataType"].toChar(),self["ComputeDataType"].toChar() )
-    if gemmType in _HPATypes:
-      name[-1] += "".join([self["DestDataType"].toChar(), self["ComputeDataType"].toChar()])
+    gemmType = (self["MacDataTypeA"].toChar(), self["MacDataTypeB"].toChar(), self["DestDataType"].toChar(), self["ComputeDataType"].toChar() )
+    if gemmType in HPATypes:
+      name += self["DestDataType"].toChar()    # Type of C/D
+      name += self["ComputeDataType"].toChar() # Type of Alpha/Beta
+      name += "_"
 
-    if not self["F32XdlMathOp"].isSingle() and self["DataType"].isSingle():
-      name.append("".join(["M", self["F32XdlMathOp"].toChar()]))
+    if not self["F32XdlMathOp"].isSingle() and self["MacDataTypeA"].isSingle():
+      name += "_M"
+      name += self["F32XdlMathOp"].toChar()
+      name += "_"
 
     if self["SwizzleTensorA"]:
       name.append("STA")
 
     if self["SwizzleTensorB"]:
       name.append("STB")
+
+    if self["MXBlockA"]:
+      name += f'MXA{self["MXBlockA"]}_'
+
+    if self["MXBlockB"]:
+      name += f'MXB{self["MXBlockB"]}_'
 
     # Other
     other = ""

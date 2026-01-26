@@ -384,12 +384,12 @@ namespace
             return rocisa::DataType::Int8;
         case HIP_R_32I:
             return rocisa::DataType::Int32;
-        case HIP_R_6F_E2M3_EXT: // FIXME: fix this when tensile provide FP6 type
-            return rocisa::DataType::Float8;
-        case HIP_R_6F_E3M2_EXT: // FIXME: fix this when tensile provide BF6 type
-            return rocisa::DataType::Float8;
-        case HIP_R_4F_E2M1_EXT: // FIXME: fix this when tensile provide FP4 type
-            return rocisa::DataType::Float8;
+        case HIP_R_6F_E2M3_EXT:
+            return rocisa::DataType::Float6;
+        case HIP_R_6F_E3M2_EXT:
+            return rocisa::DataType::BFloat6;
+        case HIP_R_4F_E2M1_EXT:
+            return rocisa::DataType::Float4;
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -420,6 +420,12 @@ namespace
             return HIP_R_8I;
         case rocisa::DataType::Int32:
             return HIP_R_32I;
+        case rocisa::DataType::Float6:
+            return static_cast<hipDataType>(HIP_R_6F_E2M3_EXT);
+        case rocisa::DataType::BFloat6:
+            return static_cast<hipDataType>(HIP_R_6F_E3M2_EXT);
+        case rocisa::DataType::Float4:
+            return static_cast<hipDataType>(HIP_R_4F_E2M1_EXT);
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -456,9 +462,9 @@ namespace
     }
 
     inline const rocisa::DataType
-        roc2TensileComputeInputType(const rocisa::DataType&       typeA,
-                                    const rocisa::DataType&       typeB,
-                                    const rocblaslt_compute_type& typeCompute)
+        roc2TensileComputeInputTypeA(const rocisa::DataType&       typeA,
+                                     const rocisa::DataType&       typeB,
+                                     const rocblaslt_compute_type& typeCompute)
     {
         switch(typeCompute)
         {
@@ -471,36 +477,90 @@ namespace
         case rocblaslt_compute_f32_fast_bf8_fnuz:
             return rocisa::DataType::BFloat8_fnuz;
         case rocblaslt_compute_f32_fast_f8bf8_fnuz:
-            return rocisa::DataType::Float8BFloat8_fnuz;
+            return rocisa::DataType::Float8_fnuz;
         case rocblaslt_compute_f32_fast_bf8f8_fnuz:
-            return rocisa::DataType::BFloat8Float8_fnuz;
+            return rocisa::DataType::BFloat8_fnuz;
         case rocblaslt_compute_f32_fast_f8:
             return rocisa::DataType::Float8;
         case rocblaslt_compute_f32_fast_bf8:
             return rocisa::DataType::BFloat8;
         case rocblaslt_compute_f32_fast_f8bf8:
-            return rocisa::DataType::Float8BFloat8;
+            return rocisa::DataType::Float8;
         case rocblaslt_compute_f32_fast_bf8f8:
-            return rocisa::DataType::BFloat8Float8;
+            return rocisa::DataType::BFloat8;
         default:;
         }
 
         if(typeA == rocisa::DataType::Float8_fnuz && typeB == rocisa::DataType::BFloat8_fnuz)
         {
-            return rocisa::DataType::Float8BFloat8_fnuz;
+            return rocisa::DataType::Float8_fnuz;
         }
         else if(typeA == rocisa::DataType::BFloat8_fnuz && typeB == rocisa::DataType::Float8_fnuz)
         {
-            return rocisa::DataType::BFloat8Float8_fnuz;
+            return rocisa::DataType::BFloat8_fnuz;
         }
 
         if(typeA == rocisa::DataType::Float8 && typeB == rocisa::DataType::BFloat8)
         {
-            return rocisa::DataType::Float8BFloat8;
+            return rocisa::DataType::Float8;
         }
         else if(typeA == rocisa::DataType::BFloat8 && typeB == rocisa::DataType::Float8)
         {
-            return rocisa::DataType::BFloat8Float8;
+            return rocisa::DataType::BFloat8;
+        }
+
+        return TensileLite::DataTypeInfo::Get(typeA).elementSize
+                       <= TensileLite::DataTypeInfo::Get(typeB).elementSize
+                   ? typeA
+                   : typeB;
+    }
+	
+	inline const rocisa::DataType
+        roc2TensileComputeInputTypeB(const rocisa::DataType&       typeA,
+                                     const rocisa::DataType&       typeB,
+                                     const rocblaslt_compute_type& typeCompute)
+    {
+        switch(typeCompute)
+        {
+        case rocblaslt_compute_f32_fast_f16:
+            return rocisa::DataType::Half;
+        case rocblaslt_compute_f32_fast_bf16:
+            return rocisa::DataType::BFloat16;
+        case rocblaslt_compute_f32_fast_f8_fnuz:
+            return rocisa::DataType::Float8_fnuz;
+        case rocblaslt_compute_f32_fast_bf8_fnuz:
+            return rocisa::DataType::BFloat8_fnuz;
+        case rocblaslt_compute_f32_fast_f8bf8_fnuz:
+            return rocisa::DataType::BFloat8_fnuz;
+        case rocblaslt_compute_f32_fast_bf8f8_fnuz:
+            return rocisa::DataType::Float8_fnuz;
+        case rocblaslt_compute_f32_fast_f8:
+            return rocisa::DataType::Float8;
+        case rocblaslt_compute_f32_fast_bf8:
+            return rocisa::DataType::BFloat8;
+        case rocblaslt_compute_f32_fast_f8bf8:
+            return rocisa::DataType::BFloat8;
+        case rocblaslt_compute_f32_fast_bf8f8:
+            return rocisa::DataType::Float8;
+        default:;
+        }
+
+        if(typeA == rocisa::DataType::Float8_fnuz && typeB == rocisa::DataType::BFloat8_fnuz)
+        {
+            return rocisa::DataType::BFloat8_fnuz;
+        }
+        else if(typeA == rocisa::DataType::BFloat8_fnuz && typeB == rocisa::DataType::Float8_fnuz)
+        {
+            return rocisa::DataType::Float8_fnuz;
+        }
+
+        if(typeA == rocisa::DataType::Float8 && typeB == rocisa::DataType::BFloat8)
+        {
+            return rocisa::DataType::BFloat8;
+        }
+        else if(typeA == rocisa::DataType::BFloat8 && typeB == rocisa::DataType::Float8)
+        {
+            return rocisa::DataType::Float8;
         }
 
         return TensileLite::DataTypeInfo::Get(typeA).elementSize
@@ -549,7 +609,8 @@ namespace
             hip2TensileType(typeD),
             roc2TensileType(typeCompute),
             roc2TensileType(typeCompute),
-            roc2TensileComputeInputType(typeATensile, typeBTensile, typeCompute),
+            roc2TensileComputeInputTypeA(typeATensile, typeBTensile, typeCompute),
+            roc2TensileComputeInputTypeB(typeATensile, typeBTensile, typeCompute),
             roc2TensileType(typeCompute),
             alpha,
             beta,
@@ -563,7 +624,8 @@ namespace
 
     const char* tensileComputeInputType_to_bench_string(rocisa::DataType typeCompute,
                                                         rocisa::DataType F32XdlMathOp,
-                                                        rocisa::DataType typeComputeInput,
+                                                        rocisa::DataType typeComputeInputA,
+                                                        rocisa::DataType typeComputeInputB,
                                                         rocisa::DataType typeA,
                                                         rocisa::DataType typeB)
     {
@@ -585,13 +647,14 @@ namespace
         {
             return "xf32_r";
         }
-        else if(typeComputeInput == rocisa::DataType::BFloat16
-                && (typeA == rocisa::DataType::Half && typeB == rocisa::DataType::Half
-                    || typeA == rocisa::DataType::Float && typeB == rocisa::DataType::Float))
+        else if(typeComputeInputA == rocisa::DataType::BFloat16
+                && typeComputeInputB == rocisa::DataType::BFloat16 && typeA == rocisa::DataType::Half
+                && typeB == rocisa::DataType::Half)
         {
             return "f32_bf16_r";
         }
-        else if(typeComputeInput == rocisa::DataType::Half
+        else if(typeComputeInputA == rocisa::DataType::Half
+                && typeComputeInputB == rocisa::DataType::Half
                 && (typeA == rocisa::DataType::Float8_fnuz && typeB == rocisa::DataType::Half
                     || typeA == rocisa::DataType::Half && typeB == rocisa::DataType::Float8_fnuz))
         {
@@ -605,7 +668,8 @@ namespace
 
     const char* tensileComputeInputType_to_profile_string(rocisa::DataType typeCompute,
                                                           rocisa::DataType F32XdlMathOp,
-                                                          rocisa::DataType typeComputeInput,
+                                                          rocisa::DataType typeComputeInputA,
+                                                          rocisa::DataType typeComputeInputB,
                                                           rocisa::DataType typeA,
                                                           rocisa::DataType typeB)
     {
@@ -627,13 +691,14 @@ namespace
         {
             return "c_xf32_r";
         }
-        else if(typeComputeInput == rocisa::DataType::BFloat16
-                && (typeA == rocisa::DataType::Half && typeB == rocisa::DataType::Half
-                    || typeA == rocisa::DataType::Float && typeB == rocisa::DataType::Float))
+        else if(typeComputeInputA == rocisa::DataType::BFloat16
+                && typeComputeInputB == rocisa::DataType::BFloat16 && typeA == rocisa::DataType::Half
+                && typeB == rocisa::DataType::Half)
         {
             return "c_f32_fast_bf16_r";
         }
-        else if(typeComputeInput == rocisa::DataType::Half
+        else if(typeComputeInputA == rocisa::DataType::Half
+                && typeComputeInputB == rocisa::DataType::Half
                 && (typeA == rocisa::DataType::Float8_fnuz && typeB == rocisa::DataType::Half
                     || typeA == rocisa::DataType::Half && typeB == rocisa::DataType::Float8_fnuz))
         {
@@ -763,7 +828,8 @@ namespace
             "--compute_type",
             tensileComputeInputType_to_bench_string(problem.computeType(),
                                                     problem.f32XdlMathOp(),
-                                                    problem.computeInputType(),
+                                                    problem.computeInputTypeA(),
+                                                    problem.computeInputTypeB(),
                                                     problem.a().dataType(),
                                                     problem.b().dataType()),
             "--algo_method",
@@ -876,7 +942,8 @@ namespace
                     "compute_type",
                     tensileComputeInputType_to_profile_string(problem.computeType(),
                                                               problem.f32XdlMathOp(),
-                                                              problem.computeInputType(),
+                                                              problem.computeInputTypeA(),
+                                                              problem.computeInputTypeB(),
                                                               problem.a().dataType(),
                                                               problem.b().dataType()),
                     "algo_method",
@@ -981,7 +1048,8 @@ namespace
                     "compute_type",
                     tensileComputeInputType_to_profile_string(problem.computeType(),
                                                               problem.f32XdlMathOp(),
-                                                              problem.computeInputType(),
+                                                              problem.computeInputTypeA(),
+                                                              problem.computeInputTypeB(),
                                                               problem.a().dataType(),
                                                               problem.b().dataType()),
                     "activation_type",
@@ -1110,7 +1178,8 @@ namespace
             "--compute_type",
             tensileComputeInputType_to_bench_string(problem.gemms[0].computeType(),
                                                     problem.gemms[0].f32XdlMathOp(),
-                                                    problem.gemms[0].computeInputType(),
+                                                    problem.gemms[0].computeInputTypeA(),
+                                                    problem.gemms[0].computeInputTypeB(),
                                                     problem.gemms[0].a().dataType(),
                                                     problem.gemms[0].b().dataType()),
             "--algo_method",
@@ -1269,7 +1338,8 @@ namespace
             "compute_type",
             tensileComputeInputType_to_profile_string(problem.gemms[0].computeType(),
                                                       problem.gemms[0].f32XdlMathOp(),
-                                                      problem.gemms[0].computeInputType(),
+                                                      problem.gemms[0].computeInputTypeA(),
+                                                      problem.gemms[0].computeInputTypeB(),
                                                       problem.gemms[0].a().dataType(),
                                                       problem.gemms[0].b().dataType()),
             "algo_method",
@@ -1418,7 +1488,8 @@ namespace
             "compute_type",
             tensileComputeInputType_to_profile_string(problem.gemms[0].computeType(),
                                                       problem.gemms[0].f32XdlMathOp(),
-                                                      problem.gemms[0].computeInputType(),
+                                                      problem.gemms[0].computeInputTypeA(),
+                                                      problem.gemms[0].computeInputTypeB(),
                                                       problem.gemms[0].a().dataType(),
                                                       problem.gemms[0].b().dataType()),
             "activation_type",
@@ -1573,8 +1644,10 @@ namespace
                                                            value_category(beta),
                                                            prob.workspaceSize};
 
-        tensileProblem.setComputeInputType(
-            roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
+        tensileProblem.setComputeInputTypeA(
+            roc2TensileComputeInputTypeA(a_type, b_type, prob.compute_type));
+        tensileProblem.setComputeInputTypeB(
+            roc2TensileComputeInputTypeB(a_type, b_type, prob.compute_type));
         tensileProblem.setAlphaType(compute_type);
         tensileProblem.setBetaType(compute_type);
 
@@ -1753,8 +1826,10 @@ namespace
 
         tensileProblem.updateProblem(freeIndex, batchIndex, boundIndex, beta, prob.workspaceSize);
 
-        tensileProblem.setComputeInputType(
-            roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
+        tensileProblem.setComputeInputTypeA(
+            roc2TensileComputeInputTypeA(a_type, b_type, prob.compute_type));
+        tensileProblem.setComputeInputTypeB(
+            roc2TensileComputeInputTypeB(a_type, b_type, prob.compute_type));
         tensileProblem.setAlphaType(compute_type);
         tensileProblem.setBetaType(compute_type);
 
