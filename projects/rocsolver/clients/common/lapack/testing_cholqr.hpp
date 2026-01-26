@@ -54,16 +54,11 @@ S cholqr_getToleranceByAlgo(rocsolver_cholqr_algo algo, int m, int n)
 {
     switch(algo)
     {
-        case rocsolver_cholqr_cholqr1:
-            return 10 * m * n;
-        case rocsolver_cholqr_cholqr2:
-            return 10 * m * n;
-        case rocsolver_cholqr_cholqr3_compute:
-            return 10 * m * n;
-        case rocsolver_cholqr_cholqr3_user:
-            return 10 * m * n;
-        default:
-            return 10 * m * n;
+    case rocsolver_cholqr_cholqr1: return 10 * m * n;
+    case rocsolver_cholqr_cholqr2: return 10 * m * n;
+    case rocsolver_cholqr_cholqr3_compute: return 10 * m * n;
+    case rocsolver_cholqr_cholqr3_user: return 10 * m * n;
+    default: return 10 * m * n;
     }
 }
 
@@ -250,7 +245,17 @@ void cholqr_initData(const rocblas_handle handle,
     }
 }
 
-template <bool STRIDED, typename T, typename I, typename Td, typename Ud, typename Sd, typename Id, typename Th, typename Uh, typename Sh, typename Ih>
+template <bool STRIDED,
+          typename T,
+          typename I,
+          typename Td,
+          typename Ud,
+          typename Sd,
+          typename Id,
+          typename Th,
+          typename Uh,
+          typename Sh,
+          typename Ih>
 void cholqr_getError(const rocblas_handle handle,
                      const I m,
                      const I n,
@@ -313,51 +318,98 @@ void cholqr_getError(const rocblas_handle handle,
             // Compute Q_gpu^H * Q_gpu using GEMM (should be identity for orthogonal Q)
             // QtQ = Q^H * Q, result is min_mn x min_mn
             std::vector<T> QtQ(size_t(min_mn) * min_mn, T(0));
-            rocblas_operation transQ = rocblas_is_complex<T> ? rocblas_operation_conjugate_transpose 
-                                                              : rocblas_operation_transpose;
-            cpu_gemm(transQ, rocblas_operation_none, min_mn, min_mn, m, 
-                     T(1), hARes[b], lda, hARes[b], lda, T(0), QtQ.data(), min_mn);
+            I const ldQtQ = min_mn;
 
-            // Subtract identity: QtQ - I
-            for(I i = 0; i < min_mn; ++i)
-                QtQ[i + i * min_mn] -= T(1);
+            // ---------------
+            // QtQ <- identity
+            // ---------------
+            {
+                char uplo = 'A';
+                T beta = T(1); // diagonal
+                T alpha = T(0); // off-diagonal
+                I mm = min_mn;
+                I nn = min_mn;
 
-            // Compute ||Q^H Q - I||_F
-            S orth_err = snorm('F', min_mn, min_mn, QtQ.data(), min_mn);
+                cpu_laset(uplo, mm, nn, alpha, beta, QtQ.data(), ldQtQ);
+            }
+
+            // -------------------------
+            // Compute QtQ <-  Q' * Q - identity
+            // -------------------------
+            {
+                I mm = min_mn;
+                I nn = min_mn;
+                I kk = m;
+                T alpha = T(1);
+                T beta = T(-1);
+
+                rocblas_operation transQ = rocblas_operation_conjugate_transpose;
+                cpu_gemm(transQ, rocblas_operation_none, mm, nn, kk, alpha, hARes[b], lda, hARes[b],
+                         lda, beta, QtQ.data(), ldQtQ);
+            }
+
+            // -----------------------
+            // Compute orth_err = norm( Q^H Q - I )
+            // -----------------------
+
+            char norm = 'F';
+            S orth_err = snorm(norm, min_mn, min_mn, QtQ.data(), ldQtQ);
 
             // Compute Q_gpu * R_gpu using GEMM (should equal original A)
             // QR = Q * R, result is m x n
             // Note: R may have garbage below diagonal from GPU, so extract only upper triangular
+
             std::vector<T> R_gpu_clean(size_t(ldr) * n, T(0));
-            for(I j = 0; j < n; ++j)
-                for(I i = 0; i <= j && i < min_mn; ++i)
-                    R_gpu_clean[i + j * ldr] = hRRes[b][i + j * ldr];
+
+            //  ------------------------------
+            //  Copy upper triangular part
+            //  R_gpu_clean = triu( hRRes[b] )
+            //  ------------------------------
+            cpu_lacpy('U', min_mn, min_mn, &(hRRes[b][0]), ldr, &(R_gpu_clean[0]), ldr);
 
             std::vector<T> QR(size_t(lda) * n, T(0));
-            cpu_gemm(rocblas_operation_none, rocblas_operation_none, m, n, min_mn,
-                     T(1), hARes[b], lda, R_gpu_clean.data(), ldr, T(0), QR.data(), lda);
+            I ldQR = lda;
 
-            // Compute ||A - QR||_F
-            // Note: Must iterate column by column to respect leading dimension lda
-            S recon_err_sq = S(0);
-            for(I j = 0; j < n; ++j)
+            // -------------------------
+            // compute  QR <-  Q * R - A
+            // -------------------------
+
             {
-                for(I i = 0; i < m; ++i)
-                {
-                    T diff = hA[b][i + j * lda] - QR[i + j * lda];
-                    recon_err_sq += std::real(diff * conj_helper(diff));
-                }
+                I mm = m;
+                I nn = n;
+                I kk = min_mn;
+
+                T alpha = 1;
+                T beta = -1;
+                cpu_lacpy('A', mm, nn, &(hA[b][0]), lda, QR.data(), ldQR);
+
+                cpu_gemm(rocblas_operation_none, rocblas_operation_none, mm, nn, kk,
+
+                         alpha, hARes[b], lda, R_gpu_clean.data(), ldr, beta, QR.data(), ldQR);
             }
-            S recon_err = std::sqrt(recon_err_sq);
 
-            err = orth_err + recon_err;
+            // Compute recon_err = norm(A - QR)
+            // Note: Must iterate column by column to respect leading dimension lda
+
+            auto recon_err = snorm(norm, m, n, QR.data(), ldQR);
+
+            err = std::max(orth_err, recon_err);
             *max_err = err > *max_err ? err : *max_err;
-
         }
     }
 }
 
-template <bool STRIDED, typename T, typename I, typename Td, typename Ud, typename Sd, typename Id, typename Th, typename Uh, typename Sh, typename Ih>
+template <bool STRIDED,
+          typename T,
+          typename I,
+          typename Td,
+          typename Ud,
+          typename Sd,
+          typename Id,
+          typename Th,
+          typename Uh,
+          typename Sh,
+          typename Ih>
 void cholqr_getPerfData(const rocblas_handle handle,
                         const I m,
                         const I n,
@@ -482,15 +534,15 @@ void testing_cholqr(Arguments& argus)
     if(invalid_size)
     {
         if(BATCHED)
-            EXPECT_ROCBLAS_STATUS(
-                rocsolver_cholqr(STRIDED, handle, m, n, (T* const*)nullptr, lda, stA,
-                                 (T*)nullptr, ldr, stR, (S*)nullptr, algo, (I*)nullptr, bc),
-                rocblas_status_invalid_size);
+            EXPECT_ROCBLAS_STATUS(rocsolver_cholqr(STRIDED, handle, m, n, (T* const*)nullptr, lda,
+                                                   stA, (T*)nullptr, ldr, stR, (S*)nullptr, algo,
+                                                   (I*)nullptr, bc),
+                                  rocblas_status_invalid_size);
         else
-            EXPECT_ROCBLAS_STATUS(
-                rocsolver_cholqr(STRIDED, handle, m, n, (T*)nullptr, lda, stA, (T*)nullptr, ldr,
-                                 stR, (S*)nullptr, algo, (I*)nullptr, bc),
-                rocblas_status_invalid_size);
+            EXPECT_ROCBLAS_STATUS(rocsolver_cholqr(STRIDED, handle, m, n, (T*)nullptr, lda, stA,
+                                                   (T*)nullptr, ldr, stR, (S*)nullptr, algo,
+                                                   (I*)nullptr, bc),
+                                  rocblas_status_invalid_size);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_size);
@@ -715,4 +767,3 @@ INSTANTIATE(EXTERN_TESTING_CHOLQR,
             FOREACH_SCALAR_TYPE,
             FOREACH_INT_TYPE,
             APPLY_STAMP)
-
