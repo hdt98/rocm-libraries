@@ -41,6 +41,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+void zlaset_(char* uplo,
+             int* m,
+             int* n,
+             rocblas_double_complex* alpha,
+             rocblas_double_complex* beta,
+             rocblas_double_complex* A,
+             int* lda);
+void claset_(char* uplo,
+             int* m,
+             int* n,
+             rocblas_float_complex* alpha,
+             rocblas_float_complex* beta,
+             rocblas_float_complex* A,
+             int* lda);
+void dlaset_(char* uplo, int* m, int* n, double* alpha, double* beta, double* A, int* lda);
+void slaset_(char* uplo, int* m, int* n, float* alpha, float* beta, float* A, int* lda);
 
 float slange_(char* norm, int* m, int* n, float* A, int* lda, float* work);
 double dlange_(char* norm, int* m, int* n, double* A, int* lda, double* work);
@@ -2648,6 +2664,56 @@ double cpu_lange<rocblas_double_complex, double>(char norm,
                                                  double* work)
 {
     return zlange_(&norm, &m, &n, A, &lda, work);
+}
+
+// laset
+
+template <>
+void cpu_laset<float>(char uplo,
+                      rocblas_int m,
+                      rocblas_int n,
+                      float alpha,
+                      float beta,
+                      float* A,
+                      rocblas_int lda)
+{
+    slaset_(&uplo, &m, &n, &alpha, &beta, A, &lda);
+}
+
+template <>
+void cpu_laset<double>(char uplo,
+                       rocblas_int m,
+                       rocblas_int n,
+                       double alpha,
+                       double beta,
+                       double* A,
+                       rocblas_int lda)
+{
+    dlaset_(&uplo, &m, &n, &alpha, &beta, A, &lda);
+}
+
+template <>
+void cpu_laset<rocblas_float_complex>(char uplo,
+                                      rocblas_int m,
+                                      rocblas_int n,
+                                      rocblas_float_complex alpha,
+                                      rocblas_float_complex beta,
+                                      rocblas_float_complex* A,
+                                      rocblas_int lda)
+{
+    claset_(&uplo, &m, &n, &alpha, &beta, A, &lda);
+}
+
+template <>
+void cpu_laset<rocblas_double_complex>(char uplo,
+                                       rocblas_int m,
+                                       rocblas_int n,
+                                       rocblas_double_complex alpha,
+                                       rocblas_double_complex beta,
+                                       rocblas_double_complex* A,
+                                       rocblas_int lda)
+{
+    zlaset_(&uplo, &m, &n, &alpha, &beta, A, &lda);
 }
 
 // gecon

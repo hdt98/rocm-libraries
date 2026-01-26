@@ -72,6 +72,9 @@ void cpu_syr(rocblas_fill uplo, rocblas_int n, T alpha, T *x,
                rocblas_int incx, T *A, rocblas_int lda);
 */
 
+template <typename T>
+void cpu_laset(char norm, rocblas_int m, rocblas_int n, T alpha, T beta, T* A, rocblas_int lda);
+
 template <typename T, typename S>
 S cpu_lange(char norm, rocblas_int m, rocblas_int n, T* A, rocblas_int lda, S* work);
 
