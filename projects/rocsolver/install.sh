@@ -473,7 +473,8 @@ if [[ -n "${rocsparse_path+x}" ]]; then
 fi
 
 # Default cmake executable is called cmake
-cmake_executable=cmake
+# cmake_executable=cmake
+cmake_executable=/usr/bin/cmake # WA for /opt/venv/bin bad version
 
 case "${ID}" in
   centos|rhel)

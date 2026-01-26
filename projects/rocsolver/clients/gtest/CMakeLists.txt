@@ -111,6 +111,7 @@ set(rocauxiliary_test_source
   auxiliary/stebz_gtest.cpp
   auxiliary/stein_gtest.cpp
   auxiliary/latrd_gtest.cpp
+  auxiliary/latrd_forsytrd_gtest.cpp
   # symmetric matrices
   auxiliary/lasyf_gtest.cpp
   # triangular matrices
