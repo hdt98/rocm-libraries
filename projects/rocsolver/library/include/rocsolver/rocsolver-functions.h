@@ -1210,6 +1210,133 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlatrd(rocblas_handle handle,
 //! @}
 
 /*! @{
+    \brief LATRD computes the tridiagonal form of k rows and columns of
+    a symmetric/hermitian matrix A, as well as the matrix W needed to update
+    the remaining part of A. The _forsytrd variant is a specialized variant
+    intended to support SYTRD.
+
+    \details
+    The reduced form is given by:
+
+    \f[
+        T = Q'AQ
+    \f]
+
+    If uplo is lower, the first k rows and columns of T form the tridiagonal block. If uplo is upper, then the last
+    k rows and columns of T form the tridiagonal block. Q is an orthogonal/unitary matrix represented as the
+    product of Householder matrices
+
+    \f[
+        \begin{array}{cl}
+        Q = H(1)H(2)\cdots H(k) & \text{if uplo indicates lower, or}\\
+        Q = H(n)H(n-1)\cdots H(n-k+1) & \text{if uplo is upper}.
+        \end{array}
+    \f]
+
+    Each Householder matrix \f$H(i)\f$ is given by
+
+    \f[
+        H(i) = I - \text{tau}[i]\cdot v_i^{}v_i'
+    \f]
+
+    where tau[\f$i\f$] is the corresponding Householder scalar. When uplo indicates lower, the first \f$i\f$
+    elements of the Householder vector \f$v_i\f$ are zero, and \f$v_i[i+1] = 1\f$. If uplo is upper,
+    the last n-\f$i\f$ elements of the Householder vector \f$v_i\f$ are zero, and \f$v_i[i] = 1\f$.
+
+    The unreduced part of the matrix A can be updated using a rank update of the form:
+
+    \f[
+        A = A - VW' - WV'
+    \f]
+
+    where V is the n-by-k matrix formed by the vectors \f$v_i\f$.
+
+    @param[in]
+    handle      rocblas_handle.
+    @param[in]
+    uplo        rocblas_fill.
+                Specifies whether the upper or lower part of the matrix A is stored.
+                If uplo indicates lower (or upper), then the upper (or lower)
+                part of A is not used.
+    @param[in]
+    n           rocblas_int. n >= 0.
+                The number of rows and columns of the matrix A.
+    @param[in]
+    k           rocblas_int. 0 <= k <= n.
+                The number of rows and columns of the matrix A to be reduced.
+    @param[inout]
+    A           pointer to type. Array on the GPU of dimension lda*n.
+                On entry, the n-by-n matrix to be reduced.
+                On exit, if uplo is lower, the first k columns have been reduced to tridiagonal form
+                (given in the diagonal elements of A and the array E), the elements below the diagonal
+                contain the possibly non-zero entries of the Householder vectors associated with Q, stored as columns.
+                If uplo is upper, the last k columns have been reduced to tridiagonal form
+                (given in the diagonal elements of A and the array E), the elements above the diagonal
+                contain the possibly non-zero entries of the Householder vectors associated with Q, stored as columns.
+    @param[in]
+    lda         rocblas_int. lda >= n.
+                The leading dimension of A.
+    @param[out]
+    E           pointer to real type. Array on the GPU of dimension n-1.
+                If upper (lower), the last (first) k elements of E are the off-diagonal elements of the
+                computed tridiagonal block.
+    @param[out]
+    tau         pointer to type. Array on the GPU of dimension n-1.
+                If upper (lower), the last (first) k elements of tau are the Householder scalars related to Q.
+    @param[out]
+    W           pointer to type. Array on the GPU of dimension ldw*k.
+                The n-by-k matrix needed to update the unreduced part of A.
+    @param[in]
+    ldw         rocblas_int. ldw >= n.
+                The leading dimension of W.
+    ********************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_slatrd_forsytrd(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int k,
+                                                 float* A,
+                                                 const rocblas_int lda,
+                                                 float* E,
+                                                 float* tau,
+                                                 float* W,
+                                                 const rocblas_int ldw);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dlatrd_forsytrd(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int k,
+                                                 double* A,
+                                                 const rocblas_int lda,
+                                                 double* E,
+                                                 double* tau,
+                                                 double* W,
+                                                 const rocblas_int ldw);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_clatrd_forsytrd(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int k,
+                                                 rocblas_float_complex* A,
+                                                 const rocblas_int lda,
+                                                 float* E,
+                                                 rocblas_float_complex* tau,
+                                                 rocblas_float_complex* W,
+                                                 const rocblas_int ldw);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zlatrd_forsytrd(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int k,
+                                                 rocblas_double_complex* A,
+                                                 const rocblas_int lda,
+                                                 double* E,
+                                                 rocblas_double_complex* tau,
+                                                 rocblas_double_complex* W,
+                                                 const rocblas_int ldw);
+//! @}
+
+/*! @{
     \brief LASYF computes a partial factorization of a symmetric matrix \f$A\f$
     using Bunch-Kaufman diagonal pivoting.
 

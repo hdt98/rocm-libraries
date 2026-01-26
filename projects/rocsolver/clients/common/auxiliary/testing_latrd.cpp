@@ -30,3 +30,7 @@
 #define TESTING_LATRD(...) template void testing_latrd<__VA_ARGS__>(Arguments&);
 
 INSTANTIATE(TESTING_LATRD, FOREACH_SCALAR_TYPE, APPLY_STAMP)
+
+#define TESTING_LATRD_FORSYTRD(...) template void testing_latrd_forsytrd<__VA_ARGS__>(Arguments&);
+
+INSTANTIATE(TESTING_LATRD_FORSYTRD, FOREACH_SCALAR_TYPE, APPLY_STAMP)
