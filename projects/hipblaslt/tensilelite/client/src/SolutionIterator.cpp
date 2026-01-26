@@ -379,7 +379,7 @@ namespace TensileLite
                         m_qSolutionIdx.push(performance[bestIdx]);
                         break;
                     }
-                    else if(performance[i].second <= threshhold)
+                    else if(i <= index)
                     {
                         // std::cout<<"check performance "<<performance[i].second<<std::endl;
                         m_qSolutionIdx.push(performance[i]);
@@ -394,9 +394,9 @@ namespace TensileLite
                 m_currentPrediction  = m_qSolutionIdx.front().second;
                 m_currentIdx = 0;
 
-                std::cout<<"predict performance is "<<performance[0].second<<" us, idx = "<<performance[0].first<<std::endl;
+                std::cout<<"[AllSolutionsIterator::preProblem] predict performance is "<<performance[0].second<<" us, idx = "<<performance[0].first<<std::endl;
                 //std::cout<<"Threshold performance is "<<threshhold<<std::endl;
-                //std::cout<<"Solution number is "<<m_qSolutionIdx.size()<<std::endl;
+                std::cout<<"[AllSolutionsIterator::preProblem] number of solutions to run = "<<m_qSolutionIdx.size()<<std::endl;
             }
         }
 
