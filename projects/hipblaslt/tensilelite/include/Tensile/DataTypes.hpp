@@ -47,6 +47,10 @@
 #include <Tensile/DataTypes_Int8.hpp>
 #include <Tensile/DataTypes_Int8x4.hpp>
 #include <Tensile/DataTypes_XFloat32.hpp>
+#include <Tensile/DataTypes_Float6.hpp>
+#include <Tensile/DataTypes_BFloat6.hpp>
+#include <Tensile/DataTypes_Float4.hpp>
+#include <Tensile/DataTypes_MXScale.hpp>
 
 namespace rocisa
 {
@@ -63,7 +67,7 @@ namespace rocisa
  */
 
     std::string   TypeAbbrev(rocisa::DataType d);
-    size_t        GetElementSize(rocisa::DataType d);
+    float         GetElementSize(rocisa::DataType d);
     std::ostream& operator<<(std::ostream& stream, rocisa::DataType const& t);
     std::istream& operator>>(std::istream& stream, rocisa::DataType& t);
 
@@ -86,7 +90,7 @@ namespace TensileLite
         std::string      name;
         std::string      abbrev;
 
-        size_t elementSize;
+        float  elementSize;
         size_t packing;
         size_t segmentSize;
 
@@ -125,11 +129,11 @@ namespace TensileLite
         constexpr static rocisa::DataType Enum = T_Enum;
 
         /// Bytes of one element.  May contain multiple segments.
-        constexpr static size_t ElementSize = sizeof(T);
+        constexpr static float ElementSize = float(sizeof(T)) / float(T_Packing);
         /// Segments per element.
         constexpr static size_t Packing = T_Packing;
         /// Bytes per segment.
-        constexpr static size_t SegmentSize = ElementSize / Packing;
+        constexpr static float SegmentSize = ElementSize / Packing;
 
         constexpr static bool IsComplex  = T_IsComplex;
         constexpr static bool IsIntegral = T_IsIntegral;
@@ -155,7 +159,7 @@ namespace TensileLite
               int              T_Packing,
               bool             T_IsComplex,
               bool             T_IsIntegral>
-    constexpr size_t BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::ElementSize;
+    constexpr float BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::ElementSize;
     template <typename T,
               rocisa::DataType T_Enum,
               int              T_Packing,
@@ -167,7 +171,7 @@ namespace TensileLite
               int              T_Packing,
               bool             T_IsComplex,
               bool             T_IsIntegral>
-    constexpr size_t BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::SegmentSize;
+    constexpr float BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::SegmentSize;
 
     template <typename T,
               rocisa::DataType T_Enum,
@@ -233,6 +237,11 @@ namespace TensileLite
     };
 
     template <>
+    struct TypeInfo<Int8> : public BaseTypeInfo<Int8, DataType::Int8, 1, false, true>
+    {
+    };
+
+    template <>
     struct TypeInfo<Float8> : public BaseTypeInfo<Float8, rocisa::DataType::Float8, 1, false, false>
     {
     };
@@ -291,6 +300,30 @@ namespace TensileLite
     {
     };
 
+#ifdef TENSILE_USE_FP6
+    template <>
+    struct TypeInfo<Float6x32> : public BaseTypeInfo<Float6x32, rocisa::DataType::Float6, 32, false, false>
+    {
+    };
+#endif // #ifdef TENSILE_USE_FP6
+#ifdef TENSILE_USE_BF6
+    template <>
+    struct TypeInfo<BFloat6x32> : public BaseTypeInfo<BFloat6x32, rocisa::DataType::BFloat6, 32, false, false>
+    {
+    };
+#endif // #ifdef TENSILE_USE_BF6
+#ifdef TENSILE_USE_FP4
+    template <>
+    struct TypeInfo<Float4x2> : public BaseTypeInfo<Float4x2, rocisa::DataType::Float4, 2, false, false>
+    {
+    };
+#endif // #ifdef TENSILE_USE_FP4
+    template <>
+    struct TypeInfo<MXScale>
+        : public BaseTypeInfo<MXScale, rocisa::DataType::MXScale, 1, false, false>
+    {
+    };
+
     // Variant for constants
     using ConstantVariant = std::variant<float,
                                          double,
@@ -305,7 +338,18 @@ namespace TensileLite
                                          BFloat8,
                                          Float8_fnuz,
                                          BFloat8_fnuz,
-                                         int8_t>;
+                                         int8_t
+#ifdef TENSILE_USE_FP6
+                                       , Float6x32
+#endif // #ifdef TENSILE_USE_FP6
+#ifdef TENSILE_USE_BF6
+                                       , BFloat6x32
+#endif // #ifdef TENSILE_USE_BF6
+#ifdef TENSILE_USE_FP4
+                                       , Float4x2
+#endif // #ifdef TENSILE_USE_FP4
+                                       , MXScale
+                                        >;
 
     // Convert variants to type T
     template <typename T>
@@ -373,8 +417,58 @@ namespace TensileLite
         return static_cast<T>(*std::get_if<Int8x4>(&val));
     }
 
+#ifdef TENSILE_USE_FP6
+    // Convert variants to type T
+    template <typename T>
+    typename std::enable_if<std::is_same<Float6x32, T>::value, T>::type
+        constVariantCast(const ConstantVariant& val)
+    {
+        switch(val.index())
+        {
+        case static_cast<int>(rocisa::DataType::Float6):
+            return static_cast<T>(*std::get_if<Float6x32>(&val));
+        default:
+            throw std::runtime_error("Unsupported variant cast type.");
+        }
+    }
+#endif // #ifdef TENSILE_USE_FP6
+
+#ifdef TENSILE_USE_BF6
+    // Convert variants to type T
+    template <typename T>
+    typename std::enable_if<std::is_same<BFloat6x32, T>::value, T>::type
+        constVariantCast(const ConstantVariant& val)
+    {
+        switch(val.index())
+        {
+        case static_cast<int>(rocisa::DataType::BFloat6):
+            return static_cast<T>(*std::get_if<BFloat6x32>(&val));
+        default:
+            throw std::runtime_error("Unsupported variant cast type.");
+        }
+    }
+#endif // #ifdef TENSILE_USE_BF6
+
+#ifdef TENSILE_USE_FP4
+    // Convert variants to type T
+    template <typename T>
+    typename std::enable_if<std::is_same<Float4x2, T>::value, T>::type
+        constVariantCast(const ConstantVariant& val)
+    {
+        switch(val.index())
+        {
+        case static_cast<int>(rocisa::DataType::Float4):
+            return static_cast<T>(*std::get_if<Float4x2>(&val));
+        default:
+            throw std::runtime_error("Unsupported variant cast type.");
+        }
+    }
+#endif // #ifdef TENSILE_USE_FP4
+
     std::string ToString(ConstantVariant d);
     bool        CompareValue(const ConstantVariant& d, double value);
+
+    size_t multiplyElementSize(size_t element, float elementSize);
 
     /**
  * @}
