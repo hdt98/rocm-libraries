@@ -1685,7 +1685,6 @@ static rocblas_status
     {
         rocblas_fill const uplo = rocblas_fill_upper;
         rocsolver_potrf_getMemorySize_alt<T, I>(n, uplo, batch_count, &size_potrf);
-        adjust_for_alignment(size_potrf);
     }
 
     // -------------------------------
@@ -1718,9 +1717,9 @@ static rocblas_status
         }
     }
 
-    size_work = std::max(size_work, (use_syrk) ? size_syrk_herk : size_gemm);
-    size_work = std::max(size_work, size_potrf);
-    size_work = std::max(size_work, size_trsm);
+    size_t const size_blas = std::max({size_syrk_herk, size_gemm, size_trsm});
+
+    size_work = std::max(size_potrf, size_blas);
 
     adjust_for_alignment(size_work);
 
@@ -1862,6 +1861,9 @@ static rocblas_status rocsolver_cholqr1_template(
 
     rocblas_status istat = rocblas_status_success;
 
+    S const zero = 0;
+    S const one = 1;
+
     hipStream_t stream;
     try
     {
@@ -1919,11 +1921,10 @@ static rocblas_status rocsolver_cholqr1_template(
                 I const nn = n;
                 I const kk = m;
                 rocblas_fill const uplo = rocblas_fill_upper;
-                S alpha = 1;
-                S beta = 0;
+                S alpha = one;
+                S beta = zero;
 
-                rocblas_operation const trans1 = (is_complex) ? rocblas_operation_conjugate_transpose
-                                                              : rocblas_operation_transpose;
+                rocblas_operation const trans1 = rocblas_operation_conjugate_transpose;
 
                 istat = rocblasCall_syrk_herk_alt<T>(handle, uplo, trans1, nn, kk,
 
@@ -1942,8 +1943,8 @@ static rocblas_status rocsolver_cholqr1_template(
                 I const mm = n;
                 I const nn = n;
                 I const kk = m;
-                rocblas_operation const trans1 = (is_complex) ? rocblas_operation_conjugate_transpose
-                                                              : rocblas_operation_transpose;
+                rocblas_operation const trans1 = rocblas_operation_conjugate_transpose;
+
                 rocblas_operation const trans2 = rocblas_operation_none;
 
                 T alpha = 1;
