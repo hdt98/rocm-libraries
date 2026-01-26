@@ -30,7 +30,7 @@ from rocisa.code import KernelBody, Label, Macro, Module, RegSet, SrdUpperValue,
 from rocisa.container import DSModifiers, SDWAModifiers, VOP3PModifiers, \
                       MUBUFModifiers, SMEMModifiers, EXEC, VCC, RegisterContainer, \
                       DPPModifiers, vgpr, sgpr, accvgpr, mgpr, ContinuousRegister, \
-                      HWRegContainer, GLOBALModifiers
+                      HWRegContainer, GLOBALModifiers, FLATModifiers
 from rocisa.instruction import SGetPositivePCOffset, SLongBranchPositive, SCLongBranchScc0, SCLongBranchScc1, SCLongBranchVccnz, \
                         SMulInt64to32, VCvtBF16toFP32
 from rocisa.functions import vectorStaticDivide, vectorStaticRemainder, vectorUInt32CeilDivideAndRemainder, \
@@ -4517,9 +4517,9 @@ class KernelWriterAssembly(KernelWriter):
         label = Label("StaggerUMapping_%d"%(i + 1), comment="")
         module.add(SCmpEQU32(src0=sgpr(staggerUMapping), src1=hex(i << 13)))
         if i != 4:
-          module.add(SCBranchSCC1(labelName=label.getLabelName()))
+          module.add(SCBranchSCC0(labelName=label.getLabelName()))
         else:
-          module.add(SCBranchSCC1(labelName=staggerLabel.getLabelName()))
+          module.add(SCBranchSCC0(labelName=staggerLabel.getLabelName()))
         if i == 0:
           module.add(SMovB32(dst=sgpr(staggerInput), src=sgpr("WorkGroup0")))
         elif i == 1:
@@ -4562,7 +4562,9 @@ class KernelWriterAssembly(KernelWriter):
     imod = Module("calculateStagger")
     tc = tP["tensorChar"]
 
-    assert (kernel["BufferLoad"])
+    # Stagger only works with BufferLoad
+    if not kernel["BufferLoad"]:
+      return imod
 
     with self.allocTmpSgpr(3) as tmpSgprInfo:
       staggerTmp    = tmpSgprInfo.idx
@@ -9468,7 +9470,12 @@ class KernelWriterAssembly(KernelWriter):
 #                print(vgpr(destVgprPrefix + "+%u"%(self.vgprs.globalReadRegisters[tc][i]), blockWidth))
 #                print("i = ", i)
 #                print("_ = ", _)
-                paramList.append(vgpr(destVgprPrefix + "+%u"%(self.vgprs.globalReadRegisters[tc][i]), blockWidth))
+                # Check if index is within bounds (can be out of range with BufferLoad=0)
+                if i < len(self.vgprs.globalReadRegisters[tc]):
+                  paramList.append(vgpr(destVgprPrefix + "+%u"%(self.vgprs.globalReadRegisters[tc][i]), blockWidth))
+                else:
+                  paramList.append(vgpr(destVgprPrefix + "+%u"%(g2lIdx), blockWidth))
+                numsOfRegister.append(blockWidth)
 #                print("DONE")
               elif blockWidth == 1:
                 paramList.append(vgpr(destVgprPrefix + "+%u"%(g2lIdx)))
@@ -11763,7 +11770,9 @@ class KernelWriterAssembly(KernelWriter):
       if (kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") or kernel["BufferStore"]:
         numTmpVgpr += 1
       else:
-        numTmpVgpr = None
+        # Set to 0 instead of None to avoid issues with max() calls later
+        if numTmpVgpr is None:
+          numTmpVgpr = 0
       # dot2: for WaveSplitK reduction
       if kernel["NumWaveSplitK"] > 1:
         numTmpVgpr += 1
@@ -11783,13 +11792,16 @@ class KernelWriterAssembly(KernelWriter):
           actPCMaxTempVgpr = max(actPCMaxTempVgpr, gprs["vgpr"])
           actPCMaxTempSgpr = max(actPCMaxTempSgpr, gprs["sgpr"])
         actPCGwvwVgpr = int(ceil(maxVw * kernel["ProblemType"]["ActivationComputeDataType"].numRegisters()))
-        numTmpVgpr = max(numTmpVgpr, actPCMaxTempVgpr + actPCGwvwVgpr)
+        numTmpVgpr = max(numTmpVgpr if numTmpVgpr is not None else 0, actPCMaxTempVgpr + actPCGwvwVgpr)
       if kernel["ProblemType"]["UseE"] and (not kernel["ProblemType"]["Gradient"]):
         maxVw = max(vectorWidths)
         gwvwVgpr = int(ceil(maxVw * kernel["ProblemType"]["ActivationComputeDataType"].numRegisters()))
         if kernel["ActivationFuncCall"]:
           gwvwVgpr += actPCMaxTempVgpr + actPCGwvwVgpr
-        numTmpVgpr = max(numTmpVgpr, gwvwVgpr)
+        numTmpVgpr = max(numTmpVgpr if numTmpVgpr is not None else 0, gwvwVgpr)
+      # Ensure numTmpVgpr is at least 0 before calling checkOutAligned
+      if numTmpVgpr is None or numTmpVgpr == 0:
+        numTmpVgpr = 1  # Need at least 1 register
       tmpVgpr = self.vgprPool.checkOutAligned(numTmpVgpr, maxAlign, "store tmps")
       tmpVgpr = ContinuousRegister(idx=tmpVgpr, size=numTmpVgpr)
 
@@ -14100,8 +14112,9 @@ class KernelWriterAssembly(KernelWriter):
     loopChar = self.states.indexChars[kernel["ProblemType"]["IndicesSummation"][self.states.unrollIdx]]
 
     if numCodePath == 1:
+      module.add(Label("LoopBegin%s_0"%(loopChar), "" ))
       module.add(MacroInstruction(name="MAINLOOP", args=[0]))
-      module.add(SCBranchSCC0(labelName="label_LoopBegin%s"%(loopChar), comment="" ))
+      module.add(SCBranchSCC0(labelName="label_LoopBegin%s_0"%(loopChar), comment="" ))
       module.add(Label("LoopEnd%s"%(loopChar), "" ))
       return module
 
