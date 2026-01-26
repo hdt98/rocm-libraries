@@ -685,11 +685,18 @@ class TestCustomScheduleTF32:
         valid, message = isValid(schedule_info, {"kernel": kernel})
         assert valid, message
 
-    def test_schedule_256x192x32_TF32(self):
+    @pytest.mark.parametrize(
+        # fmt: off
+        "transA, transB", [
+        (  True,  False),
+        ( False,   False),
+        # fmt: on
+        ])
+    def test_schedule_256x192x32_TF32(self, transA, transB):
         """Tests the 256x192x32 TF32 TN schedule."""
         kernel = create_base_kernel()
         kernel["ProblemType"].update({
-            "TransposeA": True, "TransposeB": False
+            "TransposeA": transA, "TransposeB": transB
         })
         kernel.update({
             "UseF32XEmulation": True, "UseDirect32XEmulation": True,
@@ -708,6 +715,8 @@ class TestCustomScheduleTF32:
         assert schedule_info.numCodePaths == 2
         assert schedule_info.numMfma == 144
         assert kernel["UsePLRPack"]
+        if transA == False and transB == False:
+            assert kernel["UseMFMAF32XEmulation"]
         valid, message = isValid(schedule_info, {"kernel": kernel})
         assert valid, message
 
