@@ -142,23 +142,34 @@ def generate_rocprof_graph(rocprof_dir, n=10):
 
     x = []
     y = []
+    other_percentage = 0.0
 
     with open(kernel_stats_file, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for i, row in enumerate(reader):
-            if i >= n:
-                break
-            try:
-                # Strip template parameters from kernel names for readability
-                slice_index = row['Name'].index('<')
-            except ValueError:
-                slice_index = -1
-            sliced_name = row['Name'][:slice_index] if slice_index > 0 else row['Name']
-            x.append(sliced_name)
-            y.append(float(row['Percentage']))
+            percentage = float(row['Percentage'])
+
+            if i < n:
+                # Add to top N kernels
+                try:
+                    # Strip template parameters from kernel names for readability
+                    slice_index = row['Name'].index('<')
+                except ValueError:
+                    slice_index = -1
+                sliced_name = row['Name'][:slice_index] if slice_index > 0 else row['Name']
+                x.append(sliced_name)
+                y.append(percentage)
+            else:
+                # Accumulate remaining kernels into "Other"
+                other_percentage += percentage
 
     if not x:
         sys.exit("Error: No valid data found in kernel stats file")
+
+    # Add "Other" category if there are remaining kernels
+    if other_percentage > 0:
+        x.append("Other")
+        y.append(other_percentage)
 
     fig, ax = plt.subplots(figsize=(5, 10))
 
