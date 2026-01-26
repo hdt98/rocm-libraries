@@ -31,6 +31,7 @@
 
 #include "common_host_helpers.hpp"
 #include "init_scalars.hpp"
+#include "laset.hpp"
 #include "lib_device_helpers.hpp"
 #include "lib_host_helpers.hpp"
 #include "rocblas/internal/rocblas-exported-proto.hpp"

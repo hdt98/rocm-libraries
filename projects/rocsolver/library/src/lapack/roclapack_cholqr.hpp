@@ -38,43 +38,6 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-//   ------------------------
-//   ceildiv( 9, 5)   is 2
-//   ceildiv( 10, 5)  is 2
-//   ceildiv( 11, 5)  is 3
-//   ------------------------
-template <typename I>
-__host__ __device__ static inline I ceildiv(I const n, I const base)
-{
-    return (((n - 1) / base) + 1);
-}
-
-// -----------------------------
-// max function that handles NaN
-// -----------------------------
-template <typename T>
-__host__ __device__ static inline bool max_nan(T const x, T const y)
-{
-    if(std::isnan(x) && std::isnan(y))
-    {
-        return (std::numeric_limits<T>::quiet_NaN());
-    }
-
-    if(std::isnan(x))
-    {
-        return (y);
-    }
-    if(std::isnan(y))
-    {
-        return (x);
-    }
-
-    // ---------------------
-    // both x, y are not NaN
-    // ---------------------
-    return (std::max(x, y));
-}
-
 bool constexpr use_syrk = true;
 
 static inline void adjust_for_alignment(size_t& size_work)
@@ -1401,7 +1364,7 @@ static __global__ void set_triangular_kernel(char const uplo,
 }
 
 template <typename T, typename I, typename Istride, typename UA>
-static void set_triangular(hipStream_t stream,
+static void set_triangular(rocblas_handle handle,
                            char const uplo,
                            I const m,
                            I const n,
@@ -1421,20 +1384,45 @@ static void set_triangular(hipStream_t stream,
         }
     }
 
-    I const nx = 32;
-    I const ny = 32;
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    I const max_threads = 1024;
+    I const nx = (m <= 32) ? 32 : 64;
+    I const ny = max_threads / nx;
 
     I const max_blocks = get_num_cu();
     I const nbx = std::min(max_blocks, ceildiv(m, nx));
     I const nby = std::min(max_blocks, ceildiv(n, ny));
-    I const nbz = std::max(I{1}, std::min(max_blocks, batch_count));
+    I const nbz = std::min(max_blocks, batch_count);
 
-    set_triangular_kernel<<<dim3(nbx, nby, nbz), dim3(nx, ny, 1), 0, stream>>>(uplo, m, n, alpha,
+    bool constexpr use_laset = true;
+    if(use_laset)
+    {
+        bool const use_lower = (uplo == 'L') || (uplo == 'l');
+        Istride const offset = (use_lower) ? idx2D(1, 0, lda) : 0;
 
-                                                                               A_arg, shiftA, lda,
-                                                                               strideA,
+        T const lalpha = alpha;
+        T const lbeta = alpha;
 
-                                                                               batch_count);
+        I const mm = m - 1;
+        I const nn = n - 1;
+
+        laset(handle, uplo, mm, nn, lalpha, lbeta,
+
+              A_arg, shiftA + offset, lda, strideA,
+
+              batch_count);
+    }
+    else
+    {
+        set_triangular_kernel<<<dim3(nbx, nby, nbz), dim3(nx, ny, 1), 0, stream>>>(uplo, m, n, alpha,
+
+                                                                                   A_arg, shiftA,
+                                                                                   lda, strideA,
+
+                                                                                   batch_count);
+    }
 }
 
 template <typename T, typename I>
@@ -2360,7 +2348,7 @@ static rocblas_status rocsolver_cholqr2_template(rocblas_handle handle,
 
             char uplo = 'L';
             T alpha = 0;
-            set_triangular(stream, uplo, n, n, alpha,
+            set_triangular(handle, uplo, n, n, alpha,
 
                            R, shiftR, ldr, strideR,
 
@@ -2638,7 +2626,7 @@ static rocblas_status rocsolver_cholqr3_template(rocblas_handle handle,
 
             char const uplo = 'L';
             T const alpha = 0;
-            set_triangular(stream, uplo, n, n, alpha,
+            set_triangular(handle, uplo, n, n, alpha,
 
                            R, shiftR, ldr, strideR,
 
