@@ -71,7 +71,7 @@ rocblas_status rocsolver_gesvd_strided_batched_impl(rocblas_handle handle,
     rocblas_int shiftA = 0;
 
     // execution
-    return rocsolver_gesvd_template<false, true, T>(
+    return rocsolver_gesvd_template_alt<false, true, T>(
         handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
         V, ldv, strideV, E, strideE, fast_alg, info, batch_count, nullptr);
 }

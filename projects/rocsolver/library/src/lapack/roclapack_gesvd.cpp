@@ -70,7 +70,7 @@ rocblas_status rocsolver_gesvd_impl(rocblas_handle handle,
     rocblas_int batch_count = 1;
 
     // execution
-    return rocsolver_gesvd_template<false, false, T>(
+    return rocsolver_gesvd_template_alt<false, false, T>(
         handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
         V, ldv, strideV, E, strideE, fast_alg, info, batch_count, nullptr);
 }
