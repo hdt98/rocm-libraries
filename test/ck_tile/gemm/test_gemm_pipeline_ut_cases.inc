@@ -19,15 +19,6 @@ TYPED_TEST(TEST_SUITE_NAME, SmallM)
     {
         for(int K : Ks)
         {
-            if constexpr(std::is_same_v<typename TestFixture::ADataType, ck_tile::fp16_t> &&
-                         std::is_same_v<typename TestFixture::BDataType, ck_tile::pk_int4_t>)
-            {
-                if(K == 2 * TestFixture::K_Tile)
-                {
-                    // This particular combination of parameters fails.
-                    continue;
-                }
-            }
             if constexpr(std::is_same_v<typename TestFixture::ALayout,
                                         ck_tile::tensor_layout::gemm::ColumnMajor>)
             {
