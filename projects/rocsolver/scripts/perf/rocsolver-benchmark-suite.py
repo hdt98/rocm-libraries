@@ -100,7 +100,7 @@ def main():
     # Find the directory containing this script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     perfoptim_script = os.path.join(script_dir, 'rocsolver-perfoptim-suite.py')
-    graph_script = os.path.join(script_dir, 'rocsolver-graph.py')
+    graph_script = os.path.join(script_dir, 'rocsolver_graph.py')
 
     # Step 1: Run benchmarks
     benchmark_cmd = [
