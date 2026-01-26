@@ -2,7 +2,7 @@
 # Copyright 2019-2025 Advanced Micro Devices, Inc.
 # ########################################################################
 
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.21...3.31 FATAL_ERROR)
 
 # --------------------------------------
 # Update these variables at release time
@@ -48,6 +48,63 @@ set(CMAKE_HIP_EXTENSIONS OFF)
 
 include(CheckLanguage)
 include(CMakeDependentOption)
+include(CheckCompilerFlag)
+
+# If '_var' is unset, but '_fallback_var' is set, sets '_var'
+# to the contents of '_fallback_var' and throws a warning.
+function(set_fallback _var _fallback_var)
+  if(DEFINED ${_fallback_var} AND NOT DEFINED ${_var})
+    message(WARNING
+      "${_fallback_var} is set, but ${_var} is not. This is \
+      probably unintended. We're assuming that the intent is \
+      to also set ${_var}. Please set ${_var} to suppress \
+      this warning.")
+    set(${_var} "${${_fallback_var}}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Sets multiple fallbacks. Use to transfer multiple CXX variables
+# to HIP variables.
+function(set_cxx_fallbacks)
+  foreach(_hip_var IN LISTS ARGN)
+    string(REPLACE "HIP" "CXX" _cxx_var "${_hip_var}")
+    set_fallback(${_hip_var} ${_cxx_var})
+  endforeach()
+endfunction()
+
+# When HIP compiler is not configured, attempt to use the same
+# flags as CXX compiler. This is because critical flags such as
+# '--hip-device-lib-path' and '--hip-path' might be passed there.
+# This is also required for 'check_compiler_flag(HIP ...)'.
+set_cxx_fallbacks(
+  CMAKE_HIP_FLAGS
+  CMAKE_HIP_FLAGS_DEBUG
+  CMAKE_HIP_FLAGS_RELEASE
+  CMAKE_HIP_FLAGS_MINSIZEREL
+  CMAKE_HIP_FLAGS_RELWITHDEBINFO
+  CMAKE_HIP_COMPILER_LAUNCHER
+  CMAKE_HIP_LINKER_LAUNCHER
+)
+
+# Some build systems use a custom HIP compiler, but only pass
+# this to this CMake script via CMAKE_CXX_COMPILER. In the case
+# that we cannot find it, we can attempt to use that compiler
+# as our HIP compiler.
+check_language(HIP OPTIONAL)
+if (NOT CMAKE_HIP_COMPILER)
+  message(WARNING
+    "No valid HIP compiler found. Checking if we can use CXX \
+    compiler as HIP compiler. Please set CMAKE_HIP_COMPILER to \
+    suppress this warning.")
+  # The CXX compiler might not be a HIP-aware compiler. We can
+  # verify this by compiling explicitly with '-xhip'.
+  check_compiler_flag(CXX "-xhip" CXX_COMPILER_SUPPORTS_XHIP)
+  if(NOT CXX_COMPILER_SUPPORTS_XHIP)
+      message(FATAL_ERROR "CXX compiler does not support HIP!")
+  endif()
+  set(CMAKE_HIP_COMPILER "${CMAKE_CXX_COMPILER}")
+endif()
+enable_language(HIP)
 
 # Build options
 # Disable -Werror
@@ -76,20 +133,30 @@ if((BUILD_TEST OR BUILD_BENCHMARK OR BUILD_EXAMPLE) AND
     message(FATAL_ERROR "rocThrust tests, benchmarks, and examples must be built with ROCTHRUST_DEVICE_SYSTEM=HIP|CUDA since they require device acceleration.")
 endif()
 
-if(${ROCTHRUST_DEVICE_SYSTEM} STREQUAL "HIP")
-  check_language(HIP)
-endif()
+cmake_dependent_option(USE_HIPCXX "Use CMake HIP language support" ON CMAKE_HIP_COMPILER OFF)
 
-cmake_dependent_option(USE_HIPCXX "Use CMake HIP language support" OFF CMAKE_HIP_COMPILER OFF)
-
-include(CheckCXXCompilerFlag)
-
-if(BUILD_OFFLOAD_COMPRESS)
-  check_cxx_compiler_flag("--offload-compress -x hip" CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
-  if(CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --offload-compress")
+# Function that checks if a HIP compiler function exists.
+function(hip_check_compiler_flag _flag _var)
+  if(USE_HIPCXX)
+    cmake_check_compiler_flag(HIP "${_flag}" ${_var})
   else()
-    message(STATUS "Warning: BUILD_OFFLOAD_COMPRESS=ON but flag not supported by compiler. Ignoring option.")
+    check_cxx_compiler_flag("-xhip ${_flag}" ${_var})
+  endif()
+endfunction(hip_check_compiler_flag)
+
+# Enable offload compress.
+if(BUILD_OFFLOAD_COMPRESS)
+  # Except on SPIR-V!
+  if ("amdgcnspirv" IN_LIST HIP_ARCHITECTURES)
+    message(FATAL_ERROR "Cannot combine SPIR-V and BUILD_OFFLOAD_COMPRESS")
+  endif()
+
+  # Detect capability and add flag.
+  hip_check_compiler_flag("--offload-compress" HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
+  if(HIP_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:--offload-compress>)
+  else()
+    message(WARNING "BUILD_OFFLOAD_COMPRESS=ON but flag not supported by compiler. Ignoring option.")
   endif()
 endif()
 
@@ -128,9 +195,7 @@ include( ROCMHeaderWrapper )
 include( ROCMCheckTargetIds )
 include( ROCMClients )
 
-if(USE_HIPCXX)
-  enable_language(HIP)
-else()
+if(CMAKE_HIP_PLATFORM STREQUAL "amd")
   # Use target ID syntax if supported for GPU_TARGETS
   if (NOT DEFINED AMDGPU_TARGETS)
     set(GPU_TARGETS "all" CACHE STRING "GPU architectures to compile for")

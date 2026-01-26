@@ -84,8 +84,8 @@ macro(get_gpu_targets)
   # HIP_ARCHITECTURES and CMAKE_HIP_ARCHITECTURES are new CMake
   # cache variables. Unfortunately most of the ROCm ecosystem
   # still uses GPU_TARGETS. We'll set both, just in case.
-  set(CMAKE_HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE INTERNAL "" FORCE)
-  set(HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE INTERNAL "" FORCE)
+  set(CMAKE_HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE STRING "" FORCE)
+  set(HIP_ARCHITECTURES "${VERIFIED_GPU_TARGETS}" CACHE STRING "" FORCE)
   set(GPU_TARGETS "${VERIFIED_GPU_TARGETS}" CACHE STRING "" FORCE)
 endmacro(get_gpu_targets)
 

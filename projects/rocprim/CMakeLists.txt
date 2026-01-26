@@ -24,7 +24,7 @@
 # CMake Preamble #
 ##################
 
-cmake_minimum_required(VERSION 3.21...3.25 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.21...3.31 FATAL_ERROR)
 
 if(WIN32)
   set(ROCM_PATH "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
@@ -36,23 +36,72 @@ endif()
 set(CMAKE_INSTALL_PREFIX ${ROCM_PATH} CACHE PATH "Install path prefix, prepended onto install directories")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker search and installed rpath")
 
-# On some build systems, CMAKE_HIP_COMPILER is not available but is instead set via CMAKE_CXX_COMPILER.
-# We work around it by falling back to the CMAKE_CXX_COMPILER if it supports HIP.
-include(CheckLanguage)
-include(CheckCXXCompilerFlag)
-if (NOT DEFINED CMAKE_HIP_COMPILER)
-  check_language(CXX)
-  enable_language(CXX)
-  check_cxx_compiler_flag("-xhip" CXX_COMPILER_SUPPORTS_XHIP)
-  if(CXX_COMPILER_SUPPORTS_XHIP)
-    message(WARNING "No HIP-compiler set or found, falling back to CXX-compiler. Please set 'CMAKE_HIP_COMPILER'!")
-    set(CMAKE_HIP_COMPILER ${CMAKE_CXX_COMPILER})
-  endif()
-endif()
-
 # Declare project.
-project(rocprim LANGUAGES CXX HIP)
+project(rocprim LANGUAGES CXX)
 set(VERSION_STRING "4.2.0")
+
+##################
+# CMake HIP shim #
+##################
+
+include(CheckLanguage)
+include(CheckCompilerFlag)
+
+# If '_var' is unset, but '_fallback_var' is set, sets '_var'
+# to the contents of '_fallback_var' and throws a warning.
+function(set_fallback _var _fallback_var)
+  if(DEFINED ${_fallback_var} AND NOT DEFINED ${_var})
+    message(WARNING
+      "${_fallback_var} is set, but ${_var} is not. This is \
+      probably unintended. We're assuming that the intent is \
+      to also set ${_var}. Please set ${_var} to suppress \
+      this warning.")
+    set(${_var} "${${_fallback_var}}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Sets multiple fallbacks. Use to transfer multiple CXX variables
+# to HIP variables.
+function(set_cxx_fallbacks)
+  foreach(_hip_var IN LISTS ARGN)
+    string(REPLACE "HIP" "CXX" _cxx_var "${_hip_var}")
+    set_fallback(${_hip_var} ${_cxx_var})
+  endforeach()
+endfunction()
+
+# When HIP compiler is not configured, attempt to use the same
+# flags as CXX compiler. This is because critical flags such as
+# '--hip-device-lib-path' and '--hip-path' might be passed there.
+# This is also required for 'check_compiler_flag(HIP ...)'.
+set_cxx_fallbacks(
+  CMAKE_HIP_FLAGS
+  CMAKE_HIP_FLAGS_DEBUG
+  CMAKE_HIP_FLAGS_RELEASE
+  CMAKE_HIP_FLAGS_MINSIZEREL
+  CMAKE_HIP_FLAGS_RELWITHDEBINFO
+  CMAKE_HIP_COMPILER_LAUNCHER
+  CMAKE_HIP_LINKER_LAUNCHER
+)
+
+# Some build systems use a custom HIP compiler, but only pass
+# this to this CMake script via CMAKE_CXX_COMPILER. In the case
+# that we cannot find it, we can attempt to use that compiler
+# as our HIP compiler.
+check_language(HIP OPTIONAL)
+if (NOT CMAKE_HIP_COMPILER)
+  message(WARNING
+    "No valid HIP compiler found. Checking if we can use CXX \
+    compiler as HIP compiler. Please set CMAKE_HIP_COMPILER to \
+    suppress this warning.")
+  # The CXX compiler might not be a HIP-aware compiler. We can
+  # verify this by compiling explicitly with '-xhip'.
+  check_compiler_flag(CXX "-xhip" CXX_COMPILER_SUPPORTS_XHIP)
+  if(NOT CXX_COMPILER_SUPPORTS_XHIP)
+      message(FATAL_ERROR "CXX compiler does not support HIP!")
+  endif()
+  set(CMAKE_HIP_COMPILER "${CMAKE_CXX_COMPILER}")
+endif()
+enable_language(HIP)
 
 ###########
 # Options #

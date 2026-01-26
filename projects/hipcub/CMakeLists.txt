@@ -20,8 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-cmake_policy(VERSION 3.18...3.25)
+cmake_minimum_required(VERSION 3.21...3.31 FATAL_ERROR)
 
 # --------------------------------------
 # Update these variables at release time
@@ -60,6 +59,63 @@ set(CMAKE_HIP_EXTENSIONS OFF)
 
 include(CheckLanguage)
 include(CMakeDependentOption)
+include(CheckCompilerFlag)
+
+# If '_var' is unset, but '_fallback_var' is set, sets '_var'
+# to the contents of '_fallback_var' and throws a warning.
+function(set_fallback _var _fallback_var)
+  if(DEFINED ${_fallback_var} AND NOT DEFINED ${_var})
+    message(WARNING
+      "${_fallback_var} is set, but ${_var} is not. This is \
+      probably unintended. We're assuming that the intent is \
+      to also set ${_var}. Please set ${_var} to suppress \
+      this warning.")
+    set(${_var} "${${_fallback_var}}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Sets multiple fallbacks. Use to transfer multiple CXX variables
+# to HIP variables.
+function(set_cxx_fallbacks)
+  foreach(_hip_var IN LISTS ARGN)
+    string(REPLACE "HIP" "CXX" _cxx_var "${_hip_var}")
+    set_fallback(${_hip_var} ${_cxx_var})
+  endforeach()
+endfunction()
+
+# When HIP compiler is not configured, attempt to use the same
+# flags as CXX compiler. This is because critical flags such as
+# '--hip-device-lib-path' and '--hip-path' might be passed there.
+# This is also required for 'check_compiler_flag(HIP ...)'.
+set_cxx_fallbacks(
+  CMAKE_HIP_FLAGS
+  CMAKE_HIP_FLAGS_DEBUG
+  CMAKE_HIP_FLAGS_RELEASE
+  CMAKE_HIP_FLAGS_MINSIZEREL
+  CMAKE_HIP_FLAGS_RELWITHDEBINFO
+  CMAKE_HIP_COMPILER_LAUNCHER
+  CMAKE_HIP_LINKER_LAUNCHER
+)
+
+# Some build systems use a custom HIP compiler, but only pass
+# this to this CMake script via CMAKE_CXX_COMPILER. In the case
+# that we cannot find it, we can attempt to use that compiler
+# as our HIP compiler.
+check_language(HIP OPTIONAL)
+if (NOT CMAKE_HIP_COMPILER)
+  message(WARNING
+    "No valid HIP compiler found. Checking if we can use CXX \
+    compiler as HIP compiler. Please set CMAKE_HIP_COMPILER to \
+    suppress this warning.")
+  # The CXX compiler might not be a HIP-aware compiler. We can
+  # verify this by compiling explicitly with '-xhip'.
+  check_compiler_flag(CXX "-xhip" CXX_COMPILER_SUPPORTS_XHIP)
+  if(NOT CXX_COMPILER_SUPPORTS_XHIP)
+      message(FATAL_ERROR "CXX compiler does not support HIP!")
+  endif()
+  set(CMAKE_HIP_COMPILER "${CMAKE_CXX_COMPILER}")
+endif()
+enable_language(HIP)
 
 # Build options
 option(BUILD_TEST "Build tests (requires googletest)" OFF)
@@ -73,21 +129,6 @@ option(BUILD_OFFLOAD_COMPRESS "Build hipCUB with offload compression" ON)
 option(BUILD_COMPUTE_SANITIZER "Build tests with cuda's compute sanitizer enabled" OFF)
 cmake_dependent_option(USE_SYSTEM_LIB "Use installed hipCUB when building tests" OFF BUILD_TEST OFF)
 
-# On some build systems, CMAKE_HIP_COMPILER is not available but is instead set via CMAKE_CXX_COMPILER.
-# We work around it by falling back to the CMAKE_CXX_COMPILER if it supports HIP.
-include(CheckLanguage)
-include(CheckCXXCompilerFlag)
-if (NOT DEFINED CMAKE_HIP_COMPILER)
-  check_language(CXX)
-  enable_language(CXX)
-  check_cxx_compiler_flag("-xhip" CXX_COMPILER_SUPPORTS_XHIP)
-  if(CXX_COMPILER_SUPPORTS_XHIP)
-    message(WARNING "No HIP-compiler set or found, falling back to CXX-compiler. Please set 'CMAKE_HIP_COMPILER'!")
-    set(CMAKE_HIP_COMPILER ${CMAKE_CXX_COMPILER})
-  endif()
-endif()
-# Check and test HIP compiler, defines 'CMAKE_HIP_COMPILER'
-check_language(HIP)
 cmake_dependent_option(USE_HIPCXX "Use CMake HIP language support" ON CMAKE_HIP_COMPILER OFF)
 
 if (USE_HIPCXX AND NOT DEFINED CMAKE_HIP_COMPILER)
@@ -140,14 +181,8 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker searc
 include(ROCmCMakeBuildToolsDependency)
 
 # Detect compiler through use of result from 'check_language(...)'
-if(USE_HIPCXX)
-  enable_language(HIP)
-elseif(NOT (CMAKE_CXX_COMPILER MATCHES ".*nvcc$" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
-  # Detected HIP through archaic match by checking passed CXX compiler. This can
-  # be removed once we bump minimum CMake version to 3.21 or higher.
-
+if(CMAKE_HIP_PLATFORM STREQUAL "amd")
   # Setup GPU targets for rocm platform
-  message(STATUS "CMake could not derive language via 'check_language'. Falling back to legacy compiler checks.")
   if(NOT DEFINED AMDGPU_TARGETS)
     set(GPU_TARGETS "all" CACHE STRING "GPU architectures to compile for")
   else()
