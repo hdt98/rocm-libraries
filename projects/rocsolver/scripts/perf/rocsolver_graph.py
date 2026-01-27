@@ -39,16 +39,102 @@ import sys
 import matplotlib.pyplot as plt
 
 
-def generate_benchmark_graph(csv_path, output_path=None):
+def generate_combined_graph(groups, graph_title, csv_path, output_path):
+    """
+    Generate a single graph with all groups plotted as separate lines.
+
+    This is the existing behavior, extracted for clarity.
+
+    Args:
+        groups: dict of {group_key: {'x': [...], 'y': [...]}}
+        graph_title: base title from CSV
+        csv_path: path to CSV file
+        output_path: output path for the graph
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for group_name, data in groups.items():
+        ax.plot(data['x'], data['y'], marker='o', label=group_name, linewidth=2)
+
+    ax.set_xlabel('Input Size (n)', fontsize=12)
+    ax.set_ylabel('Total Time (ms)', fontsize=12)
+    ax.grid(True, alpha=0.3)
+
+    # Only show legend if there are multiple groups
+    if len(groups) > 1:
+        ax.legend(fontsize=8, loc='best')
+
+    title = graph_title or os.path.splitext(os.path.basename(csv_path))[0]
+    fig.suptitle(f'{title} - Runtime by Size', fontsize=14)
+
+    # Determine output path
+    if output_path is None:
+        output_path = os.path.splitext(csv_path)[0] + '.png'
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    print(f"Graph saved to: {output_path}")
+
+
+def generate_separate_graphs(groups, graph_title, csv_path, output_path):
+    """
+    Generate separate graphs for each group, one graph per parameter configuration.
+
+    Args:
+        groups: dict of {group_key: {'x': [...], 'y': [...]}}
+        graph_title: base title from CSV
+        csv_path: path to CSV file
+        output_path: base output path for graphs
+    """
+    # Determine base output path
+    if output_path is None:
+        base_path = os.path.splitext(csv_path)[0]
+    else:
+        base_path = os.path.splitext(output_path)[0]
+
+    # Determine base title
+    base_title = graph_title or os.path.splitext(os.path.basename(csv_path))[0]
+
+    # Generate one graph per group
+    for group_key, data in groups.items():
+        # Create individual graph
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        # Plot single line (no legend needed)
+        ax.plot(data['x'], data['y'], marker='o', linewidth=2)
+
+        ax.set_xlabel('Input Size (n)', fontsize=12)
+        ax.set_ylabel('Total Time (ms)', fontsize=12)
+        ax.grid(True, alpha=0.3)
+
+        # Title includes group key to identify parameters
+        title = f'{base_title} - Runtime by Size ({group_key})'
+        fig.suptitle(title, fontsize=14)
+
+        # Filename includes group key
+        group_output_path = f'{base_path}_{group_key}.png'
+
+        plt.tight_layout()
+        plt.savefig(group_output_path, dpi=150)
+        plt.close()
+
+        print(f"Graph saved to: {group_output_path}")
+
+
+def generate_benchmark_graph(csv_path, output_path=None, separate_groups=False):
     """
     Generate a graph of benchmark results from a CSV file.
 
-    Results are grouped by all parameters except 'n', and separate lines
-    are plotted for each group showing runtime vs. input size.
+    Results are grouped by all parameters except 'n', and either:
+    - plotted as separate lines on one graph (default), or
+    - plotted as separate individual graphs (if separate_groups=True)
 
     Args:
         csv_path: Path to CSV file containing benchmark results
         output_path: Optional output path for the graph (defaults to CSV basename)
+        separate_groups: If True, generate one graph per group instead of one combined graph
     """
     if not os.path.exists(csv_path):
         sys.exit(f"Error: CSV file not found: {csv_path}")
@@ -96,32 +182,11 @@ def generate_benchmark_graph(csv_path, output_path=None):
     if not groups:
         sys.exit("Error: No valid data found in CSV file")
 
-    # Generate graph
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    for group_name, data in groups.items():
-        ax.plot(data['x'], data['y'], marker='o', label=group_name, linewidth=2)
-
-    ax.set_xlabel('Input Size (n)', fontsize=12)
-    ax.set_ylabel('Total Time (ms)', fontsize=12)
-    ax.grid(True, alpha=0.3)
-
-    # Only show legend if there are multiple groups
-    if len(groups) > 1:
-        ax.legend(fontsize=8, loc='best')
-
-    title = graph_title or os.path.splitext(os.path.basename(csv_path))[0]
-    fig.suptitle(f'{title} - Runtime by Size', fontsize=14)
-
-    # Determine output path
-    if output_path is None:
-        output_path = os.path.splitext(csv_path)[0] + '.png'
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-
-    print(f"Graph saved to: {output_path}")
+    # Choose plotting strategy based on flag
+    if separate_groups:
+        generate_separate_graphs(groups, graph_title, csv_path, output_path)
+    else:
+        generate_combined_graph(groups, graph_title, csv_path, output_path)
 
 
 def generate_kernel_breakdown_graph(csv_path, output_path, title, n=10,
@@ -270,6 +335,9 @@ if __name__ == '__main__':
             type=int,
             default=10,
             help='Number of top kernels to show in rocprof graph (default: 10)')
+    parser.add_argument('--separate-groups',
+            action='store_true',
+            help='generate separate graph for each parameter group instead of combined graph')
 
     args = parser.parse_args()
 
@@ -280,4 +348,4 @@ if __name__ == '__main__':
     else:
         if not os.path.isfile(args.input):
             sys.exit(f"Error: For benchmark graphs, input must be a CSV file: {args.input}")
-        generate_benchmark_graph(args.input, args.output_path)
+        generate_benchmark_graph(args.input, args.output_path, args.separate_groups)
