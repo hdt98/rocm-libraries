@@ -615,10 +615,13 @@ fwd_result fmha_fwd_run(mode_enum mode,
             flop += nhead * (static_cast<std::size_t>(2) * mask.get_unmaskarea() * hdim_q +
                              static_cast<std::size_t>(2) * mask.get_unmaskarea() * hdim_v);
 
-            num_byte += nhead * (sizeof(QDataType) * real_seqlen_q * hdim_q +
+            num_byte += nhead * (sizeof(QDataType) * real_seqlen_q * hdim_q /
+                                     ck_tile::numeric_traits<QDataType>::PackedSize +
                                  sizeof(ODataType) * real_seqlen_q * hdim_v);
-            num_byte += nhead_k * (sizeof(KDataType) * real_seqlen_k * hdim_q +
-                                   sizeof(VDataType) * hdim_v * real_seqlen_k);
+            num_byte += nhead_k * (sizeof(KDataType) * real_seqlen_k * hdim_q /
+                                       ck_tile::numeric_traits<KDataType>::PackedSize +
+                                   sizeof(VDataType) * hdim_v * real_seqlen_k /
+                                       ck_tile::numeric_traits<VDataType>::PackedSize);
         }
     }
 

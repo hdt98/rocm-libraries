@@ -2264,7 +2264,8 @@ struct FmhaFwdKernel
                         make_tuple(number<FmhaPipeline::kM0>{}, number<FmhaPipeline::kK0>{}),
                         sequence<false, kPadHeadDimQ>{});
 #if CK_TILE_FMHA_HANDLE_XOR_LENGTH_FOLD
-                    constexpr index_t LDSLayerSize  = 256 / sizeof(QDataType);
+                    constexpr index_t LDSLayerSize =
+                        256 * numeric_traits<QDataType>::PackedSize / sizeof(QDataType);
                     constexpr index_t XorLengthFold = LDSLayerSize / (FmhaPipeline::kQKHeaddim);
 
                     if constexpr(XorLengthFold > 1)
@@ -2388,7 +2389,8 @@ struct FmhaFwdKernel
                     FmhaPipeline::kKLoadOnce ? FmhaPipeline::kQKHeaddim : FmhaPipeline::kK0;
 
 #if CK_TILE_FMHA_HANDLE_XOR_LENGTH_FOLD
-                constexpr index_t LDSLayerSize  = 256 / sizeof(KDataType);
+                constexpr index_t LDSLayerSize =
+                    256 * numeric_traits<KDataType>::PackedSize / sizeof(KDataType);
                 constexpr index_t XorLengthFold = LDSLayerSize / (FmhaPipeline::kQKHeaddim);
 
                 if constexpr(XorLengthFold > 1)
@@ -2512,7 +2514,8 @@ struct FmhaFwdKernel
                     sequence<kPadSeqLenK, false>{});
 
 #if CK_TILE_FMHA_HANDLE_XOR_LENGTH_FOLD
-                constexpr index_t LDSLayerSize  = 256 / sizeof(VDataType);
+                constexpr index_t LDSLayerSize =
+                    256 * numeric_traits<VDataType>::PackedSize / sizeof(VDataType);
                 constexpr index_t XorLengthFold = LDSLayerSize / (FmhaPipeline::kQKHeaddim);
 
                 if constexpr(XorLengthFold > 1)
