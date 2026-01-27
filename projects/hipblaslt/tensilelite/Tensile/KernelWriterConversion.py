@@ -468,7 +468,7 @@ class KernelWriterConversion(KernelWriterBase):
 
     typeStr = "int" if self.state["ProblemType"]["MacDataTypeA"].isInt8() or self.state["ProblemType"]["MacDataTypeA"].isInt32() else ("double" if self.state["ProblemType"]["MacDataTypeA"].isDouble() else "float")
     typeStr2 = "int16_t" if self.state["ProblemType"]["DestDataType"].isInt8() else ("tensile_half" if self.state["ProblemType"]["DestDataType"].isAnyFloat8() else "tensile_bfloat16")
-    if self.state["ProblemType"]["DataType"].isComplex():
+    if self.state["ProblemType"]["MacDataTypeA"].isComplex():
       loadTypeStr = "%s%s" % (self.datatype, "" if self.num_dword_load == 1 else self.num_dword_load)
       storeTypeStr = "%s%s" % (self.datatype, "" if self.num_dword_store == 1 else self.num_dword_store)
     else:
