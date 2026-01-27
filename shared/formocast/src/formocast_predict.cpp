@@ -581,8 +581,6 @@ namespace Tensilelite
     {
         PredictedPerformance pp;
 
-        //std::cout<<"[Formocast] predictedPerformance"<<std::endl;
-
         // 1. Problem Dimension Calculation
         double M = problem.M;
         double N = problem.N;
@@ -597,9 +595,26 @@ namespace Tensilelite
         bool     isSwizzleA = problem.swizzleTensorA;
         bool     isSwizzleB = problem.swizzleTensorB;
 
+        std::ostringstream oss;
+
+        oss << "Problem: [ " << problem.M << ", " << problem.N << ", " << problem.K << ", " << problem.NumBatches << "]"
+            << "\n\ttransA " << transA << " transB " << transB
+            << "\n\tbpeA " << bpeA << " bpeA " << bpeA << " bpeD " << bpeD
+            << "\n\tisSwizzleA " << isSwizzleA << " isSwizzleB " << isSwizzleB
+            << "\n";
+
+        oss <<  "Solution:" << sizeMapping.solutionName << "\n";
+
         // 2. Hardware Parameter Extraction
-        //HardwareConstants hw_consts = getHardwareConstants();
-        //hw_consts.print();
+        // - hw_consts.print();
+        oss << "Hardware const:"
+            << "\n\tL1CacheCapacity " << hw_consts.L1CacheCapacity
+            << "\n\tL1CacheLineSize " << hw_consts.L1CacheLineSize
+            << "\n\tL1BusWidthPerCU " << hw_consts.L1BusWidthPerCU
+            << "\n\tL2CacheCapacity " << hw_consts.L2CacheCapacity
+            << "\n\tNumCUs " << hw_consts.NumCUs
+            << "\n\tNumXCDs " << hw_consts.NumXCDs
+            << "\n";
 
         // 3. Variables directly from sizeMapping
 
@@ -645,44 +660,27 @@ namespace Tensilelite
         // Clock calculation
         // TODO: No need to check minMathClock if we guarantee that MathClocksUnrolledLoop is correct.
         double math_clk = sizeMapping.MathClocksUnrolledLoop;
-        //auto miLatency = hardware.get_mi_latency(sizeMapping.matrixInstruction[0], sizeMapping.matrixInstruction[1], sizeMapping.matrixInstruction[2], DataType::BFloat16); //FIXME: Only for Bf16 now (TF32 is also BF16 in gfx950)
-        //auto minMathClock = ((double)MT0 * MT1 * depthU / (sizeMapping.matrixInstruction[0] * sizeMapping.matrixInstruction[1] * sizeMapping.matrixInstruction[2]) * miLatency);
-        //assert(math_clk >= minMathClock);
-        //math_clk = std::max(math_clk, minMathClock); //FIXME: CMS kernel has incorrect MathClocksUnrolledLoop
 
-        // Debug output (commented)
-        //std::cout<<"DTVA         =          "<<DTVA<<std::endl;
-        //std::cout<<"DTVB         =          "<<DTVB<<std::endl;
-        //std::cout<<"MT0          =          "<<MT0<<std::endl;
-        //std::cout<<"MT1          =          "<<MT1<<std::endl;
-        //std::cout<<"GlobalSplitU =          "<<GlobalSplitU<<std::endl;
-        //std::cout<<"math_clk     =          "<<math_clk<<std::endl;
-        //std::cout<<"WGM          =          "<<WGM<<std::endl;
-        //std::cout<<"CUOccupancy  =          "<<CUOccupancy<<std::endl;
-        //std::cout<<"depthU       =          "<<depthU<<std::endl;
-        //std::cout<<"PGR          =          "<<PGR<<std::endl;
-        //std::cout<<"GWVWD        =          "<<GWVWD<<std::endl;
-        //std::cout<<"miSize       =          "<<miSize<<std::endl;
-
-        // 3.1 Early terminate. FIXME: Can filter most of the solutions with an outside function.
-        // FIXME: add an extra function to reject the solutions first.
+        // 3.1 Early terminate.
+        // - FIXME: Can filter most of the solutions with an outside function.
+        // - FIXME: add an extra function to reject the solutions first.
         if (GlobalSplitU == 0)
         {
             // FIXME: Need to support streamK kernels.
-            std::cout << "Formocast-earlycut:" << sizeMapping.solutionName << ",cause1," << std::endl;
+            std::cout << "Formocast-earlycut:" << " cause1" << std::endl;
             GlobalSplitU = 1;
             pp.microSeconds = 9999999.9;
             pp.hitRate = 0;
             return pp;
         }
-        // if (MT0 - M >= 16 || MT1 - N >= 16)
-        // {
-        //     //std::cout<<"M:"<<M<<",N:"<<N<<",MT0:"<<MT0<<",MT1:"<<MT1<<std::endl;
-        //     std::cout << "Formocast-earlycut:" << sizeMapping.solutionName << ",cause2," << std::endl;
-        //     pp.microSeconds = 9999999.9;
-        //     pp.hitRate = 0;
-        //     return pp;
-        // }
+        if (MT0 - M >= 16 || MT1 - N >= 16)
+        {
+            //std::cout<<"M:"<<M<<",N:"<<N<<",MT0:"<<MT0<<",MT1:"<<MT1<<std::endl;
+            std::cout << "Formocast-earlycut:" << " cause2" << std::endl;
+            pp.microSeconds = 9999999.9;
+            pp.hitRate = 0;
+            return pp;
+        }
         if(problem.dataType == DataType::BFloat16 || problem.dataType == DataType::Half)
         {
             //TODO: handle TF32 problem so that check the BPE here.
@@ -690,7 +688,7 @@ namespace Tensilelite
                 if (((K >= 64 && depthU <=32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) && NumBatches < hw_consts.NumCUs && sizeMapping.matrixInstruction[2] >= 32)
                 {
                     //std::cout<<"K:"<<K<<",depthU:"<<depthU<<",NumBatches:"<<NumBatches<<",sizeMapping.matrixInstruction[2]:"<<sizeMapping.matrixInstruction[2]<<std::endl;
-                    std::cout << "Formocast-earlycut:" << sizeMapping.solutionName << ",cause3," << std::endl;
+                    std::cout << "Formocast-earlycut:" << " cause3" << std::endl;
                     pp.microSeconds = 9999999.9;
                     pp.hitRate = 0;
                     return pp;
@@ -714,6 +712,17 @@ namespace Tensilelite
         uint32_t loopCnt = K_AfterGSU / depthU;
         uint32_t K_tail = K_AfterGSU - (loopCnt * depthU);
 
+        oss << "Workgroup Dimensions:"
+            << "\n\tM_WGs_total " << M_WGs_total
+            << "\n\tN_WGs_total " << N_WGs_total
+            << "\n\tM_WGs_per_tile_XCD " << M_WGs_per_tile_XCD
+            << "\n\tN_WGs_per_tile_XCD " << N_WGs_per_tile_XCD
+            << "\n\tM_WGs_per_tile " << M_WGs_per_tile
+            << "\n\tN_WGs_per_tile " << N_WGs_per_tile
+            << "\n\tnumberWGs " << numberWGs << " | num_tiles " << num_tiles << " | loopCnt " << loopCnt << " | K_tail " << K_tail
+            << "\n\tWGs_per_tile " << WGs_per_tile << " | WGs_per_tile_XCD " << WGs_per_tile_XCD
+            << "\n";
+
         // 5. Cache Hit Rates and Bandwidths
         CacheHitRates cache_hits;
         L1CacheHitRate l1 = computeL1CacheHitRate(hw_consts,
@@ -723,6 +732,26 @@ namespace Tensilelite
                                                 VWA, VWB, transA, transB,
                                                 M, N, NLCA, NLCB,
                                                 NumThreads, NumWave0, NumWave1);
+
+        oss << "L1CacheHitRate:"
+            << "\n\ttransA " << transA << " transB " << transB
+            << "\n\tGlobalReadVectorWidth: GRVWA " << GRVWA << " GRVWB " << GRVWB
+            << "\n\tDirectToVgpr DTVA " << DTVA << " DTVB " << DTVB
+            << "\n\tVectorWidth VWA " << VWA << " VWB " << VWB
+            << "\n\tNumLoadsCoalesced NLCA " << NLCA << " NLCB " << NLCB
+            << "\n\tlda (M) " << M << " ldb (N) " << N
+            << "\n\tThreadnum " << NumThreads << " MT0 " << MT0 << " MT1 " << MT1
+            << "\n\tNumWave0 " << NumWave0 << " NumWave1 " << NumWave1
+            << "\n\tSome important equals "
+            << "\n\t    GRVWA * bpeA " << GRVWA * bpeA
+            << "\n\t    isL1BypassA " << (0 >= 2)
+            << "\n\t    MT0 / NLCA * bpeA " << MT0 / NLCA * bpeA
+            << "\n\t---"
+            << "\n\t    GRVWB * bpeB " << GRVWB * bpeB
+            << "\n\t    isL1BypassA " << (0 >= 2)
+            << "\n\t    MT1 / NLCB * bpeB " << MT1 / NLCB * bpeB
+            << "\n";
+
         L2CacheHitRate l2 = computeL2CacheHitRate(M,
                                                 N,
                                                 K_AfterGSU,
@@ -735,6 +764,12 @@ namespace Tensilelite
                                                 0,
                                                 0,
                                                 isGSUWGMRR);
+
+        oss << "L2CacheHitRate:"
+            << "\n\tdepthU " << depthU << " GlobalSplitU " << GlobalSplitU << " WGM " << WGM
+            << "\n\tbatches " << NumBatches << " isGSUWGMRR " << isGSUWGMRR
+            << "\n";
+
         L3CacheHitRate l3 = computeL3CacheHitRate(M, N, K, hw_consts,
                                                 bpeA, bpeB, 0, 0,
                                                 N_WGs_total, M_WGs_total, N_WGs_per_tile, M_WGs_per_tile);
@@ -877,50 +912,9 @@ namespace Tensilelite
         perfInfo.du = depthU;
 
 #if 1
-        std::ostringstream oss;
-
-        /////////////////////////////
-        // metrics print in csv form
-
-        // create problem hash
-        // oss << "Formocast-internal:M" << problem.M << "-";
-        // oss << "N" << problem.N << "-";
-        // oss << "K" << problem.K << "-";
-        // oss << "NB" << problem.NumBatches << ",";
-
-        // oss << "bpeA" << problem.bpeA << "-";
-        // oss << "bpeB" << problem.bpeB << "-";
-        // oss << "bpeC" << problem.bpeCompute << "-";
-        // oss << "bpeD" << problem.bpeD << "-";
-        // oss << "tA" << problem.transA << "-";
-        // oss << "tB" << problem.transB << "-";
-        // oss << "sA" << problem.swizzleTensorA << "-";
-        // oss << "sB" << problem.swizzleTensorB << "-";
-        // oss << "dt" << int(problem.dataType) << ",";
-
-        // create SizeMapping hash
-        // oss <<  sizeMapping.solutionName << ",";
-
-        /////////////////////////////////////////
-        // no not enough, give me all the details
-
-        // print problem
-        oss << "Problem: [ " << problem.M << ", " << problem.N << ", " << problem.K << ", " << problem.NumBatches << "]\n";
-
-        oss << "Solution grid:"
-            << "\n\tM_WGs_total " << M_WGs_total
-            << "\n\tN_WGs_total " << N_WGs_total
-            << "\n\tM_WGs_per_tile_XCD " << M_WGs_per_tile_XCD
-            << "\n\tN_WGs_per_tile_XCD " << N_WGs_per_tile_XCD
-            << "\n\tM_WGs_per_tile " << M_WGs_per_tile
-            << "\n\tN_WGs_per_tile " << N_WGs_per_tile
-            << "\n\tnumberWGs " << numberWGs << " | num_tiles " << num_tiles << " | loopCnt " << loopCnt << " | K_tail " << K_tail
-            << "\n\tWGs_per_tile " << WGs_per_tile << " | WGs_per_tile_XCD " << WGs_per_tile_XCD
-            << "\n";
-
         std::cout << oss.str() << std::endl;
-
 #endif
+
         return pp;
     }
 
