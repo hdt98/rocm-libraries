@@ -83,6 +83,11 @@ NB_MODULE(origami, m) {
 
   m.def("int_to_reduction_t", &origami::int_to_reduction_t, "Convert int to reduction_t.");
 
+  nanobind::enum_<origami::prediction_modes_t>(m, "prediction_modes_t")
+      .value("estimation", origami::prediction_modes_t::estimation)
+      .value("simulation", origami::prediction_modes_t::simulation)
+      .export_values();
+
   // Add new struct bindings
   nanobind::class_<origami::dim3_t>(m, "dim3_t")
       .def(nanobind::init<std::size_t, std::size_t, std::size_t>())
@@ -105,7 +110,35 @@ NB_MODULE(origami, m) {
       .def_rw("cache_hints_b", &origami::config_t::cache_hints_b)
       .def_rw("workspace_size", &origami::config_t::workspace_size)
       .def_rw("workspace_size_per_elem_c", &origami::config_t::workspace_size_per_elem_c)
-      .def_rw("grid_selection", &origami::config_t::grid_selection);
+      .def_rw("grid_selection", &origami::config_t::grid_selection)
+      .def_rw("prediction_mode", &origami::config_t::prediction_mode)
+      // Formocast-specific parameters (used when prediction_mode == simulation)
+      .def_rw("depth_u", &origami::config_t::depth_u)
+      .def_rw("global_split_u", &origami::config_t::global_split_u)
+      .def_rw("global_accumulation", &origami::config_t::global_accumulation)
+      .def_rw("local_split_u", &origami::config_t::local_split_u)
+      .def_rw("grvw_a", &origami::config_t::grvw_a)
+      .def_rw("grvw_b", &origami::config_t::grvw_b)
+      .def_rw("gwvw_d", &origami::config_t::gwvw_d)
+      .def_rw("direct_to_vgpr_a", &origami::config_t::direct_to_vgpr_a)
+      .def_rw("direct_to_vgpr_b", &origami::config_t::direct_to_vgpr_b)
+      .def_rw("direct_to_lds_a", &origami::config_t::direct_to_lds_a)
+      .def_rw("direct_to_lds_b", &origami::config_t::direct_to_lds_b)
+      .def_rw("num_loads_coalesced_a", &origami::config_t::num_loads_coalesced_a)
+      .def_rw("num_loads_coalesced_b", &origami::config_t::num_loads_coalesced_b)
+      .def_rw("vector_width_a", &origami::config_t::vector_width_a)
+      .def_rw("vector_width_b", &origami::config_t::vector_width_b)
+      .def_rw("wave_num", &origami::config_t::wave_num)
+      .def_rw("wave_group_m", &origami::config_t::wave_group_m)
+      .def_rw("wave_group_n", &origami::config_t::wave_group_n)
+      .def_rw("prefetch_global_read", &origami::config_t::prefetch_global_read)
+      .def_rw("math_clocks_unrolled_loop", &origami::config_t::math_clocks_unrolled_loop)
+      .def_rw("swizzle_a", &origami::config_t::swizzle_a)
+      .def_rw("swizzle_b", &origami::config_t::swizzle_b)
+      .def_rw("workgroup_mapping_xcc", &origami::config_t::workgroup_mapping_xcc)
+      .def_rw("workgroup_mapping_xcc_group", &origami::config_t::workgroup_mapping_xcc_group)
+      .def_rw("global_split_u_coalesced", &origami::config_t::global_split_u_coalesced)
+      .def_rw("global_split_u_wgm_round_robin", &origami::config_t::global_split_u_wgm_round_robin);
 
   nanobind::class_<origami::workgroup_mapping_t>(m, "workgroup_mapping_t")
       .def(nanobind::init<>())
@@ -237,6 +270,9 @@ NB_MODULE(origami, m) {
                                const origami::config_t&,
                                size_t max_cus)>(&origami::compute_total_latency),
         "Compute total latency");
+  m.def("compute_formocast_latency",
+        &origami::compute_formocast_latency,
+        "Compute latency using Formocast simulation model (more accurate, slower)");
   m.def("compute_number_matrix_instructions",
         &origami::compute_number_matrix_instructions,
         "Compute the number of matrix instructions required");

@@ -244,4 +244,19 @@ double compute_total_latency(const problem_t& problem,
                              const config_t& config,
                              size_t max_cus);
 
+/**
+ * @brief Compute latency using Formocast simulation model.
+ *
+ * This function uses the Formocast simulator for more accurate (but slower)
+ * performance prediction. It converts Origami types to Formocast types internally.
+ *
+ * @param problem Problem description (M, N, K, etc.)
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param config Kernel configuration with Formocast-specific parameters.
+ * @return double Predicted latency in microseconds.
+ */
+double compute_formocast_latency(const problem_t& problem,
+                                 const hardware_t& hardware,
+                                 const config_t& config);
+
 }  // namespace origami
