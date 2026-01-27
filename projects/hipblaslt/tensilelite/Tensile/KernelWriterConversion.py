@@ -385,12 +385,22 @@ class KernelWriterConversion(KernelWriterBase):
 
       if self.state["ProblemType"]["UseE"]:
         ptrStr = self.state["ProblemType"]["DataTypeE"].toDevice(self.language)
-        kStr += "  " + ptrStr + " * arg.E = arg.BatchE[wg];" + self.endLine
+        kStr += "  " + ptrStr + " * E = arg.BatchE[wg];" + self.endLine
       ptrStr = self.state["ProblemType"]["DestDataType"].toDevice(self.language)
-      kStr += "  " + ptrStr + " * arg.D = arg.BatchD[wg];" + self.endLine
+      kStr += "  " + ptrStr + " * D = arg.BatchD[wg];" + self.endLine
       ptrStr = self.state["ProblemType"]["DestDataType"].toDevice(self.language)
       zeroStr = self.state["ProblemType"]["ComputeDataType"].zeroString(self.language, 1)
-      kStr += "  " + ptrStr + f" const* arg.C = (arg.beta == {zeroStr}) ? nullptr : arg.BatchC[wg];" + self.endLine
+      kStr += "  " + ptrStr + f" const* C = (arg.beta == {zeroStr}) ? nullptr : arg.BatchC[wg];" + self.endLine
+    else:
+      # For StridedBatched, D and C are accessed directly from arg
+      if self.state["ProblemType"]["UseE"]:
+        ptrStr = self.state["ProblemType"]["DataTypeE"].toDevice(self.language)
+        kStr += "  " + ptrStr + " * E = arg.E;" + self.endLine
+      ptrStr = self.state["ProblemType"]["DestDataType"].toDevice(self.language)
+      kStr += "  " + ptrStr + " * D = arg.D;" + self.endLine
+      ptrStr = self.state["ProblemType"]["DestDataType"].toDevice(self.language)
+      zeroStr = self.state["ProblemType"]["ComputeDataType"].zeroString(self.language, 1)
+      kStr += "  " + ptrStr + f" const* C = (arg.beta == {zeroStr}) ? nullptr : arg.C;" + self.endLine
 
     ########################################
     # D index
@@ -672,7 +682,7 @@ class KernelWriterConversion(KernelWriterBase):
     #Beta
     kStr += "  if(arg.beta != (%s)0){%s" % (self.state["ProblemType"]["ComputeDataType"].toDevice(self.language), self.endLine)
     for vIdx in range(self.num_dword_load):
-      kStr += "    %s[%d] += arg.beta * (%s)arg.C[idxC+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
+      kStr += "    %s[%d] += arg.beta * (%s)C[idxC+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
     kStr += "  }" + self.endLine
     kStr += self.endLine
 
@@ -710,10 +720,10 @@ class KernelWriterConversion(KernelWriterBase):
         kStr += ");%s" % (self.endLine)
         kStr += "  %s dataE[%d];%s" % (intermediateDataType, self.num_dword_load, self.endLine)
         for vIdx in range(self.num_dword_load):
-          kStr += "  dataE[%d] = (%s)arg.E[idxE+%d];%s" % ( vIdx, intermediateDataType, vIdx, self.endLine)
+          kStr += "  dataE[%d] = (%s)E[idxE+%d];%s" % ( vIdx, intermediateDataType, vIdx, self.endLine)
       else:
         # E index
-        kStr += "  if( arg.E != nullptr)%s" % (self.endLine)
+        kStr += "  if( E != nullptr)%s" % (self.endLine)
         kStr += "  {%s" % (self.endLine)
         kStr += "    %s idxE = GLOBAL_E( (%s)" % (self.uint64Str, self.uint64Str)
         for i in range(problemType["NumIndicesC"]):
@@ -721,7 +731,7 @@ class KernelWriterConversion(KernelWriterBase):
           kStr += '0'  if i in nonTileFreeIndices else ('id%d' % i)
         kStr += ");%s" % (self.endLine)
         for vIdx in range(self.num_dword_load):
-          kStr += "    arg.E[idxE+%d] = (%s)(accum[%d]);%s" % (vIdx, dataTypeE, vIdx, self.endLine)
+          kStr += "    E[idxE+%d] = (%s)(accum[%d]);%s" % (vIdx, dataTypeE, vIdx, self.endLine)
         kStr += "  }%s" % (self.endLine)
 
     #Activation
@@ -760,8 +770,8 @@ class KernelWriterConversion(KernelWriterBase):
     for vIdx in range(self.num_dword_load):
       kStr += "  %s[%d] = (%s)%s[%d];%s" % (resultStr, vIdx, destTypeStr, accumStr, vIdx, self.endLine)
 
-    # kStr += "  *(%s *)(arg.D+idxD) = *(%s *)%s;%s" % (storeTypeStr, storeTypeStr, resultStr, self.endLine)
-    kStr += "  buffer_store<%s, sizeof(%s), CacheOperation::Kind::Always>(*(%s *)%s, arg.D, idxD * sizeof(%s), 0);%s" % (storeTypeStr, storeTypeStr, storeTypeStr, resultStr, destTypeStr, self.endLine)
+    # kStr += "  *(%s *)(D+idxD) = *(%s *)%s;%s" % (storeTypeStr, storeTypeStr, resultStr, self.endLine)
+    kStr += "  buffer_store<%s, sizeof(%s), CacheOperation::Kind::Always>(*(%s *)%s, D, idxD * sizeof(%s), 0);%s" % (storeTypeStr, storeTypeStr, storeTypeStr, resultStr, destTypeStr, self.endLine)
 
     ########################################
     # end
