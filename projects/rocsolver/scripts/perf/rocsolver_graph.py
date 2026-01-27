@@ -192,6 +192,75 @@ def generate_rocprof_graph(rocprof_dir, n=10):
     print(f"Rocprof graph saved to: {output_path}")
 
 
+def generate_internal_profiler_graph(kernel_csv, output_dir, n=10):
+    """
+    Generate a graph decomposing total runtime into individual kernels.
+
+    This function uses results from rocSOLVER internal logger to show which
+    kernels contribute most to the total runtime.
+
+    Args:
+        kernel_csv: Path to CSV file containing parsed kernel data
+        output_dir: Directory to save the graph
+        n: Number of top kernels to display (default: 10)
+    """
+    if not os.path.exists(kernel_csv):
+        sys.exit(f"Error: Kernel data file not found: {kernel_csv}")
+
+    # Read and sort kernels by percentage (descending)
+    kernels = []
+    with open(kernel_csv, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            kernels.append({
+                'name': row['Name'],
+                'percentage': float(row['Percentage'])
+            })
+
+    kernels.sort(key=lambda k: k['percentage'], reverse=True)
+
+    # Extract top N and accumulate rest into "Other"
+    x = []
+    y = []
+    other_percentage = 0.0
+
+    for i, kernel in enumerate(kernels):
+        if i < n:
+            x.append(kernel['name'])
+            y.append(kernel['percentage'])
+        else:
+            other_percentage += kernel['percentage']
+
+    if not x:
+        sys.exit("Error: No kernel data found")
+
+    # Add "Other" category if there are remaining kernels
+    if other_percentage > 0:
+        x.append("Other")
+        y.append(other_percentage)
+
+    # Generate bar chart
+    fig, ax = plt.subplots(figsize=(5, 10))
+
+    ax.set_ylabel('Proportion of Run Time (%)', fontsize=12)
+    ax.set_xlabel('Kernel Name', fontsize=12)
+
+    rects = ax.bar(x, y)
+    ax.bar_label(rects)
+
+    ax.set_ylim(0, 1.2*max(y))
+    ax.tick_params("x", rotation=90)
+
+    fig.suptitle('Proportion of Time (%) by Kernel (Internal Profiler)', fontsize=14)
+
+    plt.subplots_adjust(bottom=0.40)
+    output_path = os.path.join(output_dir, f'{os.path.basename(output_dir)}_kernel_breakdown.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    print(f"Internal profiler graph saved to: {output_path}")
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='rocsolver-graph',
