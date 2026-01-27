@@ -39,6 +39,45 @@ import sys
 import matplotlib.pyplot as plt
 
 
+def create_and_save_plot(data_dict, title, output_path, show_legend=True):
+    """
+    Create and save a single plot with common styling.
+
+    Args:
+        data_dict: dict of {label: {'x': [...], 'y': [...]}} for multiple series,
+                   or single {'x': [...], 'y': [...]} for single series
+        title: graph title
+        output_path: where to save the PNG
+        show_legend: whether to show legend (only if multiple series)
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Check if this is a single data series (has 'x' and 'y' keys directly)
+    if 'x' in data_dict and 'y' in data_dict:
+        # Single data series (no label needed)
+        ax.plot(data_dict['x'], data_dict['y'], marker='o', linewidth=2)
+    else:
+        # Multiple data series with labels
+        for label, data in data_dict.items():
+            ax.plot(data['x'], data['y'], marker='o', label=label, linewidth=2)
+
+        # Show legend if requested and multiple groups
+        if show_legend and len(data_dict) > 1:
+            ax.legend(fontsize=8, loc='best')
+
+    ax.set_xlabel('Input Size (n)', fontsize=12)
+    ax.set_ylabel('Total Time (ms)', fontsize=12)
+    ax.grid(True, alpha=0.3)
+
+    fig.suptitle(title, fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    print(f"Graph saved to: {output_path}")
+
+
 def generate_combined_graph(groups, graph_title, csv_path, output_path):
     """
     Generate a single graph with all groups plotted as separate lines.
@@ -51,31 +90,16 @@ def generate_combined_graph(groups, graph_title, csv_path, output_path):
         csv_path: path to CSV file
         output_path: output path for the graph
     """
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    for group_name, data in groups.items():
-        ax.plot(data['x'], data['y'], marker='o', label=group_name, linewidth=2)
-
-    ax.set_xlabel('Input Size (n)', fontsize=12)
-    ax.set_ylabel('Total Time (ms)', fontsize=12)
-    ax.grid(True, alpha=0.3)
-
-    # Only show legend if there are multiple groups
-    if len(groups) > 1:
-        ax.legend(fontsize=8, loc='best')
-
-    title = graph_title or os.path.splitext(os.path.basename(csv_path))[0]
-    fig.suptitle(f'{title} - Runtime by Size', fontsize=14)
-
     # Determine output path
     if output_path is None:
         output_path = os.path.splitext(csv_path)[0] + '.png'
 
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
-    plt.close()
+    # Determine title
+    title = graph_title or os.path.splitext(os.path.basename(csv_path))[0]
+    full_title = f'{title} - Runtime by Size'
 
-    print(f"Graph saved to: {output_path}")
+    # Create and save the plot
+    create_and_save_plot(groups, full_title, output_path, show_legend=True)
 
 
 def generate_separate_graphs(groups, graph_title, csv_path, output_path):
@@ -99,28 +123,14 @@ def generate_separate_graphs(groups, graph_title, csv_path, output_path):
 
     # Generate one graph per group
     for group_key, data in groups.items():
-        # Create individual graph
-        fig, ax = plt.subplots(figsize=(10, 6))
-
-        # Plot single line (no legend needed)
-        ax.plot(data['x'], data['y'], marker='o', linewidth=2)
-
-        ax.set_xlabel('Input Size (n)', fontsize=12)
-        ax.set_ylabel('Total Time (ms)', fontsize=12)
-        ax.grid(True, alpha=0.3)
-
         # Title includes group key to identify parameters
         title = f'{base_title} - Runtime by Size ({group_key})'
-        fig.suptitle(title, fontsize=14)
 
         # Filename includes group key
         group_output_path = f'{base_path}_{group_key}.png'
 
-        plt.tight_layout()
-        plt.savefig(group_output_path, dpi=150)
-        plt.close()
-
-        print(f"Graph saved to: {group_output_path}")
+        # Create and save the plot (no legend needed for single series)
+        create_and_save_plot(data, title, group_output_path, show_legend=False)
 
 
 def generate_benchmark_graph(csv_path, output_path=None, separate_groups=False):
