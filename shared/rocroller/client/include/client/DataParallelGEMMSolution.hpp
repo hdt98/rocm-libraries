@@ -297,8 +297,6 @@ namespace rocRoller
 
                     auto typeA = fromString<DataType>(solutionParams.types.typeA);
                     auto typeB = fromString<DataType>(solutionParams.types.typeB);
-                    auto typeC = fromString<DataType>(solutionParams.types.typeC);
-                    auto typeD = fromString<DataType>(solutionParams.types.typeD);
 
                     if(typeA == DataType::Float && typeB == DataType::Float)
                     {

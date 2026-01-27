@@ -323,8 +323,6 @@ namespace GEMMTests
 
         std::string modifiers{"cbsz:0b000 blgp:0b000"};
 
-        auto const numBitsPerElementAB = DataTypeInfo::Get(typeAB).elementBits;
-
         switch(typeAB)
         {
         case DataType::FP8:
@@ -383,8 +381,6 @@ namespace GEMMTests
         problem.unrollK          = 2;
 
         std::string modifiers{"cbsz:0b000 blgp:0b000"};
-
-        auto const numBitsPerElementAB = DataTypeInfo::Get(typeAB).elementBits;
 
         switch(typeAB)
         {

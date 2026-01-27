@@ -76,7 +76,6 @@ namespace rocRollerTests
             REQUIRE((*next_iter)->name != testName);
         }
 
-        bool found = false;
         for(auto const& testTag : (*first_match)->tags)
         {
             if(testTag == tag)

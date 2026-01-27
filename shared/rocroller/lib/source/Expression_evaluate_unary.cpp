@@ -346,8 +346,7 @@ namespace rocRoller::Expression::EvaluateDetail
                         expr.width,
                         argBits);
 
-            using UnsignedARG       = std::make_unsigned_t<ARG>;
-            UnsignedARG unsignedArg = static_cast<UnsignedARG>(arg);
+            using UnsignedARG = std::make_unsigned_t<ARG>;
 
             UnsignedARG mask = 0;
             if(argBits == static_cast<size_t>(this->expr.width))

@@ -309,11 +309,6 @@ namespace rocRollerTest
             co_yield m_context->copier()->copy(result_ptr, s_result, "Move pointer.");
             co_yield m_context->copier()->copy(a_ptr, s_a, "Move pointer.");
 
-            auto bpi
-                = CeilDivide(DataTypeInfo::Get(a_ptr->variableType().dataType).elementBits, 8u);
-            auto bpo = CeilDivide(
-                DataTypeInfo::Get(result_ptr->variableType().dataType).elementBits, 8u);
-
             Expression::ExpressionPtr bufferExpr = Expression::literal(Buffer{0, 0, 0, 0});
             bufferExpr = BufferDescriptor::SetDefaults(bufferExpr, m_context);
             bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, s_a->expression());
@@ -374,8 +369,6 @@ namespace rocRollerTest
             hipMemcpy(result.data(), d_result.get(), sizeof(uint32_t) * N / 4, hipMemcpyDefault),
             HasHipSuccess(0));
 
-        auto bpi = 1;
-        auto bpo = 4;
         for(int i = 0; i < N / 4; i++)
         {
             uint32_t expected = a[i] | (a[i + 1] << 8) | (a[i + 2] << 16) | (a[i + 3] << 24);

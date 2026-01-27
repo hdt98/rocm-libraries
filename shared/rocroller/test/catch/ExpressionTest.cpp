@@ -1031,10 +1031,6 @@ namespace ExpressionTest
             Register::Type::Scalar,
             context.get()->kernel()->wavefront_size() == 64 ? DataType::Bool64 : DataType::Bool32};
 
-        Expression::ResultType rVCC{Register::Type::VCC, DataType::Bool32};
-        Expression::ResultType rSCC{Register::Type::SCC, DataType::Bool};
-
-        Expression::ResultType rAgprFloat{Register::Type::Accumulator, DataType::Float};
         Expression::ResultType rAgprDouble{Register::Type::Accumulator, DataType::Double};
 
         SECTION("Value expressions")
@@ -1567,7 +1563,6 @@ namespace ExpressionTest
         CHECK(Half(8.75) == std::get<Half>(evaluate(eight75Half)));
 
         Expression::ResultType litDouble{Register::Type::Literal, DataType::Double};
-        Expression::ResultType litFloat{Register::Type::Literal, DataType::Float};
         Expression::ResultType litBool{Register::Type::Literal, DataType::Bool};
 
         CHECK(litDouble == resultType(exprSix));

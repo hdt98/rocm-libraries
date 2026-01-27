@@ -109,7 +109,8 @@ namespace rocRoller::KernelGraph
 
         void incorporate(int node, std::unordered_set<std::string> const& args)
         {
-            auto& dest = m_referencedArgs[node];
+            (void)m_referencedArgs[node];
+
             for(auto const& arg : args)
             {
                 incorporate(node, arg);
@@ -192,8 +193,6 @@ namespace rocRoller::KernelGraph
                                  CG::LoadTiled,
                                  CG::StoreTiled> auto const& op)
         {
-            auto [target, dir] = getOperationTarget(node, m_graph);
-
             auto [coords, path] = findAllRequiredCoordinates(node, m_graph);
 
             for(auto coord : path)

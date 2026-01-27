@@ -605,8 +605,7 @@ namespace TransposeLoadsTest
                                                    std::make_tuple(DataType::BF6, false, 3),
                                                    std::make_tuple(DataType::FP4, false, 2));
 
-        auto wavetile = GENERATE(std::make_pair(16, 128), std::make_pair(32, 64));
-        auto context  = TestContext::ForTestDevice();
+        auto context = TestContext::ForTestDevice();
         if(!(context->targetArchitecture().HasCapability(GPUCapability::ds_read_b64_tr_b16)
              || context->targetArchitecture().HasCapability(GPUCapability::ds_read_b64_tr_b8)
              || context->targetArchitecture().HasCapability(GPUCapability::ds_read_b96_tr_b6)

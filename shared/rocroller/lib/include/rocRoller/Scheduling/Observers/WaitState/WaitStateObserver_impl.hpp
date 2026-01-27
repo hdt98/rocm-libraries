@@ -145,8 +145,6 @@ namespace rocRoller
                 return std::nullopt;
             }
 
-            auto const* thisDerived = static_cast<DerivedObserver const*>(this);
-
             int requiredNops = -1;
             for(auto const& regId : reg->getRegisterIds())
             {

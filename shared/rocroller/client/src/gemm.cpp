@@ -1853,9 +1853,8 @@ int main(int argc, const char* argv[])
                          ->expected(0, 1);
     auto coOption
         = generate->add_option("--co", io.saveCOPath, "Save code-object to file.")->expected(0, 1);
-    auto graphOption
-        = generate->add_option("--graph", io.saveGraphPath, "Save kernel graph to file.")
-              ->expected(0, 1);
+    (void)generate->add_option("--graph", io.saveGraphPath, "Save kernel graph to file.")
+        ->expected(0, 1);
     generate
         ->add_option(
             "--config", loadConfigPath, "Load solution generation parameters from YAML file.")

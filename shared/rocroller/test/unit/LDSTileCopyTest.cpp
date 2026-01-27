@@ -231,9 +231,9 @@ namespace LDSCopyTest
             Assign{Register::Type::Vector, DF(mactile0) + DF(mactile0)});
         auto store = kgraph.control.addElement(StoreTiled(DataType::UInt32));
 
-        auto body      = kgraph.control.addElement(Body(), {kernel}, {load});
-        auto sequence1 = kgraph.control.addElement(Sequence(), {load}, {assignAdd});
-        auto sequence2 = kgraph.control.addElement(Sequence(), {load}, {assignAdd});
+        (void)kgraph.control.addElement(Body(), {kernel}, {load});
+        (void)kgraph.control.addElement(Sequence(), {load}, {assignAdd});
+        (void)kgraph.control.addElement(Sequence(), {load}, {assignAdd});
         kgraph.control.addElement(Sequence(), {assignAdd}, {store});
 
         // connect

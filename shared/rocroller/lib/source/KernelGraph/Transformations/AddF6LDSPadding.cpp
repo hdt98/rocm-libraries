@@ -45,8 +45,7 @@ namespace rocRoller
         CoordinateGraph::MacroTile paddedMacroTile(CoordinateGraph::MacroTile& macroTile,
                                                    uint                        paddingBytes)
         {
-            uint const elementBits = 6;
-            uint const packing     = 16;
+            uint const packing = 16;
 
             auto fastMovingDim = isMatrixA(macroTile) ? 0 : 1;
             auto padElements   = macroTile.sizes[fastMovingDim] / packing;
@@ -113,7 +112,6 @@ namespace rocRoller
 
                         for(auto conn : graph.mapper.getCoordinateConnections(ldsTag))
                         {
-                            auto coordTag   = conn.coordinate;
                             auto controlTag = conn.control;
 
                             auto storeLDSTile

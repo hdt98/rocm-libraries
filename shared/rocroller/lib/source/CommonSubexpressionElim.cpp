@@ -485,7 +485,6 @@ namespace rocRoller
 
                 lhsLoc = tree.size() - 1;
                 deps.insert(lhsLoc);
-                int lhsSize = tree.size();
 
                 rhsTree = generateTree(expr.rhs);
                 if(rhsTree.empty())
@@ -532,7 +531,6 @@ namespace rocRoller
 
                 lhsLoc = tree.size() - 1;
                 deps.insert(lhsLoc);
-                int lhsSize = tree.size();
 
                 r1hsTree = generateTree(expr.r1hs);
                 if(r1hsTree.empty())

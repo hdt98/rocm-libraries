@@ -53,6 +53,9 @@ namespace rocRoller
                     OP operation;
                     if(CCommutativeBinary<OP> && eval_lhs)
                     {
+                        AssertFatal(eval_rhs,
+                                    "Both sides must be translate-time constants but rhs is not.",
+                                    ShowValue(eval_rhs));
                         operation.lhs
                             = simplify(std::make_shared<Expression>(OP{lhs_op.lhs, literal(rhs)}));
                         operation.rhs = lhs_op.rhs;

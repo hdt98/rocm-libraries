@@ -48,12 +48,12 @@ namespace KernelGraphTest
         auto B = graph0.control.addElement(NOP());
         auto C = graph0.control.addElement(NOP());
 
-        auto b0 = graph0.control.addElement(Body(), {A}, {B});
-        auto b1 = graph0.control.addElement(Body(), {B}, {C});
+        (void)graph0.control.addElement(Body(), {A}, {B});
+        (void)graph0.control.addElement(Body(), {B}, {C});
 
         auto b2 = graph0.control.addElement(Body(), {A}, {C});
 
-        auto s0 = graph0.control.addElement(Sequence(), {A}, {C});
+        (void)graph0.control.addElement(Sequence(), {A}, {C});
 
         EXPECT_EQ(graph0.control.getEdges().to<std::vector>().size(), 4);
 
@@ -120,8 +120,8 @@ namespace KernelGraphTest
         auto B = graph0.control.addElement(NOP());
         auto C = graph0.control.addElement(NOP());
 
-        auto s0 = graph0.control.addElement(Sequence(), {A}, {B});
-        auto s1 = graph0.control.addElement(Sequence(), {B}, {C});
+        (void)graph0.control.addElement(Sequence(), {A}, {B});
+        (void)graph0.control.addElement(Sequence(), {B}, {C});
 
         auto s2 = graph0.control.addElement(Sequence(), {A}, {C});
 
@@ -141,8 +141,8 @@ namespace KernelGraphTest
         auto B = graph0.control.addElement(NOP());
         auto C = graph0.control.addElement(NOP());
 
-        auto b0 = graph0.control.addElement(Body(), {A}, {B});
-        auto s0 = graph0.control.addElement(Sequence(), {B}, {C});
+        (void)graph0.control.addElement(Body(), {A}, {B});
+        (void)graph0.control.addElement(Sequence(), {B}, {C});
 
         auto b1 = graph0.control.addElement(Body(), {A}, {C});
 
@@ -164,7 +164,7 @@ namespace KernelGraphTest
 
         auto b0 = graph0.control.addElement(Body(), {A}, {B});
         auto b1 = graph0.control.addElement(Body(), {A}, {B});
-        auto s0 = graph0.control.addElement(Sequence(), {B}, {C});
+        (void)graph0.control.addElement(Sequence(), {B}, {C});
 
         auto b2 = graph0.control.addElement(Body(), {A}, {C});
 

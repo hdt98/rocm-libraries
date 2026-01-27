@@ -89,8 +89,7 @@ namespace rocRoller
                 auto info
                     = m_context.lock()->targetArchitecture().GetInstructionInfo(inst.getOpCode());
 
-                auto latency        = info.getLatency();
-                auto initialLatency = latency;
+                auto latency = info.getLatency();
 
                 if(variableCycleInsts.contains(inst.getOpCode()))
                 {
@@ -236,7 +235,6 @@ namespace rocRoller
             if(!inst.isCommentOnly() && !m_disallowedOps.empty()
                && Settings::Get(Settings::LogLvl) >= LogLevel::Debug)
             {
-                auto lastCycle = m_disallowedOps.rbegin()->first;
                 inst.addComment(
                     fmt::format("Cycle: {}\nQueue: {}", m_programCycle, toString(m_disallowedOps)));
             }

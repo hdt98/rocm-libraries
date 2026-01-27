@@ -456,8 +456,6 @@ SCENARIO("RegisterTagManager initialize adds alias edges.", "[codegen][kernel-gr
         // CHECK(linears == std::vector<int>{});
 
         auto l2 = linears[2];
-        auto l3 = linears[3];
-        auto l4 = linears[4];
 
         THEN("initialize() will throw with bad dest.")
         {

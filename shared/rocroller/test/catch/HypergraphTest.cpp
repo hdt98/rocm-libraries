@@ -448,7 +448,6 @@ namespace HypergraphTest
 
         auto TestSplit4 = g.addElement(TestSplit{}, {u1}, {sd2, sd3});
 
-        auto sd5 = g.addElement(TestSubDimension{});
         auto sd6 = g.addElement(TestSubDimension{});
         auto sd7 = g.addElement(TestSubDimension{});
         auto sd8 = g.addElement(TestSubDimension{});
@@ -493,11 +492,11 @@ namespace HypergraphTest
 
         auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0, sd1});
 
-        auto TestVGPR0   = g.addElement(TestVGPR{});
-        auto TestForget0 = g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR0});
+        auto TestVGPR0 = g.addElement(TestVGPR{});
+        (void)g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR0});
 
-        auto TestVGPR1   = g.addElement(TestVGPR{});
-        auto TestForget1 = g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR1});
+        auto TestVGPR1 = g.addElement(TestVGPR{});
+        (void)g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR1});
 
         SECTION("Edges to Edges not allowed")
         {
@@ -528,10 +527,10 @@ namespace HypergraphTest
         auto sd3 = g.addElement(TestSubDimension{});
 
         auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0});
-        auto TestSplit1 = g.addElement(TestSplit{}, {u0}, {sd1});
+        (void)g.addElement(TestSplit{}, {u0}, {sd1});
 
-        auto TestVGPR0   = g.addElement(TestVGPR{});
-        auto TestForget0 = g.addElement(TestForget{}, {sd0}, {TestVGPR0});
+        auto TestVGPR0 = g.addElement(TestVGPR{});
+        (void)g.addElement(TestForget{}, {sd0}, {TestVGPR0});
 
         SECTION("Edges to Edges not allowed")
         {
@@ -566,8 +565,8 @@ namespace HypergraphTest
         auto sd2 = g.addElement(TestSubDimension{});
         auto sp3 = g.addElement(TestSplit{}, {u1}, {sd2});
 
-        auto sd4 = g.addElement(TestSubDimension{});
-        auto sp5 = g.addElement(TestSplit{}, {u1}, {sd4});
+        auto                  sd4 = g.addElement(TestSubDimension{});
+        [[maybe_unused]] auto sp5 = g.addElement(TestSplit{}, {u1}, {sd4});
 
         auto sd6 = g.addElement(TestSubDimension{});
         auto sp7 = g.addElement(TestSplit{}, {sd4}, {sd6});
@@ -623,13 +622,13 @@ namespace HypergraphTest
         auto sd0 = g.addElement(TestSubDimension{});
         auto sd1 = g.addElement(TestSubDimension{});
 
-        auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0, sd1});
+        (void)g.addElement(TestSplit{}, {u0}, {sd0, sd1});
 
-        auto TestVGPR0   = g.addElement(TestVGPR{});
-        auto TestForget0 = g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR0});
+        auto TestVGPR0 = g.addElement(TestVGPR{});
+        (void)g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR0});
 
-        auto TestVGPR1   = g.addElement(TestVGPR{});
-        auto TestForget1 = g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR1});
+        auto TestVGPR1 = g.addElement(TestVGPR{});
+        (void)g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR1});
 
         CHECK_THROWS_AS(
             g.deleteElement<TestForget>(std::vector<int>{sd0}, std::vector<int>{TestVGPR0}),
@@ -646,8 +645,8 @@ namespace HypergraphTest
         auto sd0 = g.addElement(TestSubDimension{});
         auto sd1 = g.addElement(TestSubDimension{});
 
-        auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0, sd1});
-        auto TestSplit1 = g.addElement(TestSplit{}, {u0}, {sd0, sd1});
+        (void)g.addElement(TestSplit{}, {u0}, {sd0, sd1});
+        (void)g.addElement(TestSplit{}, {u0}, {sd0, sd1});
 
         auto childVec  = g.childNodes(1).to<std::vector>();
         auto parentVec = g.parentNodes(2).to<std::vector>();
@@ -689,10 +688,10 @@ namespace HypergraphTest
                 sd2 = g.addElement(TestSubDimension{});
             }
 
-            auto TestSplit0  = g.addElement(TestSplit{}, {u0}, {sd0});
-            auto TestSplit1  = g.addElement(TestSplit{}, {u0}, {sd1});
-            auto TestSplit2  = g.addElement(TestSplit{}, {sd1}, {sd2});
-            auto TestForget0 = g.addElement(TestForget{}, {sd0}, {sd2});
+            auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0});
+            (void)g.addElement(TestSplit{}, {u0}, {sd1});
+            (void)g.addElement(TestSplit{}, {sd1}, {sd2});
+            (void)g.addElement(TestForget{}, {sd0}, {sd2});
 
             CHECK(g.followEdges<TestSplit>({}) == std::set<int>());
             CHECK(g.followEdges<TestSplit>({u0}) == std::set<int>({u0, sd0, sd1, sd2}));

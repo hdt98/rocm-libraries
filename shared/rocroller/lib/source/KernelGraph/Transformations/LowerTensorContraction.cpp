@@ -52,7 +52,6 @@ namespace rocRoller
                 "KernelGraph::LowerTensorContraction::addConnectionsMultiply(): Multiply({})",
                 waveMult);
 
-            auto userTag   = graph.mapper.get<User>(loadTag);
             auto macroTile = graph.mapper.get<MacroTile>(loadTag);
 
             auto [waveTag, wave] = graph.getDimension<WaveTile>(loadTag);

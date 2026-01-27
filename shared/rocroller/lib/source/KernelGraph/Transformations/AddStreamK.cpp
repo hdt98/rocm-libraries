@@ -444,10 +444,6 @@ namespace rocRoller
         {
             auto one  = Expression::literal(1u);
             auto zero = Expression::literal(0, numTilesVarType);
-            auto DF   = [numTilesVarType](int tag) {
-                return std::make_shared<Expression::Expression>(
-                    Expression::DataFlowTag{tag, Register::Type::Scalar, numTilesVarType});
-            };
 
             auto workgroup = graph.coordinates.addElement(Workgroup(0));
             graph.coordinates.addElement(PassThrough(), {workgroup}, {flagsScratchTag});

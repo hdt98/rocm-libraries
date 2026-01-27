@@ -115,7 +115,6 @@ namespace rocRoller
                 dst = only(graph.coordinates.getOutputNodeIndices(dst, CT::isEdge<CT::Duplicate>))
                           .value_or(dst);
 
-                bool hasLDS = false;
                 for(auto output :
                     graph.coordinates.getInputNodeIndices(dst, CT::isEdge<CT::DataFlow>))
                 {

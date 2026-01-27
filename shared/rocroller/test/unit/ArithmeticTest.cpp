@@ -553,7 +553,6 @@ namespace ArithmeticTest
         m_context->schedule(k->prolog());
 
         auto       arch          = m_context->targetArchitecture();
-        auto       gpu           = arch.target();
         auto const wavefrontSize = arch.GetCapability(GPUCapability::DefaultWavefrontSize);
 
         auto kb = [&]() -> Generator<Instruction> {
@@ -808,8 +807,6 @@ namespace ArithmeticTest
         m_context->schedule(k->preamble());
         m_context->schedule(k->prolog());
 
-        auto const& gpu = m_context->targetArchitecture().target();
-
         auto kb = [&]() -> Generator<Instruction> {
             Register::ValuePtr s_result, s_a;
             co_yield m_context->argLoader()->getValue("result", s_result);
@@ -921,8 +918,6 @@ namespace ArithmeticTest
 
         m_context->schedule(k->preamble());
         m_context->schedule(k->prolog());
-
-        auto const& gpu = m_context->targetArchitecture().target();
 
         auto kb = [&]() -> Generator<Instruction> {
             Register::ValuePtr s_result, s_a, s_b, s_c;
@@ -1143,7 +1138,6 @@ namespace ArithmeticTest
         m_context->schedule(k->prolog());
 
         auto       arch          = m_context->targetArchitecture();
-        auto       gpu           = arch.target();
         auto const wavefrontSize = arch.GetCapability(GPUCapability::DefaultWavefrontSize);
 
         auto kb = [&]() -> Generator<Instruction> {

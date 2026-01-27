@@ -248,7 +248,6 @@ namespace GEMMTests
 
         auto const& arch                = m_context->targetArchitecture();
         uint const  elementsPerWavetile = waveM * waveK / wfs;
-        uint const  elementsPerTrLoad   = bitsPerTransposeLoad(arch, elementBits) / elementBits;
 
         uint const bitsPerABMemOp = (elementBits == 6 ? 96 : 128);
         uint const trLoadsPerWave
@@ -367,7 +366,6 @@ namespace GEMMTests
 
         auto const& arch                = m_context->targetArchitecture();
         uint const  elementsPerWavetile = waveM * waveK / wfs;
-        uint const  elementsPerTrLoad   = bitsPerTransposeLoad(arch, elementBits) / elementBits;
 
         uint const bitsPerABMemOp = (elementBits == 6 ? 96 : 128);
         uint const trLoadsPerWave
@@ -454,8 +452,6 @@ namespace GEMMTests
         auto gemm = GEMMProblemF8F6F4{waveM, waveN, waveK};
 
         std::tie(gemm.transA, gemm.transB) = transOp;
-
-        uint const elementBits = DataTypeInfo::Get(typeAB).elementBits;
 
         gemm.scaleAMode = Operations::ScaleMode::Separate;
         gemm.scaleBMode = Operations::ScaleMode::Separate;
@@ -638,10 +634,6 @@ namespace GEMMTests
 
         std::tie(problem.transA, problem.transB) = transOp;
 
-        // TODO: enable non-TN F6 tests
-        auto const elementBitsA = DataTypeInfo::Get(typeA).elementBits;
-        auto const elementBitsB = DataTypeInfo::Get(typeB).elementBits;
-
         basicGEMMMixed(typeA, typeB, problem);
 
         auto const mfma{fmt::format("v_mfma_f32_{}x{}x{}_f8f6f4", waveM, waveN, waveK)};
@@ -703,10 +695,6 @@ namespace GEMMTests
         problem.loadPathB = loadPathB;
 
         std::tie(problem.transA, problem.transB) = transOp;
-
-        // TODO: enable non-TN F6 tests
-        auto const elementBitsA = DataTypeInfo::Get(typeA).elementBits;
-        auto const elementBitsB = DataTypeInfo::Get(typeB).elementBits;
 
         problem.scaleAMode = scaleAMode;
         problem.scaleBMode = scaleBMode;

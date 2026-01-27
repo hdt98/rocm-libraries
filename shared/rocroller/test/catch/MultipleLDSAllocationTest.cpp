@@ -56,8 +56,6 @@ namespace multipleLDSAllocTest
             , m_numBytes3(numBytes3)
             , m_numLoads3(numLoads3)
         {
-            auto const& arch = m_context->targetArchitecture().target();
-
             auto maxLDS = context->targetArchitecture().GetCapability(GPUCapability::MaxLdsSize);
             auto ldsSize
                 = m_numBytes1 * m_numLoads1 + m_numBytes2 * m_numLoads2 + m_numBytes3 * m_numLoads3;

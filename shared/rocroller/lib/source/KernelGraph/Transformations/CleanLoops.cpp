@@ -60,7 +60,7 @@ namespace rocRoller
                     continue;
 
                 // Replace ForLoop with Scope; ideally would reconnect but OK for now
-                auto scope = replaceWith(k, loop, k.control.addElement(Scope()));
+                (void)replaceWith(k, loop, k.control.addElement(Scope()));
 
                 purgeFor(k, loop);
             }

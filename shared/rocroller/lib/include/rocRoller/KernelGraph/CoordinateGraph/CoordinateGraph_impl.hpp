@@ -43,8 +43,7 @@ namespace rocRoller
                                       std::vector<int> const&                dsts,
                                       Visitor&                               visitor) const
         {
-            bool constexpr forward     = Dir == Graph::Direction::Downstream;
-            auto constexpr OppositeDir = opposite(Dir);
+            bool constexpr forward = Dir == Graph::Direction::Downstream;
 
             auto const& starts = forward ? srcs : dsts;
             auto const& ends   = forward ? dsts : srcs;

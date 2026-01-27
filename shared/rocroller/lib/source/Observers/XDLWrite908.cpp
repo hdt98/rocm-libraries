@@ -45,8 +45,6 @@ namespace rocRoller
         {
             if(GPUInstructionInfo::isMFMA(inst.getOpCode()))
             {
-                std::optional<int> value;
-
                 auto const& srcs = inst.getSrcs();
 
                 // SrcC RAW

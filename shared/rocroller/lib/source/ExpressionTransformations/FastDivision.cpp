@@ -499,7 +499,6 @@ namespace rocRoller
                     return rv;
                 }
 
-                auto rhsType = resultVariableType(rhs);
                 if(rhsEvalTimes[EvaluationTime::KernelLaunch])
                 {
                     auto div = magicNumberDivision(lhs, rhs, m_context);
@@ -537,8 +536,6 @@ namespace rocRoller
                     copyComment(rv, expr);
                     return rv;
                 }
-
-                auto rhsType = resultVariableType(rhs);
 
                 if(rhsEvalTimes[EvaluationTime::KernelLaunch])
                 {

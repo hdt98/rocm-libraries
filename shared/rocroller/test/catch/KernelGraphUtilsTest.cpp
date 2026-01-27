@@ -183,7 +183,7 @@ TEST_CASE("ForLoop utils", "[kernel-graph]")
         CHECK(graph.control.allElements().to<std::vector>().size() == 5);
         CHECK(graph.coordinates.allElements().to<std::vector>().size() == 3);
 
-        auto clonedForLoopOp = KernelGraph::cloneForLoop(graph, forLoopOp);
+        (void)KernelGraph::cloneForLoop(graph, forLoopOp);
 
         CHECK(graph.control.allElements().to<std::vector>().size() == 10);
         // The new loop re-uses the ForLoop coordinate

@@ -809,8 +809,6 @@ namespace rocRoller
                     = only(m_graph->coordinates.getInputNodeIndices(macTileTag, CT::isEdge<View>))
                           .value_or(macTileTag);
 
-                auto packedVariableType = varTypeInfo.packedVariableType();
-
                 auto allocOptions = Register::AllocationOptions::FullyContiguous();
 
                 auto elementBits = DataTypeInfo::Get(varTypeInfo.segmentVariableType).elementBits;
@@ -1453,8 +1451,6 @@ namespace rocRoller
                                                       ShowValue(packing),
                                                       ShowValue(activeLanesInWave * packing),
                                                       ShowValue(store.varType)));
-
-            uint numVgpr = waveTileNumElements / activeLanesInWave;
 
             auto agpr = m_context->registerTagManager()->getRegister(macTileTag);
 

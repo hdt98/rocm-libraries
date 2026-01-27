@@ -154,8 +154,6 @@ namespace ExpressionTest
 
                 kernel({}, d_result.get(), a, b);
 
-                double result;
-
                 CHECK_THAT(d_result, HasDeviceScalar(Catch::Matchers::WithinULP(r, 2)));
                 CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
             }

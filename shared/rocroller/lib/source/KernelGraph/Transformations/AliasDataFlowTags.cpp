@@ -218,8 +218,6 @@ namespace rocRoller
 
             void TagExtent::merge(KernelGraph const& kgraph, TagExtent const& inner)
             {
-                bool found = false;
-
                 AssertFatal(
                     typeKey() == inner.typeKey(), ShowValue(typeKey()), ShowValue(inner.typeKey()));
                 AssertFatal(dataType != DataType::None, ShowValue(dataType));
@@ -488,7 +486,6 @@ namespace rocRoller
                 bool foundAny = false;
                 do
                 {
-                    auto e   = extents.size();
                     foundAny = false;
                     for(auto outer = extents.begin(); outer != extents.end(); outer++)
                     {

@@ -104,10 +104,7 @@ namespace GEMMTests
                || gemm.scaleBMode != Operations::ScaleMode::None)
             {
                 REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_scale_f8f6f4);
-                const auto  scaleType = gemm.scaleAMode != Operations::ScaleMode::None
-                                            ? gemm.scaleTypeA
-                                            : gemm.scaleTypeB;
-                const auto& arch      = m_context->targetArchitecture();
+                const auto& arch = m_context->targetArchitecture();
                 AssertFatal(gemm.scaleAMode == Operations::ScaleMode::None
                                 || arch.isSupportedScaleType(gemm.scaleTypeA),
                             fmt::format("Scale mode for A set but architecture {} does not "

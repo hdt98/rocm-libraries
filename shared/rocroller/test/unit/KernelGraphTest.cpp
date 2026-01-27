@@ -2228,8 +2228,7 @@ namespace KernelGraphTest
 
     TEST_F(KernelGraphTest, CleanExpression)
     {
-        VariableType doubleVal{DataType::Double, PointerType::Value};
-        auto         command = std::make_shared<Command>();
+        auto command = std::make_shared<Command>();
 
         auto aTag = command->allocateTag();
         auto a    = std::make_shared<Expression::Expression>(command->allocateArgument(
@@ -2255,9 +2254,9 @@ namespace KernelGraphTest
         auto example = rocRollerTest::Graphs::VectorAddNegSquare<int>();
         auto command = example.getCommand();
 
-        int workGroupSize = 64;
+        const uint workGroupSize = 64;
         m_context->kernel()->setKernelDimensions(1);
-        m_context->kernel()->setWorkgroupSize({64, 1, 1});
+        m_context->kernel()->setWorkgroupSize({workGroupSize, 1, 1});
 
         auto cleanArgumentsTransform = std::make_shared<CleanArguments>(m_context, command);
 
@@ -2309,64 +2308,59 @@ namespace KernelGraphTest
         int kernel_index = kgraph.control.addElement(Kernel());
         int loadA_index  = kgraph.control.addElement(LoadLinear(DataType::Float));
         int loadB_index  = kgraph.control.addElement(LoadLinear(DataType::Float));
-        int body1_index  = kgraph.control.addElement(Body(), {kernel_index}, {loadA_index});
-        int body2_index  = kgraph.control.addElement(Body(), {kernel_index}, {loadB_index});
+        (void)kgraph.control.addElement(Body(), {kernel_index}, {loadA_index});
+        (void)kgraph.control.addElement(Body(), {kernel_index}, {loadB_index});
 
         int op1_index
             = kgraph.control.addElement(Assign{Register::Type::Vector, Expression::literal(5)});
-        int sequence1_index = kgraph.control.addElement(Sequence(), {loadA_index}, {op1_index});
-        int sequence2_index = kgraph.control.addElement(Sequence(), {loadB_index}, {op1_index});
+        (void)kgraph.control.addElement(Sequence(), {loadA_index}, {op1_index});
+        (void)kgraph.control.addElement(Sequence(), {loadB_index}, {op1_index});
 
         int op2_index
             = kgraph.control.addElement(Assign{Register::Type::Vector, Expression::literal(7)});
-        int sequence3_index = kgraph.control.addElement(Sequence(), {op1_index}, {op2_index});
+        (void)kgraph.control.addElement(Sequence(), {op1_index}, {op2_index});
 
         int op3_index
             = kgraph.control.addElement(Assign{Register::Type::Vector, Expression::literal(9)});
-        int sequence4_index = kgraph.control.addElement(Sequence(), {op1_index}, {op3_index});
-        int sequence5_index = kgraph.control.addElement(Sequence(), {op2_index}, {op3_index});
+        (void)kgraph.control.addElement(Sequence(), {op1_index}, {op3_index});
+        (void)kgraph.control.addElement(Sequence(), {op2_index}, {op3_index});
 
-        int storeC_index    = kgraph.control.addElement(StoreLinear());
-        int sequence6_index = kgraph.control.addElement(Sequence(), {op3_index}, {storeC_index});
+        int storeC_index = kgraph.control.addElement(StoreLinear());
+        (void)kgraph.control.addElement(Sequence(), {op3_index}, {storeC_index});
 
         // Coordinate Graph
-        int u1_index       = kgraph.coordinates.addElement(User());
-        int sd1_index      = kgraph.coordinates.addElement(SubDimension());
-        int split1_index   = kgraph.coordinates.addElement(Split(), {u1_index}, {sd1_index});
-        int linear1_index  = kgraph.coordinates.addElement(Linear());
-        int flatten1_index = kgraph.coordinates.addElement(Flatten(), {sd1_index}, {linear1_index});
-        int dataflow1_index
-            = kgraph.coordinates.addElement(DataFlow(), {u1_index}, {linear1_index});
-        int buffer1_index = kgraph.coordinates.addElement(
+        int u1_index  = kgraph.coordinates.addElement(User());
+        int sd1_index = kgraph.coordinates.addElement(SubDimension());
+        (void)kgraph.coordinates.addElement(Split(), {u1_index}, {sd1_index});
+        int linear1_index = kgraph.coordinates.addElement(Linear());
+        (void)kgraph.coordinates.addElement(Flatten(), {sd1_index}, {linear1_index});
+        (void)kgraph.coordinates.addElement(DataFlow(), {u1_index}, {linear1_index});
+        (void)kgraph.coordinates.addElement(
             rocRoller::KernelGraph::CoordinateGraph::Buffer(), {u1_index}, {linear1_index});
 
-        int u2_index       = kgraph.coordinates.addElement(User());
-        int sd2_index      = kgraph.coordinates.addElement(SubDimension());
-        int split2_index   = kgraph.coordinates.addElement(Split(), {u2_index}, {sd2_index});
-        int linear2_index  = kgraph.coordinates.addElement(Linear());
-        int flatten2_index = kgraph.coordinates.addElement(Flatten(), {sd2_index}, {linear2_index});
-        int dataflow2_index
-            = kgraph.coordinates.addElement(DataFlow(), {u2_index}, {linear2_index});
+        int u2_index  = kgraph.coordinates.addElement(User());
+        int sd2_index = kgraph.coordinates.addElement(SubDimension());
+        (void)kgraph.coordinates.addElement(Split(), {u2_index}, {sd2_index});
+        int linear2_index = kgraph.coordinates.addElement(Linear());
+        (void)kgraph.coordinates.addElement(Flatten(), {sd2_index}, {linear2_index});
+        (void)kgraph.coordinates.addElement(DataFlow(), {u2_index}, {linear2_index});
 
-        int linear3_index   = kgraph.coordinates.addElement(Linear());
-        int dataflow3_index = kgraph.coordinates.addElement(
+        int linear3_index = kgraph.coordinates.addElement(Linear());
+        (void)kgraph.coordinates.addElement(
             DataFlow(), {linear1_index, linear2_index}, {linear3_index});
         int linear4_index = kgraph.coordinates.addElement(Linear());
-        int dataflow4_index
-            = kgraph.coordinates.addElement(DataFlow(), {linear3_index}, {linear4_index});
-        int linear5i_index  = kgraph.coordinates.addElement(Linear());
-        int dataflow5_index = kgraph.coordinates.addElement(
+        (void)kgraph.coordinates.addElement(DataFlow(), {linear3_index}, {linear4_index});
+        int linear5i_index = kgraph.coordinates.addElement(Linear());
+        (void)kgraph.coordinates.addElement(
             DataFlow(), {linear3_index, linear4_index}, {linear5i_index});
 
         int linear5o_index = kgraph.coordinates.addElement(Linear());
-        int makeoutput1_index
-            = kgraph.coordinates.addElement(MakeOutput(), {linear5i_index}, {linear5o_index});
-        int sd5o_index   = kgraph.coordinates.addElement(SubDimension(0));
-        int split3_index = kgraph.coordinates.addElement(Split(), {linear5o_index}, {sd5o_index});
-        int u5o_index    = kgraph.coordinates.addElement(User({}, ""));
-        int join1_index  = kgraph.coordinates.addElement(Join(), {sd5o_index}, {u5o_index});
-        int dataflow6_index
-            = kgraph.coordinates.addElement(DataFlow(), {linear5i_index}, {u5o_index});
+        (void)kgraph.coordinates.addElement(MakeOutput(), {linear5i_index}, {linear5o_index});
+        int sd5o_index = kgraph.coordinates.addElement(SubDimension(0));
+        (void)kgraph.coordinates.addElement(Split(), {linear5o_index}, {sd5o_index});
+        int u5o_index = kgraph.coordinates.addElement(User({}, ""));
+        (void)kgraph.coordinates.addElement(Join(), {sd5o_index}, {u5o_index});
+        (void)kgraph.coordinates.addElement(DataFlow(), {linear5i_index}, {u5o_index});
 
         auto yamlData = toYAML(kgraph);
         auto graph2   = rocRoller::KernelGraph::fromYAML(yamlData);
@@ -2758,8 +2752,7 @@ namespace KernelGraphTest
 
         auto test = m_context->kernel()->addArgument({"foo", DataType::Int32});
 
-        auto                    destReg = kgraph.coordinates.addElement(Linear());
-        Expression::DataFlowTag destRegTag{destReg, Register::Type::Vector, DataType::Int32};
+        auto destReg = kgraph.coordinates.addElement(Linear());
 
         auto beforeConditionalAssign
             = kgraph.control.addElement(Assign{Register::Type::Vector, Expression::literal(0)});
@@ -2770,10 +2763,10 @@ namespace KernelGraphTest
 
         kgraph.control.addElement(Sequence(), {beforeConditionalAssign}, {conditional});
 
-        auto trueOp    = kgraph.control.addElement(Assign{Register::Type::Vector, unit});
-        auto trueBody  = kgraph.control.addElement(Body(), {conditional}, {trueOp});
-        auto falseOp   = kgraph.control.addElement(Assign{Register::Type::Vector, zero});
-        auto falseBody = kgraph.control.addElement(Else(), {conditional}, {falseOp});
+        auto trueOp = kgraph.control.addElement(Assign{Register::Type::Vector, unit});
+        (void)kgraph.control.addElement(Body(), {conditional}, {trueOp});
+        auto falseOp = kgraph.control.addElement(Assign{Register::Type::Vector, zero});
+        (void)kgraph.control.addElement(Else(), {conditional}, {falseOp});
 
         kgraph.mapper.connect(beforeConditionalAssign, destReg, NaryArgument::DEST);
         kgraph.mapper.connect(trueOp, destReg, NaryArgument::DEST);

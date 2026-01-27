@@ -505,8 +505,6 @@ namespace RandomNumberGenerationTest
     {
         auto seedMode = rocRoller::Operations::RandomNumberGenerator::SeedMode::Default;
 
-        auto nx = 32u; // Number of elements in Tensor A
-
         auto command = std::make_shared<Command>();
 
         // Seed

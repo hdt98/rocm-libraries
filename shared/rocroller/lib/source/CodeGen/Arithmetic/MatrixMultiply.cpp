@@ -157,8 +157,6 @@ namespace rocRoller
 
             const auto isFP8 = [](DataType type) { return type == DataType::FP8x4; };
 
-            const auto isBF8 = [](DataType type) { return type == DataType::BF8x4; };
-
             const auto isF16 = [](DataType type) {
                 return type == DataType::Halfx2 || type == DataType::BFloat16x2;
             };

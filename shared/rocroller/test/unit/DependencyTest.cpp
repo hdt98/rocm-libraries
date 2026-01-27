@@ -388,7 +388,6 @@ namespace rocRollerTest
         auto command = std::make_shared<Command>();
 
         VariableType Int64Value(DataType::Int64, PointerType::Value);
-        VariableType UInt64Value(DataType::UInt64, PointerType::Value);
         VariableType Int64Pointer(DataType::Int64, PointerType::PointerGlobal);
 
         auto resultTag = command->allocateTag();

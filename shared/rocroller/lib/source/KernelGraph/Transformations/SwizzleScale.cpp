@@ -440,8 +440,6 @@ namespace rocRoller
                 }
                 if(existingUnroll1 != -1)
                 {
-                    auto factor = macTile.subTileSizes.at(2) / existingMacTile.subTileSizes.at(2);
-
                     auto unroll1 = existingUnroll1;
                     graph.coordinates.addElement(PassThrough(), {nWave1}, {unroll1});
                     connections.push_back(DC<Unroll>(unroll1, 1));
@@ -475,8 +473,6 @@ namespace rocRoller
                 }
                 if(existingUnroll0 != -1)
                 {
-                    auto factor = macTile.subTileSizes.at(2) / existingMacTile.subTileSizes.at(2);
-
                     auto unroll0 = existingUnroll0;
                     graph.coordinates.addElement(PassThrough(), {nWave0}, {unroll0});
                     connections.push_back(DC<Unroll>(unroll0, 0));

@@ -652,7 +652,6 @@ namespace rocRollerTest
 
         auto bufferRegs = Register::Value::Placeholder(
             m_context, Register::Type::Scalar, {DataType::None, PointerType::Buffer}, 1);
-        auto buff_opts = BufferInstructionOptions();
 
         // copy
         EXPECT_THROW(m_context->schedule(m_context->copier()->packHalf(vf32, vh16_1, vh16_2)),

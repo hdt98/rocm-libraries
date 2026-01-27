@@ -2192,9 +2192,7 @@ namespace rocRoller
                 auto workgroupSizes        = m_context->kernel()->workgroupSize();
                 auto wavefrontSize         = m_context->kernel()->wavefront_size();
                 auto wavetilesPerWavefront = m_params->getWaveTilesPerWavefront();
-                auto useWaveAccess         = tile.memoryType == MemoryType::WAVE
-                                     || tile.memoryType == MemoryType::WAVE_LDS;
-                bool useSwappedAccess = m_params->transposeMemoryAccess[tile.layoutType];
+                bool useSwappedAccess      = m_params->transposeMemoryAccess[tile.layoutType];
                 // XXX debug
                 logger->debug("  LDS({}), MacroTile({}), MacroTile size: {}x{}, SubTile size: "
                               "{}x{}, MemoryType {}, LayoutType {}, useSwappedAccess {}",

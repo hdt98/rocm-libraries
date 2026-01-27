@@ -54,15 +54,15 @@ namespace rocRollerTest
         int kernel_index = control.addElement(Kernel());
         int loadA_index  = control.addElement(LoadLinear(DataType::Float));
         int loadB_index  = control.addElement(LoadLinear(DataType::Float));
-        int body1_index  = control.addElement(Body(), {kernel_index}, {loadA_index});
-        int body2_index  = control.addElement(Body(), {kernel_index}, {loadB_index});
+        (void)control.addElement(Body(), {kernel_index}, {loadA_index});
+        (void)control.addElement(Body(), {kernel_index}, {loadB_index});
 
         int add_index       = control.addElement(Assign());
         int sequence1_index = control.addElement(Sequence(), {loadA_index}, {add_index});
         int sequence2_index = control.addElement(Sequence(), {loadB_index}, {add_index});
 
-        int mul_index       = control.addElement(Assign());
-        int sequence3_index = control.addElement(Sequence(), {add_index}, {mul_index});
+        int mul_index = control.addElement(Assign());
+        (void)control.addElement(Sequence(), {add_index}, {mul_index});
 
         int storeC_index = control.addElement(StoreLinear());
 
@@ -274,11 +274,11 @@ namespace rocRollerTest
         int scope3 = control.addElement(Scope());
         control.addElement(Sequence(), {forOp}, {scope3});
 
-        int mul       = control.addElement(Assign());
-        int sequence3 = control.addElement(Body(), {scope3}, {mul});
+        int mul = control.addElement(Assign());
+        (void)control.addElement(Body(), {scope3}, {mul});
 
-        int storeE    = control.addElement(StoreLinear());
-        int sequence5 = control.addElement(Sequence(), {mul}, {storeE});
+        int storeE = control.addElement(StoreLinear());
+        (void)control.addElement(Sequence(), {mul}, {storeE});
 
         {
             std::vector<int> root = control.roots().to<std::vector>();
@@ -452,15 +452,15 @@ namespace rocRollerTest
 
         int kernelIndex = control.addElement(Kernel());
         int loadAIndex  = control.addElement(LoadLinear(DataType::Float));
-        int body1Index  = control.addElement(Body(), {kernelIndex}, {loadAIndex});
-        int condOp      = control.addElement(ConditionalOp());
+        (void)control.addElement(Body(), {kernelIndex}, {loadAIndex});
+        int condOp = control.addElement(ConditionalOp());
 
         control.addElement(Sequence(), {loadAIndex}, {condOp});
 
-        int addIndex   = control.addElement(Assign());
-        int mulIndex   = control.addElement(Assign());
-        int trueIndex  = control.addElement(Body(), {condOp}, {addIndex});
-        int falseIndex = control.addElement(Else(), {condOp}, {mulIndex});
+        int addIndex = control.addElement(Assign());
+        int mulIndex = control.addElement(Assign());
+        (void)control.addElement(Body(), {condOp}, {addIndex});
+        (void)control.addElement(Else(), {condOp}, {mulIndex});
 
         int storeCIndex = control.addElement(StoreLinear());
         control.addElement(Sequence(), {condOp}, {storeCIndex});
@@ -513,8 +513,8 @@ namespace rocRollerTest
         int assertOp    = control.addElement(AssertOp());
         control.addElement(Body(), {kernelIndex}, {assertOp});
 
-        int dummyIndex  = control.addElement(Assign());
-        int passedIndex = control.addElement(Sequence(), {assertOp}, {dummyIndex});
+        int dummyIndex = control.addElement(Assign());
+        (void)control.addElement(Sequence(), {assertOp}, {dummyIndex});
 
         auto assertOps = control
                              .findNodes(
@@ -630,15 +630,15 @@ namespace rocRollerTest
         int kernel_index = control.addElement(Kernel());
 
         int assign1_index = control.addElement(Assign());
-        int init_index    = control.addElement(Initialize(), {kernel_index}, {assign1_index});
+        (void)control.addElement(Initialize(), {kernel_index}, {assign1_index});
 
         int assign2_index = control.addElement(Assign());
-        int seq_index     = control.addElement(Sequence(), {kernel_index}, {assign2_index});
+        (void)control.addElement(Sequence(), {kernel_index}, {assign2_index});
 
         int loadA_index = control.addElement(LoadLinear(DataType::Float));
         int loadB_index = control.addElement(LoadLinear(DataType::Float));
-        int body1_index = control.addElement(Body(), {kernel_index}, {loadA_index});
-        int body2_index = control.addElement(Body(), {kernel_index}, {loadB_index});
+        (void)control.addElement(Body(), {kernel_index}, {loadA_index});
+        (void)control.addElement(Body(), {kernel_index}, {loadB_index});
 
         int add_index       = control.addElement(Assign());
         int sequence1_index = control.addElement(Sequence(), {loadA_index}, {add_index});

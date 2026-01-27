@@ -182,7 +182,7 @@ TEST_CASE("ControlFlowRWTracer - ForLoopOp", "[kernel-graph][utils]")
 
     auto unroll  = graph.coordinates.addElement(Unroll());
     auto forLoop = graph.coordinates.addElement(ForLoop());
-    auto tile    = graph.coordinates.addElement(MacroTile());
+    (void)graph.coordinates.addElement(MacroTile());
 
     auto kernel    = graph.control.addElement(Kernel());
     auto counter   = dataFlowTag(forLoop, Register::Type::Scalar, DataType::Int32);
@@ -426,7 +426,7 @@ TEST_CASE("ControlFlowRWTracer - Error on getDependencies without build", "[kern
 TEST_CASE("ControlFlowRWTracer - Empty graph", "[kernel-graph][utils]")
 {
     KernelGraph::KernelGraph graph;
-    auto                     kernel = graph.control.addElement(Kernel());
+    (void)graph.control.addElement(Kernel());
 
     KernelGraph::ControlFlowRWTracer tracer(graph);
     auto                             records = tracer.coordinatesReadWrite();
@@ -643,8 +643,8 @@ TEST_CASE("ControlFlowRWTracer - Dependencies with no writes", "[kernel-graph][u
 {
     KernelGraph::KernelGraph graph;
 
-    auto tileA  = graph.coordinates.addElement(MacroTile());
-    auto kernel = graph.control.addElement(Kernel());
+    auto tileA = graph.coordinates.addElement(MacroTile());
+    (void)graph.control.addElement(Kernel());
 
     // Just create a tile, don't write to it
     KernelGraph::ControlFlowRWTracer tracer(graph);

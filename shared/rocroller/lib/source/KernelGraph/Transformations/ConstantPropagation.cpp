@@ -217,9 +217,8 @@ namespace rocRoller::KernelGraph
             = kgraph.control.addElement(ConditionalOp{zero == DF(scalarDFTag), "0 == beta"});
 
         // find (parent --e--> head --body--> node)
-        auto e           = *only(kgraph.control.getNeighbours<Graph::Direction::Upstream>(head));
-        auto parent      = *only(kgraph.control.getInputNodeIndices<Sequence>(head));
-        auto forLoopBody = *only(kgraph.control.getOutputNodeIndices<Body>(head));
+        auto e      = *only(kgraph.control.getNeighbours<Graph::Direction::Upstream>(head));
+        auto parent = *only(kgraph.control.getInputNodeIndices<Sequence>(head));
 
         // change it to (parent  --head--> condOp)
         auto elem = kgraph.control.getElement(e);

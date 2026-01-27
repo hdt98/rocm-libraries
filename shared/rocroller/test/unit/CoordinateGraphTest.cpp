@@ -112,7 +112,7 @@ namespace rocRollerTest
         auto y = ct.addElement(SubDimension(0, size, unit));
         auto m = ct.addElement(SubDimension(0, size * size, unit));
 
-        auto flatten_id = ct.addElement(Flatten{}, {x, y}, {m});
+        (void)ct.addElement(Flatten{}, {x, y}, {m});
 
         EXPECT_EQ(ct.getNodes().to<std::set>(), std::set<int>({x, y, m}));
 
@@ -182,7 +182,7 @@ namespace rocRollerTest
 
         EXPECT_EQ(ct.getNodes().to<std::set>(), std::set<int>({x, y, z, m}));
 
-        auto flat = ct.addElement(Flatten(), {x, y, z}, {m});
+        (void)ct.addElement(Flatten(), {x, y, z}, {m});
 
         auto exprs = ct.forward({x_index, y_index, z_index}, {x, y, z}, {m});
         auto sexpr = Expression::toString(exprs[0]);
@@ -742,7 +742,7 @@ namespace rocRollerTest
         auto linX = ct.addElement(Linear(Expression::literal(100u), one));
         auto sw   = ct.addElement(Linear(Expression::literal(2u), one));
 
-        auto sunder = ct.addElement(Sunder(), {input}, {linX, sw});
+        (void)ct.addElement(Sunder(), {input}, {linX, sw});
 
         auto a = ct.addElement(Linear());
         auto b = ct.addElement(Linear(Expression::literal(10u), one));
@@ -773,7 +773,7 @@ namespace rocRollerTest
         auto linY = ct.addElement(Linear(Expression::literal(24u), one));
         auto sw   = ct.addElement(Linear(Expression::literal(2u), one));
 
-        auto sunder = ct.addElement(Sunder(), {input}, {linX, linY, sw});
+        (void)ct.addElement(Sunder(), {input}, {linX, linY, sw});
 
         auto a = ct.addElement(Linear());
         auto b = ct.addElement(Linear(Expression::literal(10u), one));
@@ -819,7 +819,7 @@ namespace rocRollerTest
         auto linZ = ct.addElement(Linear(Expression::literal(17u), one));
         auto sw   = ct.addElement(Linear(Expression::literal(2u), one));
 
-        auto sunder = ct.addElement(Sunder(), {input}, {linX, linY, linZ, sw});
+        (void)ct.addElement(Sunder(), {input}, {linX, linY, linZ, sw});
 
         auto a = ct.addElement(Linear());
         auto b = ct.addElement(Linear(Expression::literal(10u), one));
@@ -874,7 +874,7 @@ namespace rocRollerTest
         auto linX = ct.addElement(Linear(Expression::literal(100u), one));
         auto sw   = ct.addElement(Linear(Expression::literal(2u), one));
 
-        auto sunder = ct.addElement(Sunder(), {input}, {linX, sw});
+        (void)ct.addElement(Sunder(), {input}, {linX, sw});
 
         auto a = ct.addElement(Linear());
         auto b = ct.addElement(Linear(Expression::literal(10u), one));
@@ -913,7 +913,7 @@ namespace rocRollerTest
         auto linY = ct.addElement(Linear(Expression::literal(24u), one));
         auto sw   = ct.addElement(Linear(Expression::literal(2u), one));
 
-        auto sunder = ct.addElement(Sunder(), {input}, {linX, linY, sw});
+        (void)ct.addElement(Sunder(), {input}, {linX, linY, sw});
 
         auto a = ct.addElement(Linear());
         auto b = ct.addElement(Linear(Expression::literal(10u), one));
@@ -977,7 +977,7 @@ namespace rocRollerTest
         auto linZ = ct.addElement(Linear(Expression::literal(17u), one));
         auto sw   = ct.addElement(Linear(Expression::literal(2u), one));
 
-        auto sunder = ct.addElement(Sunder(), {input}, {linX, linY, linZ, sw});
+        (void)ct.addElement(Sunder(), {input}, {linX, linY, linZ, sw});
 
         auto a = ct.addElement(Linear());
         auto b = ct.addElement(Linear(Expression::literal(10u), one));

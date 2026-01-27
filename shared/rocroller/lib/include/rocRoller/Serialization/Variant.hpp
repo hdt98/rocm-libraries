@@ -157,8 +157,6 @@ namespace rocRoller
 
                 std::optional<std::string> remainingCtx;
 
-                bool mapTypeName = true;
-
                 if(iot::outputting(io))
                 {
                     myTypePath = typePath(exp);

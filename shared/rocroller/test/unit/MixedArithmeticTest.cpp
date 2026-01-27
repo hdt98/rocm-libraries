@@ -593,7 +593,7 @@ namespace MixedArithmeticTest
                 for(size_t i = 0; i < maxValues; i++)
                 {
                     auto idx = (i * stride) % tmpValues.size();
-                    param.argValues.push_back(tmpValues[i]);
+                    param.argValues.push_back(tmpValues[idx]);
                 }
             }
 

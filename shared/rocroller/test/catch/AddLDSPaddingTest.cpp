@@ -73,7 +73,7 @@ namespace AddLDSPaddingTest
 
             auto ldsTag = graph.coordinates.addElement(LDS());
 
-            auto flatten = graph.coordinates.addElement(Flatten(), {indexX, indexY}, {ldsTag});
+            (void)graph.coordinates.addElement(Flatten(), {indexX, indexY}, {ldsTag});
 
             int ldsElements = GetNumLDSElements(graph, ldsTag);
             CHECK(ldsElements == static_cast<int>(sizeX * sizeY));
@@ -95,7 +95,7 @@ namespace AddLDSPaddingTest
 
             auto ldsTag = graph.coordinates.addElement(LDS());
 
-            auto join = graph.coordinates.addElement(Join(), {indexX, indexY}, {ldsTag});
+            (void)graph.coordinates.addElement(Join(), {indexX, indexY}, {ldsTag});
 
             int ldsElements = GetNumLDSElements(graph, ldsTag);
             CHECK(ldsElements == static_cast<int>(strideX * sizeX));
@@ -117,7 +117,7 @@ namespace AddLDSPaddingTest
 
             auto ldsTag = graph.coordinates.addElement(LDS());
 
-            auto join = graph.coordinates.addElement(Join(), {indexX, indexY}, {ldsTag});
+            (void)graph.coordinates.addElement(Join(), {indexX, indexY}, {ldsTag});
 
             int ldsElements = GetNumLDSElements(graph, ldsTag);
             CHECK(ldsElements == static_cast<int>(strideY * sizeY));
