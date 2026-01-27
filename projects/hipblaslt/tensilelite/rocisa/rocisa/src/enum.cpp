@@ -61,6 +61,15 @@ void init_enum(nb::module_ m)
         .value("BFloat8", rocisa::DataType::BFloat8)
         .value("Float8BFloat8", rocisa::DataType::Float8BFloat8)
         .value("BFloat8Float8", rocisa::DataType::BFloat8Float8)
+#ifdef TENSILE_USE_FP6
+        .value("Float6", rocisa::DataType::Float6)
+#endif // #ifdef TENSILE_USE_FP6
+#ifdef TENSILE_USE_BF6
+        .value("BFloat6", rocisa::DataType::BFloat6)
+#endif // #ifdef TENSILE_USE_BF6
+#ifdef TENSILE_USE_FP4
+        .value("Float4", rocisa::DataType::Float4)
+#endif // #ifdef TENSILE_USE_FP4
         .export_values();
 
     nb::enum_<rocisa::SignatureValueKind>(m_enum, "SignatureValueKind")
@@ -109,6 +118,20 @@ void init_enum(nb::module_ m)
         .value("INST_TR16_B128", rocisa::InstType::INST_TR16_B128)
         .value("INST_CVT", rocisa::InstType::INST_CVT)
         .value("INST_MACRO", rocisa::InstType::INST_MACRO)
+        .value("INST_F6", rocisa::InstType::INST_F6)
+        .value("INST_BF6", rocisa::InstType::INST_BF6)
+        .value("INST_F4", rocisa::InstType::INST_F4)
+        .value("INST_F8_F6", rocisa::InstType::INST_F8_F6)
+        .value("INST_F6_F8", rocisa::InstType::INST_F6_F8)
+        .value("INST_F8_F4", rocisa::InstType::INST_F8_F4)
+        .value("INST_F4_F8", rocisa::InstType::INST_F4_F8)
+        .value("INST_F6_B6", rocisa::InstType::INST_F6_B6)
+        .value("INST_B6_F6", rocisa::InstType::INST_B6_F6)
+        .value("INST_F6_F4", rocisa::InstType::INST_F6_F4)
+        .value("INST_F4_F6", rocisa::InstType::INST_F4_F6)
+        .value("INST_B6_F4", rocisa::InstType::INST_B6_F4)
+        .value("INST_F4_B6", rocisa::InstType::INST_F4_B6)
+        .value("INST_B192", rocisa::InstType::INST_B192)
         .value("INST_NOTYPE", rocisa::InstType::INST_NOTYPE)
         .export_values();
 

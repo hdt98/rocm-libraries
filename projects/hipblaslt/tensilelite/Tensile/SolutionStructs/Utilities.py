@@ -25,6 +25,9 @@
 import sys
 import math
 
+from Tensile.Common.DataType import DataType
+from rocisa.enum import DataTypeEnum
+
 def reject(state: dict, printSolutionRejectionReason: bool = True, *args) -> bool:
   """
   Reject a solution based on its internal state.
@@ -65,3 +68,27 @@ def pvar(state, field):
 
 def roundupRatio(dividend, divisor):
   return int(math.ceil(float(dividend) / float(divisor)))
+
+def getRealDataTypeA(dataType):
+    if dataType.value == DataTypeEnum.Float8BFloat8.value:
+        return DataType(DataTypeEnum.Float8)
+    elif dataType.value == DataTypeEnum.BFloat8Float8.value:
+        return DataType(DataTypeEnum.BFloat8)
+    elif dataType.value == DataTypeEnum.Float8BFloat8_fnuz.value:
+        return DataType(DataTypeEnum.Float8_fnuz)
+    elif dataType.value == DataTypeEnum.BFloat8Float8_fnuz.value:
+        return DataType(DataTypeEnum.BFloat8_fnuz)
+    else:
+        return dataType
+
+def getRealDataTypeB(dataType):
+    if dataType.value == DataTypeEnum.Float8BFloat8.value:
+        return DataType(DataTypeEnum.BFloat8)
+    elif dataType.value == DataTypeEnum.BFloat8Float8.value:
+        return DataType(DataTypeEnum.Float8)
+    elif dataType.value == DataTypeEnum.Float8BFloat8_fnuz.value:
+        return DataType(DataTypeEnum.BFloat8_fnuz)
+    elif dataType.value == DataTypeEnum.BFloat8Float8_fnuz.value:
+        return DataType(DataTypeEnum.Float8_fnuz)
+    else:
+        return dataType

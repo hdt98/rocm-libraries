@@ -110,20 +110,6 @@ namespace rocisa
             return 1;
         case DataType::BFloat8Float8:
             return 1;
-#ifdef TENSILE_USE_FP6
-        case DataType::Float6:
-            return 1; // 6-bit type, but stored as 1 byte per element for simplicity
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
-        case DataType::BFloat6:
-            return 1; // 6-bit type, but stored as 1 byte per element for simplicity
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
-        case DataType::Float4:
-            return 1; // 4-bit type, but stored as 1 byte per element for simplicity
-#endif // #ifdef TENSILE_USE_FP4
-        case DataType::MXScale:
-            return 1;
         default:
             return -1; // Invalid type
         }
@@ -220,26 +206,40 @@ namespace rocisa
         INST_B32        = 19,
         INST_B64        = 20,
         INST_B128       = 21,
-        INST_B256       = 22,
-        INST_B512       = 23,
-        INST_B8_HI_D16  = 24,
-        INST_D16_U8     = 25,
-        INST_D16_HI_U8  = 26,
-        INST_D16_U16    = 27,
-        INST_D16_HI_U16 = 28,
-        INST_D16_B8     = 29,
-        INST_D16_HI_B8  = 30,
-        INST_D16_B16    = 31,
-        INST_D16_HI_B16 = 32,
-        INST_XF32       = 33,
-        INST_BF8        = 34,
-        INST_F8_BF8     = 35,
-        INST_BF8_F8     = 36,
-        INST_TR8_B64    = 37,
-        INST_TR16_B128  = 38,
-        INST_CVT        = 39,
-        INST_MACRO      = 40,
-        INST_NOTYPE     = 41
+        INST_B192       = 22,
+        INST_B256       = 23,
+        INST_B512       = 24,
+        INST_B8_HI_D16  = 25,
+        INST_D16_U8     = 26,
+        INST_D16_HI_U8  = 27,
+        INST_D16_U16    = 28,
+        INST_D16_HI_U16 = 29,
+        INST_D16_B8     = 30,
+        INST_D16_HI_B8  = 31,
+        INST_D16_B16    = 32,
+        INST_D16_HI_B16 = 33,
+        INST_XF32       = 34,
+        INST_BF8        = 35,
+        INST_F8_BF8     = 36,
+        INST_BF8_F8     = 37,
+        INST_TR8_B64    = 38,
+        INST_TR16_B128  = 39,
+        INST_CVT        = 40,
+        INST_MACRO      = 41,
+        INST_F6         = 42,
+        INST_BF6        = 43,
+        INST_F4         = 44,
+        INST_F8_F6      = 45,
+        INST_F6_F8      = 46,
+        INST_F8_F4      = 47,
+        INST_F4_F8      = 48,
+        INST_F6_B6      = 49,
+        INST_B6_F6      = 50,
+        INST_F6_F4      = 51,
+        INST_F4_F6      = 52,
+        INST_B6_F4      = 53,
+        INST_F4_B6      = 55,
+        INST_NOTYPE     = 56
     };
 
     enum class SelectBit : int

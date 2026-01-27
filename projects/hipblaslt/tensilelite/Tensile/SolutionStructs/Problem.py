@@ -34,8 +34,7 @@ from Tensile.Common.Constants import INDEX_CHARS
 from Tensile.Common.DataType import DataType
 from Tensile.Common.Utilities import assignParameterWithDefault, printWarning, print2, printExit
 
-
-
+from .Utilities import getRealDataTypeA, getRealDataTypeB
 
 class ProblemSizeRange:
 
@@ -632,6 +631,10 @@ _HPATypes = [
 def problemTypeToEnum(problemType):
   problemType["DataType"] = \
           problemType["DataType"].value
+  problemType["MacDataTypeA"] = \
+          problemType["MacDataTypeA"].value
+  problemType["MacDataTypeB"] = \
+          problemType["MacDataTypeB"].value
   problemType["DataTypeA"] = \
           problemType["DataTypeA"].value
   problemType["DataTypeB"] = \
