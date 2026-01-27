@@ -114,17 +114,15 @@ def run_benchmarks(exe_path, output_csv, suite, precision, case, verbose, script
 
 
 def generate_comparison_graphs(baseline_csv, comparison_csv, output_prefix,
-                                script_dir, verbose):
+                                separate_groups, script_dir, verbose):
     """
     Generate speedup comparison graphs using rocsolver_compare.py.
-
-    Note: rocsolver_compare.py automatically generates separate graphs for each
-    parameter group, so no additional flag is needed.
 
     Args:
         baseline_csv: Path to baseline CSV file
         comparison_csv: Path to comparison CSV file
         output_prefix: Prefix for output graph files
+        separate_groups: Whether to generate separate graphs for each parameter group
         script_dir: Directory containing the scripts
         verbose: Whether to run in verbose mode
 
@@ -140,6 +138,9 @@ def generate_comparison_graphs(baseline_csv, comparison_csv, output_prefix,
         comparison_csv,
         '--output-prefix', f'{output_prefix}_speedup'
     ]
+
+    if separate_groups:
+        cmd.append('--separate-groups')
 
     return cmd
 
@@ -255,7 +256,7 @@ def main():
 
     comparison_graph_cmd = generate_comparison_graphs(
         baseline_csv, comparison_csv, output_base,
-        script_dir, args.verbose
+        args.separate_groups, script_dir, args.verbose
     )
     run_command(comparison_graph_cmd, "Generating speedup comparison graphs", args.verbose)
 
@@ -283,7 +284,10 @@ def main():
         print(f"Baseline CSV:     {baseline_csv}")
         print(f"Comparison CSV:   {comparison_csv}")
 
-    print(f"Speedup graphs:   {output_base}_speedup_*.png")
+    if args.separate_groups:
+        print(f"Speedup graphs:   {output_base}_speedup_*.png")
+    else:
+        print(f"Speedup graph:    {output_base}_speedup.png")
 
     if not args.no_individual_graphs:
         if args.separate_groups:

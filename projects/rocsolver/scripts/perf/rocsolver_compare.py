@@ -188,61 +188,35 @@ def calculate_speedups(baseline_groups, comparison_groups):
     return speedup_data
 
 
-def generate_speedup_bar_chart(group_key, data, output_path, title):
+def generate_combined_speedup_graph(speedup_data, title, output_path):
     """
-    Generate a bar chart showing speedup for a single parameter group.
+    Generate a single graph with all groups plotted as separate lines.
 
-    Creates a bar chart with:
-    - Green bars for speedup > 1.0 (improvement)
-    - Red bars for speedup < 1.0 (regression)
-    - Gray bars for speedup = 1.0 (no change)
-    - Horizontal reference line at y=1.0
-    - Value labels on each bar
+    This creates a combined speedup graph showing all parameter groups
+    on one plot for easy comparison.
 
     Args:
-        group_key: parameter group identifier
-        data: dict with 'x' (n values) and 'speedup' (speedup values)
-        output_path: path to save PNG
+        speedup_data: dict of {group_key: {'x': [...], 'speedup': [...]}}
         title: base title for the graph
+        output_path: output path for the graph
     """
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    n_values = data['x']
-    speedups = data['speedup']
-
-    # Color bars: green (faster), red (slower), gray (no change)
-    colors = []
-    for s in speedups:
-        if s > 1.0:
-            colors.append('green')
-        elif s < 1.0:
-            colors.append('red')
-        else:
-            colors.append('gray')
-
-    bars = ax.bar(range(len(n_values)), speedups, color=colors, alpha=0.7, edgecolor='black')
+    # Plot each group as a separate line
+    for group_key, data in speedup_data.items():
+        ax.plot(data['x'], data['speedup'], marker='o', label=group_key, linewidth=2)
 
     # Reference line at y=1.0
     ax.axhline(y=1.0, color='black', linestyle='--', linewidth=1.5, label='No change (1.0x)')
 
-    ax.set_xticks(range(len(n_values)))
-    ax.set_xticklabels(n_values, rotation=45, ha='right')
     ax.set_xlabel('Input Size (n)', fontsize=12)
     ax.set_ylabel('Speedup Factor', fontsize=12)
-    ax.set_title(f'Speedup: {title} ({group_key})', fontsize=14)
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.set_title(f'Speedup: {title}', fontsize=14)
+    ax.grid(True, alpha=0.3)
 
-    # Add value labels on bars
-    for i, (bar, speedup) in enumerate(zip(bars, speedups)):
-        if speedup == 0:
-            continue  # Skip zero values (division by zero)
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height,
-                f'{speedup:.2f}x',
-                ha='center', va='bottom' if height > 0 else 'top',
-                fontsize=8)
-
-    ax.legend(loc='best')
+    # Show legend if multiple groups
+    if len(speedup_data) > 1:
+        ax.legend(fontsize=8, loc='best')
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
@@ -251,18 +225,64 @@ def generate_speedup_bar_chart(group_key, data, output_path, title):
     print(f"Speedup graph saved to: {output_path}")
 
 
-def generate_speedup_comparison(baseline_csv, comparison_csv, output_dir=None, output_prefix="speedup_comparison"):
+def generate_separate_speedup_graphs(speedup_data, title, output_path):
+    """
+    Generate separate graphs for each group, one graph per parameter configuration.
+
+    Args:
+        speedup_data: dict of {group_key: {'x': [...], 'speedup': [...]}}
+        title: base title for the graph
+        output_path: base output path for graphs
+    """
+    # Determine base output path
+    base_path = os.path.splitext(output_path)[0]
+
+    # Generate one graph per group
+    for group_key, data in speedup_data.items():
+        # Title includes group key to identify parameters
+        graph_title = f'Speedup: {title} ({group_key})'
+
+        # Filename includes group key
+        group_output_path = f'{base_path}_{group_key}.png'
+
+        # Create the graph
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        ax.plot(data['x'], data['speedup'], marker='o', linewidth=2)
+
+        # Reference line at y=1.0
+        ax.axhline(y=1.0, color='black', linestyle='--', linewidth=1.5, label='No change (1.0x)')
+
+        ax.set_xlabel('Input Size (n)', fontsize=12)
+        ax.set_ylabel('Speedup Factor', fontsize=12)
+        ax.set_title(graph_title, fontsize=14)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='best')
+
+        plt.tight_layout()
+        plt.savefig(group_output_path, dpi=150)
+        plt.close()
+
+        print(f"Speedup graph saved to: {group_output_path}")
+
+
+def generate_speedup_comparison(baseline_csv, comparison_csv, output_dir=None, output_prefix="speedup_comparison", separate_groups=False):
     """
     Generate speedup comparison graphs from two benchmark CSVs.
 
     Reads both CSV files, validates they have matching groups and n values,
-    calculates speedup for each configuration, and generates bar charts.
+    calculates speedup for each configuration, and generates line graphs.
+
+    Results are either:
+    - plotted as separate lines on one graph (default), or
+    - plotted as separate individual graphs (if separate_groups=True)
 
     Args:
         baseline_csv: path to baseline/reference benchmark results (denominator)
         comparison_csv: path to comparison/new benchmark results (numerator)
         output_dir: optional output directory (default: current directory)
         output_prefix: optional prefix for output filenames (default: "speedup_comparison")
+        separate_groups: if True, generate one graph per group instead of one combined graph
     """
     print(f"Baseline:   {baseline_csv}")
     print(f"Comparison: {comparison_csv}\n")
@@ -286,13 +306,18 @@ def generate_speedup_comparison(baseline_csv, comparison_csv, output_dir=None, o
         output_dir = os.getcwd()
     os.makedirs(output_dir, exist_ok=True)
 
-    # Generate one bar chart per group
     title = baseline_title or "Benchmark Results"
-    for group_key, data in speedup_data.items():
-        output_path = os.path.join(output_dir, f"{output_prefix}_{group_key}.png")
-        generate_speedup_bar_chart(group_key, data, output_path, title)
 
-    print(f"\nGenerated {len(speedup_data)} speedup comparison graph(s)")
+    # Choose plotting strategy based on flag
+    if separate_groups:
+        # Generate one graph per group
+        base_output_path = os.path.join(output_dir, f"{output_prefix}.png")
+        generate_separate_speedup_graphs(speedup_data, title, base_output_path)
+        print(f"\nGenerated {len(speedup_data)} speedup comparison graph(s)")
+    else:
+        # Generate one combined graph with all groups
+        output_path = os.path.join(output_dir, f"{output_prefix}.png")
+        generate_combined_speedup_graph(speedup_data, title, output_path)
 
 
 def main():
@@ -320,6 +345,9 @@ def main():
     parser.add_argument('--output-prefix',
                        default='speedup_comparison',
                        help='Prefix for output filenames (default: speedup_comparison)')
+    parser.add_argument('--separate-groups',
+                       action='store_true',
+                       help='Generate separate graph for each parameter group instead of combined graph')
 
     args = parser.parse_args()
 
@@ -328,7 +356,7 @@ def main():
     if not os.path.exists(args.comparison):
         sys.exit(f"Error: Comparison CSV not found: {args.comparison}")
 
-    generate_speedup_comparison(args.baseline, args.comparison, args.output_dir, args.output_prefix)
+    generate_speedup_comparison(args.baseline, args.comparison, args.output_dir, args.output_prefix, args.separate_groups)
 
 
 if __name__ == '__main__':
