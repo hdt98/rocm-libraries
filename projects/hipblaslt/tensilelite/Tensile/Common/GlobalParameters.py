@@ -175,6 +175,8 @@ globalParameters["DataInitTypeScaleB"] = 2
 globalParameters["DataInitTypeScaleC"] = 2
 globalParameters["DataInitTypeScaleD"] = 2
 globalParameters["DataInitTypeScaleAlphaVec"] = 3
+globalParameters["DataInitTypeMXSA"] = 1
+globalParameters["DataInitTypeMXSB"] = 1
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
 globalParameters["CEqualD"] = (
     False  # Set to true if testing for the case where the pointer to C is the same as D.
@@ -327,10 +329,14 @@ defaultBenchmarkCommonParameters = [
     {"InnerUnroll": [1]},
     {"KernelLanguage": ["Assembly"]},
     {"LdsPadA": [-1]},
+    {"LdsPadMXSA": [ 0 ] },
     {"LdsPadB": [-1]},
+    {"LdsPadMXSB": [ 0 ] },
     {"LdsPadMetadata": [0]},
     {"LdsBlockSizePerPadA": [-1]},
+    {"LdsBlockSizePerPadMXSA": [ 0 ] },
     {"LdsBlockSizePerPadB": [-1]},
+    {"LdsBlockSizePerPadMXSB": [ 0 ] },
     {"LdsBlockSizePerPadMetadata": [0]},
     {"TransposeLDS": [-1]},
     {"MaxOccupancy": [40]},
@@ -342,6 +348,8 @@ defaultBenchmarkCommonParameters = [
     {"GlobalReadVectorWidthA": [-1]},
     {"GlobalReadVectorWidthB": [-1]},
     {"LocalReadVectorWidth": [-1]},
+    {"LocalReadVectorWidthA": [-1]},
+    {"LocalReadVectorWidthB": [-1]},
     {"WaveSeparateGlobalReadA": [0]},
     {"WaveSeparateGlobalReadB": [0]},
     {"WaveSeparateGlobalReadMetadata": [0]},
@@ -395,7 +403,9 @@ defaultBenchmarkCommonParameters = [
     {"NonTemporalD": [0]},
     {"NonTemporalC": [0]},
     {"NonTemporalA": [0]},
+    {"NonTemporalMXSA": [ 0 ] },
     {"NonTemporalB": [0]},
+    {"NonTemporalMXSB": [ 0 ] },
     {"NonTemporalWS": [0]},
     {"NonTemporalMetadata": [0]},
     {"NonTemporal": [-1]},
