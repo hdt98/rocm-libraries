@@ -32,7 +32,8 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_batched_gemm_gemm_wmma_cshuffle_v3(typename DeviceOp::RawArg arg)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__))
+#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
+    defined(__gfx13__))
 
     __shared__ char p_shared[GridwiseOp::GetSharedMemoryNumberOfByte()];
     const index_t num_blocks_per_batch =
@@ -66,7 +67,8 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         arg.block_2_ctile_map);
 #else
     ignore = arg;
-#endif // (!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__)
+#endif // (!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) ||
+       // defined(__gfx13__))
 }
 
 // Computes C = A  * B0 * B1
@@ -435,7 +437,7 @@ struct DeviceBatchedGemmGemm_Wmma_CShuffleV3 : public DeviceBatchedGemmGemm<ALay
             }
         };
 
-        if(!(ck::is_gfx11_supported() || ck::is_gfx12_supported()))
+        if(!(ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported()))
         {
             print("DeviceOp: Arch err\n");
             return false;

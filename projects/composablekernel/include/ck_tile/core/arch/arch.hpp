@@ -1007,7 +1007,7 @@ struct WaitcntLayoutLegacy
 };
 
 // Select active layout
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
 using Waitcnt = WaitcntLayoutGfx12;
 #elif defined(__gfx11__)
 using Waitcnt = WaitcntLayoutGfx11;
@@ -1021,7 +1021,7 @@ using Waitcnt = WaitcntLayoutLegacy;
 struct waitcnt_arg
 {
     // kMax* exposed for callers; match field widths per-arch
-#if defined(__gfx12__) || defined(__gfx11__)
+#if defined(__gfx12__) || defined(__gfx11__) || defined(__gfx13__)
     CK_TILE_DEVICE static constexpr index_t kMaxVmCnt   = 0x3F; // 6 bits
     CK_TILE_DEVICE static constexpr index_t kMaxLgkmCnt = 0x3F; // 6 bits
     CK_TILE_DEVICE static constexpr index_t kMaxExpCnt  = 0x0;  // none
@@ -1051,7 +1051,7 @@ struct waitcnt_arg
         if constexpr(Waitcnt::HAS_EXP)
         {
             // EXP_MASK only exists on legacy
-#if !defined(__gfx12__) && !defined(__gfx11__)
+#if !defined(__gfx12__) && !defined(__gfx11__) && !defined(__gfx13__)
             static_assert((cnt & ~Waitcnt::EXP_MASK) == 0, "expcnt out of range");
             return Waitcnt::pack_exp(cnt);
 #else
@@ -1072,7 +1072,7 @@ template <index_t vmcnt   = waitcnt_arg::kMaxVmCnt,
           index_t lgkmcnt = waitcnt_arg::kMaxLgkmCnt>
 CK_TILE_DEVICE void s_waitcnt()
 {
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
     // GFX12 do't use __builtin_amdgcn_s_waitcnt
     constexpr index_t wait_mask = waitcnt_arg::from_vmcnt<vmcnt>() |
                                   waitcnt_arg::from_expcnt<expcnt>() |

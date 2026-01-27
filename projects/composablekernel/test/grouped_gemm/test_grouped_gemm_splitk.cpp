@@ -34,7 +34,7 @@ class TestGroupedGemm : public ck::test::TestGroupedGemm<Tuple>
         // behaviour When compiling WMMA instances and WMMA is supported, then we'll fail if a
         // specific case is not supported
         this->fail_if_no_supported_instances_ =
-            ck::is_gfx11_supported() || ck::is_gfx12_supported();
+            ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported();
 #endif
     }
 };
@@ -53,7 +53,7 @@ using KernelTypes = ::testing::Types<
     std::tuple<     Row, Col, Row, BF16, I8, BF16>,
 #endif
 
-#if (defined(CK_USE_XDL) && (defined(__gfx9__) || defined(__gfx12__))) || (defined(CK_USE_WMMA) && defined(__gfx12__))
+#if (defined(CK_USE_XDL) && (defined(__gfx9__) || defined(__gfx12__) || defined(__gfx13__))) || (defined(CK_USE_WMMA) && (defined(__gfx12__) || defined(__gfx13__)))
     std::tuple<     Row, Row, Row, F8, F16, F16>,
     std::tuple<     Row, Row, Row, F16, F8, F16>,
 #endif

@@ -43,7 +43,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                             const CBlockClusterAdaptor c_block_cluster_adaptor)
 {
 #ifdefined(__gfx908__) || defined(__gfx90a__) || defined(__gfx94__) || defined(__gfx11__) || \
-    defined(__gfx12__)
+    defined(__gfx12__) || defined(__gfx13__)
     if constexpr(GridwiseGemm::template IsValidCompilationParameter<>())
     {
         constexpr index_t shared_block_size =
