@@ -53,8 +53,6 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
     miopenGet4dTensorDescriptorLengths(inputTensor, &n, &c, &h, &w);
     miopenGet4dTensorDescriptorStrides(inputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
     miopenGet4dTensorDescriptorStrides(outputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
-    (void)in_wstr;
-    (void)out_wstr;
 
     constexpr Tcheck max_val = (sizeof(Tgpu) == 4) ? 3.402823466e+38f : 65504.;
     const Tcheck neg_inf     = static_cast<Tcheck>(
@@ -65,39 +63,35 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
 
     if(mode == MIOPEN_SOFTMAX_MODE_INSTANCE)
     {
-        miopen::par_for(n, jobs, [&](int i) {
+        for(int i =0; i < n; ++i) {
             if(algo == MIOPEN_SOFTMAX_FAST)
             {
-                for(int j = 0; j < c; j++)
-                    for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                miopen::par_ford(miopen::max_threads{jobs}, c, h, w)([&](int j, int s0, int s1)
                         {
                             results[(i * c + j) * h * w + s0 * w + s1] = static_cast<Tcheck>(
-                                in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1]);
-                        }
+                                in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr]);
+                        });
             }
             else
             {
                 Tcheck channel_max{-max_val};
                 for(int j = 0; j < c; j++)
                     for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                        for(int s1 = 0; s1 < w; s1++) // TODO implement par_for_flat - working on flat array
                         {
-                            channel_max =
-                                std::max(static_cast<Tcheck>(
-                                             in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1]),
-                                         channel_max);
+                            channel_max = std::max(
+                                static_cast<Tcheck>(
+                                    in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr]),
+                                channel_max);
                         }
 
-                for(int j = 0; j < c; j++)
-                    for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                miopen::par_ford(miopen::max_threads{jobs}, c, h, w)([&](int j, int s0, int s1)
                         {
                             results[(i * c + j) * h * w + s0 * w + s1] =
                                 static_cast<Tcheck>(
-                                    in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1]) -
+                                    in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr]) -
                                 channel_max;
-                        }
+                        });
             }
 
             if(algo == MIOPEN_SOFTMAX_LOG)
@@ -105,106 +99,116 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                 Tcheck channel_max{neg_inf};
                 for(int j = 0; j < c; j++)
                     for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                        for(int s1 = 0; s1 < w; s1++) // TODO implement par_for_flat - working on flat array
                         {
-                            channel_max = logaddexp(
-                                results[(i * c + j) * h * w + s0 * w + s1], channel_max, neg_inf);
+                            channel_max    = logaddexp(results[(i * c + j) * h * w + s0 * w + s1], 
+                                                       channel_max, 
+                                                       neg_inf);
                         }
 
-                for(int j = 0; j < c; j++)
-                    for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                miopen::par_ford(miopen::max_threads{jobs}, c, h, w)([&](int j, int s0, int s1)
                         {
-                            outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1] =
-                                alpha * (results[(i * c + j) * h * w + s0 * w + s1] - channel_max) +
-                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1];
-                        }
+                            outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
+                                alpha *
+                                    (results[(i * c + j) * h * w + s0 * w + s1] - channel_max) +
+                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                               s1 * out_wstr];
+                        });
             }
             else
             {
                 Tcheck channel_max{0.0};
                 for(int j = 0; j < c; j++)
                     for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                        for(int s1 = 0; s1 < w; s1++) // TODO implement par_for_flat - working on flat array
                         {
                             const auto val = exp(results[(i * c + j) * h * w + s0 * w + s1]);
                             results[(i * c + j) * h * w + s0 * w + s1] = val;
                             channel_max += val;
                         }
 
-                for(int j = 0; j < c; j++)
-                    for(int s0 = 0; s0 < h; s0++)
-                        for(int s1 = 0; s1 < w; s1++)
+                miopen::par_ford(miopen::max_threads{jobs}, c, h, w)([&](int j, int s0, int s1)
                         {
-                            outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1] =
-                                alpha * (results[(i * c + j) * h * w + s0 * w + s1] / channel_max) +
-                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1];
-                        }
+                            outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
+                                alpha *
+                                    (results[(i * c + j) * h * w + s0 * w + s1] / channel_max) +
+                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                               s1 * out_wstr];
+                        });
             }
-        });
+        }
     }
     else
     {
-        miopen::par_ford(miopen::max_threads{jobs}, n, h, w)([&](int i, int s0, int s1) {
-            if(algo == MIOPEN_SOFTMAX_FAST)
-            {
-                for(int j = 0; j < c; j++)
-                {
-                    results[(i * c + j) * h * w + s0 * w + s1] =
-                        static_cast<Tcheck>(in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1]);
-                }
-            }
-            else
-            {
-                Tcheck channel_max{-max_val};
-                for(int j = 0; j < c; j++)
-                {
-                    channel_max = std::max(
-                        static_cast<Tcheck>(in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1]),
-                        channel_max);
-                }
+        miopen::par_ford(miopen::max_threads{jobs}, n, h, w)([&](int i, int s0, int s1) { // TODO implement par_for_flat - working on flat array
+                    if(algo == MIOPEN_SOFTMAX_FAST)
+                    {
+                        for(int j = 0; j < c; j++)
+                        {
+                            results[(i * c + j) * h * w + s0 * w + s1] = static_cast<Tcheck>(
+                                in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr]);
+                        }
+                    }
+                    else
+                    {
+                        Tcheck channel_max{-max_val};
+                        for(int j = 0; j < c; j++)
+                        {
+                            channel_max = std::max(
+                                static_cast<Tcheck>(
+                                    in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr]),
+                                channel_max);
+                        }
 
-                for(int j = 0; j < c; j++)
-                {
-                    results[(i * c + j) * h * w + s0 * w + s1] =
-                        static_cast<Tcheck>(in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1]) -
-                        channel_max;
-                }
-            }
+                        for(int j = 0; j < c; j++)
+                        {
+                            results[(i * c + j) * h * w + s0 * w + s1] =
+                                static_cast<Tcheck>(
+                                    in[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr]) -
+                                channel_max;
+                        }
+                    }
 
-            if(algo == MIOPEN_SOFTMAX_LOG)
-            {
-                Tcheck channel_max = results[i * c * h * w + s0 * w + s1];
-                for(int j = 1; j < c; j++)
-                {
-                    channel_max =
-                        logaddexp(results[(i * c + j) * h * w + s0 * w + s1], channel_max, neg_inf);
-                }
+                    if(algo == MIOPEN_SOFTMAX_LOG)
+                    {
+                        Tcheck channel_max = results[i * c * h * w + s0 * w + s1];
+                        for(int j = 1; j < c; j++)
+                        {
+                            channel_max =
+                                logaddexp(results[(i * c + j) * h * w + s0 * w + s1],
+                                          channel_max,
+                                          neg_inf);
+                        }
 
-                for(int j = 0; j < c; j++)
-                {
-                    outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1] =
-                        alpha * (results[(i * c + j) * h * w + s0 * w + s1] - channel_max) +
-                        beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1];
-                }
-            }
-            else
-            {
-                Tcheck channel_max{0.0};
-                for(int j = 0; j < c; j++)
-                {
-                    results[(i * c + j) * h * w + s0 * w + s1] =
-                        exp(results[(i * c + j) * h * w + s0 * w + s1]);
-                    channel_max += results[(i * c + j) * h * w + s0 * w + s1];
-                }
+                        for(int j = 0; j < c; j++)
+                        {
+                            outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
+                                alpha * (results[(i * c + j) * h * w + s0 * w + s1] -
+                                         channel_max) +
+                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                               s1 * out_wstr];
+                        }
+                    }
+                    else
+                    {
+                        Tcheck channel_max{0.0};
+                        for(int j = 0; j < c; j++)
+                        {
+                            results[(i * c + j) * h * w + s0 * w + s1] =
+                                exp(results[(i * c + j) * h * w + s0 * w + s1]);
+                            channel_max += 
+                                results[(i * c + j) * h * w + s0 * w + s1];
+                        }
 
-                for(int j = 0; j < c; j++)
-                {
-                    outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1] =
-                        alpha * (results[(i * c + j) * h * w + s0 * w + s1] / channel_max) +
-                        beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1];
-                }
-            }
+                        for(int j = 0; j < c; j++)
+                        {
+                            outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1] =
+                                alpha * (results[(i * c + j) * h * w + s0 * w + s1] /
+                                         channel_max) +
+                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                               s1 * out_wstr];
+                        }
+                    }
         });
     }
 
@@ -229,8 +233,6 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
     miopenGet4dTensorDescriptorLengths(dOutputTensor, &n, &c, &h, &w);
     miopenGet4dTensorDescriptorStrides(dInputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
     miopenGet4dTensorDescriptorStrides(dOutputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
-    (void)in_wstr;
-    (void)out_wstr;
 
     std::vector<Tcheck> channel_dot((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
                                     static_cast<Tcheck>(0.0));
@@ -238,74 +240,69 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
 
     jobs = adjustJobs(jobs, h, w);
 
-    miopen::par_for(n, jobs, [&](int i) {
+    for(int i = 0; i < n; ++i) {
         if(mode == MIOPEN_SOFTMAX_MODE_INSTANCE)
         {
-            for(int j = 0; j < c; j++)
-                for(int s0 = 0; s0 < h; s0++)
-                    for(int s1 = 0; s1 < w; s1++)
+            miopen::par_ford(miopen::max_threads{jobs}, c, h, w)([&](int j, int s0, int s1)
                     {
                         if(algo == MIOPEN_SOFTMAX_LOG)
                         {
                             channel_dot[i] += static_cast<Tcheck>(
-                                dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr]);
                         }
                         else
                         {
                             channel_dot[i] +=
-                                static_cast<Tcheck>(
-                                    out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]) *
-                                static_cast<Tcheck>(
-                                    dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                static_cast<Tcheck>(out[i * out_nstr + j * out_cstr +
+                                                        s0 * out_hstr + s1 * out_wstr]) *
+                                static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
+                                                         s0 * out_hstr + s1 * out_wstr]);
                         }
-                    }
+                    });
 
-            for(int j = 0; j < c; j++)
-                for(int s0 = 0; s0 < h; s0++)
-                    for(int s1 = 0; s1 < w; s1++)
+            miopen::par_ford(miopen::max_threads{jobs}, c, h, w)([&](int j, int s0, int s1)
                     {
                         if(algo == MIOPEN_SOFTMAX_LOG)
                         {
                             results[(i * c + j) * h * w + s0 * w + s1] =
-                                static_cast<Tcheck>(
-                                    dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]) -
-                                channel_dot[i] *
-                                    std::exp(out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
+                                                         s0 * out_hstr + s1 * out_wstr]) -
+                                channel_dot[i] * std::exp(out[i * out_nstr + j * out_cstr +
+                                                              s0 * out_hstr + s1 * out_wstr]);
                         }
                         else
                         {
                             results[(i * c + j) * h * w + s0 * w + s1] =
-                                static_cast<Tcheck>(
-                                    dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]) -
+                                static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
+                                                         s0 * out_hstr + s1 * out_wstr]) -
                                 channel_dot[i];
 
                             results[(i * c + j) * h * w + s0 * w + s1] *= static_cast<Tcheck>(
-                                out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr]);
                         }
-                        dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1] =
+                        dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr] =
                             alpha * results[(i * c + j) * h * w + s0 * w + s1] +
-                            beta * dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1];
-                    }
+                            beta * dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr];
+                    });
         }
         else
         {
-            for(int s0 = 0; s0 < h; s0++)
-                for(int s1 = 0; s1 < w; s1++)
+            miopen::par_ford(miopen::max_threads{jobs}, h, w)([&](int s0, int s1)
                 {
                     for(int j = 0; j < c; j++)
                     {
                         if(algo == MIOPEN_SOFTMAX_LOG)
                         {
                             channel_dot[i * h * w + s0 * w + s1] += static_cast<Tcheck>(
-                                dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr]);
                         }
                         else
                         {
                             channel_dot[i * h * w + s0 * w + s1] +=
-                                static_cast<Tcheck>(
-                                    out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]) *
-                                static_cast<Tcheck>(
-                                    dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                static_cast<Tcheck>(out[i * out_nstr + j * out_cstr +
+                                                        s0 * out_hstr + s1 * out_wstr]) *
+                                static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
+                                                         s0 * out_hstr + s1 * out_wstr]);
                         }
                     }
 
@@ -314,28 +311,29 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                         if(algo == MIOPEN_SOFTMAX_LOG)
                         {
                             results[(i * c + j) * h * w + s0 * w + s1] =
-                                static_cast<Tcheck>(
-                                    dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]) -
+                                static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
+                                                         s0 * out_hstr + s1 * out_wstr]) -
                                 channel_dot[i * h * w + s0 * w + s1] *
-                                    std::exp(out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                    std::exp(out[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                                 s1 * out_wstr]);
                         }
                         else
                         {
                             results[(i * c + j) * h * w + s0 * w + s1] =
-                                static_cast<Tcheck>(
-                                    dout[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]) -
+                                static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
+                                                         s0 * out_hstr + s1 * out_wstr]) -
                                 channel_dot[i * h * w + s0 * w + s1];
 
                             results[(i * c + j) * h * w + s0 * w + s1] *= static_cast<Tcheck>(
-                                out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1]);
+                                out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr]);
                         }
-                        dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1] =
+                        dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr] =
                             alpha * results[(i * c + j) * h * w + s0 * w + s1] +
-                            beta * dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1];
+                            beta * dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr];
                     }
-                }
+                });
         }
-    });
+    }
 
     return 0;
 }
