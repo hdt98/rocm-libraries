@@ -134,18 +134,6 @@ set(rocsolver_lapack_source
   lapack/roclapack_gerqf_batched.cpp
   lapack/roclapack_gerqf_strided_batched.cpp
   # - Cholesky QR
-  lapack/roclapack_cholqr1.cpp
-  lapack/roclapack_cholqr1_strided_batched.cpp
-  lapack/roclapack_cholqr1_batched.cpp
-  #
-  lapack/roclapack_cholqr2.cpp
-  lapack/roclapack_cholqr2_strided_batched.cpp
-  lapack/roclapack_cholqr2_batched.cpp
-  #
-  lapack/roclapack_cholqr3.cpp
-  lapack/roclapack_cholqr3_strided_batched.cpp
-  lapack/roclapack_cholqr3_batched.cpp
-  #
   lapack/roclapack_cholqr.cpp
   lapack/roclapack_cholqr_strided_batched.cpp
   lapack/roclapack_cholqr_batched.cpp
