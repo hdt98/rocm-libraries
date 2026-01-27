@@ -420,6 +420,10 @@ if __name__ == '__main__':
             help='the size case to use for the benchmarks')
 
     args = parser.parse_args()
+
+    if args.top_n < 0:
+        sys.exit(f"Error: --top-n must have a positive integer argument")
+
     setup_vprint(args)
 
     profile_benchmarks(args.suite, args.precision, args.case, args.exe,
