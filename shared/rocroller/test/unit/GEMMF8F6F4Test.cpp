@@ -81,7 +81,6 @@ namespace GEMMTests
     static auto FilterValidScalePathAndScaleModeParams(
         ScaledMixedGEMMF8F6F4TestParamGenerator&& inputParamGenerator)
     {
-        using LP = SolutionParams::LoadPath;
         using SM = rocRoller::Operations::ScaleMode;
 
         std::vector<ScaledMixedGEMMF8F6F4TestGPU::ParamType> filtered;
@@ -94,13 +93,13 @@ namespace GEMMTests
             auto const& loadScalePathA = std::get<7>(params);
             auto const& loadScalePathB = std::get<8>(params);
 
-            if((loadScalePathA != LP::BufferToVGPR or loadScalePathA != LP::GlobalToVGPR)
+            if((not SolutionParams::IsPathToLDS(loadScalePathA))
                && (scaleAMode == SM::None || scaleAMode == SM::SingleScale))
             {
                 continue;
             }
 
-            if((loadScalePathB != LP::BufferToVGPR or loadScalePathB != LP::GlobalToVGPR)
+            if((not SolutionParams::IsPathToLDS(loadScalePathB))
                && (scaleBMode == SM::None || scaleBMode == SM::SingleScale))
             {
                 continue;
