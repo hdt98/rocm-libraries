@@ -76,6 +76,9 @@ def main():
     parser.add_argument('--no-graph',
             action='store_true',
             help='skip graph generation')
+    parser.add_argument('--separate-groups',
+            action='store_true',
+            help='generate separate graph for each parameter group')
     parser.add_argument('suite',
             choices=SUITES.keys(),
             help='the set of benchmarks to run')
@@ -127,6 +130,9 @@ def main():
             csv_path,
             '-o', graph_path
         ]
+
+        if args.separate_groups:
+            graph_cmd.append('--separate-groups')
 
         run_command(graph_cmd, "Generating performance graph")
 
