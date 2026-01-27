@@ -55,7 +55,7 @@ namespace rocRoller
         {
         }
 
-        FP8(FP8 const& other)            = default;
+        FP8(FP8 const& other) = default;
         FP8& operator=(FP8 const& other) = default;
 
         template <typename T>

@@ -255,13 +255,13 @@ namespace rocRoller
         {
             for(size_t i = 0; i < dst->valueCount(); i++)
             {
-                co_yield generate(dst->element({i}),
-                                  arg,
-                                  Expression::BitFieldExtract{
-                                      {},
-                                      expr.outputDataType,
-                                      expr.offset + dwidth * static_cast<int>(i),
-                                      dwidth});
+                co_yield generate(
+                    dst->element({i}),
+                    arg,
+                    Expression::BitFieldExtract{{},
+                                                expr.outputDataType,
+                                                expr.offset + dwidth * static_cast<int>(i),
+                                                dwidth});
             }
             co_return;
         }

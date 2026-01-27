@@ -458,11 +458,12 @@ namespace rocRoller
 
                 tree.push_back(ExpressionNode{
                     nullptr,
-                    std::make_shared<Expression>(Expr{{
-                        canUseAsReg(tree.back()) ? tree.back().reg->expression() : tree.back().expr,
-                        getComment(expr),
-                    }}
-                                                     .copyParams(expr)),
+                    std::make_shared<Expression>(Expr{
+                        {
+                            canUseAsReg(tree.back()) ? tree.back().reg->expression()
+                                                     : tree.back().expr,
+                            getComment(expr),
+                        }}.copyParams(expr)),
                     deps,
                     tree.back().consolidationCount,
                 });

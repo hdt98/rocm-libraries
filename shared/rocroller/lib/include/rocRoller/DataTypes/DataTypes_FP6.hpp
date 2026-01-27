@@ -52,7 +52,7 @@ namespace rocRoller
         {
         }
 
-        FP6(FP6 const& other)            = default;
+        FP6(FP6 const& other) = default;
         FP6& operator=(FP6 const& other) = default;
 
         template <typename T>

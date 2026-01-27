@@ -335,7 +335,7 @@ namespace rocRoller
         {
         }
 
-        FP4(FP4 const& other)            = default;
+        FP4(FP4 const& other) = default;
         FP4& operator=(FP4 const& other) = default;
 
         template <typename T>

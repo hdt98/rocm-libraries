@@ -55,7 +55,7 @@ namespace rocRoller
         {
         }
 
-        BF8(BF8 const& other)            = default;
+        BF8(BF8 const& other) = default;
         BF8& operator=(BF8 const& other) = default;
 
         template <typename T>

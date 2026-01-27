@@ -174,7 +174,7 @@ namespace rocRoller
                     // scaled number is in f6 subnorm range,
                     //  adjust mantissa such that unbiased_exp_f32 is
                     //  max_subnorm_uexp_f6 and apply rne
-                    int32_t exp_shift       = max_subnorm_uexp_f6 - unbiased_exp_f32;
+                    int32_t exp_shift = max_subnorm_uexp_f6 - unbiased_exp_f32;
                     assert(unbiased_exp_f32 + exp_shift == max_subnorm_uexp_f6);
                     uint32_t trail_sig_f6 = (1u << 31) | (trailing_significand_f32 << 8);
                     trail_sig_f6 >>= exp_shift;
@@ -302,7 +302,7 @@ namespace rocRoller
                 {
                     // scaled number is in f32 subnorm range,
                     //  adjust mantissa such that unbiased_exp_fp6 is -126 and apply rne
-                    int32_t exp_shift        = -126 - unbiased_exp_fp6;
+                    int32_t exp_shift = -126 - unbiased_exp_fp6;
                     assert(unbiased_exp_fp6 + exp_shift == -126);
                     uint32_t trail_sig_fp32
                         = (1u << 31) | (trailing_significand_fp6 << (31 - mantissa_bits));

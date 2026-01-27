@@ -47,7 +47,7 @@ namespace rocRoller
         {
         }
 
-        BFloat16(BFloat16 const& other)            = default;
+        BFloat16(BFloat16 const& other) = default;
         BFloat16& operator=(BFloat16 const& other) = default;
 
         template <typename T,

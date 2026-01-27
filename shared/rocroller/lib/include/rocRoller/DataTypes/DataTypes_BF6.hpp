@@ -50,7 +50,7 @@ namespace rocRoller
         {
         }
 
-        BF6(BF6 const& other)            = default;
+        BF6(BF6 const& other) = default;
         BF6& operator=(BF6 const& other) = default;
 
         template <typename T>

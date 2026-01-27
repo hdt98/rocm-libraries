@@ -57,8 +57,8 @@ namespace rocRoller
             template <CNary Expr>
             bool operator()(Expr const& expr) const
             {
-                return std::ranges::any_of(expr.operands,
-                                           [this](auto const& operand) { return this->call(operand); });
+                return std::ranges::any_of(
+                    expr.operands, [this](auto const& operand) { return this->call(operand); });
             }
 
             template <CTernary Expr>

@@ -114,7 +114,7 @@ namespace mxDataGeneratorTest
             const float max          = 1.f;
             const int   blockScaling = 32;
 
-            using rrDT   = TestType;
+            using rrDT = TestType;
 
             auto             dataType = TypeInfo<rrDT>::Var.dataType;
             TensorDescriptor desc(dataType, {dim1, dim2}, "T");

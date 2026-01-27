@@ -91,7 +91,8 @@ namespace rocRoller
         {
             InstructionStatus rv;
             const auto*       derived = static_cast<const Derived*>(this);
-            if(derived->isMEMInstruction(inst) && m_incomplete.size() >= static_cast<size_t>(m_queueAllotment))
+            if(derived->isMEMInstruction(inst)
+               && m_incomplete.size() >= static_cast<size_t>(m_queueAllotment))
             {
                 auto complete  = m_incomplete.front().expectedCompleteCycle;
                 rv.stallCycles = std::max(complete - m_programCycle, 0);

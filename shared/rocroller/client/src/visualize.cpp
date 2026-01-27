@@ -337,7 +337,8 @@ namespace rocRoller
                 {
                     gi.setCoordinate(workitemIndices, threadIdx);
 
-                    for(unsigned int workgroupIndex = 0; workgroupIndex < workgroupCount[hipWorkgroupIndex];
+                    for(unsigned int workgroupIndex = 0;
+                        workgroupIndex < workgroupCount[hipWorkgroupIndex];
                         workgroupIndex++)
                     {
                         gi.setCoordinate(workgroupIndices[hipWorkgroupIndex], workgroupIndex);

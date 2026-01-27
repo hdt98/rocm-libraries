@@ -207,7 +207,8 @@ namespace MatrixMultiplyTest
             uint        workgroup_size_y = 1;
 
             auto bpe = CeilDivide(DataTypeInfo::Get(dataTypeA).elementBits, 8u);
-            AssertFatal(mac_m * mac_k * bpe > static_cast<unsigned int>(wave_m * wave_k), "Not enough elements.");
+            AssertFatal(mac_m * mac_k * bpe > static_cast<unsigned int>(wave_m * wave_k),
+                        "Not enough elements.");
 
             auto NX = std::make_shared<Expression::Expression>(workgroup_size_x);
             auto NY = std::make_shared<Expression::Expression>(workgroup_size_y);
@@ -564,7 +565,8 @@ namespace MatrixMultiplyTest
             uint workgroup_size_y = 1;
 
             auto bpe = CeilDivide(DataTypeInfo::Get(dataTypeA).elementBits, 8u);
-            AssertFatal(mac_m * mac_k * bpe > static_cast<unsigned int>(wave_m * wave_k), "Not enough elements.");
+            AssertFatal(mac_m * mac_k * bpe > static_cast<unsigned int>(wave_m * wave_k),
+                        "Not enough elements.");
 
             uint num_workgroup_x = M / mac_m;
             uint num_workgroup_y = N / mac_n;

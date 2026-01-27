@@ -298,7 +298,8 @@ namespace rocRoller
                         // Check if chunk is outside of block, or if it runs up against the end of the total number of registers
                         // The equal check in `start + width >= m_registers.size()`
                         // is to avoid increasing register high-water mark by not allocating the last register
-                        if(start + width > idx + blockSize || static_cast<size_t>(start + width) >= m_registers.size())
+                        if(start + width > idx + blockSize
+                           || static_cast<size_t>(start + width) >= m_registers.size())
                         {
                             // Should not use end of block, revert to using beginning
                             start = idx;

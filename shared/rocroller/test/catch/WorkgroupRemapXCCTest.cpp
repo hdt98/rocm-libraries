@@ -53,6 +53,7 @@ namespace WorkgroupRemapXCCTest
     class RemapWorkgroupXCCKernel : public AssemblyTestKernel
     {
         using GD = rocRoller::Graph::Direction;
+
     public:
         RemapWorkgroupXCCKernel(rocRoller::ContextPtr context, uint numXCC, uint size)
             : AssemblyTestKernel(context)

@@ -154,7 +154,8 @@ namespace rocRoller
                     //
                     // Literal 0 can only accept Int32/UInt32/Int64/UInt64/Half/Float/Double
                     //
-                    if((elementSize == 4u or elementSize == 8u) and (static_cast<size_t>(rhs) >= elementSize * 8u))
+                    if((elementSize == 4u or elementSize == 8u)
+                       and (static_cast<size_t>(rhs) >= elementSize * 8u))
                     {
                         return literal(0, resultVarType);
                     }
@@ -846,7 +847,8 @@ namespace rocRoller
 
                 // Extracting the entire arg with no offset
                 auto argVarType = resultVariableType(cpy.arg);
-                if(cpy.offset == 0 && static_cast<size_t>(cpy.width) == argVarType.getElementSize() * 8
+                if(cpy.offset == 0
+                   && static_cast<size_t>(cpy.width) == argVarType.getElementSize() * 8
                    && argVarType.getElementSize()
                           == DataTypeInfo::Get(cpy.outputDataType).elementBytes)
                     return call(reinterpret(cpy.outputDataType, cpy.arg));

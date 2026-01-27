@@ -1441,7 +1441,8 @@ namespace rocRoller
             auto numWorkitems = product(workgroupSizes);
             auto numElements  = product(sizes);
             AssertFatal(
-                static_cast<unsigned int>(numElements) >= numWorkitems && numElements % numWorkitems == 0,
+                static_cast<unsigned int>(numElements) >= numWorkitems
+                    && numElements % numWorkitems == 0,
                 "The number of elements must be an integer multiple of the number of workitems",
                 ShowValue(numElements),
                 ShowValue(numWorkitems));
