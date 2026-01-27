@@ -1978,13 +1978,24 @@ namespace
         // push 2 activation arguments
         std::visit(
             [&inputs, &prob](auto val) {
-                inputs.activationArgs.push_back((decltype(val))prob.act0);
-                inputs.activationArgs.push_back((decltype(val))prob.act1);
-                if(prob.k)
-                    inputs.alpha = *(decltype(val)*)(prob.alpha);
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double> 
+                           || std::is_same_v<T, int32_t> || std::is_same_v<T, TensileLite::Half>
+                           || std::is_same_v<T, std::complex<float>> || std::is_same_v<T, std::complex<double>>)
+                {
+                    inputs.activationArgs.push_back((T)prob.act0);
+                    inputs.activationArgs.push_back((T)prob.act1);
+                    if(prob.k)
+                        inputs.alpha = *(T*)(prob.alpha);
+                    else
+                        inputs.alpha = val;
+                    inputs.beta = *(T*)(prob.beta);
+                }
                 else
-                    inputs.alpha = val;
-                inputs.beta = *(decltype(val)*)(prob.beta);
+                {
+                    // Unsupported types for activation - should not be reached at runtime
+                    throw std::runtime_error("[GetTensileInputs] unsupported type for activation arguments.");
+                }
             },
             argument_vals.at(compute_type));
 
@@ -2491,7 +2502,7 @@ TensileLite::ProblemOverride TensileDataGemm2ProblemOverride(std::shared_ptr<voi
 {
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
     rocisa::DataType                 computeType      = rocisa::DataType::None;
-    rocisa::DataType                 computeInputType = data->problem.computeInputType();
+    rocisa::DataType                 computeInputType = data->problem.computeInputTypeA();
 
     if(data->problem.f32XdlMathOp() == rocisa::DataType::XFloat32)
     {

@@ -61,15 +61,10 @@ void init_enum(nb::module_ m)
         .value("BFloat8", rocisa::DataType::BFloat8)
         .value("Float8BFloat8", rocisa::DataType::Float8BFloat8)
         .value("BFloat8Float8", rocisa::DataType::BFloat8Float8)
-#ifdef TENSILE_USE_FP6
         .value("Float6", rocisa::DataType::Float6)
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
         .value("BFloat6", rocisa::DataType::BFloat6)
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
         .value("Float4", rocisa::DataType::Float4)
-#endif // #ifdef TENSILE_USE_FP4
+        .value("MXScale", rocisa::DataType::MXScale)
         .export_values();
 
     nb::enum_<rocisa::SignatureValueKind>(m_enum, "SignatureValueKind")

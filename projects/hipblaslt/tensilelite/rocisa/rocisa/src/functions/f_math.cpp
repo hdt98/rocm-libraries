@@ -329,10 +329,10 @@ namespace rocisa
                 throw std::runtime_error("Invalid tmpVgprRes, must be at least 1");
             }
             auto tmpVgpr  = vgpr(tmpVgprRes->idx);
-            auto product1 = vgpr(product->getIdx() + 1);
-            auto operand1 = vgpr(operand->getIdx() + 1);
+            auto product1 = vgpr(product->regIdx + 1);
+            auto operand1 = vgpr(operand->regIdx + 1);
 
-            module->addT<VMovB32>(tmpVgpr, operand1, dComment);
+            module->addT<VMovB32>(tmpVgpr, operand1, std::nullopt, dComment);
             module->addT<VMulHIU32>(product1, 6, operand, dComment);
             module->addT<VMulLOU32>(product, 6, operand, dComment);
             module->addT<VMulLOU32>(tmpVgpr, 6, tmpVgpr, dComment);
@@ -406,8 +406,8 @@ namespace rocisa
                 throw std::runtime_error("Invalid tmpSgprRes, must be at least 1");
             }
             auto tmpSgpr  = sgpr(tmpSgprRes->idx);
-            auto product1 = sgpr(product->getIdx() + 1);
-            auto operand1 = sgpr(operand->getIdx() + 1);
+            auto product1 = sgpr(product->regIdx + 1);
+            auto operand1 = sgpr(operand->regIdx + 1);
 
             module->addT<SMovB32>(tmpSgpr, operand1, dComment);
             module->addT<SMulHIU32>(product1, 6, operand, dComment);

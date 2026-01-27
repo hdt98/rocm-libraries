@@ -54,15 +54,9 @@ namespace rocisa
         BFloat8,
         Float8BFloat8,
         BFloat8Float8,
-#ifdef TENSILE_USE_FP6
         Float6,
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
         BFloat6,
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
         Float4,
-#endif // #ifdef TENSILE_USE_FP4
         MXScale,
         Count,
         None = Count
@@ -157,18 +151,12 @@ namespace rocisa
             return "Float8BFloat8";
         case DataType::BFloat8Float8:
             return "BFloat8Float8";
-#ifdef TENSILE_USE_FP6
         case DataType::Float6:
             return "Float6";
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
         case DataType::BFloat6:
             return "BFloat6";
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
         case DataType::Float4:
             return "Float4";
-#endif // #ifdef TENSILE_USE_FP4
         case DataType::MXScale:
             return "MXScale";
         default:
