@@ -358,6 +358,7 @@ class LocalRead(ValidatorInstruction):
     # Needed to properly calculate must_start_after for Packs.
     issue_index: int
     needed_by: ValidatorInstruction = field(default_factory=lambda: MFMA(float('inf')))
+    must_start_after: ValidatorInstruction = field(default_factory=lambda: MFMA(float('-inf')))
     guaranteed_by: Union[int, float] = float('inf')
 
     def done_idx(self) -> Union[int, float]:
@@ -370,13 +371,19 @@ class LocalRead(ValidatorInstruction):
 
         # Needs to be guaranteed BEFORE the index at which it's needed since the
         # SWaitCnt is issued AFTER the vmfma.
-        if self.guaranteed_by < self.needed_by.issued_at:
+        if self.must_start_after.done_idx() < self.issued_at and self.guaranteed_by < self.needed_by.issued_at:
             return None
+
+        issued_at = floor(self.issued_at) % self.num_vmfma
+
+        if self.issued_at < self.must_start_after.done_idx():
+            # TODO: Need to handle -1?
+            _start_after_index = floor(self.must_start_after.done_idx()) % self.num_vmfma
+            return f"{self.name} @ idx={issued_at} issued too early, must be issued after {self.must_start_after.name} @ idx={_start_after_index}."
 
         guaranteed_by = self.guaranteed_by
         # Modulo for LRs that finish in next iteration.
         needed_by = int(self.needed_by.issued_at) % self.num_vmfma
-        issued_at = floor(self.issued_at) % self.num_vmfma
         if guaranteed_by == float('inf'):
             return f"{self.name} @ idx={issued_at} is not valid. There are no guarantees on when it will be done."
         
