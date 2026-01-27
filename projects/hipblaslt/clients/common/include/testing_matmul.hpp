@@ -4316,26 +4316,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                             handle, heuristicResult[sol].algo);
                     }
                 }
-                ArgumentModel<argument_param>{}.log_args(
-                    Talpha,
-                    hipblaslt_cout,
-                    sol,
-                    solutionIndex,
-                    solutionName,
-                    kernelName,
-                    archName,
-                    cuNum,
-                    arg,
-                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].getSplitK(),
-                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].getWgm(),
-                    gpu_time_used,
-                    flush_time_used,
-                    flops,
-                    gpu_mem_gbytes,
-                    cpu_time_used,
-                    hipblaslt_error,
-                    hipblaslt_atol,
-                    hipblaslt_rtol);
+                
 
                 // Print per-iteration timing details (only when using GPU timer)
                 if(arg.use_gpu_timer)
@@ -4387,6 +4368,27 @@ void testing_matmul_with_bias(const Arguments& arg,
                     // Update gpu_time_used to use filtered average for more accurate performance calculation
                     gpu_time_used = hot_filtered_avg * number_hot_calls;
                 }
+
+                ArgumentModel<argument_param>{}.log_args(
+                    Talpha,
+                    hipblaslt_cout,
+                    sol,
+                    solutionIndex,
+                    solutionName,
+                    kernelName,
+                    archName,
+                    cuNum,
+                    arg,
+                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].getSplitK(),
+                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].getWgm(),
+                    gpu_time_used,
+                    flush_time_used,
+                    flops,
+                    gpu_mem_gbytes,
+                    cpu_time_used,
+                    hipblaslt_error,
+                    hipblaslt_atol,
+                    hipblaslt_rtol);
             }
             if(best_gpu_time > gpu_time_used)
             {
