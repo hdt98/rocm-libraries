@@ -128,7 +128,7 @@ def profile_benchmarks(suite, precision, case, bench_executable, output_dir, gra
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='rocsolver-profile',
-        description='Profile rocSOLVER benchmarks using rocprofv3.')
+        description='Profile rocSOLVER benchmarks using rocprofv3 or internal logger.')
     parser.add_argument('-v','--verbose',
             action='store_true',
             help='display more information about operations being performed')
@@ -142,6 +142,14 @@ if __name__ == '__main__':
     parser.add_argument('--graph',
             action='store_true',
             help='generate graphs of profiling results using matplotlib')
+    parser.add_argument('--profiler',
+            choices=['rocprofv3', 'internal'],
+            default='rocprofv3',
+            help='profiler to use: rocprofv3 (external) or internal (rocSOLVER logger)')
+    parser.add_argument('--top-n',
+            type=int,
+            default=10,
+            help='number of top kernels to show in profiling graphs (default: 10)')
     parser.add_argument('suite',
             choices=SUITES.keys(),
             help='the set of benchmarks to profile')
@@ -156,4 +164,4 @@ if __name__ == '__main__':
     setup_vprint(args)
 
     profile_benchmarks(args.suite, args.precision, args.case, args.exe,
-                       args.output_dir, args.graph)
+                       args.output_dir, args.graph, args.profiler, args.top_n)
