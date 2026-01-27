@@ -384,7 +384,7 @@ struct BlockFmhaPipelineQRKSVS
                                      {seqlen_k_start, 0}),
                     make_tile_window(v_scale_dram_block_window_tmp.get_bottom_tensor_view(),
                                      v_scale_dram_block_window_tmp.get_window_lengths(),
-                                     {0, seqlen_k_start},
+                                     {0, seqlen_k_start / kVScaleGranularity},
                                      Policy::template MakeVScaleRegTileDistribution<Problem>()));
             }
             else
