@@ -199,6 +199,7 @@ def main():
                        default=None,
                        help='Base name for output files (default: <suite>_<precision>_<case>_comparison)')
     parser.add_argument('--keep-csvs',
+                       default=True,
                        action='store_true',
                        help='Keep intermediate CSV files (default: delete after comparison)')
     parser.add_argument('--no-individual-graphs',
@@ -285,8 +286,12 @@ def main():
     print(f"Speedup graphs:   {output_base}_speedup_*.png")
 
     if not args.no_individual_graphs:
-        print(f"Baseline graph:   {output_base}_baseline.png")
-        print(f"Comparison graph: {output_base}_comparison.png")
+        if args.separate_groups:
+            print(f"Baseline graphs:  {output_base}_baseline_*.png")
+            print(f"Comparison graphs: {output_base}_comparison_*.png")
+        else:
+            print(f"Baseline graph:   {output_base}_baseline.png")
+            print(f"Comparison graph: {output_base}_comparison.png")
 
 
 if __name__ == '__main__':

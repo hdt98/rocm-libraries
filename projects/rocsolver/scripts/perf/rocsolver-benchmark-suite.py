@@ -140,7 +140,10 @@ def main():
         print("SUCCESS")
         print(f"{'='*60}")
         print(f"Benchmark results: {csv_path}")
-        print(f"Performance graph: {graph_path}")
+        if args.separate_groups:
+            print(f"Performance graphs: {output_base}_*.png")
+        else:
+            print(f"Performance graph: {graph_path}")
     else:
         print(f"\n{'='*60}")
         print("SUCCESS")
