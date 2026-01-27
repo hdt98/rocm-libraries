@@ -16,6 +16,7 @@ try:
         transpose_t,
         grid_selection_t,
         reduction_t,
+        prediction_modes_t,
         # Data structures
         dim3_t,
         config_t,
@@ -40,6 +41,7 @@ try:
         # Performance functions
         compute_perf_gflops,
         compute_total_latency,
+        compute_formocast_latency,
         compute_number_matrix_instructions,
         compute_mt_compute_latency,
         # Memory functions
@@ -75,6 +77,7 @@ __all__ = [
     "transpose_t",
     "grid_selection_t",
     "reduction_t",
+    "prediction_modes_t",
     # Data structures
     "dim3_t",
     "config_t",
@@ -98,6 +101,7 @@ __all__ = [
     # Performance functions
     "compute_perf_gflops",
     "compute_total_latency",
+    "compute_formocast_latency",
     "compute_number_matrix_instructions",
     "compute_mt_compute_latency",
     # Memory functions
