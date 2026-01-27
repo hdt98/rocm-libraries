@@ -117,7 +117,7 @@ struct DynamicBuffer
         }
         else if constexpr(GetAddressSpace() == AddressSpaceEnum::Global && DoTranspose)
         {
-#ifdef __gfx12__
+#if defined(__gfx12__) || defined(__gfx13__)
             return amd_global_load_transpose_to_vgpr(p_data_ + i);
 #else
             static_assert(!DoTranspose, "load-with-transpose only supported on gfx12+");
@@ -241,6 +241,22 @@ struct DynamicBuffer
                 return X{invalid_element_value_};
             }
         }
+    }
+
+    template <typename X,
+              typename enable_if<is_same<typename scalar_type<remove_cvref_t<X>>::type,
+                                         typename scalar_type<remove_cvref_t<T>>::type>::value,
+                                 bool>::type = false>
+    __host__ __device__ constexpr auto trLoad(index_t src_offset, bool is_valid_element) const
+    {
+        constexpr index_t scalar_per_t_vector = scalar_type<remove_cvref_t<T>>::vector_size;
+        constexpr index_t scalar_per_x_vector = scalar_type<remove_cvref_t<X>>::vector_size;
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+        constexpr index_t t_per_x             = scalar_per_x_vector / scalar_per_t_vector;
+        constexpr AddressSpaceEnum addr_space = GetAddressSpace();
+        return amd_tr_load_to_vgpr<remove_cvref_t<T>, t_per_x, addr_space>(p_data_ + src_offset,
+                                                                           is_valid_element);
     }
 
     template <typename DstBuffer, index_t NumElemsPerThread>

@@ -1020,7 +1020,7 @@ inline __host__ __device__ float2_t type_convert<float2_t, f8x2_ocp_t>(f8x2_ocp_
 #if CK_OCP_FP8_CVT_FAST_PATH
 // __builtin_amdgcn_cvt_pk_f32_fp8 can produce incorrect results due to a compiler issue.
 // TODO: Enable when SWDEV-532959 is fixed.
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
     return float2_t{__builtin_amdgcn_cvt_f32_fp8(bit_cast<uint16_t>(x), 0),
                     __builtin_amdgcn_cvt_f32_fp8(bit_cast<uint16_t>(x), 1)};
 #else
@@ -1163,7 +1163,7 @@ inline __host__ __device__ float2_t type_convert<float2_t, bf8x2_ocp_t>(bf8x2_oc
 #if CK_OCP_FP8_CVT_FAST_PATH
 // __builtin_amdgcn_cvt_pk_f32_bf8 can produce incorrect results due to a compiler issue.
 // TODO: Enable when SWDEV-532959 is fixed.
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
     return float2_t{__builtin_amdgcn_cvt_f32_bf8(bit_cast<uint16_t>(x), 0),
                     __builtin_amdgcn_cvt_f32_bf8(bit_cast<uint16_t>(x), 1)};
 #else

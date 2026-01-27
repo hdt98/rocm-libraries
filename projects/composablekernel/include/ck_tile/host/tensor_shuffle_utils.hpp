@@ -74,7 +74,7 @@ auto shuffle_b(const ck_tile::HostTensor<T>& t)
     int n_ = t.get_lengths()[1];
     int k_ = t.get_lengths()[0];
 
-    if(ck_tile::is_gfx12_supported())
+    if(ck_tile::is_gfx12_supported() || ck_tile::is_gfx13_supported())
     {
         constexpr int divisor      = 2;
         constexpr int kABK1PerLane = 8;
@@ -135,7 +135,7 @@ auto shuffle_b_permuteN(const ck_tile::HostTensor<T>& t)
     int n_                = t.get_lengths()[1];
     int k_                = t.get_lengths()[0];
     constexpr int NRepeat = GemmConfig::N_Tile / GemmConfig::N_Warp_Tile / GemmConfig::N_Warp;
-    if(ck_tile::is_gfx12_supported())
+    if(ck_tile::is_gfx12_supported() || ck_tile::is_gfx13_supported())
     {
         constexpr int divisor      = 2;
         constexpr int kABK1PerLane = 8;

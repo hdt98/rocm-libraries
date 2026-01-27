@@ -435,7 +435,7 @@ __device__ void amd_global_atomic_add_impl(const typename vector_type<T, N>::typ
                                                       tmp.template AsType<half2_t>()[i]);
         });
     }
-#if defined(__gfx942__) || defined(__gfx950__) || defined(__gfx12__)
+#if defined(__gfx942__) || defined(__gfx950__) || defined(__gfx12__) || defined(__gfx13__)
     else if constexpr(is_same<T, bhalf_t>::value)
     {
         vector_type<bhalf_t, N> tmp{src_thread_data};
@@ -1185,6 +1185,33 @@ __device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
         ignore = global_offset;
 #endif
     }
+}
+
+template <typename T, index_t N, AddressSpaceEnum BufferAddressSpace>
+__device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
+{
+    using vector_t = typename vector_type_maker<T, N>::type::type;
+#if defined(__gfx13__)
+    if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t>)
+    {
+        if(is_src_valid)
+        {
+            typedef __attribute__((__vector_size__(8 * sizeof(__fp16)))) __fp16 llvm_fp16x8_t;
+            __attribute__((address_space(1))) llvm_fp16x8_t* global_ptr =
+                reinterpret_cast<__attribute__((address_space(1))) llvm_fp16x8_t*>(
+                    reinterpret_cast<uintptr_t>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_load_tr16_b128_v8f16(global_ptr));
+        }
+        else
+        {
+            return vector_t{0};
+        }
+    }
+#else
+    ignore = in_ptr;
+    ignore = is_src_valid;
+    return vector_t{0};
+#endif
 }
 
 template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
