@@ -316,3 +316,214 @@ def test_gfx950_bfloat16_recommended_matrix_instruction():
     assert recommended_mi.m == 16, f"Expected m=16, got {recommended_mi.m}"
     assert recommended_mi.n == 16, f"Expected n=16, got {recommended_mi.n}"
     assert recommended_mi.k == 32, f"Expected k=32, got {recommended_mi.k}"
+
+
+# Formocast Simulation Mode Tests
+
+@pytest.mark.integration
+def test_prediction_modes_enum_exists():
+    """Test that prediction_modes_t enum is available."""
+    assert hasattr(origami, 'prediction_modes_t')
+    assert hasattr(origami.prediction_modes_t, 'estimation')
+    assert hasattr(origami.prediction_modes_t, 'simulation')
+
+
+@pytest.mark.integration
+def test_compute_formocast_latency_exists():
+    """Test that compute_formocast_latency function is available."""
+    assert hasattr(origami, 'compute_formocast_latency')
+
+
+@pytest.mark.integration
+def test_config_has_formocast_fields():
+    """Test that config_t has Formocast-specific fields."""
+    config = origami.config_t()
+    
+    # Check prediction_mode field
+    assert hasattr(config, 'prediction_mode')
+    
+    # Check Formocast-specific fields
+    assert hasattr(config, 'depth_u')
+    assert hasattr(config, 'global_split_u')
+    assert hasattr(config, 'global_accumulation')
+    assert hasattr(config, 'local_split_u')
+    assert hasattr(config, 'grvw_a')
+    assert hasattr(config, 'grvw_b')
+    assert hasattr(config, 'gwvw_d')
+    assert hasattr(config, 'direct_to_vgpr_a')
+    assert hasattr(config, 'direct_to_vgpr_b')
+    assert hasattr(config, 'wave_num')
+    assert hasattr(config, 'wave_group_m')
+    assert hasattr(config, 'wave_group_n')
+    assert hasattr(config, 'prefetch_global_read')
+
+
+@pytest.mark.integration
+def test_simulation_mode_returns_valid_latency():
+    """Test that simulation mode returns a valid positive latency."""
+    # Create hardware for gfx942
+    hardware = origami.hardware_t(
+        origami.architecture_t.gfx942,
+        304,    # N_CU
+        65536,  # lds_capacity
+        8,      # NUM_XCD
+        1.0,    # mem1_perf_ratio
+        1.0,    # mem2_perf_ratio
+        1.0,    # mem3_perf_ratio
+        4000000,  # L2_capacity
+        1.5,    # compute_clock_ghz
+        1,      # parallel_mi_cu
+        (0.0, 0.015, 0.0)  # mem_bw_per_wg_coefficients
+    )
+    
+    # Create problem
+    problem = origami.problem_t()
+    problem.size = origami.dim3_t(2048, 2048, 2048)
+    problem.batch = 1
+    problem.a_transpose = origami.transpose_t.T
+    problem.b_transpose = origami.transpose_t.N
+    problem.a_dtype = origami.data_type_t.Half
+    problem.b_dtype = origami.data_type_t.Half
+    problem.c_dtype = origami.data_type_t.Half
+    problem.d_dtype = origami.data_type_t.Half
+    problem.mi_dtype = origami.data_type_t.Half
+    
+    # Create config with simulation mode
+    config = origami.config_t()
+    config.mt = origami.dim3_t(128, 128, 32)
+    config.mi = origami.dim3_t(16, 16, 16)
+    config.occupancy = 2
+    config.workgroup_mapping = 8
+    config.prediction_mode = origami.prediction_modes_t.simulation
+    
+    # Set Formocast-specific parameters
+    config.depth_u = 32
+    config.global_split_u = 1
+    config.grvw_a = 4
+    config.grvw_b = 4
+    config.gwvw_d = 4
+    config.wave_num = 4
+    config.wave_group_m = 2
+    config.wave_group_n = 2
+    config.prefetch_global_read = 2
+    
+    # Call compute_formocast_latency directly
+    latency = origami.compute_formocast_latency(problem, hardware, config)
+    
+    assert latency > 0, f"Expected positive latency, got {latency}"
+
+
+@pytest.mark.integration
+def test_simulation_mode_via_compute_total_latency():
+    """Test that compute_total_latency uses Formocast when prediction_mode is simulation."""
+    # Create hardware for gfx942
+    hardware = origami.hardware_t(
+        origami.architecture_t.gfx942,
+        304,    # N_CU
+        65536,  # lds_capacity
+        8,      # NUM_XCD
+        1.0,    # mem1_perf_ratio
+        1.0,    # mem2_perf_ratio
+        1.0,    # mem3_perf_ratio
+        4000000,  # L2_capacity
+        1.5,    # compute_clock_ghz
+        1,      # parallel_mi_cu
+        (0.0, 0.015, 0.0)  # mem_bw_per_wg_coefficients
+    )
+    
+    # Create problem
+    problem = origami.problem_t()
+    problem.size = origami.dim3_t(2048, 2048, 2048)
+    problem.batch = 1
+    problem.a_transpose = origami.transpose_t.T
+    problem.b_transpose = origami.transpose_t.N
+    problem.a_dtype = origami.data_type_t.Half
+    problem.b_dtype = origami.data_type_t.Half
+    problem.c_dtype = origami.data_type_t.Half
+    problem.d_dtype = origami.data_type_t.Half
+    problem.mi_dtype = origami.data_type_t.Half
+    
+    # Create config with estimation mode
+    config_estimation = origami.config_t()
+    config_estimation.mt = origami.dim3_t(128, 128, 32)
+    config_estimation.mi = origami.dim3_t(16, 16, 16)
+    config_estimation.occupancy = 2
+    config_estimation.workgroup_mapping = 8
+    config_estimation.prediction_mode = origami.prediction_modes_t.estimation
+    
+    # Create config with simulation mode
+    config_simulation = origami.config_t()
+    config_simulation.mt = origami.dim3_t(128, 128, 32)
+    config_simulation.mi = origami.dim3_t(16, 16, 16)
+    config_simulation.occupancy = 2
+    config_simulation.workgroup_mapping = 8
+    config_simulation.prediction_mode = origami.prediction_modes_t.simulation
+    config_simulation.depth_u = 32
+    config_simulation.global_split_u = 1
+    config_simulation.grvw_a = 4
+    config_simulation.grvw_b = 4
+    config_simulation.gwvw_d = 4
+    config_simulation.wave_num = 4
+    config_simulation.wave_group_m = 2
+    config_simulation.wave_group_n = 2
+    config_simulation.prefetch_global_read = 2
+    
+    # Get latencies from both modes
+    latency_estimation = origami.compute_total_latency(
+        problem, hardware, config_estimation, hardware.N_CU)
+    latency_simulation = origami.compute_total_latency(
+        problem, hardware, config_simulation, hardware.N_CU)
+    
+    # Both should return positive values
+    assert latency_estimation > 0, f"Estimation latency should be positive: {latency_estimation}"
+    assert latency_simulation > 0, f"Simulation latency should be positive: {latency_simulation}"
+    
+    # The values should be different (different models)
+    # Note: They use different units (cycles vs microseconds), so they will definitely differ
+    assert latency_estimation != latency_simulation, \
+        "Estimation and simulation should produce different results"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("m,n,k", [
+    (1024, 1024, 1024),
+    (2048, 2048, 2048),
+    (4096, 4096, 512),
+    (512, 4096, 4096),
+])
+def test_simulation_mode_various_problem_sizes(m, n, k):
+    """Test simulation mode with various problem sizes."""
+    # Create hardware for gfx942
+    hardware = origami.hardware_t(
+        origami.architecture_t.gfx942,
+        304, 65536, 8, 1.0, 1.0, 1.0, 4000000, 1.5, 1, (0.0, 0.015, 0.0)
+    )
+    
+    problem = origami.problem_t()
+    problem.size = origami.dim3_t(m, n, k)
+    problem.batch = 1
+    problem.a_transpose = origami.transpose_t.T
+    problem.b_transpose = origami.transpose_t.N
+    problem.a_dtype = origami.data_type_t.Half
+    problem.b_dtype = origami.data_type_t.Half
+    problem.c_dtype = origami.data_type_t.Half
+    problem.d_dtype = origami.data_type_t.Half
+    problem.mi_dtype = origami.data_type_t.Half
+    
+    config = origami.config_t()
+    config.mt = origami.dim3_t(128, 128, 32)
+    config.mi = origami.dim3_t(16, 16, 16)
+    config.occupancy = 2
+    config.workgroup_mapping = 8
+    config.prediction_mode = origami.prediction_modes_t.simulation
+    config.depth_u = 32
+    config.global_split_u = 1
+    config.grvw_a = 4
+    config.grvw_b = 4
+    config.gwvw_d = 4
+    config.wave_num = 4
+    config.wave_group_m = 2
+    config.wave_group_n = 2
+    
+    latency = origami.compute_formocast_latency(problem, hardware, config)
+    assert latency > 0, f"Expected positive latency for {m}x{n}x{k}, got {latency}"
