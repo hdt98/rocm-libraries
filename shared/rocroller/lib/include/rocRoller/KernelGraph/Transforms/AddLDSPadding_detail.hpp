@@ -62,6 +62,12 @@ namespace rocRoller
             uint CalculateAutomaticContiguousBlockSize(LDSPaddingInfo const& info);
 
             /**
+             * @brief Calculate automatic padding bytes for LDS.
+             */
+            uint CalculateAutomaticPaddingBytes(LDSPaddingInfo const& info,
+                                                uint                  contiguousBytes);
+
+            /**
              * @brief Convert LDSPaddingInfo to string representation.
              */
             std::string toString(LDSPaddingInfo const& info);

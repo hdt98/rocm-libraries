@@ -155,4 +155,124 @@ namespace AddLDSPaddingTest
             CHECK(calculatedContiguousBytes == expectedContiguousBytes);
         }
     }
+
+    TEST_CASE("CalculateAutomaticPaddingBytes", "[kernel-graph][utils]")
+    {
+        using namespace rocRoller::KernelGraph;
+        using namespace rocRoller::KernelGraph::AddLDSPaddingDetail;
+        using namespace rocRoller::Expression;
+
+        SECTION("No padding needed for non-128-aligned blocks")
+        {
+            // When contiguous block size is not a multiple of 128, no
+            // padding is needed as successive rows naturally hit
+            // different banks
+            LDSPaddingInfo info{.ldsTag                   = 0,
+                                .upstreamEdge             = 1,
+                                .downstreamEdge           = 2,
+                                .upstreamTags             = {3, 4},
+                                .downstreamTags           = {5, 6},
+                                .dataType                 = DataType::Float,
+                                .layoutType               = LayoutType::MATRIX_A,
+                                .loadInstructionByteWidth = 16u,
+                                .loadLaneWidth            = 64u};
+
+            uint contiguousBytes = 16u * 64u; // 1024 bytes (128 * 8, so it IS aligned)
+            uint paddingBytes    = CalculateAutomaticPaddingBytes(info, contiguousBytes);
+            CHECK(paddingBytes > 0);
+
+            contiguousBytes = 16u * 63u; // 1008 bytes (not a multiple of 128)
+            paddingBytes    = CalculateAutomaticPaddingBytes(info, contiguousBytes);
+            CHECK(paddingBytes == 0);
+        }
+
+        SECTION("Padding for 128-aligned blocks")
+        {
+            // When contiguous block size is a multiple of 128,
+            // padding is needed
+            LDSPaddingInfo info{.ldsTag                   = 0,
+                                .upstreamEdge             = 1,
+                                .downstreamEdge           = 2,
+                                .upstreamTags             = {3, 4},
+                                .downstreamTags           = {5, 6},
+                                .dataType                 = DataType::Float,
+                                .layoutType               = LayoutType::MATRIX_A,
+                                .loadInstructionByteWidth = 16u,
+                                .loadLaneWidth            = 64u};
+
+            uint contiguousBytes = 1024u; // 128 * 8
+            uint paddingBytes    = CalculateAutomaticPaddingBytes(info, contiguousBytes);
+
+            // Padding should be non-zero
+            CHECK(paddingBytes > 0);
+            // Padding should be reasonable (not too large)
+            CHECK(paddingBytes <= 64u);
+            // Padding should be at least one element (4 bytes for Float)
+            CHECK(paddingBytes >= 4u);
+        }
+
+        SECTION("Different data types")
+        {
+            uint contiguousBytes = 2048u; // 128 * 16
+
+            // Float16
+            LDSPaddingInfo infoF16{.ldsTag                   = 0,
+                                   .upstreamEdge             = 1,
+                                   .downstreamEdge           = 2,
+                                   .upstreamTags             = {3, 4},
+                                   .downstreamTags           = {5, 6},
+                                   .dataType                 = DataType::Half,
+                                   .layoutType               = LayoutType::MATRIX_A,
+                                   .loadInstructionByteWidth = 16u,
+                                   .loadLaneWidth            = 64u};
+            uint paddingBytesF16 = CalculateAutomaticPaddingBytes(infoF16, contiguousBytes);
+            CHECK(paddingBytesF16 >= 2u); // At least one Half element (2 bytes)
+
+            // Float32
+            LDSPaddingInfo infoF32{.ldsTag                   = 0,
+                                   .upstreamEdge             = 1,
+                                   .downstreamEdge           = 2,
+                                   .upstreamTags             = {3, 4},
+                                   .downstreamTags           = {5, 6},
+                                   .dataType                 = DataType::Float,
+                                   .layoutType               = LayoutType::MATRIX_A,
+                                   .loadInstructionByteWidth = 16u,
+                                   .loadLaneWidth            = 64u};
+            uint paddingBytesF32 = CalculateAutomaticPaddingBytes(infoF32, contiguousBytes);
+            CHECK(paddingBytesF32 >= 4u); // At least one Float element (4 bytes)
+
+            // FP8
+            LDSPaddingInfo infoFP8{.ldsTag                   = 0,
+                                   .upstreamEdge             = 1,
+                                   .downstreamEdge           = 2,
+                                   .upstreamTags             = {3, 4},
+                                   .downstreamTags           = {5, 6},
+                                   .dataType                 = DataType::FP8,
+                                   .layoutType               = LayoutType::MATRIX_A,
+                                   .loadInstructionByteWidth = 16u,
+                                   .loadLaneWidth            = 64u};
+            uint paddingBytesFP8 = CalculateAutomaticPaddingBytes(infoFP8, contiguousBytes);
+            CHECK(paddingBytesFP8 >= 1u); // At least one FP8 element (1 byte)
+        }
+
+        SECTION("Padding respects maximum bounds")
+        {
+            // Very large contiguous block
+            LDSPaddingInfo info{.ldsTag                   = 0,
+                                .upstreamEdge             = 1,
+                                .downstreamEdge           = 2,
+                                .upstreamTags             = {3, 4},
+                                .downstreamTags           = {5, 6},
+                                .dataType                 = DataType::Float,
+                                .layoutType               = LayoutType::MATRIX_A,
+                                .loadInstructionByteWidth = 16u,
+                                .loadLaneWidth            = 64u};
+
+            uint contiguousBytes = 8192u; // 128 * 64
+            uint paddingBytes    = CalculateAutomaticPaddingBytes(info, contiguousBytes);
+
+            // Padding should not exceed 64 bytes
+            CHECK(paddingBytes <= 64u);
+        }
+    }
 }

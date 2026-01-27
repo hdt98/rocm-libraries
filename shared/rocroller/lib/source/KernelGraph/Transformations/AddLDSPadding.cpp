@@ -119,6 +119,71 @@ namespace rocRoller
                 return info.loadInstructionByteWidth * info.loadLaneWidth;
             }
 
+            uint CalculateAutomaticPaddingBytes(LDSPaddingInfo const& info, uint contiguousBytes)
+            {
+                // LDS has 32 banks, each 4 bytes wide
+                constexpr uint LDS_NUM_BANKS      = 32;
+                constexpr uint LDS_BYTES_PER_BANK = 4;
+
+                // A "row" of banks has 128 bytes.
+                constexpr uint LDS_BANK_ROW_BYTES = LDS_NUM_BANKS * LDS_BYTES_PER_BANK;
+
+                auto elementBytes = DataTypeInfo::Get(info.dataType).elementBits / 8u;
+
+                // The goal is to avoid LDS bank conflicts by adding
+                // padding when rows would otherwise map to the same
+                // banks.
+                //
+                // If contiguous block size + padding is NOT a
+                // multiple of 128 bytes, successive rows will hit
+                // different banks, reducing conflicts.
+                //
+
+                // Calculate how the contiguous block aligns with LDS
+                // banks
+                uint remainder = contiguousBytes % LDS_BANK_ROW_BYTES;
+
+                // If already not aligned to 128 bytes, bank conflicts
+                // are naturally avoided
+                if(remainder != 0)
+                {
+                    return 0;
+                }
+
+                // For 128-byte aligned blocks, we need padding to
+                // shift subsequent rows:
+                //
+                // - loadInstructionByteWidth (for optimal load pattern)
+                // - or 16 bytes
+
+                uint paddingBytes = info.loadInstructionByteWidth;
+
+                // However, ensure padding is at least one element and
+                // reasonable
+                uint minPaddingBytes = elementBytes;
+                uint maxPaddingBytes = 64;
+
+                paddingBytes = std::max(paddingBytes, minPaddingBytes);
+                paddingBytes = std::min(paddingBytes, maxPaddingBytes);
+
+                // Special case: for very small element types with large vector widths,
+                // we might over-pad. Cap at a reasonable fraction of the block size.
+                if(paddingBytes > contiguousBytes / 8)
+                {
+                    paddingBytes = std::max(contiguousBytes / 16, minPaddingBytes);
+                }
+
+                Log::debug("KernelGraph::AddLDSPadding::CalculateAutomaticPaddingBytes: "
+                           "contiguousBytes={}, elementBytes={}, loadInstructionByteWidth={}, "
+                           "calculated paddingBytes={}",
+                           contiguousBytes,
+                           elementBytes,
+                           info.loadInstructionByteWidth,
+                           paddingBytes);
+
+                return paddingBytes;
+            }
+
             std::string toString(LDSPaddingInfo const& info)
             {
                 return fmt::format(
@@ -382,7 +447,9 @@ namespace rocRoller
                 }
                 if(paddingBytes == -1)
                 {
-                    Throw<FatalError>("Automatic padding not implemented yet.");
+                    paddingBytes = CalculateAutomaticPaddingBytes(info, contiguousBytes);
+                    Log::debug("KernelGraph::AddLDSPadding: Automatic padding bytes: {}",
+                               paddingBytes);
                 }
                 return {contiguousBytes, paddingBytes};
             }
