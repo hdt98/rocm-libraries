@@ -130,6 +130,7 @@ LAPACK main functions
     :ref:`rocsolver_gelqf <gelqf>`, x, x, x, x
     :ref:`rocsolver_geql2 <geql2>`, x, x, x, x
     :ref:`rocsolver_geqlf <geqlf>`, x, x, x, x
+    :ref:`rocsolver_cholqr <cholqr>`, x, x, x, x
 
 .. csv-table:: Problem and matrix reductions
     :header: "Function", "single", "double", "single complex", "double complex"
