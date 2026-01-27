@@ -659,6 +659,65 @@ rocsolver_<type>gelqf_strided_batched()
 .. doxygenfunction:: rocsolver_sgelqf_strided_batched
 
 
+.. _cholqr:
+
+rocsolver_<type>cholqr()
+---------------------------------------------------
+.. doxygenfunction:: rocsolver_zcholqr_64
+   :outline:
+.. doxygenfunction:: rocsolver_ccholqr_64
+   :outline:
+.. doxygenfunction:: rocsolver_dcholqr_64
+   :outline:
+.. doxygenfunction:: rocsolver_scholqr_64
+   :outline:
+.. doxygenfunction:: rocsolver_zcholqr
+   :outline:
+.. doxygenfunction:: rocsolver_ccholqr
+   :outline:
+.. doxygenfunction:: rocsolver_dcholqr
+   :outline:
+.. doxygenfunction:: rocsolver_scholqr
+
+.. _cholqr_batched:
+
+rocsolver_<type>cholqr_batched()
+---------------------------------------------------
+.. doxygenfunction:: rocsolver_zcholqr_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_ccholqr_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_dcholqr_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_scholqr_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_zcholqr_batched
+   :outline:
+.. doxygenfunction:: rocsolver_ccholqr_batched
+   :outline:
+.. doxygenfunction:: rocsolver_dcholqr_batched
+   :outline:
+.. doxygenfunction:: rocsolver_scholqr_batched
+
+.. _cholqr_strided_batched:
+
+rocsolver_<type>cholqr_strided_batched()
+---------------------------------------------------
+.. doxygenfunction:: rocsolver_zcholqr_strided_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_ccholqr_strided_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_dcholqr_strided_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_scholqr_strided_batched_64
+   :outline:
+.. doxygenfunction:: rocsolver_zcholqr_strided_batched
+   :outline:
+.. doxygenfunction:: rocsolver_ccholqr_strided_batched
+   :outline:
+.. doxygenfunction:: rocsolver_dcholqr_strided_batched
+   :outline:
+.. doxygenfunction:: rocsolver_scholqr_strided_batched
 
 .. _reductions:
 
