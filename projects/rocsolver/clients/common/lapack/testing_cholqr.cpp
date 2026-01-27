@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,9 +29,4 @@
 
 #define TESTING_CHOLQR(...) template void testing_cholqr<__VA_ARGS__>(Arguments&);
 
-INSTANTIATE(TESTING_CHOLQR,
-            FOREACH_MATRIX_DATA_LAYOUT,
-            FOREACH_SCALAR_TYPE,
-            FOREACH_INT_TYPE,
-            APPLY_STAMP)
-
+INSTANTIATE(TESTING_CHOLQR, FOREACH_MATRIX_DATA_LAYOUT, FOREACH_SCALAR_TYPE, FOREACH_INT_TYPE, APPLY_STAMP)
