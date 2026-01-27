@@ -124,6 +124,87 @@ def generate_benchmark_graph(csv_path, output_path=None):
     print(f"Graph saved to: {output_path}")
 
 
+def generate_kernel_breakdown_graph(csv_path, output_path, title, n=10,
+                                     strip_templates=False, sort_by_percentage=False):
+    """
+    Generate a bar chart showing kernel runtime breakdown.
+
+    Generic function that creates a bar chart from a CSV file containing
+    kernel performance data. Shows the top N kernels by percentage, with
+    remaining kernels grouped into an "Other" category.
+
+    Args:
+        csv_path: Path to CSV file with 'Name' and 'Percentage' columns
+        output_path: Path where the PNG graph will be saved
+        title: Title for the graph
+        n: Number of top kernels to display (default: 10)
+        strip_templates: Whether to strip template parameters from names (default: False)
+        sort_by_percentage: Whether to sort data by percentage before processing (default: False)
+    """
+    if not os.path.exists(csv_path):
+        sys.exit(f"Error: CSV file not found: {csv_path}")
+
+    # Read kernel data from CSV
+    kernels = []
+    with open(csv_path, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            name = row['Name']
+
+            # Strip template parameters if requested
+            if strip_templates and '<' in name:
+                name = name[:name.index('<')]
+
+            kernels.append({
+                'name': name,
+                'percentage': float(row['Percentage'])
+            })
+
+    if not kernels:
+        sys.exit("Error: No kernel data found in CSV")
+
+    # Sort by percentage if requested (e.g., for unsorted CSV data)
+    if sort_by_percentage:
+        kernels.sort(key=lambda k: k['percentage'], reverse=True)
+
+    # Extract top N kernels and accumulate rest into "Other"
+    x = []
+    y = []
+    other_percentage = 0.0
+
+    for i, kernel in enumerate(kernels):
+        if i < n:
+            x.append(kernel['name'])
+            y.append(kernel['percentage'])
+        else:
+            other_percentage += kernel['percentage']
+
+    # Add "Other" category if there are remaining kernels
+    if other_percentage > 0:
+        x.append("Other")
+        y.append(other_percentage)
+
+    # Create bar chart
+    fig, ax = plt.subplots(figsize=(5, 10))
+
+    ax.set_ylabel('Proportion of Run Time (%)', fontsize=12)
+    ax.set_xlabel('Kernel Name', fontsize=12)
+
+    rects = ax.bar(x, y)
+    ax.bar_label(rects)
+
+    ax.set_ylim(0, 1.2*max(y))
+    ax.tick_params("x", rotation=90)
+
+    fig.suptitle(title, fontsize=14)
+
+    plt.subplots_adjust(bottom=0.40)
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    print(f"Graph saved to: {output_path}")
+
+
 def generate_rocprof_graph(rocprof_dir, n=10):
     """
     Generate a graph decomposing total runtime into individual kernels.
@@ -136,60 +217,16 @@ def generate_rocprof_graph(rocprof_dir, n=10):
         n: Number of top kernels to display (default: 10)
     """
     kernel_stats_file = os.path.join(rocprof_dir, f'{os.path.basename(rocprof_dir)}_kernel_stats.csv')
-
-    if not os.path.exists(kernel_stats_file):
-        sys.exit(f"Error: Kernel stats file not found: {kernel_stats_file}")
-
-    x = []
-    y = []
-    other_percentage = 0.0
-
-    with open(kernel_stats_file, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for i, row in enumerate(reader):
-            percentage = float(row['Percentage'])
-
-            if i < n:
-                # Add to top N kernels
-                try:
-                    # Strip template parameters from kernel names for readability
-                    slice_index = row['Name'].index('<')
-                except ValueError:
-                    slice_index = -1
-                sliced_name = row['Name'][:slice_index] if slice_index > 0 else row['Name']
-                x.append(sliced_name)
-                y.append(percentage)
-            else:
-                # Accumulate remaining kernels into "Other"
-                other_percentage += percentage
-
-    if not x:
-        sys.exit("Error: No valid data found in kernel stats file")
-
-    # Add "Other" category if there are remaining kernels
-    if other_percentage > 0:
-        x.append("Other")
-        y.append(other_percentage)
-
-    fig, ax = plt.subplots(figsize=(5, 10))
-
-    ax.set_ylabel('Proportion of Run Time (%)', fontsize=12)
-    ax.set_xlabel('Kernel Name', fontsize=12)
-
-    rects = ax.bar(x, y)
-    ax.bar_label(rects)
-
-    ax.set_ylim(0, 1.2*max(y))
-    ax.tick_params("x", rotation=90)
-
-    fig.suptitle('Proportion of Time (%) by Kernel', fontsize=14)
-
-    plt.subplots_adjust(bottom=0.40)
     output_path = os.path.join(rocprof_dir, f'{os.path.basename(rocprof_dir)}_kernel_breakdown.png')
-    plt.savefig(output_path, dpi=150)
-    plt.close()
 
-    print(f"Rocprof graph saved to: {output_path}")
+    generate_kernel_breakdown_graph(
+        csv_path=kernel_stats_file,
+        output_path=output_path,
+        title='Proportion of Time (%) by Kernel',
+        n=n,
+        strip_templates=True,
+        sort_by_percentage=False  # rocprof CSV is already sorted
+    )
 
 
 def generate_internal_profiler_graph(kernel_csv, output_dir, n=10):
@@ -204,61 +241,16 @@ def generate_internal_profiler_graph(kernel_csv, output_dir, n=10):
         output_dir: Directory to save the graph
         n: Number of top kernels to display (default: 10)
     """
-    if not os.path.exists(kernel_csv):
-        sys.exit(f"Error: Kernel data file not found: {kernel_csv}")
-
-    # Read and sort kernels by percentage (descending)
-    kernels = []
-    with open(kernel_csv, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            kernels.append({
-                'name': row['Name'],
-                'percentage': float(row['Percentage'])
-            })
-
-    kernels.sort(key=lambda k: k['percentage'], reverse=True)
-
-    # Extract top N and accumulate rest into "Other"
-    x = []
-    y = []
-    other_percentage = 0.0
-
-    for i, kernel in enumerate(kernels):
-        if i < n:
-            x.append(kernel['name'])
-            y.append(kernel['percentage'])
-        else:
-            other_percentage += kernel['percentage']
-
-    if not x:
-        sys.exit("Error: No kernel data found")
-
-    # Add "Other" category if there are remaining kernels
-    if other_percentage > 0:
-        x.append("Other")
-        y.append(other_percentage)
-
-    # Generate bar chart
-    fig, ax = plt.subplots(figsize=(5, 10))
-
-    ax.set_ylabel('Proportion of Run Time (%)', fontsize=12)
-    ax.set_xlabel('Kernel Name', fontsize=12)
-
-    rects = ax.bar(x, y)
-    ax.bar_label(rects)
-
-    ax.set_ylim(0, 1.2*max(y))
-    ax.tick_params("x", rotation=90)
-
-    fig.suptitle('Proportion of Time (%) by Kernel (Internal Profiler)', fontsize=14)
-
-    plt.subplots_adjust(bottom=0.40)
     output_path = os.path.join(output_dir, f'{os.path.basename(output_dir)}_kernel_breakdown.png')
-    plt.savefig(output_path, dpi=150)
-    plt.close()
 
-    print(f"Internal profiler graph saved to: {output_path}")
+    generate_kernel_breakdown_graph(
+        csv_path=kernel_csv,
+        output_path=output_path,
+        title='Proportion of Time (%) by Kernel (Internal Profiler)',
+        n=n,
+        strip_templates=False,  # Names already cleaned during CSV creation
+        sort_by_percentage=True  # Need to sort the data
+    )
 
 
 if __name__ == '__main__':
