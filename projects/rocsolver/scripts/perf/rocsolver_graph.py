@@ -352,6 +352,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # Validate that --top-n is only used with --rocprof
+    if args.top_n != 10 and not args.rocprof:
+        sys.exit(f"Error: --top-n can only be used with --rocprof (kernel breakdown graphs)")
+
+    if args.top_n < 0:
+        sys.exit(f"Error: --top-n must have a positive integer argument")
+
     if args.rocprof:
         if not os.path.isdir(args.input):
             sys.exit(f"Error: For rocprof graphs, input must be a directory: {args.input}")
