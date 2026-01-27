@@ -235,21 +235,20 @@ def main():
     # Find script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Step 1: Run baseline benchmarks
+    # Run benchmarks
     baseline_cmd = run_benchmarks(
         args.baseline_exe, baseline_csv, args.suite, args.precision,
         args.case, args.verbose, script_dir
     )
     run_command(baseline_cmd, "Running baseline benchmarks", args.verbose)
 
-    # Step 2: Run comparison benchmarks
     comparison_cmd = run_benchmarks(
         args.comparison_exe, comparison_csv, args.suite, args.precision,
         args.case, args.verbose, script_dir
     )
     run_command(comparison_cmd, "Running comparison benchmarks", args.verbose)
 
-    # Step 3: Generate speedup comparison graphs
+    # Generate speedup comparison graphs
     if not os.path.exists(baseline_csv) or not os.path.exists(comparison_csv):
         sys.exit(f"Error: CSV files not found after benchmark runs")
 
@@ -259,7 +258,7 @@ def main():
     )
     run_command(comparison_graph_cmd, "Generating speedup comparison graphs", args.verbose)
 
-    # Step 4: Generate individual performance graphs (optional)
+    # Generate individual performance graphs (optional)
     if not args.no_individual_graphs:
         baseline_graph_path = f"{output_base}_baseline.png"
         baseline_graph_cmd = generate_individual_graphs(
@@ -273,17 +272,11 @@ def main():
         )
         run_command(comparison_graph_cmd, "Generating comparison performance graph", args.verbose)
 
-    # Step 5: Cleanup (optional)
     if not args.keep_csvs:
         os.remove(baseline_csv)
         os.remove(comparison_csv)
         if args.verbose:
             print(f"\nCleaned up intermediate CSV files")
-
-    # Step 6: Summary
-    print(f"\n{'='*60}")
-    print("SUCCESS")
-    print(f"{'='*60}")
 
     if args.keep_csvs:
         print(f"Baseline CSV:     {baseline_csv}")
