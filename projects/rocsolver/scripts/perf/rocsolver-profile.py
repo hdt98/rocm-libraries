@@ -112,6 +112,7 @@ def parse_internal_profiler_output(output_text):
             break
 
     if profile_start == -1:
+        print(lines)
         raise ValueError("No profile section found in output")
 
     # Parse each line to build function list
@@ -298,7 +299,7 @@ def profile_with_internal_logger(benchmark_string, bench_executable, bench_args,
 
     # Parse profiler output
     try:
-        timing_us, kernels = parse_internal_profiler_output(out)
+        timing_us, kernels = parse_internal_profiler_output(out+err)
     except Exception as e:
         print(f"Warning: Failed to parse profiler output for {benchmark_string}: {e}", file=sys.stderr)
         return False, None
