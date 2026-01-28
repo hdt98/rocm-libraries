@@ -275,7 +275,16 @@ class LocalReadMFMA(LocalRead):
         numElementPerGroup = (writer.states.kernel["WavefrontSize"] // kernel["MatrixInstM"]) * miInputPerGroup
         inputPerThread   = kernel["LocalReadVectorWidth"] if not writer.states.inTailLoop else kernel["MIInputPerThread%s"%tc]
 
-        abmatrixinfo = writer.states.a if tc == 'A' else writer.states.b
+        if tc == 'A':
+            abmatrixinfo = writer.states.a
+        elif tc == 'MXSA':
+            abmatrixinfo = writer.states.mxsa
+        elif tc == 'B':
+            abmatrixinfo = writer.states.b
+        elif tc == 'MXSB':
+            abmatrixinfo = writer.states.mxsb
+        else:
+            raise Exception(f"unsupport tc %s{tc}")
         perpStride   = abmatrixinfo.gNLCPerpStride
 
         # pack register

@@ -38,7 +38,8 @@ from Tensile.Common import assignParameterWithDefault, IsaInfo, \
                     roundUpToNearestMultiple
 from Tensile.Common.DataType import DataType
 from Tensile.Common.GlobalParameters import defaultSolution, \
-                                            defaultInternalSupportParams
+                                            defaultInternalSupportParams, \
+                                            globalParameters
 from Tensile.SolutionStructs.Naming import getSolutionNameFull
 from Tensile.SolutionStructs.Problem import ProblemType
 from Tensile.Toolchain.Component import Assembler
@@ -1437,9 +1438,12 @@ class Solution(collections.abc.Mapping):
         state["MacroTileMXSA"] = state["MacroTileA"]
         state["WaveSeparateGlobalReadMXSA"] = state["WaveSeparateGlobalReadA"]
         state["NumLoadsCoalescedMXSA"] = state["NumLoadsCoalescedA"]
-        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA')
+        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
         state["DirectToLdsMXSA"] = False
         state["LocalWriteUseSgprMXSA"] = False
+        state["UseGeneralizedNLCOneMXSA"] = False
+        state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
+        state["MIInputPerThreadMXSA"] = state["MIInputPerThreadA"]
         state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
         state["VectorWidthMXSA"] = state["VectorWidthA"]
         state["MIWaveTileMXSA"] = state["MIWaveTileA"]
@@ -1452,9 +1456,12 @@ class Solution(collections.abc.Mapping):
         state["MacroTileMXSB"] = state["MacroTileB"]
         state["WaveSeparateGlobalReadMXSB"] = state["WaveSeparateGlobalReadB"]
         state["NumLoadsCoalescedMXSB"] = state["NumLoadsCoalescedB"]
-        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB')
+        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
         state["DirectToLdsMXSB"] = False
         state["LocalWriteUseSgprMXSB"] = False
+        state["UseGeneralizedNLCOneMXSB"] = False
+        state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
+        state["MIInputPerThreadMXSB"] = state["MIInputPerThreadB"]
         state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
         state["VectorWidthMXSB"] = state["VectorWidthB"]
         state["MIWaveTileMXSB"] = state["MIWaveTileB"]
@@ -2239,7 +2246,7 @@ class Solution(collections.abc.Mapping):
         totalElementsA = totalElementsCoalescedA * totalElementsPerpA
 
         tva = totalElementsA // state["GlobalReadVectorWidthA"]
-        if not Solution.setGlobalReadVectorWidth(state, "A", tva, state["GlobalReadVectorWidthA"]):
+        if not Solution.setGlobalReadVectorWidth(state, "A", tva, state["GlobalReadVectorWidthA"], printRejectionReason):
           validDepthU = False
 
         if state["EnableMatrixInstruction"] and state["GlobalReadVectorWidthA"]:
@@ -2258,7 +2265,7 @@ class Solution(collections.abc.Mapping):
             # reduce GLVA if GLVA larger than MIOVW
             if state["GlobalReadVectorWidthA"] > glvwAlimit:
               tva = totalElementsA // glvwAlimit
-              if not Solution.setGlobalReadVectorWidth(state, "A", tva, glvwAlimit):
+              if not Solution.setGlobalReadVectorWidth(state, "A", tva, glvwAlimit, printRejectionReason):
                 validDepthU = False
 
         GlobalReadVectorWidthA = state["GlobalReadVectorWidthA"]
@@ -2280,7 +2287,7 @@ class Solution(collections.abc.Mapping):
           totalElementsMXSA = totalElementsCoalescedMXSA * totalElementsPerpMXSA
 
           tva = totalElementsMXSA // state["GlobalReadVectorWidthMXSA"]
-          if not Solution.setGlobalReadVectorWidth(state, "MXSA", tva, state["GlobalReadVectorWidthMXSA"]):
+          if not Solution.setGlobalReadVectorWidth(state, "MXSA", tva, state["GlobalReadVectorWidthMXSA"], printRejectionReason):
             validDepthU = False
 
           GlobalReadVectorWidthMXSA = state["GlobalReadVectorWidthMXSA"]
@@ -2301,7 +2308,7 @@ class Solution(collections.abc.Mapping):
         totalElementsB = totalElementsCoalescedB * totalElementsPerpB
 
         tvb = totalElementsB // state["GlobalReadVectorWidthB"]
-        if not Solution.setGlobalReadVectorWidth(state, "B", tvb, state["GlobalReadVectorWidthB"]):
+        if not Solution.setGlobalReadVectorWidth(state, "B", tvb, state["GlobalReadVectorWidthB"], printRejectionReason):
           validDepthU = False
 
         if state["EnableMatrixInstruction"] and state["GlobalReadVectorWidthB"]:
@@ -2319,7 +2326,7 @@ class Solution(collections.abc.Mapping):
             # reduce GLVB if GLVB larger than MIOVW
             if state["GlobalReadVectorWidthB"] > glvwBlimit:
               tvb = totalElementsB // glvwBlimit
-              if not Solution.setGlobalReadVectorWidth(state, "B", tvb, glvwBlimit):
+              if not Solution.setGlobalReadVectorWidth(state, "B", tvb, glvwBlimit, printRejectionReason):
                 validDepthU = False
 
         GlobalReadVectorWidthB = state["GlobalReadVectorWidthB"]
@@ -2341,7 +2348,7 @@ class Solution(collections.abc.Mapping):
           totalElementsMXSB = totalElementsCoalescedMXSB * totalElementsPerpMXSB
 
           tva = totalElementsMXSB // state["GlobalReadVectorWidthMXSB"]
-          if not Solution.setGlobalReadVectorWidth(state, "MXSB", tva, state["GlobalReadVectorWidthMXSB"]):
+          if not Solution.setGlobalReadVectorWidth(state, "MXSB", tva, state["GlobalReadVectorWidthMXSB"], printRejectionReason):
             validDepthU = False
 
           GlobalReadVectorWidthMXSB = state["GlobalReadVectorWidthMXSB"]
@@ -2402,7 +2409,7 @@ class Solution(collections.abc.Mapping):
                   validDepthU = False
 
         if validDepthU and state["KernelLanguage"] == "Assembly":
-          if globalParameters["ArchCaps"][globalParameters["CurrentISA"]]["HasEccHalf"]:
+          if isaInfoMap[isa].archCaps["HasEccHalf"]:
             if state["ProblemType"]["MacDataTypeA"].numRegisters() == 0.5 and (not state["ProblemType"]["HighPrecisionAccumulate"]):
                 if state["GlobalReadVectorWidthA"] == 1 or state["GlobalReadVectorWidthB"] == 1:
                   reject(state, "HalfEcc requires HPA if glvw = 1")
@@ -2609,7 +2616,7 @@ class Solution(collections.abc.Mapping):
 
     if state["ProblemType"]["MXBlockA"]:
       if not Solution.setGlobalLoadTileDimClassic(state, "MXSA", state["NumLoadsMXSA"], \
-          totalVectorsCoalescedMXSA, totalElementsPerpMXSA, state["_DepthUMXSA"]):
+          totalVectorsCoalescedMXSA, totalElementsPerpMXSA, state["_DepthUMXSA"], printRejectionReason):
         return
 
     if not Solution.setGlobalLoadTileDimClassic(state, "B", state["NumLoadsB"], \
@@ -2618,7 +2625,7 @@ class Solution(collections.abc.Mapping):
 
     if state["ProblemType"]["MXBlockB"]:
       if not Solution.setGlobalLoadTileDimClassic(state, "MXSB", state["NumLoadsMXSB"], \
-          totalVectorsCoalescedMXSB, totalElementsPerpMXSB, state["_DepthUMXSB"]):
+          totalVectorsCoalescedMXSB, totalElementsPerpMXSB, state["_DepthUMXSB"], printRejectionReason):
         return
 
     if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:

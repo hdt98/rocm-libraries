@@ -206,6 +206,12 @@ class LraTileAssignmentMFMA(LraTileAssignment):
            abmatrixinfo = writer.states.a
         elif tc == 'B':
            abmatrixinfo = writer.states.b
+        if tc == 'MXSA':
+           abmatrixinfo = writer.states.mxsa
+        elif tc == 'MXSB':
+           abmatrixinfo = writer.states.mxsb
+        else:
+           raise Exception(f"unsupport tc %s{tc}")
         perpStride = abmatrixinfo.gNLCPerpStride
         permBlock  = abmatrixinfo.gNLCPermBlock
 
