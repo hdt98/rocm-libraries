@@ -903,7 +903,7 @@ namespace rocRoller
                                         "Should be unset",
                                         ShowValue(instr.getModelledAddresses().value()));
                             instr.setModelledAddresses(normalizedAddresses);
-                            instr.addComment(fmt::format("addresses {}", addresses));
+                            instr.addComment(fmt::format("addresses {}", normalizedAddresses));
                         }
                         else
                         {
