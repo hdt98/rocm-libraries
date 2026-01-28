@@ -209,10 +209,10 @@ const int SYEVDX_MIN_DC_SIZE = 16;
 *******************************************************************************/
 
 #ifndef GETF2_SPKER_MAX_M
-const int GETF2_SPKER_MAX_M = 1024;
+const int GETF2_SPKER_MAX_M = 1024; //always <= 1024
 #endif
 #ifndef GETF2_SPKER_MAX_N
-const int GETF2_SPKER_MAX_N = 256;
+const int GETF2_SPKER_MAX_N = 256; //always <= 256
 #endif
 #ifndef GETRF_NUM_INTERVALS_REAL
 const int GETRF_NUM_INTERVALS_REAL = 4;
@@ -243,7 +243,7 @@ const int GETRF_NPVT_BATCH_NUM_INTERVALS_COMPLEX = 5;
 *******************************************************************************/
 
 #ifndef GETRI_MAX_COLS
-const int GETRI_MAX_COLS = 64;
+const int GETRI_MAX_COLS = 64; //always <= wavefront size
 #endif
 #ifndef GETRI_TINY_SIZE
 const int GETRI_TINY_SIZE = 43;

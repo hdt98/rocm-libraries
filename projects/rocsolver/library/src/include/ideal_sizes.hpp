@@ -357,16 +357,16 @@ extern const int SYEVDX_MIN_DC_SIZE;
 /**************************** getf2/getfr *************************************
 *******************************************************************************/
 #ifndef GETF2_SPKER_MAX_M
-extern const int GETF2_SPKER_MAX_M;
+extern const int GETF2_SPKER_MAX_M; //always <= 1024
 #endif
 #ifndef GETF2_SPKER_MAX_N
-extern const int GETF2_SPKER_MAX_N;
+extern const int GETF2_SPKER_MAX_N; //always <= 256
 #endif
 #ifndef GETF2_SSKER_MAX_M
-#define GETF2_SSKER_MAX_M 512
+#define GETF2_SSKER_MAX_M 512 //always <= 512 and <= GETF2_SPKER_MAX_M
 #endif
 #ifndef GETF2_SSKER_MAX_N
-#define GETF2_SSKER_MAX_N 64
+#define GETF2_SSKER_MAX_N 64 //always <= wavefront and <= GETF2_SPKER_MAX_N
 #endif
 #ifndef GETF2_OPTIM_NGRP
 #define GETF2_OPTIM_NGRP \
@@ -479,7 +479,7 @@ extern const int GETRI_BATCH_NUM_INTERVALS;
 /***************************** trtri ******************************************
 *******************************************************************************/
 #ifndef TRTRI_MAX_COLS
-#define TRTRI_MAX_COLS 64
+#define TRTRI_MAX_COLS 64 //always <= wavefront size
 #endif
 #ifndef TRTRI_NUM_INTERVALS
 extern const int TRTRI_NUM_INTERVALS;
