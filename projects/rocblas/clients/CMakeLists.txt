@@ -66,29 +66,39 @@ endfunction()
 # Find AOCL via CMake package configuration (e.g., TheRock builds)
 # Sets BLAS_LIBRARY and BLIS_INCLUDE_DIR in parent scope if found
 function(find_aocl_cmake_package)
-  # Try uppercase package name first (canonical for AOCL::aocl target)
+  # Try uppercase package name (standard CMake convention for acronyms like BLAS::BLAS, LAPACK::LAPACK)
   find_package(AOCL CONFIG QUIET)
-  if(NOT TARGET AOCL::aocl)
-    # Fallback to lowercase for compatibility
-    find_package(aocl CONFIG QUIET)
+  if(NOT TARGET AOCL::AOCL)
+    # Fallback to lowercase target for compatibility with older configurations
+    if(TARGET AOCL::aocl)
+      set(_aocl_target AOCL::aocl)
+    else()
+      # Try lowercase package name as last resort
+      find_package(aocl CONFIG QUIET)
+      if(TARGET AOCL::aocl)
+        set(_aocl_target AOCL::aocl)
+      endif()
+    endif()
+  else()
+    set(_aocl_target AOCL::AOCL)
   endif()
   
-  if(TARGET AOCL::aocl)
+  if(_aocl_target)
     # Extract library location with config-aware fallback
-    get_target_property(library_path AOCL::aocl IMPORTED_LOCATION)
+    get_target_property(library_path ${_aocl_target} IMPORTED_LOCATION)
     if(NOT library_path)
       # Many CMake packages only set IMPORTED_LOCATION_<CONFIG>
-      get_target_property(library_path AOCL::aocl IMPORTED_LOCATION_RELEASE)
+      get_target_property(library_path ${_aocl_target} IMPORTED_LOCATION_RELEASE)
     endif()
     if(NOT library_path)
-      get_target_property(library_path AOCL::aocl IMPORTED_LOCATION_DEBUG)
+      get_target_property(library_path ${_aocl_target} IMPORTED_LOCATION_DEBUG)
     endif()
     
     if(library_path)
       set(BLAS_LIBRARY "${library_path}" PARENT_SCOPE)
       
       # Extract include directories (normalize if it's a list)
-      get_target_property(include_dirs AOCL::aocl INTERFACE_INCLUDE_DIRECTORIES)
+      get_target_property(include_dirs ${_aocl_target} INTERFACE_INCLUDE_DIRECTORIES)
       if(include_dirs)
         # Take first entry if INTERFACE_INCLUDE_DIRECTORIES returns a list
         list(GET include_dirs 0 first_include_dir)
