@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2024-2026 AMD ROCm(TM) Software
+ * Copyright 2024-2025 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -287,14 +287,15 @@ namespace rocRoller
                                 auto arg = m_context->kernel()->findArgument(argName);
 
                                 msg += fmt::format(
-                                    "\n\t- {}: {}\n", argName, toString(arg.getExpression()));
+                                    "\n\t- {}: {}\n", argName, toString(arg.expression));
                             }
 
-                            Throw<FatalError>(msg,
-                                              ShowValue(expectedArgs),
-                                              ShowValue(extraArgs),
-                                              ShowValue(m_context->kernel()->arguments()),
-                                              ShowValue(operation));
+                            AssertFatal(false,
+                                        msg,
+                                        ShowValue(expectedArgs),
+                                        ShowValue(extraArgs),
+                                        ShowValue(m_context->kernel()->arguments()),
+                                        ShowValue(operation));
                         }
 
                         if(!extraArgs.empty())
@@ -722,14 +723,8 @@ namespace rocRoller
                 for(auto const& c : m_graph->mapper.getConnections(tag))
                 {
                     auto srcTag = c.coordinate;
-                    // Barriers that are connected to coordinates without allocated
-                    // register values are legal but do not require waits as they
-                    // are used to sync threads across loop iterations.
-                    if(m_context->registerTagManager()->hasRegister(srcTag))
-                    {
-                        auto reg = m_context->registerTagManager()->getRegister(srcTag);
-                        srcs.push_back(std::move(reg));
-                    }
+                    auto reg    = m_context->registerTagManager()->getRegister(srcTag);
+                    srcs.push_back(std::move(reg));
                 }
 
                 co_yield m_context->mem()->barrier(srcs);
@@ -762,132 +757,12 @@ namespace rocRoller
 
             Generator<Instruction> operator()(int tag, LoadLDSTile const& load)
             {
-                // TODO: should this be done on a copy of the graph?
-                const auto addresses = [&]() -> Generator<size_t> {
-                    namespace CT = rocRoller::KernelGraph::CoordinateGraph;
-
-                    auto [ldsTag, lds]   = m_graph->getDimension<LDS>(tag);
-                    auto [tileTag, tile] = m_graph->getDimension<MacroTile>(tag);
-
-                    auto maybeParentLDS = only(
-                        m_graph->coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<Duplicate>));
-                    if(maybeParentLDS)
-                        ldsTag = *maybeParentLDS;
-
-                    if(tile.memoryType == MemoryType::WAVE)
-                    {
-                        auto [waveTileTag, waveTile] = m_graph->getDimension<WaveTile>(tag);
-                        auto [vgprTag, vgpr]         = m_graph->getDimension<VGPR>(tag);
-
-                        auto dataTypeInfo = DataTypeInfo::Get(load.varType);
-                        auto numBits
-                            = static_cast<uint>(dataTypeInfo.elementBits / dataTypeInfo.packing);
-                        auto numElements = getUnsignedInt(evaluate(vgpr.size));
-                        auto numBytes    = (numBits * numElements) / 8u;
-
-                        // TODO: most of this can be cached
-                        KernelArguments              m_arguments;
-                        std::array<uint, 3>          m_workgroupOffset, m_workitemOffset;
-                        std::array<ExpressionPtr, 3> m_kernelWorkgroupIndexes,
-                            m_kernelWorkitemIndexes;
-
-                        for(int i = 0; i < 3; ++i)
-                        {
-                            m_workgroupOffset[i] = m_arguments.size();
-                            auto wg_name         = concatenate("WG", i);
-                            auto wg_carg         = CommandArgument(nullptr,
-                                                           DataType::UInt32,
-                                                           m_workgroupOffset[i],
-                                                           DataDirection::ReadOnly,
-                                                           wg_name);
-                            auto wg              = std::make_shared<CommandArgument>(wg_carg);
-                            m_arguments.appendUnbound<uint>(wg_name);
-
-                            m_workitemOffset[i] = m_arguments.size();
-                            auto wi_name        = concatenate("WI", i);
-                            auto wi_carg        = CommandArgument(nullptr,
-                                                           DataType::UInt32,
-                                                           m_workitemOffset[i],
-                                                           DataDirection::ReadOnly,
-                                                           wi_name);
-                            auto wi             = std::make_shared<CommandArgument>(wi_carg);
-                            m_arguments.appendUnbound<uint>(wi_name);
-
-                            m_kernelWorkgroupIndexes[i]
-                                = std::make_shared<Expression::Expression>(wg);
-                            m_kernelWorkitemIndexes[i]
-                                = std::make_shared<Expression::Expression>(wi);
-                        }
-
-                        auto rawArguments = m_arguments.dataVector();
-                        auto runtimeArguments
-                            = RuntimeArguments(rawArguments.data(), rawArguments.size());
-
-                        auto setWorkgroup = [&](uint i, uint v) {
-                            *((uint*)(rawArguments.data() + m_workgroupOffset[i])) = v;
-                        };
-                        auto setWorkitem = [&](uint i, uint v) {
-                            *((uint*)(rawArguments.data() + m_workitemOffset[i])) = v;
-                        };
-
-                        auto coords = m_graph->buildTransformer(tag);
-                        coords.setCoordinate(vgprTag, Expression::literal(0));
-                        coords.fillExecutionCoordinates(
-                            m_context, m_kernelWorkgroupIndexes, m_kernelWorkitemIndexes);
-                        auto index = coords.reverse({ldsTag})[0];
-
-                        Log::info("LoadLDSTile: tag {}, numBits {}, numElements {}, numBytes {}",
-                                  tag,
-                                  numBits,
-                                  numElements,
-                                  numBytes);
-
-                        const auto byteIndex = index * Expression::literal(numBytes)
-                                               / Expression::literal(numElements);
-
-                        Log::info("Offset expression: {}", toString(byteIndex));
-
-                        for(uint wg = 0; wg < 1; ++wg)
-                        {
-                            setWorkgroup(0, wg);
-                            for(uint wi = 0; wi < 64; ++wi)
-                            {
-                                setWorkitem(0, wi);
-
-                                const auto offsetValue
-                                    = Expression::evaluate(byteIndex, runtimeArguments);
-
-                                const auto offset = std::visit(
-                                    [](auto&& x) {
-                                        using T = std::decay_t<decltype(x)>;
-                                        if constexpr(std::is_same_v<T, rocRoller::Buffer>)
-                                        {
-                                            Throw<FatalError>("Cannot extract LDS address from "
-                                                              "rocRoller::Buffer");
-                                            return size_t{0};
-                                        }
-                                        else
-                                        {
-                                            return (size_t)x;
-                                        }
-                                    },
-                                    offsetValue);
-
-                                co_yield offset;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Log::info("Skipping LDS address annotations due to",
-                                  ShowValue(tile.memoryType));
-                    }
-                }()
-                                                    .to<std::vector>();
+                const auto addresses
+                    = getLDSAddresses(tag, *m_graph, m_context, load).to<std::vector>();
 
                 std::stringstream ss;
                 streamJoin(ss, addresses, ", ");
-                Log::info("LDS addresses: {}", ss.str());
+                Log::debug("LDS addresses: {}", ss.str());
 
                 for(auto instr : m_loadStoreTileGenerator.genLoadLDSTile(
                         tag, load, m_graph->buildTransformer(tag)))
