@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "custom_kernels_fwd.hpp"
 #include "parameter_selection.hpp"
 
 #include <rocRoller/CommandSolution.hpp>
@@ -65,6 +66,8 @@ struct GemmKernel
     rocRoller::Operations::OperationTag tagWGM;
 
     int occupancy;
+
+    CustomKernelPtr customKernel = 0;
 };
 
 /**
