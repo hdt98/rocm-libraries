@@ -231,6 +231,6 @@ rocblas_status larf_run_small(rocblas_handle handle,
         rocblas_handle handle, const rocblas_side side, const I m, const I n, U x,             \
         const rocblas_stride shiftX, const I incX, const rocblas_stride strideX, const T* tau, \
         const rocblas_stride strideP, U A, const rocblas_stride shiftA, const I lda,           \
-        const rocblas_stride strideA, const I batch_count);
+        const rocblas_stride strideA, const I batch_count)
 
 ROCSOLVER_END_NAMESPACE
