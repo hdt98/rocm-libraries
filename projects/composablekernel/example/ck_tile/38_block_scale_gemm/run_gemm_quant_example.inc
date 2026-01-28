@@ -33,19 +33,12 @@ template <typename GemmConfig,
 float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::stream_config& s)
 {
     static_assert(std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor>);
-<<<<<<< HEAD
+    constexpr bool transpose_c = QuantMode == ck_tile::QuantType::ABQuantGrouped;
     using AComputeDataType = std::conditional_t<QuantMode == ck_tile::QuantType::AQuantGrouped ||
                                                     QuantMode == ck_tile::QuantType::RowColQuant,
                                                 typename TypeConfig::BDataType,
                                                 typename TypeConfig::ADataType>;
     using BComputeDataType = AComputeDataType; // TODO : need to double check
-=======
-    constexpr bool transpose_c = QuantMode == ck_tile::QuantType::ABQuantGrouped;
-    using ComputeDataType = std::conditional_t<QuantMode == ck_tile::QuantType::AQuantGrouped ||
-                                                   QuantMode == ck_tile::QuantType::RowColQuant,
-                                               typename TypeConfig::BDataType,
-                                               typename TypeConfig::ADataType>;
->>>>>>> develop
 
     using GemmShape = ck_tile::TileGemmShape<
         ck_tile::sequence<GemmConfig::M_Tile, GemmConfig::N_Tile, GemmConfig::K_Tile>,

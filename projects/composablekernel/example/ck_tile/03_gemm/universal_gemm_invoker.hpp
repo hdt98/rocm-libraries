@@ -221,7 +221,8 @@ struct UniversalInvoker
               typename BLayout,
               typename DsLayout,
               typename ELayout,
-              typename CDEElementWise>
+              typename CDEElementWise,
+              typename ComputeDataType = void>
     static void test_async_input_scheduler(const ck_tile::GemmHostArgs& args,
                                            const ck_tile::stream_config& s)
     {
@@ -253,13 +254,26 @@ struct UniversalInvoker
                                              GemmConfig::Preshuffle>;
 
         constexpr auto scheduler = GemmConfig::Scheduler;
+        using AComputeDataType   = std::conditional_t<
+              std::is_same_v<ComputeDataType, void>,
+              std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>,
+              ComputeDataType>;
+        using BComputeDataType = std::conditional_t<
+            std::is_same_v<ComputeDataType, void>,
+            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>,
+            ComputeDataType>;
 
-        using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                           BDataType,
-                                                                           AccDataType,
-                                                                           GemmShape,
-                                                                           GemmUniversalTraits,
-                                                                           scheduler>;
+        using UniversalGemmProblem =
+            ck_tile::UniversalGemmPipelineProblem<ADataType,
+                                                  BDataType,
+                                                  AccDataType,
+                                                  GemmShape,
+                                                  GemmUniversalTraits,
+                                                  scheduler,
+                                                  ck_tile::element_wise::PassThrough,
+                                                  ck_tile::element_wise::PassThrough,
+                                                  AComputeDataType,
+                                                  BComputeDataType>;
 
         using GemmPipeline = typename PipelineTypeTraits<
             GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
@@ -286,7 +300,9 @@ struct UniversalInvoker
                                              1,     /*VectorSizeC_*/
                                              false, /*TiledMMAPermuteN_*/
                                              1,     /*BlockedXDLN_PerWarp_*/
-                                             GemmConfig::DoubleSmemBuffer>>;
+                                             GemmConfig::DoubleSmemBuffer,
+                                             AComputeDataType,
+                                             BComputeDataType>>;
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 

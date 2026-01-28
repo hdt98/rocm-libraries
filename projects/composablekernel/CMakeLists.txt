@@ -749,10 +749,6 @@ if (NOT MIOPEN_REQ_LIBS_ONLY)
     add_subdirectory(profiler)
 endif()
 
-if (CK_EXPERIMENTAL_BUILDER)
-  add_subdirectory(experimental/builder)
-endif()
-
 if (CK_EXPERIMENTAL_GEMM_BENCHMARK)
   add_subdirectory(experimental/gemm_benchmark)
 endif()
