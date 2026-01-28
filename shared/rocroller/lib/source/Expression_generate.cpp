@@ -1212,7 +1212,45 @@ namespace rocRoller
 
             std::set<int> completedNodes;
 
-            auto generateNode = [&](int idx) -> Generator<Instruction> {
+            auto comparePriorities = [&](int a, int b) {
+                auto const& nodeA = tree.at(a);
+                auto const& nodeB = tree.at(b);
+
+                return std::make_tuple(nodeA.distanceFromRoot, nodeA.deps.size(), -a)
+                       < std::make_tuple(nodeB.distanceFromRoot, nodeB.deps.size(), -b);
+            };
+
+            std::set<Register::Type> allCategories;
+            for(auto node : nodes)
+                allCategories.insert(tree.at(node).regType());
+
+            std::map<Register::Type, std::set<int>> generating;
+
+            using PQ = std::priority_queue<int, std::vector<int>, decltype(comparePriorities)>;
+            std::map<Register::Type, PQ> ready;
+
+            for(auto category : allCategories)
+                ready.emplace(category, PQ{comparePriorities});
+
+            auto fillReady = [&]() {
+                for(auto iter = nodes.begin(); iter != nodes.end();)
+                {
+                    auto idx = *iter;
+
+                    if(std::ranges::includes(completedNodes, tree.at(idx).deps))
+                    {
+                        ready.at(tree.at(idx).regType()).push(idx);
+                        iter = nodes.erase(iter);
+                    }
+                    else
+                    {
+                        ++iter;
+                    }
+                }
+            };
+
+            auto generate = [&](int idx) -> Generator<Instruction> {
+                auto category = tree.at(idx).regType();
                 auto& node = tree.at(idx);
 
                 if(node.reg == nullptr || node.reg->regType() != Register::Type::Literal)
@@ -1223,36 +1261,82 @@ namespace rocRoller
                 // Don't clear the last register as that is the destination for the expression.
                 if(idx + 1 != tree.size())
                     node.reg = nullptr;
+
+                completedNodes.insert(idx);
+                generating[category].erase(idx);
             };
 
-            auto nodeIsReady = [&](int idx) -> bool {
-                return std::ranges::includes(completedNodes, tree.at(idx).deps);
+            auto anyRemainingNodes = [&]() -> bool {
+                if(!nodes.empty())
+                    return true;
+
+                for(auto const& [category, readyQueue] : ready)
+                {
+                    if(!readyQueue.empty())
+                        return true;
+                }
+
+                for(auto const& [category, generatingSet] : generating)
+                {
+                    AssertFatal(generatingSet.empty());
+                }
+
+                return false;
             };
 
-            auto nodeCategory = [&](int idx) -> Register::Type { return tree.at(idx).regType(); };
+            while(anyRemainingNodes())
+            {
+                std::vector<Generator<Instruction>> schedulable;
 
-            auto categoryLimit = [&options](Register::Type category) -> size_t {
-                if(category == Register::Type::Literal)
-                    return std::numeric_limits<int>::max();
-                return options->maxConcurrentSubExpressions;
-            };
+                auto fillSchedulable = [&]() {
+                    for(auto& [category, readyQueue] : ready)
+                    {
+                        size_t limit = 0;
+                        if(category == Register::Type::Literal)
+                            limit = std::numeric_limits<int>::max();
+                        else
+                            limit = options->maxConcurrentSubExpressions;
+                        AssertFatal(limit > 0);
 
-            auto comparePriorities = [&](int a, int b) {
-                auto const& nodeA = tree.at(a);
-                auto const& nodeB = tree.at(b);
+                        while(!readyQueue.empty() && generating[category].size() < limit)
+                        {
+                            auto idx = readyQueue.top();
+                            readyQueue.pop();
 
-                return std::make_tuple(nodeA.distanceFromRoot, nodeA.deps.size(), -a)
-                       < std::make_tuple(nodeB.distanceFromRoot, nodeB.deps.size(), -b);
-            };
+                            generating[category].insert(idx);
 
-            co_yield generateNodes<int, Register::Type>(scheduler,
-                                                        nodes,
-                                                        completedNodes,
-                                                        generateNode,
-                                                        nodeIsReady,
-                                                        nodeCategory,
-                                                        categoryLimit,
-                                                        comparePriorities);
+                            schedulable.push_back(generate(idx));
+                        }
+                    }
+                };
+
+                fillReady();
+                fillSchedulable();
+
+                if(!scheduler->supportsAddingStreams())
+                {
+                    co_yield (*scheduler)(schedulable);
+                }
+                else
+                {
+                    auto generator    = (*scheduler)(schedulable);
+                    auto prevDoneSize = completedNodes.size();
+
+                    for(auto iter = generator.begin(); iter != generator.end(); ++iter)
+                    {
+                        co_yield *iter;
+
+                        if(prevDoneSize != completedNodes.size())
+                        {
+                            fillReady();
+
+                            prevDoneSize = completedNodes.size();
+                        }
+
+                        fillSchedulable();
+                    }
+                }
+            }
 
             AssertFatal(completedNodes.size() == tree.size(),
                         ShowValue(completedNodes.size()),
