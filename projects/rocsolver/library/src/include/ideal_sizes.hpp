@@ -75,6 +75,14 @@ extern const int LARFT_SWITCHSIZE;
 #ifndef GEQxF_BLOCKSIZE
 extern const int GEQxF_BLOCKSIZE;
 #endif
+
+/*! \brief Determines the size at which rocSOLVER switches from
+    the unblocked to the blocked algorithm when executing GEQRF or GEQLF. It also applies to the
+    corresponding batched and strided-batched routines.
+
+    \details GEQRF or GEQLF will factorize blocks of GEQxF_BLOCKSIZE columns at a time until
+    the rest of the matrix has no more than GEQxF_GEQx2_SWITCHSIZE rows or columns; at this point the last block,
+    if any, will be factorized with the unblocked algorithm (GEQR2 or GEQL2).*/
 #ifndef GEQxF_GEQx2_SWITCHSIZE
 extern const int GEQxF_GEQx2_SWITCHSIZE;
 #endif
@@ -87,6 +95,14 @@ extern const int GEQxF_GEQx2_SWITCHSIZE;
 #ifndef GExQF_BLOCKSIZE
 extern const int GExQF_BLOCKSIZE;
 #endif
+
+/*! \brief Determines the size at which rocSOLVER switches from
+    the unblocked to the blocked algorithm when executing GERQF or GELQF. It also applies to the
+    corresponding batched and strided-batched routines.
+
+    \details GERQF or GELQF will factorize blocks of GExQF_BLOCKSIZE rows at a time until
+    the rest of the matrix has no more than GExQF_GExQ2_SWITCHSIZE rows or columns; at this point the last block,
+    if any, will be factorized with the unblocked algorithm (GERQ2 or GELQ2).*/
 #ifndef GExQF_GExQ2_SWITCHSIZE
 extern const int GExQF_GExQ2_SWITCHSIZE;
 #endif
@@ -98,6 +114,13 @@ extern const int GExQF_GExQ2_SWITCHSIZE;
 #ifndef xxGQx_BLOCKSIZE
 extern const int xxGQx_BLOCKSIZE;
 #endif
+
+/*! \brief Determines the size at which rocSOLVER switches from
+    the unblocked to the blocked algorithm when executing ORGQR/UNGQR or ORGQL/UNGQL.
+
+    \details ORGQR/UNGQR or ORGQL/UNGQL will accumulate xxGQx_BLOCKSIZE reflectors at a time until
+    there are no more than xxGQx_xxGQx2_SWITCHSIZE reflectors left; the remaining reflectors, if any,
+    are applied one by one using the unblocked algorithm (ORG2R/UNG2R or ORG2L/UNG2L).*/
 #ifndef xxGQx_xxGQx2_SWITCHSIZE
 extern const int xxGQx_xxGQx2_SWITCHSIZE;
 #endif
@@ -109,6 +132,13 @@ extern const int xxGQx_xxGQx2_SWITCHSIZE;
 #ifndef xxGxQ_BLOCKSIZE
 extern const int xxGxQ_BLOCKSIZE;
 #endif
+
+/*! \brief Determines the size at which rocSOLVER switches from
+    the unblocked to the blocked algorithm when executing ORGRQ/UNGRQ or ORGLQ/UNGLQ.
+
+    \details ORGRQ/UNGRQ or ORGLQ/UNGLQ will accumulate xxGxQ_BLOCKSIZE reflectors at a time until
+    there are no more than xxGxQ_xxGxQ2_SWITCHSIZE reflectors left; the remaining reflectors, if any,
+    are applied one by one using the unblocked algorithm (ORGR2/UNGR2 or ORGL2/UNGL2).*/
 #ifndef xxGxQ_xxGxQ2_SWITCHSIZE
 extern const int xxGxQ_xxGxQ2_SWITCHSIZE;
 #endif
@@ -145,6 +175,14 @@ extern const int xxMxQ_BLOCKSIZE;
 #ifndef GEBRD_BLOCKSIZE
 extern const int GEBRD_BLOCKSIZE;
 #endif
+
+/*! \brief Determines the size at which rocSOLVER switches from
+    the unblocked to the blocked algorithm when executing GEBRD. It also applies to the
+    corresponding batched and strided-batched routines.
+
+    \details GEBRD will use LABRD to reduce blocks of GEBRD_BLOCKSIZE rows and columns at a time until
+    the trailing submatrix has no more than GEBRD_GEBD2_SWITCHSIZE rows or columns; at this point the last block,
+    if any, will be reduced with the unblocked algorithm (GEBD2).*/
 #ifndef GEBRD_GEBD2_SWITCHSIZE
 extern const int GEBRD_GEBD2_SWITCHSIZE;
 #endif
@@ -161,6 +199,12 @@ extern const int GEBRD_GEBD2_SWITCHSIZE;
 #ifndef BDSQR_SWITCH_SIZE
 extern const int BDSQR_SWITCH_SIZE;
 #endif
+
+/*! \brief Determines the number of iterations that BDSQR will execute between device synchronizations
+    in the multi-kernel algorithm.
+
+    \details BDSQR will run an inner loop BDSQR_ITERS_PER_SYNC at a time, before synchronizing with the
+    device to check if the stopping criterion has been met. */
 #ifndef BDSQR_ITERS_PER_SYNC
 extern const int BDSQR_ITERS_PER_SYNC;
 #endif
@@ -186,6 +230,13 @@ extern const double THIN_SVD_SWITCH;
 extern const int xxTRD_BLOCKSIZE;
 #endif
 
+/*! \brief Determines the size at which rocSOLVER switches from
+    the unblocked to the blocked algorithm when executing SYTRD/HETRD. It also applies to the
+    corresponding batched and strided-batched routines.
+
+    \details SYTRD/HETRD will use LATRD to reduce blocks of xxTRD_BLOCKSIZE rows and columns at a time until
+    the rest of the matrix has no more than xxTRD_xxTD2_SWITCHSIZE rows or columns; at this point the last block,
+    if any, will be reduced with the unblocked algorithm (SYTD2/HETD2).*/
 #ifndef xxTRD_xxTD2_SWITCHSIZE
 extern const int xxTRD_xxTD2_SWITCHSIZE;
 #endif
