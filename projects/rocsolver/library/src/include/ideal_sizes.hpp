@@ -28,9 +28,9 @@
 #pragma once
 
 /*! \file
-    \brief ideal_sizes.hpp and ideal_sizes.cpp gathers all constants that can be tuned for performance.
-    We define variables that are used on the host, and not used as compile time constants as const int in ideal_sizes.cpp.
-    We define variables that are used on the device, or used as compile time constants as macros in ideal_sizes.hpp.
+    \brief ideal_sizes.hpp and ideal_sizes.cpp gather all constants that can be tuned for performance.
+    We define variables that are used on the host, and not used as compile time constants, as const int in ideal_sizes.cpp.
+    We define variables that are used on the device, or used as compile time constants, as macros in ideal_sizes.hpp.
  *********************************************************************************/
 
 #define BS1 256 // generic 1 dimensional thread-block size used to call common kernels
