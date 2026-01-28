@@ -29608,7 +29608,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zhegvdx_strided_batched(rocblas_handle
     algo        rocsolver_cholqr_algo. Specifies which Cholesky QR algorithm to use.
 
     @param[out]
-    info        pointer to rocblas_int. Array of batch_count=1 integer on the GPU.
+    info        pointer to rocblas_int on the GPU. 
                 If info = 0, successful exit.
                 If info = i > 0, the Cholesky factorization failed.
     ********************************************************************/
