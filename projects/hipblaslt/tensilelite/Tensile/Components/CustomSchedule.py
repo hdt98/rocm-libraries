@@ -57,23 +57,7 @@ class SyncSchedule:
     schedule: list[tuple[int, Union[SWaitCnt, SBarrier]]] = field(default_factory=list)
 
     def add(self, idx: int, dscnt: int = -1, vlcnt: int = -1, vscnt: int = -1, comment: str = "", barrier: bool = False, barrier_idx: Optional[int] = None, barrier_comment: str = ""):
-        """ Add a SWaitCnt (and optionally a SBarrier) to the schedule at the given index.
-
-        Args:
-            idx:             The index at which to add the SWaitCnt.
-            dscnt:           The dscnt value for the SWaitCnt.
-            vlcnt:           The vlcnt value for the SWaitCnt.
-            vscnt:           The vscnt value for the SWaitCnt.
-            comment:         An optional comment for the SWaitCnt.
-            barrier:         If True, also add a SBarrier.
-            barrier_idx:     The index at which to add the SBarrier. If None, uses idx.
-            barrier_comment: An optional comment for the SBarrier.
-
-        Example:
-            wait.add(2, dscnt=3)                                   adds SWaitCnt at index 2 with dscnt=3
-            wait.add(5, dscnt=0, sbarrier=True)                    adds SWaitCnt at index 5 with dscnt=0 and a SBarrier at the same index
-            wait.add(5, dscnt=0, sbarrier=True, barrier_idx=6)     adds SWaitCnt at index 5 with dscnt=0 and a SBarrier at index 6
-        """
+        """Append an `SWaitCnt` (and optional `SBarrier`) at a schedule index."""
         self.schedule.append( (idx, SWaitCnt(dscnt=dscnt, vlcnt=vlcnt, vscnt=vscnt, comment=comment)) )
         if barrier:
             barrier_idx = barrier_idx if barrier_idx is not None else idx
@@ -513,33 +497,10 @@ class TileConfig:
     wave_separate_global_read_b: int
 
 class RegisterSchedule:
-    """
-    Decorator that registers a schedule function with its matching criteria.
-    The function is wrapped with logic that checks if the kernel matches the criteria.
-    
-    Usage:
-        @RegisterSchedule(
-            tile_config=TileConfig(256, 96, 64, 2, 1, True, 0, 0),
-            dtype_predicate=is16bit,
-            vector_widths=[8, 8, 8],
-            matrix_inst=[16, 16, 32, 1],
-            mfma_wave_group=[2, 2]
-        )
-        def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
-            ...
-    """
+    """Decorator for registering a custom mainloop schedule with match criteria."""
     
     def __init__(self, tile_config: TileConfig, dtype_predicate: Callable, vector_widths: list[int], matrix_inst: list[int], mfma_wave_group: list[int]):
-        """
-        Initialize the registration decorator with matching criteria.
-        
-        Args:
-            tile_config:        TileConfig object
-            dtype_predicate:    Callable that takes kernel and returns True if dtype matches
-            vector_widths:      List of [GRVWA, GRVWB, LRVW]
-            matrix_inst:        List [M, N, K, B] for MI
-            mfma_wave_group:    List [rows, cols] for MIWG
-        """
+        """Initialize the decorator with matching criteria."""
         self.tile_config = tile_config
         self.dtype_predicate = dtype_predicate
         self.vector_widths = vector_widths
@@ -1612,49 +1573,65 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
 
     # 224x128x64 NT schedule (A/B-swapped variant of 128x224 TN)
     if isNT(kernel) and useLDSTr and TLDS == 0:
+        # Global read scheduling:
+        # Each GR has two instructions (addr update + buffer_load), so we list them explicitly as
+        # two adjacent MFMA indices per GR.
+
+        syncTable = [
+            # Loop start:
+            # - LRB1 waits previous-iter GRB
+            # - LRA1 waits previous-iter GRA
+            -1, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 before starting main loop"),
+
+            # After early MFMAs (keep prior-iter LR fully fenced)
+            3,  SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 for the remaining main loop"),
+
+            # GRB must wait for LRB0 (interleave LRA0 + GRB safely)
+            15, SWaitCnt(dscnt=10, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete to start GRB"),
+            15, SBarrier(comment=""),
+
+            # GRA must wait for LRA0; LRB1 can be interleaved with GRA after this fence
+            27, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0/GRB to complete to start GRA/LRB1"),
+            27, SBarrier(comment=""),
+
+            # Mid-loop global-read safety fence (GR-to-LDS)
+            29, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Mid-loop fence (wait for outstanding GR-to-LDS)"),
+            29, SBarrier(comment=""),
+
+            # Ensure all GR-to-LDS are complete before LRA1 (next-iter A LDS reads)
+            40, SWaitCnt(dscnt=-1, vlcnt=11-3, vscnt=-1, comment="Wait for all GR-to-LDS to complete before LRA1"),
+            40, SBarrier(comment=""),
+        ]
+
         optSchedule = {
-            'SYNC'   : [[-1, 3, 10, 10, 26, 27, 45, 45]],
+            'SYNC'   : [syncTable[::2]],
             # Swap A/B increments
-            'GRIncA' : [[22, 22, 24, 24, 25, 25, 26, 27, 27]],
             'GRIncB' : [[0, 1, 2, 3, 4, 5, 6, 7, 8]],
+            'GRIncA' : [[9, 10, 11, 26, 26, 27, 28, 29, 29]],
 
-            # Swap current-iteration local reads: LRA0 <-> LRB0
-            'LRA0'   : [[8, 11, 13, 15, 17, 19, 21],
-                        [9, 12, 14, 16, 18, 20, 22]],
-            'LRB0'   : [[0, 2, 3, 4]],
+            'LRB0'   : [[0, 1, 2, 3, 4, 5, 6, 7],
+                        [1, 2, 3, 4, 5, 6, 7, 8]],
+            'LRA0'   : [[8, 8, 9, 9,   11, 11, 12, 12,  13, 13, 15, 15, 16, 16],
+                        [9, 9, 10, 10, 12, 12, 13, 13, 14, 14, 16, 16, 17, 17]],
+         
+            'GRB'    : [[15,15, 18,18, 21,21, 24,24],
+                        [16,16, 19,19, 22,22, 25,25]],
+            'GRA'    : [[29,29, 32,32, 35,35, 38,38, 41,41, 44,44, 47,47],
+                        [30,30, 33,33, 36,36, 39,39, 42,42, 45,45, 48,48]],
 
-            # Swap global reads: GRA <-> GRB
-            'GRA'    : [[28, 28, 31, 31, 34, 34, 37, 37, 40, 40, 43, 43, 46, 46],
-                        [29, 29, 32, 32, 35, 35, 38, 38, 41, 41, 44, 44, 47, 47]],
-            'GRB'    : [[10, 11, 14, 14, 17, 17, 20, 20],
-                        [11, 12, 15, 15, 18, 18, 21, 21]],
+            'LRB1'   : [[29, 30, 31, 32, 33, 34, 35, 36],
+                        [30, 31, 32, 33, 34, 35, 36, 37]],
+            'LRA1'   : [[40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53],
+                        [41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54]],
 
-            # Swap next-iteration local reads: LRA1 <-> LRB1
-            'LRA1'   : [[45, 46, 47, 48, 49, 50, 51]],
-            'LRB1'   : [[29, 32, 35, 38],
-                        [30, 33, 36, 39]],
-
-            # Swap local write/read sync points for A/B (values are equal in the source schedule).
-            'LRSA'   : [[23]],
+            'LRSA'   : [[22]],
             'LRSB'   : [[23]],
-            'LWSA'   : [[54]],
-            'LWSB'   : [[54]],
-
+            'LWSA'   : [[38]],
+            'LWSB'   : [[39]],
             'LCC'    : [[55, 55]],
         }
 
-        syncCode = [
-            # Must fully fence prior-iteration LDS reads before the new iteration begins (early MFMA uses).
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 before starting main loop"),
-            # Need to prove prior-iteration LRA1/LRB1 completion before next-iteration early MFMA use.
-            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 for the remaining main loop"),
-            SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete to start GRB"),
-            SBarrier(comment=""),
-            SWaitCnt(dscnt=0, vlcnt=11, vscnt=-1, comment="Wait for LRA0/GRB to complete to start GRA/LRB1"),
-            SBarrier(comment=""),
-            SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Wait for GRA to complete to start LRA1"),
-            SBarrier(comment=""),
-        ]
+        syncCode = syncTable[1::2]
         nglshift = nllshift = 11
         numMfma = 56
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
