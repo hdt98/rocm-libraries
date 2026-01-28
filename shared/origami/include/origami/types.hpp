@@ -325,54 +325,13 @@ struct runtime_options {
 };
 
 /**
- * @brief Full kernel configuration (tile shape + execution parameters).
+ * @brief Tensile/TensileLite-specific configuration parameters.
  *
- * Holds the geometric tile sizes along with occupancy,
- * work-group mapping (WGM), and cache-control hints.
+ * Contains parameters specific to TensileLite-generated GEMM kernels,
+ * used by the Formocast simulation model. These parameters are ignored
+ * by the estimation-based prediction model.
  */
-struct config_t {
-  /// Macro tile and matrix-instruction shape.
-  dim3_t mt{0, 0, 0};
-  dim3_t mi{0, 0, 0};
-
-  /// Main loop optimization flag (indicates use of any optimized kernel variant)
-  bool hand_optimized_main_loop = false;
-
-  /// Occupancy (number of wavefronts resident per CU).
-  int occupancy = -1;
-
-  /// Reorder workgroup id for L2 reuse.
-  int workgroup_mapping = 0;
-
-  /// Whether operand A is accessed with cache-flags.
-  int cache_hints_a = 0;
-
-  /// Whether operand B is accessed with cache-flags.
-  int cache_hints_b = 0;
-
-  /// Workspace size parameters.
-  std::size_t workspace_size            = 0;
-  std::size_t workspace_size_per_elem_c = 0;
-
-  /// Reduction strategy.
-  reduction_t reduction_strategy = reduction_t::none;
-
-  /// Prediction mode for latency estimation.
-  prediction_modes_t prediction_mode = prediction_modes_t::estimation;
-
-  /// Target backend for kernel execution.
-  target_t target = target_t::tensilelite;
-  /// Grid selection algorithm.
-  grid_selection_t grid_selection = grid_selection_t::k_split_aware;
-
-  /// CMS kernel flag
-  bool cms_kernel = false;
-
-  // ============================================================
-  // Formocast-specific parameters (used when prediction_mode == simulation)
-  // These are ignored by the estimation-based prediction model.
-  // ============================================================
-
+struct tensile_params_t {
   /// Depth unroll factor (0 = use mt.k)
   std::size_t depth_u = 0;
 
@@ -432,6 +391,57 @@ struct config_t {
   int workgroup_mapping_xcc_group = 0;
   bool global_split_u_coalesced = false;
   bool global_split_u_wgm_round_robin = false;
+
+  constexpr bool operator==(const tensile_params_t& o) const noexcept = default;
+};
+
+/**
+ * @brief Full kernel configuration (tile shape + execution parameters).
+ *
+ * Holds the geometric tile sizes along with occupancy,
+ * work-group mapping (WGM), and cache-control hints.
+ */
+struct config_t {
+  /// Macro tile and matrix-instruction shape.
+  dim3_t mt{0, 0, 0};
+  dim3_t mi{0, 0, 0};
+
+  /// Custom mainloop scheduling flag
+  bool custom_mainloop_scheduling = false;
+
+  /// Occupancy (number of wavefronts resident per CU).
+  int occupancy = -1;
+
+  /// Reorder workgroup id for L2 reuse.
+  int workgroup_mapping = 0;
+
+  /// Whether operand A is accessed with cache-flags.
+  int cache_hints_a = 0;
+
+  /// Whether operand B is accessed with cache-flags.
+  int cache_hints_b = 0;
+
+  /// Workspace size parameters.
+  std::size_t workspace_size            = 0;
+  std::size_t workspace_size_per_elem_c = 0;
+
+  /// Reduction strategy.
+  reduction_t reduction_strategy = reduction_t::none;
+
+  /// Prediction mode for latency estimation.
+  prediction_modes_t prediction_mode = prediction_modes_t::estimation;
+
+  /// Target backend for kernel execution.
+  target_t target = target_t::tensilelite;
+  /// Grid selection algorithm.
+  grid_selection_t grid_selection = grid_selection_t::k_split_aware;
+
+  /// CMS kernel flag
+  bool cms_kernel = false;
+
+  /// Tensile/TensileLite-specific parameters (used when prediction_mode == simulation)
+  /// These are ignored by the estimation-based prediction model.
+  tensile_params_t tensile{};
 
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && mi == o.mi && hand_optimized_main_loop == o.hand_optimized_main_loop &&

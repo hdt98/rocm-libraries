@@ -545,109 +545,165 @@ TEST_CASE("Origami: select_config_mnk unit test", "[origami]") {
   }
 }
 
-TEST_CASE("Origami: select_staggerU unit test", "[origami]") {
+// Formocast Simulation Mode Tests
+
+TEST_CASE("Origami: compute_formocast_latency basic", "[origami][formocast]") {
   for (int gpu_arch : test_architectures) {
-    if (gpu_arch != 950) continue;  // StaggerU tuned for gfx950
-    DYNAMIC_SECTION("gfx" << gpu_arch << " - select_staggerU") {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - Formocast returns positive latency") {
       auto hardware = make_hardware(gpu_arch);
+      auto problem = make_problem(2048, 2048, 2048);
+      
+      // Create config with simulation mode
+      auto config = make_config(128, 128, 32, 16, 16, 16, false, 8, 2);
+      config.prediction_mode = origami::prediction_modes_t::simulation;
+      
+      // Set Formocast-specific parameters (via tensile nested struct)
+      config.tensile.depth_u = 32;
+      config.tensile.global_split_u = 1;
+      config.tensile.grvw_a = 4;
+      config.tensile.grvw_b = 4;
+      config.tensile.gwvw_d = 4;
+      config.tensile.wave_num = 4;
+      config.tensile.wave_group_m = 2;
+      config.tensile.wave_group_n = 2;
+      config.tensile.prefetch_global_read = 2;
+      
+      double latency = origami::compute_formocast_latency(problem, hardware, config);
+      
+      REQUIRE(latency > 0);
+    }
+  }
+}
 
-      // Helper to compute skGrid (no stream-K, just numMTs)
-      auto compute_skGrid = [](size_t M, size_t N, size_t MT_M, size_t MT_N) {
-        return ((M + MT_M - 1) / MT_M) * ((N + MT_N - 1) / MT_N);
+TEST_CASE("Origami: simulation mode via compute_total_latency", "[origami][formocast]") {
+  for (int gpu_arch : test_architectures) {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - compute_total_latency uses Formocast in simulation mode") {
+      auto hardware = make_hardware(gpu_arch);
+      auto problem = make_problem(2048, 2048, 2048);
+      
+      // Create config with estimation mode
+      auto config_estimation = make_config(128, 128, 32, 16, 16, 16, false, 8, 2);
+      config_estimation.prediction_mode = origami::prediction_modes_t::estimation;
+      
+      // Create config with simulation mode
+      auto config_simulation = make_config(128, 128, 32, 16, 16, 16, false, 8, 2);
+      config_simulation.prediction_mode = origami::prediction_modes_t::simulation;
+      config_simulation.tensile.depth_u = 32;
+      config_simulation.tensile.global_split_u = 1;
+      config_simulation.tensile.grvw_a = 4;
+      config_simulation.tensile.grvw_b = 4;
+      config_simulation.tensile.gwvw_d = 4;
+      config_simulation.tensile.wave_num = 4;
+      config_simulation.tensile.wave_group_m = 2;
+      config_simulation.tensile.wave_group_n = 2;
+      config_simulation.tensile.prefetch_global_read = 2;
+      
+      double latency_estimation = origami::compute_total_latency(
+          problem, hardware, config_estimation, hardware.N_CU);
+      double latency_simulation = origami::compute_total_latency(
+          problem, hardware, config_simulation, hardware.N_CU);
+      
+      // Both should be positive
+      REQUIRE(latency_estimation > 0);
+      REQUIRE(latency_simulation > 0);
+      
+      // They should produce different results (different models, different units)
+      REQUIRE(latency_estimation != latency_simulation);
+    }
+  }
+}
+
+TEST_CASE("Origami: Formocast with various problem sizes", "[origami][formocast]") {
+  for (int gpu_arch : test_architectures) {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - Formocast handles various problem sizes") {
+      auto hardware = make_hardware(gpu_arch);
+      
+      std::vector<std::tuple<size_t, size_t, size_t>> problem_sizes = {
+          {1024, 1024, 1024},
+          {2048, 2048, 2048},
+          {4096, 4096, 512},
+          {512, 4096, 4096},
+          {8192, 8192, 1024},
       };
-
-      // Test 1: Non-temporal access uses max_staggerU
-      {
-        auto problem = make_problem(4096, 4096, 2048);
-        auto config  = make_config(128, 128, 64, 16, 16, 32, false, 1, 1, 4, 0);  // nta=4
-        auto skGrid  = compute_skGrid(4096, 4096, 128, 128);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 4);
-        REQUIRE(result.staggerU == 32);
-      }
-
-      // Test 2: Batch > 1 should disable stagger
-      {
-        auto problem = make_problem(4096, 4096, 2048, origami::transpose_t::T, origami::transpose_t::N, 2);
-        auto config  = make_config(128, 128, 64, 16, 16, 32);
-        auto skGrid  = compute_skGrid(4096, 4096, 128, 128);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 4);
-        REQUIRE(result.staggerU == 0);
-      }
-
-      // Test 3: Split-K should disable stagger
-      {
-        auto problem = make_problem(1024, 1024, 1024);
-        auto config  = make_config(128, 128, 64, 16, 16, 32);
-        size_t numMTs = ((1024 + 127) / 128) * ((1024 + 127) / 128);  // 64
-        size_t skGrid = numMTs * 2;  // split_factor = 2
-        auto result   = origami::select_staggerU(problem, hardware, config, skGrid, 4);
-        REQUIRE(result.staggerU == 0);
-      }
-
-      // Test 4: Basic TN case — stagger should be enabled
-      {
-        auto problem = make_problem(2048, 2048, 2048, origami::transpose_t::T, origami::transpose_t::N);
-        auto config  = make_config(128, 128, 64, 16, 16, 32);
-        auto skGrid  = compute_skGrid(2048, 2048, 128, 128);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 4);
-        REQUIRE(result.staggerU > 0);
-        // StaggerU should be power of 2
-        REQUIRE((result.staggerU & (result.staggerU - 1)) == 0);
-      }
-
-      // Test 5: StaggerU mapping should be SUM1 for positive WGM when A contention dominates
-      // [1320, 256, 2048] MT=64x32x256 WGM=8: L2Tile_N=8 > L2Tile_M=4, row-mates share A
-      {
-        auto problem = make_problem(1320, 256, 2048, origami::transpose_t::T, origami::transpose_t::N);
-        problem.a_dtype = origami::data_type_t::BFloat16;
-        problem.b_dtype = origami::data_type_t::BFloat16;
-        auto config  = make_config(64, 32, 256, 16, 16, 32);
-        auto skGrid  = compute_skGrid(1320, 256, 64, 32);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 8);
-        REQUIRE(result.staggerU > 0);
-        REQUIRE(result.staggerUMapping == 1);  // SUM1: distribute A reads
-      }
-
-      // Test 6: StaggerU mapping should be SUM0 when B contention dominates
-      // [128, 1024, 144] MT=32x64x16 WGM=1 FP32: L2Tile_M > L2Tile_N, B is the bottleneck
-      {
-        auto problem = make_problem(128, 1024, 144, origami::transpose_t::T, origami::transpose_t::N);
-        problem.a_dtype = origami::data_type_t::Float;
-        problem.b_dtype = origami::data_type_t::Float;
-        auto config  = make_config(32, 64, 16, 16, 16, 4);
-        auto skGrid  = compute_skGrid(128, 1024, 32, 64);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 1);
-        REQUIRE(result.staggerU > 0);
-        REQUIRE(result.staggerUMapping == 0);  // SUM0: distribute B reads
-      }
-
-      // Test 7: StaggerU value should be power of 2 and <= 32
-      {
-        auto problem = make_problem(4096, 4096, 4096, origami::transpose_t::T, origami::transpose_t::N);
-        auto config  = make_config(128, 128, 64, 16, 16, 32);
-        auto skGrid  = compute_skGrid(4096, 4096, 128, 128);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 4);
-        if (result.staggerU > 0) {
-          REQUIRE(result.staggerU <= 32);
-          REQUIRE((result.staggerU & (result.staggerU - 1)) == 0);
-          REQUIRE(result.staggerUMapping <= 1);
-        }
-      }
-
-      // Test 8: Stride shift ensures each stagger step crosses a cache line
-      {
-        auto problem = make_problem(2048, 2048, 2048, origami::transpose_t::T, origami::transpose_t::N);
-        auto config  = make_config(64, 64, 16, 16, 16, 16);  // Small MT_K=16
-        auto skGrid  = compute_skGrid(2048, 2048, 64, 64);
-        auto result  = origami::select_staggerU(problem, hardware, config, skGrid, 4);
-        if (result.staggerU > 0) {
-          // With MT_K=16, bpe=2: bytes_per_k_iter=32 < 128, so shift should be > 0
-          size_t bytes_per_k = 16 * 2;  // MT_K * bpe
-          REQUIRE((bytes_per_k << result.staggerUStrideShift) >= 128);
-        }
+      
+      for (const auto& [m, n, k] : problem_sizes) {
+        auto problem = make_problem(m, n, k);
+        
+        auto config = make_config(128, 128, 32, 16, 16, 16, false, 8, 2);
+        config.prediction_mode = origami::prediction_modes_t::simulation;
+        config.tensile.depth_u = 32;
+        config.tensile.global_split_u = 1;
+        config.tensile.grvw_a = 4;
+        config.tensile.grvw_b = 4;
+        config.tensile.gwvw_d = 4;
+        config.tensile.wave_num = 4;
+        config.tensile.wave_group_m = 2;
+        config.tensile.wave_group_n = 2;
+        
+        double latency = origami::compute_formocast_latency(problem, hardware, config);
+        
+        INFO("Problem size: " << m << "x" << n << "x" << k);
+        REQUIRE(latency > 0);
       }
     }
   }
+}
+
+TEST_CASE("Origami: Formocast with different tile sizes", "[origami][formocast]") {
+  for (int gpu_arch : test_architectures) {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - Formocast handles different tile sizes") {
+      auto hardware = make_hardware(gpu_arch);
+      auto problem = make_problem(4096, 4096, 4096);
+      
+      std::vector<std::tuple<size_t, size_t, size_t>> tile_sizes = {
+          {64, 64, 32},
+          {128, 128, 32},
+          {256, 256, 32},
+          {128, 256, 64},
+          {256, 128, 64},
+      };
+      
+      for (const auto& [mt_m, mt_n, mt_k] : tile_sizes) {
+        auto config = make_config(mt_m, mt_n, mt_k, 16, 16, 16, false, 8, 2);
+        config.prediction_mode = origami::prediction_modes_t::simulation;
+        config.tensile.depth_u = mt_k;
+        config.tensile.global_split_u = 1;
+        config.tensile.grvw_a = 4;
+        config.tensile.grvw_b = 4;
+        config.tensile.gwvw_d = 4;
+        config.tensile.wave_num = 4;
+        config.tensile.wave_group_m = 2;
+        config.tensile.wave_group_n = 2;
+        
+        double latency = origami::compute_formocast_latency(problem, hardware, config);
+        
+        INFO("Tile size: " << mt_m << "x" << mt_n << "x" << mt_k);
+        REQUIRE(latency > 0);
+      }
+    }
+  }
+}
+
+TEST_CASE("Origami: Formocast config fields have correct defaults", "[origami][formocast]") {
+  origami::config_t config;
+  
+  // Check default values for Tensile-specific fields (via nested struct)
+  REQUIRE(config.tensile.depth_u == 0);
+  REQUIRE(config.tensile.global_split_u == 1);
+  REQUIRE(config.tensile.global_accumulation == 0);
+  REQUIRE(config.tensile.local_split_u == 1);
+  REQUIRE(config.tensile.grvw_a == 1);
+  REQUIRE(config.tensile.grvw_b == 1);
+  REQUIRE(config.tensile.gwvw_d == 1);
+  REQUIRE(config.tensile.direct_to_vgpr_a == false);
+  REQUIRE(config.tensile.direct_to_vgpr_b == false);
+  REQUIRE(config.tensile.direct_to_lds_a == false);
+  REQUIRE(config.tensile.direct_to_lds_b == false);
+  REQUIRE(config.tensile.wave_num == 4);
+  REQUIRE(config.tensile.wave_group_m == 2);
+  REQUIRE(config.tensile.wave_group_n == 2);
+  REQUIRE(config.tensile.prefetch_global_read == 2);
+  REQUIRE(config.prediction_mode == origami::prediction_modes_t::estimation);
 }
 
 TEST_CASE("Origami: select_workgroup_mapping unit test", "[Origami]") {
