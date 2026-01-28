@@ -77,39 +77,6 @@ __device__ __host__ inline I1 ceildiv(I1 const n, I2 const nb)
     return (((n - 1) / nb) + 1);
 }
 
-// -----------------------------
-// max function that handles NaN
-// -----------------------------
-template <typename T>
-__host__ __device__ static inline bool max_nan(T const x, T const y)
-{
-    if constexpr(std::is_integral<T>::value)
-    {
-        return (std::max(x, y));
-    }
-    else
-    {
-        if(std::isnan(x) && std::isnan(y))
-        {
-            return (std::numeric_limits<T>::quiet_NaN());
-        }
-
-        if(std::isnan(x))
-        {
-            return (y);
-        }
-        if(std::isnan(y))
-        {
-            return (x);
-        }
-
-        // ---------------------
-        // both x, y are not NaN
-        // ---------------------
-        return (std::max(x, y));
-    }
-}
-
 template <typename T>
 T const* cast2constType(T* array)
 {
