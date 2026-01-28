@@ -1189,157 +1189,279 @@ namespace rocRoller
             ContextPtr m_context;
         };
 
-        Generator<Instruction> generateFromTree(Register::ValuePtr&   dest,
-                                                ExpressionTree&       tree,
-                                                CodeGeneratorVisitor& visitor,
-                                                ContextPtr            context)
+        /**
+         * @brief Helper class to manage state during expression tree code generation.
+         *
+         * This class encapsulates the scheduling state for generating code from an
+         * expression tree. Nodes are processed in dependency order, with ready nodes
+         * (whose dependencies are satisfied) queued by register type category.
+         *
+         * Nodes go from pending -> ready -> generating -> completed.
+         */
+        class TreeGenerationState
         {
-            auto const& options = context->kernelOptions();
-
-            if(Log::getLogger()->should_log(LogLevel::Trace))
+        public:
+            TreeGenerationState(ExpressionTree&       tree,
+                                CodeGeneratorVisitor& visitor,
+                                ContextPtr            context)
+                : m_tree(tree)
+                , m_visitor(visitor)
+                , m_options(context->kernelOptions())
+                , m_pendingNodes(iota<int>(0, tree.size()).to<std::set>())
             {
-                co_yield Instruction::Comment(toDOT(tree));
-                co_yield Instruction::Comment(statistics(tree));
+                // Get register types of nodes to be generated
+                std::set<Register::Type> categories;
+                for(auto nodeIdx : m_pendingNodes)
+                    categories.insert(m_tree.at(nodeIdx).regType());
+            
+                // Initialize ready queues for each register type
+                auto comparator = [this](int a, int b) { return comparePriorities(a, b); };
+                for(auto category : categories)
+                    m_readyQueues.emplace(category, PriorityQueue{comparator});
             }
 
-            tree.back().reg = dest;
-
-            auto proc      = Settings::getInstance()->get(Settings::Scheduler);
-            auto cost      = Settings::getInstance()->get(Settings::SchedulerCost);
-            auto scheduler = Component::GetNew<Scheduling::Scheduler>(proc, cost, context);
-
-            auto nodes = iota<int>(0, tree.size()).to<std::set>();
-
-            std::set<int> completedNodes;
-
-            auto comparePriorities = [&](int a, int b) {
-                auto const& nodeA = tree.at(a);
-                auto const& nodeB = tree.at(b);
-
-                return std::make_tuple(nodeA.distanceFromRoot, nodeA.deps.size(), -a)
-                       < std::make_tuple(nodeB.distanceFromRoot, nodeB.deps.size(), -b);
-            };
-
-            std::set<Register::Type> allCategories;
-            for(auto node : nodes)
-                allCategories.insert(tree.at(node).regType());
-
-            std::map<Register::Type, std::set<int>> generating;
-
-            using PQ = std::priority_queue<int, std::vector<int>, decltype(comparePriorities)>;
-            std::map<Register::Type, PQ> ready;
-
-            for(auto category : allCategories)
-                ready.emplace(category, PQ{comparePriorities});
-
-            auto fillReady = [&]() {
-                for(auto iter = nodes.begin(); iter != nodes.end();)
+            /**
+             * @brief Moves nodes with satisfied dependencies to the ready queues.
+             */
+            void moveReadyNodes()
+            {
+                auto iter = m_pendingNodes.begin();
+                while(iter != m_pendingNodes.end())
                 {
                     auto idx = *iter;
-
-                    if(std::ranges::includes(completedNodes, tree.at(idx).deps))
+                    if(allDependenciesSatisfied(idx))
                     {
-                        ready.at(tree.at(idx).regType()).push(idx);
-                        iter = nodes.erase(iter);
+                        auto category = m_tree.at(idx).regType();
+                        m_readyQueues.at(category).push(idx);
+                        iter = m_pendingNodes.erase(iter);
                     }
                     else
                     {
                         ++iter;
                     }
                 }
-            };
+            }
 
-            auto generate = [&](int idx) -> Generator<Instruction> {
-                auto category = tree.at(idx).regType();
-                auto& node = tree.at(idx);
+            /**
+             * @brief Fills the schedulable list with nodes ready for code generation.
+             *
+             * Respects concurrency limits per register type category.
+             */
+            void fillSchedulableList(std::vector<Generator<Instruction>>& schedulable)
+            {
+                for(auto& [category, readyQueue] : m_readyQueues)
+                {
+                    size_t limit = getConcurrencyLimit(category);
 
-                if(node.reg == nullptr || node.reg->regType() != Register::Type::Literal)
-                    co_yield visitor.call(node.reg, node.expr);
+                    while(!readyQueue.empty() && m_generatingNodes[category].size() < limit)
+                    {
+                        int idx = readyQueue.top();
+                        readyQueue.pop();
 
-                node.expr = nullptr;
+                        m_generatingNodes[category].insert(idx);
+                        schedulable.push_back(generateNode(idx));
+                    }
+                }
+            }
 
-                // Don't clear the last register as that is the destination for the expression.
-                if(idx + 1 != tree.size())
-                    node.reg = nullptr;
-
-                completedNodes.insert(idx);
-                generating[category].erase(idx);
-            };
-
-            auto anyRemainingNodes = [&]() -> bool {
-                if(!nodes.empty())
+            /**
+             * @brief Checks if there are nodes remaining to process.
+             */
+            bool hasRemainingNodes() const
+            {
+                if(!m_pendingNodes.empty())
                     return true;
 
-                for(auto const& [category, readyQueue] : ready)
+                for(auto const& [category, readyQueue] : m_readyQueues)
                 {
                     if(!readyQueue.empty())
                         return true;
                 }
 
-                for(auto const& [category, generatingSet] : generating)
+                for(auto const& [category, generatingSet] : m_generatingNodes)
                 {
                     AssertFatal(generatingSet.empty());
                 }
 
                 return false;
-            };
-
-            while(anyRemainingNodes())
-            {
-                std::vector<Generator<Instruction>> schedulable;
-
-                auto fillSchedulable = [&]() {
-                    for(auto& [category, readyQueue] : ready)
-                    {
-                        size_t limit = 0;
-                        if(category == Register::Type::Literal)
-                            limit = std::numeric_limits<int>::max();
-                        else
-                            limit = options->maxConcurrentSubExpressions;
-                        AssertFatal(limit > 0);
-
-                        while(!readyQueue.empty() && generating[category].size() < limit)
-                        {
-                            auto idx = readyQueue.top();
-                            readyQueue.pop();
-
-                            generating[category].insert(idx);
-
-                            schedulable.push_back(generate(idx));
-                        }
-                    }
-                };
-
-                fillReady();
-                fillSchedulable();
-
-                if(!scheduler->supportsAddingStreams())
-                {
-                    co_yield (*scheduler)(schedulable);
-                }
-                else
-                {
-                    auto generator    = (*scheduler)(schedulable);
-                    auto prevDoneSize = completedNodes.size();
-
-                    for(auto iter = generator.begin(); iter != generator.end(); ++iter)
-                    {
-                        co_yield *iter;
-
-                        if(prevDoneSize != completedNodes.size())
-                        {
-                            fillReady();
-
-                            prevDoneSize = completedNodes.size();
-                        }
-
-                        fillSchedulable();
-                    }
-                }
             }
 
-            AssertFatal(completedNodes.size() == tree.size(),
-                        ShowValue(completedNodes.size()),
+            size_t completedCount() const
+            {
+                return m_completedNodes.size();
+            }
+
+        private:
+            /**
+             * @brief Compares node priorities for scheduling order.
+             *
+             * Used with std::priority_queue, so the "largest" node is popped first.
+             * Priority order (highest first):
+             *   1. Higher distanceFromRoot (leaf nodes processed before root)
+             *   2. More dependencies
+             *   3. Earlier index (smaller node index)
+             */
+            bool comparePriorities(int a, int b) const
+            {
+                auto const& nodeA = m_tree.at(a);
+                auto const& nodeB = m_tree.at(b);
+
+                return std::make_tuple(nodeA.distanceFromRoot, nodeA.deps.size(), -a)
+                       < std::make_tuple(nodeB.distanceFromRoot, nodeB.deps.size(), -b);
+            }
+
+            bool allDependenciesSatisfied(int nodeIdx) const
+            {
+                return std::ranges::includes(m_completedNodes, m_tree.at(nodeIdx).deps);
+            }
+
+            size_t getConcurrencyLimit(Register::Type category) const
+            {
+                if(category == Register::Type::Literal)
+                    return std::numeric_limits<int>::max();
+
+                AssertFatal(m_options->maxConcurrentSubExpressions > 0);
+                return m_options->maxConcurrentSubExpressions;
+            }
+
+            Generator<Instruction> generateNode(int idx)
+            {
+                auto  category = m_tree.at(idx).regType();
+                auto& node     = m_tree.at(idx);
+
+                if(node.reg == nullptr || node.reg->regType() != Register::Type::Literal)
+                    co_yield m_visitor.call(node.reg, node.expr);
+
+                node.expr = nullptr;
+
+                // Preserve the last register as the destination for the expression.
+                bool isLastNode = (idx + 1 == static_cast<int>(m_tree.size()));
+                if(!isLastNode)
+                    node.reg = nullptr;
+
+                m_completedNodes.insert(idx);
+                m_generatingNodes[category].erase(idx);
+            }
+
+            ExpressionTree&       m_tree;
+            CodeGeneratorVisitor& m_visitor;
+            KernelOptions const&  m_options;
+
+            std::set<int> m_pendingNodes;
+            std::set<int> m_completedNodes;
+
+            using PriorityQueue
+                = std::priority_queue<int, std::vector<int>, std::function<bool(int, int)>>;
+            std::map<Register::Type, PriorityQueue> m_readyQueues;
+            std::map<Register::Type, std::set<int>> m_generatingNodes;
+        };
+
+        /**
+         * @brief Executes instruction generators through the scheduler.
+         *
+         * There are two scheduling strategies depending on scheduler capabilities:
+         *
+         * **Batch scheduling** (when scheduler doesn't support adding streams):
+         *   - All generators in `schedulable` are processed as a fixed batch
+         *   - New nodes cannot be added until the entire batch completes
+         *
+         * **Incremental scheduling** (when scheduler supports adding streams):
+         *   - Generators are processed one instruction at a time
+         *   - After each instruction, checks if any expression node completed
+         *   - When a node completes, its dependents may become ready
+         *   - Newly ready nodes are immediately added to the scheduler
+         *
+         * @param scheduler   The instruction scheduler to use
+         * @param state       Tracks node readiness and completion
+         * @param schedulable Vector of instruction generators to execute (may grow during execution)
+         */
+        Generator<Instruction>
+            scheduleFromList(std::shared_ptr<Scheduling::Scheduler>& scheduler,
+                             TreeGenerationState&                    state,
+                             std::vector<Generator<Instruction>>&    schedulable)
+        {
+            if(!scheduler->supportsAddingStreams())
+            {
+                // Batch scheduling
+                co_yield (*scheduler)(schedulable);
+            }
+            else
+            {
+                // Incremental scheduling
+                auto generator = (*scheduler)(schedulable);
+
+                size_t prevCompletedCount = state.completedCount();
+
+                for(auto iter = generator.begin(); iter != generator.end(); ++iter)
+                {
+                    co_yield *iter;
+
+                    // After yielding an instruction, a node may have completed.
+                    bool nodeCompleted = (state.completedCount() != prevCompletedCount);
+                    if(nodeCompleted)
+                    {
+                        state.moveReadyNodes();
+                        prevCompletedCount = state.completedCount();
+                    }
+
+                    // Add any newly-ready nodes to the scheduler's stream list.
+                    // The scheduler will incorporate these into its scheduling decisions.
+                    state.fillSchedulableList(schedulable);
+                }
+            }
+        }
+
+        /**
+         * @brief Generates code from an expression tree using dependency-driven scheduling.
+         *
+         * The algorithm processes nodes in waves:
+         * 1. Identify nodes whose dependencies are satisfied (ready nodes)
+         * 2. Schedule ready nodes for code generation, respecting concurrency limits
+         * 3. Execute scheduled generators through the scheduler
+         * 4. Repeat until all nodes are processed
+         *
+         * @param dest    Output register for the final expression result
+         * @param tree    Expression tree with nodes ordered by dependencies
+         * @param visitor Code generator visitor for individual expressions
+         * @param context Kernel context for scheduling and options
+         */
+        Generator<Instruction> generateFromTree(Register::ValuePtr&   dest,
+                                                ExpressionTree&       tree,
+                                                CodeGeneratorVisitor& visitor,
+                                                ContextPtr            context)
+        {
+            // Emit debug information if tracing is enabled
+            if(Log::getLogger()->should_log(LogLevel::Trace))
+            {
+                co_yield Instruction::Comment("generateFromTree()");
+                co_yield Instruction::Comment(toDOT(tree));
+                co_yield Instruction::Comment(statistics(tree));
+            }
+
+            // Set up the destination register for the root node
+            tree.back().reg = dest;
+
+            // Initialize scheduler
+            auto proc      = Settings::getInstance()->get(Settings::Scheduler);
+            auto cost      = Settings::getInstance()->get(Settings::SchedulerCost);
+            auto scheduler = Component::GetNew<Scheduling::Scheduler>(proc, cost, context);
+
+            // Initialize generation state tracker
+            TreeGenerationState state(tree, visitor, context);
+
+            // Process nodes until all are completed
+            while(state.hasRemainingNodes())
+            {
+                state.moveReadyNodes();
+
+                std::vector<Generator<Instruction>> schedulable;
+                state.fillSchedulableList(schedulable);
+
+                co_yield scheduleFromList(scheduler, state, schedulable);
+            }
+
+            AssertFatal(state.completedCount() == tree.size(),
+                        ShowValue(state.completedCount()),
                         ShowValue(tree.size()));
 
             dest = tree.back().reg;
