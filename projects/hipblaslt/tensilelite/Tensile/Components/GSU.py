@@ -376,15 +376,15 @@ class GSUOn(GSU):
                 gsuSgpr = tmpSgpr + 1
 
                 # swizzle
-            	mult_MI_Dim = 1
+                mult_MI_Dim = 1
                 if tc == "A" and kernel["ProblemType"]["SwizzleTensorA"]:
-                	mult_MI_Dim = mult_MI_Dim * 16 # MI_M = 16
+                    mult_MI_Dim = mult_MI_Dim * 16 # MI_M = 16
                 elif tc == "B" and kernel["ProblemType"]["SwizzleTensorB"]:
-                	mult_MI_Dim = mult_MI_Dim * 16 # MI_N = 16
+                    mult_MI_Dim = mult_MI_Dim * 16 # MI_N = 16
 
-            	duBpe = int(kernel["_DepthU%s" % tc] * tP["bpeGR"] * mult_MI_Dim)
+                duBpe = int(kernel["_DepthU%s" % tc] * tP["bpeGR"] * mult_MI_Dim)
                 module.add(SAndB32(dst=sgpr(gsuSgpr), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
-            	module.add(SMulI32(dst=sgpr(gsuSgpr), src0=sgpr(gsuSgpr), src1=duBpe, comment="GSU*DepthU*BpeGR*MI_M"))
+                module.add(SMulI32(dst=sgpr(gsuSgpr), src0=sgpr(gsuSgpr), src1=duBpe, comment="GSU*DepthU*BpeGR*MI_M"))
                 module.add(SAndB32(dst=sgpr(tmpSgpr), src0=sgpr("GSU"), src1=hex(0x8000), comment="SCC = (GSUC == 1) ?"))
 
                 m = sgpr(gsuSgpr)

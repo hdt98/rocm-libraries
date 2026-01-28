@@ -2383,8 +2383,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadA = 1 if u == 0 else 0
         doReadB = 1 if u == 0 else 0
         doReadM = 1 if u == 0 else 0
-		doReadMXSA = 1 if u == 0 else 0
-		doReadMXSB = 1 if u == 0 else 0
+        doReadMXSA = 1 if u == 0 else 0
+        doReadMXSB = 1 if u == 0 else 0
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadMXSA = doReadMXSA or (hasLiveLdsData and u > localWriteEndIter)
@@ -2424,7 +2424,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if needNextBufLR:
             localReads.add(localReadCodeMXSA)
           pack[plrIdx*self.states.numIterPerCoalescedReadMXSA].add(packCodeMXSA)
-		  if kernel["ForceUnrollSubIter"]:
+          if kernel["ForceUnrollSubIter"]:
             pack[1].add(packCodeMXSA)
         if doReadM:
           localReads.addComment1("local read metadata")
@@ -2444,7 +2444,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if needNextBufLR:
             localReads.add(localReadCodeMXSB)
           pack[plrIdx*self.states.numIterPerCoalescedReadMXSB].add(packCodeMXSB)
-		  if kernel["ForceUnrollSubIter"]:
+          if kernel["ForceUnrollSubIter"]:
             pack[1].add(packCodeMXSB)
         if doReadB:
           localReads.addComment1("local read b")
@@ -2504,15 +2504,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
             if not kernel["ForceUnrollSubIter"] or (doReadA and (u<localWriteEndIter)):
               pointerLRCode.addComment1("local read swap offsets a")
               pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersA))
-			if kernel["ProblemType"]["MXBlockA"] and ((not kernel["ForceUnrollSubIter"]) or (doReadMXSA and (u<localWriteEndIter))):
+            if kernel["ProblemType"]["MXBlockA"] and ((not kernel["ForceUnrollSubIter"]) or (doReadMXSA and (u<localWriteEndIter))):
               pointerLRCode.addComment1("local read swap offsets mxsa")
               pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersA["MX"]))
             if not kernel["ForceUnrollSubIter"] or (doReadB and (u<localWriteEndIter)):
               pointerLRCode.addComment1("local read swap offsets b")
               pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersB))
-			if kernel["ProblemType"]["MXBlockB"] and ((not kernel["ForceUnrollSubIter"]) or (doReadMXSB and (u<localWriteEndIter))):
+            if kernel["ProblemType"]["MXBlockB"] and ((not kernel["ForceUnrollSubIter"]) or (doReadMXSB and (u<localWriteEndIter))):
               pointerLRCode.addComment1("local read swap offsets mxsb")
-              pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersB["MX"]))		  
+              pointerLRCode.add(self.localReadSwapOffsets(kernel, internalPointerSwap, tensorParametersB["MX"]))
             if (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]) and\
                (not kernel["ForceUnrollSubIter"] or (doReadM and (u<localWriteEndIter))):
               pointerLRCode.addComment1("local read swap offsets metadata")
@@ -2917,8 +2917,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadA = 1 if u == 0 else 0
         doReadB = 1 if u == 0 else 0
         doReadM = 1 if u == 0 else 0
-		doReadMXSA = 1 if u == 0 else 0
-		doReadMXSB = 1 if u == 0 else 0
+        doReadMXSA = 1 if u == 0 else 0
+        doReadMXSB = 1 if u == 0 else 0
 
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
@@ -2951,7 +2951,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             LRCodeAAllIters[uIdx].add(localReadCodeA)
             PackCodeAAllIters[uIdx].add(packCodeA)
           if kernel["ForceUnrollSubIter"]:
-            pack[1].add(packCodeA)		
+            pack[1].add(packCodeA)
         if doReadMXSA:
           localReads.addComment1("local read maxa")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadMXSA
@@ -2962,7 +2962,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReads.add(localReadCodeMXSA)
           localReadsMXSA.add(localReadCodeMXSA)
           pack[plrIdx*self.states.numIterPerCoalescedReadMXSA].add(packCodeMXSA)
-		  if kernel["UseCustomMainLoopSchedule"]:
+          if kernel["UseCustomMainLoopSchedule"]:
             LRCodeAAllIters[uIdx].add(localReadCodeMXSA)
             PackCodeAAllIters[uIdx].add(packCodeMXSA)
           if kernel["ForceUnrollSubIter"]:
@@ -2985,7 +2985,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReads.add(localReadCodeMXSB)
           localReadsMXSB.add(localReadCodeMXSB)
           pack[plrIdx*self.states.numIterPerCoalescedReadMXSB].add(packCodeMXSB)
-		  if kernel["UseCustomMainLoopSchedule"]:
+          if kernel["UseCustomMainLoopSchedule"]:
             LRCodeAAllIters[uIdx].add(localReadCodeMXSB)
             PackCodeAAllIters[uIdx].add(packCodeMXSB)
           if kernel["ForceUnrollSubIter"]:
@@ -4838,22 +4838,22 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     numVgprMultiplierA = 1
     numVgprMultiplierB = 1
-	numVgprMultiplierMXSA = 1
+    numVgprMultiplierMXSA = 1
     numVgprMultiplierMXSB = 1
     numVgprMultiplierMetadata = 1
     maxLDSConstOffset = self.states.regCaps["maxLDSConstOffset"]
 
     if self.states.archCaps["DeviceLDS"] > maxLDSConstOffset:
       hasMultipleBuffer = kernel["ExpandPointerSwap"] and not kernel["1LDSBuffer"] and not kernel["StoreSwapAddr"]
-	  
+
       numVgprMultiplier = 1 if not hasMultipleBuffer else (kernel["LdsOffsetA_Blk"] // maxLDSConstOffset + 1)
       numVgprMultiplierA = max(numVgprMultiplier, kernel["LdsNumElementsAlignedA"] // maxLDSConstOffset + 1)
       numVgprMultiplierB = max(numVgprMultiplier, kernel["LdsNumElementsAlignedB"] // maxLDSConstOffset + 1)
       numVgprMultiplierMetadata = max(numVgprMultiplier, kernel["LdsNumElementsAlignedMetadata"] // maxLDSConstOffset + 1)
-	  #TODO:
-	  numVgprMultiplier = 1 if not hasMultipleBuffer else (kernel["LdsOffsetMXSA_Blk"] // maxLDSConstOffset + 1)
+      #TODO:
+      numVgprMultiplier = 1 if not hasMultipleBuffer else (kernel["LdsOffsetMXSA_Blk"] // maxLDSConstOffset + 1)
       numVgprMultiplierMXSA = max(numVgprMultiplier, kernel["LdsNumElementsAlignedMXSA"] // maxLDSConstOffset + 1)
-	  numVgprMultiplier = 1 if not hasMultipleBuffer else (kernel["LdsOffsetMXSB_Blk"] // maxLDSConstOffset + 1)
+      numVgprMultiplier = 1 if not hasMultipleBuffer else (kernel["LdsOffsetMXSB_Blk"] // maxLDSConstOffset + 1)
       numVgprMultiplierMXSB = max(numVgprMultiplier, kernel["LdsNumElementsAlignedMXSB"] // maxLDSConstOffset + 1)
 
 
@@ -4867,12 +4867,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     self.states.m.numVgprLocalReadAddr *= numVgprMultiplierMetadata
     self.states.m.numVgprLocalWriteAddr *= numVgprMultiplierMetadata
-	#TODO:
-	if kernel["ProblemType"]["MXBlockA"]:
-	  self.states.mxsa.numVgprLocalReadAddr *= numVgprMultiplierMXSA
+    #TODO:
+    if kernel["ProblemType"]["MXBlockA"]:
+      self.states.mxsa.numVgprLocalReadAddr *= numVgprMultiplierMXSA
       self.states.mxsa.numVgprLocalWriteAddr *= numVgprMultiplierMXSA
-	if kernel["ProblemType"]["MXBlockB"]:
-	  self.states.mxsb.numVgprLocalReadAddr *= numVgprMultiplierMXSB
+    if kernel["ProblemType"]["MXBlockB"]:
+      self.states.mxsb.numVgprLocalReadAddr *= numVgprMultiplierMXSB
       self.states.mxsb.numVgprLocalWriteAddr *= numVgprMultiplierMXSB
 
 
@@ -4911,7 +4911,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.b.numVgprLocalWriteSwapAddr = 1
       if kernel["ProblemType"]["Sparse"] and not kernel["LocalWriteUseSgprMetadata"] and self.states.m.numVgprLocalWriteAddr > 0:
         self.states.m.numVgprLocalWriteSwapAddr = 1
-	  #TODO:check if mxsa/mxsb needs LocalReadSwapAddr and LocalWriteSwapAddr
+      #TODO:check if mxsa/mxsb needs LocalReadSwapAddr and LocalWriteSwapAddr
 
     ####################################
     # num vgprs: global read addresses
@@ -5949,7 +5949,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.localReadDoCntMetadata  = 0
 
     if kernel["EnableMatrixInstruction"]:
-	  #TODO:import getMXMFMAIssueLatency
+      #TODO:import getMXMFMAIssueLatency
       from rocisa.instruction import getMFMAIssueLatency, getSMFMAIssueLatency
       self.states.miLatency, miIssueLatency = getSMFMAIssueLatency(kernel["ProblemType"]["MacDataTypeA"].toEnum(), kernel["MatrixInstM"], kernel["MatrixInstB"]) if kernel["ProblemType"]["Sparse"] else \
                                               getMFMAIssueLatency(kernel["ProblemType"]["MacDataTypeA"].toEnum(), kernel["MatrixInstM"], kernel["MatrixInstB"])

@@ -202,7 +202,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
                                                                         vectorWidth=vectorWidth, \
                                                                         maxKId=maxKId)
         #abmatrixinfo = writer.states.a if tc == 'A' else writer.states.b
-		if tc == 'A':
+        if tc == 'A':
            abmatrixinfo = writer.states.a
         elif tc == 'B':
            abmatrixinfo = writer.states.b

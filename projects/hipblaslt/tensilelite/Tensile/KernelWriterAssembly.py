@@ -32,12 +32,12 @@ from rocisa.container import DSModifiers, SDWAModifiers, VOP3PModifiers, \
                       DPPModifiers, vgpr, sgpr, accvgpr, mgpr, ContinuousRegister, \
                       HWRegContainer, GLOBALModifiers
 from rocisa.instruction import SGetPositivePCOffset, SLongBranchPositive, SCLongBranchScc0, SCLongBranchScc1, SCLongBranchVccnz, \
-                        SMulInt64to32, VCvtBF16toFP32, vectorMultiplyBpe, vectorMultiply64Bpe, scalarMultiplyBpe, scalarMultiply64Bpe
+                        SMulInt64to32, VCvtBF16toFP32
 from rocisa.functions import vectorStaticDivide, vectorStaticRemainder, vectorUInt32CeilDivideAndRemainder, \
                         vectorStaticDivideAndRemainder, scalarStaticDivideAndRemainder, scalarStaticCeilDivide, \
                         scalarStaticRemainder, scalarUInt32DivideAndRemainder, sMagicDiv, vectorStaticMultiply, \
                         vectorStaticMultiplyAdd, scalarStaticMultiply64, BranchIfZero, BranchIfNotZero, DSInit, \
-                        ArgumentLoader
+                        ArgumentLoader, vectorMultiplyBpe, vectorMultiply64Bpe, scalarMultiplyBpe, scalarMultiply64Bpe
 from rocisa.enum import InstType, SelectBit, CacheScope
 from rocisa.macro import MacroVMagicDiv, PseudoRandomGenerator
 from . import CUSTOM_KERNEL_PATH
@@ -6099,7 +6099,7 @@ class KernelWriterAssembly(KernelWriter):
               oddIterCode.add(SWaitAlu(vm_vsrc=0, comment="wait for local read to vgpr complete"))
             oddIterCode.add(self.localReadSwapOffsets(kernel, False, tPA))
             #TODO:to nable ExpertSchedulingMode support
-			if kernel["ProblemType"]["MXBlockA"]:
+            if kernel["ProblemType"]["MXBlockA"]:
               oddIterCode.add(self.localReadSwapOffsets(kernel, False, tPA["MX"]))
           # Generate local read address code only if DirectToVgpr is not enabled
           if not kernel["DirectToVgprB"] and not kernel["StoreSwapAddr"]:
@@ -6107,7 +6107,7 @@ class KernelWriterAssembly(KernelWriter):
               oddIterCode.add(SWaitAlu(vm_vsrc=0, comment="wait for local read to vgpr complete"))
             oddIterCode.add(self.localReadSwapOffsets(kernel, False, tPB))
             #TODO:to nable ExpertSchedulingMode support
-			if kernel["ProblemType"]["MXBlockB"]:
+            if kernel["ProblemType"]["MXBlockB"]:
               oddIterCode.add(self.localReadSwapOffsets(kernel, False, tPB["MX"]))
 
           if kernel["ProblemType"]["Sparse"]:
@@ -6754,80 +6754,80 @@ class KernelWriterAssembly(KernelWriter):
     shiftK = Module("shiftK")
     m = (u) % (self.states.numVgprBuffer) # local to use for MACs
 
-	def dataTypeNameAbbrevToInstType(abbrevA: str, abbrevB: str, sourceSwap: bool = False) -> InstType:
-	    abbrev = abbrevA + '_' + abbrevB
-	    if abbrev == 'f64_f64':
-	        return InstType.INST_F64
-	    elif abbrev == 'f32_f32':
-	        return InstType.INST_F32
-	    elif abbrev == 'f16_f16':
-	        return InstType.INST_F16
-	    elif abbrev == 'i32_i32':
-	        return InstType.INST_I32
-	    elif abbrev == 'i8_i8':
-	        return InstType.INST_I8
-	    elif abbrev == 'bf16_bf16':
-	        return InstType.INST_BF16
-	    elif abbrev == 'xf32_xf32':
-	        return InstType.INST_XF32
-	    elif abbrev == 'fp8_fp8':
-	        return InstType.INST_F8
-	    elif abbrev == 'bf8_bf8':
-	        return InstType.INST_BF8
-	    elif (abbrev == 'fp8_bf8' and sourceSwap == False) or \
-	        (abbrev == 'bf8_fp8' and sourceSwap == True):
-	        return InstType.INST_F8_BF8
-	    elif (abbrev == 'bf8_fp8' and sourceSwap == False) or \
-	        (abbrev == 'fp8_bf8' and sourceSwap == True):
-	        return InstType.INST_BF8_F8
-	    elif abbrev == 'fp6_fp6':
-	        return InstType.INST_F6
-	    elif abbrev == 'bf6_bf6':
-	        return InstType.INST_BF6
-	    elif abbrev == 'fp4_fp4':
-	        return InstType.INST_F4
-	    elif (abbrev == 'fp8_fp6' and sourceSwap == False) or \
-	        (abbrev == 'fp6_fp8' and sourceSwap == True):
-	        return InstType.INST_F8_F6
-	    elif (abbrev == 'fp6_fp8' and sourceSwap == False) or \
-	        (abbrev == 'fp8_fp6' and sourceSwap == True):
-	        return InstType.INST_F6_F8
-	    elif (abbrev == 'fp8_fp4' and sourceSwap == False) or \
-	        (abbrev == 'fp4_fp8' and sourceSwap == True):
-	        return InstType.INST_F8_F4
-	    elif (abbrev == 'fp4_fp8' and sourceSwap == False) or \
-	        (abbrev == 'fp8_fp4' and sourceSwap == True):
-	        return InstType.INST_F4_F8
-	    elif (abbrev == 'fp6_bf6' and sourceSwap == False) or \
-	        (abbrev == 'bf6_fp6' and sourceSwap == True):
-	        return InstType.INST_F6_B6
-	    elif (abbrev == 'bf6_fp6' and sourceSwap == False) or \
-	        (abbrev == 'fp6_bf6' and sourceSwap == True):
-	        return InstType.INST_B6_F6
-	    elif (abbrev == 'fp6_fp4' and sourceSwap == False) or \
-	        (abbrev == 'fp4_fp6' and sourceSwap == True):
-	        return InstType.INST_F6_F4
-	    elif (abbrev == 'fp4_fp6' and sourceSwap == False) or \
-	        (abbrev == 'fp6_fp4' and sourceSwap == True):
-	        return InstType.INST_F4_F6
-	    elif (abbrev == 'bf6_fp4' and sourceSwap == False) or \
-	        (abbrev == 'fp4_bf6' and sourceSwap == True):
-	        return InstType.INST_B6_F4
-	    elif (abbrev == 'fp4_bf6' and sourceSwap == False) or \
-	        (abbrev == 'bf6_fp4' and sourceSwap == True):
-	        return InstType.INST_F4_B6
-	    else:
-	        assert("Unsupported data type.")
-	    return InstType.INST_NOTYPE
+    def dataTypeNameAbbrevToInstType(abbrevA: str, abbrevB: str, sourceSwap: bool = False) -> InstType:
+        abbrev = abbrevA + '_' + abbrevB
+        if abbrev == 'f64_f64':
+            return InstType.INST_F64
+        elif abbrev == 'f32_f32':
+            return InstType.INST_F32
+        elif abbrev == 'f16_f16':
+            return InstType.INST_F16
+        elif abbrev == 'i32_i32':
+            return InstType.INST_I32
+        elif abbrev == 'i8_i8':
+            return InstType.INST_I8
+        elif abbrev == 'bf16_bf16':
+            return InstType.INST_BF16
+        elif abbrev == 'xf32_xf32':
+            return InstType.INST_XF32
+        elif abbrev == 'fp8_fp8':
+            return InstType.INST_F8
+        elif abbrev == 'bf8_bf8':
+            return InstType.INST_BF8
+        elif (abbrev == 'fp8_bf8' and sourceSwap == False) or \
+            (abbrev == 'bf8_fp8' and sourceSwap == True):
+            return InstType.INST_F8_BF8
+        elif (abbrev == 'bf8_fp8' and sourceSwap == False) or \
+            (abbrev == 'fp8_bf8' and sourceSwap == True):
+            return InstType.INST_BF8_F8
+        elif abbrev == 'fp6_fp6':
+            return InstType.INST_F6
+        elif abbrev == 'bf6_bf6':
+            return InstType.INST_BF6
+        elif abbrev == 'fp4_fp4':
+            return InstType.INST_F4
+        elif (abbrev == 'fp8_fp6' and sourceSwap == False) or \
+            (abbrev == 'fp6_fp8' and sourceSwap == True):
+            return InstType.INST_F8_F6
+        elif (abbrev == 'fp6_fp8' and sourceSwap == False) or \
+            (abbrev == 'fp8_fp6' and sourceSwap == True):
+            return InstType.INST_F6_F8
+        elif (abbrev == 'fp8_fp4' and sourceSwap == False) or \
+            (abbrev == 'fp4_fp8' and sourceSwap == True):
+            return InstType.INST_F8_F4
+        elif (abbrev == 'fp4_fp8' and sourceSwap == False) or \
+            (abbrev == 'fp8_fp4' and sourceSwap == True):
+            return InstType.INST_F4_F8
+        elif (abbrev == 'fp6_bf6' and sourceSwap == False) or \
+            (abbrev == 'bf6_fp6' and sourceSwap == True):
+            return InstType.INST_F6_B6
+        elif (abbrev == 'bf6_fp6' and sourceSwap == False) or \
+            (abbrev == 'fp6_bf6' and sourceSwap == True):
+            return InstType.INST_B6_F6
+        elif (abbrev == 'fp6_fp4' and sourceSwap == False) or \
+            (abbrev == 'fp4_fp6' and sourceSwap == True):
+            return InstType.INST_F6_F4
+        elif (abbrev == 'fp4_fp6' and sourceSwap == False) or \
+            (abbrev == 'fp6_fp4' and sourceSwap == True):
+            return InstType.INST_F4_F6
+        elif (abbrev == 'bf6_fp4' and sourceSwap == False) or \
+            (abbrev == 'fp4_bf6' and sourceSwap == True):
+            return InstType.INST_B6_F4
+        elif (abbrev == 'fp4_bf6' and sourceSwap == False) or \
+            (abbrev == 'bf6_fp4' and sourceSwap == True):
+            return InstType.INST_F4_B6
+        else:
+            assert("Unsupported data type.")
+        return InstType.INST_NOTYPE
 
-	def dataTypeToMfmaInstTypePair(dataTypeA: DataType, dataTypeB: DataType, sourceSwap: bool) -> Tuple[InstType, InstType]:
-	    miInTypeStrA  = dataTypeA.toNameAbbrev()
-	    miInTypeStrB  = dataTypeB.toNameAbbrev()
-	    miInInstType = dataTypeNameAbbrevToInstType(miInTypeStrA, miInTypeStrB, sourceSwap) # v_mfma_[...xK]<InType>
+    def dataTypeToMfmaInstTypePair(dataTypeA: DataType, dataTypeB: DataType, sourceSwap: bool) -> Tuple[InstType, InstType]:
+        miInTypeStrA  = dataTypeA.toNameAbbrev()
+        miInTypeStrB  = dataTypeB.toNameAbbrev()
+        miInInstType = dataTypeNameAbbrevToInstType(miInTypeStrA, miInTypeStrB, sourceSwap) # v_mfma_[...xK]<InType>
 
-	    miOutTypeStr = dataTypeA.MIOutputTypeNameAbbrev()
-	    miOutInstType = dataTypeNameAbbrevToInstType(miOutTypeStr, miOutTypeStr) # v_mfma_<OutType>..
-	    return miInInstType, miOutInstType
+        miOutTypeStr = dataTypeA.MIOutputTypeNameAbbrev()
+        miOutInstType = dataTypeNameAbbrevToInstType(miOutTypeStr, miOutTypeStr) # v_mfma_<OutType>..
+        return miInInstType, miOutInstType
 
     miInputTypeA     = kernel["ProblemType"]["F32XdlMathOp"] if kernel["EnableF32XdlMathOp"] else kernel["ProblemType"]["MacDataTypeA"]
     miInputTypeB     = kernel["ProblemType"]["F32XdlMathOp"] if kernel["EnableF32XdlMathOp"] else kernel["ProblemType"]["MacDataTypeB"]
@@ -7438,7 +7438,7 @@ class KernelWriterAssembly(KernelWriter):
                                        a=src0, b=src1, acc2=self.accVgprReadWriteIndex(kernel, accStart, (accEnd-accStart+1)), \
                                        mxsa=srcMX0, mxsb=srcMX1,
                                        comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
-			else:
+            else:
               if kernel["UseF32XEmulation"]:
                 abOffsetStr = "+2" if kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 16 else "+4"
                 if kernel["SourceSwap"]:
@@ -9215,10 +9215,10 @@ class KernelWriterAssembly(KernelWriter):
         else:
           # Using inlined constants - TODO: always use LdsOffsetA_Blk for A/B/MXSA/MXSB?
           src0Val = hex(kernel["LdsOffsetA_Blk"])
-		
+
         numLwa = self.states.a.numVgprLocalWriteAddr if tP["isA"] else self.states.b.numVgprLocalWriteAddr
         localWriteSwapXOR(tc, src0Val, numLwa)
-		    #TODO:
+        #TODO:
         if "MX" in tP:
           tc = tP["MX"]["tensorChar"]
           src0Val = hex(kernel["LdsOffsetA_Blk"])

@@ -1403,7 +1403,7 @@ class Solution(collections.abc.Mapping):
       and ((numBytes == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
         or (numBytes == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
       )
-	  
+
     state["enableLDSTrMXSA"] = False
     state["enableLDSTrMXSB"] = False
     if state["enableLDSTrA"] or state["enableGLTrA"]:
@@ -2066,7 +2066,7 @@ class Solution(collections.abc.Mapping):
             if state["ProblemType"]["SwizzleTensorA"]:
               state["GlobalReadVectorWidthA"] = state["MIInputPerThreadA"] * calSwizzlePackK(state, "A")
             elif state["ProblemType"]["DataTypeA"].is6bitFloat():
-              state["GlobalReadVectorWidthA"] = 32	  
+              state["GlobalReadVectorWidthA"] = 32
             elif state["enableGLTrA"]:
               state["GlobalReadVectorWidthA"] = 8
             else:
@@ -2726,7 +2726,7 @@ class Solution(collections.abc.Mapping):
         state["NoTailLoop"] = True
     if state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
         state["NoTailLoop"] = True
-		
+
     # TailloopInNll optimization check
     if state["TailloopInNll"]:
       # Disable TailloopInNll

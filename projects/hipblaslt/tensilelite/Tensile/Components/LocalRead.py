@@ -273,6 +273,7 @@ class LocalReadMFMA(LocalRead):
             raise Exception(f"unsupport tc %s{tc}")
         numElementPerRead = 1 if kernel["ConvertAfterDS"] and not kernel["UseF32XEmulation"] else int(blockWidth * bpr // tP['bpe'] // lrvwTile)
         numElementPerGroup = (writer.states.kernel["WavefrontSize"] // kernel["MatrixInstM"]) * miInputPerGroup
+        inputPerThread   = kernel["LocalReadVectorWidth"] if not writer.states.inTailLoop else kernel["MIInputPerThread%s"%tc]
 
         abmatrixinfo = writer.states.a if tc == 'A' else writer.states.b
         perpStride   = abmatrixinfo.gNLCPerpStride
@@ -292,9 +293,9 @@ class LocalReadMFMA(LocalRead):
         needPack |= kernel["UseF32XEmulation"]
 
         # split Metadata when localread width > mi input
-		#TODO:
+        #TODO:
         #numSplitMetadata = max(ceil((blockWidth * 4) // tP["bpeDS"]) - 1, 0) if tP["isM"] else 0
-		numSplitMetadata = max(ceil((blockWidth * 4) // (kernel["MIInputPerThread%s"%tc] * tP["bpeDS"])) - 1, 0) if tP["isM"] else 0
+        numSplitMetadata = max(ceil((blockWidth * 4) // (kernel["MIInputPerThread%s"%tc] * tP["bpeDS"])) - 1, 0) if tP["isM"] else 0
 
         # caculate SMFMA layout
         blocksPerTGroupSMFMA = 1
@@ -353,9 +354,9 @@ class LocalReadMFMA(LocalRead):
                         or numSubTiles == 1) or writer.states.inTailLoop:
                         imod.add(localReadCode)
                     subIterLoadCount += 1
-        	# DTV case, do not return local read code. Return pack code only.
-        	if (tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]:
-          		imod = Module("LocalReadDo%s_I%s (Empty)" % (tP["tensorChar"],iui))
+            # DTV case, do not return local read code. Return pack code only.
+            if (tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]:
+                  imod = Module("LocalReadDo%s_I%s (Empty)" % (tP["tensorChar"],iui))
         else:
             totalLoads = numVectorsPerTile * numReadsPerVector * numReadsPerUnroll * miInputGroup
             for vIdx in range(0, numVectorsPerTile):
@@ -367,618 +368,618 @@ class LocalReadMFMA(LocalRead):
                         packCode = pack.add(Module("packCode"))
 
                     tmpvgpr = []
-                	for gIdx in range(0, miInputGroup):
-                    	for rIdx in range(0, numReadsPerUnroll):
-                        	grIdx = gIdx * numReadsPerUnroll + rIdx
-                        	valuiIdx = int(valufIdx)
-                        	baseLRVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx), numVgpr)
-                        	destVgpr = baseLRVgpr
-                        	highBitsForHalf = (blockWidth == 0.5) and ((grIdx % 2) == 1) # grIdx = 1
-                        	isHigh16Bits = (blockWidth == 0.25) and ( ((grIdx % 4) //2) == 1) # 2,3
+                    for gIdx in range(0, miInputGroup):
+                        for rIdx in range(0, numReadsPerUnroll):
+                            grIdx = gIdx * numReadsPerUnroll + rIdx
+                            valuiIdx = int(valufIdx)
+                            baseLRVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx), numVgpr)
+                            destVgpr = baseLRVgpr
+                            highBitsForHalf = (blockWidth == 0.5) and ((grIdx % 2) == 1) # grIdx = 1
+                            isHigh16Bits = (blockWidth == 0.25) and ( ((grIdx % 4) //2) == 1) # 2,3
 
-                        	packCodeT = Module() # Allocate temporary module for pack code
-                        	localReadCodeT = Module()
+                            packCodeT = Module() # Allocate temporary module for pack code
+                            localReadCodeT = Module()
 
-                        	if needPack or numSplitMetadata:
-                            	if kernel["UseF32XEmulation"]:
-	                                # Pack data 0-7 with layout:
-	                                # Val+0: bf16 high (0,1)
-	                                # Val+1: bf16 high (2,3)
-	                                # Val+2: bf16 high (4,5)
-	                                # Val+3: bf16 high (6,7)
-	                                # Val+4: bf16 low  (0,1)
-	                                # Val+5: bf16 low  (2,3)
-	                                # Val+6: bf16 low  (4,5)
-	                                # Val+7: bf16 low  (6,7)
+                            if needPack or numSplitMetadata:
+                                if kernel["UseF32XEmulation"]: #TODO: check the loop changes impact for this branch
+                                    # Pack data 0-7 with layout:
+                                    # Val+0: bf16 high (0,1)
+                                    # Val+1: bf16 high (2,3)
+                                    # Val+2: bf16 high (4,5)
+                                    # Val+3: bf16 high (6,7)
+                                    # Val+4: bf16 low  (0,1)
+                                    # Val+5: bf16 low  (2,3)
+                                    # Val+6: bf16 low  (4,5)
+                                    # Val+7: bf16 low  (6,7)
 
-	                                # For every 8 read vgprs of fp32, pack high bits of bf16 into first 4 vgprs
-	                                if valuiIdx % 8 == 0:
-	                                    self.pack4HiBits(kernel, tc, 0, bufferIdx, baseValuiIdx, iui, writer, packCodeT, tmpvgprFP32)
-	                                    self.pack4HiBits(kernel, tc, 4, bufferIdx, baseValuiIdx, iui, writer, packCodeT, tmpvgprFP32)
-	                                if valuiIdx % 4 == 0:
-	                                    tmpvgpr = []
-	                                    tmp = writer.vgprPool.checkOut(1)
-	                                    tmpvgpr.append(tmp)
-	                                    # tmp vgprs need to be unique across A/B, so we store in writer state
-	                                    if not baseValuiIdx in writer.states.tmpvgpr:
-	                                        writer.states.tmpvgpr[baseValuiIdx] = []
-	                                    # store vgpr state on A, release on B. Assumes A, B ordering which seems to always be the case.
-	                                    if tc == "B":
-	                                        while tmp in writer.states.tmpvgpr[baseValuiIdx]:
-	                                            tmp = writer.vgprPool.checkOut(1)
-	                                            tmpvgpr.append(tmp)
-	                                    else:
-	                                        if not tmp in writer.states.tmpvgpr[baseValuiIdx]:
-	                                            writer.states.tmpvgpr[baseValuiIdx].append(tmp)
-
-	                                    if (valuiIdx % 8) == 0:
-	                                        if kernel["UseDirect32XEmulation"]:
-	                                            v0t = vgpr("Valu%s_T%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx // 2))
-	                                            v1t = vgpr("Valu%s_T%u_I%u+%u+1"%(tc, bufferIdx, iui, valuiIdx // 2))
-	                                            v2t = vgpr("Valu%s_T%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx // 2))
-	                                            v3t = vgpr("Valu%s_T%u_I%u+%u+3"%(tc, bufferIdx, iui, valuiIdx // 2))
-	                                        else:
-	                                            tmpIdx = len(tmpvgprFP32) - 2
-	                                            v0t = vgpr(tmpvgprFP32[tmpIdx + 0])
-	                                            v1t = vgpr(tmpvgprFP32[tmpIdx] + 1)
-	                                            v2t = vgpr(tmpvgprFP32[tmpIdx + 1])
-	                                            v3t = vgpr(tmpvgprFP32[tmpIdx + 1] + 1)
-	                                    else:
-	                                        v0t = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx))
-	                                        v1t = vgpr("Valu%s_X%u_I%u+%u+1"%(tc, bufferIdx, iui, valuiIdx))
-	                                        v2t = vgpr("Valu%s_X%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx))
-	                                        v3t = vgpr("Valu%s_X%u_I%u+%u+3"%(tc, bufferIdx, iui, valuiIdx))
-	                                    vHi0 = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, (valuiIdx-baseValuiIdx)/2 + baseValuiIdx))
-	                                    vHi1 = vgpr("Valu%s_X%u_I%u+%u+1"%(tc, bufferIdx, iui, (valuiIdx-baseValuiIdx)/2 + baseValuiIdx))
-
-                                    if kernel["UseMFMAF32XEmulation"]:
-                                        vTBase = str(v0t.regName)
-                                        vHiBase = str(vHi0.regName)
-                                        idMat = vgpr(writer.states.startVgprIdentityMatrix,2)
-                                        tmpDelay = writer.vgprPool.checkOut(1)
-                                        # We use a single MFMA 4x4x4_16b to perform 4 `vT - vHi` operations. 
-                                        # - A is set to negative identity matrix
-                                        # - no need for DPP as B has the same layout as C & D
-                                        packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4), 
-                                        comment="Calculate low bits for TF32 emulation"))
-                                        writer.vgprPool.checkIn(tmpDelay)
-                                    else:
-                                        # Compute low bits = fp32(highBF16(A/B)) - fp32(A/B)
-                                        if kernel["UseDot2F32XEmulation"]:
-                                            packCodeT.add(VDot2CF32BF16(dst=v0t, src0=hex(0x8000bf80), src1=vHi0))
-                                            packCodeT.add(VDot2CF32BF16(dst=v1t, src0=hex(0xbf800000), src1=vHi0))
-                                        else:
-                                            packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, comment="begin"+str(valuiIdx)))
-                                            packCodeT.add(VSubF32(dst=v0t, src0=v0t, src1=vgpr(tmp)))
-                                            packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, vgprMask=None, vi=1))
-                                            packCodeT.add(VSubF32(dst=v1t, src0=v1t, src1=vgpr(tmp)))
-
-                                        if kernel["UseDot2F32XEmulation"]:
-                                            packCodeT.add(VDot2CF32BF16(dst=v2t, src0=hex(0x8000bf80), src1=vHi1))
-                                        else:
-                                            packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi1))
-                                            packCodeT.add(VSubF32(dst=v2t, src0=v2t, src1=vgpr(tmp)))
-
-                                        # We use cvt+sub pair since dot2 requires adding 4 wait states.
-                                        packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi1, vgprMask=None, vi=1))
-                                        packCodeT.add(VSubF32(dst=v3t, src0=v3t, src1=vgpr(tmp), comment="end"))
-
-                                        if kernel["UseDot2F32XEmulation"]:
-                                            packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
-                                            packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
-
-                                    for val in tmpvgpr:
-                                        writer.vgprPool.checkIn(val)
-                                    tmpvgpr = []
-
-                            # on last iteration, store lower bits in last 4 registers
-                            if grIdx == numReadsPerUnroll*miInputGroup - 1:
-                                if not (kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 16):
-                                    if kernel["UseDirect32XEmulation"]:
-                                        v0 = vgpr("Valu%s_T%u_I%u+%u+0"%(tc, bufferIdx, iui, baseValuiIdx // 2))
-                                        v1 = vgpr("Valu%s_T%u_I%u+%u+1"%(tc, bufferIdx, iui, baseValuiIdx // 2))
-                                        v2 = vgpr("Valu%s_T%u_I%u+%u+2"%(tc, bufferIdx, iui, baseValuiIdx // 2))
-                                        v3 = vgpr("Valu%s_T%u_I%u+%u+3"%(tc, bufferIdx, iui, baseValuiIdx // 2))
-                                    else:
-                                        tmpIdx = len(tmpvgprFP32) - 2
-                                        v0 = vgpr(tmpvgprFP32[tmpIdx + 0])
-                                        v1 = vgpr(tmpvgprFP32[tmpIdx + 0] + 1)
-                                        v2 = vgpr(tmpvgprFP32[tmpIdx + 1])
-                                        v3 = vgpr(tmpvgprFP32[tmpIdx + 1] + 1)
-                                    v4 = vgpr("Valu%s_X%u_I%u+%u+4"%(tc, bufferIdx, iui, baseValuiIdx))
-                                    v5 = vgpr("Valu%s_X%u_I%u+%u+5"%(tc, bufferIdx, iui, baseValuiIdx))
-                                    v6 = vgpr("Valu%s_X%u_I%u+%u+6"%(tc, bufferIdx, iui, baseValuiIdx))
-                                    v7 = vgpr("Valu%s_X%u_I%u+%u+7"%(tc, bufferIdx, iui, baseValuiIdx))
-                                    if kernel["UseMFMAF32XEmulation"]:
-                                        # 5 wait states needed before the following CVT instructions
-                                        packCodeT.add(SNop(waitState = 4))
-                                    packCodeT.add(VCvtPkF32toBF16(dst=v7, src0=v6, src1=v7, comment="pack final begin"))
-                                    packCodeT.add(VCvtPkF32toBF16(dst=v6, src0=v4, src1=v5))
-                                    packCodeT.add(VCvtPkF32toBF16(dst=v5, src0=v2, src1=v3))
-                                    commentStr = "__TF32_2_" + tc + " pack final end"
-                                    packCodeT.add(VCvtPkF32toBF16(dst=v4, src0=v0, src1=v1, comment=commentStr))
-                                    if kernel["UseDirect32XEmulation"]:
-                                        index = len(tmpvgprFP32) - 1
-                                        while index >= 0:
-                                            tmp = tmpvgprFP32[index]
-                                            index -= 1
-                                            # if A, write tmp vgpr to writer state
-                                            if tc == "A":
-                                                if baseValuiIdx not in writer.states.tmpvgpr:
-                                                    writer.states.tmpvgpr[baseValuiIdx] = []
-                                                if tmp not in writer.states.tmpvgpr[baseValuiIdx]:
-                                                    writer.states.tmpvgpr[baseValuiIdx].append(tmp)
-                                        # if B, free tmp vgpr from writer state
+                                    # For every 8 read vgprs of fp32, pack high bits of bf16 into first 4 vgprs
+                                    if valuiIdx % 8 == 0:
+                                        self.pack4HiBits(kernel, tc, 0, bufferIdx, baseValuiIdx, iui, writer, packCodeT, tmpvgprFP32)
+                                        self.pack4HiBits(kernel, tc, 4, bufferIdx, baseValuiIdx, iui, writer, packCodeT, tmpvgprFP32)
+                                    if valuiIdx % 4 == 0:
+                                        tmpvgpr = []
+                                        tmp = writer.vgprPool.checkOut(1)
+                                        tmpvgpr.append(tmp)
+                                        # tmp vgprs need to be unique across A/B, so we store in writer state
+                                        if not baseValuiIdx in writer.states.tmpvgpr:
+                                            writer.states.tmpvgpr[baseValuiIdx] = []
+                                        # store vgpr state on A, release on B. Assumes A, B ordering which seems to always be the case.
                                         if tc == "B":
-                                            if baseValuiIdx in writer.states.tmpvgpr:
-                                                writer.states.tmpvgpr[baseValuiIdx] = []
-                                    else:
-                                        while len(tmpvgprFP32):
-                                            tmp = tmpvgprFP32.pop()
-                                            writer.vgprPool.checkIn(tmp)
-                                        # if A, write tmp vgpr to writer state
-                                        if tc == "A":
-                                            if baseValuiIdx not in writer.states.tmpvgpr:
-                                                writer.states.tmpvgpr[baseValuiIdx] = []
-                                            if tmp not in writer.states.tmpvgpr[baseValuiIdx]:
-                                                writer.states.tmpvgpr[baseValuiIdx].append(tmp)
-                                        # if B, free tmp vgpr from writer state
-                                        elif tc == "B":
-                                            if baseValuiIdx in writer.states.tmpvgpr:
-                                                writer.states.tmpvgpr[baseValuiIdx] = []
-
-                            if kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]):
-                                if tP["bpe"] == 2 and tP["bpeDS"] == 4:
-                                    assert 0 # Doesn't support ConvertAfterDS
-                                else:
-                                    highBitsForHalf = False
-                                    isHigh16Bits = False
-                                    #Case A
-                                    if kernel["UnrollMajorLDS%s"%tc]:
-                                        cvtTimes = int(blockWidth * writer.states.bpr // tP["bpeDS"]) // kernel["MIInputPerThread%s"%tc]
-                                        for i in range(0, cvtTimes):
-                                            offset = cvtTimes - i - 1
-                                            if writer.states.asmCaps["Hascvtf16_fp8"]:
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+1+offset*2)),\
-                                                                            src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)), scale=0x3f800000,\
-                                                                            vop3=VOP3PModifiers(op_sel=[1,0,0,0]), comment="convert fp8 to f16"))
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+0+offset*2)),\
-                                                                            src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)), scale=0x3f800000,\
-                                                                            vop3=VOP3PModifiers(op_sel=[0,0,0,0]), comment="convert fp8 to f16"))
-                                            else:
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)),\
-                                                                            sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_1), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+1+offset*2)), src=vgpr("CvtTemp+0"),\
-                                                                        sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+1+offset*2)), src=vgpr("CvtTemp+1"),\
-                                                                        sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)),\
-                                                                            sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+0+offset*2)), src=vgpr("CvtTemp+0"),\
-                                                                        sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+0+offset*2)), src=vgpr("CvtTemp+1"),\
-                                                                        sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                                    #Case B
-                                    elif (writer.states.lrvwTileA == 1 and tc == 'A') or (writer.states.lrvwTileB == 1 and tc == 'B'):
-                                        sdwa = SDWAModifiers(dst_sel=SelectBit.WORD_0) if (grIdx % 2 == 0) else SDWAModifiers(dst_sel=SelectBit.WORD_1)
-                                        destVgpr   = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, int(valufIdx*2)), numVgpr)
-                                        CvtDstVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, int(valufIdx*2)), numVgpr)
-                                        if needPack and grIdx != 0:
-                                            destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%4, valuiIdx), numVgpr)
-                                        if writer.states.asmCaps["Hascvtf16_fp8"]:
-                                            sel = [0,0,0,0] if (grIdx % 2 == 0)  else [0,0,1,0]
-                                            packCodeT.add(VCvtScaleFP8toF16(dst=CvtDstVgpr, src=destVgpr, scale=0x3f800000, vop3=VOP3PModifiers(op_sel=sel), comment="convert fp8 to f16"))
+                                            while tmp in writer.states.tmpvgpr[baseValuiIdx]:
+                                                tmp = writer.vgprPool.checkOut(1)
+                                                tmpvgpr.append(tmp)
                                         else:
-                                            packCodeT.add(VCvtFP8toF32(dst=destVgpr, src=destVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.BYTE_0)))
-                                            packCodeT.add(VCvtF32toF16(dst=CvtDstVgpr, src=destVgpr, sdwa=sdwa, comment="Convert to FP16"))
-                                    #Case C
-                                    elif (writer.states.lrvwTileA == 2 and tc == 'A') or (writer.states.lrvwTileB == 2 and tc == 'B'):
-                                        if needPack or numSplitMetadata:
-                                            destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), vIdx*numVgpr), numVgpr)
-                                            for i in range(0, numVgpr):
-                                                cvtDstVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), vIdx*numVgpr), numVgpr)
+                                            if not tmp in writer.states.tmpvgpr[baseValuiIdx]:
+                                                writer.states.tmpvgpr[baseValuiIdx].append(tmp)
+
+                                        if (valuiIdx % 8) == 0:
+                                            if kernel["UseDirect32XEmulation"]:
+                                                v0t = vgpr("Valu%s_T%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx // 2))
+                                                v1t = vgpr("Valu%s_T%u_I%u+%u+1"%(tc, bufferIdx, iui, valuiIdx // 2))
+                                                v2t = vgpr("Valu%s_T%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx // 2))
+                                                v3t = vgpr("Valu%s_T%u_I%u+%u+3"%(tc, bufferIdx, iui, valuiIdx // 2))
+                                            else:
+                                                tmpIdx = len(tmpvgprFP32) - 2
+                                                v0t = vgpr(tmpvgprFP32[tmpIdx + 0])
+                                                v1t = vgpr(tmpvgprFP32[tmpIdx] + 1)
+                                                v2t = vgpr(tmpvgprFP32[tmpIdx + 1])
+                                                v3t = vgpr(tmpvgprFP32[tmpIdx + 1] + 1)
+                                        else:
+                                            v0t = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx))
+                                            v1t = vgpr("Valu%s_X%u_I%u+%u+1"%(tc, bufferIdx, iui, valuiIdx))
+                                            v2t = vgpr("Valu%s_X%u_I%u+%u+2"%(tc, bufferIdx, iui, valuiIdx))
+                                            v3t = vgpr("Valu%s_X%u_I%u+%u+3"%(tc, bufferIdx, iui, valuiIdx))
+                                        vHi0 = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, (valuiIdx-baseValuiIdx)/2 + baseValuiIdx))
+                                        vHi1 = vgpr("Valu%s_X%u_I%u+%u+1"%(tc, bufferIdx, iui, (valuiIdx-baseValuiIdx)/2 + baseValuiIdx))
+
+                                        if kernel["UseMFMAF32XEmulation"]:
+                                            vTBase = str(v0t.regName)
+                                            vHiBase = str(vHi0.regName)
+                                            idMat = vgpr(writer.states.startVgprIdentityMatrix,2)
+                                            tmpDelay = writer.vgprPool.checkOut(1)
+                                            # We use a single MFMA 4x4x4_16b to perform 4 `vT - vHi` operations. 
+                                            # - A is set to negative identity matrix
+                                            # - no need for DPP as B has the same layout as C & D
+                                            packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4), 
+                                            comment="Calculate low bits for TF32 emulation"))
+                                            writer.vgprPool.checkIn(tmpDelay)
+                                        else:
+                                            # Compute low bits = fp32(highBF16(A/B)) - fp32(A/B)
+                                            if kernel["UseDot2F32XEmulation"]:
+                                                packCodeT.add(VDot2CF32BF16(dst=v0t, src0=hex(0x8000bf80), src1=vHi0))
+                                                packCodeT.add(VDot2CF32BF16(dst=v1t, src0=hex(0xbf800000), src1=vHi0))
+                                            else:
+                                                packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, comment="begin"+str(valuiIdx)))
+                                                packCodeT.add(VSubF32(dst=v0t, src0=v0t, src1=vgpr(tmp)))
+                                                packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi0, vgprMask=None, vi=1))
+                                                packCodeT.add(VSubF32(dst=v1t, src0=v1t, src1=vgpr(tmp)))
+
+                                            if kernel["UseDot2F32XEmulation"]:
+                                                packCodeT.add(VDot2CF32BF16(dst=v2t, src0=hex(0x8000bf80), src1=vHi1))
+                                            else:
+                                                packCodeT.add(PVCvtBF16toFP32(dst=vgpr(tmp), src=vHi1))
+                                                packCodeT.add(VSubF32(dst=v2t, src0=v2t, src1=vgpr(tmp)))
+
+                                            # We use cvt+sub pair since dot2 requires adding 4 wait states.
+                                            packCodeT.add(VCvtBF16toFP32(dst=vgpr(tmp), src=vHi1, vgprMask=None, vi=1))
+                                            packCodeT.add(VSubF32(dst=v3t, src0=v3t, src1=vgpr(tmp), comment="end"))
+
+                                            if kernel["UseDot2F32XEmulation"]:
+                                                packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
+                                                packCodeT.add(VMovB32(dst=vgpr(tmp), src=0))
+
+                                        for val in tmpvgpr:
+                                            writer.vgprPool.checkIn(val)
+                                        tmpvgpr = []
+
+                                    # on last iteration, store lower bits in last 4 registers
+                                    if grIdx == numReadsPerUnroll*miInputGroup - 1:
+                                        if not (kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 16):
+                                            if kernel["UseDirect32XEmulation"]:
+                                                v0 = vgpr("Valu%s_T%u_I%u+%u+0"%(tc, bufferIdx, iui, baseValuiIdx // 2))
+                                                v1 = vgpr("Valu%s_T%u_I%u+%u+1"%(tc, bufferIdx, iui, baseValuiIdx // 2))
+                                                v2 = vgpr("Valu%s_T%u_I%u+%u+2"%(tc, bufferIdx, iui, baseValuiIdx // 2))
+                                                v3 = vgpr("Valu%s_T%u_I%u+%u+3"%(tc, bufferIdx, iui, baseValuiIdx // 2))
+                                            else:
+                                                tmpIdx = len(tmpvgprFP32) - 2
+                                                v0 = vgpr(tmpvgprFP32[tmpIdx + 0])
+                                                v1 = vgpr(tmpvgprFP32[tmpIdx + 0] + 1)
+                                                v2 = vgpr(tmpvgprFP32[tmpIdx + 1])
+                                                v3 = vgpr(tmpvgprFP32[tmpIdx + 1] + 1)
+                                            v4 = vgpr("Valu%s_X%u_I%u+%u+4"%(tc, bufferIdx, iui, baseValuiIdx))
+                                            v5 = vgpr("Valu%s_X%u_I%u+%u+5"%(tc, bufferIdx, iui, baseValuiIdx))
+                                            v6 = vgpr("Valu%s_X%u_I%u+%u+6"%(tc, bufferIdx, iui, baseValuiIdx))
+                                            v7 = vgpr("Valu%s_X%u_I%u+%u+7"%(tc, bufferIdx, iui, baseValuiIdx))
+                                            if kernel["UseMFMAF32XEmulation"]:
+                                                # 5 wait states needed before the following CVT instructions
+                                                packCodeT.add(SNop(waitState = 4))
+                                            packCodeT.add(VCvtPkF32toBF16(dst=v7, src0=v6, src1=v7, comment="pack final begin"))
+                                            packCodeT.add(VCvtPkF32toBF16(dst=v6, src0=v4, src1=v5))
+                                            packCodeT.add(VCvtPkF32toBF16(dst=v5, src0=v2, src1=v3))
+                                            commentStr = "__TF32_2_" + tc + " pack final end"
+                                            packCodeT.add(VCvtPkF32toBF16(dst=v4, src0=v0, src1=v1, comment=commentStr))
+                                            if kernel["UseDirect32XEmulation"]:
+                                                index = len(tmpvgprFP32) - 1
+                                                while index >= 0:
+                                                    tmp = tmpvgprFP32[index]
+                                                    index -= 1
+                                                    # if A, write tmp vgpr to writer state
+                                                    if tc == "A":
+                                                        if baseValuiIdx not in writer.states.tmpvgpr:
+                                                            writer.states.tmpvgpr[baseValuiIdx] = []
+                                                        if tmp not in writer.states.tmpvgpr[baseValuiIdx]:
+                                                            writer.states.tmpvgpr[baseValuiIdx].append(tmp)
+                                                # if B, free tmp vgpr from writer state
+                                                if tc == "B":
+                                                    if baseValuiIdx in writer.states.tmpvgpr:
+                                                        writer.states.tmpvgpr[baseValuiIdx] = []
+                                            else:
+                                                while len(tmpvgprFP32):
+                                                    tmp = tmpvgprFP32.pop()
+                                                    writer.vgprPool.checkIn(tmp)
+                                                # if A, write tmp vgpr to writer state
+                                                if tc == "A":
+                                                    if baseValuiIdx not in writer.states.tmpvgpr:
+                                                        writer.states.tmpvgpr[baseValuiIdx] = []
+                                                    if tmp not in writer.states.tmpvgpr[baseValuiIdx]:
+                                                        writer.states.tmpvgpr[baseValuiIdx].append(tmp)
+                                                # if B, free tmp vgpr from writer state
+                                                elif tc == "B":
+                                                    if baseValuiIdx in writer.states.tmpvgpr:
+                                                        writer.states.tmpvgpr[baseValuiIdx] = []
+
+                                if kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]):
+                                    if tP["bpe"] == 2 and tP["bpeDS"] == 4:
+                                        assert 0 # Doesn't support ConvertAfterDS
+                                    else:
+                                        highBitsForHalf = False
+                                        isHigh16Bits = False
+                                        #Case A
+                                        if kernel["UnrollMajorLDS%s"%tc]:
+                                            cvtTimes = int(blockWidth * writer.states.bpr // tP["bpeDS"]) // kernel["MIInputPerThread%s"%tc]
+                                            for i in range(0, cvtTimes):
+                                                offset = cvtTimes - i - 1
                                                 if writer.states.asmCaps["Hascvtf16_fp8"]:
-                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=destVgpr, src=destVgpr,scale=0x3f800000,vop3=VOP3PModifiers(op_sel=[0,0,0,0]),comment="convert F8 to F16"))
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+1+offset*2)),\
+                                                                                src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)), scale=0x3f800000,\
+                                                                                vop3=VOP3PModifiers(op_sel=[1,0,0,0]), comment="convert fp8 to f16"))
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+0+offset*2)),\
+                                                                                src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)), scale=0x3f800000,\
+                                                                                vop3=VOP3PModifiers(op_sel=[0,0,0,0]), comment="convert fp8 to f16"))
+                                                else:
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)),\
+                                                                                sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_1), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+1+offset*2)), src=vgpr("CvtTemp+0"),\
+                                                                            sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+1+offset*2)), src=vgpr("CvtTemp+1"),\
+                                                                            sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+offset)),\
+                                                                                sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+0+offset*2)), src=vgpr("CvtTemp+0"),\
+                                                                            sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx+0+offset*2)), src=vgpr("CvtTemp+1"),\
+                                                                            sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                        #Case B
+                                        elif (writer.states.lrvwTileA == 1 and tc == 'A') or (writer.states.lrvwTileB == 1 and tc == 'B'):
+                                            sdwa = SDWAModifiers(dst_sel=SelectBit.WORD_0) if (grIdx % 2 == 0) else SDWAModifiers(dst_sel=SelectBit.WORD_1)
+                                            destVgpr   = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, int(valufIdx*2)), numVgpr)
+                                            CvtDstVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, int(valufIdx*2)), numVgpr)
+                                            if needPack and grIdx != 0:
+                                                destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%4, valuiIdx), numVgpr)
+                                            if writer.states.asmCaps["Hascvtf16_fp8"]:
+                                                sel = [0,0,0,0] if (grIdx % 2 == 0)  else [0,0,1,0]
+                                                packCodeT.add(VCvtScaleFP8toF16(dst=CvtDstVgpr, src=destVgpr, scale=0x3f800000, vop3=VOP3PModifiers(op_sel=sel), comment="convert fp8 to f16"))
+                                            else:
+                                                packCodeT.add(VCvtFP8toF32(dst=destVgpr, src=destVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.BYTE_0)))
+                                                packCodeT.add(VCvtF32toF16(dst=CvtDstVgpr, src=destVgpr, sdwa=sdwa, comment="Convert to FP16"))
+                                        #Case C
+                                        elif (writer.states.lrvwTileA == 2 and tc == 'A') or (writer.states.lrvwTileB == 2 and tc == 'B'):
+                                            if needPack or numSplitMetadata:
+                                                destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), vIdx*numVgpr), numVgpr)
+                                                for i in range(0, numVgpr):
+                                                    cvtDstVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), vIdx*numVgpr), numVgpr)
+                                                    if writer.states.asmCaps["Hascvtf16_fp8"]:
+                                                        packCodeT.add(VCvtScalePkFP8toF16(dst=destVgpr, src=destVgpr,scale=0x3f800000,vop3=VOP3PModifiers(op_sel=[0,0,0,0]),comment="convert F8 to F16"))
+                                                    else:
+                                                        packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=destVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                        packCodeT.add(VCvtF32toF16(dst=destVgpr, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                        packCodeT.add(VCvtF32toF16(dst=destVgpr, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+
+                                                if grIdx == numReadsPerUnroll*miInputGroup-1:
+                                                    for i in range(0, numVgpr):
+                                                        vgprIdx = int((vIdx * numVgpr + i) * tP["bpe"] * kernel["MIInputPerThread%s"%tc] // writer.states.bpr * min(writer.states.bpr // tP["bpe"], vectorWidth))
+                                                        vgprOffset = 0
+                                                        for vectorIdx in range(0, 2):
+                                                            for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
+                                                                packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
+                                                                                    src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2+1, i+vIdx*numVgpr)), \
+                                                                                    src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2, i+vIdx*numVgpr)), \
+                                                                                    src2=sgpr("PackKForV%u"%vectorIdx), \
+                                                                                    comment="select K=%u%u for vector=%u"%(elementIdx*2,  elementIdx*2+1, vectorIdx)))
+                                                                vgprOffset += 1
+                                        #Case D
+                                        elif (writer.states.lrvwTileA == 4 and tc == 'A') or (writer.states.lrvwTileB == 4 and tc == 'B'):
+                                            if needPack or numSplitMetadata:
+                                                destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2 * vIdx * numVgpr), numVgpr)
+                                                cvtDestVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2 * vIdx * numVgpr + 1), numVgpr)
+                                                packCodeT.add(VLShiftRightB32(dst=cvtDestVgpr, shiftHex=16, src=destVgpr, comment="shift 2 element to vgpr+1"))
+                                                if writer.states.asmCaps["Hascvtf16_fp8"]:
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=destVgpr, src=destVgpr,scale=0x3f800000, comment="convert F8 to F16"))
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr, src=cvtDestVgpr,scale=0x3f800000, comment="convert F8 to F16"))
                                                 else:
                                                     packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=destVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
                                                     packCodeT.add(VCvtF32toF16(dst=destVgpr, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
                                                     packCodeT.add(VCvtF32toF16(dst=destVgpr, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
 
-                                            if grIdx == numReadsPerUnroll*miInputGroup-1:
-                                                for i in range(0, numVgpr):
-                                                    vgprIdx = int((vIdx * numVgpr + i) * tP["bpe"] * kernel["MIInputPerThread%s"%tc] // writer.states.bpr * min(writer.states.bpr // tP["bpe"], vectorWidth))
-                                                    vgprOffset = 0
-                                                    for vectorIdx in range(0, 2):
-                                                        for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
-                                                            packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
-                                                                                src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2+1, i+vIdx*numVgpr)), \
-                                                                                src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2, i+vIdx*numVgpr)), \
-                                                                                src2=sgpr("PackKForV%u"%vectorIdx), \
-                                                                                comment="select K=%u%u for vector=%u"%(elementIdx*2,  elementIdx*2+1, vectorIdx)))
-                                                            vgprOffset += 1
-                                    #Case D
-                                    elif (writer.states.lrvwTileA == 4 and tc == 'A') or (writer.states.lrvwTileB == 4 and tc == 'B'):
-                                        if needPack or numSplitMetadata:
-                                            destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2 * vIdx * numVgpr), numVgpr)
-                                            cvtDestVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2 * vIdx * numVgpr + 1), numVgpr)
-                                            packCodeT.add(VLShiftRightB32(dst=cvtDestVgpr, shiftHex=16, src=destVgpr, comment="shift 2 element to vgpr+1"))
-                                            if writer.states.asmCaps["Hascvtf16_fp8"]:
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=destVgpr, src=destVgpr,scale=0x3f800000, comment="convert F8 to F16"))
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr, src=cvtDestVgpr,scale=0x3f800000, comment="convert F8 to F16"))
-                                            else:
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=destVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=destVgpr, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=destVgpr, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                                if grIdx == numReadsPerUnroll*miInputGroup-1:
+                                                    for i in range(0, numVgpr*2):
+                                                        vgprIdx = int((2 * vIdx * numVgpr + i) * tP["bpe"] * kernel["MIInputPerThread%s"%tc] // writer.states.bpr * min(writer.states.bpr // tP["bpe"], vectorWidth))
+                                                        vgprOffset = 0
+                                                        for vectorIdx in range(0, 2):
+                                                            for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
+                                                                packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
+                                                                                    src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2+1, i+2*vIdx*numVgpr)), \
+                                                                                    src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2, i+2*vIdx*numVgpr)), \
+                                                                                    src2=sgpr("PackKForV%u"%vectorIdx), \
+                                                                                    comment="select K=%u%u for vector=%u"%(elementIdx*2,  elementIdx*2+1, vectorIdx)))
+                                                                vgprOffset += 1
+                                        #Case E
+                                        elif (writer.states.lrvwTileA == 8 and tc == 'A') or (writer.states.lrvwTileB == 8 and tc == 'B'):
+                                            if needPack or numSplitMetadata:
+                                                destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr), numVgpr)
+                                                cvtDestVgpr0 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+0), 1)
+                                                cvtDestVgpr1 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+1), 1)
+                                                cvtDestVgpr2 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+2), 1)
+                                                cvtDestVgpr3 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+3), 1)
+                                                packCodeT.add(VLShiftRightB32(dst=cvtDestVgpr3, shiftHex=16, src=cvtDestVgpr1, comment="shift 2 element to vgpr+3"))
 
-                                            if grIdx == numReadsPerUnroll*miInputGroup-1:
-                                                for i in range(0, numVgpr*2):
-                                                    vgprIdx = int((2 * vIdx * numVgpr + i) * tP["bpe"] * kernel["MIInputPerThread%s"%tc] // writer.states.bpr * min(writer.states.bpr // tP["bpe"], vectorWidth))
-                                                    vgprOffset = 0
-                                                    for vectorIdx in range(0, 2):
-                                                        for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
-                                                            packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
-                                                                                src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2+1, i+2*vIdx*numVgpr)), \
-                                                                                src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2, i+2*vIdx*numVgpr)), \
-                                                                                src2=sgpr("PackKForV%u"%vectorIdx), \
-                                                                                comment="select K=%u%u for vector=%u"%(elementIdx*2,  elementIdx*2+1, vectorIdx)))
-                                                            vgprOffset += 1
-                                    #Case E
-                                    elif (writer.states.lrvwTileA == 8 and tc == 'A') or (writer.states.lrvwTileB == 8 and tc == 'B'):
-                                        if needPack or numSplitMetadata:
-                                            destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr), numVgpr)
-                                            cvtDestVgpr0 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+0), 1)
-                                            cvtDestVgpr1 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+1), 1)
-                                            cvtDestVgpr2 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+2), 1)
-                                            cvtDestVgpr3 = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), 2*vIdx*numVgpr+3), 1)
-                                            packCodeT.add(VLShiftRightB32(dst=cvtDestVgpr3, shiftHex=16, src=cvtDestVgpr1, comment="shift 2 element to vgpr+3"))
-
-                                            packCodeT.add(VMovB32(dst=cvtDestVgpr2, src=cvtDestVgpr1))
-                                            packCodeT.add(VLShiftRightB32(dst=cvtDestVgpr1, shiftHex=16, src=cvtDestVgpr0, comment="shift 2 element to vgpr+1"))
-                                            if writer.states.asmCaps["Hascvtf16_fp8"]:
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr0, src=cvtDestVgpr0,scale=0x3f800000, comment="convert F8 to F16"))
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr1, src=cvtDestVgpr1,scale=0x3f800000, comment="convert F8 to F16"))
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr2, src=cvtDestVgpr2,scale=0x3f800000, comment="convert F8 to F16"))
-                                                packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr3, src=cvtDestVgpr3,scale=0x3f800000, comment="convert F8 to F16"))
-                                            else:
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr0, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr0, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr0, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr1, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr1, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr1, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr2, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr2, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr2, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr3, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr3, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
-                                                packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr3, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
-
-                                            if grIdx == numReadsPerUnroll*miInputGroup-1:
-                                                for i in range(0, numVgpr*2):
-                                                    vgprIdx = int((2 * vIdx * numVgpr + i) * tP["bpe"] * kernel["MIInputPerThread%s"%tc] // writer.states.bpr * min(writer.states.bpr // tP["bpe"], vectorWidth))
-                                                    vgprOffset = 0
-                                                    for vectorIdx in range(0, 2):
-                                                        for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
-                                                            packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
-                                                                                src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2+1, i+2*vIdx*numVgpr)), \
-                                                                                src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2, i+2*vIdx*numVgpr)), \
-                                                                                src2=sgpr("PackKForV%u"%vectorIdx), \
-                                                                                comment="select K=%u%u for vector=%u"%(elementIdx*2,  elementIdx*2+1, vectorIdx)))
-                                                            vgprOffset += 1
-                                    else:
-                                        pass
-                            elif lrvwTile > 1:
-                                highBitsForHalf = 0
-                                isHigh8Bits = 0
-                                isHigh16Bits = 0
-                                numElementPerReg = int(writer.states.bpr//tP["bpe"])
-                                if needPack or numSplitMetadata:
-                                    destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), vIdx*numVgpr), numVgpr)
-                                if grIdx == numReadsPerUnroll*miInputGroup-1:
-                                    for i in range(0, numVgpr):
-                                        # convert from [tile][MiInputPerThread][vector] to [tile][vector][MiInputPerThread]
-                                        vgprIdx = int((vIdx*numVgpr+i)*tP["bpeDS"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr*min(writer.states.bpr//tP["bpeDS"],vectorWidth))
-                                        if numSplitMetadata:
-											#TODO:
-                                            #vgprIdx = (vIdx*numVgpr+i)*ceil(tP["bpeDS"]*kernel["MIInputPerThread%s"%tc] / writer.states.bpr)*min(writer.states.bpr//tP["bpeDS"],vectorWidth)
-                                            if kernel["MIInputPerThread%s"%tc] == 4:
-                                                vgprOffset = 0
-                                                for rIdx_ in range(0, numReadsPerUnroll*miInputGroup):
-                                                    for elementIdx in range(0, numSplitMetadata+1):
-                                                    	# since the number of input thread is 4, so will alwasy be D0, D1, D2, D3
-                                                    	packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
-																		src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 1, i+vIdx*numVgpr)), \
-																		src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 0, i+vIdx*numVgpr)), \
-																		src2=sgpr("PackKForV%u"%vgprOffset), \
-                                                        				comment="1 select K=%u%u for vector=%u"%(0, 1, vgprOffset)))
-                                                    	packCodeT.add(VPermB32(dst=vgpr("PackTemp"), \
-																		src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 3, i+vIdx*numVgpr)), \
-																		src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 2, i+vIdx*numVgpr)), \
-																		src2=sgpr("PackKForV%u"%vgprOffset), \
-                                                                       	comment="1 select K=%u%u for vector=%u"%(2, 3, vgprOffset)))
-                                                    	packCodeT.add(VLShiftLeftOrB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
-																		src0=vgpr("PackTemp"), shiftHex=16, \
-																		src1=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
-																		comment="pack two half Vgpr to one Vgpr"))
-                                                    	vgprOffset += 1
-                                            elif kernel["MIInputPerThread%s"%tc] == 2:
-                                                vgprOffset = 0
-                                                for rIdx_ in range(0, numReadsPerUnroll*miInputGroup):
-                                                    for elementIdx in range(0, numSplitMetadata+1):
-                                                    	# since the number of input thread is 2, so will alwasy be D0 and D1
-                                                    	packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
-																				src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 1, i+vIdx*numVgpr)), \
-																				src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 0, i+vIdx*numVgpr)), \
-                                                                            	src2=sgpr("PackKForV%u"%vgprOffset), \
-                                                                        		comment="select K=%u%u for vector=%u"%(0, 1, vgprOffset)))
-                                                    	vgprOffset += 1
-                                            elif kernel["MIInputPerThread%s"%tc] == 1:
-                                                vgprIdx_ = vgprIdx+vIdx*(numSplitMetadata+1)
-                                                packCodeT.add(VMovB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_)), src=destVgpr))
-                                                for elementIdx in range(1, numSplitMetadata+1):
-                                                    packCodeT.add(VMovB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_ + elementIdx)), src=destVgpr, \
-                                                                         comment="another VGPR storing lshr 8-bit value %d %d" %(vgprIdx, elementIdx)))
-                                                    packCodeT.add(VLShiftRightB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_+elementIdx)), \
-                                                                                 shiftHex=hex(8*elementIdx), \
-                                                                                 src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_+elementIdx)), \
-                                                                                 comment="ValuMetadata Vpgr >> 8"))
-                                            else:
-                                                assert False
-                                        elif tP["isM"]:
-                                            vgprOffset = 0
-                                            for elementIdx in range(0, kernel["MIInputPerThread%s"%tc]):
-                                                packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx+vIdx*2)), \
-                                                                      src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, vgprOffset*2 + 1 , i+vIdx*numVgpr)), \
-                                                                      src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, vgprOffset*2, i+vIdx*numVgpr)), \
-                                                                      src2=sgpr("PackKForV%u"%elementIdx), \
-                                                                      comment="select K=%u%u for vector=%u"%(vgprOffset*2+1, vgprOffset*2, elementIdx)))
-                                                vgprOffset += (1 if elementIdx % 2 == 1 else 0)
-                                        elif kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["MFMA_BF16_1K"] or kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
-                                            vgprOffset = 0
-                                            for vectorIdx in range(0, numElementPerReg):
-                                                for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
-                                                    packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
-                                                                          src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+1, i+vIdx*numVgpr)), \
-                                                                          src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg, i+vIdx*numVgpr)), src2=sgpr("PackKForV%u"%vectorIdx), \
-                                                                          comment="select K=%u%u for vector=%u"%(elementIdx*numElementPerReg,  elementIdx*numElementPerReg+1, vectorIdx)))
-                                                    vgprOffset += 1
-                                        elif kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat():
-                                            vgprOffset = 0
-                                            # vertorIdx 2,3 is for the case vectorWidth > 2
-                                            for vectorIdx in range(0, numElementPerReg):
-                                                if vectorWidth <= 2 and vectorIdx > 1:
-                                                    break
-                                                for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
-                                                    packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
-                                                                          src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+1, i+vIdx*numVgpr)), \
-                                                                          src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg, i+vIdx*numVgpr)), \
-                                                                          src2=sgpr("PackKForV%u"%vectorIdx), \
-                                                                          comment="select K=%u%u for vector=%u"%(elementIdx*4,  elementIdx*4+1, vectorIdx)))
-                                                    packCodeT.add(VPermB32(dst=vgpr("PackTemp"), \
-                                                                          src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+3, i+vIdx*numVgpr)), \
-                                                                          src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+2, i+vIdx*numVgpr)), \
-                                                                          src2=sgpr("PackKForV%u"%vectorIdx), \
-                                                                          comment="select K=%u%u for vector=%u"%(elementIdx*4+2,  elementIdx*4+3, vectorIdx)))
-                                                    packCodeT.add(VLShiftLeftOrB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + vgprOffset)),
-                                                                                  src0=vgpr("PackTemp"), \
-                                                                                  shiftHex=16, \
-                                                                                  src1=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + vgprOffset)), \
-                                                                                  comment="pack two half Vgpr to one Vgpr"))
-                                                    vgprOffset += 1
-
-                            else:
-                                isHigh8Bits  = (blockWidth == 0.25) and ( ((grIdx % 4) % 2) == 1) # 1,3
-                                # pack for blockWidth 0.5 type
-                                if tP["isM"]:
-                                    isHigh8Bits  = (blockWidth == 0.25) and ( (grIdx % 2) == 1) # grIdx = 1
-                                    isHigh16Bits = (blockWidth == 0.25) and ( (grIdx % 4) == 3) if kernel["MIInputPerThread%s"%tc] == 4 else False # grIdx = 3
-                                    if isHigh8Bits:
-                                        dstVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/2), numVgpr)
-                                        lowVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx - 1), numVgpr)
-                                        highVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx), numVgpr)
-                                        packCodeT.add(VLShiftLeftOrB32(dst=dstVgpr, src0=highVgpr, shiftHex=8, src1=lowVgpr, comment="pack two int8 Vgpr to one half Vgpr"))
-                                    if isHigh16Bits:
-                                        # every 4 metadatas will be packed into one vgpr, so divide 4 to let dstVgrp be 0,1,2,...
-                                        dstVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/4), numVgpr)
-                                        lowVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/2 - 1), numVgpr)
-                                        highVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/2), numVgpr)
-                                        packCodeT.add(VLShiftLeftOrB32(dst=dstVgpr, src0=highVgpr, shiftHex=hex(0x10), src1=lowVgpr, comment="pack two int8x2 Vgpr to one Vgpr"))
-                                    # Metadata only use one vgpr in current SMFMA instructions, so doesn't need these two flags at localread (gfx94x, gfx95x).
-                                    isHigh16Bits = False
-                                    isHigh8Bits = False
-                                elif writer.states.archCaps["HasEccHalf"] or not writer.states.asmCaps["HasWMMA_V1"]: # ECC pack
-                                    if highBitsForHalf:
-                                        highVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%2, valuiIdx), numVgpr)
-                                        if writer.states.archCaps["DSLow16NotPreserve"]:
-                                          packCodeT.add(VLShiftLeftOrB32(dst=baseLRVgpr, src0=highVgpr, shiftHex=hex(0x10), src1=baseLRVgpr, comment="pack two half Vgpr to one Vgpr"))
-                                        else:
-                                          packCodeT.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=highVgpr, comment="pack two half Vgpr to one Vgpr"))
-                                        destVgpr = highVgpr
-                                    # pack for blockWidth 0.25 type
-                                    if grIdx != 0:
-                                        if isHigh8Bits or isHigh16Bits:
-                                            highVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%4, valuiIdx), numVgpr)
-                                            destVgpr = highVgpr
-                                        if isHigh8Bits:
-                                            lowVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, (grIdx%4)-1, valuiIdx), numVgpr) if isHigh16Bits else baseLRVgpr
-                                            packCodeT.add(VLShiftLeftOrB32(dst=lowVgpr, src0=highVgpr, shiftHex=8, src1=lowVgpr, comment="pack two int8 Vgpr to one half Vgpr"))
-                                            if isHigh16Bits:
-                                                if writer.states.archCaps["DSLow16NotPreserve"]:
-                                                  packCodeT.add(VLShiftLeftOrB32(dst=baseLRVgpr, src0=lowVgpr, shiftHex=hex(0x10), src1=baseLRVgpr, comment="pack two half Vgpr to one Vgpr"))
+                                                packCodeT.add(VMovB32(dst=cvtDestVgpr2, src=cvtDestVgpr1))
+                                                packCodeT.add(VLShiftRightB32(dst=cvtDestVgpr1, shiftHex=16, src=cvtDestVgpr0, comment="shift 2 element to vgpr+1"))
+                                                if writer.states.asmCaps["Hascvtf16_fp8"]:
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr0, src=cvtDestVgpr0,scale=0x3f800000, comment="convert F8 to F16"))
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr1, src=cvtDestVgpr1,scale=0x3f800000, comment="convert F8 to F16"))
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr2, src=cvtDestVgpr2,scale=0x3f800000, comment="convert F8 to F16"))
+                                                    packCodeT.add(VCvtScalePkFP8toF16(dst=cvtDestVgpr3, src=cvtDestVgpr3,scale=0x3f800000, comment="convert F8 to F16"))
                                                 else:
-                                                  packCodeT.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=lowVgpr, comment="pack two half Vgpr to one Vgpr"))
-                                else: # no ECC pack
-                                # pack for No ECC blockwidth 0.25 type
-                                    if grIdx != 0:
-                                        if isHigh8Bits:
-                                            highVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%2, valuiIdx), numVgpr)
-                                            destVgpr = highVgpr
-                                        if isHigh8Bits and isHigh16Bits:
-                                            packCodeT.add(VLShiftLeftOrB32(dst=baseLRVgpr, src0=highVgpr, shiftHex=hex(0x8), src1=baseLRVgpr, comment="pack two int8x2 Vgpr to one Vgpr"))
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr0, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr0, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr0, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr1, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr1, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr1, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr2, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr2, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr2, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtPkFP8toF32(dst=vgpr("CvtTemp", 2), src=cvtDestVgpr3, sdwa=SDWAModifiers(src0_sel=SelectBit.WORD_0), comment="convert to F32"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr3, src=vgpr("CvtTemp+0"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_0), comment="Convert to FP16"))
+                                                    packCodeT.add(VCvtF32toF16(dst=cvtDestVgpr3, src=vgpr("CvtTemp+1"), sdwa=SDWAModifiers(dst_sel=SelectBit.WORD_1), comment="Convert to FP16"))
 
-                        if kernel["ConvertAfterDS"] and kernel["UnrollMajorLDS%s"%tc]:
-                            valufIdx += blockWidth * (tP["bpe"] // tP["bpeDS"]) if (not tP["isM"]) else 1
-                        else:
-                            valufIdx += blockWidth if (tc in ("A", "B")) else 1
+                                                if grIdx == numReadsPerUnroll*miInputGroup-1:
+                                                    for i in range(0, numVgpr*2):
+                                                        vgprIdx = int((2 * vIdx * numVgpr + i) * tP["bpe"] * kernel["MIInputPerThread%s"%tc] // writer.states.bpr * min(writer.states.bpr // tP["bpe"], vectorWidth))
+                                                        vgprOffset = 0
+                                                        for vectorIdx in range(0, 2):
+                                                            for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
+                                                                packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
+                                                                                    src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2+1, i+2*vIdx*numVgpr)), \
+                                                                                    src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*2, i+2*vIdx*numVgpr)), \
+                                                                                    src2=sgpr("PackKForV%u"%vectorIdx), \
+                                                                                    comment="select K=%u%u for vector=%u"%(elementIdx*2,  elementIdx*2+1, vectorIdx)))
+                                                                vgprOffset += 1
+                                        else:
+                                            pass
+                                elif lrvwTile > 1:
+                                    highBitsForHalf = 0
+                                    isHigh8Bits = 0
+                                    isHigh16Bits = 0
+                                    numElementPerReg = int(writer.states.bpr//tP["bpe"])
+                                    if needPack or numSplitMetadata:
+                                        destVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%(kernel["MIInputPerThread%s"%tc]), vIdx*numVgpr), numVgpr)
+                                    if grIdx == numReadsPerUnroll*miInputGroup-1:
+                                        for i in range(0, numVgpr):
+                                            # convert from [tile][MiInputPerThread][vector] to [tile][vector][MiInputPerThread]
+                                            vgprIdx = int((vIdx*numVgpr+i)*tP["bpeDS"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr*min(writer.states.bpr//tP["bpeDS"],vectorWidth))
+                                            if numSplitMetadata:
+                                                #TODO:
+                                                #vgprIdx = (vIdx*numVgpr+i)*ceil(tP["bpeDS"]*kernel["MIInputPerThread%s"%tc] / writer.states.bpr)*min(writer.states.bpr//tP["bpeDS"],vectorWidth)
+                                                if kernel["MIInputPerThread%s"%tc] == 4:
+                                                    vgprOffset = 0
+                                                    for rIdx_ in range(0, numReadsPerUnroll*miInputGroup):
+                                                        for elementIdx in range(0, numSplitMetadata+1):
+                                                            # since the number of input thread is 4, so will alwasy be D0, D1, D2, D3
+                                                            packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
+                                                                            src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 1, i+vIdx*numVgpr)), \
+                                                                            src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 0, i+vIdx*numVgpr)), \
+                                                                            src2=sgpr("PackKForV%u"%vgprOffset), \
+                                                                            comment="1 select K=%u%u for vector=%u"%(0, 1, vgprOffset)))
+                                                            packCodeT.add(VPermB32(dst=vgpr("PackTemp"), \
+                                                                            src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 3, i+vIdx*numVgpr)), \
+                                                                            src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 2, i+vIdx*numVgpr)), \
+                                                                            src2=sgpr("PackKForV%u"%vgprOffset), \
+                                                                            comment="1 select K=%u%u for vector=%u"%(2, 3, vgprOffset)))
+                                                            packCodeT.add(VLShiftLeftOrB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
+                                                                            src0=vgpr("PackTemp"), shiftHex=16, \
+                                                                            src1=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
+                                                                            comment="pack two half Vgpr to one Vgpr"))
+                                                            vgprOffset += 1
+                                                elif kernel["MIInputPerThread%s"%tc] == 2:
+                                                    vgprOffset = 0
+                                                    for rIdx_ in range(0, numReadsPerUnroll*miInputGroup):
+                                                        for elementIdx in range(0, numSplitMetadata+1):
+                                                            # since the number of input thread is 2, so will alwasy be D0 and D1
+                                                            packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx)), \
+                                                                                    src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 1, i+vIdx*numVgpr)), \
+                                                                                    src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, 0, i+vIdx*numVgpr)), \
+                                                                                    src2=sgpr("PackKForV%u"%vgprOffset), \
+                                                                                    comment="select K=%u%u for vector=%u"%(0, 1, vgprOffset)))
+                                                            vgprOffset += 1
+                                                elif kernel["MIInputPerThread%s"%tc] == 1:
+                                                    vgprIdx_ = vgprIdx+vIdx*(numSplitMetadata+1)
+                                                    packCodeT.add(VMovB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_)), src=destVgpr))
+                                                    for elementIdx in range(1, numSplitMetadata+1):
+                                                        packCodeT.add(VMovB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_ + elementIdx)), src=destVgpr, \
+                                                                            comment="another VGPR storing lshr 8-bit value %d %d" %(vgprIdx, elementIdx)))
+                                                        packCodeT.add(VLShiftRightB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_+elementIdx)), \
+                                                                                    shiftHex=hex(8*elementIdx), \
+                                                                                    src=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx_+elementIdx)), \
+                                                                                    comment="ValuMetadata Vpgr >> 8"))
+                                                else:
+                                                    assert False
+                                            elif tP["isM"]:
+                                                vgprOffset = 0
+                                                for elementIdx in range(0, kernel["MIInputPerThread%s"%tc]):
+                                                    packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+elementIdx+vIdx*2)), \
+                                                                        src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, vgprOffset*2 + 1 , i+vIdx*numVgpr)), \
+                                                                        src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, vgprOffset*2, i+vIdx*numVgpr)), \
+                                                                        src2=sgpr("PackKForV%u"%elementIdx), \
+                                                                        comment="select K=%u%u for vector=%u"%(vgprOffset*2+1, vgprOffset*2, elementIdx)))
+                                                    vgprOffset += (1 if elementIdx % 2 == 1 else 0)
+                                            elif kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["MFMA_BF16_1K"] or kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
+                                                vgprOffset = 0
+                                                for vectorIdx in range(0, numElementPerReg):
+                                                    for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
+                                                        packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
+                                                                            src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+1, i+vIdx*numVgpr)), \
+                                                                            src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg, i+vIdx*numVgpr)), src2=sgpr("PackKForV%u"%vectorIdx), \
+                                                                            comment="select K=%u%u for vector=%u"%(elementIdx*numElementPerReg,  elementIdx*numElementPerReg+1, vectorIdx)))
+                                                        vgprOffset += 1
+                                            elif kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat():
+                                                vgprOffset = 0
+                                                # vertorIdx 2,3 is for the case vectorWidth > 2
+                                                for vectorIdx in range(0, numElementPerReg):
+                                                    if vectorWidth <= 2 and vectorIdx > 1:
+                                                        break
+                                                    for elementIdx in range(0, int(tP["bpe"]*kernel["MIInputPerThread%s"%tc]//writer.states.bpr)):
+                                                        packCodeT.add(VPermB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx+vgprOffset)), \
+                                                                            src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+1, i+vIdx*numVgpr)), \
+                                                                            src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg, i+vIdx*numVgpr)), \
+                                                                            src2=sgpr("PackKForV%u"%vectorIdx), \
+                                                                            comment="select K=%u%u for vector=%u"%(elementIdx*4,  elementIdx*4+1, vectorIdx)))
+                                                        packCodeT.add(VPermB32(dst=vgpr("PackTemp"), \
+                                                                            src0=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+3, i+vIdx*numVgpr)), \
+                                                                            src1=vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, elementIdx*numElementPerReg+2, i+vIdx*numVgpr)), \
+                                                                            src2=sgpr("PackKForV%u"%vectorIdx), \
+                                                                            comment="select K=%u%u for vector=%u"%(elementIdx*4+2,  elementIdx*4+3, vectorIdx)))
+                                                        packCodeT.add(VLShiftLeftOrB32(dst=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + vgprOffset)),
+                                                                                    src0=vgpr("PackTemp"), \
+                                                                                    shiftHex=16, \
+                                                                                    src1=vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, vgprIdx + vgprOffset)), \
+                                                                                    comment="pack two half Vgpr to one Vgpr"))
+                                                        vgprOffset += 1
 
-                        # load read instrution
-                        paramList = []
-
-                        for oIdx in range(0, numOffsets):
-                            if perpStride > 1 and kernel["ProblemType"]["TLU%s"%tc] == 0:
-                                permBlock = kernel["MatrixInstK"] if kernel["ProblemType"]["TLU%s"%tc] == 1 else kernel["VectorWidth%s"%tc] * kernel["MatrixInstM"]
-                                perpStrideInv = permBlock // perpStride
-                                offset_val = (eIdx * (perpStrideInv) + ((vIdx) * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
-                            else:
-                                offset_val = (eIdx + (vIdx * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
-
-                            if kernel["ProblemType"]["Sparse"] != 0:
-                                if blocksPerTGroupSMFMA > 1:
-                                    blockId = (rIdx * numElementPerRead) // elementsPerBlockSMFMA  #block 0 or block 1
-                                    if kernel["UnrollMajorLDS%s"%(tc)]:
-                                        offset_val = offset_val + (blockOffsetSMFMA * blockId)
-                                    else:
-                                        offset_val = offset_val + (blockOffsetSMFMA * blockId) * UnrollStride
-                                offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
-                            elif kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() and kernel["MatrixInstK"] > 32:
-                                incOffset = 0
-                                midIdx = numReadsPerUnroll*miInputGroup // 2
-                                if rIdx >= midIdx:
-                                    if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
-                                        # TODO: why are these the offsets???
-                                        if kernel["MatrixInstM"] == 32:
-                                             incOffset = midIdx * numElementPerRead * UnrollStride
-                                        elif kernel["MatrixInstM"] == 16:
-                                            incOffset = 3 * midIdx * numElementPerRead * UnrollStride
-                                    else:
-                                        if kernel["MatrixInstM"] == 32:
-                                            incOffset = 16
-                                        elif kernel["MatrixInstM"] == 16:
-                                            incOffset = 48
-                                incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
-                                offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
-                            elif kernel["UseF32XEmulation"]:
-                                # Previously a single ds_read could be used to load all inputs for mfma
-                                # For emulated TF32, 2x ds_read is required along with a different mfma layout
-                                # so we need to adjust the offsets accordingly for the second ds_read.
-                                # Numbers here are specific to the mfma layout
-                                incOffset = 0
-                                midIdx = numReadsPerUnroll*miInputGroup // 2
-                                if rIdx >= midIdx:
-                                    if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
-                                        if kernel["MatrixInstM"] == 32:
-                                            incOffset = midIdx * numElementPerRead * UnrollStride
-                                        elif kernel["MatrixInstM"] == 16:
-                                            incOffset = 3 * midIdx * numElementPerRead * UnrollStride
-                                    else:
-                                        if kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16:
-                                            incOffset = 4
-                                        elif kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 32:
-                                            incOffset = 12
-                                incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
-                                offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
-                            else:
-								#TODO:
-                                #offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
-								offset_val = int(((gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
-
-                            if (kernel["LdsBlockSizePerPad%s"%tc] != 0) and (kernel["LdsPad%s"%tc] != 0):
-                                offset_val = int(offset_val + (offset_val // kernel["LdsBlockSizePerPad%s"%tc]) * kernel["LdsPad%s"%tc] * tP["bpeDS"])
-                            offset_val = offset_val + tP["localReadSwapByteOffset"]
-                            # TODO: Add NLC>1 offset calcs here? 
-                            if (kernel["DirectToLds%s" % tc] and  \
-                                kernel["GlobalReadVectorWidth%c"%tc] * tP["bpeDS"] > 4) and not kernel["UseGeneralizedNLCOne%s"%tc]:
-                              # another address conversion for DirectToLds + NumLoadsCoalesced > 1
-                              dummy, offset_val = writer.lraOffsetConversionForDTLandNLC(kernel, tP, offset_val)
-
-                            paramList.append(int(offset_val))
-
-                        comment = "L -> Reg lro=%d swapByteOffset=%u ti=%u vIdx=%u eIdx=%u grIdx=%u oIdx=%u buffer=%u iui=%u" \
-                                % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, eIdx, grIdx, oIdx, bufferIdx, iui)
-
-                        highBits = 0 if writer.states.archCaps["DSLow16NotPreserve"] else highBitsForHalf or isHigh16Bits
-
-
-                        if(paramList[0] >=131072):
-                            paramList[0] = paramList[0] -131072
-                            srcAddr=vgpr("LocalReadAddr%s+2"%tc)
-                        elif (paramList[0] >=65536):
-                            paramList[0] = paramList[0] -65536
-                            srcAddr=vgpr("LocalReadAddr%s+1"%tc)
-                        else:
-                            srcAddr=vgpr("LocalReadAddr%s"%tc)
-
-                        if numOffsets == 1:
-                            ds = DSModifiers(na=1, offset=paramList[0])
-                        else:
-                            ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
-                        LocalReadX = instruction.getInst(highBits)
-                        if kernel["UseDirect32XEmulation"] and (valuiIdx % 8) < 4:
-                            index = baseValuiIdx // 2 + rIdx
-                            destVgpr      = vgpr("Valu%s_T%u_I%u+%u"%(tc, bufferIdx, iui, index), blockWidth)
-                        localReadCodeT.add(LocalReadX(dst=destVgpr, src=srcAddr, ds=ds, comment=comment))
-                        # TODO - handle vector-load
-                        with writer.allocTmpSgpr(1) as tmpSgprInfo:
-                            tmpSgpr = tmpSgprInfo.idx
-                            if writer.db["CheckValue1%s"%tc] and not writer.inTailLoop:
-
-                                dbgVgpr = destVgpr
-                                dbgVgprList = destVgpr.split("v[")
-                                if len(dbgVgprList) == 1: # vIdx, no []
-                                    dbgVgpr = dbgVgprList[0]
                                 else:
-                                    # We only check the first one now
-                                    # TODO: Handle vector, but need to take care the last one
-                                    dbgVgprList = (dbgVgprList[1].split("]")[0]).split(':')
-                                    dbgVgpr = "v[%s]"%dbgVgprList[0]
-                                localReadCodeT.add(SWaitCnt(dscnt=0, vscnt=0, comment="CheckValue1 wait for LDS read"))
+                                    isHigh8Bits  = (blockWidth == 0.25) and ( ((grIdx % 4) % 2) == 1) # 1,3
+                                    # pack for blockWidth 0.5 type
+                                    if tP["isM"]:
+                                        isHigh8Bits  = (blockWidth == 0.25) and ( (grIdx % 2) == 1) # grIdx = 1
+                                        isHigh16Bits = (blockWidth == 0.25) and ( (grIdx % 4) == 3) if kernel["MIInputPerThread%s"%tc] == 4 else False # grIdx = 3
+                                        if isHigh8Bits:
+                                            dstVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/2), numVgpr)
+                                            lowVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx - 1), numVgpr)
+                                            highVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx), numVgpr)
+                                            packCodeT.add(VLShiftLeftOrB32(dst=dstVgpr, src0=highVgpr, shiftHex=8, src1=lowVgpr, comment="pack two int8 Vgpr to one half Vgpr"))
+                                        if isHigh16Bits:
+                                            # every 4 metadatas will be packed into one vgpr, so divide 4 to let dstVgrp be 0,1,2,...
+                                            dstVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/4), numVgpr)
+                                            lowVgpr  = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/2 - 1), numVgpr)
+                                            highVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valufIdx/2), numVgpr)
+                                            packCodeT.add(VLShiftLeftOrB32(dst=dstVgpr, src0=highVgpr, shiftHex=hex(0x10), src1=lowVgpr, comment="pack two int8x2 Vgpr to one Vgpr"))
+                                        # Metadata only use one vgpr in current SMFMA instructions, so doesn't need these two flags at localread (gfx94x, gfx95x).
+                                        isHigh16Bits = False
+                                        isHigh8Bits = False
+                                    elif writer.states.archCaps["HasEccHalf"] or not writer.states.asmCaps["HasWMMA_V1"]: # ECC pack
+                                        if highBitsForHalf:
+                                            highVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%2, valuiIdx), numVgpr)
+                                            if writer.states.archCaps["DSLow16NotPreserve"]:
+                                              packCodeT.add(VLShiftLeftOrB32(dst=baseLRVgpr, src0=highVgpr, shiftHex=hex(0x10), src1=baseLRVgpr, comment="pack two half Vgpr to one Vgpr"))
+                                            else:
+                                              packCodeT.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=highVgpr, comment="pack two half Vgpr to one Vgpr"))
+                                            destVgpr = highVgpr
+                                        # pack for blockWidth 0.25 type
+                                        if grIdx != 0:
+                                            if isHigh8Bits or isHigh16Bits:
+                                                highVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%4, valuiIdx), numVgpr)
+                                                destVgpr = highVgpr
+                                            if isHigh8Bits:
+                                                lowVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, (grIdx%4)-1, valuiIdx), numVgpr) if isHigh16Bits else baseLRVgpr
+                                                packCodeT.add(VLShiftLeftOrB32(dst=lowVgpr, src0=highVgpr, shiftHex=8, src1=lowVgpr, comment="pack two int8 Vgpr to one half Vgpr"))
+                                                if isHigh16Bits:
+                                                    if writer.states.archCaps["DSLow16NotPreserve"]:
+                                                      packCodeT.add(VLShiftLeftOrB32(dst=baseLRVgpr, src0=lowVgpr, shiftHex=hex(0x10), src1=baseLRVgpr, comment="pack two half Vgpr to one Vgpr"))
+                                                    else:
+                                                      packCodeT.add(VOrB32(dst=baseLRVgpr, src0=baseLRVgpr, src1=lowVgpr, comment="pack two half Vgpr to one Vgpr"))
+                                    else: # no ECC pack
+                                    # pack for No ECC blockwidth 0.25 type
+                                        if grIdx != 0:
+                                            if isHigh8Bits:
+                                                highVgpr = vgpr("Valu%s_X%u_I%u_D%u+%u"%(tc, bufferIdx, iui, grIdx%2, valuiIdx), numVgpr)
+                                                destVgpr = highVgpr
+                                            if isHigh8Bits and isHigh16Bits:
+                                                packCodeT.add(VLShiftLeftOrB32(dst=baseLRVgpr, src0=highVgpr, shiftHex=hex(0x8), src1=baseLRVgpr, comment="pack two int8x2 Vgpr to one Vgpr"))
 
-                                if kernel["ProblemType"]["MacDataTypeA"].isHalf():
-                                    hexValue = hex(0x3c003c00)     # packed 1s
-                                    if needPack:
-                                        hexValue = hex(0x3c000000) if highBitsForHalf else hex(0x00003c00)
-                                    localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hexValue, comment="CheckValue1: FP16"))
-                                    localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
+                            if kernel["ConvertAfterDS"] and kernel["UnrollMajorLDS%s"%tc]:
+                                valufIdx += blockWidth * (tP["bpe"] // tP["bpeDS"]) if (not tP["isM"]) else 1
+                            else:
+                                valufIdx += blockWidth if (tc in ("A", "B")) else 1
 
-                                elif kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
-                                    hexValue = hex(0x3f803f80)     # packed 1s
-                                    if needPack:
-                                        hexValue = hex(0x3f800000) if highBitsForHalf else hex(0x00003f80)
-                                    localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hexValue, comment="CheckValue1: BF16"))
-                                    localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
+                            # load read instrution
+                            paramList = []
 
-                                if kernel["ProblemType"]["MacDataTypeA"].isInt8():
-                                    if needPack:
-                                        hexValue = hex(0x00010000) if isHigh16Bits else hex(0x00000001)
-                                        localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hexValue, comment="CheckValue1: INT8"))
+                            for oIdx in range(0, numOffsets):
+                                if perpStride > 1 and kernel["ProblemType"]["TLU%s"%tc] == 0:
+                                    permBlock = kernel["MatrixInstK"] if kernel["ProblemType"]["TLU%s"%tc] == 1 else kernel["VectorWidth%s"%tc] * kernel["MatrixInstM"]
+                                    perpStrideInv = permBlock // perpStride
+                                    offset_val = (eIdx * (perpStrideInv) + ((vIdx) * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
+                                else:
+                                    offset_val = (eIdx + (vIdx * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
+
+                                if kernel["ProblemType"]["Sparse"] != 0:
+                                    if blocksPerTGroupSMFMA > 1:
+                                        blockId = (rIdx * numElementPerRead) // elementsPerBlockSMFMA  #block 0 or block 1
+                                        if kernel["UnrollMajorLDS%s"%(tc)]:
+                                            offset_val = offset_val + (blockOffsetSMFMA * blockId)
+                                        else:
+                                            offset_val = offset_val + (blockOffsetSMFMA * blockId) * UnrollStride
+                                    offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                elif kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() and kernel["MatrixInstK"] > 32:
+                                    incOffset = 0
+                                    midIdx = numReadsPerUnroll*miInputGroup // 2
+                                    if rIdx >= midIdx:
+                                        if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
+                                            # TODO: why are these the offsets???
+                                            if kernel["MatrixInstM"] == 32:
+                                                incOffset = midIdx * numElementPerRead * UnrollStride
+                                            elif kernel["MatrixInstM"] == 16:
+                                                incOffset = 3 * midIdx * numElementPerRead * UnrollStride
+                                        else:
+                                            if kernel["MatrixInstM"] == 32:
+                                                incOffset = 16
+                                            elif kernel["MatrixInstM"] == 16:
+                                                incOffset = 48
+                                    incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
+                                    offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                elif kernel["UseF32XEmulation"]:
+                                    # Previously a single ds_read could be used to load all inputs for mfma
+                                    # For emulated TF32, 2x ds_read is required along with a different mfma layout
+                                    # so we need to adjust the offsets accordingly for the second ds_read.
+                                    # Numbers here are specific to the mfma layout
+                                    incOffset = 0
+                                    midIdx = numReadsPerUnroll*miInputGroup // 2
+                                    if rIdx >= midIdx:
+                                        if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
+                                            if kernel["MatrixInstM"] == 32:
+                                                incOffset = midIdx * numElementPerRead * UnrollStride
+                                            elif kernel["MatrixInstM"] == 16:
+                                                incOffset = 3 * midIdx * numElementPerRead * UnrollStride
+                                        else:
+                                            if kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16:
+                                                incOffset = 4
+                                            elif kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 32:
+                                                incOffset = 12
+                                    incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
+                                    offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                else:
+                                    #TODO:
+                                    #offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                    offset_val = int(((gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
+
+                                if (kernel["LdsBlockSizePerPad%s"%tc] != 0) and (kernel["LdsPad%s"%tc] != 0):
+                                    offset_val = int(offset_val + (offset_val // kernel["LdsBlockSizePerPad%s"%tc]) * kernel["LdsPad%s"%tc] * tP["bpeDS"])
+                                offset_val = offset_val + tP["localReadSwapByteOffset"]
+                                # TODO: Add NLC>1 offset calcs here? 
+                                if (kernel["DirectToLds%s" % tc] and  \
+                                    kernel["GlobalReadVectorWidth%c"%tc] * tP["bpeDS"] > 4) and not kernel["UseGeneralizedNLCOne%s"%tc]:
+                                  # another address conversion for DirectToLds + NumLoadsCoalesced > 1
+                                  dummy, offset_val = writer.lraOffsetConversionForDTLandNLC(kernel, tP, offset_val)
+
+                                paramList.append(int(offset_val))
+
+                            comment = "L -> Reg lro=%d swapByteOffset=%u ti=%u vIdx=%u eIdx=%u grIdx=%u oIdx=%u buffer=%u iui=%u" \
+                                    % (tP["localReadOffset"], tP["localReadSwapByteOffset"], MIWaveGroupShape[tile01], vIdx, eIdx, grIdx, oIdx, bufferIdx, iui)
+
+                            highBits = 0 if writer.states.archCaps["DSLow16NotPreserve"] else highBitsForHalf or isHigh16Bits
+
+
+                            if(paramList[0] >=131072):
+                                paramList[0] = paramList[0] -131072
+                                srcAddr=vgpr("LocalReadAddr%s+2"%tc)
+                            elif (paramList[0] >=65536):
+                                paramList[0] = paramList[0] -65536
+                                srcAddr=vgpr("LocalReadAddr%s+1"%tc)
+                            else:
+                                srcAddr=vgpr("LocalReadAddr%s"%tc)
+
+                            if numOffsets == 1:
+                                ds = DSModifiers(na=1, offset=paramList[0])
+                            else:
+                                ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
+                            LocalReadX = instruction.getInst(highBits)
+                            if kernel["UseDirect32XEmulation"] and (valuiIdx % 8) < 4:
+                                index = baseValuiIdx // 2 + rIdx
+                                destVgpr      = vgpr("Valu%s_T%u_I%u+%u"%(tc, bufferIdx, iui, index), blockWidth)
+                            localReadCodeT.add(LocalReadX(dst=destVgpr, src=srcAddr, ds=ds, comment=comment))
+                            # TODO - handle vector-load
+                            with writer.allocTmpSgpr(1) as tmpSgprInfo:
+                                tmpSgpr = tmpSgprInfo.idx
+                                if writer.db["CheckValue1%s"%tc] and not writer.inTailLoop:
+
+                                    dbgVgpr = destVgpr
+                                    dbgVgprList = destVgpr.split("v[")
+                                    if len(dbgVgprList) == 1: # vIdx, no []
+                                        dbgVgpr = dbgVgprList[0]
+                                    else:
+                                        # We only check the first one now
+                                        # TODO: Handle vector, but need to take care the last one
+                                        dbgVgprList = (dbgVgprList[1].split("]")[0]).split(':')
+                                        dbgVgpr = "v[%s]"%dbgVgprList[0]
+                                    localReadCodeT.add(SWaitCnt(dscnt=0, vscnt=0, comment="CheckValue1 wait for LDS read"))
+
+                                    if kernel["ProblemType"]["MacDataTypeA"].isHalf():
+                                        hexValue = hex(0x3c003c00)     # packed 1s
+                                        if needPack:
+                                            hexValue = hex(0x3c000000) if highBitsForHalf else hex(0x00003c00)
+                                        localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hexValue, comment="CheckValue1: FP16"))
                                         localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
-                                # TODO - Check if this works. But need this? MFMA would use INT8
-                                elif kernel["ProblemType"]["MacDataTypeA"].isInt8x4():
-                                    localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(0x01010101), comment="CheckValue1: INT8x4"))
-                                    localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
+                                    elif kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
+                                        hexValue = hex(0x3f803f80)     # packed 1s
+                                        if needPack:
+                                            hexValue = hex(0x3f800000) if highBitsForHalf else hex(0x00003f80)
+                                        localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hexValue, comment="CheckValue1: BF16"))
+                                        localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
-                                elif kernel["ProblemType"]["MacDataTypeA"].isSingle():
-                                    localReadCodeT.add(writer.assert_eq( dbgVgpr, 1.0) )
+                                    if kernel["ProblemType"]["MacDataTypeA"].isInt8():
+                                        if needPack:
+                                            hexValue = hex(0x00010000) if isHigh16Bits else hex(0x00000001)
+                                            localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hexValue, comment="CheckValue1: INT8"))
+                                            localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
-                        addPackLR = False
-                        if ((subTileIdx == 0 and subIterLoadCount < totalLoads // numSubTiles) \
-                           or (subTileIdx == 1 and subIterLoadCount >= totalLoads // numSubTiles) \
-                           or numSubTiles == 1) or writer.states.inTailLoop:
-                            addPackLR = True
+                                    # TODO - Check if this works. But need this? MFMA would use INT8
+                                    elif kernel["ProblemType"]["MacDataTypeA"].isInt8x4():
+                                        localReadCodeT.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(0x01010101), comment="CheckValue1: INT8x4"))
+                                        localReadCodeT.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
-                        if addPackLR:
-                            if needPack or numSplitMetadata:
-                                packCode.add(packCodeT)
-                            localReadCode.add(localReadCodeT)
+                                    elif kernel["ProblemType"]["MacDataTypeA"].isSingle():
+                                        localReadCodeT.add(writer.assert_eq( dbgVgpr, 1.0))
 
-                        subIterLoadCount += 1
-                    # End of loop3
-                    if needPack:
-                        writer.states.numPackCvt = len(packCode.flatitems())
+                            addPackLR = False
+                            if ((subTileIdx == 0 and subIterLoadCount < totalLoads // numSubTiles) \
+                            or (subTileIdx == 1 and subIterLoadCount >= totalLoads // numSubTiles) \
+                            or numSubTiles == 1) or writer.states.inTailLoop:
+                                addPackLR = True
+
+                            if addPackLR:
+                                if needPack or numSplitMetadata:
+                                    packCode.add(packCodeT)
+                                localReadCode.add(localReadCodeT)
+
+                            subIterLoadCount += 1
+                        # End of loop3
+                        if needPack:
+                            writer.states.numPackCvt = len(packCode.flatitems())
                 # End of loop2
             # End of loop1
         # DTV case, do not return local read code.

@@ -1048,9 +1048,9 @@ class ProblemType(Mapping):
 
     if printIndexAssignmentInfo:
       print("TLUA:  %s (stridePosA(%d) <? unrollIdxA(%d)" % \
-			(state["TLUA"], strideIdxA, unrollIdxA))
+            (state["TLUA"], strideIdxA, unrollIdxA))
       print("TLUB:  %s (stridePosB(%d) <? unrollIdxB(%d)" % \
-	  		(state["TLUB"], strideIdxB, unrollIdxB))
+            (state["TLUB"], strideIdxB, unrollIdxB))
       print("Index01A:  %s" % state["Index01A"])
       print("Index01B:  %s" % state["Index01B"])
     #unrollDimStrideGreaterThanTileDimStrideA = TLUA = !transA = fast

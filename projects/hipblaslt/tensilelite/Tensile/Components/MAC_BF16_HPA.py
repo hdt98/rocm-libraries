@@ -120,7 +120,7 @@ class FMA_BF16_HPA_DOT2(MAC):
     asmCaps = lambda caps: caps['v_dot2_f32_bf16'] or caps['v_dot2c_f32_bf16']
     #archCaps = {}
     kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.BFloat16),
-	                          "MacDataTypeB": DataType(DataTypeEnum.BFloat16),
+                              "MacDataTypeB": DataType(DataTypeEnum.BFloat16),
                               "HighPrecisionAccumulate": True},
               "UseDotInstruction": True,
              }
