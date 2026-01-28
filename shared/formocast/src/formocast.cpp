@@ -461,6 +461,12 @@ namespace Tensilelite
             uint32_t missA = 0;
             uint32_t missB = 0;
 
+            // std::cout << "\t\twg0 " << wg0 << " wg1 " << wg1
+            //     << "\n\t\tMT0_Edge " << MT0_Edge << " MT1_Edge " << MT1_Edge
+            //     << "\n\t\tisL2BypassA " << isL2BypassA << " isL2BypassB " << isL2BypassB
+            //     << "\n\t\taRatio " << aRatio << " bRatio " << bRatio
+            //     << "\n\t\ttotalWGNum " << totalWGNum << " bRatio " << bRatio;
+
             for(uint32_t wg = 0; wg < std::min(totalWGNum, 10 * NumCUs); wg++)
             {
                 //clean cache
@@ -536,9 +542,13 @@ namespace Tensilelite
                 uint32_t xccres  = xccgWgNum % WGMXCC;
                 // starting wgId
                 uint32_t resWGId = (wg - realWGId) % xccgWgNum;
-
+                
                 // go xcc
                 uint32_t xccIdx = resWGId % WGMXCC;
+
+                // std::cout << "\n\t\trealWGId " << realWGId << " xccunit " << xccunit
+                //     << " xccres " << xccres << " resWGId " << resWGId << " xccIdx " << xccIdx;
+
                 // skip previous xcc
                 uint32_t skip = 0;
                 for(int i = 0; i < xccIdx; i++)
@@ -565,6 +575,12 @@ namespace Tensilelite
                 uint32_t idxWG01 = realWGId - (wg2 * sgprNumWorkGroups0 * sgprNumWorkGroups1 * gsu);
                 uint32_t sgprWorkGroup1 = idxWG01 / wg0;
                 uint32_t sgprWorkGroup0 = idxWG01 - (sgprWorkGroup1 * wg0);
+
+                // std::cout << "\n\t\tinnerXccId " << innerXccId << " realWGId " << realWGId
+                //           << " sgprWGM " << sgprWGM
+                //           << " sgprNumWorkGroups0 " << sgprNumWorkGroups0 << " sgprNumWorkGroups1 " << sgprNumWorkGroups1
+                //           << " wg2 " << wg2 << " idxWG01 " << idxWG01
+                //           << " sgprWorkGroup1 " << sgprWorkGroup1 << " sgprWorkGroup0 " << sgprWorkGroup0;
 
                 //go GSUWGMRR
                 uint32_t gsuSumIdx = 0;
@@ -720,6 +736,8 @@ namespace Tensilelite
             hitRate.totalHitRate = totalHitRate;
             hitRate.tile0HitRate = hitRateA;
             hitRate.tile1HitRate = hitRateB;
+
+            // std::cout << std::endl;
 
             return hitRate;
         }
