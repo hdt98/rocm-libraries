@@ -28,29 +28,29 @@
 #include "ideal_sizes.hpp"
 
 /*
-ideal_sizes.hpp and ideal_sizes.cpp gathers all constants that can be tuned for performance.
-We define variables that are used on the host, and not used as compile time constants as const int in ideal_sizes.cpp.
-We define variables that are used on the device, or used as compile time constants as macros in ideal_sizes.hpp.
+ideal_sizes.hpp and ideal_sizes.cpp gather all constants that can be tuned for performance.
+We define variables that are used on the host, and not used as compile time constants, as const int in ideal_sizes.cpp.
+We define variables that are used on the device, or used as compile time constants, as macros in ideal_sizes.hpp.
 */
 
 /******************************* larf ****************************************
 *******************************************************************************/
 
 #ifndef LARF_SSKER_THREADS
-const int LARF_SSKER_THREADS = 256;
+const int LARF_SSKER_THREADS = 256; // must be 64, 128, 256, 512, or 1024
 #endif
 #ifndef LARF_SSKER_BLOCKS
 const int LARF_SSKER_BLOCKS = 64;
 #endif
 #ifndef LARF_SSKER_MIN_DIM
-const int LARF_SSKER_MIN_DIM = 64;
+const int LARF_SSKER_MIN_DIM = 64; // should be >= LARF_SSKER_BLOCKS
 #endif
 
 /******************************* larfg ****************************************
 *******************************************************************************/
 
 #ifndef LARFG_SSKER_THREADS
-const int LARFG_SSKER_THREADS = 256;
+const int LARFG_SSKER_THREADS = 256; // must be 64, 128, 256, 512, or 1024
 #endif
 #ifndef LARFG_SSKER_MAX_N
 const int LARFG_SSKER_MAX_N = 2048;
