@@ -48,7 +48,7 @@ from rocisa.instruction import BranchInstruction, BufferLoadB128, BufferLoadB32,
   DSLoadB16, DSLoadB32, DSLoadB64, DSLoadU16, DSStoreB128, DSStoreB16, DSStoreB32, \
   DSStoreB64, DSStoreB8, DSStoreInstruction, FlatLoadB128, FlatLoadB32, FlatLoadB64, \
   FlatLoadD16B16, FlatLoadD16HIB16, FlatStoreB128, FlatStoreB32, FlatStoreB64, \
-  FlatStoreD16B16, FlatStoreD16HIB16, MFMAInstruction, MUBUFReadInstruction, \
+  FlatStoreD16B16, FlatStoreD16HIB16, MFMAInstruction, MXMFMAInstruction, MUBUFReadInstruction, \
   MacroInstruction, SAShiftRightI32, SAbsI32, SAddCU32, SAddI32, SAddU32, SAndB32, \
   SAndB64, SAndN2B32, SAtomicDec, SBarrier, SBfmB32, SBitcmp1B32, SBranch, SCBranchSCC0, \
   SCBranchSCC1, SCBranchVCCNZ, SCBranchVCCZ, SCMovB32, SCSelectB32, SCmpEQI32, \
@@ -3369,10 +3369,10 @@ class KernelWriterAssembly(KernelWriter):
       module.add(MacroInstruction(name=bfName, args=bfArgs, comment=bfComment))
       if kernel["BufferLoad"]:
           dest = "GlobalReadOffset%s+%u" % (tP["tensorChar"], graIdx)
-          module.add(vectorMultiplyBpe(vgpr(dest), vgpr(dest), tP["bpeGR"]))
+          module.add(vectorMultiplyBpe(dest, dest, tP["bpeGR"]))
       else:
           dset = "GlobalReadAddr%s+%u"%(tP["tensorChar"], graIdx)
-          module.add(vectorMultiply64Bpe(vgpr(dset, 2), vgpr(dset, 2), tP["bpeGR"]))
+          module.add(vectorMultiply64Bpe(dset, dset, tP["bpeGR"]))
 
       with self.allocTmpSgpr(2) as tmpSgprInfo:
         tmpSgpr = tmpSgprInfo.idx
@@ -3438,7 +3438,7 @@ class KernelWriterAssembly(KernelWriter):
 
       # Using offsets so GRO holds a byte offset not an element offset
       # So scale here before comparison:
-      module.add(scalarMultiplyBpe(sgpr(scalarGro), sgpr(scalarGro), tP["bpeGR"]))
+      module.add(scalarMultiplyBpe(scalarGro, scalarGro, tP["bpeGR"]))
 
       if kernel["DirectToLds%s"%tc] and kernel["UseInstOffsetForGRO"]:
         # add room for instruction offset
@@ -3702,7 +3702,7 @@ class KernelWriterAssembly(KernelWriter):
         # and when we get within 32-bit we start to step down the SRD
         # if the limit is <32bits, set it accurately here:
         # Note lshl_b64 the higher-numbered SGPR has the upper 32-bits
-        module.add(scalarMultiply64Bpe(sgpr("ShadowLimit%s"%tc, 2), sgpr("ShadowLimit%s"%tc, 2), tP["bpeGR"], ContinuousRegister(stmp, 2), "Set limit to use bytes"))
+        module.add(scalarMultiply64Bpe("ShadowLimit%s"%tc, "ShadowLimit%s"%tc, tP["bpeGR"], stmp, "Set limit to use bytes"))
         if prePad:
           module.add(SAddU32(dst=sgpr("ShadowLimit%s+0"%tc), src0=sgpr("ShadowLimit%s+0"%tc), src1=prePad, comment="extend limit for pre-pad"))
           module.add(SAddCU32(dst=sgpr("ShadowLimit%s+1"%tc), src0=sgpr("ShadowLimit%s+1"%tc), src1=0, comment="extend limit for pre-pad"))
@@ -3715,7 +3715,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SCSelectB32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("ShadowLimit%s+0"%tc), src1="BufferLimit", comment="Move shadow to real if we are within 2^32"))
       else:
         # put limit directly into SRD:
-        module.add(scalarMultiplyBpe(sgpr("Srd%s+2"%tc), sgpr(stmp), tP["bpeGR"], comment="Set limit to use bytes"))
+        module.add(scalarMultiplyBpe("Srd%s+2"%tc, stmp, tP["bpeGR"], comment="Set limit to use bytes"))
         module.add(SAddU32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("Srd%s+2"%tc), src1=prePad, comment="extend limit for pre-pad"))
 
       # Apply any high-order address components to the tileStart and eventually the SRD - batch idx for batched gemm
@@ -3742,7 +3742,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # Add the tile start to the SRD
     if wroteTileStart:
-      module.add(scalarMultiply64Bpe(sgpr(tileStart, 2), sgpr(tileStart, 2), tP["bpeGR"], ContinuousRegister(stmp, 2), "tileStart"))
+      module.add(scalarMultiply64Bpe(tileStart, tileStart, tP["bpeGR"], stmp, "tileStart"))
       module.add(SAddU32(dst=sgpr("Srd%s+0"%tc), src0=sgpr("Address%s+0"%tc), src1=sgpr(tileStart+0), comment="SRD base = Address+ tileStart0"))
       module.add(SAddCU32(dst=sgpr("Srd%s+1"%tc), src0=sgpr("Address%s+1"%tc), src1=sgpr(tileStart+1), comment="SRD base = Address+ tileStart1"))
     else:
@@ -4158,7 +4158,7 @@ class KernelWriterAssembly(KernelWriter):
           comment="lw%s%s**(MT%s + PAD)"%(tc, self.states.unrollChar, tc)))
       module.add(VAddU32(dst=vgpr(destVgpr), src0=vgpr(tP["gpr"]["lwoT"]), src1=vgpr(destVgpr), \
           comment="lwFO%s = (lw%s%s + lw%s%s*(MT%s+PAD))" % (tc, tc, tc, tc, self.states.unrollChar, tP["tileChar"]) ))
-    module.add(vectorMultiplyBpe(vgpr(destVgpr), vgpr(destVgpr), tP["bpeDS"]))
+    module.add(vectorMultiplyBpe(destVgpr, destVgpr, tP["bpeDS"]))
 
     # LdsBlockSizePerPad: add padding
     if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] != 0:
@@ -4265,7 +4265,8 @@ class KernelWriterAssembly(KernelWriter):
         self.vgprPool.checkIn(tmpv)
       self.vgprPool.checkIn(destVgpr)
 
-    if kernel["StoreSwapAddr"]:
+    # MXSA/MXSB do not use swap addresses (per mx_tony implementation)
+    if kernel["StoreSwapAddr"] and tc not in ("MXSA", "MXSB"):
       if kernel["LocalWriteUseSgpr%s"%tc]:
         # needed for the VReadfirstlaneB32 in the prior code block
         if self.states.archCaps["CrosslaneWait"]:
@@ -4364,7 +4365,7 @@ class KernelWriterAssembly(KernelWriter):
       finalVgpr = "LocalReadAddr%s"%tc
       module.add(VAddU32(dst=vgpr(finalVgpr), src0=vgpr(wave_id), src1=vgpr(tP["gpr"]["lro"]), \
         comment="Final Offset: offset = (lro%s+lsuoffset)*bpeDS" % tile01 ))
-      module.add(vectorMultiplyBpe(vgpr(finalVgpr), vgpr(finalVgpr), tP["bpeDS"]))
+      module.add(vectorMultiplyBpe(finalVgpr, finalVgpr, tP["bpeDS"]))
 
       # LdsBlockSizePerPad: add padding
       if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] !=0:
@@ -4534,7 +4535,8 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("lraSwapAddressesForDTLPad")
 
     tc = tP["tensorChar"]
-    if kernel["StoreSwapAddr"]:
+    # MXSA/MXSB do not use swap addresses (per mx_tony implementation)
+    if kernel["StoreSwapAddr"] and tc not in ("MXSA", "MXSB"):
       module.add(VAddU32(dst=vgpr("LocalReadSwapAddr%s"%tc), src0=kernel["LdsOffsetA_Blk"], src1=vgpr("LocalReadAddr%s"%tc), \
                          comment="Calculate starting lds addr of second buffer" ))
       module.add(VXorB32(dst=vgpr("LocalReadSwapAddr%s"%tc), \
@@ -7433,10 +7435,13 @@ class KernelWriterAssembly(KernelWriter):
                            a=src0, b=src1, metadata=mStr, \
                            comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
             elif kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]:
-              imod.add(MXMFMAInstruction(instType=miInInstType, accType=miOutInstType, variant=variant, \
+              mxBlock = kernel["ProblemType"]["MXBlockA"] if kernel["ProblemType"]["MXBlockA"] else kernel["ProblemType"]["MXBlockB"]
+              imod.add(MXMFMAInstruction(instType=miInInstType, accType=miOutInstType, \
+                                       mxScaleAType=InstType.INST_E8, mxScaleBType=InstType.INST_E8, \
+                                       variant=variant, \
                                        acc=self.accVgprReadWriteIndex(kernel, (accStart+accStoreCIdx), (accEnd-accStart+1)), \
                                        a=src0, b=src1, acc2=self.accVgprReadWriteIndex(kernel, accStart, (accEnd-accStart+1)), \
-                                       mxsa=srcMX0, mxsb=srcMX1,
+                                       mxsa=srcMX0, mxsb=srcMX1, block=mxBlock,
                                        comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
             else:
               if kernel["UseF32XEmulation"]:
@@ -8124,7 +8129,7 @@ class KernelWriterAssembly(KernelWriter):
                     sgpr("Sizes%s+%u"%("Sum" if sizeIdxIsSum else "Free", sizeIdx)),  \
                     sgpr("Stride%s%s"%(tc, self.states.indexChars[tP['ia'][-1]])), \
                     comment="64b tensor%s size in elements"%tc))
-        module.add(scalarMultiply64Bpe(sgpr(maxAddrSgpr, 2), sgpr(maxAddrSgpr, 2), tP["bpeGR"], ContinuousRegister(tmpSgpr, 2), comment="<- tensor%s size in bytes"%tc))
+        module.add(scalarMultiply64Bpe(maxAddrSgpr, maxAddrSgpr, tP["bpeGR"], tmpSgpr, comment="<- tensor%s size in bytes"%tc))
 
         module.add(SAddU32(
             dst=sgpr(maxAddrSgpr+0), \
@@ -9273,7 +9278,9 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("localWriteResetOffsets")
     if needReset:
       resetMask = hex(kernel["LdsOffsetA_Blk"]-1 | self.consts.ldsOOB)
-      if internalPointerSwap or kernel["StoreSwapAddr"]:
+      # MXSA/MXSB do not use swap addresses, use else branch instead
+      useSwapAddr = (internalPointerSwap or kernel["StoreSwapAddr"]) and tc not in ("MXSA", "MXSB")
+      if useSwapAddr:
         if internalPointerSwap:
           tP["localWriteSwapByteOffset"] = 0
         else:
@@ -10181,6 +10188,13 @@ class KernelWriterAssembly(KernelWriter):
       if not kernel["StoreSwapAddr"]:
         tP["localReadSwapByteOffset"] = 0 if tP["localReadSwapByteOffset"] else kernel["LdsOffsetA_Blk"]
         module.addComment1("local read swap internal offset -> %u" % tP["localReadSwapByteOffset"])
+      elif tc in ("MXSA", "MXSB"):
+        #TODO: MXSA/MXSB do not use swap addresses, use fixed offset instead
+        module.add(VXorB32(
+          dst=vgpr("LocalReadAddr%s"%tc), \
+          src0=hex(kernel["LdsOffsetA_Blk"]), \
+          src1=vgpr("LocalReadAddr%s"%tc), \
+          comment="swap Red Blk"))
       else:
         module.add(VXorB32(
           dst=vgpr("LocalReadAddr%s"%tc), \
@@ -10233,7 +10247,8 @@ class KernelWriterAssembly(KernelWriter):
       tP["localReadOffset"] = 0
       module.addComment0("handled internally")
 
-    if kernel["StoreSwapAddr"]:
+    # MXSA/MXSB do not use swap addresses
+    if kernel["StoreSwapAddr"] and tc not in ("MXSA", "MXSB"):
       # Reset offset, by picking smaller of the two
       tmpvgpr = self.vgprPool.checkOut(1) # contains other offsets
       module.add(VXorB32(
