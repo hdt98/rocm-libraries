@@ -999,7 +999,7 @@ static __global__ void cal_gnorm_sq_kernel(I const m,
                     auto const aij = Ap[ij];
                     norm_j += std::norm(aij);
                 }
-                gnorm_j = max_nan(gnorm_j, norm_j);
+                gnorm_j = rocblas_max_nan(gnorm_j, norm_j);
             }
             atomicMax(&(gnorm_block[0]), gnorm_j);
             __syncthreads();
@@ -1355,13 +1355,15 @@ static void set_triangular(rocblas_handle handle,
 
     {
         bool const use_lower = (uplo == 'L') || (uplo == 'l');
-        Istride const offset = (use_lower) ? idx2D(1, 0, lda) : 0;
+        bool const use_upper = (uplo == 'U') || (uplo == 'u');
+
+        Istride const offset = (use_lower) ? idx2D(1, 0, lda)(use_upper) ? idx2D(0, 1, lda) : 0;
 
         T const lalpha = alpha;
         T const lbeta = alpha;
 
-        I const mm = m - 1;
-        I const nn = n - 1;
+        I const mm = (use_lower || use_upper) ? m - 1 : m;
+        I const nn = (use_lower || use_upper) ? n - 1 : n;
 
         laset(handle, uplo, mm, nn, lalpha, lbeta,
 
