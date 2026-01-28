@@ -758,37 +758,22 @@ namespace rocRoller
             Generator<Instruction> operator()(int tag, LoadLDSTile const& load)
             {
                 const auto addresses
-                    = getLDSAddresses(tag, *m_graph, m_context, load).to<std::vector>();
+                    = getLDSAddresses(*m_graph, tag, load.varType).to<std::vector>();
 
-                std::stringstream ss;
-                streamJoin(ss, addresses, ", ");
-                Log::debug("LDS addresses: {}", ss.str());
+                std::vector<size_t> normalizedAddresses;
+                auto minAddress = *std::min_element(addresses.begin(), addresses.end());
+                for(auto addr : addresses)
+                {
+                    normalizedAddresses.push_back(addr - minAddress);
+                }
 
                 for(auto instr : m_loadStoreTileGenerator.genLoadLDSTile(
                         tag, load, m_graph->buildTransformer(tag)))
                 {
                     if(GPUInstructionInfo::isLDS(instr.getOpCode()))
                     {
-                        if(addresses.size() > 0)
-                        {
-                            // Normalize addresses
-                            std::vector<size_t> normalizedAddresses;
-                            auto minAddress = *std::min_element(addresses.begin(), addresses.end());
-                            for(auto addr : addresses)
-                            {
-                                normalizedAddresses.push_back(addr - minAddress);
-                            }
-
-                            AssertFatal(not instr.getModelledAddresses().has_value(),
-                                        "Should be unset",
-                                        ShowValue(instr.getModelledAddresses().value()));
-                            instr.setModelledAddresses(normalizedAddresses);
-                            instr.addComment(fmt::format("addresses {}", normalizedAddresses));
-                        }
-                        else
-                        {
-                            co_yield Instruction::Comment("Skipping address annotations");
-                        }
+                        instr.setModelledAddresses(normalizedAddresses);
+                        instr.addComment(fmt::format("addresses {}", normalizedAddresses));
                     }
                     co_yield std::move(instr);
                 }

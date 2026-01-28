@@ -1727,80 +1727,76 @@ namespace rocRoller
             return {};
         }
 
-        Generator<size_t> getLDSAddresses(int             tag,
-                                          KernelGraph&    m_graph, // TODO: remove m_
-                                          ContextPtr      m_context, // TODO: remove m_
-                                          CG::LoadLDSTile load) // TODO; only need var type
+        Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, VariableType varType)
         {
-            namespace CT = rocRoller::KernelGraph::CoordinateGraph; // TODO; CT:: prefix not needed?
+            namespace CT         = rocRoller::KernelGraph::CoordinateGraph;
             namespace Expression = rocRoller::Expression;
             using namespace ControlGraph;
             using namespace CoordinateGraph;
             using namespace Expression;
 
-            auto [ldsTag, lds]   = m_graph.getDimension<LDS>(tag);
-            auto [tileTag, tile] = m_graph.getDimension<MacroTile>(tag);
+            auto [ldsTag, lds]   = graph.getDimension<LDS>(tag);
+            auto [tileTag, tile] = graph.getDimension<MacroTile>(tag);
 
             auto maybeParentLDS
-                = only(m_graph.coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<Duplicate>));
+                = only(graph.coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<Duplicate>));
             if(maybeParentLDS)
                 ldsTag = *maybeParentLDS;
 
             if(tile.memoryType == MemoryType::WAVE)
             {
-                auto [waveTileTag, waveTile] = m_graph.getDimension<WaveTile>(tag);
-                auto [vgprTag, vgpr]         = m_graph.getDimension<VGPR>(tag);
+                auto [vgprTag, vgpr] = graph.getDimension<VGPR>(tag);
 
-                auto dataTypeInfo = DataTypeInfo::Get(load.varType);
+                auto dataTypeInfo = DataTypeInfo::Get(varType);
                 auto numBits = static_cast<uint>(dataTypeInfo.elementBits / dataTypeInfo.packing);
                 auto numElements = getUnsignedInt(evaluate(vgpr.size));
                 auto numBytes    = (numBits * numElements) / 8u;
 
-                // TODO: most of this can be cached
-                KernelArguments              m_arguments;
-                std::array<uint, 3>          m_workgroupOffset, m_workitemOffset;
-                std::array<ExpressionPtr, 3> m_kernelWorkgroupIndexes, m_kernelWorkitemIndexes;
+                // TODO: most of this can be cached for a const graph
+                KernelArguments              arguments;
+                std::array<uint, 3>          workgroupOffset, workitemOffset;
+                std::array<ExpressionPtr, 3> kernelWorkgroupIndexes, kernelWorkitemIndexes;
 
                 for(int i = 0; i < 3; ++i)
                 {
-                    m_workgroupOffset[i] = m_arguments.size();
-                    auto wg_name         = concatenate("WG", i);
-                    auto wg_carg         = CommandArgument(nullptr,
+                    workgroupOffset[i] = arguments.size();
+                    auto wg_name       = concatenate("WG", i);
+                    auto wg_carg       = CommandArgument(nullptr,
                                                    DataType::UInt32,
-                                                   m_workgroupOffset[i],
+                                                   workgroupOffset[i],
                                                    DataDirection::ReadOnly,
                                                    wg_name);
-                    auto wg              = std::make_shared<CommandArgument>(wg_carg);
-                    m_arguments.appendUnbound<uint>(wg_name);
+                    auto wg            = std::make_shared<CommandArgument>(wg_carg);
+                    arguments.appendUnbound<uint>(wg_name);
 
-                    m_workitemOffset[i] = m_arguments.size();
-                    auto wi_name        = concatenate("WI", i);
-                    auto wi_carg        = CommandArgument(nullptr,
+                    workitemOffset[i] = arguments.size();
+                    auto wi_name      = concatenate("WI", i);
+                    auto wi_carg      = CommandArgument(nullptr,
                                                    DataType::UInt32,
-                                                   m_workitemOffset[i],
+                                                   workitemOffset[i],
                                                    DataDirection::ReadOnly,
                                                    wi_name);
-                    auto wi             = std::make_shared<CommandArgument>(wi_carg);
-                    m_arguments.appendUnbound<uint>(wi_name);
+                    auto wi           = std::make_shared<CommandArgument>(wi_carg);
+                    arguments.appendUnbound<uint>(wi_name);
 
-                    m_kernelWorkgroupIndexes[i] = std::make_shared<Expression::Expression>(wg);
-                    m_kernelWorkitemIndexes[i]  = std::make_shared<Expression::Expression>(wi);
+                    kernelWorkgroupIndexes[i] = std::make_shared<Expression::Expression>(wg);
+                    kernelWorkitemIndexes[i]  = std::make_shared<Expression::Expression>(wi);
                 }
 
-                auto rawArguments     = m_arguments.dataVector();
+                auto rawArguments     = arguments.dataVector();
                 auto runtimeArguments = RuntimeArguments(rawArguments.data(), rawArguments.size());
 
                 auto setWorkgroup = [&](uint i, uint v) {
-                    *((uint*)(rawArguments.data() + m_workgroupOffset[i])) = v;
+                    *((uint*)(rawArguments.data() + workgroupOffset[i])) = v;
                 };
                 auto setWorkitem = [&](uint i, uint v) {
-                    *((uint*)(rawArguments.data() + m_workitemOffset[i])) = v;
+                    *((uint*)(rawArguments.data() + workitemOffset[i])) = v;
                 };
 
-                auto coords = m_graph.buildTransformer(tag);
+                auto coords = graph.buildTransformer(tag);
                 coords.setCoordinate(vgprTag, Expression::literal(0));
                 coords.fillExecutionCoordinates(
-                    m_context, m_kernelWorkgroupIndexes, m_kernelWorkitemIndexes);
+                    nullptr, kernelWorkgroupIndexes, kernelWorkitemIndexes);
                 auto index = coords.reverse({ldsTag})[0];
 
                 Log::debug("LoadLDSTile: tag {}, numBits {}, numElements {}, numBytes {}",

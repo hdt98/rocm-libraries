@@ -878,10 +878,7 @@ namespace rocRoller
         std::optional<int>
             getExchangeForMultiply(KernelGraph const& graph, int multiplyTag, NaryArgument arg);
 
-        Generator<size_t> getLDSAddresses(int                       tag,
-                                          KernelGraph&              m_graph,
-                                          ContextPtr                m_context,
-                                          ControlGraph::LoadLDSTile load);
+        Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, VariableType varType);
     }
 }
 
