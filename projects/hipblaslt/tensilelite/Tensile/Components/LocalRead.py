@@ -208,6 +208,7 @@ class LocalReadMFMA(LocalRead):
     """
     def __call__(self, writer, kernel, bufferIdx, iui, epsi, tP):
         imod = Module("LocalReadDo%s_I%s" % (tP["tensorChar"],iui))
+        pack = Module("pack%s_I%s" % (tP["tensorChar"],iui))
         subTileIdx = writer.states.SubTileIdx
 
         tc = tP["tensorChar"]

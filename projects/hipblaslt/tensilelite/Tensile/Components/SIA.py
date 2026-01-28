@@ -21,7 +21,7 @@
 ################################################################################
 
 from rocisa import countInstruction, countGlobalRead, countLocalWrite, \
-                    countDSStoreB128, countVMovB32
+                    countDSStoreB128, countVMovB32, countType
 from rocisa.base import Item
 from rocisa.code import Module, TextBlock
 from rocisa.container import DSModifiers, HolderContainer, replaceHolder
@@ -844,7 +844,7 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
                 if gapIndex == itemsLWToSchedIndex:
                     if item:
                         writesPerItem = countLocalWrite(item)
-                        decWait = 1 + item.countType(DSStoreB192)
+                        decWait = 1 + countType(item, DSStoreB192)
                         if kernel["ProblemType"]["Sparse"] and not writesPerItem:
                             writesPerItem = item.name.startswith("MetadataWrite") and countVMovB32(item)
                         if writesPerItem:

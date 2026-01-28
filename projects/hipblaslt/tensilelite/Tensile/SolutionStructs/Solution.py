@@ -38,8 +38,7 @@ from Tensile.Common import assignParameterWithDefault, IsaInfo, \
                     roundUpToNearestMultiple
 from Tensile.Common.DataType import DataType
 from Tensile.Common.GlobalParameters import defaultSolution, \
-                                            defaultInternalSupportParams, \
-                                            globalParameters
+                                            defaultInternalSupportParams
 from Tensile.SolutionStructs.Naming import getSolutionNameFull
 from Tensile.SolutionStructs.Problem import ProblemType
 from Tensile.Toolchain.Component import Assembler
@@ -331,6 +330,10 @@ class Solution(collections.abc.Mapping):
       if not "MIInputPerThreadA" in state:
         state["MIInputPerThreadA"] = state["MIInputPerThread"]
         state["MIInputPerThreadB"] = state["MIInputPerThread"]
+      if state["ProblemType"]["MXBlockA"]:
+        state['MIInputPerThreadMXSA'] = 1 # TODO: state['MIInputPerThread'] // state["ProblemType"]["MXBlock"]
+      if state["ProblemType"]["MXBlockB"]:
+        state['MIInputPerThreadMXSB'] = 1 # TODO: state['MIInputPerThread'] // state["ProblemType"]["MXBlock"]
 
     elif EnableMatrixInstruction == False:
       state["ThreadTile0"] = state["ThreadTile"][0]
@@ -1219,6 +1222,11 @@ class Solution(collections.abc.Mapping):
     # set True for DTL 
     state["UseGeneralizedNLCOneA"] = state["DirectToLdsA"]
     state["UseGeneralizedNLCOneB"] = state["DirectToLdsB"]
+    # MX block does not use DTL, so set to False
+    if state["ProblemType"]["MXBlockA"]:
+      state["UseGeneralizedNLCOneMXSA"] = False
+    if state["ProblemType"]["MXBlockB"]:
+      state["UseGeneralizedNLCOneMXSB"] = False
 
     state["LocalWriteUseSgprA"] = False
     state["LocalWriteUseSgprB"] = False
@@ -1404,7 +1412,7 @@ class Solution(collections.abc.Mapping):
       and ((numBytes == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
         or (numBytes == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
       )
-
+	  
     state["enableLDSTrMXSA"] = False
     state["enableLDSTrMXSB"] = False
     if state["enableLDSTrA"] or state["enableGLTrA"]:
@@ -1441,9 +1449,6 @@ class Solution(collections.abc.Mapping):
         Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
         state["DirectToLdsMXSA"] = False
         state["LocalWriteUseSgprMXSA"] = False
-        state["UseGeneralizedNLCOneMXSA"] = False
-        state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
-        state["MIInputPerThreadMXSA"] = state["MIInputPerThreadA"]
         state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
         state["VectorWidthMXSA"] = state["VectorWidthA"]
         state["MIWaveTileMXSA"] = state["MIWaveTileA"]
@@ -1459,9 +1464,6 @@ class Solution(collections.abc.Mapping):
         Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
         state["DirectToLdsMXSB"] = False
         state["LocalWriteUseSgprMXSB"] = False
-        state["UseGeneralizedNLCOneMXSB"] = False
-        state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
-        state["MIInputPerThreadMXSB"] = state["MIInputPerThreadB"]
         state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
         state["VectorWidthMXSB"] = state["VectorWidthB"]
         state["MIWaveTileMXSB"] = state["MIWaveTileB"]
@@ -2073,7 +2075,7 @@ class Solution(collections.abc.Mapping):
             if state["ProblemType"]["SwizzleTensorA"]:
               state["GlobalReadVectorWidthA"] = state["MIInputPerThreadA"] * calSwizzlePackK(state, "A")
             elif state["ProblemType"]["DataTypeA"].is6bitFloat():
-              state["GlobalReadVectorWidthA"] = 32
+              state["GlobalReadVectorWidthA"] = 32	  
             elif state["enableGLTrA"]:
               state["GlobalReadVectorWidthA"] = 8
             else:
@@ -2733,7 +2735,7 @@ class Solution(collections.abc.Mapping):
         state["NoTailLoop"] = True
     if state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
         state["NoTailLoop"] = True
-
+		
     # TailloopInNll optimization check
     if state["TailloopInNll"]:
       # Disable TailloopInNll
@@ -2771,6 +2773,12 @@ class Solution(collections.abc.Mapping):
     ########################################
     # LDS
     ########################################
+
+    if state["ProblemType"]["MXBlockA"]:
+      state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
+
+    if state["ProblemType"]["MXBlockB"]:
+      state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
 
     state["TransposeLDSMetadata"] = False if state["ProblemType"]["Sparse"] == 2 else True
     state["UnrollMajorLDSMetadata"] = False if state["ProblemType"]["Sparse"] == 2 else True
@@ -3091,9 +3099,13 @@ class Solution(collections.abc.Mapping):
 
     if state["PrefetchGlobalRead"]:
       offsetBlk = state["LdsOffsetB"] + state["LdsNumElementsAlignedB"]
-      state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
-        (state["1LDSBuffer"] == 0) and \
-        (offsetBlk + int(2**(math.ceil(math.log(offsetBlk, 2)))) > state["MaxLDS"])
+      # Disable StoreSwapAddr to ensure LdsOffsetA_Blk is always a power of 2
+      # This is consistent with mx_tony implementation which doesn't have StoreSwapAddr
+      state["StoreSwapAddr"] = False
+      # Original logic (disabled):
+      # state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
+      #   (state["1LDSBuffer"] == 0) and \
+      #   (offsetBlk + int(2**(math.ceil(math.log(offsetBlk, 2)))) > state["MaxLDS"])
 
       if offsetBlk > 0 and not state["StoreSwapAddr"]:
         # Rounds offsetBlk to a power of two to enable inlining {s,v}_xor constants for swapping offsets
