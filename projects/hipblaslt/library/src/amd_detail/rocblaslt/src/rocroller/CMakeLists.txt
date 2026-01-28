@@ -2,21 +2,10 @@
 # SPDX-License-Identifier:  MIT
 
 add_library(hipblaslt-rocroller OBJECT)
-target_sources(hipblaslt-rocroller
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/custom_kernels.hip"
-        "${CMAKE_CURRENT_SOURCE_DIR}/gemm.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/parameter_selection.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/runtime_args_selection.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocroller_host.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/solution_cache.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/solution_selection.cpp"
-)
 
 target_compile_features(hipblaslt-rocroller PRIVATE cxx_std_20)
 set_target_properties(hipblaslt-rocroller PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(hipblaslt-rocroller PRIVATE roc::origami-headers)
-target_link_libraries(hipblaslt-rocroller PUBLIC hip::host)
 if(TARGET roc::rocroller-interface)
     target_link_libraries(hipblaslt-rocroller PRIVATE roc::rocroller-interface)
 else()
@@ -33,4 +22,42 @@ target_include_directories(hipblaslt-rocroller
         "${PROJECT_SOURCE_DIR}/library/include"
         "${PROJECT_SOURCE_DIR}/tensilelite/include"
 )
+
+set(aiter_kernel_files
+    "${CMAKE_CURRENT_SOURCE_DIR}/kernels/f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co"
+)
+set(clang_offload_wrapper_exe /opt/rocm/lib/llvm/bin/clang-offload-wrapper)
+set(wrapper_bc "${CMAKE_CURRENT_BINARY_DIR}/multi_kernel_wrapper.bc")
+set(wrapper_obj "${CMAKE_CURRENT_BINARY_DIR}/multi_kernel_wrapper.o")
+
+add_custom_command(
+    OUTPUT ${wrapper_bc}
+    COMMAND ${clang_offload_wrapper_exe} 
+            -o ${wrapper_bc}
+            --target=amdgcn-amd-amdhsa
+            --offload-arch=gfx950
+            ${aiter_kernel_files}  # Passes all files in the list
+    DEPENDS ${aiter_kernel_files}
+    COMMENT "Wrapping multiple GPU Code Objects into a single host bitcode"
+)
+
+add_custom_command(
+    OUTPUT ${wrapper_obj}
+    COMMAND ${CMAKE_CXX_COMPILER} -c ${wrapper_bc} -o ${wrapper_obj}
+    DEPENDS ${wrapper_bc}
+    COMMENT "Compiling multi-kernel wrapper"
+)
+
+target_sources(hipblaslt-rocroller
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/custom_kernels.hip"
+        "${CMAKE_CURRENT_SOURCE_DIR}/gemm.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/parameter_selection.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/runtime_args_selection.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocroller_host.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/solution_cache.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/solution_selection.cpp"
+        ${wrapper_obj}
+)
+
 target_link_libraries(hipblaslt PRIVATE hipblaslt-rocroller)
