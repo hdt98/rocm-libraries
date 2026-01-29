@@ -10,6 +10,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 * Computation of different matrix norms
     * LANGE
     * LANGE_64
+* Computation of different matrix condition numbers
+    * GECON
+    * GECON_64
 
 ### Changed
 ### Removed
@@ -20,53 +23,6 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Known issues
 ### Upcoming changes
-
-## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
-
-### Added
-
-* Compute the norm of a matrix using the following routines:
-    * LANGE
-    * LANGE_64
-
-
-
-## rocSOLVER 3.32.0 for ROCm 7.2.0
-
-### Optimized
-
-* Improved the performance of LARFB and downstream functions such as GEQRF and ORMTR.
-## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
-
-### Added
-
-* Computation of the condition number of a matrix
-    * GECON
-    * GECON_64
-
-
-
-## rocSOLVER 3.31.0 for ROCm 7.1.0
-## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
-
-### Added
-
-* Compute the norm of a matrix
-    * LANGE
-    * LANGE_64
-
-
-
-## rocSOLVER 3.31.0 for ROCm 7.1.0
-## rocSOLVER 3.33.0 (unreleased) for ROCm 7.2.0
-
-### Added
-
-* Compute the norm of a matrix
-* Compute the norm of a matrix using the following routines:
-* Computation of different matrix norms
-    * LANGE
-    * LANGE_64
 
 
 
