@@ -79,7 +79,7 @@ class LocalReadVALU(LocalRead):
                 # paramList.append(vgpr("LocalReadAddr%s"%tc))
 
                 for oIdx in range(0, numOffsets):
-                    # dot2 -TODO: check if this is correct when using rTdx
+                    # dot2
                     if kernel["UseDotInstruction"]:
                         paramList.append(int((rIdx*blockWidth + kernel["SubGroup%u"%tile01] * (vIdx*numOffsets+oIdx) * tileStride \
                             + tP["localReadOffset"]) * tP["bpe"] + tP["localReadSwapByteOffset"]) // offsetMultiplier)
@@ -852,25 +852,26 @@ class LocalReadMFMA(LocalRead):
                                             offset_val = offset_val + (blockOffsetSMFMA * blockId) * UnrollStride
                                     #offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
                                     offset_val = int(((gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
-                                elif kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() and kernel["MatrixInstK"] > 32 and tc in ("A", "B"):
-                                    # Note: This special offset logic only applies to A/B tensors, not MXSA/MXSB scale data
-                                    incOffset = 0
-                                    midIdx = numReadsPerUnroll*miInputGroup // 2
-                                    if grIdx >= midIdx:
-                                        if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
-                                            # TODO: why are these the offsets???
-                                            if kernel["MatrixInstM"] == 32:
-                                                incOffset = midIdx * numElementPerRead * UnrollStride
-                                            elif kernel["MatrixInstM"] == 16:
-                                                incOffset = 3 * midIdx * numElementPerRead * UnrollStride
-                                        else:
-                                            if kernel["MatrixInstM"] == 32:
-                                                incOffset = 16
-                                            elif kernel["MatrixInstM"] == 16:
-                                                incOffset = 48
-                                    # Include gIdx * numElementPerGroup to properly account for group index offset
-                                    incOffset = (gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + incOffset
-                                    offset_val = int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
+                                # Bugfixed for the wrong additional offset calculation in MX feature -TODO: need tensilelite expert to confirm this.
+                                # elif kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() and kernel["MatrixInstK"] > 32 and tc in ("A", "B"):
+                                #     # Note: This special offset logic only applies to A/B tensors, not MXSA/MXSB scale data
+                                #     incOffset = 0
+                                #     midIdx = numReadsPerUnroll*miInputGroup // 2
+                                #     if grIdx >= midIdx:
+                                #         if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
+                                #             # TODO: why are these the offsets???
+                                #             if kernel["MatrixInstM"] == 32:
+                                #                 incOffset = midIdx * numElementPerRead * UnrollStride
+                                #             elif kernel["MatrixInstM"] == 16:
+                                #                 incOffset = 3 * midIdx * numElementPerRead * UnrollStride
+                                #         else:
+                                #             if kernel["MatrixInstM"] == 32:
+                                #                 incOffset = 16
+                                #             elif kernel["MatrixInstM"] == 16:
+                                #                 incOffset = 48
+                                #     # Include gIdx * numElementPerGroup to properly account for group index offset
+                                #     incOffset = (gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + incOffset
+                                #     offset_val = int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
                                 elif kernel["UseF32XEmulation"]:
                                     # Previously a single ds_read could be used to load all inputs for mfma
                                     # For emulated TF32, 2x ds_read is required along with a different mfma layout
@@ -892,7 +893,6 @@ class LocalReadMFMA(LocalRead):
                                     incOffset = (gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + incOffset
                                     offset_val = int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
                                 else:
-                                    #TODO:
                                     #offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
                                     offset_val = int(((gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
 
