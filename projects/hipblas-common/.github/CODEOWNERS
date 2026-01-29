@@ -1,4 +1,4 @@
-* @bnemanich @daineAMD @TorreZuk
+* @bnemanich @TorreZuk
 
-*.md @ROCm/rocm-documentation @bnemanich @daineAMD @TorreZuk
-*.rst @ROCm/rocm-documentation @bnemanich @daineAMD @TorreZuk
+*.md @ROCm/rocm-documentation @bnemanich @TorreZuk
+*.rst @ROCm/rocm-documentation @bnemanich @TorreZuk
