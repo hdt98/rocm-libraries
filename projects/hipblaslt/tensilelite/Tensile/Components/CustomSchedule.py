@@ -1576,6 +1576,7 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
         # Global read scheduling:
         # Each GR has two instructions (addr update + buffer_load), so we list them explicitly as
         # two adjacent MFMA indices per GR.
+        kernel["SwapGlobalReadOrder"] = True
 
         syncTable = [
             # Loop start:
@@ -1595,39 +1596,38 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
             27, SBarrier(comment=""),
 
             # Mid-loop global-read safety fence (GR-to-LDS)
-            29, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Mid-loop fence (wait for outstanding GR-to-LDS)"),
-            29, SBarrier(comment=""),
+            30, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Mid-loop fence (wait for outstanding GR-to-LDS)"),
+            30, SBarrier(comment=""),
 
             # Ensure all GR-to-LDS are complete before LRA1 (next-iter A LDS reads)
-            40, SWaitCnt(dscnt=-1, vlcnt=11-3, vscnt=-1, comment="Wait for all GR-to-LDS to complete before LRA1"),
-            40, SBarrier(comment=""),
+            48, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Wait for all GR-to-LDS to complete before LRA1"),
+            48, SBarrier(comment=""),
         ]
 
         optSchedule = {
             'SYNC'   : [syncTable[::2]],
             # Swap A/B increments
             'GRIncB' : [[0, 1, 2, 3, 4, 5, 6, 7, 8]],
-            'GRIncA' : [[9, 10, 11, 26, 26, 27, 28, 29, 29]],
+            'GRIncA' : [[9, 9, 9, 9, 9, 9, 9, 9, 9]],
 
             'LRB0'   : [[0, 1, 2, 3, 4, 5, 6, 7],
                         [1, 2, 3, 4, 5, 6, 7, 8]],
             'LRA0'   : [[8, 8, 9, 9,   11, 11, 12, 12,  13, 13, 15, 15, 16, 16],
                         [9, 9, 10, 10, 12, 12, 13, 13, 14, 14, 16, 16, 17, 17]],
          
-            'GRB'    : [[15,15, 18,18, 21,21, 24,24],
+            'GRA'    : [[15,15, 18,18, 21,21, 24,24],
                         [16,16, 19,19, 22,22, 25,25]],
-            'GRA'    : [[29,29, 32,32, 35,35, 38,38, 41,41, 44,44, 47,47],
-                        [30,30, 33,33, 36,36, 39,39, 42,42, 45,45, 48,48]],
+            'GRB'    : [[29,29, 32,32, 35,35, 38,38, 41,41, 44,44, 47,47],
+                        [30,30, 33,33, 36,36, 39,39, 42,42, 45,45, 46,46]],
 
-            'LRB1'   : [[29, 30, 31, 32, 33, 34, 35, 36],
-                        [30, 31, 32, 33, 34, 35, 36, 37]],
-            'LRA1'   : [[40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53],
-                        [41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54]],
+            'LRB1'   : [[30, 32, 34, 36, 38, 40, 42, 44]],
+            'LRA1'   : [[48,48, 49,49, 50,50, 51, 51, 52, 52, 53, 53, 54, 54],
+                        [49, 49, 50, 50, 51, 51, 52, 52, 53, 53, 54, 54, 55, 55]],
 
             'LRSA'   : [[22]],
             'LRSB'   : [[23]],
-            'LWSA'   : [[38]],
-            'LWSB'   : [[39]],
+            'LWSA'   : [[48]],
+            'LWSB'   : [[49]],
             'LCC'    : [[55, 55]],
         }
 
