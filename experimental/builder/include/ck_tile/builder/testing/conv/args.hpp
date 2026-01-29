@@ -196,8 +196,9 @@ struct Args<SIGNATURE>
     // TODO: We shouldn't need to call into an internal namespace here.
     using Ops = factory::internal::ConvElementwiseOps<SIGNATURE>;
 
+    // NOTE: ConvTensorLayouts removed - not used in this file and causes compilation error
     // TODO: We shouldn't need to call into an internal namespace here.
-    using Layouts = factory::internal::ConvTensorLayouts<SIGNATURE>;
+    // using Layouts = factory::internal::ConvTensorLayouts<SIGNATURE>;
 
     ConvTensorLengths<SPATIAL_DIM> lengths;
 
