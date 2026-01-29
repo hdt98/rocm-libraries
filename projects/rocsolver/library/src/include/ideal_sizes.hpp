@@ -68,12 +68,6 @@
 #define LARFT_SWITCHSIZE 64
 #endif
 
-/******************************* gecon ****************************************
-*******************************************************************************/
-#ifndef GECON_BLOCKSIZE
-#define GECON_BLOCKSIZE 1024
-#endif
-
 /***************** geqr2/geqrf and geql2/geqlf ********************************
 *******************************************************************************/
 /*! \brief Determines the size of the block column factorized at each step

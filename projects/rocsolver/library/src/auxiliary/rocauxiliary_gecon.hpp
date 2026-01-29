@@ -44,6 +44,10 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#ifndef GECON_BLOCKSIZE
+#define GECON_BLOCKSIZE 1024
+#endif
+
 /**
  * gecon_compute_rcond: Compute rcond from estimate on device
  * rcond = 1 / (||A|| * ||A^-1||) = 1 / (anorm * est)
