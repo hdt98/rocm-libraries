@@ -26,20 +26,16 @@
 #ifndef MIOPEN_FUSION_HPP_
 #define MIOPEN_FUSION_HPP_
 
-#include <miopen/common.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 #include <miopen/convolution.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/kernel_info.hpp>
-#include <miopen/op_kernel_args.hpp>
 #include <miopen/fusion_ops.hpp>
 #include <miopen/fusion/fusion_invoke_params.hpp>
 #include <miopen/activ.hpp>
 
-#include <set>
 #include <vector>
-#include <unordered_map>
 
 namespace miopen {
 
@@ -267,6 +263,12 @@ solver::ConvSolution MakeFusedSolution(const struct FusionContext& ctx,
                                        const std::optional<std::string>& perf_cfg_override,
                                        const struct FusionDescription& problem,
                                        const AnyInvokeParams& invoke_params);
+
+namespace debug {
+// For unit tests.
+MIOPEN_INTERNALS_EXPORT std::vector<solver::Id>
+GetAllApplicableFusionSolutions(const FusionContext& ctx, const FusionDescription& fusion_problem);
+} // namespace debug
 
 } // namespace miopen
 MIOPEN_DEFINE_OBJECT(miopenFusionOpDescriptor, miopen::FusionOpDescriptor);

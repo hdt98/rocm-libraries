@@ -224,6 +224,9 @@ class GEMMSolution:
     storeLDS_D: bool = True
     betaInFma: bool = True
 
+    padLDS_A: tuple[int, int] = (0, 0)
+    padLDS_B: tuple[int, int] = (0, 0)
+
     scheduler: str = "Priority"
     schedulerCost: str = "LinearWeighted"
 
@@ -232,11 +235,13 @@ class GEMMSolution:
     prefetchLDSFactor: int = 0
     prefetchMixMemOps: bool = False
 
-    loadLDSScale_A: bool = False
-    loadLDSScale_B: bool = False
+    loadScale_A: str = "BufferToVGPR"
+    loadScale_B: str = "BufferToVGPR"
+
     swizzleScale: bool = False
     swizzleTileSize: MKNLTuple = MKNLTuple(0, 0, 0, 0)
     prefetchScale: bool = False
+    pretileScale: bool = False
 
     streamK: bool = False
     numWGs: int = 0
