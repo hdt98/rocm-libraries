@@ -33,8 +33,8 @@
     We define variables that are used on the device, or used as compile time constants, as macros in ideal_sizes.hpp.
  *********************************************************************************/
 
-#define BS1 256 // generic 1 dimensional thread-block size used to call common kernels
-#define BS2 32 // generic 2 dimensional thread-block size used to call common kernels
+constexpr int BS1 = 256; // generic 1 dimensional thread-block size used to call common kernels
+constexpr int BS2 = 32; // generic 2 dimensional thread-block size used to call common kernels
 
 /******************************* larf ****************************************
 *******************************************************************************/
@@ -45,7 +45,7 @@ extern const int LARF_SSKER_THREADS; // must be 64, 128, 256, 512, or 1024
 extern const int LARF_SSKER_BLOCKS;
 #endif
 #ifndef LARF_SSKER_MAX_DIM
-#define LARF_SSKER_MAX_DIM 2048 // should be >= LARF_SSKER_THREADS
+constexpr int LARF_SSKER_MAX_DIM = 2048; // should be >= LARF_SSKER_THREADS
 #endif
 #ifndef LARF_SSKER_MIN_DIM
 extern const int LARF_SSKER_MIN_DIM; // should be >= LARF_SSKER_BLOCKS
@@ -363,10 +363,10 @@ extern const int GETF2_SPKER_MAX_M; //always <= 1024
 extern const int GETF2_SPKER_MAX_N; //always <= 256
 #endif
 #ifndef GETF2_SSKER_MAX_M
-#define GETF2_SSKER_MAX_M 512 //always <= 512 and <= GETF2_SPKER_MAX_M
+constexpr int GETF2_SSKER_MAX_M = 512; //always <= 512 and <= GETF2_SPKER_MAX_M
 #endif
 #ifndef GETF2_SSKER_MAX_N
-#define GETF2_SSKER_MAX_N 64 //always <= wavefront and <= GETF2_SPKER_MAX_N
+constexpr int GETF2_SSKER_MAX_N = 64; //always <= wavefront and <= GETF2_SPKER_MAX_N
 #endif
 #ifndef GETF2_OPTIM_NGRP
 #define GETF2_OPTIM_NGRP \
@@ -479,7 +479,7 @@ extern const int GETRI_BATCH_NUM_INTERVALS;
 /***************************** trtri ******************************************
 *******************************************************************************/
 #ifndef TRTRI_MAX_COLS
-#define TRTRI_MAX_COLS 64 //always <= wavefront size
+constexpr int TRTRI_MAX_COLS = 64; //always <= wavefront size
 #endif
 #ifndef TRTRI_NUM_INTERVALS
 extern const int TRTRI_NUM_INTERVALS;
