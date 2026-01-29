@@ -265,24 +265,6 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                                               const std::vector<config_t>& configs) {
   if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
 
-  auto problem_type = problem;
-  problem_type.batch = 0;
-  problem_type.size = {0, 0, 0};
-
-  static std::unordered_map<problem_t, std::vector<kernel_cache_t>> kernel_cache_map;
-  static std::mutex mut;
-  std::unique_lock<std::mutex> lock(mut);
-  bool use_cache = get_runtime_options().cache_kernel_info;
-  auto p_cache_entry = use_cache ? kernel_cache_map.find(problem_type) : kernel_cache_map.end();
-  if (p_cache_entry == kernel_cache_map.end()) {
-    std::vector<kernel_cache_t> caches;
-    caches.reserve(configs.size());
-    for (auto& config : configs)
-      caches.push_back(create_kernel_cache(problem_type, hardware, config));
-    p_cache_entry = kernel_cache_map.insert({problem_type, caches}).first;
-  }
-  auto& cache_entry = p_cache_entry->second;
-
   struct prediction_result_wrapper_t {
     double latency;
     std::reference_wrapper<const config_t> config;
@@ -291,15 +273,13 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
   std::vector<prediction_result_wrapper_t> latencies_configs;
   latencies_configs.reserve(configs.size());
 
-  for (std::size_t i = 0; i < configs.size(); i++) {
-    if (!cache_entry[i].fits_lds_capacity)
+  for (auto& config : configs) {
+    if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype))
       continue;
-    double latency = compute_total_latency(problem, hardware, configs[i], cache_entry[i], hardware.N_CU);
+    double latency = compute_total_latency(problem, hardware, config, hardware.N_CU);
     if (latency != std::numeric_limits<double>::max())
-      latencies_configs.push_back({latency, std::cref(configs[i])});
+      latencies_configs.push_back({latency, std::cref(config)});
   }
-  if(!use_cache) kernel_cache_map.clear();
-  lock.unlock();
 
   if (latencies_configs.empty()) { throw std::runtime_error("No valid configs found."); }
 

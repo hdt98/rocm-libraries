@@ -21,9 +21,7 @@
 #include "origami/streamk.hpp"
 
 namespace origami {
-double calculate_work_utilization(const problem_t& problem,
-                                  const config_t& config,
-                                  const origami_cache_t& cache) {
+double calculate_work_utilization(const problem_t& problem, const config_t& config) {
   const size_t M = problem.size.m;
   const size_t N = problem.size.n;
   const size_t K = problem.size.k;
@@ -35,11 +33,14 @@ double calculate_work_utilization(const problem_t& problem,
   if (MT_M <= 0 || MT_N <= 0) return 1.0;
 
   // Calculate the full dimensions covered by the launched grid of tiles (spatial).
-  const double launched_M = static_cast<double>(cache.grid_m) * static_cast<double>(MT_M);
-  const double launched_N = static_cast<double>(cache.grid_n) * static_cast<double>(MT_N);
+  const double launched_M =
+      static_cast<double>(math::safe_ceil_div(M, MT_M)) * static_cast<double>(MT_M);
+  const double launched_N =
+      static_cast<double>(math::safe_ceil_div(N, MT_N)) * static_cast<double>(MT_N);
 
   // Calculate the full depth covered by the k-loop iterations (temporal).
-  const double launched_K = static_cast<double>(cache.grid_k) * static_cast<double>(MT_K);
+  const double launched_K =
+      static_cast<double>(math::safe_ceil_div(K, MT_K)) * static_cast<double>(MT_K);
 
   // The utilization is the ratio of the useful problem volume to the total scheduled volume.
   const double useful_volume   = static_cast<double>(M * N * K);
@@ -361,13 +362,20 @@ double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t num_acti
 double estimate_l2_hit(const problem_t& problem,
                        const hardware_t& hardware,
                        const config_t& config,
+                       size_t splitting_factor) {                       
+  auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
+  return estimate_l2_hit(problem, hardware, config, splitting_factor, cache);
+}
+
+double estimate_l2_hit(const problem_t& problem,
+                       const hardware_t& hardware,
+                       const config_t& config,
+                       size_t splitting_factor,
                        const origami_cache_t& cache) {
   // Use size_t for dimensions and counts to ensure type safety.
   const size_t workgroups_m     = cache.grid_m;
   const size_t workgroups_n     = cache.grid_n;
   const size_t total_workgroups = workgroups_m * workgroups_n;
-
-  const auto splitting_factor = cache.splitting_factor;
 
   // Concurrently executing workgroups are limited by the number of CUs.a
   const size_t concurrent_workgroups = std::min(total_workgroups, hardware.N_CU);
@@ -443,10 +451,18 @@ double estimate_l2_hit(const problem_t& problem,
 std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
                                                      const hardware_t& hardware,
                                                      const config_t& config,
-                                                     const origami_cache_t& cache) {
-  const auto num_active_cus   = cache.num_active_cus;
-  const auto splitting_factor = cache.splitting_factor;
+                                                     size_t num_active_cus,
+                                                     size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor);
+}
 
+std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
+                                                     const hardware_t& hardware,
+                                                     const config_t& config,
+                                                     size_t num_active_cus,
+                                                     size_t splitting_factor,
+                                                     const origami_cache_t& cache) {
   const size_t workgroups_m = cache.grid_m;
   const size_t workgroups_n = cache.grid_n;
 
@@ -500,8 +516,16 @@ std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
 double compute_l2_hit_rate_global(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config,
-                                  const origami_cache_t& cache,
                                   size_t l2_capacity_bytes) {
+  auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
+  return compute_l2_hit_rate_global(problem, hardware, config, l2_capacity_bytes);
+}
+
+double compute_l2_hit_rate_global(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config,
+                                  size_t l2_capacity_bytes,
+                                  const origami_cache_t& cache) {
   // --- Hardware Parameters (as requested, defined locally) ---
   // You would normally get l2_capacity_bytes from your hardware_t struct.
   if (l2_capacity_bytes == 0) throw std::runtime_error("L2 Capacity is zero");
@@ -556,10 +580,21 @@ size_t round_elements_to_128B(size_t elements, size_t element_size_bits) {
   return round_up_mul(elements, E_block);
 }
 
+double compute_memory_latency(const problem_t& problem,
+                              const hardware_t& hardware,
+                              const config_t& config,
+                              std::size_t num_active_cus,
+                              std::size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return compute_memory_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
 // Determine the memory latency
 double compute_memory_latency(const problem_t& problem,
                               const hardware_t& hardware,
                               const config_t& config,
+                              std::size_t num_active_cus,
+                              std::size_t splitting_factor,
                               const origami_cache_t& cache) {
   // Extract parameters from structured types
   const auto a_bytes = cache.kernel_cache.a_bytes;
@@ -575,15 +610,13 @@ double compute_memory_latency(const problem_t& problem,
   const size_t MT_N = config.mt.n;
   const size_t MT_K = config.mt.k;
 
-  const auto num_active_cus = cache.num_active_cus;
-
   // 1) Estimate L2 hit-rate
-  double H_mem1 = estimate_l2_hit(problem, hardware, config, cache);
+  double H_mem1 = estimate_l2_hit(problem, hardware, config, splitting_factor, cache);
 
   // Global cap on L2 hit-rate (prevents impossible cache residency claims)
   // (Assumes capacity is given in KiB, convert to bytes)
   double H_mem1_global =
-      compute_l2_hit_rate_global(problem, hardware, config, cache, hardware.L2_capacity * 1024);
+      compute_l2_hit_rate_global(problem, hardware, config, hardware.L2_capacity * 1024, cache);
 
   H_mem1 = std::min(H_mem1, H_mem1_global);
 
@@ -663,9 +696,21 @@ double compute_memory_latency(const problem_t& problem,
 /* ---------------------------------------------------------------------------------------- */
 /* Tile-related functions                                                                   */
 /* ---------------------------------------------------------------------------------------- */
+
 double compute_tile_latency(const problem_t& problem,
                             const hardware_t& hardware,
                             const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return compute_tile_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
+double compute_tile_latency(const problem_t& problem,
+                            const hardware_t& hardware,
+                            const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor,
                             const origami_cache_t& cache) {
   // Extract parameters from structured types
   const size_t K = problem.size.k;
@@ -679,16 +724,13 @@ double compute_tile_latency(const problem_t& problem,
   const auto b_bits  = cache.kernel_cache.b_bits;
   const auto d_bytes = cache.kernel_cache.d_bytes;
 
-  auto num_active_cus   = cache.num_active_cus;
-  auto splitting_factor = cache.splitting_factor;
-
   // 1) Compute per-tile latencies
   double L_compute = cache.kernel_cache.mt_compute_latency;
 
-  double L_mem = compute_memory_latency(problem, hardware, config, cache);
+  double L_mem = compute_memory_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
 
   // TODO Does work utilization need to be 128-byte rounded for a cache line?
-  double utilization        = calculate_work_utilization(problem, config, cache);
+  double utilization        = calculate_work_utilization(problem, config);
   // double output_utilization = calculate_output_utilization(problem, config, 1UL);
   // The effective latency per useful operation increases as utilization drops.
   // This penalty affects BOTH compute and memory bounds for the tile's core work.
@@ -781,9 +823,20 @@ double compute_tile_latency(const problem_t& problem,
 double compute_timestep_latency(const problem_t& problem,
                                 const hardware_t& hardware,
                                 const config_t& config,
+                                std::size_t num_active_cus,
+                                std::size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return compute_timestep_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
+double compute_timestep_latency(const problem_t& problem,
+                                const hardware_t& hardware,
+                                const config_t& config,
+                                std::size_t num_active_cus,
+                                std::size_t splitting_factor,
                                 const origami_cache_t& cache) {
   // Assume latency of a timestep is latency of a single K-complete output tile computed on one CU.
-  double L_timestep = compute_tile_latency(problem, hardware, config, cache);
+  double L_timestep = compute_tile_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
 
   return L_timestep;
 }
@@ -862,35 +915,43 @@ kernel_cache_t create_kernel_cache(const problem_t& problem_type,
 origami_cache_t create_origami_cache(const problem_t& problem,
                                      const hardware_t& hardware,
                                      const config_t& config,
-                                     const kernel_cache_t& kernel_cache,
-                                     size_t max_cus) {
-  // Find CU occupancy
-  auto [num_wgs, num_active_cus, numWaves, splitting_factor] = compute_cu_occupancy(
-      problem, hardware, config, config.grid_selection, max_cus);
-
+                                     std::size_t num_active_cus) {
   auto grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
   auto grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
   auto grid_k = math::safe_ceil_div(problem.size.k, config.mt.k);
+
+  auto problem_type = problem;
+  problem_type.batch = 0;
+  problem_type.size = {0, 0, 0};
+  using key_t = std::pair<problem_t, config_t>;
+  auto key = std::make_pair(problem_type, config);
+
+  struct key_hasher_t {
+      std::size_t operator()(const key_t& k) const {
+        auto& p = k.first;
+        auto& c = k.second;
+        return math::hash_combine(
+          c.mt.m, c.mt.n, c.mt.k, c.cache_hints_a, c.cache_hints_b,
+          static_cast<int>(p.a_transpose), static_cast<int>(p.b_transpose),
+          static_cast<int>(p.a_dtype));
+      }
+  };
+
+  static std::unordered_map<key_t, kernel_cache_t, key_hasher_t> kernel_cache_map;
+  // static std::mutex mut;
+  // std::unique_lock<std::mutex> lock(mut);
+  auto p_cache_entry = kernel_cache_map.find(key);
+  if (p_cache_entry == kernel_cache_map.end())
+    p_cache_entry = kernel_cache_map.insert({key, create_kernel_cache(problem_type, hardware, config)}).first;
 
   return origami_cache_t{
     .grid_m = grid_m,
     .grid_n = grid_n,
     .grid_k = grid_k,
     .num_C_tiles = grid_m * grid_n,
-    .num_waves = numWaves,
-    .num_active_cus = num_active_cus,
-    .splitting_factor = splitting_factor,
     .achievable_mem_bandwidth = compute_mem_bw_from_occupancy(hardware, num_active_cus),
-    .kernel_cache = kernel_cache
+    .kernel_cache = p_cache_entry->second
   };
-}
-
-origami_cache_t create_origami_cache(const problem_t& problem,
-                                     const hardware_t& hardware,
-                                     const config_t& config,
-                                     size_t max_cus) {
-  auto kernel_cache = create_kernel_cache(problem, hardware, config);
-  return create_origami_cache(problem, hardware, config, kernel_cache, max_cus);
 }
 
 // Compute the total latency of a gemm based on the latency of one wave multiplied by the number of
@@ -898,7 +959,6 @@ origami_cache_t create_origami_cache(const problem_t& problem,
 double compute_total_latency(const problem_t& problem,
                              const hardware_t& hardware,
                              const config_t& config,
-                             const kernel_cache_t& kernel_cache,
                              size_t max_cus) {
   assert(config.is_valid());
 
@@ -963,15 +1023,19 @@ double compute_total_latency(const problem_t& problem,
   auto config_with_default_wgm              = config;
   config_with_default_wgm.workgroup_mapping = std::max(defaultWGM, 1);
 
-  // 1-2) Find CU occupancy, etc, store in cache
-  auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, kernel_cache, max_cus);
+  // 1-2) Find CU occupancy
+  auto [num_wgs, num_active_cus, num_timesteps, splitting_factor] = compute_cu_occupancy(
+      problem, hardware, config_with_default_wgm, config_with_default_wgm.grid_selection, max_cus);
+
+  auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, num_active_cus);
 
   // 2) Compute latency of a wave
   // Compute latency of a wave
-  double L_wave = compute_timestep_latency(problem, hardware, config_with_default_wgm, cache);
+  double L_timestep = compute_timestep_latency(
+      problem, hardware, config_with_default_wgm, num_active_cus, splitting_factor, cache);
 
   // Compute latency for all waves and return it as the latency for the MT/problem
-  double total_latency = L_wave * cache.num_waves;
+  double total_latency = L_timestep * num_timesteps;
 
   // 3) Customized heuristics
   // TODO These are quantifying effects that don't work in the current math.

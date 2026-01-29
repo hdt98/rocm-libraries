@@ -14,12 +14,10 @@ namespace origami {
  *
  * @param problem Problem description (M, N, K, etc.)
  * @param config Kernel configuration.
- * @param cache Precomputed quantities, grid_m, etc.
  * @return double ratio of the useful problem volume to the total scheduled volume.
  */
 double calculate_work_utilization(const problem_t& problem,
-                                  const config_t& config,
-                                  const origami_cache_t& cache);
+                                  const config_t& config);
 
 /**
  * @brief calculate the output utilization which is the ratio of the useful problem volume to the total scheduled volume.
@@ -80,7 +78,11 @@ size_t round_elements_to_128B(size_t elements, size_t element_size_bits);
 double compute_l2_hit_rate_global(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config,
-                                  const origami_cache_t& cache,
+                                  size_t l2_capacity_bytes,
+                                  const origami_cache_t& cache);
+double compute_l2_hit_rate_global(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config,
                                   size_t l2_capacity_bytes);
 
 /**
@@ -158,13 +160,19 @@ bool check_lds_capacity(const hardware_t& hardware,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
+ * @param splitting_factor
  * @param cache Precomputed quantities, grid_m, etc.
  * @return double Predicted L2-hitrate.
  */
 double estimate_l2_hit(const problem_t& problem,
                        const hardware_t& hardware,
                        const config_t& config,
+                       std::size_t splitting_factor,
                        const origami_cache_t& cache);
+double estimate_l2_hit(const problem_t& problem,
+                       const hardware_t& hardware,
+                       const config_t& config,
+                       std::size_t splitting_factor);
 
 /**
  * @brief Estimate the MALL-hitrate (last-level cache.)
@@ -172,13 +180,22 @@ double estimate_l2_hit(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
+ * @param num_active_cus
+ * @param splitting_factor
  * @param cache Precomputed quantities, grid_m, etc.
  * @return tuple<double: Predicted MALL-hitrate, size_t: MALL tile rows, size_t: MALL tile columns>
  */
 std::tuple<double,size_t,size_t> estimate_mall_hit(const problem_t& problem,
                                                    const hardware_t& hardware,
                                                    const config_t& config,
+                                                   std::size_t num_active_cus,
+                                                   std::size_t splitting_factor,
                                                    const origami_cache_t& cache);
+std::tuple<double,size_t,size_t> estimate_mall_hit(const problem_t& problem,
+                                                   const hardware_t& hardware,
+                                                   const config_t& config,
+                                                   std::size_t num_active_cus,
+                                                   std::size_t splitting_factor);
 
 /**
  * @brief Determine the memory latency per MT_M x MT_N x MT_K Macro Tile (L_MT).
@@ -186,13 +203,22 @@ std::tuple<double,size_t,size_t> estimate_mall_hit(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
+ * @param num_active_cus
+ * @param splitting_factor
  * @param cache Precomputed quantities, grid_m, etc.
  * @return double Latency in cycles.
  */
 double compute_memory_latency(const problem_t& problem,
                               const hardware_t& hardware,
                               const config_t& config,
+                              std::size_t num_active_cus,
+                              std::size_t splitting_factor,
                               const origami_cache_t& cache);
+double compute_memory_latency(const problem_t& problem,
+                              const hardware_t& hardware,
+                              const config_t& config,
+                              std::size_t num_active_cus,
+                              std::size_t splitting_factor);
 
 /**
  * @brief Computes the latency to compute a K-COMPLETE tile.
@@ -200,13 +226,22 @@ double compute_memory_latency(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
+ * @param num_active_cus
+ * @param splitting_factor
  * @param cache Precomputed quantities, grid_m, etc.
  * @return double Latency in cycles.
  */
 double compute_tile_latency(const problem_t& problem,
                             const hardware_t& hardware,
                             const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor,
                             const origami_cache_t& cache);
+double compute_tile_latency(const problem_t& problem,
+                            const hardware_t& hardware,
+                            const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor);
 
 /**
  * @brief Computes the latency per K-complete macro-tile timestep.
@@ -218,13 +253,22 @@ double compute_tile_latency(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
+ * @param num_active_cus
+ * @param splitting_factor
  * @param cache Precomputed quantities, grid_m, etc.
  * @return double Latency in cycles.
  */
 double compute_timestep_latency(const problem_t& problem,
                                 const hardware_t& hardware,
                                 const config_t& config,
+                                std::size_t num_active_cus,
+                                std::size_t splitting_factor,
                                 const origami_cache_t& cache);
+double compute_timestep_latency(const problem_t& problem,
+                                const hardware_t& hardware,
+                                const config_t& config,
+                                std::size_t num_active_cus,
+                                std::size_t splitting_factor);
 
 /**
  * @brief Compute the total latency of a gemm based on the latency of one timestep multiplied by the
@@ -233,14 +277,12 @@ double compute_timestep_latency(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
- * @param kernel_cache Kernel precomputed quantities.
  * @param max_cus
  * @return double Latency in cycles.
  */
 double compute_total_latency(const problem_t& problem,
                              const hardware_t& hardware,
                              const config_t& config,
-                             const kernel_cache_t& kernel_cache,
                              size_t max_cus);
 
 /**
@@ -249,13 +291,13 @@ double compute_total_latency(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
- * @param max_cus
+ * @param num_active_cus
  * @return origami_cache_t struct
  */
 origami_cache_t create_origami_cache(const problem_t& problem,
                                      const hardware_t& hardware,
                                      const config_t& config,
-                                     size_t max_cus);
+                                     std::size_t num_active_cus);
 
 /**
  * @brief Creates a cache struct with precomputed values depending only on the problem type,
@@ -269,27 +311,5 @@ origami_cache_t create_origami_cache(const problem_t& problem,
 kernel_cache_t create_kernel_cache(const problem_t& problem,
                                    const hardware_t& hardware,
                                    const config_t& config);
-
-/**
- * @brief Compute the total latency of a gemm based on the latency of one wave multiplied by the
- * number of waves A wave is defined as the time it takes for one CU to complete one K-complete
- * output tile.
- *
- * @param problem Problem description (M, N, K, etc.)
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param config Kernel configuration.
- * @param max_cus
- * @return double Latency in cycles.
- */
-inline double compute_total_latency(const problem_t& problem,
-                                    const hardware_t& hardware,
-                                    const config_t& config,
-                                    size_t max_cus) {
-  return compute_total_latency(problem,
-                               hardware,
-                               config,
-                               create_kernel_cache(problem, hardware, config),
-                               max_cus);
-}
 
 }  // namespace origami

@@ -366,9 +366,9 @@ struct origami_cache_t {
   std::size_t grid_k;
 
   std::size_t num_C_tiles;
-  std::size_t num_waves;
-  std::size_t num_active_cus;
-  std::size_t splitting_factor;
+  // std::size_t num_waves;
+  // std::size_t num_active_cus;
+  // std::size_t splitting_factor;
 
   double achievable_mem_bandwidth;
 

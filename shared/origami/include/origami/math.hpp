@@ -58,7 +58,9 @@ inline double ceiling_math(double value, double significance = 1.0)
  */
 template <class T>
 inline void hash_combine_helper(std::size_t& seed, const T& v) {
-  seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  // seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  // cheaper and good enough?
+  seed = (seed ^ (std::hash<T>{}(v) << 1)); // >> 1;
 }
 
 /**
