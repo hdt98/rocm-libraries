@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 
 #pragma once
 
@@ -22,16 +22,23 @@ enum class WMMA_SCALE
 {
     SCALE_F32_16x16x128 = static_cast<int>(
         MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125), // V_WMMA_SCALE_F32_16X16X128_F8F6F4
+    SCALE16_F32_16x16x128 = static_cast<int>(
+        MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125), // V_WMMA_SCALE16_F32_16X16X128_F8F6F4
     SCALE_F32_32x16x128 = static_cast<int>(
-        MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125) // V_WMMA_SCALE_F32_32X16X128_F4
+        MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125), // V_WMMA_SCALE_F32_32X16X128_F4
+    SCALE16_F32_32x16x128 = static_cast<int>(
+        MfmaInstr::wmma_scale16_f32_32x16x128_f4_gfx125) // V_WMMA_SCALE16_F32_32X16X128_F4
 };
 
-// WMMA scale type selector for 16x16 blocks
-template <int32_t BLOCK_M, int32_t BLOCK_N>
+template <int32_t BLOCK_M,
+          int32_t BLOCK_N,
+          int32_t BLOCK_X,
+          typename ScaleTypeA,
+          typename ScaleTypeB>
 struct wmma_scale_type_selector;
 
-template <>
-struct wmma_scale_type_selector<16, 16>
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<16, 16, 32, ScaleTypeA, ScaleTypeB>
 {
     template <typename AFragT,
               typename AScaleFragT,
@@ -45,12 +52,13 @@ struct wmma_scale_type_selector<16, 16>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125>{};
-        op.template run<16, 16, 1, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<16, 16, 1, 1, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
-template <>
-struct wmma_scale_type_selector<32, 16>
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<32, 16, 32, ScaleTypeA, ScaleTypeB>
 {
     template <typename AFragT,
               typename AScaleFragT,
@@ -64,6 +72,44 @@ struct wmma_scale_type_selector<32, 16>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125>{};
+        op.template run<32, 16, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
+    }
+};
+
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<16, 16, 16, ScaleTypeA, ScaleTypeB>
+{
+    template <typename AFragT,
+              typename AScaleFragT,
+              typename BFragT,
+              typename BScaleFragT,
+              typename AccumFragT>
+    __device__ static void run(AFragT const& fragA,
+                               AScaleFragT const& scale_a,
+                               BFragT const& fragB,
+                               BScaleFragT const& scale_b,
+                               AccumFragT& fragAcc)
+    {
+        auto op = mfma_type<MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125>{};
+        op.template run<16, 16, 1, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
+    }
+};
+
+template <typename ScaleTypeA, typename ScaleTypeB>
+struct wmma_scale_type_selector<32, 16, 16, ScaleTypeA, ScaleTypeB>
+{
+    template <typename AFragT,
+              typename AScaleFragT,
+              typename BFragT,
+              typename BScaleFragT,
+              typename AccumFragT>
+    __device__ static void run(AFragT const& fragA,
+                               AScaleFragT const& scale_a,
+                               BFragT const& fragB,
+                               BScaleFragT const& scale_b,
+                               AccumFragT& fragAcc)
+    {
+        auto op = mfma_type<MfmaInstr::wmma_scale16_f32_32x16x128_f4_gfx125>{};
         op.template run<32, 16, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
@@ -351,6 +397,15 @@ __device__ AFragT load_mx_A_row_major(AType const* input_ptr,
     // Reg 4-7   |   K64 - K95  |   K96 - K127  |
     // Reg 8     |   Scale[0-3] |   Scale[0-3]  |
 
+    // Register Mapping for 16x128 for FP4, scale block size 16:
+    // Size              |   BLOCK_M  |   BLOCK_M   |
+    // M                 | 0  ...  15 |  0  ...  15 |
+    // Thread Id         | 0  ...  15 | 16  ...  31 |
+    // Register Element  |------------|-------------|
+    // Reg 0 - 3         |    K0-K31  |    K32-K63  |
+    // Reg 4 - 7         |    K64-K95 |    K96-K127 |
+    // Reg 8 - 9         | Scale[0-7] |  Scale[0-7] |
+
     // Register Mapping for 32x128 for FP4:
     // Thread Id |      0  ...  15    |      16  ...  31      |
     // Register  |--------------------|-----------------------|
@@ -359,6 +414,15 @@ __device__ AFragT load_mx_A_row_major(AType const* input_ptr,
     // Reg 8-11  | M=thId+16, K0-K31  | M=thId,      K32-K63  |
     // Reg 12-15 | M=thId+16, K64-K95 | M=thId,      K96-K127 |
     // Reg 16    | Scale[M=thId,0-3]  | Scale[M=thId,0-3]     |
+
+    // Register Mapping for 32x128 for FP4, scale block size 16:
+    // Thread Id |      0  ...  15    |      16  ...  31      |
+    // Register  |--------------------|-----------------------|
+    // Reg 0-3   | M=thId,    K0-K31  | M=thId % 16, K32-K63  |
+    // Reg 4-7   | M=thId,    K64-K95 | M=thId % 16, K96-K127 |
+    // Reg 8-11  | M=thId+16, K0-K31  | M=thId,      K32-K63  |
+    // Reg 12-15 | M=thId+16, K64-K95 | M=thId,      K96-K127 |
+    // Reg 16-17 | Scale[M=thId,0-7]  | Scale[M=thId,0-7]     |
 
     // clang-format on
 
@@ -371,17 +435,13 @@ __device__ AFragT load_mx_A_row_major(AType const* input_ptr,
     }
     else if constexpr(num_steps == 2)
     {
-        constexpr index_t stride = 64;
+        constexpr index_t stride = BLOCK_M * (BLOCK_K / BLOCK_X);
         startOffset = startCoord2D.first * (BLOCK_K / BLOCK_X) + startCoord2D.second * stride;
     }
 
-    // map scale values, threads 0..15 use scale[0] and scale[1],
-    // threads 16..31 use scale[2] and scale[3]
-    auto& scale_vec        = fragX.template AsType<ScaleType>();
-    scale_vec(Number<0>{}) = scale_ptr[startOffset + 0];
-    scale_vec(Number<1>{}) = scale_ptr[startOffset + 1];
-    scale_vec(Number<2>{}) = scale_ptr[startOffset + 2];
-    scale_vec(Number<3>{}) = scale_ptr[startOffset + 3];
+    auto& scale_vec = fragX.template AsType<ScaleType>();
+    static_for<0, scalar_type<ScaleFragT>::vector_size, 1>{}(
+        [&](auto i) { scale_vec(Number<i.value>{}) = scale_ptr[startOffset + i.value]; });
 
     return load_A_row_major<AType, AFragT, BLOCK_M, BLOCK_K>(input_ptr);
 }
@@ -413,13 +473,9 @@ __device__ BFragT load_mx_B_col_major(BType const* input_ptr,
     auto col_major    = [](auto const& coord, auto ld) { return coord.second * ld; };
     auto startOffset  = col_major(startCoord2D, BLOCK_K / BLOCK_X);
 
-    // map scale values, threads 0..15 use scale[0] and scale[1],
-    // threads 16..31 use scale[2] and scale[3]
-    auto& scale_vec        = fragX.template AsType<ScaleType>();
-    scale_vec(Number<0>{}) = scale_ptr[startOffset + 0];
-    scale_vec(Number<1>{}) = scale_ptr[startOffset + 1];
-    scale_vec(Number<2>{}) = scale_ptr[startOffset + 2];
-    scale_vec(Number<3>{}) = scale_ptr[startOffset + 3];
+    auto& scale_vec = fragX.template AsType<ScaleType>();
+    static_for<0, scalar_type<ScaleFragT>::vector_size, 1>{}(
+        [&](auto i) { scale_vec(Number<i.value>{}) = scale_ptr[startOffset + i.value]; });
 
     return load_B_col_major<BType, BFragT, BLOCK_K, BLOCK_N>(input_ptr);
 }
@@ -441,17 +497,13 @@ struct store_C_row_major<CType, CFragT, 16, 16>
 
         auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
 
-        auto startOffset = row_major(startCoord2D, 16);
-        auto kOffset     = row_major(stepCoord2D, 16);
+        auto startOffset = row_major(startCoord2D, Dim);
+        auto kOffset     = row_major(stepCoord2D, Dim);
 
-        output[startOffset]               = cFrag[0];
-        output[startOffset + kOffset]     = cFrag[1];
-        output[startOffset + 2 * kOffset] = cFrag[2];
-        output[startOffset + 3 * kOffset] = cFrag[3];
-        output[startOffset + 4 * kOffset] = cFrag[4];
-        output[startOffset + 5 * kOffset] = cFrag[5];
-        output[startOffset + 6 * kOffset] = cFrag[6];
-        output[startOffset + 7 * kOffset] = cFrag[7];
+        for(uint32_t i = 0; i < vectorSize(cFrag); ++i)
+        {
+            output[startOffset + i * kOffset] = cFrag[i];
+        }
     }
 };
 
@@ -471,29 +523,18 @@ struct store_C_row_major<CType, CFragT, 32, 16>
         auto startOffset = row_major(startCoord2D, Dim);
         auto kOffset     = row_major(stepCoord2D, Dim);
 
-        output[startOffset]                = cFrag[0];
-        output[startOffset + kOffset]      = cFrag[1];
-        output[startOffset + 2 * kOffset]  = cFrag[2];
-        output[startOffset + 3 * kOffset]  = cFrag[3];
-        output[startOffset + 4 * kOffset]  = cFrag[4];
-        output[startOffset + 5 * kOffset]  = cFrag[5];
-        output[startOffset + 6 * kOffset]  = cFrag[6];
-        output[startOffset + 7 * kOffset]  = cFrag[7];
-        output[startOffset + 8 * kOffset]  = cFrag[8];
-        output[startOffset + 9 * kOffset]  = cFrag[9];
-        output[startOffset + 10 * kOffset] = cFrag[10];
-        output[startOffset + 11 * kOffset] = cFrag[11];
-        output[startOffset + 12 * kOffset] = cFrag[12];
-        output[startOffset + 13 * kOffset] = cFrag[13];
-        output[startOffset + 14 * kOffset] = cFrag[14];
-        output[startOffset + 15 * kOffset] = cFrag[15];
+        for(uint32_t i = 0; i < vectorSize(cFrag); ++i)
+        {
+            output[startOffset + i * kOffset] = cFrag[i];
+        }
     }
 };
 
 // WMMA scale kernel
 template <typename AType,
           typename BType,
-          typename ScaleType,
+          typename AScaleType,
+          typename BScaleType,
           typename CType,
           typename AccType,
           int32_t BLOCK_M,
@@ -505,9 +546,9 @@ template <typename AType,
           typename CLayout,
           index_t num_steps>
 __global__ void matmul(const packed_type_t<AType>* a,
-                       const ScaleType* xa,
+                       const AScaleType* xa,
                        const packed_type_t<BType>* b,
-                       const ScaleType* xb,
+                       const BScaleType* xb,
                        CType* c)
 {
     using PackedAType            = packed_type_t<AType>;
@@ -530,8 +571,12 @@ __global__ void matmul(const packed_type_t<AType>* a,
     using CFragPartT = typename vector_type<CType, BLOCK_M * BLOCK_N / WAVE_SIZE / num_steps>::type;
     using AccumFragT = vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>;
     using RawAccumFragT = typename vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
-    using AScaleFragT   = typename vector_type<ScaleType, 4>::type; // packed 4 scale values
-    using BScaleFragT   = typename vector_type<ScaleType, 4>::type; // packed 4 scale values
+    using AScaleFragT =
+        typename vector_type<AScaleType,
+                             BLOCK_K / BLOCK_X>::type; // packed BLOCK_K / BLOCK_X scale values
+    using BScaleFragT =
+        typename vector_type<BScaleType,
+                             BLOCK_K / BLOCK_X>::type; // packed BLOCK_K / BLOCK_X scale values
 
     // Create frags
     auto fragA        = AFragT{};
@@ -549,7 +594,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
         {
             fragA = load_mx_A_row_major<PackedAType,
                                         AFragT,
-                                        ScaleType,
+                                        AScaleType,
                                         AScaleFragT,
                                         BLOCK_M,
                                         BLOCK_K,
@@ -567,7 +612,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
 
             fragA_union.fragA_part[0] = load_mx_A_row_major<PackedAType,
                                                             AFragPartT,
-                                                            ScaleType,
+                                                            AScaleType,
                                                             AScaleFragT,
                                                             BLOCK_M / num_steps,
                                                             BLOCK_K,
@@ -578,7 +623,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
             fragA_union.fragA_part[1] =
                 load_mx_A_row_major<PackedAType,
                                     AFragPartT,
-                                    ScaleType,
+                                    AScaleType,
                                     AScaleFragT,
                                     BLOCK_M / num_steps,
                                     BLOCK_K,
@@ -607,7 +652,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
     {
         fragB = load_mx_B_col_major<PackedBType,
                                     BFragT,
-                                    ScaleType,
+                                    BScaleType,
                                     BScaleFragT,
                                     BLOCK_K,
                                     BLOCK_N,
@@ -615,7 +660,7 @@ __global__ void matmul(const packed_type_t<AType>* a,
     }
 
     // Scaled Matrix multiply-accumulate using WMMA scale units
-    using wmma = wmma_scale_type_selector<BLOCK_M, BLOCK_N>;
+    using wmma = wmma_scale_type_selector<BLOCK_M, BLOCK_N, BLOCK_X, AScaleFragT, BScaleFragT>;
     wmma::template run<>(fragA, fragXa, fragB, fragXb, fragAcc);
 
     for(int i = 0; i < vectorSize(fragC); ++i)
@@ -771,7 +816,8 @@ bool RunDeviceGEMM(KernelType kernel,
 template <typename DeviceWMMA,
           typename ADataType,
           typename BDataType,
-          typename ScaleType,
+          typename AScaleType,
+          typename BScaleType,
           typename CDataType,
           typename ALayout,
           typename BLayout,
@@ -816,11 +862,11 @@ struct TestMXWMMA
 
         Tensor<PackedAType> a_m_k(
             f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
-        Tensor<ScaleType> a_scales(
+        Tensor<AScaleType> a_scales(
             f_host_tensor_descriptor(params.M, params.K / BLOCK_X, params.K / BLOCK_X, ALayout{}));
         Tensor<PackedBType> b_n_k(
             f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
-        Tensor<ScaleType> b_scales(
+        Tensor<BScaleType> b_scales(
             f_host_tensor_descriptor(params.K / BLOCK_X, params.N, params.K / BLOCK_X, BLayout{}));
         Tensor<CDataType> c_m_n_host_result(
             f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
@@ -831,27 +877,27 @@ struct TestMXWMMA
         {
         case 0:
             a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{0.5f});
+            a_scales.GenerateTensorValue(GeneratorTensor_1<AScaleType>{0.5f});
             b_n_k.GenerateTensorValue(GeneratorTensor_Sequential<PackedBType, 1>{});
-            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{1.0f});
+            b_scales.GenerateTensorValue(GeneratorTensor_1<BScaleType>{1.0f});
             break;
         case 1:
             a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{512.0f});
+            a_scales.GenerateTensorValue(GeneratorTensor_1<AScaleType>{1.0f});
             b_n_k.GenerateTensorValue(GeneratorTensor_1<PackedBType>{1.0f});
-            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{1.0f / 512});
+            b_scales.GenerateTensorValue(GeneratorTensor_1<BScaleType>{1.0f});
             break;
         case 2:
             a_m_k.GenerateTensorValue(GeneratorTensor_3<PackedAType>{-2.0, 2.0});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{126, 129});
+            a_scales.GenerateTensorValue(GeneratorTensor_2<AScaleType>{0, 4});
             b_n_k.GenerateTensorValue(GeneratorTensor_3<PackedBType>{-2.0, 2.0});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{126, 129});
+            b_scales.GenerateTensorValue(GeneratorTensor_2<BScaleType>{0, 4});
             break;
         default:
             a_m_k.GenerateTensorValue(GeneratorTensor_2<PackedAType>{-6, 7});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{122, 129});
+            a_scales.GenerateTensorValue(GeneratorTensor_3<AScaleType>{0.0625f, 8.0f});
             b_n_k.GenerateTensorValue(GeneratorTensor_2<PackedBType>{-6, 7});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{122, 129});
+            b_scales.GenerateTensorValue(GeneratorTensor_3<BScaleType>{0.0625f, 8.0f});
             break;
         }
 
@@ -892,12 +938,12 @@ struct TestMXWMMA
 
         auto host_tensors = PrepareGemmTensors(params, init);
 
-        const Tensor<PackedAType>& a      = std::get<0>(host_tensors);
-        const Tensor<ScaleType>& a_scales = std::get<1>(host_tensors);
-        const Tensor<PackedBType>& b      = std::get<2>(host_tensors);
-        const Tensor<ScaleType>& b_scales = std::get<3>(host_tensors);
-        Tensor<CDataType>& c_host         = std::get<4>(host_tensors);
-        Tensor<CDataType>& c_device       = std::get<5>(host_tensors);
+        const Tensor<PackedAType>& a       = std::get<0>(host_tensors);
+        const Tensor<AScaleType>& a_scales = std::get<1>(host_tensors);
+        const Tensor<PackedBType>& b       = std::get<2>(host_tensors);
+        const Tensor<BScaleType>& b_scales = std::get<3>(host_tensors);
+        Tensor<CDataType>& c_host          = std::get<4>(host_tensors);
+        Tensor<CDataType>& c_device        = std::get<5>(host_tensors);
 
         RunHostGEMM(a, a_scales, b, b_scales, c_host);
 
