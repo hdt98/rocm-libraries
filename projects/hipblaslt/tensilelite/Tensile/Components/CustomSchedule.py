@@ -1568,6 +1568,84 @@ def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
+    tile_config=TileConfig(192, 128, 64, 2, 1, True, 0, 0),
+    dtype_predicate=is16bit,
+    vector_widths=[8, 8, 8],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
+    """192x128x64 TN schedule (BF16/FP16)."""
+    kernel["MfmaInitCVgprs"] = True
+
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+
+    # 192 = 16 * MIWaveTileA(6) * MIWaveGroup0(2)
+    # 128 = 16 * MIWaveTileB(4) * MIWaveGroup1(2)
+    if isTN(kernel) and (not useLDSTr) and TLDS == 1:
+        numMfma = 2 * kernel["MIWaveTileA"] * kernel["MIWaveTileB"]
+        # Number of global reads per iter (A:6, B:4) = 10
+        nglshift = nllshift = 10
+
+        # Use syncTable format (idx, wait/barrier, idx, wait/barrier, ...)
+        syncTable = [
+            # Loop start: must guarantee prior-iteration LR1 completion for the next iteration's early MFMA use.
+            -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 before starting main loop"),
+            3,  SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 for the remaining main loop"),
+
+            7,  SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete to start GRA"),
+            7,  SBarrier(comment=""),
+
+            15, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete to start GRB"),
+            15, SBarrier(comment=""),
+
+            # GR -> SWait(vmcnt=0) -> SBarrier -> LR1 ordering (global-read to LDS must be visible before LR1)
+            32, SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="Wait for all GRs to complete before starting LR1"),
+            32, SBarrier(comment=""),
+
+            39, SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="Wait for all GRs to complete before starting LRB1"),
+            39, SBarrier(comment=""),
+        ]
+
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[22,22,23,23,24,24,25,26,26]],
+
+            # Current iteration local reads
+            'LRA0'   : [[0,2,3,4,5,6]],
+            'LRB0'   : [[7,9,11,13],
+                        [8,10,12,14]],
+
+            # Global reads (two instructions per GR -> explicit duplicates)
+            # NOTE: Avoid placing GRA between GRIncB (22-24) due to SCC usage.
+            'GRA'    : [[9,9, 11,11, 13,13, 15,15, 17,17, 19,19],
+                        [10,10, 12,12, 14,14, 16,16, 18,18, 20,20]],
+            'GRB'    : [[26,26, 29,29, 32,32, 35,35],
+                        [27,27, 30,30, 33,33, 36,36]],
+
+            # Prefetch next iteration
+            'LRA1'   : [[37,39,41,43,44,45],
+                        [38,40,42,43,44,45]],
+            'LRB1'   : [[39,40,41,42]],
+
+            'LRSA'   : [[21]],
+            'LRSB'   : [[21]],
+            'LWSA'   : [[46]],
+            'LWSB'   : [[46]],
+            'LCC'    : [[47, 47]],
+        }
+
+        syncCode = syncTable[1::2]
+    else:
+        return False, None
+
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    return True, opt1
+
+@RegisterSchedule(
     tile_config=TileConfig(224, 128, 64, 2, 1, True, 0, 0),
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
