@@ -1315,10 +1315,11 @@ static void add_shift(hipStream_t stream,
 // the  *strictly* upper triangular part if uplo == 'U'
 // similar to triu(A,1) = alpha
 //
-// the entire matrix otherwise
+// the entire matrix if uplo == 'G'
 // similar to A = alpha
 //
-// laset is used by adjusting the indices by 1
+// laset is used by adjusting the indices by 1 for
+// the lower and upper case
 // ----------------------------------------------------
 template <typename T, typename I, typename Istride, typename UA>
 static void set_triangular(rocblas_handle handle,
@@ -1356,8 +1357,17 @@ static void set_triangular(rocblas_handle handle,
     {
         bool const use_lower = (uplo == 'L') || (uplo == 'l');
         bool const use_upper = (uplo == 'U') || (uplo == 'u');
+        bool const use_full = (uplo == 'G') || (uplo == 'g'); // 'GE' general full matrix
 
-        Istride const offset = (use_lower) ? idx2D(1, 0, lda)(use_upper) ? idx2D(0, 1, lda) : 0;
+        {
+            bool const isvalid_uplo = (use_lower || use_upper || use_full);
+            assert(isvalid_uplo);
+        }
+
+        Istride const offset = (use_lower) ? idx2D(1, 0, lda)
+            : (use_upper)                  ? idx2D(0, 1, lda)
+            : (use_full)                   ? idx2D(0, 0, lda)
+                                           : 0;
 
         T const lalpha = alpha;
         T const lbeta = alpha;
