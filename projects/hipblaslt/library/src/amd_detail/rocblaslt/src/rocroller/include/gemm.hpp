@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "custom_kernels_fwd.hpp"
+#include "aiter_kernels_fwd.hpp"
 #include "parameter_selection.hpp"
 
 #include <rocRoller/CommandSolution.hpp>
@@ -46,8 +46,8 @@
  */
 struct GemmKernel
 {
-    rocRoller::CommandPtr                          command;
-    rocRoller::CommandKernelPtr                    commandKernel;
+    rocRoller::CommandPtr               command;
+    rocRoller::CommandKernelPtr         commandKernel;
     std::shared_ptr<SolutionParameters> params;
 
     rocRoller::Operations::OperationTag tagTensorA;
@@ -62,12 +62,12 @@ struct GemmKernel
     rocRoller::Operations::OperationTag tagTensorScaleB;
 
     std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag> tagScratch;
-    rocRoller::Operations::OperationTag tagSKGrid;
-    rocRoller::Operations::OperationTag tagWGM;
+    rocRoller::Operations::OperationTag                                                 tagSKGrid;
+    rocRoller::Operations::OperationTag                                                 tagWGM;
 
     int occupancy;
 
-    CustomKernelPtr customKernel = 0;
+    AiterKernelPtr customKernel = 0;
 };
 
 /**
@@ -96,8 +96,8 @@ size_t workspaceRequired(std::shared_ptr<GemmKernel> gemm, const RocblasltContra
  * @return CommandArguments
  */
 rocRoller::CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
-    const RocblasltContractionProblem& prob,
-    int wgm);
+                                                   const RocblasltContractionProblem& prob,
+                                                   int                                wgm);
 
 std::string genKernelName(std::shared_ptr<SolutionParameters> gemm);
 
@@ -109,4 +109,4 @@ std::string genKernelName(std::shared_ptr<SolutionParameters> gemm);
  * @return rocblaslt_status
  */
 rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
-    const RocblasltContractionProblem& prob);
+                               const RocblasltContractionProblem& prob);

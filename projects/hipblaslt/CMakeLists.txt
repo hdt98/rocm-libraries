@@ -105,6 +105,8 @@ endif()
 message(STATUS "Building for GPU targets: ${GPU_TARGETS}")
 
 find_package(hip REQUIRED)
+enable_language(HIP)
+
 if(HIPBLASLT_ENABLE_HOST)
     if(HIPBLASLT_ENABLE_HIPBLAS_DIRECT)
         set(hipblas_target hipblas)
