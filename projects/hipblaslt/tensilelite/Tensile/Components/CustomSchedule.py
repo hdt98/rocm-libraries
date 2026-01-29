@@ -1576,7 +1576,11 @@ def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
 )
 def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     kernel["MfmaInitCVgprs"] = True
-    # 224x128x64 TN schedule (existing)
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0
+    numMfma = 56
+
     if isTN(kernel) and TLDS:
         nglshift = nllshift = 11 # vmcnt shift for ngl and nll
         optSchedule = {
@@ -1606,12 +1610,9 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
             SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Outstanding LR are all LRA so no need to wait. All of GR from previous iteration must be done."),
             SBarrier(comment="")
         ]
-        numMfma = 56
         opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-        return True, opt1
 
-    # 224x128x64 NT schedule (A/B-swapped variant of 128x224 TN)
-    if isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and useLDSTr and TLDS == 0:
         # Global read scheduling:
         # Each GR has two instructions (addr update + buffer_load), so we list them explicitly as
         # two adjacent MFMA indices per GR.
@@ -1672,11 +1673,10 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
 
         syncCode = syncTable[1::2]
         nglshift = nllshift = 11
-        numMfma = 56
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-        return True, opt1
-
-    return False, None
+    else:
+        return False, None
+    return True, opt1
 
 @RegisterSchedule(
     tile_config=TileConfig(224, 256, 64, 2, 1, True, 0, 0),
