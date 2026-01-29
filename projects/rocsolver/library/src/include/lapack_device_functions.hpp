@@ -3140,7 +3140,7 @@ template <typename T, typename I>
 __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_index, rocblas_int offset)
 {
     T compare_local_max = shift_left(*local_max, offset);
-    T compare_local_index = shift_left(*local_max_index, offset);
+    I compare_local_index = shift_left(*local_max_index, offset);
     if(compare_local_max > *local_max)
     {
         *local_max = compare_local_max;
@@ -3242,7 +3242,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump2(const I n, 
 
     // shared variables
     __shared__ S sval[LACN2_BLOCKSIZE / WarpSize];
-    __shared__ S sval_indices[LACN2_BLOCKSIZE / WarpSize];
+    __shared__ I sval_indices[LACN2_BLOCKSIZE / WarpSize];
 
     // find index of maximum absolute value in vector x
     S local_max = std::numeric_limits<S>::min();
@@ -3447,7 +3447,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump4(const I n,
 
     // shared variables
     __shared__ S sval[LACN2_BLOCKSIZE / WarpSize];
-    __shared__ S sval_indices[LACN2_BLOCKSIZE / WarpSize];
+    __shared__ I sval_indices[LACN2_BLOCKSIZE / WarpSize];
 
     // find index of maximum absolute value in vector x
     S local_max = std::numeric_limits<S>::min();
