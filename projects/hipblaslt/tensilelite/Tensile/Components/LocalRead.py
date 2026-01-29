@@ -79,7 +79,7 @@ class LocalReadVALU(LocalRead):
                 # paramList.append(vgpr("LocalReadAddr%s"%tc))
 
                 for oIdx in range(0, numOffsets):
-                    # dot2
+                    # dot2 -TODO: check if this is correct when using rTdx
                     if kernel["UseDotInstruction"]:
                         paramList.append(int((rIdx*blockWidth + kernel["SubGroup%u"%tile01] * (vIdx*numOffsets+oIdx) * tileStride \
                             + tP["localReadOffset"]) * tP["bpe"] + tP["localReadSwapByteOffset"]) // offsetMultiplier)
@@ -364,9 +364,6 @@ class LocalReadMFMA(LocalRead):
                         or numSubTiles == 1) or writer.states.inTailLoop:
                         imod.add(localReadCode)
                     subIterLoadCount += 1
-            # DTV case, do not return local read code. Return pack code only.
-            if (tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]:
-                  imod = Module("LocalReadDo%s_I%s (Empty)" % (tP["tensorChar"],iui))
         else:
             totalLoads = numVectorsPerTile * numReadsPerVector * numReadsPerUnroll * miInputGroup
             for vIdx in range(0, numVectorsPerTile):
@@ -842,22 +839,24 @@ class LocalReadMFMA(LocalRead):
                                 if perpStride > 1 and kernel["ProblemType"]["TLU%s"%tc] == 0:
                                     permBlock = kernel["MatrixInstK"] if kernel["ProblemType"]["TLU%s"%tc] == 1 else kernel["VectorWidth%s"%tc] * kernel["MatrixInstM"]
                                     perpStrideInv = permBlock // perpStride
-                                    offset_val = (eIdx * (perpStrideInv) + ((vIdx) * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
+                                    offset_val = int((eIdx * (perpStrideInv) + ((vIdx) * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride)
                                 else:
-                                    offset_val = (eIdx + (vIdx * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride
+                                    offset_val = int((eIdx + (vIdx * numOffsets+oIdx) * MIWaveGroupShape[tile01]) * tileStride)
 
                                 if kernel["ProblemType"]["Sparse"] != 0:
                                     if blocksPerTGroupSMFMA > 1:
-                                        blockId = (rIdx * numElementPerRead) // elementsPerBlockSMFMA  #block 0 or block 1
+                                        blockId = (gIdx * numElementPerGroup + rIdx * numElementPerRead) // elementsPerBlockSMFMA  #block 0 or block 1
                                         if kernel["UnrollMajorLDS%s"%(tc)]:
                                             offset_val = offset_val + (blockOffsetSMFMA * blockId)
                                         else:
                                             offset_val = offset_val + (blockOffsetSMFMA * blockId) * UnrollStride
-                                    offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
-                                elif kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() and kernel["MatrixInstK"] > 32:
+                                    #offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                    offset_val = int(((gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
+                                elif kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() and kernel["MatrixInstK"] > 32 and tc in ("A", "B"):
+                                    # Note: This special offset logic only applies to A/B tensors, not MXSA/MXSB scale data
                                     incOffset = 0
                                     midIdx = numReadsPerUnroll*miInputGroup // 2
-                                    if rIdx >= midIdx:
+                                    if grIdx >= midIdx:
                                         if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
                                             # TODO: why are these the offsets???
                                             if kernel["MatrixInstM"] == 32:
@@ -869,8 +868,9 @@ class LocalReadMFMA(LocalRead):
                                                 incOffset = 16
                                             elif kernel["MatrixInstM"] == 16:
                                                 incOffset = 48
-                                    incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
-                                    offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                    # Include gIdx * numElementPerGroup to properly account for group index offset
+                                    incOffset = (gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + incOffset
+                                    offset_val = int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
                                 elif kernel["UseF32XEmulation"]:
                                     # Previously a single ds_read could be used to load all inputs for mfma
                                     # For emulated TF32, 2x ds_read is required along with a different mfma layout
@@ -878,7 +878,7 @@ class LocalReadMFMA(LocalRead):
                                     # Numbers here are specific to the mfma layout
                                     incOffset = 0
                                     midIdx = numReadsPerUnroll*miInputGroup // 2
-                                    if rIdx >= midIdx:
+                                    if grIdx >= midIdx:
                                         if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
                                             if kernel["MatrixInstM"] == 32:
                                                 incOffset = midIdx * numElementPerRead * UnrollStride
@@ -889,8 +889,8 @@ class LocalReadMFMA(LocalRead):
                                                 incOffset = 4
                                             elif kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 32:
                                                 incOffset = 12
-                                    incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
-                                    offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                    incOffset = (gIdx * numElementPerGroup + rIdx * numElementPerRead) * UnrollStride + incOffset
+                                    offset_val = int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
                                 else:
                                     #TODO:
                                     #offset_val = (rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
@@ -928,7 +928,7 @@ class LocalReadMFMA(LocalRead):
                                 ds = DSModifiers(na=2, offset0=paramList[0], offset1=paramList[1])
                             LocalReadX = instruction.getInst(highBits)
                             if kernel["UseDirect32XEmulation"] and (valuiIdx % 8) < 4:
-                                index = baseValuiIdx // 2 + rIdx
+                                index = baseValuiIdx // 2 + grIdx
                                 destVgpr      = vgpr("Valu%s_T%u_I%u+%u"%(tc, bufferIdx, iui, index), blockWidth)
                             localReadCodeT.add(LocalReadX(dst=destVgpr, src=srcAddr, ds=ds, comment=comment))
                             # TODO - handle vector-load

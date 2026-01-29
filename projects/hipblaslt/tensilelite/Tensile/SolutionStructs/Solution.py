@@ -282,6 +282,24 @@ class Solution(collections.abc.Mapping):
     if "Valid" not in state:
       state["Valid"] = True
 
+    # # MXBlock kernels: Force simple scheduling configuration to match  reference for debug
+    # # This ensures consistent kernel structure for MX feature correctness
+    # if state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
+    #   # Force SIA1 (simple single-loop scheduling) instead of SIA3 (complex multi-buffer scheduling)
+    #   state["ScheduleIterAlg"] = 1
+    #   # Disable PrefetchGlobalRead to avoid double buffering complexity
+    #   state["PrefetchGlobalRead"] = 0
+    #   # Disable PrefetchLocalRead to avoid extra VGPR buffers
+    #   state["PrefetchLocalRead"] = 0
+    #   # Disable ExpandPointerSwap
+    #   state["ExpandPointerSwap"] = 0
+    #   # Disable ClusterLocalRead
+    #   state["ClusterLocalRead"] = 0
+    #   # Disable 1LDSBuffer (use standard double buffer XOR swap)
+    #   state["1LDSBuffer"] = 0
+    #   # Disable PreloadKernArgs to match mx_tony (which doesn't use kernarg preload)
+    #   state["PreloadKernArgs"] = 0
+
     if (not state["ProblemType"]["StridedBatched"]) and (not state["ProblemType"]['Batched']):
       reject(state, printRejectionReason, "General Batched GEMM only support Batched Problem")
 
@@ -3728,6 +3746,13 @@ class Solution(collections.abc.Mapping):
       # Hard to check alpha == 1.0 directly
       # Turn off ONLL for now
       # TODO: support ONLL if necessary
+      state["OptNoLoadLoop"] = 0
+
+    # MX feature requires scale data (MXSA/MXSB) to be loaded in NLL as well
+    # ONLL assumes no new data needs to be loaded, which is incorrect for MX
+    # Disable ONLL for MXBlock kernels
+    # TODO: check if this is correct
+    if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) and state["OptNoLoadLoop"]:
       state["OptNoLoadLoop"] = 0
 
     # if state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1:
