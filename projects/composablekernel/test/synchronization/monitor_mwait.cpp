@@ -13,8 +13,10 @@ using ::ck::DeviceMem;
 using F8DataType = ck::f8_t;
 
 #if defined(__gfx125__)
-__device__ constexpr int hint_and_scope = 2 << 3;                      // temporal + Device
-__device__ constexpr short duration     = static_cast<short>(1 << 15); // forever
+__device__ constexpr int hint_and_scope = 2 << 3; // temporal + Device
+// BUG: duration = 0x8000 (sleep-forever) should not be used as the wave might never wake up if the
+// s_monitor_sleep(duration) is called when MWAIT=0
+__device__ constexpr short duration = static_cast<short>(1 << 15) - 1; // forever - 1 clock cycle
 #endif
 
 /// @param ptr points to a buffer of 4 F8 numbers
