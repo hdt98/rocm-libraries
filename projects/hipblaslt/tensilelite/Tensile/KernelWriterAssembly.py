@@ -3369,7 +3369,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(MacroInstruction(name=bfName, args=bfArgs, comment=bfComment))
       if kernel["BufferLoad"]:
           dest = "GlobalReadOffset%s+%u" % (tP["tensorChar"], graIdx)
-          module.add(vectorMultiplyBpe(dest, dest, tP["bpeGR"]))
+          module.add(vectorMultiplyBpe(vgpr(dest), vgpr(dest), tP["bpeGR"]))
       else:
           dset = "GlobalReadAddr%s+%u"%(tP["tensorChar"], graIdx)
           module.add(vectorMultiply64Bpe(dset, dset, tP["bpeGR"]))
@@ -3438,7 +3438,7 @@ class KernelWriterAssembly(KernelWriter):
 
       # Using offsets so GRO holds a byte offset not an element offset
       # So scale here before comparison:
-      module.add(scalarMultiplyBpe(scalarGro, scalarGro, tP["bpeGR"]))
+      module.add(scalarMultiplyBpe(sgpr(scalarGro), sgpr(scalarGro), tP["bpeGR"]))
 
       if kernel["DirectToLds%s"%tc] and kernel["UseInstOffsetForGRO"]:
         # add room for instruction offset
@@ -3702,7 +3702,7 @@ class KernelWriterAssembly(KernelWriter):
         # and when we get within 32-bit we start to step down the SRD
         # if the limit is <32bits, set it accurately here:
         # Note lshl_b64 the higher-numbered SGPR has the upper 32-bits
-        module.add(scalarMultiply64Bpe("ShadowLimit%s"%tc, "ShadowLimit%s"%tc, tP["bpeGR"], stmp, "Set limit to use bytes"))
+        module.add(scalarMultiply64Bpe(sgpr("ShadowLimit%s"%tc, 2), sgpr("ShadowLimit%s"%tc, 2), tP["bpeGR"], ContinuousRegister(stmp, 2), "Set limit to use bytes"))
         if prePad:
           module.add(SAddU32(dst=sgpr("ShadowLimit%s+0"%tc), src0=sgpr("ShadowLimit%s+0"%tc), src1=prePad, comment="extend limit for pre-pad"))
           module.add(SAddCU32(dst=sgpr("ShadowLimit%s+1"%tc), src0=sgpr("ShadowLimit%s+1"%tc), src1=0, comment="extend limit for pre-pad"))
@@ -3715,7 +3715,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SCSelectB32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("ShadowLimit%s+0"%tc), src1="BufferLimit", comment="Move shadow to real if we are within 2^32"))
       else:
         # put limit directly into SRD:
-        module.add(scalarMultiplyBpe("Srd%s+2"%tc, stmp, tP["bpeGR"], comment="Set limit to use bytes"))
+        module.add(scalarMultiplyBpe(sgpr("Srd%s+2"%tc), sgpr(stmp), tP["bpeGR"], comment="Set limit to use bytes"))
         module.add(SAddU32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("Srd%s+2"%tc), src1=prePad, comment="extend limit for pre-pad"))
 
       # Apply any high-order address components to the tileStart and eventually the SRD - batch idx for batched gemm
@@ -3742,7 +3742,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # Add the tile start to the SRD
     if wroteTileStart:
-      module.add(scalarMultiply64Bpe(tileStart, tileStart, tP["bpeGR"], stmp, "tileStart"))
+      module.add(scalarMultiply64Bpe(sgpr(tileStart, 2), sgpr(tileStart, 2), tP["bpeGR"], ContinuousRegister(stmp, 2), "tileStart"))
       module.add(SAddU32(dst=sgpr("Srd%s+0"%tc), src0=sgpr("Address%s+0"%tc), src1=sgpr(tileStart+0), comment="SRD base = Address+ tileStart0"))
       module.add(SAddCU32(dst=sgpr("Srd%s+1"%tc), src0=sgpr("Address%s+1"%tc), src1=sgpr(tileStart+1), comment="SRD base = Address+ tileStart1"))
     else:
@@ -4158,7 +4158,7 @@ class KernelWriterAssembly(KernelWriter):
           comment="lw%s%s**(MT%s + PAD)"%(tc, self.states.unrollChar, tc)))
       module.add(VAddU32(dst=vgpr(destVgpr), src0=vgpr(tP["gpr"]["lwoT"]), src1=vgpr(destVgpr), \
           comment="lwFO%s = (lw%s%s + lw%s%s*(MT%s+PAD))" % (tc, tc, tc, tc, self.states.unrollChar, tP["tileChar"]) ))
-    module.add(vectorMultiplyBpe(destVgpr, destVgpr, tP["bpeDS"]))
+    module.add(vectorMultiplyBpe(vgpr(destVgpr), vgpr(destVgpr), tP["bpeDS"]))
 
     # LdsBlockSizePerPad: add padding
     if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] != 0:
@@ -4365,7 +4365,7 @@ class KernelWriterAssembly(KernelWriter):
       finalVgpr = "LocalReadAddr%s"%tc
       module.add(VAddU32(dst=vgpr(finalVgpr), src0=vgpr(wave_id), src1=vgpr(tP["gpr"]["lro"]), \
         comment="Final Offset: offset = (lro%s+lsuoffset)*bpeDS" % tile01 ))
-      module.add(vectorMultiplyBpe(finalVgpr, finalVgpr, tP["bpeDS"]))
+      module.add(vectorMultiplyBpe(vgpr(finalVgpr), vgpr(finalVgpr), tP["bpeDS"]))
 
       # LdsBlockSizePerPad: add padding
       if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] !=0:
@@ -7435,13 +7435,10 @@ class KernelWriterAssembly(KernelWriter):
                            a=src0, b=src1, metadata=mStr, \
                            comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
             elif kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]:
-              mxBlock = kernel["ProblemType"]["MXBlockA"] if kernel["ProblemType"]["MXBlockA"] else kernel["ProblemType"]["MXBlockB"]
-              imod.add(MXMFMAInstruction(instType=miInInstType, accType=miOutInstType, \
-                                       mxScaleAType=InstType.INST_E8, mxScaleBType=InstType.INST_E8, \
-                                       variant=variant, \
+              imod.add(MXMFMAInstruction(instType=miInInstType, accType=miOutInstType, variant=variant, \
                                        acc=self.accVgprReadWriteIndex(kernel, (accStart+accStoreCIdx), (accEnd-accStart+1)), \
                                        a=src0, b=src1, acc2=self.accVgprReadWriteIndex(kernel, accStart, (accEnd-accStart+1)), \
-                                       mxsa=srcMX0, mxsb=srcMX1, block=mxBlock,
+                                       mxsa=srcMX0, mxsb=srcMX1,
                                        comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
             else:
               if kernel["UseF32XEmulation"]:
@@ -8129,7 +8126,7 @@ class KernelWriterAssembly(KernelWriter):
                     sgpr("Sizes%s+%u"%("Sum" if sizeIdxIsSum else "Free", sizeIdx)),  \
                     sgpr("Stride%s%s"%(tc, self.states.indexChars[tP['ia'][-1]])), \
                     comment="64b tensor%s size in elements"%tc))
-        module.add(scalarMultiply64Bpe(maxAddrSgpr, maxAddrSgpr, tP["bpeGR"], tmpSgpr, comment="<- tensor%s size in bytes"%tc))
+        module.add(scalarMultiply64Bpe(sgpr(maxAddrSgpr, 2), sgpr(maxAddrSgpr, 2), tP["bpeGR"], ContinuousRegister(tmpSgpr, 2), comment="<- tensor%s size in bytes"%tc))
 
         module.add(SAddU32(
             dst=sgpr(maxAddrSgpr+0), \
