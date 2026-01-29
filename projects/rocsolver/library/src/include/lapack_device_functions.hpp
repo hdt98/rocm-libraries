@@ -3246,7 +3246,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump2(const I n, 
 
     // find index of maximum absolute value in vector x
     S local_max = std::numeric_limits<S>::min();
-    I local_max_index;
+    I local_max_index = 0;
     for(I i = tid; i < n; i += LACN2_BLOCKSIZE)
     {
         if(rocblas_abs(x[i]) > local_max)
@@ -3451,7 +3451,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump4(const I n,
 
     // find index of maximum absolute value in vector x
     S local_max = std::numeric_limits<S>::min();
-    I local_max_index;
+    I local_max_index = 0;
     for(I i = tid; i < n; i += LACN2_BLOCKSIZE)
     {
         if(rocblas_abs(x[i]) > local_max)
