@@ -24,6 +24,12 @@
 #include "origami/simulator/tensilelite/formocast_simulator.hpp"
 
 namespace origami {
+
+// Forward declaration for internal Formocast latency computation
+static double compute_formocast_latency(const problem_t& problem,
+                                        const hardware_t& hardware,
+                                        const config_t& config);
+
 double calculate_work_utilization(const problem_t& problem, const config_t& config) {
   const size_t M = problem.size.m;
   const size_t N = problem.size.n;
@@ -1000,9 +1006,9 @@ double compute_total_latency(const problem_t& problem,
   return total_latency;
 }
 
-double compute_formocast_latency(const problem_t& problem,
-                                 const hardware_t& hardware,
-                                 const config_t& config) {
+static double compute_formocast_latency(const problem_t& problem,
+                                        const hardware_t& hardware,
+                                        const config_t& config) {
   // Create Formocast simulator instance
   Formocast formocast;
 

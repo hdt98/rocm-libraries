@@ -329,12 +329,6 @@ def test_prediction_modes_enum_exists():
 
 
 @pytest.mark.integration
-def test_compute_formocast_latency_exists():
-    """Test that compute_formocast_latency function is available."""
-    assert hasattr(origami, 'compute_formocast_latency')
-
-
-@pytest.mark.integration
 def test_config_has_formocast_fields():
     """Test that config_t has Formocast-specific fields via nested tensile struct."""
     config = origami.config_t()
@@ -410,8 +404,8 @@ def test_simulation_mode_returns_valid_latency():
     config.tensile.wave_group_n = 2
     config.tensile.prefetch_global_read = 2
     
-    # Call compute_formocast_latency directly
-    latency = origami.compute_formocast_latency(problem, hardware, config)
+    # Call compute_total_latency with simulation mode
+    latency = origami.compute_total_latency(problem, hardware, config, hardware.N_CU)
     
     assert latency > 0, f"Expected positive latency, got {latency}"
 
@@ -528,5 +522,5 @@ def test_simulation_mode_various_problem_sizes(m, n, k):
     config.tensile.wave_group_m = 2
     config.tensile.wave_group_n = 2
     
-    latency = origami.compute_formocast_latency(problem, hardware, config)
+    latency = origami.compute_total_latency(problem, hardware, config, hardware.N_CU)
     assert latency > 0, f"Expected positive latency for {m}x{n}x{k}, got {latency}"

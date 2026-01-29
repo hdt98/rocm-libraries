@@ -274,10 +274,7 @@ NB_MODULE(origami, m) {
                                const origami::hardware_t&,
                                const origami::config_t&,
                                size_t max_cus)>(&origami::compute_total_latency),
-        "Compute total latency");
-  m.def("compute_formocast_latency",
-        &origami::compute_formocast_latency,
-        "Compute latency using Formocast simulation model (more accurate, slower)");
+        "Compute total latency (uses Formocast when config.prediction_mode == simulation)");
   m.def("compute_number_matrix_instructions",
         &origami::compute_number_matrix_instructions,
         "Compute the number of matrix instructions required");
