@@ -6,7 +6,7 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Added
 
-* Cholesky QR method for computing the QR factorization of a tall rectangular matrix
+* Cholesky QR methods for computing the QR factorization of a tall rectangular matrix
     * CholQR
     * CHolQR_64
 
