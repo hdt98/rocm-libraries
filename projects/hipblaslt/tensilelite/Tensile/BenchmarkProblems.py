@@ -81,6 +81,21 @@ def timing_context(category_name):
         yield
 
 
+@contextmanager
+def timing_context(category_name):
+    """Context manager for timing instrumentation."""
+    if globalParameters.get("TimingInstrumentation", False):
+        # Using time_ns() for better precision: https://docs.python.org/3/library/time.html#time.time
+        start = time.time_ns()
+        try:
+            yield
+        finally:
+            elapsed_ms = (time.time_ns() - start) / 1_000_000
+            print(f"TIMING:{category_name}:{elapsed_ms:.3f}", file=sys.stderr)
+    else:
+        yield
+
+
 def _generateForkedSolutions(problemType, constantParams, forkPermutations, assembler: Assembler, \
                             debugConfig: DebugConfig, isaInfoMap: Dict[IsaVersion, IsaInfo]):
     """Creates a list with a Solution object for each parameter combination in forkPermutations"""
