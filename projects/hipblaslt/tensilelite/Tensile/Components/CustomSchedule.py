@@ -58,7 +58,7 @@ class SyncSchedule:
 
     def add(self, idx: int, dscnt: int = -1, vlcnt: int = -1, vscnt: int = -1, comment: str = "", barrier: bool = False, barrier_idx: Optional[int] = None, barrier_comment: str = ""):
         """ Add a SWaitCnt (and optionally a SBarrier) to the schedule at the given index.
-        
+
         Args:
             idx:             The index at which to add the SWaitCnt.
             dscnt:           The dscnt value for the SWaitCnt.
@@ -68,7 +68,7 @@ class SyncSchedule:
             barrier:         If True, also add a SBarrier.
             barrier_idx:     The index at which to add the SBarrier. If None, uses idx.
             barrier_comment: An optional comment for the SBarrier.
-        
+
         xample:
             wait.add(2, dscnt=3)                                   adds SWaitCnt at index 2 with dscnt=3
             wait.add(5, dscnt=0, sbarrier=True)                    adds SWaitCnt at index 5 with dscnt=0 and a SBarrier at the same index
