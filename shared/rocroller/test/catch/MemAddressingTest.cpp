@@ -40,14 +40,779 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/All.hpp>
 #include <rocRoller/KernelGraph/Visitors.hpp>
+#include <rocRoller/TensorDescriptor.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 
 #include <common/CommonGraphs.hpp>
 #include <common/Scheduling.hpp>
+#include <common/Utilities.hpp>
+#include <common/mxDataGen.hpp>
 
 #include "CustomAssertions.hpp"
 #include "CustomSections.hpp"
 #include "TestContext.hpp"
+
+template <typename TA, typename TB = TA, typename TC = TA, typename TD = TC, typename ACC = float>
+void basicGEMM(rocRoller::ContextPtr   m_context,
+               const GEMMProblem&      gemm,
+               bool                    debuggable  = false,
+               bool                    setIdentity = false,
+               int                     numIters    = 1,
+               bool                    notSetC     = false,
+               std::optional<uint32_t> srCvtSeed   = std::nullopt)
+{
+    using namespace rocRoller;
+
+    if(gemm.scaleAMode != Operations::ScaleMode::None
+       || gemm.scaleBMode != Operations::ScaleMode::None)
+    {
+        const auto scaleType
+            = gemm.scaleAMode != Operations::ScaleMode::None ? gemm.scaleTypeA : gemm.scaleTypeB;
+        const auto& arch = m_context->targetArchitecture();
+        AssertFatal(gemm.scaleAMode == Operations::ScaleMode::None
+                        || arch.isSupportedScaleType(gemm.scaleTypeA),
+                    fmt::format("Scale mode for A set but architecture {} does not "
+                                "support scale type {}.",
+                                arch.target().toString(),
+                                toString(gemm.scaleTypeA)));
+        AssertFatal(gemm.scaleBMode == Operations::ScaleMode::None
+                        || arch.isSupportedScaleType(gemm.scaleTypeB),
+                    fmt::format("Scale mode for B set but architecture {} does not "
+                                "support scale type {}.",
+                                arch.target().toString(),
+                                toString(gemm.scaleTypeB)));
+    }
+
+    AssertFatal(gemm.scaleAMode == Operations::ScaleMode::None
+                    || gemm.scaleAMode == Operations::ScaleMode::SingleScale
+                    || gemm.scaleAMode == Operations::ScaleMode::Separate,
+                "Scale mode not supported!",
+                ShowValue(gemm.scaleAMode));
+    AssertFatal(gemm.scaleBMode == Operations::ScaleMode::None
+                    || gemm.scaleBMode == Operations::ScaleMode::SingleScale
+                    || gemm.scaleBMode == Operations::ScaleMode::Separate,
+                "Scale mode not supported!",
+                ShowValue(gemm.scaleBMode));
+
+    auto dataTypeA   = TypeInfo<TA>::Var.dataType;
+    auto dataTypeB   = TypeInfo<TB>::Var.dataType;
+    auto dataTypeC   = TypeInfo<TC>::Var.dataType;
+    auto dataTypeD   = TypeInfo<TD>::Var.dataType;
+    auto dataTypeAcc = TypeInfo<ACC>::Var.dataType;
+
+    // D (MxN) = alpha * A (MxK) X B (KxN) + beta * C (MxN)
+    int   M     = gemm.m;
+    int   N     = gemm.n;
+    int   K     = gemm.k;
+    float alpha = gemm.alpha;
+    float beta  = gemm.beta;
+
+    AssertFatal(
+        M % gemm.macM == 0, "MacroTile size mismatch (M)", ShowValue(M), ShowValue(gemm.macM));
+    AssertFatal(
+        N % gemm.macN == 0, "MacroTile size mismatch (N)", ShowValue(N), ShowValue(gemm.macN));
+
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate
+       || gemm.scaleBMode == Operations::ScaleMode::Separate)
+    {
+        AssertFatal(m_context->targetArchitecture().isSupportedScaleBlockSize(gemm.scaleBlockSize),
+                    fmt::format("Architecture {} does not support block scaling (size: {}).",
+                                m_context->targetArchitecture().target().toString(),
+                                gemm.scaleBlockSize));
+    }
+
+    if(gemm.unrollK > 0 && !gemm.tailLoops)
+    {
+        AssertFatal(K % (gemm.macK * gemm.unrollK) == 0, "MacroTile size mismatch (K unroll)");
+    }
+
+    auto bpeA = DataTypeInfo::Get(dataTypeA).elementBytes;
+    auto bpeB = DataTypeInfo::Get(dataTypeB).elementBytes;
+    AssertFatal(gemm.macM * gemm.macK * bpeA >= gemm.waveM * gemm.waveK,
+                "Not enough elements (A).");
+    AssertFatal(gemm.macN * gemm.macK * bpeB >= gemm.waveN * gemm.waveK,
+                "Not enough elements (B).");
+
+    AssertFatal(gemm.workgroupSizeX % gemm.wavefrontSize == 0,
+                "Workgroup Size X must be multiply of wave front size");
+
+    uint wavetilePerWavefrontM = gemm.wavefrontSize * gemm.macM / gemm.waveM / gemm.workgroupSizeX;
+    uint wavetilePerWavefrontN = gemm.macN / gemm.waveN / gemm.workgroupSizeY;
+
+    AssertFatal(wavetilePerWavefrontM > 0, "WaveTile size mismatch (M).");
+    AssertFatal(wavetilePerWavefrontN > 0, "WaveTile size mismatch (N).");
+
+    AssertFatal(gemm.macM % (gemm.waveM * wavetilePerWavefrontM) == 0,
+                "WaveTile size mismatch (M)");
+    AssertFatal(gemm.macN % (gemm.waveN * wavetilePerWavefrontN) == 0,
+                "WaveTile size mismatch (N)");
+
+    Log::debug("GEMMTest jamming: {}x{}", wavetilePerWavefrontM, wavetilePerWavefrontN);
+
+    uint workgroupSizeX = gemm.workgroupSizeX * gemm.workgroupSizeY;
+    uint workgroupSizeY = 1;
+
+    uint numWorkgroupX;
+    uint numWorkgroupY;
+
+    if(gemm.loopOverTiles > 0)
+    {
+        // multiple output macro tiles per workgroup
+        numWorkgroupX = M * N / gemm.macM / gemm.macN / 2;
+        numWorkgroupY = 1;
+    }
+    else if(gemm.streamK)
+    {
+        numWorkgroupX = gemm.numWGs;
+        numWorkgroupY = 1;
+    }
+    else
+    {
+        // one output macro tile per workgroup
+        numWorkgroupX = M / gemm.macM;
+        numWorkgroupY = N / gemm.macN;
+    }
+
+    // Host data
+    using PackedTypeA = typename PackedTypeOf<TA>::type;
+    using PackedTypeB = typename PackedTypeOf<TB>::type;
+    std::vector<PackedTypeA> hostA;
+    std::vector<PackedTypeB> hostB;
+    std::vector<TC>          hostC;
+
+    std::vector<uint8_t> hostScaleA, hostScaleB;
+
+    TensorDescriptor descA(dataTypeA, {size_t(M), size_t(K)}, gemm.transA);
+    TensorDescriptor descB(dataTypeB, {size_t(K), size_t(N)}, gemm.transB);
+    TensorDescriptor descC(dataTypeD, {size_t(M), size_t(N)}, "N");
+    TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
+
+    auto seed = 31415u;
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate
+       || gemm.scaleBMode == Operations::ScaleMode::Separate)
+    {
+        auto const& arch = m_context->targetArchitecture();
+
+        auto scaleBlockSize = gemm.scaleBlockSize;
+        AssertFatal(scaleBlockSize > 0, "scaleBlockSize must be set to scale A or B.");
+        AssertFatal(arch.isSupportedScaleBlockSize(scaleBlockSize),
+                    fmt::format("Architecture {} does not support block scaling (size: {}).",
+                                arch.target().toString(),
+                                scaleBlockSize));
+        AssertFatal(gemm.k % scaleBlockSize == 0,
+                    fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                gemm.k,
+                                scaleBlockSize));
+        DGenInput(seed,
+                  hostA,
+                  descA,
+                  hostB,
+                  descB,
+                  hostC,
+                  descC,
+                  hostScaleA,
+                  hostScaleB,
+                  gemm.scaleAMode == Operations::ScaleMode::Separate,
+                  gemm.scaleBMode == Operations::ScaleMode::Separate,
+                  -1.f,
+                  1.f,
+                  static_cast<uint>(scaleBlockSize));
+    }
+    else
+    {
+        DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
+    }
+
+    if(setIdentity)
+    {
+        SetIdentityMatrix(hostA, K, M);
+        SetIdentityMatrix(hostB, N, K);
+
+        std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
+    }
+
+    auto deviceA = make_shared_device<TA>(hostA);
+    auto deviceB = make_shared_device<TB>(hostB);
+
+    std::shared_ptr<TC> deviceC = (notSetC) ? nullptr : make_shared_device(hostC);
+    std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
+
+    std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
+
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+        deviceScaleA = make_shared_device(hostScaleA);
+    if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+        deviceScaleB = make_shared_device(hostScaleB);
+
+    // In SingleScale mode, don't need to copy to device
+    // if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
+    //     hostScaleA = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeA)};
+
+    // if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
+    //     hostScaleB = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeB)};
+
+    auto command = std::make_shared<Command>();
+
+    std::vector<size_t> oneStridesN
+        = gemm.literalStrides ? std::vector<size_t>({(size_t)1}) : std::vector<size_t>({});
+
+    std::vector<size_t> oneStridesT = gemm.literalStrides
+                                          ? std::vector<size_t>({(size_t)0, (size_t)1})
+                                          : std::vector<size_t>({});
+
+    auto tagTensorA = command->addOperation(rocRoller::Operations::Tensor(
+        2, dataTypeA, {}, gemm.transA == "N" ? oneStridesN : oneStridesT)); // A
+    auto tagLoadA   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorA));
+
+    auto tagTensorB = command->addOperation(rocRoller::Operations::Tensor(
+        2, dataTypeB, {}, gemm.transB == "N" ? oneStridesN : oneStridesT)); // B
+    auto tagLoadB   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
+
+    auto mulInputA = tagLoadA;
+    auto mulInputB = tagLoadB;
+
+    std::optional<Operations::OperationTag> tagTensorScaleA, tagLoadScaleA, tagBlockScaleA,
+        tagTensorScaleB, tagLoadScaleB, tagBlockScaleB;
+
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+    {
+        tagTensorScaleA = command->addOperation(rocRoller::Operations::Tensor(
+            2, gemm.scaleTypeA, {}, gemm.transA == "N" ? oneStridesN : oneStridesT));
+        tagLoadScaleA
+            = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleA));
+
+        tagBlockScaleA = mulInputA = command->addOperation(rocRoller::Operations::BlockScale(
+            tagLoadA, 2, tagLoadScaleA, {1, static_cast<unsigned int>(gemm.scaleBlockSize)}));
+    }
+    else if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
+    {
+        tagTensorScaleA = command->addOperation(rocRoller::Operations::Scalar(gemm.scaleTypeA));
+        tagLoadScaleA
+            = command->addOperation(rocRoller::Operations::T_Load_Scalar(*tagTensorScaleA));
+        tagBlockScaleA = mulInputA
+            = command->addOperation(rocRoller::Operations::BlockScale(tagLoadA, 0, tagLoadScaleA));
+    }
+
+    if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+    {
+        tagTensorScaleB = command->addOperation(rocRoller::Operations::Tensor(
+            2, gemm.scaleTypeB, {}, gemm.transB == "N" ? oneStridesN : oneStridesT));
+        tagLoadScaleB
+            = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleB));
+
+        tagBlockScaleB = mulInputB = command->addOperation(rocRoller::Operations::BlockScale(
+            tagLoadB, 2, tagLoadScaleB, {static_cast<unsigned int>(gemm.scaleBlockSize), 1}));
+    }
+    else if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
+    {
+        tagTensorScaleB = command->addOperation(rocRoller::Operations::Scalar(gemm.scaleTypeB));
+        tagLoadScaleB
+            = command->addOperation(rocRoller::Operations::T_Load_Scalar(*tagTensorScaleB));
+        tagBlockScaleB = mulInputB
+            = command->addOperation(rocRoller::Operations::BlockScale(tagLoadB, 0, tagLoadScaleB));
+    }
+
+    auto tagTensorC
+        = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeC, {}, oneStridesN)); // C
+    auto tagLoadC = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorC));
+
+    auto tagScalarAlpha
+        = command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // alpha
+    auto tagLoadAlpha = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarAlpha));
+
+    auto tagScalarBeta
+        = command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // beta
+    auto tagLoadBeta = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarBeta));
+
+    auto tagAB = command->addOperation(
+        rocRoller::Operations::T_Mul(mulInputA, mulInputB, dataTypeAcc)); // A * B
+
+    rocRoller::Operations::T_Execute execute(command->getNextTag());
+    auto tagBetaC = execute.addXOp(rocRoller::Operations::E_Mul(tagLoadBeta, tagLoadC)); // beta * C
+
+    auto tagAlphaAB
+        = execute.addXOp(rocRoller::Operations::E_Mul(tagLoadAlpha, tagAB)); // alpha * (A * B)
+
+    rocRoller::Operations::OperationTag tagStoreD;
+    if(gemm.betaInFma)
+    {
+        tagStoreD = execute.addXOp(
+            rocRoller::Operations::E_Add(tagBetaC, tagAlphaAB)); // beta * C + alpha * (A * B)
+    }
+    else
+    {
+        tagStoreD = execute.addXOp(
+            rocRoller::Operations::E_Add(tagAlphaAB, tagBetaC)); // alpha * (A * B) + beta * C
+    }
+
+    command->addOperation(std::make_shared<rocRoller::Operations::Operation>(execute));
+
+    auto tagTensorD
+        = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeD, {}, oneStridesN)); // D
+    Operations::OperationTag tagScalarSeed;
+    if constexpr(std::is_same_v<TC, TD>)
+    {
+        command->addOperation(rocRoller::Operations::T_Store_Tiled(tagStoreD, tagTensorD));
+    }
+    else
+    {
+        Operations::OperationTag tagLoadSeed;
+        // If Matrix C and D are of different types, an explicit type conversion is required
+        if(srCvtSeed.has_value())
+        {
+            tagScalarSeed
+                = command->addOperation(rocRoller::Operations::Scalar(DataType::UInt32)); // alpha
+            tagLoadSeed
+                = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarSeed));
+        }
+
+        auto cvtOp = rocRoller::Operations::T_Execute(command->getNextTag());
+        // (SR)Convert( alpha * (A * B) + beta * C )
+        auto tagCvt = srCvtSeed.has_value()
+                          ? cvtOp.addXOp(rocRoller::Operations::E_StochasticRoundingCvt(
+                              tagStoreD, tagLoadSeed, dataTypeD))
+                          : cvtOp.addXOp(rocRoller::Operations::E_Cvt(tagStoreD, dataTypeD));
+        tagStoreD   = command->addOperation(std::move(cvtOp));
+        command->addOperation(rocRoller::Operations::T_Store_Tiled(tagCvt, tagTensorD));
+    }
+
+    std::map<Operations::ScratchPolicy, Operations::OperationTag> scratchTags;
+    Operations::OperationTag                                      tagNumWGs;
+    if(gemm.streamK)
+    {
+        tagNumWGs      = command->allocateTag();
+        auto numWGsArg = command->allocateArgument(DataType::UInt32,
+                                                   tagNumWGs,
+                                                   ArgumentType::Value,
+                                                   DataDirection::ReadOnly,
+                                                   rocRoller::NUMWGS);
+
+        scratchTags[Operations::ScratchPolicy::None] = command->allocateTag();
+        command->addOperation(rocRoller::Operations::Scratch(
+            scratchTags.at(Operations::ScratchPolicy::None), Operations::ScratchPolicy::None));
+        command->allocateArgument(VariableType(DataType::UInt32, PointerType::PointerGlobal),
+                                  scratchTags.at(Operations::ScratchPolicy::None),
+                                  ArgumentType::Value,
+                                  DataDirection::ReadWrite,
+                                  getScratchName(Operations::ScratchPolicy::None));
+
+        scratchTags[Operations::ScratchPolicy::ZeroedBeforeAndAfter] = command->allocateTag();
+        command->addOperation(rocRoller::Operations::Scratch(
+            scratchTags.at(Operations::ScratchPolicy::ZeroedBeforeAndAfter),
+            Operations::ScratchPolicy::ZeroedBeforeAndAfter));
+        command->allocateArgument(VariableType(DataType::UInt32, PointerType::PointerGlobal),
+                                  scratchTags.at(Operations::ScratchPolicy::ZeroedBeforeAndAfter),
+                                  ArgumentType::Value,
+                                  DataDirection::ReadWrite,
+                                  getScratchName(Operations::ScratchPolicy::ZeroedBeforeAndAfter));
+    }
+
+    Operations::OperationTag tagWGM;
+    if(gemm.workgroupMappingDim != -1)
+    {
+        tagWGM      = command->allocateTag();
+        auto wgmArg = command->allocateArgument(
+            DataType::Int32, tagWGM, ArgumentType::Value, DataDirection::ReadOnly, rocRoller::WGM);
+    }
+
+    auto params = std::make_shared<CommandParameters>();
+    params->setManualKernelDimension(2);
+    params->setManualWorkgroupSize({workgroupSizeX, workgroupSizeY, 1});
+
+    // TODO: Calculate these values internally based on workgroup sizes.
+    params->setManualWavefrontCount(
+        {static_cast<uint>(gemm.macM / gemm.waveM / wavetilePerWavefrontM),
+         static_cast<uint>(gemm.macN / gemm.waveN / wavetilePerWavefrontN)});
+    params->setWaveTilesPerWavefront(wavetilePerWavefrontM, wavetilePerWavefrontN);
+    params->setSplitStoreTileIntoWaveBlocks(gemm.splitStoreTileIntoWaveBlocks);
+
+    // Set LDS padding for MATRIX_A and MATRIX_B
+    params->ldsPadding[LayoutType::MATRIX_A] = gemm.padA;
+    params->ldsPadding[LayoutType::MATRIX_B] = gemm.padB;
+
+    params->swizzleScale                  = gemm.swizzleScale;
+    params->prefetchScale                 = gemm.prefetchScale;
+    params->fuseLoops                     = gemm.fuseLoops;
+    params->tailLoops                     = gemm.tailLoops;
+    params->allowAmbiguousMemoryNodes     = gemm.allowAmbiguousMemoryNodes;
+    params->unrollX                       = gemm.unrollX;
+    params->unrollY                       = gemm.unrollY;
+    params->unrollK                       = gemm.unrollK;
+    params->packMultipleElementsInto1VGPR = gemm.packMultipleElementsInto1VGPR;
+    params->prefetch                      = gemm.prefetch;
+    params->prefetchInFlight              = gemm.prefetchInFlight;
+    params->prefetchLDSFactor             = gemm.prefetchLDSFactor;
+    params->prefetchMixMemOps             = gemm.prefetchMixMemOps;
+    params->transposeMemoryAccess.set(LayoutType::MATRIX_A, gemm.transA == "T");
+    params->transposeMemoryAccess.set(LayoutType::MATRIX_B, gemm.transB == "T");
+
+    if(gemm.workgroupMappingDim != -1)
+    {
+        params->workgroupMappingDim = gemm.workgroupMappingDim;
+    }
+
+    if(gemm.workgroupRemapXCC)
+    {
+        params->workgroupRemapXCC
+            = m_context->targetArchitecture().GetCapability(GPUCapability::DefaultRemapXCCValue);
+    }
+
+    if(gemm.loopOverTiles > 0)
+    {
+        params->loopOverOutputTilesDimensions = {0, 1};
+        params->loopOverOutputTilesCoordSizes
+            = {static_cast<uint>(M / gemm.macM), static_cast<uint>(N / gemm.macN)};
+        params->loopOverOutputTilesIteratedTiles = 2;
+    }
+
+    if(gemm.streamK)
+    {
+        AssertFatal(numWorkgroupY == 1,
+                    "Current scratch space implementation assumes that the kernel is launched "
+                    "with numWorkgroupY == 1");
+
+        params->loopOverOutputTilesDimensions = {0, 1};
+        params->streamK                       = gemm.streamK;
+    }
+
+    auto memoryTypeA = GetMemoryType(gemm.loadPathA);
+    auto memoryTypeB = GetMemoryType(gemm.loadPathB);
+
+    {
+        auto macTileA = KernelGraph::CoordinateGraph::MacroTile(
+            {gemm.macM, gemm.macK},
+            LayoutType::MATRIX_A,
+            {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
+            memoryTypeA);
+        params->setDimensionInfo(tagLoadA, macTileA);
+    }
+
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+    {
+        AssertFatal(gemm.waveK % gemm.scaleBlockSize == 0,
+                    fmt::format("waveK: {} must be a multiple of the scale block size: {}",
+                                gemm.waveK,
+                                gemm.scaleBlockSize));
+        AssertFatal(gemm.loadScalePathA != SolutionParams::LoadPath::BufferToLDS
+                        || gemm.swizzleScale,
+                    "If loadScalePathA is BufferToLDS, swizzleScale must be enabled");
+        auto macTileAScale = KernelGraph::CoordinateGraph::MacroTile(
+            {gemm.macM, gemm.macK / gemm.scaleBlockSize},
+            LayoutType::MATRIX_A,
+            {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
+            GetMemoryType(gemm.loadScalePathA),
+            {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
+            {gemm.swizzleM, gemm.swizzleN, gemm.swizzleK, gemm.swizzleB});
+        params->setDimensionInfo(*tagLoadScaleA, macTileAScale);
+    }
+
+    {
+        auto macTileB = KernelGraph::CoordinateGraph::MacroTile(
+            {gemm.macK, gemm.macN},
+            LayoutType::MATRIX_B,
+            {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
+            memoryTypeB);
+        params->setDimensionInfo(tagLoadB, macTileB);
+    }
+
+    if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+    {
+        AssertFatal(gemm.waveK % gemm.scaleBlockSize == 0,
+                    fmt::format("waveK: {} must be a multiple of the scale block size: {}",
+                                gemm.waveK,
+                                gemm.scaleBlockSize));
+        AssertFatal(gemm.loadScalePathB != SolutionParams::LoadPath::BufferToLDS
+                        || gemm.swizzleScale,
+                    "If loadScalePathB is BufferToLDS, swizzleScale must be enabled");
+        auto macTileBScale = KernelGraph::CoordinateGraph::MacroTile(
+            {gemm.macK / gemm.scaleBlockSize, gemm.macN},
+            LayoutType::MATRIX_B,
+            {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
+            GetMemoryType(gemm.loadScalePathB),
+            {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
+            {gemm.swizzleM, gemm.swizzleN, gemm.swizzleK, gemm.swizzleB});
+        params->setDimensionInfo(*tagLoadScaleB, macTileBScale);
+    }
+
+    {
+        auto macTileC = KernelGraph::CoordinateGraph::MacroTile(
+            {gemm.macM, gemm.macN},
+            LayoutType::MATRIX_ACCUMULATOR,
+            {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB});
+        params->setDimensionInfo(tagLoadC, macTileC);
+    }
+
+    {
+        auto macTileD = KernelGraph::CoordinateGraph::MacroTile(
+            {gemm.macM, gemm.macN},
+            LayoutType::MATRIX_ACCUMULATOR,
+            {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
+            gemm.storeLDSD ? MemoryType::LDS : MemoryType::WAVE);
+        params->setDimensionInfo(tagStoreD, macTileD);
+    }
+
+    CommandKernel commandKernel(command, "kernel_name_todo");
+
+    // TODO Some test have loops, we need to reset the context.
+    // m_context = createContext();
+
+    commandKernel.setContext(m_context);
+    commandKernel.setCommandParameters(params);
+    commandKernel.generateKernel();
+
+    CommandArguments commandArgs = command->createArguments();
+
+    setCommandTensorArg(commandArgs, tagTensorA, descA, deviceA.get());
+    setCommandTensorArg(commandArgs, tagTensorB, descB, deviceB.get());
+    setCommandTensorArg(commandArgs, tagTensorC, descC, deviceC.get());
+    setCommandTensorArg(commandArgs, tagTensorD, descD, deviceD.get());
+
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+    {
+        AssertFatal(K % gemm.scaleBlockSize == 0,
+                    fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                K,
+                                gemm.scaleBlockSize));
+        TensorDescriptor descAScale(
+            dataTypeA, {size_t(M), size_t(K / gemm.scaleBlockSize)}, gemm.transA);
+        setCommandTensorArg(commandArgs, tagTensorScaleA.value(), descAScale, deviceScaleA.get());
+    }
+    else if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
+    {
+        commandArgs.setArgument(*tagTensorScaleA, ArgumentType::Value, hostScaleA[0]);
+    }
+
+    if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+    {
+        AssertFatal(K % gemm.scaleBlockSize == 0,
+                    fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                K,
+                                gemm.scaleBlockSize));
+        TensorDescriptor descBScale(
+            dataTypeB, {size_t(K / gemm.scaleBlockSize), size_t(N)}, gemm.transB);
+        setCommandTensorArg(commandArgs, tagTensorScaleB.value(), descBScale, deviceScaleB.get());
+    }
+    else if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
+    {
+        commandArgs.setArgument(*tagTensorScaleB, ArgumentType::Value, hostScaleB[0]);
+    }
+
+    commandArgs.setArgument(tagScalarAlpha, ArgumentType::Value, alpha);
+    commandArgs.setArgument(tagScalarBeta, ArgumentType::Value, beta);
+    if(srCvtSeed.has_value())
+        commandArgs.setArgument(tagScalarSeed, ArgumentType::Value, srCvtSeed.value());
+
+    // Create scratch space
+    size_t scratchSpaceRequired[static_cast<int>(Operations::ScratchPolicy::Count)];
+    std::shared_ptr<uint8_t> deviceScratch[static_cast<int>(Operations::ScratchPolicy::Count)];
+    std::fill(std::begin(scratchSpaceRequired), std::end(scratchSpaceRequired), 0);
+    std::fill(std::begin(deviceScratch), std::end(deviceScratch), nullptr);
+    if(gemm.streamK)
+    {
+        commandArgs.setArgument(tagNumWGs, ArgumentType::Value, gemm.numWGs);
+        for(int i = 0; i < static_cast<int>(Operations::ScratchPolicy::Count); ++i)
+        {
+            auto policy = static_cast<Operations::ScratchPolicy>(i);
+            scratchSpaceRequired[i]
+                = commandKernel.scratchSpaceRequired(policy, commandArgs.runtimeArguments());
+            if(scratchSpaceRequired[i] > 0)
+            {
+                deviceScratch[i] = make_shared_device<uint8_t>(scratchSpaceRequired[i], 0);
+                commandArgs.setArgument(
+                    scratchTags.at(policy), ArgumentType::Value, deviceScratch[i].get());
+            }
+        }
+    }
+
+    if(gemm.workgroupMappingDim != -1)
+    {
+        commandArgs.setArgument(tagWGM, ArgumentType::Value, gemm.workgroupMappingValue);
+    }
+
+    // Host result
+    std::vector<TD> h_result(M * N, TD{});
+    if(gemm.scaleAMode != Operations::ScaleMode::None
+       || gemm.scaleBMode != Operations::ScaleMode::None)
+    {
+        rocRoller::ScaledCPUMM(h_result,
+                               hostC,
+                               hostA,
+                               hostB,
+                               hostScaleA,
+                               hostScaleB,
+                               M,
+                               N,
+                               K,
+                               alpha,
+                               beta,
+                               gemm.transA == "T",
+                               gemm.transB == "T",
+                               gemm.scaleBlockSize,
+                               gemm.scaleTypeA,
+                               gemm.scaleTypeB);
+    }
+    else if constexpr(std::is_same_v<TC, TD>)
+    {
+        rocRoller::CPUMM(h_result,
+                         hostC,
+                         hostA,
+                         hostB,
+                         M,
+                         N,
+                         K,
+                         alpha,
+                         beta,
+                         gemm.transA == "T",
+                         gemm.transB == "T");
+    }
+    else
+    {
+        std::vector<TC> hostD(M * N, TC{});
+        rocRoller::CPUMM(hostD,
+                         hostC,
+                         hostA,
+                         hostB,
+                         M,
+                         N,
+                         K,
+                         alpha,
+                         beta,
+                         gemm.transA == "T",
+                         gemm.transB == "T");
+        ASSERT_EQ(hostD.size(), h_result.size());
+        bool const isSRConversion = srCvtSeed.has_value();
+        for(size_t i = 0; i < hostD.size(); i++)
+        {
+            if(isSRConversion)
+            {
+                // SR conversion currently only supports F32 to FP8/BF8
+                AssertFatal((std::is_same_v<TC, float>),
+                            "Source type of SR conversion only accepts float");
+                AssertFatal((std::is_same_v<TD, FP8>) || (std::is_same_v<TD, BF8>),
+                            "Destionation type of SR conversion can only be FP8/BF8");
+
+                int constexpr exp_width      = std::is_same_v<TD, FP8> ? 4 : 5;
+                int constexpr mantissa_width = 7 - exp_width;
+                bool constexpr is_bf8        = std::is_same_v<TD, BF8>;
+
+                auto const f8Mode = Settings::getInstance()->get(Settings::F8ModeOption);
+
+                if(f8Mode == rocRoller::F8Mode::NaNoo)
+                {
+                    h_result[i].data = DataTypes::cast_to_f8<mantissa_width,
+                                                             exp_width,
+                                                             float,
+                                                             false /* is_ocp */,
+                                                             is_bf8,
+                                                             true /*negative_zero_nan*/,
+                                                             true /*clip*/>(
+                        hostD[i],
+                        true /* is stochastic rounding? */,
+                        srCvtSeed.value() /* seed for stochastic rounding */);
+                }
+                else
+                {
+                    h_result[i].data = DataTypes::cast_to_f8<mantissa_width,
+                                                             exp_width,
+                                                             float,
+                                                             true /* is_ocp */,
+                                                             is_bf8,
+                                                             true /*negative_zero_nan*/,
+                                                             true /*clip*/>(
+                        hostD[i],
+                        true /* is stochastic rounding? */,
+                        srCvtSeed.value() /* seed for stochastic rounding */);
+                }
+            }
+            else
+                h_result[i] = TD(hostD[i]);
+        }
+    }
+
+    // Device result
+    std::vector<TD> d_result(M * N);
+
+    for(int iteration = 0; iteration < numIters; ++iteration)
+    {
+        AssertFatal(hipMemset(deviceD.get(), 0, M * N * sizeof(TD)) == hipSuccess);
+        if(iteration == 0)
+        {
+            for(int i = 0; i < static_cast<int>(Operations::ScratchPolicy::Count); ++i)
+            {
+                if(scratchSpaceRequired[i] > 0)
+                {
+                    AssertFatal(hipMemset(deviceScratch[i].get(), 0, scratchSpaceRequired[i])
+                                == hipSuccess);
+                }
+            }
+        }
+
+        commandKernel.launchKernel(commandArgs.runtimeArguments());
+
+        AssertFatal(
+            hipMemcpy(d_result.data(), deviceD.get(), M * N * sizeof(TD), hipMemcpyDeviceToHost)
+            == hipSuccess);
+
+        auto tol
+            = gemmAcceptableError<TA, TB, TD>(M, N, K, m_context->targetArchitecture().target());
+        auto res = compare(d_result, h_result, tol);
+        Log::info("RNorm is {} (acceptable {}, iteration {})",
+                  res.relativeNormL2,
+                  res.acceptableError.relativeL2Tolerance,
+                  iteration);
+
+        // Verify ZeroedBeforeAndAfter scratch is all zeros after kernel execution
+        auto zeroedIdx = static_cast<size_t>(Operations::ScratchPolicy::ZeroedBeforeAndAfter);
+        if(scratchSpaceRequired[zeroedIdx] > 0)
+        {
+            std::vector<uint8_t> zeroedResult(scratchSpaceRequired[zeroedIdx]);
+            AssertFatal(hipMemcpy(zeroedResult.data(),
+                                  deviceScratch[zeroedIdx].get(),
+                                  scratchSpaceRequired[zeroedIdx],
+                                  hipMemcpyDeviceToHost)
+                        == hipSuccess);
+
+            bool allZeros = true;
+            for(size_t i = 0; i < zeroedResult.size(); ++i)
+            {
+                if(zeroedResult[i] != 0)
+                {
+                    allZeros = false;
+                    // Print as uint32 since flags are UInt32
+                    size_t flagIndex = i / sizeof(uint32_t);
+                    std::cerr << "Non-zero at byte " << i << " (flag index " << flagIndex
+                              << "): " << static_cast<int>(zeroedResult[i]) << std::endl;
+                }
+            }
+            AssertFatal(allZeros,
+                        fmt::format("ZeroedBeforeAndAfter scratch should be all zeros after kernel "
+                                    "execution (size={} bytes)",
+                                    scratchSpaceRequired[zeroedIdx]));
+        }
+
+        if(debuggable && !res.ok)
+        {
+            for(size_t i = 0; i < M; i++)
+            {
+                for(size_t j = 0; j < N; j++)
+                {
+                    auto a = d_result[i * N + j];
+                    auto b = h_result[i * N + j];
+                    if((a - b) * (a - b) / (b * b) > res.acceptableError.relativeL2Tolerance)
+                    {
+                        std::cout << std::setw(8) << i << std::setw(8) << j //
+                                  << std::setw(16) << std::scientific << a //
+                                  << std::setw(16) << std::scientific << b //
+                                  << std::setw(16) << std::scientific << a - b //
+                                  << std::endl;
+                    }
+                }
+            }
+        }
+        INFO(res.message());
+        CHECK(res.ok);
+    }
+}
 
 namespace MemAddressingTest
 {
@@ -55,6 +820,13 @@ namespace MemAddressingTest
     using namespace rocRoller::KernelGraph;
     using namespace rocRoller::KernelGraph::ControlGraph;
     using namespace rocRoller::KernelGraph::CoordinateGraph;
+
+    TEST_CASE("basicGEMM")
+    {
+        auto        context = TestContext::ForTestDevice();
+        GEMMProblem gemm;
+        basicGEMM<float>(context.get(), gemm);
+    }
 
     TEST_CASE("LoadLDSTile basic test", "[mem-addressing]")
     {
