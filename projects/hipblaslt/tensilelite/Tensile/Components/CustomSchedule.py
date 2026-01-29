@@ -69,7 +69,7 @@ class SyncSchedule:
             barrier_idx:     The index at which to add the SBarrier. If None, uses idx.
             barrier_comment: An optional comment for the SBarrier.
 
-        xample:
+        Example:
             wait.add(2, dscnt=3)                                   adds SWaitCnt at index 2 with dscnt=3
             wait.add(5, dscnt=0, sbarrier=True)                    adds SWaitCnt at index 5 with dscnt=0 and a SBarrier at the same index
             wait.add(5, dscnt=0, sbarrier=True, barrier_idx=6)     adds SWaitCnt at index 5 with dscnt=0 and a SBarrier at index 6
