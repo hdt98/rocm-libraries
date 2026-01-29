@@ -150,9 +150,8 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         do
         {
             // Call LACN2 to get next operation (simplified parameter list)
-            rocsolver_lacn2_template<T, I, S>(handle, n, &x, &v, isgn, d_est, d_max_idx,
-                                              d_kase, d_jump, &h_kase, &h_jump, &h_iters,
-                                              max_iter, stream);
+            rocsolver_lacn2_template<T, I, S>(handle, n, &x, &v, isgn, d_est, d_max_idx, d_kase,
+                                              d_jump, &h_kase, &h_jump, &h_iters, max_iter, stream);
 
             if(h_kase == 0)
                 break; // converged, d_est contains ||inv(A)||_1
@@ -161,13 +160,11 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
             rocblas_operation opr;
             if(norm_type == rocsolver_norm_type_one)
             {
-                opr = (h_kase == 1) ? rocblas_operation_none
-                                    : rocblas_operation_conjugate_transpose;
+                opr = (h_kase == 1) ? rocblas_operation_none : rocblas_operation_conjugate_transpose;
             }
             else
             { // infinity norm
-                opr = (h_kase == 1) ? rocblas_operation_conjugate_transpose
-                                    : rocblas_operation_none;
+                opr = (h_kase == 1) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
             }
 
             rocsolver_getrs_template<false, false, T>(

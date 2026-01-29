@@ -3534,8 +3534,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump4(const I n,
  * Computes final estimate and stores in norm
  */
 template <typename T, typename I, typename S>
-ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
-    lacn2_jump5(const I n, const T* x, S* norm)
+ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump5(const I n, const T* x, S* norm)
 {
     rocblas_int tid = hipThreadIdx_x;
 

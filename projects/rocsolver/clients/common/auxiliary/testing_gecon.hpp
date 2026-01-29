@@ -220,8 +220,8 @@ void gecon_getPerfData(const rocblas_handle handle,
         std::vector<S> rwork(2 * n);
         std::vector<rocblas_int> iwork(n);
         *cpu_time_used = get_time_us_no_sync();
-        hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA[0], lda, hanorm[0][0], work.data(),
-                                       rwork.data(), iwork.data());
+        hrcond[0][0] = cpu_gecon<T, S>(norm, n, hA[0], lda, hanorm[0][0], work.data(), rwork.data(),
+                                       iwork.data());
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
@@ -359,14 +359,14 @@ void testing_gecon(Arguments& argus)
 
     // check computations
     if(argus.unit_check || argus.norm_check)
-        gecon_getError<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                hipiv, hanorm, hrcond, hrcond_res, &max_error);
+        gecon_getError<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA, hipiv,
+                                hanorm, hrcond, hrcond_res, &max_error);
 
     // collect performance data
     if(argus.timing)
-        gecon_getPerfData<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                   hipiv, hanorm, hrcond, &gpu_time_used, &cpu_time_used,
-                                   hot_calls, argus.profile, argus.profile_kernels, argus.perf);
+        gecon_getPerfData<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA, hipiv,
+                                   hanorm, hrcond, &gpu_time_used, &cpu_time_used, hot_calls,
+                                   argus.profile, argus.profile_kernels, argus.perf);
 
     // validate results for rocsolver-test
     // using n * machine_precision as tolerance
