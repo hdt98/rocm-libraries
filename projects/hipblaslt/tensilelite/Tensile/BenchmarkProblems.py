@@ -26,6 +26,7 @@ import os
 import shutil
 import sys
 import time
+from contextlib import contextmanager
 
 from copy import deepcopy
 from pathlib import Path
@@ -54,6 +55,20 @@ from Tensile.Common import HR, print1, print2, IsaInfo, IsaVersion, \
         BENCHMARK_PROBLEMS_DIR, BENCHMARK_DATA_DIR
 from Tensile.Common.Architectures import isaToGfx, gfxToVariants
 from Tensile.Common.GlobalParameters import globalParameters, startTime
+
+
+@contextmanager
+def timing_context(category_name):
+    """Context manager for timing instrumentation."""
+    if globalParameters.get("TimingInstrumentation", False):
+        start = time.time()
+        try:
+            yield
+        finally:
+            elapsed_ms = (time.time() - start) * 1000
+            print(f"TIMING:{category_name}:{elapsed_ms:.3f}", file=sys.stderr)
+    else:
+        yield
 
 
 def _generateForkedSolutions(problemType, constantParams, forkPermutations, assembler: Assembler, \
@@ -391,20 +406,21 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
 
         if not cacheValid:
             # enumerate benchmark permutations and create resulting solution objects
-            forkPermutations = constructForkPermutations(benchmarkStep.forkParams, \
-                    benchmarkStep.paramGroups) if problemSizeGroupConfig["ForkParameters"] else []
-            maxPossibleSolutions = len(forkPermutations)
+            with timing_context("python_solution_generation"):
+                forkPermutations = constructForkPermutations(benchmarkStep.forkParams, \
+                        benchmarkStep.paramGroups) if problemSizeGroupConfig["ForkParameters"] else []
+                maxPossibleSolutions = len(forkPermutations)
 
-            regSolutions = _generateForkedSolutions(benchmarkProcess.problemType, \
-                    benchmarkStep.constantParams, forkPermutations, asmToolchain.assembler, \
-                        debugConfig, isaInfoMap)
-            kcSolutions = _generateCustomKernelSolutions(benchmarkProcess.problemType, \
-                    benchmarkStep.customKernels, benchmarkStep.internalSupportParams, \
-                    not benchmarkStep.customKernelWildcard, asmToolchain.assembler, debugConfig, \
-                        isaInfoMap)
+                regSolutions = _generateForkedSolutions(benchmarkProcess.problemType, \
+                        benchmarkStep.constantParams, forkPermutations, asmToolchain.assembler, \
+                            debugConfig, isaInfoMap)
+                kcSolutions = _generateCustomKernelSolutions(benchmarkProcess.problemType, \
+                        benchmarkStep.customKernels, benchmarkStep.internalSupportParams, \
+                        not benchmarkStep.customKernelWildcard, asmToolchain.assembler, debugConfig, \
+                            isaInfoMap)
 
-            maxPossibleSolutions += len(kcSolutions)
-            solutions = regSolutions + kcSolutions
+                maxPossibleSolutions += len(kcSolutions)
+                solutions = regSolutions + kcSolutions
 
             print1("# Actual Solutions: {} / {} after SolutionStructs\n" \
                 .format(len(solutions), maxPossibleSolutions))
@@ -424,13 +440,14 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
                 print2("#    ({}:{}) {}".format(0, 0, getSolutionNameMin(solution, debugConfig.splitGSU)))
             print2(HR)
 
-            # write benchmarkFiles
+            # write benchmarkFiles (kernel generation and compilation)
             prevCount = len(solutions)
-            codeObjectFiles = writeBenchmarkFiles(stepBaseDir, solutions, \
-                    benchmarkStep.problemSizes, benchmarkStep.biasTypeArgs, \
-                    benchmarkStep.factorDimArgs, benchmarkStep.activationArgs, \
-                    benchmarkStep.icacheFlushArgs, shortName, [], asmToolchain, srcToolchain, \
-                    sourcePath, debugConfig, deviceId, gfxName, isaInfoMap, probSolMap)
+            with timing_context("python_kernel_compilation"):
+                codeObjectFiles = writeBenchmarkFiles(stepBaseDir, solutions, \
+                        benchmarkStep.problemSizes, benchmarkStep.biasTypeArgs, \
+                        benchmarkStep.factorDimArgs, benchmarkStep.activationArgs, \
+                        benchmarkStep.icacheFlushArgs, shortName, [], asmToolchain, srcToolchain, \
+                        sourcePath, debugConfig, deviceId, gfxName, isaInfoMap, probSolMap)
             # ^ this mutates solutions
 
             # write cache data

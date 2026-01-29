@@ -30,6 +30,7 @@ import os
 import subprocess
 import sys
 import argparse
+import time
 
 from datetime import datetime
 from pathlib import Path
@@ -95,11 +96,14 @@ def executeStepsInConfig(
     """
 
     buildTmpPath = outputPath / "build_tmp"
+    timingEnabled = globalParameters.get("TimingInstrumentation", False)
+
     ##############################################################################
     # Benchmark Problems
     ##############################################################################
     gfxName = isaToGfx(next(iter(isaInfoMap)))
     if "BenchmarkProblems" in config:
+        startTime = time.time()
         BenchmarkProblems.main(
             config["BenchmarkProblems"],
             config["UseCache"],
@@ -114,6 +118,9 @@ def executeStepsInConfig(
             isaInfoMap,
             probSolDict,
         )
+        if timingEnabled:
+            elapsed = (time.time() - startTime) * 1000
+            print(f"TIMING:python_benchmark_problems:{elapsed:.3f}", file=sys.stderr)
         print1("")
 
     ##############################################################################
@@ -130,6 +137,7 @@ def executeStepsInConfig(
                 libraryLogicConfig = config["LibraryLogic"]
             else:
                 libraryLogicConfig = {}
+            startTime = time.time()
             LibraryLogic.main(
                 libraryLogicConfig,
                 srcToolchain.compiler,
@@ -139,6 +147,9 @@ def executeStepsInConfig(
                 debugConfig.printIndexAssignmentInfo,
                 isaInfoMap,
             )
+            if timingEnabled:
+                elapsed = (time.time() - startTime) * 1000
+                print(f"TIMING:python_library_logic:{elapsed:.3f}", file=sys.stderr)
             print1("")
         else:
             print1("# LibraryLogic already done.")
@@ -152,6 +163,7 @@ def executeStepsInConfig(
             libraryClientConfig = config["LibraryClient"]
         else:
             libraryClientConfig = {}
+        startTime = time.time()
         ClientWriter.main(
             libraryClientConfig,
             asmToolchain.assembler,
@@ -161,6 +173,9 @@ def executeStepsInConfig(
             deviceId,
             gfxName,
         )
+        if timingEnabled:
+            elapsed = (time.time() - startTime) * 1000
+            print(f"TIMING:python_client_writer:{elapsed:.3f}", file=sys.stderr)
         print1("")
 
 

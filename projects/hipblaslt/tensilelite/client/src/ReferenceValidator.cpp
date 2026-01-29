@@ -27,6 +27,7 @@
 #include "ReferenceValidator.hpp"
 #include "ResultComparison.hpp"
 #include "ResultReporter.hpp"
+#include "TimingInstrumentation.hpp"
 
 #include "Reference.hpp"
 
@@ -81,9 +82,29 @@ namespace TensileLite
         {
             if(m_enabled)
             {
-                m_problem         = problem;
-                m_referenceInputs = m_dataInit->prepareCPUInputs(problem);
-                SolveCPU(problem, m_referenceInputs.get(), m_elementsToValidate);
+                m_problem = problem;
+
+                // Report problem context for timing correlation
+                if(auto gemm = dynamic_cast<ContractionProblemGemm*>(problem))
+                {
+                    size_t M          = gemm->freeSizeA(0);
+                    size_t N          = gemm->freeSizeB(0);
+                    size_t K          = gemm->boundSize(0);
+                    size_t batchCount = gemm->batchSize(0);
+                    reportProblemContext(M, N, K, batchCount,
+                                         TensileLite::ToString(gemm->a().dataType()),
+                                         TensileLite::ToString(gemm->d().dataType()));
+                }
+
+                {
+                    ScopedTimer timer("cpu_data_init");
+                    m_referenceInputs = m_dataInit->prepareCPUInputs(problem);
+                }
+
+                {
+                    ScopedTimer timer("cpu_reference_gemm");
+                    SolveCPU(problem, m_referenceInputs.get(), m_elementsToValidate);
+                }
             }
         }
 

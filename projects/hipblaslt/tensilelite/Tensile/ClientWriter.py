@@ -214,13 +214,23 @@ def runNewClient(scriptPath, clientParametersPath, cxxCompiler: str, cCompiler: 
 
 
 def runClient(libraryLogicPath, forBenchmark, enableTileSelection, cxxCompiler: str, cCompiler: str, outputPath, configPaths=None):
+  import time
+  import sys
 
   buildPath = ensurePath(outputPath / "build")
 
   runScriptName = writeRunScript(buildPath, forBenchmark, enableTileSelection, cxxCompiler, cCompiler, buildPath, configPaths)
+
+  timingEnabled = globalParameters.get("TimingInstrumentation", False)
+  startTime = time.time()
+
   with ClientExecutionLock(globalParameters["ClientExecutionLockPath"]):
     process = subprocess.Popen(runScriptName, cwd=buildPath)
     process.communicate()
+
+  if timingEnabled:
+    elapsed = (time.time() - startTime) * 1000
+    print(f"TIMING:python_client_execution:{elapsed:.3f}", file=sys.stderr)
 
   if process.returncode:
     printWarning("ClientWriter Benchmark Process exited with code %u" % process.returncode)
@@ -298,8 +308,9 @@ def writeRunScript(path, forBenchmark, enableTileSelection, cxxCompiler: str, cC
     runScriptFile.write("ERR1=0\n")
 
     clientExe = getClientExecutablePath()
+    timingFlag = " --timing-instrumentation" if globalParameters["TimingInstrumentation"] else ""
     for configFile in configPaths:
-      runScriptFile.write("{} --config-file {}\n".format(clientExe, configFile))
+      runScriptFile.write("{} --config-file {}{}\n".format(clientExe, configFile, timingFlag))
     runScriptFile.write("ERR2=$?\n\n")
 
     runScriptFile.write("""
