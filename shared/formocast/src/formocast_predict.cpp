@@ -595,25 +595,25 @@ namespace Tensilelite
         bool     isSwizzleA = problem.swizzleTensorA;
         bool     isSwizzleB = problem.swizzleTensorB;
 
-        std::cout << "\nProblem: [ " << problem.M << ", " << problem.N << ", " << problem.K << ", " << problem.NumBatches << "]"
-            << "\n\ttransA " << transA << " transB " << transB
-            << "\n\tbpeA " << bpeA << " bpeA " << bpeA << " bpeD " << bpeD
-            << "\n\tisSwizzleA " << isSwizzleA << " isSwizzleB " << isSwizzleB
-            << std::endl;
+        // std::cout << "\nProblem: [ " << problem.M << ", " << problem.N << ", " << problem.K << ", " << problem.NumBatches << "]"
+        //     << "\n\ttransA " << transA << " transB " << transB
+        //     << "\n\tbpeA " << bpeA << " bpeA " << bpeA << " bpeD " << bpeD
+        //     << "\n\tisSwizzleA " << isSwizzleA << " isSwizzleB " << isSwizzleB
+        //     << std::endl;
 
-        std::cout <<  "Solution:" << sizeMapping.solutionName << std::endl;
+        // std::cout <<  "Solution:" << sizeMapping.solutionName << std::endl;
 
-        // 2. Hardware Parameter Extraction
-        // - hw_consts.print();
-        std::cout << "Hardware const:"
-            << "\n\tL1CacheCapacity " << hw_consts.L1CacheCapacity
-            << "\n\tL1CacheLineSize " << hw_consts.L1CacheLineSize
-            << "\n\tL1BusWidthPerCU " << hw_consts.L1BusWidthPerCU
-            << "\n\tL2CacheCapacity " << hw_consts.L2CacheCapacity
-            << "\n\tL3CacheCapacity " << hw_consts.L3CacheCapacity
-            << "\n\tNumCUs " << hw_consts.NumCUs
-            << "\n\tNumXCDs " << hw_consts.NumXCDs
-            << std::endl;
+        // // 2. Hardware Parameter Extraction
+        // // - hw_consts.print();
+        // std::cout << "Hardware const:"
+        //     << "\n\tL1CacheCapacity " << hw_consts.L1CacheCapacity
+        //     << "\n\tL1CacheLineSize " << hw_consts.L1CacheLineSize
+        //     << "\n\tL1BusWidthPerCU " << hw_consts.L1BusWidthPerCU
+        //     << "\n\tL2CacheCapacity " << hw_consts.L2CacheCapacity
+        //     << "\n\tL3CacheCapacity " << hw_consts.L3CacheCapacity
+        //     << "\n\tNumCUs " << hw_consts.NumCUs
+        //     << "\n\tNumXCDs " << hw_consts.NumXCDs
+        //     << std::endl;
 
         // 3. Variables directly from sizeMapping
 
@@ -666,7 +666,7 @@ namespace Tensilelite
         if (GlobalSplitU == 0)
         {
             // FIXME: Need to support streamK kernels.
-            std::cout << "Formocast-earlycut:" << " cause1" << std::endl;
+            // std::cout << "Formocast-earlycut:" << " cause1" << std::endl;
             GlobalSplitU = 1;
             pp.microSeconds = 9999999.9;
             pp.hitRate = 0;
@@ -675,7 +675,7 @@ namespace Tensilelite
         if (MT0 - M >= 16 || MT1 - N >= 16)
         {
             //std::cout<<"M:"<<M<<",N:"<<N<<",MT0:"<<MT0<<",MT1:"<<MT1<<std::endl;
-            std::cout << "Formocast-earlycut:" << " cause2" << std::endl;
+            // std::cout << "Formocast-earlycut:" << " cause2" << std::endl;
             pp.microSeconds = 9999999.9;
             pp.hitRate = 0;
             return pp;
@@ -687,7 +687,7 @@ namespace Tensilelite
                 if (((K >= 64 && depthU <=32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) && NumBatches < hw_consts.NumCUs && sizeMapping.matrixInstruction[2] >= 32)
                 {
                     //std::cout<<"K:"<<K<<",depthU:"<<depthU<<",NumBatches:"<<NumBatches<<",sizeMapping.matrixInstruction[2]:"<<sizeMapping.matrixInstruction[2]<<std::endl;
-                    std::cout << "Formocast-earlycut:" << " cause3" << std::endl;
+                    // std::cout << "Formocast-earlycut:" << " cause3" << std::endl;
                     pp.microSeconds = 9999999.9;
                     pp.hitRate = 0;
                     return pp;
@@ -711,28 +711,28 @@ namespace Tensilelite
         uint32_t loopCnt = K_AfterGSU / depthU;
         uint32_t K_tail = K_AfterGSU - (loopCnt * depthU);
 
-        std::cout << "Workgroup Dimensions:"
-            << "\n\tM_WGs_total " << M_WGs_total
-            << "\n\tN_WGs_total " << N_WGs_total
-            << "\n\tM_WGs_per_tile_XCD " << M_WGs_per_tile_XCD
-            << "\n\tN_WGs_per_tile_XCD " << N_WGs_per_tile_XCD
-            << "\n\tM_WGs_per_tile " << M_WGs_per_tile
-            << "\n\tN_WGs_per_tile " << N_WGs_per_tile
-            << "\n\tnumberWGs " << numberWGs << " | num_tiles " << num_tiles << " | loopCnt " << loopCnt << " | K_tail " << K_tail
-            << "\n\tWGs_per_tile " << WGs_per_tile << " | WGs_per_tile_XCD " << WGs_per_tile_XCD
-            << std::endl;
+        // std::cout << "Workgroup Dimensions:"
+        //     << "\n\tM_WGs_total " << M_WGs_total
+        //     << "\n\tN_WGs_total " << N_WGs_total
+        //     << "\n\tM_WGs_per_tile_XCD " << M_WGs_per_tile_XCD
+        //     << "\n\tN_WGs_per_tile_XCD " << N_WGs_per_tile_XCD
+        //     << "\n\tM_WGs_per_tile " << M_WGs_per_tile
+        //     << "\n\tN_WGs_per_tile " << N_WGs_per_tile
+        //     << "\n\tnumberWGs " << numberWGs << " | num_tiles " << num_tiles << " | loopCnt " << loopCnt << " | K_tail " << K_tail
+        //     << "\n\tWGs_per_tile " << WGs_per_tile << " | WGs_per_tile_XCD " << WGs_per_tile_XCD
+        //     << std::endl;
 
         // 5. Cache Hit Rates and Bandwidths
-        std::cout << "L1CacheHitRate:"
-            << "\n\ttransA " << transA << " transB " << transB
-            << "\n\tGlobalReadVectorWidth: GRVWA " << GRVWA << " GRVWB " << GRVWB
-            << "\n\tDirectToVgpr DTVA " << DTVA << " DTVB " << DTVB
-            << "\n\tVectorWidth VWA " << VWA << " VWB " << VWB
-            << "\n\tNumLoadsCoalesced NLCA " << NLCA << " NLCB " << NLCB
-            << "\n\tlda (M) " << M << " ldb (N) " << N
-            << "\n\tThreadnum " << NumThreads << " MT0 " << MT0 << " MT1 " << MT1
-            << "\n\tNumWave0 " << NumWave0 << " NumWave1 " << NumWave1
-            << std::endl;
+        // std::cout << "L1CacheHitRate:"
+        //     << "\n\ttransA " << transA << " transB " << transB
+        //     << "\n\tGlobalReadVectorWidth: GRVWA " << GRVWA << " GRVWB " << GRVWB
+        //     << "\n\tDirectToVgpr DTVA " << DTVA << " DTVB " << DTVB
+        //     << "\n\tVectorWidth VWA " << VWA << " VWB " << VWB
+        //     << "\n\tNumLoadsCoalesced NLCA " << NLCA << " NLCB " << NLCB
+        //     << "\n\tlda (M) " << M << " ldb (N) " << N
+        //     << "\n\tThreadnum " << NumThreads << " MT0 " << MT0 << " MT1 " << MT1
+        //     << "\n\tNumWave0 " << NumWave0 << " NumWave1 " << NumWave1
+        //     << std::endl;
 
         CacheHitRates cache_hits;
         L1CacheHitRate l1 = computeL1CacheHitRate(hw_consts,
@@ -743,10 +743,10 @@ namespace Tensilelite
                                                 M, N, NLCA, NLCB,
                                                 NumThreads, NumWave0, NumWave1);
                                       
-        std::cout << "L2CacheHitRate:"
-            << "\n\tdepthU " << depthU << " GlobalSplitU " << GlobalSplitU << " WGM " << WGM
-            << "\n\tbatches " << NumBatches << " isGSUWGMRR " << isGSUWGMRR
-            << std::endl;
+        // std::cout << "L2CacheHitRate:"
+        //     << "\n\tdepthU " << depthU << " GlobalSplitU " << GlobalSplitU << " WGM " << WGM
+        //     << "\n\tbatches " << NumBatches << " isGSUWGMRR " << isGSUWGMRR
+        //     << std::endl;
 
         L2CacheHitRate l2 = computeL2CacheHitRate(M,
                                                 N,
@@ -761,10 +761,10 @@ namespace Tensilelite
                                                 0,
                                                 isGSUWGMRR);
 
-        std::cout << "L3CacheHitRate:"
-            << "\n\tN_WGs_total " << N_WGs_total << " M_WGs_total " << M_WGs_total
-            << " N_WGs_per_tile " << N_WGs_per_tile << "M_WGs_per_tile " << M_WGs_per_tile
-            << std::endl;
+        // std::cout << "L3CacheHitRate:"
+        //     << "\n\tN_WGs_total " << N_WGs_total << " M_WGs_total " << M_WGs_total
+        //     << " N_WGs_per_tile " << N_WGs_per_tile << "M_WGs_per_tile " << M_WGs_per_tile
+        //     << std::endl;
 
         L3CacheHitRate l3 = computeL3CacheHitRate(M, N, K, hw_consts,
                                                 bpeA, bpeB, 0, 0,
@@ -817,11 +817,11 @@ namespace Tensilelite
                                                                 NumWave0, NumWave1,
                                                                 NLCA, NLCB);
 
-        std::cout << "\tgsu_overall " << gsu_overall << " lsu_overall " << lsu_overall;
-        std::cout << "\n\tmem_costs L1 " << mem_costs.mem_l1 << " L2 " << mem_costs.mem_l2
-                  << " L3 " << mem_costs.mem_l3 << " HBM " << mem_costs.mem_hbm;
-        std::cout << "\n\tmem_costs hit L1 " << mem_costs.l1_hit << " L2 " << mem_costs.l2_hit
-                  << " L3 " << mem_costs.l3_hit << " overall " << mem_costs.mem_overall << std::endl;
+        // std::cout << "\tgsu_overall " << gsu_overall << " lsu_overall " << lsu_overall;
+        // std::cout << "\n\tmem_costs L1 " << mem_costs.mem_l1 << " L2 " << mem_costs.mem_l2
+        //           << " L3 " << mem_costs.mem_l3 << " HBM " << mem_costs.mem_hbm;
+        // std::cout << "\n\tmem_costs hit L1 " << mem_costs.l1_hit << " L2 " << mem_costs.l2_hit
+        //           << " L3 " << mem_costs.l3_hit << " overall " << mem_costs.mem_overall << std::endl;
 
         // 10. Calculate Prefetch Performance
         int numAccPerWave = MT0 * MT1 / waveNum / hw_consts.wavefrontSize;
@@ -857,8 +857,8 @@ namespace Tensilelite
 #endif
         // 12. Aggregate Performance: pre-loop + unrolled-loop + post-loop
         double perf = preLoopCost + loop_overall + store;
-        std::cout << "\tpreLoopCost " << preLoopCost << " loop_overall " << loop_overall << " store " << store;
-        std::cout << "\nperfv0 " << perf << std::endl;
+        // std::cout << "\tpreLoopCost " << preLoopCost << " loop_overall " << loop_overall << " store " << store;
+        // std::cout << "\nperfv0 " << perf << std::endl;
 
         if (num_tiles > 1)
         {
@@ -872,7 +872,7 @@ namespace Tensilelite
             perf = preLoopCost + loop_overall + store;
         }
 
-        std::cout << "perfv1 " << perf << std::endl;
+        // std::cout << "perfv1 " << perf << std::endl;
 
 #undef EXPERIMENTAL
 #define EXPERIMENTAL 0
@@ -895,15 +895,15 @@ namespace Tensilelite
 #endif
             perf += tail_overall;
         }
-        std::cout << "perfv2 " << perf << std::endl;
+        // std::cout << "perfv2 " << perf << std::endl;
 
         // 14. Apply CU Occupancy
         perf = resolveOccupancy(hw_consts, perf, prefetch, loop_overall + tail_overall, store, num_tiles, CUOccupancy);
-        std::cout << "perfv3 " << perf << std::endl;
+        // std::cout << "perfv3 " << perf << std::endl;
 
         // 15. Add LSU+GSU Reduction Part
         perf += (gsu_overall + lsu_overall);
-        std::cout << "perfv4 " << perf << std::endl;
+        // std::cout << "perfv4 " << perf << std::endl;
 
         pp.microSeconds = perf;
         pp.hitRate = cache_hits.totalL2HitRate * 100;

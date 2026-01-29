@@ -141,6 +141,10 @@ namespace TensileLite
             int           m_currProblemIdx;
             int           m_currSolutionIdx;
             int           m_probOnlyRunSolIdx;
+
+            std::vector<double_millis> m_syncDurations;
+            size_t m_syncDurationCount;
+            double timePerEnqueue_us;
         };
     } // namespace Client
 } // namespace TensileLite

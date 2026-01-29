@@ -776,6 +776,12 @@ int main(int argc, const char* argv[])
                         throw std::runtime_error("Could not find a solution");
 
                     listeners.preSolution(solution.get());
+
+                    auto size = static_cast<ContractionProblemGemm*>(problem)->problemSizes();
+                    std::cout << "per-run-timer-sync-" << syncs << "-enq-" << enq << "-" << solution->KernelName() << ","
+                        << size[0] << "-" << size[1] << "-" << size[2] << "-" << size[3]
+                        << "," << solution->name() << "," << std::flush;
+
                     if(solutionIterator->runCurrentSolution() && runKernels)
                     {
                         try
@@ -834,10 +840,6 @@ int main(int argc, const char* argv[])
                                 size_t enq        = listeners.numEnqueuesPerSync();
                                 size_t eventCount = gpuTimer ? kernels[0].size() : 0;
 
-                                auto size = static_cast<ContractionProblemGemm*>(problem)->problemSizes();
-                                std::cout << "per-run-timer-sync-" << syncs << "-enq-" << enq << "-" << solution->KernelName() << ","
-                                    << size[0] << "-" << size[1] << "-" << size[2] << "-" << size[3]
-                                    << "," << solution->name() << "," << std::flush;
                                 listeners.preSyncs();
                                 if(enq)
                                     for(int i = 0; i < syncs; i++)
@@ -861,14 +863,11 @@ int main(int argc, const char* argv[])
                                         }
 
                                         listeners.postEnqueues(startEvents, stopEvents, stream);
-
-                                        float eventMs = -0.1f;
-                                        HIP_CHECK_EXC(hipEventElapsedTime(&eventMs, benchmarkTimer->start, benchmarkTimer->stop));
-                                        auto totalTime = TensileLite::Client::BenchmarkTimer::double_millis(eventMs);
-                                        std::cout << TensileLite::Client::BenchmarkTimer::double_micros(totalTime).count()/enq - (icacheFlush ? flushTimeMs * 1000 : 0) << ",";
-
                                         listeners.validateEnqueues(inputs, startEvents, stopEvents);
                                     }
+
+                                for(auto s : benchmarkTimer->m_syncDurations)
+                                    std::cout << TensileLite::Client::BenchmarkTimer::double_micros(s).count() / enq << ",";
                                 std::cout << std::endl;
 
                                 listeners.postSyncs();
@@ -888,6 +887,11 @@ int main(int argc, const char* argv[])
                     }
 
                     listeners.postSolution();
+
+                    auto soliter = std::dynamic_pointer_cast<AllSolutionsIterator>(solutionIterator);
+                    std::cout << "pred-vs-run," << solution->name() << ","
+                        << size[0] << "-" << size[1] << "-" << size[2] << "-" << size[3] << ","
+                        << soliter->m_currentPrediction << "," << benchmarkTimer->timePerEnqueue_us << std::endl;
 
                     if(exitOnError && listeners.error() > 0)
                     {

@@ -65,6 +65,8 @@ namespace TensileLite
             , m_skiprun_from_map(0)
             , m_numSolutionSkip(0)
             , m_prob_sol_map(args["prob-sol-map"].as<prob_sol_map>())
+            , m_syncDurations(m_numSyncsPerBenchmark)
+            , m_syncDurationCount(0)
         {
         }
 
@@ -121,6 +123,8 @@ namespace TensileLite
             m_numEnqueuesInSolution = 0;
             m_timeInSolution        = double_millis::zero();
             m_skip_slow_solution    = false;
+            m_syncDurationCount     = 0;
+            timePerEnqueue_us = 0;
 
             ++m_currSolutionIdx; // update current sol-idx
             // When restore-from-log: check if this solution is skipped if it's not the specified one, init this flag as false
@@ -161,8 +165,21 @@ namespace TensileLite
         void BenchmarkTimer::postSolution()
         {
             bool   sol_is_skipped    = (m_skiprun_from_map || m_skip_slow_solution);
-            double timePerEnqueue_us = !sol_is_skipped ? double_micros(m_timeInSolution).count()
-                                                                 / m_numEnqueuesInSolution
+
+            std::sort(m_syncDurations.begin(), m_syncDurations.end(), std::less<double_millis>());
+            
+            size_t takeCount = (m_syncDurationCount * 6) / 10;
+            if(takeCount == 0)
+                takeCount = 1;
+
+            double_millis trimmedTotal(0.0);
+            for(size_t i = 0; i < takeCount; i++)
+                trimmedTotal += m_syncDurations[i];
+            double_millis trimmedMean    = trimmedTotal / takeCount;
+
+            timePerEnqueue_us = !sol_is_skipped ? double_micros(trimmedMean).count()
+                                                            * static_cast<double>(m_syncDurationCount)
+                                                            / static_cast<double>(m_numEnqueuesInSolution)
                                                              - m_flushTimeUs
                                                        : std::numeric_limits<double>::quiet_NaN();
 
@@ -380,6 +397,9 @@ namespace TensileLite
             {
                 totalTime = double_millis(m_endTime - m_startTime);
             }
+
+            m_syncDurations[m_syncDurationCount] = totalTime;
+            m_syncDurationCount++;
 
             m_timeInSolution += totalTime;
             m_totalGPUTime += totalTime;
