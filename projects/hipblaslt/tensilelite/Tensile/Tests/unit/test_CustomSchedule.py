@@ -286,26 +286,23 @@ class TestCustomScheduleBF16:
         assert isinstance(schedule_info, ScheduleInfo)
         assert schedule_info.numCodePaths == 2
         assert schedule_info.numMfma == 80
-        # SwapGlobalReadOrder is set for NN/NT branches, not required for TN.
-        if not (transA and (not transB)):
-            assert kernel["SwapGlobalReadOrder"]
-        valid, message = isValid(schedule_info, {"kernel" : kernel})
-        assert valid, message
+        assert kernel["SwapGlobalReadOrder"]
 
-    def test_schedule_224x128x64_16bit_NT(self):
-        """Tests the 224x128x64 16-bit NT schedule."""
+    @pytest.mark.parametrize("transA, transB", [(False, True)])
+    def test_schedule_224x128x64_16bit(self, transA, transB):
+        """Tests the 224x128x64 16-bit schedule."""
         kernel = create_base_kernel()
         dtype_16bit = _mock_dtype(is_16bit=True, num_bytes=2)
         kernel["ProblemType"].update({
             "DataType": dtype_16bit, "DataTypeA": dtype_16bit, "DataTypeB": dtype_16bit,
-            "TransposeA": False, "TransposeB": True
+            "TransposeA": transA, "TransposeB": transB
         })
         kernel.update({
             "MacroTile0": 224, "MacroTile1": 128, "DepthU": 64,
             "PrefetchGlobalRead": 2, "PrefetchLocalRead": 1, "DirectToLds": True,
             "GlobalReadVectorWidthA": 8, "GlobalReadVectorWidthB": 8, "LocalReadVectorWidth": 8,
             "MatrixInstruction": [16,16,32,1], "MIWaveGroup": [2,2],
-            "LDSTrInst": True, "TransposeLDS": 0, "MIWaveTileA": 7, "MIWaveTileB": 4,
+            "LDSTrInst": not transA, "TransposeLDS": 0 if transB else 1, "MIWaveTileA": 7, "MIWaveTileB": 4,
         })
 
         has_schedule, schedule_info = hasCustomSchedule(kernel)
