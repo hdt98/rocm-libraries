@@ -22,7 +22,7 @@ ROCSOLVER_BEGIN_NAMESPACE
 //
 // uplo_c == 'U' : assign to upper triangular matrix
 // uplo_c == 'L' : assign to lower triangular matrix
-// otherwise     : assign to entire matrix
+// uplo_c == 'G' : assign to entire matrix
 //
 //
 // assign beta to diagonal
@@ -47,9 +47,21 @@ __global__ static void __launch_bounds__(LASET_MAX_THREADS) laset_kernel(char co
 
                                                                          I const batch_count)
 {
+    {
+        bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+        if(!has_work)
+        {
+            return;
+        }
+    }
     bool const use_upper = (uplo_c == 'U') || (uplo_c == 'u');
     bool const use_lower = (uplo_c == 'L') || (uplo_c == 'l');
-    bool const use_all = (!use_upper) && (!use_lower);
+    bool const use_full = (uplo_c == 'G') || (uplo_c == 'g'); // "GE" general full matrix
+
+    {
+        bool const isvalid_uplo = (use_upper || use_lower || use_full);
+        assert(isvalid_uplo);
+    }
 
     I const bid_start = blockIdx.z;
     I const bid_inc = gridDim.z;
@@ -99,7 +111,7 @@ __global__ static void __launch_bounds__(LASET_MAX_THREADS) laset_kernel(char co
                 }
             }
         }
-        else
+        else if(use_full)
         {
             // ------------------------
             // assign to entire matrix
