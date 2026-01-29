@@ -6189,7 +6189,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgetrf_strided_batched_64(rocblas_hand
     \f]
 
     where R is upper triangular (upper trapezoidal if m < n), and Q is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q = H(1)H(2)\cdots H(k), \quad \text{with} \: k = \text{min}(m,n)
@@ -6299,7 +6299,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeqr2_64(rocblas_handle handle,
     \f]
 
     where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(1)H_l(2)\cdots H_l(k), \quad \text{with} \: k = \text{min}(m,n)
@@ -6433,7 +6433,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeqr2_batched_64(rocblas_handle handl
     \f]
 
     where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(1)H_l(2)\cdots H_l(k), \quad \text{with} \: k = \text{min}(m,n)
@@ -6863,7 +6863,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgerq2_strided_batched(rocblas_handle 
     \f]
 
     where L is lower triangular (lower trapezoidal if m < n), and Q is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q = H(k)H(k-1)\cdots H(1), \quad \text{with} \: k = \text{min}(m,n)
@@ -6946,7 +6946,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeql2(rocblas_handle handle,
     \f]
 
     where \f$L_l\f$ is lower triangular (lower trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(k)H_l(k-1)\cdots H_l(1), \quad \text{with} \: k = \text{min}(m,n)
@@ -7045,7 +7045,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeql2_batched(rocblas_handle handle,
     \f]
 
     where \f$L_l\f$ is lower triangular (lower trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(k)H_l(k-1)\cdots H_l(1), \quad \text{with} \: k = \text{min}(m,n)
@@ -7433,7 +7433,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgelq2_strided_batched(rocblas_handle 
     \f]
 
     where R is upper triangular (upper trapezoidal if m < n), and Q is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q = H(1)H(2)\cdots H(k), \quad \text{with} \: k = \text{min}(m,n)
@@ -7543,7 +7543,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeqrf_64(rocblas_handle handle,
     \f]
 
     where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(1)H_l(2)\cdots H_l(k), \quad \text{with} \: k = \text{min}(m,n)
@@ -7677,7 +7677,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeqrf_batched_64(rocblas_handle handl
     \f]
 
     where \f$R_l\f$ is upper triangular (upper trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(1)H_l(2)\cdots H_l(k), \quad \text{with} \: k = \text{min}(m,n)
@@ -8108,7 +8108,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgerqf_strided_batched(rocblas_handle 
     \f]
 
     where L is lower triangular (lower trapezoidal if m < n), and Q is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q = H(k)H(k-1)\cdots H(1), \quad \text{with} \: k = \text{min}(m,n)
@@ -8191,7 +8191,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeqlf(rocblas_handle handle,
     \f]
 
     where \f$L_l\f$ is lower triangular (lower trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(k)H_l(k-1)\cdots H_l(1), \quad \text{with} \: k = \text{min}(m,n)
@@ -8290,7 +8290,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeqlf_batched(rocblas_handle handle,
     \f]
 
     where \f$L_l\f$ is lower triangular (lower trapezoidal if m < n), and \f$Q_l\f$ is
-    a m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
+    an m-by-m orthogonal/unitary matrix represented as the product of Householder matrices
 
     \f[
         Q_l = H_l(k)H_l(k-1)\cdots H_l(1), \quad \text{with} \: k = \text{min}(m,n)
@@ -29562,9 +29562,9 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zhegvdx_strided_batched(rocblas_handle
         A = Q  R
     \f]
 
-    where R is upper triangular, and Q is a m-by-n orthogonal/unitary
+    where R is upper triangular, and Q is an m-by-n orthogonal/unitary
     matrix. The factorization is computed using one of several Cholesky
-    QR algorithms selected by the algo parameter.
+    QR algorithms selected by the algorithm parameter.
 
     The algorithm choices are:
     - rocsolver_cholqr_cholqr1: Basic CholeskyQR1 algorithm
@@ -29713,9 +29713,9 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_64(rocblas_handle handle,
         A_l = Q_l  R_l
     \f]
 
-    where \f$R_l\f$ is upper triangular, and \f$Q_l\f$ is a m-by-n
+    where \f$R_l\f$ is upper triangular, and \f$Q_l\f$ is an m-by-n
     orthogonal/unitary matrix. The factorization is computed using one
-    of several Cholesky QR algorithms selected by the algo parameter.
+    of several Cholesky QR algorithms selected by the algorithm parameter.
 
     @param[in]
     handle      rocblas_handle.
@@ -29883,9 +29883,9 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zcholqr_batched_64(rocblas_handle hand
         A_l = Q_l  R_l
     \f]
 
-    where \f$R_l\f$ is upper triangular, and \f$Q_l\f$ is a m-by-n
+    where \f$R_l\f$ is upper triangular, and \f$Q_l\f$ is an m-by-n
     orthogonal/unitary matrix. The factorization is computed using one
-    of several Cholesky QR algorithms selected by the algo parameter.
+    of several Cholesky QR algorithms selected by the algorithm parameter.
 
     @param[in]
     handle      rocblas_handle.
