@@ -120,7 +120,7 @@ void rocsolver_potf2_getMemorySize(const I n,
     // size of scalars (constants)
     *size_scalars = sizeof(T) * 3;
 
-    if(n <= POTF2_MAX_SMALL_SIZE(T))
+    if(n <= POTF2_MAX_SMALL_SIZE<T>())
     {
         *size_work = 0;
         *size_pivots = 0;
@@ -206,7 +206,7 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
     rocblas_get_pointer_mode(handle, &old_mode);
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_device);
 
-    if(n <= POTRF_BLOCKSIZE(T))
+    if(n <= POTRF_BLOCKSIZE<T>())
     {
         // ----------------------
         // use specialized kernel
