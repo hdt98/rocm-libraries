@@ -275,7 +275,36 @@ llvm_amdgcn_raw_buffer_store_fp32x4(float4_t vdata,
                                     index_t soffset,
                                     index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v4f32");
 
+#if defined(__gfx13__)
 // buffer atomic-add fp16
+__device__ half2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
+    half2_t vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16.v4i32");
+
+__device__ int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
+    int32_t vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32.v4i32");
+
+__device__ float llvm_amdgcn_raw_buffer_atomic_add_fp32(
+    float vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32.v4i32");
+
+__device__ double llvm_amdgcn_raw_buffer_atomic_max_fp64(
+    double vdata,
+    int32x4_t rsrc, // dst_wave_buffer_resource
+    int voffset,    // dst_thread_addr_offset
+    int soffset,    // dst_wave_addr_offset
+    int glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fmax.f64.v4i32");
+#else
 __device__ half2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
     half2_t vdata,
     int32x4_t rsrc,
@@ -291,7 +320,6 @@ __device__ int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
     index_t soffset,
     index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32");
 
-// buffer atomic-add fp32
 __device__ float llvm_amdgcn_raw_buffer_atomic_add_fp32(
     float vdata,
     int32x4_t rsrc,
@@ -299,13 +327,13 @@ __device__ float llvm_amdgcn_raw_buffer_atomic_add_fp32(
     index_t soffset,
     index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32");
 
-// buffer atomic-add fp32
 __device__ double
 llvm_amdgcn_raw_buffer_atomic_max_fp64(double vdata,
                                        int32x4_t rsrc, // dst_wave_buffer_resource
                                        int voffset,    // dst_thread_addr_offset
                                        int soffset,    // dst_wave_addr_offset
                                        int glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fmax.f64");
+#endif
 
 // memory coherency bit for buffer store/load instruction
 // check ISA manual for each GFX target

@@ -1610,12 +1610,13 @@ llvm_amdgcn_raw_buffer_store_fp32x4(fp32x4_t vdata,
                                     index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v4f32");
 
 // buffer atomic-add fp16
+#if defined(__gfx13__)
 CK_TILE_DEVICE_EXTERN fp16x2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
     fp16x2_t vdata,
     int32x4_t rsrc,
     index_t voffset,
     index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16");
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16.v4i32");
 
 // buffer atomic-add bf16
 // TODO: Replace with bf16x2_t, but llvm builins only accept cktile_bf16x2_t now.
@@ -1624,7 +1625,7 @@ CK_TILE_DEVICE_EXTERN bf16x2_t llvm_amdgcn_raw_buffer_atomic_add_bf16x2(
     int32x4_t rsrc,
     index_t voffset,
     index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16");
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16.v4i32");
 
 // buffer atomic-add i32
 CK_TILE_DEVICE_EXTERN int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
@@ -1632,15 +1633,46 @@ CK_TILE_DEVICE_EXTERN int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
     int32x4_t rsrc,
     index_t voffset,
     index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32");
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32.v4i32");
 
-// buffer atomic-add fp32
 CK_TILE_DEVICE_EXTERN float llvm_amdgcn_raw_buffer_atomic_add_fp32(
     float vdata,
     int32x4_t rsrc,
     index_t voffset,
     index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32");
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32.v4i32");
+#else
+    CK_TILE_DEVICE_EXTERN fp16x2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
+        fp16x2_t vdata,
+        int32x4_t rsrc,
+        index_t voffset,
+        index_t soffset,
+        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16");
+
+    // buffer atomic-add bf16
+    // TODO: Replace with bf16x2_t, but llvm builins only accept cktile_bf16x2_t now.
+    CK_TILE_DEVICE_EXTERN bf16x2_t llvm_amdgcn_raw_buffer_atomic_add_bf16x2(
+        bf16x2_t vdata,
+        int32x4_t rsrc,
+        index_t voffset,
+        index_t soffset,
+        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16");
+
+    // buffer atomic-add i32
+    CK_TILE_DEVICE_EXTERN int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
+        int32_t vdata,
+        int32x4_t rsrc,
+        index_t voffset,
+        index_t soffset,
+        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32");
+
+    CK_TILE_DEVICE_EXTERN float llvm_amdgcn_raw_buffer_atomic_add_fp32(
+        float vdata,
+        int32x4_t rsrc,
+        index_t voffset,
+        index_t soffset,
+        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32");
+#endif
 
 // buffer atomic-max fp64
 CK_TILE_DEVICE_EXTERN double

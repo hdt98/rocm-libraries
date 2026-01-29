@@ -79,7 +79,7 @@ target_compile_options(test_grouped_conv_fwd_wcnn_fma_cvt_wavegroup PRIVATE -sav
 add_test_executable(test_grouped_conv_bwd_data_wcnn_wavegroup grouped_conv_bwd_data_wcnn.cpp)
 target_compile_definitions(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE ENABLE_WAVEGROUP=1)
 target_link_libraries(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE utility)
-target_compile_options(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE -save-temps=obj -Wno-gnu-line-marker)
+target_compile_options(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE -save-temps=obj -Wno-gnu-line-marker -mllvm -amdgpu-enable-vopd=0)
 
 #conv wavegroup+spatialCluster test
 add_test_executable(test_grouped_conv_fwd_wcnn_wavegroup_spcluster grouped_conv_fwd_wcnn.cpp)
