@@ -105,9 +105,15 @@ class TestGroupedConvFwdWcnnInterface : public ::testing::Test
 {
     protected:
     ck::utils::conv::ConvParam conv_param;
-    HostTensorDescriptor in_g_n_c_wis_desc;
-    HostTensorDescriptor wei_g_k_c_xs_desc;
-    HostTensorDescriptor out_g_n_k_wos_desc;
+    HostTensorDescriptor in_g_n_c_wis_desc =
+        ck::utils::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<
+            typename PackedLayout<NDimSpatial>::InputLayout>(conv_param);
+    HostTensorDescriptor wei_g_k_c_xs_desc =
+        ck::utils::conv::make_weight_host_tensor_descriptor_g_k_c_xs_packed<
+            typename PackedLayout<NDimSpatial>::WeightLayout>(conv_param);
+    HostTensorDescriptor out_g_n_k_wos_desc =
+        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
+            typename PackedLayout<NDimSpatial>::OutputLayout>(conv_param);
     static constexpr ck::index_t HPerWcnn  = 4;
     static constexpr ck::index_t WPerWcnn  = 2;
     static constexpr ck::index_t BlockSize = DEFAULT_BLOCKSIZE;
@@ -134,7 +140,6 @@ class TestGroupedConvFwdWcnnInterface : public ::testing::Test
             out_g_n_k_wos_desc =
                 ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
                     typename PackedLayout<NDimSpatial>::OutputLayout>(conv_param);
-
             if(desc_mode == 1)
             {
                 auto in_strides = in_g_n_c_wis_desc.GetStrides();

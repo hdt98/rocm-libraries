@@ -398,12 +398,9 @@ struct ThreadwiseTensorSliceTransfer_v2
                 {
                     if constexpr(UseTrLoad)
                     {
-                        // Todo need use amd_global_load_transpose_to_vgpr;
-#if 0
                         src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                             src_buf.template trLoad<src_vector_t>(
                                 src_coord_.GetOffset() / PackedSize, is_src_valid);
-#endif
                     }
                     else if constexpr(UseTileLoad)
                     {
@@ -466,11 +463,8 @@ struct ThreadwiseTensorSliceTransfer_v2
                         reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
                     if constexpr(UseTrLoad)
                     {
-                        // Todo need use amd_global_load_transpose_to_vgpr;
-#if 0
                         *dst_buf_ptr = src_buf.template trLoad<src_vector_t>(
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
-#endif
                     }
                     else if constexpr(UseTileLoad)
                     {
@@ -503,12 +497,9 @@ struct ThreadwiseTensorSliceTransfer_v2
                 // copy data from src_buf into src_vector
                 if constexpr(UseTrLoad)
                 {
-                    // Todo need use amd_global_load_transpose_to_vgpr;
-#if 0
                     src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                         src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset() / PackedSize,
                                                               is_src_valid);
-#endif
                 }
                 else if constexpr(UseTileLoad)
                 {

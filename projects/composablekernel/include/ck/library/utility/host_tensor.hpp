@@ -299,9 +299,13 @@ struct HostTensorDescriptor
             if constexpr(!(std::is_same_v<ck::tensor_layout::gemm::RowMajor, Layout> ||
                            std::is_same_v<ck::tensor_layout::gemm::ColumnMajor, Layout>))
             {
-                std::cerr << "Only RowMajor and ColumnMajor layouts are supported for empty "
-                             "strides, got "
-                          << layout << ". Will calculate strides as RowMajor." << std::endl;
+                // Todo: need add consideration for convolution layout
+                if(dbg)
+                {
+                    std::cout << "Only RowMajor and ColumnMajor layouts are supported for empty "
+                                 "strides, got "
+                              << layout << ". Will calculate strides as RowMajor." << std::endl;
+                }
             }
 
             mStrides.clear();

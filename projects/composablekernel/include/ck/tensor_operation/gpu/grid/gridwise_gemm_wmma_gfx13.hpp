@@ -2800,9 +2800,9 @@ struct GridwiseGemm_Wmma_GFX13
                                                 KPack,
                                                 AEnableLds,
                                                 BEnableLds,
-                                                false, // Transpose C
                                                 false, // APermute
                                                 false, // BPermute
+                                                false, // Transpose C
                                                 ALoadOption,
                                                 BLoadOption>{};
 #else
