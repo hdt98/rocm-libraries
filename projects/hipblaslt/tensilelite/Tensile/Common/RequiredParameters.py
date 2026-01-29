@@ -71,7 +71,6 @@ def getRequiredParametersMin() -> set:
         'LocalWritePerMfma',
         'MIArchVgpr',
         'MaxOccupancy',
-        'Multicast',
         'NonTemporal',
         'NonTemporalA',
         'NonTemporalB',
@@ -119,5 +118,4 @@ def getRequiredParametersMin() -> set:
         'UsePLRPack',
         'UseSubtileImpl',
         'ClusterDim',
-        'Multicast'
     })

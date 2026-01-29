@@ -517,7 +517,6 @@ defaultBenchmarkCommonParameters = [
     {"TDMInst": [0]},
     {"TDMSplit": [False]},
     {"ClusterDim": [[1, 1]]},
-    {"Multicast": [False]},
 ]
 
 # dictionary of defaults comprised of default option for each parameter
