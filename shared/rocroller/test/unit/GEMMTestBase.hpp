@@ -219,85 +219,6 @@ namespace GEMMTests
                 numWorkgroupY = N / gemm.macN;
             }
 
-            // Host data
-            using PackedTypeA = typename PackedTypeOf<TA>::type;
-            using PackedTypeB = typename PackedTypeOf<TB>::type;
-            std::vector<PackedTypeA> hostA;
-            std::vector<PackedTypeB> hostB;
-            std::vector<TC>          hostC;
-
-            std::vector<uint8_t> hostScaleA, hostScaleB;
-
-            TensorDescriptor descA(dataTypeA, {size_t(M), size_t(K)}, gemm.transA);
-            TensorDescriptor descB(dataTypeB, {size_t(K), size_t(N)}, gemm.transB);
-            TensorDescriptor descC(dataTypeD, {size_t(M), size_t(N)}, "N");
-            TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
-
-            auto seed = 31415u;
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate
-               || gemm.scaleBMode == Operations::ScaleMode::Separate)
-            {
-                auto const& arch = m_context->targetArchitecture();
-
-                auto scaleBlockSize = gemm.scaleBlockSize;
-                AssertFatal(scaleBlockSize > 0, "scaleBlockSize must be set to scale A or B.");
-                AssertFatal(
-                    arch.isSupportedScaleBlockSize(scaleBlockSize),
-                    fmt::format("Architecture {} does not support block scaling (size: {}).",
-                                arch.target().toString(),
-                                scaleBlockSize));
-                AssertFatal(gemm.k % scaleBlockSize == 0,
-                            fmt::format("K: {} must be a multiple of the scale block size: {}",
-                                        gemm.k,
-                                        scaleBlockSize));
-                DGenInput(seed,
-                          hostA,
-                          descA,
-                          hostB,
-                          descB,
-                          hostC,
-                          descC,
-                          hostScaleA,
-                          hostScaleB,
-                          gemm.scaleAMode == Operations::ScaleMode::Separate,
-                          gemm.scaleBMode == Operations::ScaleMode::Separate,
-                          -1.f,
-                          1.f,
-                          static_cast<uint>(scaleBlockSize));
-            }
-            else
-            {
-                DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
-            }
-
-            if(setIdentity)
-            {
-                SetIdentityMatrix(hostA, K, M);
-                SetIdentityMatrix(hostB, N, K);
-
-                std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
-            }
-
-            auto deviceA = make_shared_device<TA>(hostA);
-            auto deviceB = make_shared_device<TB>(hostB);
-
-            std::shared_ptr<TC> deviceC = (notSetC) ? nullptr : make_shared_device(hostC);
-            std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
-
-            std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
-
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate)
-                deviceScaleA = make_shared_device(hostScaleA);
-            if(gemm.scaleBMode == Operations::ScaleMode::Separate)
-                deviceScaleB = make_shared_device(hostScaleB);
-
-            // In SingleScale mode, don't need to copy to device
-            if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
-                hostScaleA = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeA)};
-
-            if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
-                hostScaleB = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeB)};
-
             auto command = std::make_shared<Command>();
 
             std::vector<size_t> oneStridesN
@@ -629,6 +550,85 @@ namespace GEMMTests
             commandKernel.setContext(m_context);
             commandKernel.setCommandParameters(params);
             commandKernel.generateKernel();
+
+            // Host data
+            using PackedTypeA = typename PackedTypeOf<TA>::type;
+            using PackedTypeB = typename PackedTypeOf<TB>::type;
+            std::vector<PackedTypeA> hostA;
+            std::vector<PackedTypeB> hostB;
+            std::vector<TC>          hostC;
+
+            std::vector<uint8_t> hostScaleA, hostScaleB;
+
+            TensorDescriptor descA(dataTypeA, {size_t(M), size_t(K)}, gemm.transA);
+            TensorDescriptor descB(dataTypeB, {size_t(K), size_t(N)}, gemm.transB);
+            TensorDescriptor descC(dataTypeD, {size_t(M), size_t(N)}, "N");
+            TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
+
+            auto seed = 31415u;
+            if(gemm.scaleAMode == Operations::ScaleMode::Separate
+               || gemm.scaleBMode == Operations::ScaleMode::Separate)
+            {
+                auto const& arch = m_context->targetArchitecture();
+
+                auto scaleBlockSize = gemm.scaleBlockSize;
+                AssertFatal(scaleBlockSize > 0, "scaleBlockSize must be set to scale A or B.");
+                AssertFatal(
+                    arch.isSupportedScaleBlockSize(scaleBlockSize),
+                    fmt::format("Architecture {} does not support block scaling (size: {}).",
+                                arch.target().toString(),
+                                scaleBlockSize));
+                AssertFatal(gemm.k % scaleBlockSize == 0,
+                            fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                        gemm.k,
+                                        scaleBlockSize));
+                DGenInput(seed,
+                          hostA,
+                          descA,
+                          hostB,
+                          descB,
+                          hostC,
+                          descC,
+                          hostScaleA,
+                          hostScaleB,
+                          gemm.scaleAMode == Operations::ScaleMode::Separate,
+                          gemm.scaleBMode == Operations::ScaleMode::Separate,
+                          -1.f,
+                          1.f,
+                          static_cast<uint>(scaleBlockSize));
+            }
+            else
+            {
+                DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
+            }
+
+            if(setIdentity)
+            {
+                SetIdentityMatrix(hostA, K, M);
+                SetIdentityMatrix(hostB, N, K);
+
+                std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
+            }
+
+            auto deviceA = make_shared_device<TA>(hostA);
+            auto deviceB = make_shared_device<TB>(hostB);
+
+            std::shared_ptr<TC> deviceC = (notSetC) ? nullptr : make_shared_device(hostC);
+            std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
+
+            std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
+
+            if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+                deviceScaleA = make_shared_device(hostScaleA);
+            if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+                deviceScaleB = make_shared_device(hostScaleB);
+
+            // In SingleScale mode, don't need to copy to device
+            if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
+                hostScaleA = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeA)};
+
+            if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
+                hostScaleB = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeB)};
 
             CommandArguments commandArgs = command->createArguments();
 

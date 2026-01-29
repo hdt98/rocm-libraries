@@ -52,8 +52,18 @@
 #include "CustomSections.hpp"
 #include "TestContext.hpp"
 
+struct Tags
+{
+    rocRoller::Operations::OperationTag tagTensorA, tagTensorB, tagTensorC, tagTensorD,
+        tagScalarAlpha, tagScalarBeta, tagScalarSeed, tagWGM, tagNumWGs;
+
+    std::optional<rocRoller::Operations::OperationTag> tagTensorScaleA, tagTensorScaleB;
+
+    std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag> scratchTags;
+};
+
 template <typename TA, typename TB = TA, typename TC = TA, typename TD = TC, typename ACC = float>
-void basicGEMM(rocRoller::ContextPtr   m_context,
+auto basicGEMM(rocRoller::ContextPtr   m_context,
                const GEMMProblem&      gemm,
                bool                    debuggable  = false,
                bool                    setIdentity = false,
@@ -172,84 +182,6 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
         numWorkgroupX = M / gemm.macM;
         numWorkgroupY = N / gemm.macN;
     }
-
-    // Host data
-    using PackedTypeA = typename PackedTypeOf<TA>::type;
-    using PackedTypeB = typename PackedTypeOf<TB>::type;
-    std::vector<PackedTypeA> hostA;
-    std::vector<PackedTypeB> hostB;
-    std::vector<TC>          hostC;
-
-    std::vector<uint8_t> hostScaleA, hostScaleB;
-
-    TensorDescriptor descA(dataTypeA, {size_t(M), size_t(K)}, gemm.transA);
-    TensorDescriptor descB(dataTypeB, {size_t(K), size_t(N)}, gemm.transB);
-    TensorDescriptor descC(dataTypeD, {size_t(M), size_t(N)}, "N");
-    TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
-
-    auto seed = 31415u;
-    if(gemm.scaleAMode == Operations::ScaleMode::Separate
-       || gemm.scaleBMode == Operations::ScaleMode::Separate)
-    {
-        auto const& arch = m_context->targetArchitecture();
-
-        auto scaleBlockSize = gemm.scaleBlockSize;
-        AssertFatal(scaleBlockSize > 0, "scaleBlockSize must be set to scale A or B.");
-        AssertFatal(arch.isSupportedScaleBlockSize(scaleBlockSize),
-                    fmt::format("Architecture {} does not support block scaling (size: {}).",
-                                arch.target().toString(),
-                                scaleBlockSize));
-        AssertFatal(gemm.k % scaleBlockSize == 0,
-                    fmt::format("K: {} must be a multiple of the scale block size: {}",
-                                gemm.k,
-                                scaleBlockSize));
-        DGenInput(seed,
-                  hostA,
-                  descA,
-                  hostB,
-                  descB,
-                  hostC,
-                  descC,
-                  hostScaleA,
-                  hostScaleB,
-                  gemm.scaleAMode == Operations::ScaleMode::Separate,
-                  gemm.scaleBMode == Operations::ScaleMode::Separate,
-                  -1.f,
-                  1.f,
-                  static_cast<uint>(scaleBlockSize));
-    }
-    else
-    {
-        DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
-    }
-
-    if(setIdentity)
-    {
-        SetIdentityMatrix(hostA, K, M);
-        SetIdentityMatrix(hostB, N, K);
-
-        std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
-    }
-
-    auto deviceA = make_shared_device<TA>(hostA);
-    auto deviceB = make_shared_device<TB>(hostB);
-
-    std::shared_ptr<TC> deviceC = (notSetC) ? nullptr : make_shared_device(hostC);
-    std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
-
-    std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
-
-    if(gemm.scaleAMode == Operations::ScaleMode::Separate)
-        deviceScaleA = make_shared_device(hostScaleA);
-    if(gemm.scaleBMode == Operations::ScaleMode::Separate)
-        deviceScaleB = make_shared_device(hostScaleB);
-
-    // In SingleScale mode, don't need to copy to device
-    // if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
-    //     hostScaleA = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeA)};
-
-    // if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
-    //     hostScaleB = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeB)};
 
     auto command = std::make_shared<Command>();
 
@@ -551,6 +483,127 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
         params->setDimensionInfo(tagStoreD, macTileD);
     }
 
+    return std::make_tuple(command,
+                           params,
+                           Tags{.tagTensorA      = tagTensorA,
+                                .tagTensorB      = tagTensorB,
+                                .tagTensorC      = tagTensorC,
+                                .tagTensorD      = tagTensorD,
+                                .tagScalarAlpha  = tagScalarAlpha,
+                                .tagScalarBeta   = tagScalarBeta,
+                                .tagScalarSeed   = tagScalarSeed,
+                                .tagWGM          = tagWGM,
+                                .tagNumWGs       = tagNumWGs,
+                                .tagTensorScaleA = tagTensorScaleA,
+                                .tagTensorScaleB = tagTensorScaleB,
+                                .scratchTags     = scratchTags});
+}
+
+template <typename TA, typename TB = TA, typename TC = TA, typename TD = TC, typename ACC = float>
+void runGEMM(rocRoller::ContextPtr           m_context,
+             rocRoller::CommandPtr           command,
+             rocRoller::CommandParametersPtr params,
+             Tags                            tags,
+             const GEMMProblem&              gemm,
+             bool                            debuggable  = false,
+             bool                            setIdentity = false,
+             int                             numIters    = 1,
+             bool                            notSetC     = false,
+             std::optional<uint32_t>         srCvtSeed   = std::nullopt)
+{
+    using namespace rocRoller;
+
+    auto dataTypeA   = TypeInfo<TA>::Var.dataType;
+    auto dataTypeB   = TypeInfo<TB>::Var.dataType;
+    auto dataTypeC   = TypeInfo<TC>::Var.dataType;
+    auto dataTypeD   = TypeInfo<TD>::Var.dataType;
+    auto dataTypeAcc = TypeInfo<ACC>::Var.dataType;
+
+    // D (MxN) = alpha * A (MxK) X B (KxN) + beta * C (MxN)
+    int   M     = gemm.m;
+    int   N     = gemm.n;
+    int   K     = gemm.k;
+    float alpha = gemm.alpha;
+    float beta  = gemm.beta;
+
+    // Host data
+    using PackedTypeA = typename PackedTypeOf<TA>::type;
+    using PackedTypeB = typename PackedTypeOf<TB>::type;
+    std::vector<PackedTypeA> hostA;
+    std::vector<PackedTypeB> hostB;
+    std::vector<TC>          hostC;
+
+    std::vector<uint8_t> hostScaleA, hostScaleB;
+
+    TensorDescriptor descA(dataTypeA, {size_t(M), size_t(K)}, gemm.transA);
+    TensorDescriptor descB(dataTypeB, {size_t(K), size_t(N)}, gemm.transB);
+    TensorDescriptor descC(dataTypeD, {size_t(M), size_t(N)}, "N");
+    TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
+
+    auto seed = 31415u;
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate
+       || gemm.scaleBMode == Operations::ScaleMode::Separate)
+    {
+        auto const& arch = m_context->targetArchitecture();
+
+        auto scaleBlockSize = gemm.scaleBlockSize;
+        AssertFatal(scaleBlockSize > 0, "scaleBlockSize must be set to scale A or B.");
+        AssertFatal(arch.isSupportedScaleBlockSize(scaleBlockSize),
+                    fmt::format("Architecture {} does not support block scaling (size: {}).",
+                                arch.target().toString(),
+                                scaleBlockSize));
+        AssertFatal(gemm.k % scaleBlockSize == 0,
+                    fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                gemm.k,
+                                scaleBlockSize));
+        DGenInput(seed,
+                  hostA,
+                  descA,
+                  hostB,
+                  descB,
+                  hostC,
+                  descC,
+                  hostScaleA,
+                  hostScaleB,
+                  gemm.scaleAMode == Operations::ScaleMode::Separate,
+                  gemm.scaleBMode == Operations::ScaleMode::Separate,
+                  -1.f,
+                  1.f,
+                  static_cast<uint>(scaleBlockSize));
+    }
+    else
+    {
+        DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
+    }
+
+    if(setIdentity)
+    {
+        SetIdentityMatrix(hostA, K, M);
+        SetIdentityMatrix(hostB, N, K);
+
+        std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
+    }
+
+    auto deviceA = make_shared_device<TA>(hostA);
+    auto deviceB = make_shared_device<TB>(hostB);
+
+    std::shared_ptr<TC> deviceC = (notSetC) ? nullptr : make_shared_device(hostC);
+    std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
+
+    std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
+
+    if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+        deviceScaleA = make_shared_device(hostScaleA);
+    if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+        deviceScaleB = make_shared_device(hostScaleB);
+
+    // In SingleScale mode, don't need to copy to device
+    // if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
+    //     hostScaleA = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeA)};
+
+    // if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
+    //     hostScaleB = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeB)};
+
     CommandKernel commandKernel(command, "kernel_name_todo");
 
     // TODO Some test have loops, we need to reset the context.
@@ -562,10 +615,10 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
 
     CommandArguments commandArgs = command->createArguments();
 
-    setCommandTensorArg(commandArgs, tagTensorA, descA, deviceA.get());
-    setCommandTensorArg(commandArgs, tagTensorB, descB, deviceB.get());
-    setCommandTensorArg(commandArgs, tagTensorC, descC, deviceC.get());
-    setCommandTensorArg(commandArgs, tagTensorD, descD, deviceD.get());
+    setCommandTensorArg(commandArgs, tags.tagTensorA, descA, deviceA.get());
+    setCommandTensorArg(commandArgs, tags.tagTensorB, descB, deviceB.get());
+    setCommandTensorArg(commandArgs, tags.tagTensorC, descC, deviceC.get());
+    setCommandTensorArg(commandArgs, tags.tagTensorD, descD, deviceD.get());
 
     if(gemm.scaleAMode == Operations::ScaleMode::Separate)
     {
@@ -575,11 +628,12 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
                                 gemm.scaleBlockSize));
         TensorDescriptor descAScale(
             dataTypeA, {size_t(M), size_t(K / gemm.scaleBlockSize)}, gemm.transA);
-        setCommandTensorArg(commandArgs, tagTensorScaleA.value(), descAScale, deviceScaleA.get());
+        setCommandTensorArg(
+            commandArgs, tags.tagTensorScaleA.value(), descAScale, deviceScaleA.get());
     }
     else if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
     {
-        commandArgs.setArgument(*tagTensorScaleA, ArgumentType::Value, hostScaleA[0]);
+        commandArgs.setArgument(*tags.tagTensorScaleA, ArgumentType::Value, hostScaleA[0]);
     }
 
     if(gemm.scaleBMode == Operations::ScaleMode::Separate)
@@ -590,17 +644,18 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
                                 gemm.scaleBlockSize));
         TensorDescriptor descBScale(
             dataTypeB, {size_t(K / gemm.scaleBlockSize), size_t(N)}, gemm.transB);
-        setCommandTensorArg(commandArgs, tagTensorScaleB.value(), descBScale, deviceScaleB.get());
+        setCommandTensorArg(
+            commandArgs, tags.tagTensorScaleB.value(), descBScale, deviceScaleB.get());
     }
     else if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
     {
-        commandArgs.setArgument(*tagTensorScaleB, ArgumentType::Value, hostScaleB[0]);
+        commandArgs.setArgument(*tags.tagTensorScaleB, ArgumentType::Value, hostScaleB[0]);
     }
 
-    commandArgs.setArgument(tagScalarAlpha, ArgumentType::Value, alpha);
-    commandArgs.setArgument(tagScalarBeta, ArgumentType::Value, beta);
+    commandArgs.setArgument(tags.tagScalarAlpha, ArgumentType::Value, alpha);
+    commandArgs.setArgument(tags.tagScalarBeta, ArgumentType::Value, beta);
     if(srCvtSeed.has_value())
-        commandArgs.setArgument(tagScalarSeed, ArgumentType::Value, srCvtSeed.value());
+        commandArgs.setArgument(tags.tagScalarSeed, ArgumentType::Value, srCvtSeed.value());
 
     // Create scratch space
     size_t scratchSpaceRequired[static_cast<int>(Operations::ScratchPolicy::Count)];
@@ -609,7 +664,7 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
     std::fill(std::begin(deviceScratch), std::end(deviceScratch), nullptr);
     if(gemm.streamK)
     {
-        commandArgs.setArgument(tagNumWGs, ArgumentType::Value, gemm.numWGs);
+        commandArgs.setArgument(tags.tagNumWGs, ArgumentType::Value, gemm.numWGs);
         for(int i = 0; i < static_cast<int>(Operations::ScratchPolicy::Count); ++i)
         {
             auto policy = static_cast<Operations::ScratchPolicy>(i);
@@ -619,14 +674,14 @@ void basicGEMM(rocRoller::ContextPtr   m_context,
             {
                 deviceScratch[i] = make_shared_device<uint8_t>(scratchSpaceRequired[i], 0);
                 commandArgs.setArgument(
-                    scratchTags.at(policy), ArgumentType::Value, deviceScratch[i].get());
+                    tags.scratchTags.at(policy), ArgumentType::Value, deviceScratch[i].get());
             }
         }
     }
 
     if(gemm.workgroupMappingDim != -1)
     {
-        commandArgs.setArgument(tagWGM, ArgumentType::Value, gemm.workgroupMappingValue);
+        commandArgs.setArgument(tags.tagWGM, ArgumentType::Value, gemm.workgroupMappingValue);
     }
 
     // Host result
@@ -825,7 +880,8 @@ namespace MemAddressingTest
     {
         auto        context = TestContext::ForTestDevice();
         GEMMProblem gemm;
-        basicGEMM<float>(context.get(), gemm);
+        auto [command, params, tags] = basicGEMM<float>(context.get(), gemm);
+        runGEMM<float>(context.get(), command, params, tags, gemm);
     }
 
     TEST_CASE("LoadLDSTile basic test", "[mem-addressing]")
