@@ -3117,8 +3117,9 @@ class Solution(collections.abc.Mapping):
 
     if state["PrefetchGlobalRead"]:
       offsetBlk = state["LdsOffsetB"] + state["LdsNumElementsAlignedB"]
+      # TODO:
       # Disable StoreSwapAddr to ensure LdsOffsetA_Blk is always a power of 2
-      # This is consistent with mx_tony implementation which doesn't have StoreSwapAddr
+      # This is consistent with referenc implementation which doesn't have StoreSwapAddr
       state["StoreSwapAddr"] = False
       # Original logic (disabled):
       # state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
