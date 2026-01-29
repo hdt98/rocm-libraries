@@ -576,8 +576,7 @@ namespace rocRoller
             //
             // Prefetch before ForLoop
             //
-            auto preBarrier = graph.control.addElement(Barrier());
-            auto preNOP     = graph.control.addElement(NOP());
+            auto preNOP = graph.control.addElement(NOP());
             graph.control.addElement(Sequence(), {preNOP}, {forLoop});
 
             std::vector<int> preChain;
@@ -605,8 +604,6 @@ namespace rocRoller
                 auto storeChain = duplicateChain(graph, {load.ldsChain});
                 preChain.push_back(storeChain);
 
-                auto ldsTileTag = graph.mapper.get<LDS>(storeChain);
-                graph.mapper.connect<LDS>(preBarrier, ldsTileTag, storeLDScounter);
                 storeLDScounter++;
 
                 auto op = std::get<Operation>(graph.control.getElement(load.globalOperation));
@@ -629,7 +626,6 @@ namespace rocRoller
             {
                 graph.control.addElement(Sequence(), {preChain[i - 1]}, {preChain[i]});
             }
-            graph.control.addElement(Sequence(), {preChain.back()}, {preBarrier});
 
             auto addLDSPrefetchChains = [&](int u, int pre, int post, bool duplicate) -> int {
                 std::vector<int> prefetchChain;
@@ -722,8 +718,8 @@ namespace rocRoller
             };
 
             if(!m_prefetchFromLDSChains[forLoop].empty())
-                addLDSPrefetchChains(0, preBarrier, preNOP, true);
-            graph.control.addElement(Sequence(), {preBarrier}, {preNOP});
+                addLDSPrefetchChains(0, preChain.back(), preNOP, true);
+            graph.control.addElement(Sequence(), {preChain.back()}, {preNOP});
 
             //
             // ForLoop body
@@ -801,7 +797,7 @@ namespace rocRoller
 
                 auto globalPrefetchU = (u + numInFlight) % numUnroll;
                 auto ldsPrefetchU    = (u + 1) % numUnroll;
-                auto barrier         = graph.control.addElement(Barrier());
+                auto barrier         = graph.control.addElement(NOP());
 
                 auto nop = separateMemOps ? graph.control.addElement(NOP()) : -1;
 
@@ -866,9 +862,6 @@ namespace rocRoller
                               ldsPrefetchU,
                               globalStores[0].user);
 
-                auto ldsTileTag = graph.mapper.get<LDS>(globalStores[0].ldsChain);
-                graph.mapper.connect<LDS>(barrier, ldsTileTag, 0);
-
                 for(int i = 1; i < globalStores.size(); i++)
                 {
                     graph.control.addElement(
@@ -881,9 +874,6 @@ namespace rocRoller
                     logger->debug("  prefetch: in-loop: commit lds {} user {}",
                                   ldsPrefetchU,
                                   globalStores[i].user);
-
-                    auto ldsTileTag = graph.mapper.get<LDS>(globalStores[i].ldsChain);
-                    graph.mapper.connect<LDS>(barrier, ldsTileTag, i);
                 }
 
                 // overlap the direct2lds and load lds when they do not access the same LDS allocation
