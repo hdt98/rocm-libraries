@@ -1293,21 +1293,18 @@ namespace rocRoller
 
         private:
             /**
-             * @brief Compares node priorities for scheduling order.
+             * @brief Compares node priorities for post-order traversal.
              *
-             * Used with std::priority_queue, so the "largest" node is popped first.
-             * Priority order (highest first):
-             *   1. Higher distanceFromRoot (leaf nodes processed before root)
-             *   2. More dependencies
-             *   3. Earlier index (smaller node index)
+             * The ExpressionTree is already in topological order (dependencies have
+             * smaller indices than their dependents)
+             *   - All dependencies are processed before nodes that depend on them
+             *
+             * Used with std::priority_queue (max-heap), so returning a > b means
+             * smaller indices have higher priority and are popped first.
              */
             bool comparePriorities(int a, int b) const
             {
-                auto const& nodeA = m_tree.at(a);
-                auto const& nodeB = m_tree.at(b);
-
-                return std::make_tuple(nodeA.distanceFromRoot, nodeA.deps.size(), -a)
-                       < std::make_tuple(nodeB.distanceFromRoot, nodeB.deps.size(), -b);
+                return a > b;
             }
 
             bool allDependenciesSatisfied(int nodeIdx) const
