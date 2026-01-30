@@ -481,12 +481,6 @@ namespace rocRoller
                     concatenate("Condition: Bottom (jump to " + topLabel->toString()
                                 + " if true)"));
 
-                // TODO: Have deallocate nodes generate the proper wait count and remove this wait.
-                //       This is currently needed in case there are loads within a loop that are never
-                //       used within the loop. If there are, the wait count observer never releases
-                //       the registers.
-                co_yield Instruction::Wait(
-                    WaitCount::Zero(m_context->targetArchitecture(), "DEBUG: Wait after branch"));
                 co_yield Instruction::Unlock("Unlock DoWhile");
             }
 
@@ -532,12 +526,6 @@ namespace rocRoller
                                 + " if true)"));
 
                 co_yield Instruction::Label(botLabel);
-                // TODO: Have deallocate nodes generate the proper wait count and remove this wait.
-                //       This is currently needed in case there are loads within a loop that are never
-                //       used within the loop. If there are, the wait count observer never releases
-                //       the registers.
-                co_yield Instruction::Wait(
-                    WaitCount::Zero(m_context->targetArchitecture(), "DEBUG: Wait after branch"));
                 co_yield Instruction::Unlock("Unlock For Loop");
             }
 
