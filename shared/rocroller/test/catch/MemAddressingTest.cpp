@@ -929,6 +929,9 @@ namespace MemAddressingTest
                     }
                 }
             }
+
+            auto commandArgs = example.getCommandArguments<float>();
+            commandKernel.launchKernel(commandArgs.runtimeArguments());
         }
 
         SECTION("FP4")
