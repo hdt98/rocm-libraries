@@ -3309,7 +3309,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
 
     // Sum absolute values
     S sum = 0;
-    bool repeated = (rocblas_is_complex<T>) ? false : true;
+    int repeated = (rocblas_is_complex<T>) ? 0 : 1;
     // we iterate over v, since v contains x from previous step (pointers swapped)
     for(I i = tid; i < n; i += LACN2_BLOCKSIZE)
     {
@@ -3319,31 +3319,31 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
             if(v[i] >= 0)
             {
                 if(isgn[i] <= -1)
-                    repeated = false;
+                    repeated = 0;
             }
             else
             {
                 if(isgn[i] >= 1)
-                    repeated = false;
+                    repeated = 0;
             }
         }
     }
 
     // reduce within Warp
     sum += shift_left(sum, 1);
-    repeated = repeated && __shfl_down(repeated, 1);
+    repeated = repeated & __shfl_down(repeated, 1);
     sum += shift_left(sum, 2);
-    repeated = repeated && __shfl_down(repeated, 2);
+    repeated = repeated & __shfl_down(repeated, 2);
     sum += shift_left(sum, 4);
-    repeated = repeated && __shfl_down(repeated, 4);
+    repeated = repeated & __shfl_down(repeated, 4);
     sum += shift_left(sum, 8);
-    repeated = repeated && __shfl_down(repeated, 8);
+    repeated = repeated & __shfl_down(repeated, 8);
     sum += shift_left(sum, 16);
-    repeated = repeated && __shfl_down(repeated, 16);
+    repeated = repeated & __shfl_down(repeated, 16);
     if(WarpSize > 32)
     {
         sum += shift_left(sum, 32);
-        repeated = repeated && __shfl_down(repeated, 32);
+        repeated = repeated & __shfl_down(repeated, 32);
     }
 
     if(tid % WarpSize == 0)
