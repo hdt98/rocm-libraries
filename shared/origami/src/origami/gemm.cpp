@@ -939,7 +939,7 @@ origami_cache_t create_origami_cache(const problem_t& problem,
 
   struct key_compare_t {
       bool operator()(const key_t& a, const key_t& b) const {
-        return a.second.index == b.second.index && a.first == b.first && a.second == b.second;
+        return a.second.index == b.second.index && a == b;
       }
   };
 

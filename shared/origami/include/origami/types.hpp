@@ -408,7 +408,7 @@ struct config_t {
   /// Grid selection algorithm.
   grid_selection_t grid_selection = grid_selection_t::k_split_aware;
 
-  /// Not used by Origami, but can be set by the user
+  /// Not used by Origami (except for computing a hash)
   int index = -1;
 
   constexpr bool operator==(const config_t& o) const noexcept {
