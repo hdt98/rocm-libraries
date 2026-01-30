@@ -456,6 +456,10 @@ namespace rocRollerTest::Graphs
     {
         using namespace rocRoller::KernelGraph::CoordinateGraph;
 
+        AssertFatal(!m_tagA.uninitialized() && !m_tagB.uninitialized() && !m_tagC.uninitialized()
+                        && !m_tagD.uninitialized(),
+                    "Command not yet created, call getCommand() first");
+
         auto params = std::make_shared<CommandParameters>();
 
         params->setManualKernelDimension(2);
