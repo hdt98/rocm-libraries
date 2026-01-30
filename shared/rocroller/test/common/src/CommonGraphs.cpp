@@ -427,7 +427,7 @@ namespace rocRollerTest::Graphs
         m_problem.transB = transB;
     }
 
-    void GEMM::setPad(auto padA, auto padB)
+    void GEMM::setPad(decltype(m_problem.padA) padA, decltype(m_problem.padB) padB)
     {
         m_problem.padA = padA;
         m_problem.padB = padB;

@@ -61,13 +61,36 @@ namespace MemAddressingTest
 
     TEST_CASE("LDS Address Modelling", "[mem-addressing]")
     {
-        SECTION("No padding")
+        struct Variants
+        {
+            std::string                              name;
+            std::function<void(std::vector<size_t>)> validate;
+            decltype(GEMMProblem::padA)              padA = GEMMProblem{}.padA;
+            decltype(GEMMProblem::padB)              padB = GEMMProblem{}.padB;
+
+            static void NoPadding(std::vector<size_t> addresses)
+            {
+                CHECK(addresses
+                      == std::vector<uint64_t>{
+                          0,    256,  512,  768,  1024, 1280, 1536, 1792, 2048, 2304, 2560,
+                          2816, 3072, 3328, 3584, 3840, 4096, 4352, 4608, 4864, 5120, 5376,
+                          5632, 5888, 6144, 6400, 6656, 6912, 7168, 7424, 7680, 7936, 4,
+                          260,  516,  772,  1028, 1284, 1540, 1796, 2052, 2308, 2564, 2820,
+                          3076, 3332, 3588, 3844, 4100, 4356, 4612, 4868, 5124, 5380, 5636,
+                          5892, 6148, 6404, 6660, 6916, 7172, 7428, 7684, 7940});
+            }
+        };
+
+        const auto variants = GENERATE(Variants{"No padding", Variants::NoPadding});
+
+        SECTION(variants.name)
         {
             auto context = TestContext::ForTestDevice();
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
 
             example.setUseLDS(true, true, false);
             example.setTranspose("T", "N");
+            example.setPad(variants.padA, variants.padB);
 
             auto command = example.getCommand();
             auto params  = example.getCommandParameters();
@@ -87,15 +110,7 @@ namespace MemAddressingTest
                     auto addresses = inst.getModelledAddresses().value();
                     Log::info("addresses {}", addresses);
 
-                    // Check in rocgdb
-                    CHECK(addresses
-                          == std::vector<uint64_t>{
-                              0,    256,  512,  768,  1024, 1280, 1536, 1792, 2048, 2304, 2560,
-                              2816, 3072, 3328, 3584, 3840, 4096, 4352, 4608, 4864, 5120, 5376,
-                              5632, 5888, 6144, 6400, 6656, 6912, 7168, 7424, 7680, 7936, 4,
-                              260,  516,  772,  1028, 1284, 1540, 1796, 2052, 2308, 2564, 2820,
-                              3076, 3332, 3588, 3844, 4100, 4356, 4612, 4868, 5124, 5380, 5636,
-                              5892, 6148, 6404, 6660, 6916, 7172, 7428, 7684, 7940});
+                    variants.validate(addresses);
                 }
             }
 
