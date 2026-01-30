@@ -27,6 +27,14 @@ template <
     std::enable_if_t<std::is_same_v<PK6, pk_fp6_t> || std::is_same_v<PK6, pk_bf6_t>, bool> = true>
 CK_TILE_HOST void test_convert();
 
+template <
+    typename SRC,
+    typename PK6,
+    typename DST,
+    bool is_device,
+    std::enable_if_t<std::is_same_v<PK6, pk_fp6_t> || std::is_same_v<PK6, pk_bf6_t>, bool> = true>
+CK_TILE_HOST void test_scaled_convert();
+
 // ============================================================================
 // FP6 (E2M3) Tests
 // ============================================================================
@@ -104,6 +112,30 @@ TEST(PackedFp6, ConvertDevice)
     test_convert<fp32_t, pk_fp6_t, bf16_t, is_device>();
     test_convert<fp16_t, pk_fp6_t, fp32_t, is_device>();
     test_convert<bf16_t, pk_fp6_t, fp32_t, is_device>();
+}
+
+TEST(PackedFp6, ScaledConvertHost)
+{
+    constexpr bool is_device = false;
+    test_scaled_convert<fp32_t, pk_fp6_t, fp32_t, is_device>();
+    test_scaled_convert<fp16_t, pk_fp6_t, fp16_t, is_device>();
+    test_scaled_convert<bf16_t, pk_fp6_t, bf16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_fp6_t, fp16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_fp6_t, bf16_t, is_device>();
+    test_scaled_convert<fp16_t, pk_fp6_t, fp32_t, is_device>();
+    test_scaled_convert<bf16_t, pk_fp6_t, fp32_t, is_device>();
+}
+
+TEST(PackedFp6, ScaledConvertDevice)
+{
+    constexpr bool is_device = true;
+    test_scaled_convert<fp32_t, pk_fp6_t, fp32_t, is_device>();
+    test_scaled_convert<fp16_t, pk_fp6_t, fp16_t, is_device>();
+    test_scaled_convert<bf16_t, pk_fp6_t, bf16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_fp6_t, fp16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_fp6_t, bf16_t, is_device>();
+    test_scaled_convert<fp16_t, pk_fp6_t, fp32_t, is_device>();
+    test_scaled_convert<bf16_t, pk_fp6_t, fp32_t, is_device>();
 }
 
 // ============================================================================
@@ -194,6 +226,30 @@ TEST(PackedBf6, ConvertDevice)
     test_convert<bf16_t, pk_bf6_t, fp32_t, is_device>();
 }
 
+TEST(PackedBf6, ScaledConvertHost)
+{
+    constexpr bool is_device = false;
+    test_scaled_convert<fp32_t, pk_bf6_t, fp32_t, is_device>();
+    test_scaled_convert<fp16_t, pk_bf6_t, fp16_t, is_device>();
+    test_scaled_convert<bf16_t, pk_bf6_t, bf16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_bf6_t, fp16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_bf6_t, bf16_t, is_device>();
+    test_scaled_convert<fp16_t, pk_bf6_t, fp32_t, is_device>();
+    test_scaled_convert<bf16_t, pk_bf6_t, fp32_t, is_device>();
+}
+
+TEST(PackedBf6, ScaledConvertDevice)
+{
+    constexpr bool is_device = true;
+    test_scaled_convert<fp32_t, pk_bf6_t, fp32_t, is_device>();
+    test_scaled_convert<fp16_t, pk_bf6_t, fp16_t, is_device>();
+    test_scaled_convert<bf16_t, pk_bf6_t, bf16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_bf6_t, fp16_t, is_device>();
+    test_scaled_convert<fp32_t, pk_bf6_t, bf16_t, is_device>();
+    test_scaled_convert<fp16_t, pk_bf6_t, fp32_t, is_device>();
+    test_scaled_convert<bf16_t, pk_bf6_t, fp32_t, is_device>();
+}
+
 // ============================================================================
 // Cross-word boundary tests (for 6-bit packing)
 // ============================================================================
@@ -233,11 +289,8 @@ TEST(PackedBf6, CrossWordBoundary)
 // ============================================================================
 
 #define toF32(x) ck_tile::type_convert<float>(x)
-#define toPF6(x) ck_tile::type_convert<pk_fp6_t>(x)
-#define toBF6(x) ck_tile::type_convert<pk_bf6_t>(x)
 #define toSRC(x) ck_tile::type_convert<SRC>(x)
 #define toDST(x) ck_tile::type_convert<DST>(x)
-#define toDSTx16(x) ck_tile::type_convert<DSTx16_t>(x)
 
 template <typename Kernel, typename... Args>
 __global__ void MyKernel(Args... args)
@@ -245,11 +298,14 @@ __global__ void MyKernel(Args... args)
     Kernel{}(args...);
 }
 
+/* Unified kernel for testing 16-element vector conversions with optional scaling */
 template <typename SRC, typename PK6, typename DST, int N>
 struct SrcPk6Dst
 {
-    CK_TILE_HOST_DEVICE void operator()(const SRC* src, DST* dst) const
+    CK_TILE_HOST_DEVICE void operator()(const SRC* src, DST* dst, float scale = 1.0f) const
     {
+#define toPK6(x) ck_tile::scaled_type_convert<PK6>(x, scale)
+#define toDSTx16(x) ck_tile::scaled_type_convert<DSTx16_t>(x, scale)
 #if CK_TILE_AVX512F_WA
         // Use arrays of two 8-element vectors only for float to avoid AVX-512 on non-supporting
         // CPUs For smaller types (fp16, bf16), 16-element vectors are fine with AVX2
@@ -286,17 +342,12 @@ struct SrcPk6Dst
                     input16[j] = src[i + j];
             }
 
-            PK6 pk6_packed;
-            if constexpr(std::is_same_v<PK6, pk_fp6_t>)
-                pk6_packed = toPF6(input16);
-            else
-                pk6_packed = toBF6(input16);
-
-            // Convert to output
+            // Convert: SRCx16 -> PK6 -> DSTx16 with scaling
+            PK6 pk6_packed = toPK6(input16);
             DSTx16_t output16{};
             if constexpr(UseDstx8)
             {
-                ck_tile::type_convert<DSTx8_t[2]>(pk6_packed, output16);
+                ck_tile::scaled_type_convert<DSTx8_t[2]>(pk6_packed, scale, output16);
             }
             else
             {
@@ -323,17 +374,15 @@ struct SrcPk6Dst
             for(int j = 0; j < 16; ++j)
                 input16[j] = src[i + j];
 
-            PK6 pk6_packed{};
-            if constexpr(std::is_same_v<PK6, pk_fp6_t>)
-                pk6_packed = toPF6(input16);
-            else
-                pk6_packed = toBF6(input16);
+            PK6 pk6_packed    = toPK6(input16);
             DSTx16_t output16 = toDSTx16(pk6_packed);
 
             for(int j = 0; j < 16; ++j)
                 dst[i + j] = output16[j];
 #endif
         });
+#undef toPK6
+#undef toDSTx16
     }
 };
 
@@ -404,4 +453,147 @@ CK_TILE_HOST void test_convert()
 
     for(int i = 0; i < N; ++i)
         EXPECT_EQ(ref[i], out[i]) << "i:" << i;
+}
+
+template <typename SRC,
+          typename PK6,
+          typename DST,
+          bool is_device,
+          std::enable_if_t<std::is_same_v<PK6, pk_fp6_t> || std::is_same_v<PK6, pk_bf6_t>, bool>>
+CK_TILE_HOST void test_scaled_convert()
+{
+    constexpr float scale = 2.0f;
+
+    // FP6 E2M3 test values with scale=2.0: range [0.125, 7.5], scaled range [0.25, 15.0]
+    constexpr std::array<float, 16> fp6_test_data = {0.f,
+                                                     0.25f,
+                                                     0.5f,
+                                                     1.f,
+                                                     2.f,
+                                                     3.f,
+                                                     4.f,
+                                                     6.f,
+                                                     0.125f,
+                                                     0.75f,
+                                                     1.5f,
+                                                     2.5f,
+                                                     8.f,
+                                                     10.f,
+                                                     14.f,
+                                                     16.f};
+    /* Expected results after: input/scale -> FP6 quantize -> output*scale
+     * For scale=2.0:
+     *   0.0/2=0.0    -> 0     -> 0.0*2 = 0.0
+     *   0.25/2=0.125 -> 0.125 -> 0.125*2 = 0.25
+     *   0.5/2=0.25   -> 0.25  -> 0.25*2 = 0.5
+     *   1.0/2=0.5    -> 0.5   -> 0.5*2 = 1.0
+     *   2.0/2=1.0    -> 1.0   -> 1.0*2 = 2.0
+     *   3.0/2=1.5    -> 1.5   -> 1.5*2 = 3.0
+     *   4.0/2=2.0    -> 2.0   -> 2.0*2 = 4.0
+     *   6.0/2=3.0    -> 3.0   -> 3.0*2 = 6.0
+     *   0.125/2=0.0625 -> 0   -> 0.0*2 = 0.0
+     *   0.75/2=0.375 -> 0.375 -> 0.375*2 = 0.75
+     *   1.5/2=0.75   -> 0.75  -> 0.75*2 = 1.5
+     *   2.5/2=1.25   -> 1.25  -> 1.25*2 = 2.5
+     *   8.0/2=4.0    -> 4.0   -> 4.0*2 = 8.0
+     *   10.0/2=5.0   -> 5.0   -> 5.0*2 = 10.0
+     *   14.0/2=7.0   -> 7.0   -> 7.0*2 = 14.0
+     *   16.0/2=8.0   -> 7.5 (clamp) -> 7.5*2 = 15.0 */
+    constexpr std::array<float, 16> fp6_ref_data = {
+        0.f, 0.25f, 0.5f, 1.f, 2.f, 3.f, 4.f, 6.f, 0.f, 0.75f, 1.5f, 2.5f, 8.f, 10.f, 14.f, 15.f};
+
+    // BF6 E3M2 test values with scale=2.0: range [0.0625, 28], scaled range [0.125, 56]
+    constexpr std::array<float, 16> bf6_test_data = {0.f,
+                                                     0.125f,
+                                                     0.25f,
+                                                     0.5f,
+                                                     1.f,
+                                                     2.f,
+                                                     4.f,
+                                                     6.f,
+                                                     0.0625f,
+                                                     0.375f,
+                                                     1.5f,
+                                                     3.f,
+                                                     12.f,
+                                                     24.f,
+                                                     28.f,
+                                                     32.f};
+    /* Expected results after: input/scale -> BF6 quantize -> output*scale
+     * For scale=2.0:
+     *   0.0/2=0.0      -> 0      -> 0.0*2 = 0.0
+     *   0.125/2=0.0625 -> 0.0625 -> 0.0625*2 = 0.125
+     *   0.25/2=0.125   -> 0.125  -> 0.125*2 = 0.25
+     *   0.5/2=0.25     -> 0.25   -> 0.25*2 = 0.5
+     *   1.0/2=0.5      -> 0.5    -> 0.5*2 = 1.0
+     *   2.0/2=1.0      -> 1.0    -> 1.0*2 = 2.0
+     *   4.0/2=2.0      -> 2.0    -> 2.0*2 = 4.0
+     *   6.0/2=3.0      -> 3.0    -> 3.0*2 = 6.0
+     *   0.0625/2=0.03125 -> 0    -> 0.0*2 = 0.0
+     *   0.375/2=0.1875 -> 0.1875 -> 0.1875*2 = 0.375
+     *   1.5/2=0.75     -> 0.75   -> 0.75*2 = 1.5
+     *   3.0/2=1.5      -> 1.5    -> 1.5*2 = 3.0
+     *   12.0/2=6.0     -> 6.0    -> 6.0*2 = 12.0
+     *   24.0/2=12.0    -> 12.0   -> 12.0*2 = 24.0
+     *   28.0/2=14.0    -> 14.0   -> 14.0*2 = 28.0
+     *   32.0/2=16.0    -> 16.0   -> 16.0*2 = 32.0 */
+    constexpr std::array<float, 16> bf6_ref_data = {0.f,
+                                                    0.125f,
+                                                    0.25f,
+                                                    0.5f,
+                                                    1.f,
+                                                    2.f,
+                                                    4.f,
+                                                    6.f,
+                                                    0.f,
+                                                    0.375f,
+                                                    1.5f,
+                                                    3.f,
+                                                    12.f,
+                                                    24.f,
+                                                    28.f,
+                                                    32.f};
+
+    // Select test data based on PK6 type
+    const auto& test_data = (std::is_same_v<PK6, pk_fp6_t> ? fp6_test_data : bf6_test_data);
+    const auto& ref_data  = (std::is_same_v<PK6, pk_fp6_t> ? fp6_ref_data : bf6_ref_data);
+
+    static_assert(fp6_test_data.size() == fp6_ref_data.size());
+    static_assert(bf6_test_data.size() == bf6_ref_data.size());
+
+    constexpr int N = 16;
+    std::array<SRC, N> in;
+    std::array<DST, N> ref, out;
+
+    // Prepare input and ground truth on host
+    for(int i = 0; i < N; ++i)
+    {
+        in[i]  = toSRC(test_data[i]);
+        ref[i] = toDST(ref_data[i]);
+        EXPECT_EQ(test_data[i], toF32(in[i]));
+        EXPECT_EQ(ref_data[i], toF32(ref[i]));
+    }
+
+    using job = SrcPk6Dst<SRC, PK6, DST, N>;
+
+    if constexpr(is_device)
+    {
+        auto in_d  = std::make_unique<ck_tile::DeviceMem>(in.size() * sizeof(SRC));
+        auto out_d = std::make_unique<ck_tile::DeviceMem>(out.size() * sizeof(DST));
+        in_d->ToDevice(in.data());
+
+        MyKernel<job><<<1, 1>>>(reinterpret_cast<const SRC*>(in_d->GetDeviceBuffer()),
+                                reinterpret_cast<DST*>(out_d->GetDeviceBuffer()),
+                                scale);
+
+        out_d->FromDevice(out.data());
+    }
+    else
+    {
+        job{}(in.data(), out.data(), scale);
+    }
+
+    for(int i = 0; i < N; ++i)
+        EXPECT_EQ(ref[i], out[i]) << "i:" << i << " expected:" << toF32(ref[i])
+                                  << " got:" << toF32(out[i]);
 }
