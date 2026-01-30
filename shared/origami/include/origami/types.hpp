@@ -409,7 +409,7 @@ struct config_t {
   grid_selection_t grid_selection = grid_selection_t::k_split_aware;
 
   /// Not used by Origami, but can be set by the user
-  int index = 0;
+  int index = -1;
 
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && 

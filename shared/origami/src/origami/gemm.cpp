@@ -931,13 +931,19 @@ origami_cache_t create_origami_cache(const problem_t& problem,
         auto& p = k.first;
         auto& c = k.second;
         return math::hash_combine(
-          c.mt.m, c.mt.n, c.mt.k, c.cache_hints_a, c.cache_hints_b,
+          c.index,
           static_cast<int>(p.a_transpose), static_cast<int>(p.b_transpose),
           static_cast<int>(p.a_dtype));
       }
   };
 
-  static std::unordered_map<key_t, kernel_cache_t, key_hasher_t> kernel_cache_map;
+  struct key_compare_t {
+      bool operator()(const key_t& a, const key_t& b) const {
+        return a.second.index == b.second.index && a.first == b.first && a.second == b.second;
+      }
+  };
+
+  static std::unordered_map<key_t, kernel_cache_t, key_hasher_t, key_compare_t> kernel_cache_map;
   // static std::mutex mut;
   // std::unique_lock<std::mutex> lock(mut);
   auto p_cache_entry = kernel_cache_map.find(key);
