@@ -704,11 +704,15 @@ __global__ void matmul(const packed_type_t<AType>* a,
 // Test structure for WMMA scale operations
 namespace mx_wmma_test {
 
-template <typename ADataType, typename BDataType, typename ScaleType, typename CDataType>
+template <typename ADataType,
+          typename BDataType,
+          typename AScaleType,
+          typename BScaleType,
+          typename CDataType>
 void RunHostGEMM(const Tensor<ADataType>& A,
-                 const Tensor<ScaleType>& a_scales,
+                 const Tensor<AScaleType>& a_scales,
                  const Tensor<BDataType>& B,
-                 const Tensor<ScaleType>& b_scales,
+                 const Tensor<BScaleType>& b_scales,
                  Tensor<CDataType>& C)
 {
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
@@ -717,12 +721,13 @@ void RunHostGEMM(const Tensor<ADataType>& A,
                                                                               BDataType,
                                                                               CDataType,
                                                                               float,
-                                                                              ScaleType,
+                                                                              AScaleType,
                                                                               PassThrough,
                                                                               PassThrough,
                                                                               PassThrough,
                                                                               float,
-                                                                              float>;
+                                                                              float,
+                                                                              BScaleType>;
     auto ref_gemm               = ReferenceGemmInstance{};
     auto ref_invoker            = ref_gemm.MakeInvoker();
 
@@ -735,19 +740,20 @@ void RunHostGEMM(const Tensor<ADataType>& A,
 template <typename KernelType,
           typename ADataType,
           typename BDataType,
-          typename ScaleType,
+          typename AScaleType,
+          typename BScaleType,
           typename CDataType>
 bool RunDeviceGEMM(KernelType kernel,
                    const Tensor<ADataType>& A,
-                   const Tensor<ScaleType>& a_scales,
+                   const Tensor<AScaleType>& a_scales,
                    const Tensor<BDataType>& B,
-                   const Tensor<ScaleType>& b_scales,
+                   const Tensor<BScaleType>& b_scales,
                    Tensor<CDataType>& C)
 {
     DeviceMem a_m_k_device_buf(sizeof(ADataType) * A.mDesc.GetElementSpaceSize());
-    DeviceMem a_scales_device_buf(sizeof(ScaleType) * a_scales.mDesc.GetElementSpaceSize());
+    DeviceMem a_scales_device_buf(sizeof(AScaleType) * a_scales.mDesc.GetElementSpaceSize());
     DeviceMem b_n_k_device_buf(sizeof(BDataType) * B.mDesc.GetElementSpaceSize());
-    DeviceMem b_scales_device_buf(sizeof(ScaleType) * b_scales.mDesc.GetElementSpaceSize());
+    DeviceMem b_scales_device_buf(sizeof(BScaleType) * b_scales.mDesc.GetElementSpaceSize());
     DeviceMem c_m_n_device_buf(sizeof(CDataType) * C.mDesc.GetElementSpaceSize());
 
     a_m_k_device_buf.ToDevice(A.mData.data());
@@ -755,27 +761,27 @@ bool RunDeviceGEMM(KernelType kernel,
     b_n_k_device_buf.ToDevice(B.mData.data());
     b_scales_device_buf.ToDevice(b_scales.mData.data());
 
-    const int cold_iters = 100;
+    const int cold_iters = 1;
     printf("Warm up %d times\n", cold_iters);
 
     kernel<<<1, 32>>>(static_cast<const ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-                      static_cast<const ScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
+                      static_cast<const AScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
                       static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
-                      static_cast<const ScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
+                      static_cast<const BScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
                       static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
 
     // warm up
     for(int i = 0; i < cold_iters; ++i)
     {
         kernel<<<1, 32>>>(static_cast<const ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-                          static_cast<const ScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
+                          static_cast<const AScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
                           static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
-                          static_cast<const ScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
+                          static_cast<const BScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
                           static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
         hip_check_error(hipGetLastError());
     }
 
-    const int num_repeat = 10;
+    const int num_repeat = 1;
 
     hipEvent_t start, stop;
 
@@ -789,9 +795,9 @@ bool RunDeviceGEMM(KernelType kernel,
     for(int i = 0; i < num_repeat; ++i)
     {
         kernel<<<1, 32>>>(static_cast<const ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
-                          static_cast<const ScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
+                          static_cast<const AScaleType*>(a_scales_device_buf.GetDeviceBuffer()),
                           static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
-                          static_cast<const ScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
+                          static_cast<const BScaleType*>(b_scales_device_buf.GetDeviceBuffer()),
                           static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
         hip_check_error(hipGetLastError());
     }

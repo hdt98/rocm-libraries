@@ -82,7 +82,7 @@ bool run_mx_wmma_coexecution_test(ck::index_t init)
 const ck::index_t common_init = 2;
 
 // test FP4@FP4 with 16x16x128 instruction, scale block size 32, and e8m0 scales
-TEST(MXWMMA, MXFP4WMMA16x16x128)
+TEST(MXWMMA, MXFP4WMMA16x16x128_E8M0)
 {
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
@@ -104,7 +104,7 @@ TEST(MXWMMA, MXFP4WMMA16x16x128)
 }
 
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e8m0 scales
-TEST(MXWMMA, MXFP4WMMA32x16x128)
+TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0)
 {
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
@@ -126,7 +126,7 @@ TEST(MXWMMA, MXFP4WMMA32x16x128)
 }
 
 // test FP4@FP4 with 16x16x128 instruction, scale block size 16, and e8m0 scales
-TEST(MXWMMA, MXFP4WMMA16x16x128_SCALE16)
+TEST(MXWMMA, MXFP4WMMA16x16x128_SCALE16_E8M0)
 {
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
@@ -147,7 +147,7 @@ TEST(MXWMMA, MXFP4WMMA16x16x128_SCALE16)
     EXPECT_TRUE(pass);
 }
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e8m0 scales
-TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16)
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0)
 {
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
@@ -251,6 +251,270 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3)
                                              float,
                                              e5m3_scale_t,
                                              e5m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE16_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e8m0 and e4m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0_E4M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e8m0_bexp_t,
+                                             e4m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e8m0 and e4m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0_E4M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e8m0_bexp_t,
+                                             e4m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE16_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e8m0 and e5m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0_E5M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e8m0_bexp_t,
+                                             e5m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e8m0 and e5m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0_E5M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e8m0_bexp_t,
+                                             e5m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE16_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e4m3 and e8m0 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3_E8M0)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e4m3_scale_t,
+                                             e8m0_bexp_t,
+                                             ck::WMMA_SCALE::SCALE_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e4m3 and e8m0 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3_E8M0)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e4m3_scale_t,
+                                             e8m0_bexp_t,
+                                             ck::WMMA_SCALE::SCALE16_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e4m3 and e5m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3_E5M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e4m3_scale_t,
+                                             e5m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e4m3 and e5m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3_E5M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e4m3_scale_t,
+                                             e5m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE16_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e5m3 and e8m0 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3_E8M0)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e5m3_scale_t,
+                                             e8m0_bexp_t,
+                                             ck::WMMA_SCALE::SCALE_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e5m3 and e8m0 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3_E8M0)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e5m3_scale_t,
+                                             e8m0_bexp_t,
+                                             ck::WMMA_SCALE::SCALE16_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e5m3 and e4m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3_E4M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e5m3_scale_t,
+                                             e4m3_scale_t,
+                                             ck::WMMA_SCALE::SCALE_F32_32x16x128,
+                                             num_steps>(common_init);
+    EXPECT_TRUE(pass);
+}
+
+// test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e5m3 and e4m3 scales
+TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3_E4M3)
+{
+    using ALayout = ck::tensor_layout::gemm::RowMajor;
+    using BLayout = ck::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck::tensor_layout::gemm::RowMajor;
+
+    const ck::index_t num_steps = 2;
+
+    auto pass = run_mx_wmma_coexecution_test<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             f4_t,
+                                             f4_t,
+                                             float,
+                                             e5m3_scale_t,
+                                             e4m3_scale_t,
                                              ck::WMMA_SCALE::SCALE16_F32_32x16x128,
                                              num_steps>(common_init);
     EXPECT_TRUE(pass);
