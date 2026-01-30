@@ -930,7 +930,8 @@ namespace MemAddressingTest
                 }
             }
 
-            auto commandArgs = example.getCommandArguments<float>();
+            auto [commandArgs, deviceA, deviceB, deviceC, deviceD]
+                = example.getCommandArguments<float>();
             commandKernel.launchKernel(commandArgs.runtimeArguments());
         }
 
