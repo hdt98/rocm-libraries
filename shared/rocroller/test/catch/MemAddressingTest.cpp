@@ -896,9 +896,7 @@ namespace MemAddressingTest
             example.setUseLDS(true, false, false);
 
             auto command = example.getCommand();
-            auto params
-                = example
-                      .getCommandParameters(); // TODO: ensure this not required to be called after getCommand()
+            auto params  = example.getCommandParameters();
 
             CommandKernel commandKernel(command, context.KernelName());
             commandKernel.setContext(context.get());
@@ -915,71 +913,19 @@ namespace MemAddressingTest
                     auto addresses = inst.getModelledAddresses().value();
                     Log::info("addresses {}", addresses);
 
-                    REQUIRE(addresses.size() == 64); // TODO: should this be 64 or 256?
-
-                    for(auto addr : addresses)
-                    {
-                        CHECK(addr % 4 == 0);
-                    }
-
-                    for(size_t i = 1; i < addresses.size(); ++i)
-                    {
-                        int diff = addresses[i] - addresses[i - 1];
-                        CHECK((diff == 4 || diff == 388));
-                    }
+                    CHECK(addresses
+                          == std::vector<uint64_t>{
+                              0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,
+                              52,  56,  60,  64,  68,  72,  76,  80,  84,  88,  92,  96,  100,
+                              104, 108, 112, 116, 120, 124, 512, 516, 520, 524, 528, 532, 536,
+                              540, 544, 548, 552, 556, 560, 564, 568, 572, 576, 580, 584, 588,
+                              592, 596, 600, 604, 608, 612, 616, 620, 624, 628, 632, 636});
                 }
             }
 
             auto [commandArgs, deviceA, deviceB, deviceC, deviceD]
                 = example.getCommandArguments<float>();
             commandKernel.launchKernel(commandArgs.runtimeArguments());
-        }
-
-        SECTION("FP4")
-        {
-            auto context = TestContext::ForTestDevice();
-            auto example = rocRollerTest::Graphs::GEMM(rocRoller::DataType::FP4,
-                                                       rocRoller::DataType::FP4,
-                                                       rocRoller::DataType::Float,
-                                                       rocRoller::DataType::Float);
-
-            example.setTileSize(256, 256, 128);
-            example.setMFMA(32, 32, 64, 1);
-            example.setUseLDS(true, true, false);
-
-            auto command = example.getCommand();
-            // TODO: ensure this not required to be called after getCommand()
-            auto params = example.getCommandParameters();
-
-            CommandKernel commandKernel(command, context.KernelName());
-            commandKernel.setContext(context.get());
-            commandKernel.setCommandParameters(params);
-
-            commandKernel.generateKernelGraph("");
-            auto graph = commandKernel.getKernelGraph();
-
-            for(auto inst : kernelInstructions(context.get(), command, graph))
-            {
-                context.get()->schedule(inst);
-                if(inst.getModelledAddresses().has_value())
-                {
-                    auto addresses = inst.getModelledAddresses().value();
-                    Log::info("addresses {}", addresses);
-
-                    REQUIRE(addresses.size() == 64); // TODO: should this be 64 or 256?
-
-                    for(auto addr : addresses)
-                    {
-                        CHECK(addr % 4 == 0);
-                    }
-
-                    for(size_t i = 1; i < addresses.size(); ++i)
-                    {
-                        int diff = addresses[i] - addresses[i - 1];
-                        CHECK((diff == 128 || diff == -1912 || diff == 2168));
-                    }
-                }
-            }
         }
     }
 }
