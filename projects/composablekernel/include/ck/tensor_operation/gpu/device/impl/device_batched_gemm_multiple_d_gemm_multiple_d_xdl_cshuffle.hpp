@@ -611,7 +611,11 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
                                          BatchStrideD0s,
                                          BatchStrideB1,
                                          BatchStrideD1s,
-                                         BatchStrideE1}
+                                         BatchStrideE1},
+              MRaw_(MRaw),
+              NRaw_(NRaw),
+              KRaw_(KRaw),
+              ORaw_(Gemm1NRaw)
         {
             if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
             {
@@ -687,6 +691,11 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
         // batch
         index_t batch_count_;
         ComputeBasePtrOfStridedBatch compute_base_ptr_of_batch_;
+
+        index_t MRaw_;
+        index_t NRaw_;
+        index_t KRaw_;
+        index_t ORaw_;
     };
 
     // Invoker
@@ -864,6 +873,26 @@ struct DeviceBatchedGemmMultipleDGemmMultipleD_Xdl_CShuffle
             if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
             {
                 std::cout << "wrong! Unsupported tensor layout combination." << std::endl;
+            }
+            return false;
+        }
+
+        // Check scalar per vector requirement
+        const auto a_extent_lowest    = A0BlockTransferSrcVectorDim == 2 ? arg.KRaw_ : arg.MRaw_;
+        const auto b0_extent_lowest   = B0BlockTransferSrcVectorDim == 2 ? arg.KRaw_ : arg.NRaw_;
+        const auto cde0_extent_lowest = arg.NRaw_; // D0 tensors forced to be row-major
+        const auto b1_extent_lowest   = B1BlockTransferSrcVectorDim == 2 ? arg.NRaw_ : arg.ORaw_;
+        const auto cde1_extent_lowest = arg.ORaw_;
+
+        if(!(a_extent_lowest % A0BlockTransferSrcScalarPerVector == 0 &&
+             b0_extent_lowest % B0BlockTransferSrcScalarPerVector == 0 &&
+             cde0_extent_lowest % CDE0BlockTransferSrcScalaerPerVector == 0 &&
+             b1_extent_lowest % B1BlockTransferSrcScalarPerVector == 0 &&
+             cde1_extent_lowest % CDE1ShuffleBlockTransferScalarPerVector_NPerBlock == 0))
+        {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "DeviceOp: Data Transfer Vector scalar err" << std::endl;
             }
             return false;
         }
