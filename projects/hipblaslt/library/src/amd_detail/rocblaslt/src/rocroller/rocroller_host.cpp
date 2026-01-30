@@ -736,7 +736,7 @@ rocblaslt_status runRocRollerContractionProblem(rocblaslt_handle                
                            hotIterations);
     }
 
-    if (kernel->customKernel)
+    if (kernel->customModuleLoaded)
         return runCustomKernel(kernel, prob);
 
     return runGemmKernel(kernel, prob);
