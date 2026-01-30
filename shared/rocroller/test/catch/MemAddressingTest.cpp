@@ -76,7 +76,7 @@ namespace MemAddressingTest
             commandKernel.setContext(context.get());
             commandKernel.setCommandParameters(params);
 
-            commandKernel.generateKernelGraph(""); // TODO: unused parameter
+            commandKernel.generateKernelGraph();
             auto graph = commandKernel.getKernelGraph();
 
             for(auto inst : kernelInstructions(context.get(), command, graph))
