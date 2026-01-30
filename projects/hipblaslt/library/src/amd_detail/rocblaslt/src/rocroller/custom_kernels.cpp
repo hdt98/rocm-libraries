@@ -47,16 +47,21 @@ void preloadCustomKernels(SolutionCache& cache)
     mxfp4Kernel.transA                    = true;
     mxfp4Kernel.transB                    = false;
     mxfp4Kernel.scaleTypeA.mode           = rocRoller::Operations::ScaleMode::Separate;
+    mxfp4Kernel.scaleTypeA.blockRowSize              = 32;
+    mxfp4Kernel.scaleTypeA.blockColSize              = 1;
     mxfp4Kernel.scaleTypeA.preSwizzleTile = {32, 8, 4};
     mxfp4Kernel.scaleTypeA.preTile        = {32, 8};
     mxfp4Kernel.scaleTypeB.mode           = rocRoller::Operations::ScaleMode::Separate;
+    mxfp4Kernel.scaleTypeB.blockRowSize              = 1;
+    mxfp4Kernel.scaleTypeB.blockColSize              = 32;
     mxfp4Kernel.scaleTypeB.preSwizzleTile = {32, 8, 4};
     mxfp4Kernel.scaleTypeB.preTile        = {8, 32};
 
     SolutionIndexParameters params;
     params.workgroupTile    = {256, 256, 256};
-    params.workgroupMapping = false;
+    params.workgroupMapping = true;
     params.streamK          = false;
+    params.tailLoops         = true;
 
     cache.addKernel(
         mxfp4Kernel,
