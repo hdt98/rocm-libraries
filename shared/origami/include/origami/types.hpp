@@ -361,9 +361,6 @@ struct origami_cache_t {
   std::size_t grid_k;
 
   std::size_t num_C_tiles;
-  // std::size_t num_waves;
-  // std::size_t num_active_cus;
-  // std::size_t splitting_factor;
 
   double achievable_mem_bandwidth;
 
@@ -410,6 +407,9 @@ struct config_t {
   target_t target = target_t::tensilelite;
   /// Grid selection algorithm.
   grid_selection_t grid_selection = grid_selection_t::k_split_aware;
+
+  /// Not used by Origami, but can be set by the user
+  int index = 0;
 
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && 
