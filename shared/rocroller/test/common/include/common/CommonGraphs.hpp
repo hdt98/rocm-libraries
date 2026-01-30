@@ -239,7 +239,7 @@ namespace rocRollerTest
                       typename TC  = TA,
                       typename TD  = TC,
                       typename ACC = float>
-            CommandArguments getCommandArguments() const
+            auto getCommandArguments() const
             {
                 using namespace rocRoller;
 
@@ -316,7 +316,7 @@ namespace rocRollerTest
                 commandArgs.setArgument(m_tagScalarAlpha, ArgumentType::Value, alpha);
                 commandArgs.setArgument(m_tagScalarBeta, ArgumentType::Value, beta);
 
-                return commandArgs;
+                return std::make_tuple(commandArgs, deviceA, deviceB, deviceC, deviceD);
             }
 
             std::tuple<rocRoller::Operations::OperationTag,
