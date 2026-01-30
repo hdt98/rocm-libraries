@@ -36,6 +36,65 @@
 #include <rocRoller/TensorDescriptor.hpp>
 
 #include <map>
+#include <optional>
+
+class GemmHipModuleWrapper
+{
+public:
+    GemmHipModuleWrapper(const std::string& functionName, const std::string& path)
+        : customModuleLoaded(false)
+        , customKernelName(functionName)
+        , customModulePath(path)
+    {
+    }
+
+    ~GemmHipModuleWrapper()
+    {
+        if(customModuleLoaded)
+        {
+            if(hipError_t error = hipModuleUnload(module))
+            {
+                std::cerr << "hipModuleUnload failed: " << std::endl
+                          << " error: " << hipGetErrorString(error) << std::endl;
+            }
+        }
+    }
+
+    hipError_t loadModule()
+    {
+        if(hipError_t error = hipModuleLoad(&module, customModulePath.c_str()))
+        {
+            std::cerr << "hipModuleLoad failed: " << customModulePath << std::endl
+                      << " error: " << hipGetErrorString(error) << std::endl;
+            return error;
+        }
+        customModuleLoaded = true;
+        return hipSuccess;
+    }
+
+    hipError_t getHipFunction(hipFunction_t& function)
+    {
+        if(!customModuleLoaded)
+        {
+            if(hipError_t error = loadModule())
+            {
+                return error;
+            }
+        }
+        return hipModuleGetFunction(&function, module, customKernelName.c_str());
+    }
+
+    std::string getKernelName() const
+    {
+        return customKernelName;
+    }
+
+private:
+    bool        customModuleLoaded;
+    std::string customKernelName;
+    std::string customModulePath;
+    hipModule_t module;
+};
 
 /**
  * @brief GemmKernel
@@ -45,6 +104,7 @@
  */
 struct GemmKernel
 {
+public:
     rocRoller::CommandPtr               command;
     rocRoller::CommandKernelPtr         commandKernel;
     std::shared_ptr<SolutionParameters> params;
@@ -66,41 +126,11 @@ struct GemmKernel
 
     int occupancy;
 
-    bool        customModuleLoaded = false;
-    std::string customKernelName;
-    hipModule_t module;
+    std::optional<GemmHipModuleWrapper> module;
 
-    hipError_t loadModule(const std::string& path)
+    bool isCustomKernel() const
     {
-        if(hipError_t error = hipModuleLoad(&module, path.c_str()))
-        {
-            std::cerr << "hipModuleLoad failed: " << path.c_str() << std::endl
-                      << " error: " << hipGetErrorString(error) << std::endl;
-            return error;
-        }
-        customModuleLoaded = true;
-        return hipSuccess;
-    }
-
-    hipError_t getHipFunction(hipFunction_t& function) const
-    {
-        if(!customModuleLoaded)
-        {
-            return hipErrorNotFound;
-        }
-        return hipModuleGetFunction(&function, module, customKernelName.c_str());
-    }
-
-    ~GemmKernel()
-    {
-        if(customModuleLoaded)
-        {
-            if(hipError_t error = hipModuleUnload(module))
-            {
-                std::cerr << "hipModuleUnload failed: " << std::endl
-                          << " error: " << hipGetErrorString(error) << std::endl;
-            }
-        }
+        return module.has_value();
     }
 };
 

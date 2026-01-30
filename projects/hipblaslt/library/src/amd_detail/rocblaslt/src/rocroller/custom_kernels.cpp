@@ -14,10 +14,7 @@ std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&       cust
     gemmKernel->params->kernelType    = kernelType;
     gemmKernel->params->workgroupTile = wgt;
 
-    gemmKernel->customKernelName = customKernelName;
-
-    // TODO: Error handling on failed module load
-    auto error = gemmKernel->loadModule(path);
+    gemmKernel->module = GemmHipModuleWrapper(customKernelName, path);
 
     return gemmKernel;
 }
@@ -162,6 +159,12 @@ struct __attribute__((packed)) F4GemmKernelArgs
 rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
                                  const RocblasltContractionProblem& prob)
 {
+    if(!gemm->module.has_value())
+    {
+        std::cerr << "runCustomKernel failed: Module not loadable" << std::endl;
+        return rocblaslt_status_internal_error;
+    }
+
     dim3 grid;
     grid.x = (prob.n + gemm->params->workgroupTile.n - 1) / gemm->params->workgroupTile.n;
     grid.y = (prob.m + gemm->params->workgroupTile.m - 1) / gemm->params->workgroupTile.m;
@@ -180,9 +183,9 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
                                HIP_LAUNCH_PARAM_END};
 
     hipFunction_t function;
-    if(hipError_t error = gemm->getHipFunction(function))
+    if(hipError_t error = gemm->module->getHipFunction(function))
     {
-        std::cerr << "GemmKernel::getHipFunction failed: " << std::endl
+        std::cerr << "GemmHipModuleWrapper::getHipFunction failed: " << std::endl
                   << " error: " << hipGetErrorString(error) << std::endl;
         return rocblaslt_status_internal_error;
     }
@@ -202,12 +205,8 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
                                                    nullptr // event
                                                    ))
     {
-        std::cerr << "hipExtModuleLaunchKernel failed: " << gemm->customKernelName
-                  << std::endl
-                  //   << " with workgroup size: " << block
-                  //   << std::endl
-                  //   << " with numWorkGroups : " << kernel.numWorkGroups << std::endl
-                  //   << " with numWorkItems : " << grid << std::endl
+        std::cerr << "hipExtModuleLaunchKernel in runCustomKernel failed: "
+                  << gemm->module->getKernelName() << std::endl
                   << " error: " << hipGetErrorString(error) << std::endl;
         return rocblaslt_status_internal_error;
     }
