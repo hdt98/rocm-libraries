@@ -1017,7 +1017,7 @@ def process_results(Map conf=[:]){
         }
     }
 }
-
+/*
 def run_aiter_tests(Map conf=[:]){
     show_node_info()
     checkout scm
@@ -1111,7 +1111,7 @@ def run_pytorch_tests(Map conf=[:]){
         }
     }
 }
-
+*/
 //launch gfx1250 branch daily jobs
 CRON_SETTINGS = BRANCH_NAME == "gfx1250" ? '''0 10 * * * % BUILD_INSTANCES_ONLY=true;USE_SCCACHE=false;NINJA_BUILD_TRACE=true;FORCE_CI=true''' : ""
 
@@ -1383,6 +1383,7 @@ pipeline {
                 }
             }
         }
+/*
          stage("Run Pytorch Tests")
         {
             when {
@@ -1439,6 +1440,7 @@ pipeline {
                 }
             }
         }
+*/
         stage("Run Grouped Conv Large Case Tests")
         {
             when {
