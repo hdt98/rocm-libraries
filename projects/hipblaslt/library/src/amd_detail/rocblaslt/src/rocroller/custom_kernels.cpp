@@ -16,9 +16,28 @@ std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&       cust
 
     gemmKernel->customKernelName = customKernelName;
 
-    gemmKernel->loadModule(path);
+    // TODO: Error handling on failed module load
+    auto error = gemmKernel->loadModule(path);
 
     return gemmKernel;
+}
+
+std::string getCoPath(const std::string& filename)
+{
+    const char* env = std::getenv("HIPBLASLT_ROCROLLER_CUSTOM_KERNEL_DIR");
+    if(env)
+    {
+        std::string path = env;
+        // Ensure trailing slash
+        if(!path.empty() && path.back() != '/')
+        {
+            path += "/";
+        }
+        return path + filename;
+    }
+
+    // TODO: Fallback should be where the kernels are packaged
+    return "./" + filename;
 }
 
 void preloadCustomKernels(SolutionCache& cache)
@@ -45,12 +64,10 @@ void preloadCustomKernels(SolutionCache& cache)
     cache.addKernel(
         mxfp4Kernel,
         params,
-        createCustomGemmKernel(
-            "_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
-            mxfp4Kernel,
-            params.workgroupTile,
-            "/workspaces/rocm-libraries/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/"
-            "rocroller/custom_kernels/f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co"));
+        createCustomGemmKernel("_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
+                               mxfp4Kernel,
+                               params.workgroupTile,
+                               getCoPath("f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co")));
 }
 
 // F4 GEMM Kernel Args
