@@ -345,7 +345,7 @@ namespace rocRoller
          */
         hipFunction_t getHipFunction() const;
 
-        void generateKernelGraph(std::string name);
+        void generateKernelGraph();
 
     private:
         CommandPtr  m_command;

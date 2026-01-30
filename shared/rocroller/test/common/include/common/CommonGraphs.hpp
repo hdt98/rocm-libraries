@@ -223,6 +223,7 @@ namespace rocRollerTest
                                    SolutionParams::LoadPath scalePathB);
             void setSwizzle(int m, int n, int k, int b, bool prefetch);
             void setTranspose(std::string const& transA, std::string const& transB);
+            void setPad(auto padA, auto padB);
 
             GEMMProblem const& getProblem() const
             {

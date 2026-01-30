@@ -427,6 +427,12 @@ namespace rocRollerTest::Graphs
         m_problem.transB = transB;
     }
 
+    void GEMM::setPad(auto padA, auto padB)
+    {
+        m_problem.padA = padA;
+        m_problem.padB = padB;
+    }
+
     std::pair<std::optional<Operations::OperationTag>, std::optional<Operations::OperationTag>>
         GEMM::getABScaleTags() const
     {
