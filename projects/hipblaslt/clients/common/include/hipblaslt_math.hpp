@@ -96,6 +96,20 @@ inline __device__ __host__ hipblaslt_bf8 negate(hipblaslt_bf8 x)
     return x;
 }
 
+// Complex float specialization
+template <>
+inline __device__ __host__ std::complex<float> negate(std::complex<float> x)
+{
+    return std::complex<float>(-x. real(), -x. imag());
+}
+
+// Complex double specialization
+template <>
+inline __device__ __host__ std::complex<double> negate(std::complex<double> x)
+{
+    return std::complex<double>(-x. real(), -x. imag());
+}
+
 // Helper function to reduce intermediate precision and the output type are the same as the input type.
 template <typename TxDLi, typename TxDLo, typename Ti>
 inline void type_to_xdl_math_op_type(Ti* in, size_t s)
