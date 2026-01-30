@@ -47,13 +47,13 @@ void preloadCustomKernels(SolutionCache& cache)
     mxfp4Kernel.transA                    = true;
     mxfp4Kernel.transB                    = false;
     mxfp4Kernel.scaleTypeA.mode           = rocRoller::Operations::ScaleMode::Separate;
-    mxfp4Kernel.scaleTypeA.blockRowSize              = 32;
-    mxfp4Kernel.scaleTypeA.blockColSize              = 1;
+    mxfp4Kernel.scaleTypeA.blockRowSize   = 32;
+    mxfp4Kernel.scaleTypeA.blockColSize   = 1;
     mxfp4Kernel.scaleTypeA.preSwizzleTile = {32, 8, 4};
     mxfp4Kernel.scaleTypeA.preTile        = {32, 8};
     mxfp4Kernel.scaleTypeB.mode           = rocRoller::Operations::ScaleMode::Separate;
-    mxfp4Kernel.scaleTypeB.blockRowSize              = 1;
-    mxfp4Kernel.scaleTypeB.blockColSize              = 32;
+    mxfp4Kernel.scaleTypeB.blockRowSize   = 1;
+    mxfp4Kernel.scaleTypeB.blockColSize   = 32;
     mxfp4Kernel.scaleTypeB.preSwizzleTile = {32, 8, 4};
     mxfp4Kernel.scaleTypeB.preTile        = {8, 32};
 
@@ -61,7 +61,7 @@ void preloadCustomKernels(SolutionCache& cache)
     params.workgroupTile    = {256, 256, 256};
     params.workgroupMapping = true;
     params.streamK          = false;
-    params.tailLoops         = true;
+    params.tailLoops        = true;
 
     cache.addKernel(
         mxfp4Kernel,
@@ -134,28 +134,30 @@ struct __attribute__((packed)) F4GemmKernelArgs
 
     F4GemmKernelArgs(const RocblasltContractionProblem& prob)
         : ptr_D(prob.D)
-        , ptr_C(const_cast<void*>(prob.C))
+        , ptr_C(nullptr) // , ptr_C(const_cast<void*>(prob.C))
         , ptr_A(const_cast<void*>(prob.A))
         , ptr_B(const_cast<void*>(prob.B))
         , alpha(*static_cast<const float*>(prob.alpha))
         , beta(*static_cast<const float*>(prob.beta))
-        , stride_D0(static_cast<uint32_t>(prob.col_stride_d))
-        , stride_D1(static_cast<uint32_t>(prob.row_stride_d))
+        , stride_D0(0) //, stride_D0(static_cast<uint32_t>(prob.col_stride_d))
+        , stride_D1(0) //, stride_D1(static_cast<uint32_t>(prob.row_stride_d))
         , stride_C0(static_cast<uint32_t>(prob.col_stride_c))
-        , stride_C1(static_cast<uint32_t>(prob.row_stride_c))
+        , stride_C1(0) //, stride_C1(static_cast<uint32_t>(prob.row_stride_c))
         , stride_A0(static_cast<uint32_t>(prob.col_stride_a))
-        , stride_A1(static_cast<uint32_t>(prob.row_stride_a))
+        , stride_A1(0) //, stride_A1(static_cast<uint32_t>(prob.row_stride_a))
         , stride_B0(static_cast<uint32_t>(prob.col_stride_b))
-        , stride_B1(static_cast<uint32_t>(prob.row_stride_b))
+        , stride_B1(0) //, stride_B1(static_cast<uint32_t>(prob.row_stride_b))
         , M(static_cast<uint32_t>(prob.m))
         , N(static_cast<uint32_t>(prob.n))
         , K(static_cast<uint32_t>(prob.k))
         , ptr_ScaleA(prob.scaleA)
         , ptr_ScaleB(prob.scaleB)
-        , stride_ScaleA0(static_cast<uint32_t>(prob.m) / 32)
-        , stride_ScaleA1(1)
-        , stride_ScaleB0(static_cast<uint32_t>(prob.n) / 32)
-        , stride_ScaleB1(1)
+        , stride_ScaleA0(static_cast<uint32_t>(
+              prob.col_stride_a / 32)) //, stride_ScaleA0(static_cast<uint32_t>(prob.m))
+        , stride_ScaleA1(0)
+        , stride_ScaleB0(static_cast<uint32_t>(
+              prob.col_stride_b / 32)) //, stride_ScaleB0(static_cast<uint32_t>(prob.n))
+        , stride_ScaleB1(0)
         , log2_k_split(0)
     {
     }
