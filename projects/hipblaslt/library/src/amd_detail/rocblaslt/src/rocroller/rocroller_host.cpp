@@ -28,8 +28,8 @@
  * The implementation of the rocblaslt<->rocRoller interface layer. *
  *********************************************************/
 
-#include "custom_kernels.hpp"
 #include "rocroller_host.hpp"
+#include "custom_kernels.hpp"
 #include "gemm.hpp"
 #include "kernel_type.hpp"
 #include "parameter_selection.hpp"
@@ -64,8 +64,12 @@ struct RocRollerHandle
 void rocroller_create_handle(void** handle)
 {
     auto rr_handle = new RocRollerHandle();
-    *handle = rr_handle;
-    preloadCustomKernels(rr_handle->cache);
+    *handle        = rr_handle;
+    if(getenv("HIPBLASLT_ROCROLLER_USE_CUSTOM_KERNEL") != nullptr)
+    {
+        // If these kernels are loaded, they are used instead of RocRoller kernels
+        preloadCustomKernels(rr_handle->cache);
+    }
 }
 
 /**
@@ -736,7 +740,7 @@ rocblaslt_status runRocRollerContractionProblem(rocblaslt_handle                
                            hotIterations);
     }
 
-    if (kernel->customModuleLoaded)
+    if(kernel->customModuleLoaded)
         return runCustomKernel(kernel, prob);
 
     return runGemmKernel(kernel, prob);
