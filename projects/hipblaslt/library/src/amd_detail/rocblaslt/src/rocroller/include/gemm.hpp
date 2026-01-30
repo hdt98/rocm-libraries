@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include "custom_kernels_fwd.hpp"
 #include "parameter_selection.hpp"
 
 #include <rocRoller/CommandSolution.hpp>
@@ -46,8 +45,8 @@
  */
 struct GemmKernel
 {
-    rocRoller::CommandPtr                          command;
-    rocRoller::CommandKernelPtr                    commandKernel;
+    rocRoller::CommandPtr               command;
+    rocRoller::CommandKernelPtr         commandKernel;
     std::shared_ptr<SolutionParameters> params;
 
     rocRoller::Operations::OperationTag tagTensorA;
@@ -62,12 +61,47 @@ struct GemmKernel
     rocRoller::Operations::OperationTag tagTensorScaleB;
 
     std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag> tagScratch;
-    rocRoller::Operations::OperationTag tagSKGrid;
-    rocRoller::Operations::OperationTag tagWGM;
+    rocRoller::Operations::OperationTag                                                 tagSKGrid;
+    rocRoller::Operations::OperationTag                                                 tagWGM;
 
     int occupancy;
 
-    CustomKernelPtr customKernel = 0;
+    bool        customModuleLoaded = false;
+    std::string customKernelName;
+    hipModule_t module;
+
+    hipError_t loadModule(const std::string& path)
+    {
+        if(hipError_t error = hipModuleLoad(&module, path.c_str()))
+        {
+            std::cerr << "hipModuleLoad failed: " << path.c_str() << std::endl
+                      << " error: " << hipGetErrorString(error) << std::endl;
+            return error;
+        }
+        customModuleLoaded = true;
+        return hipSuccess;
+    }
+
+    hipError_t getHipFunction(hipFunction_t& function) const
+    {
+        if(!customModuleLoaded)
+        {
+            return hipErrorNotFound;
+        }
+        return hipModuleGetFunction(&function, module, customKernelName.c_str());
+    }
+
+    ~GemmKernel()
+    {
+        if(customModuleLoaded)
+        {
+            if(hipError_t error = hipModuleUnload(module))
+            {
+                std::cerr << "hipModuleUnload failed: " << std::endl
+                          << " error: " << hipGetErrorString(error) << std::endl;
+            }
+        }
+    }
 };
 
 /**
@@ -96,8 +130,8 @@ size_t workspaceRequired(std::shared_ptr<GemmKernel> gemm, const RocblasltContra
  * @return CommandArguments
  */
 rocRoller::CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
-    const RocblasltContractionProblem& prob,
-    int wgm);
+                                                   const RocblasltContractionProblem& prob,
+                                                   int                                wgm);
 
 std::string genKernelName(std::shared_ptr<SolutionParameters> gemm);
 
@@ -109,4 +143,4 @@ std::string genKernelName(std::shared_ptr<SolutionParameters> gemm);
  * @return rocblaslt_status
  */
 rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
-    const RocblasltContractionProblem& prob);
+                               const RocblasltContractionProblem& prob);

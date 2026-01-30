@@ -1,9 +1,9 @@
+#pragma once
+
 #include "gemm.hpp"
 #include "solution_cache.hpp"
 
 #include "rocblaslt.h"
-
-#pragma once
 
 void preloadCustomKernels(SolutionCache& cache);
 

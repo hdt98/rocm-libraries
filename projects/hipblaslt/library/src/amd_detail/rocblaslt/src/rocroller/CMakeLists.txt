@@ -4,7 +4,7 @@
 add_library(hipblaslt-rocroller OBJECT)
 target_sources(hipblaslt-rocroller
     PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/custom_kernels.hip"
+        "${CMAKE_CURRENT_SOURCE_DIR}/custom_kernels.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/gemm.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/parameter_selection.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/runtime_args_selection.cpp"
