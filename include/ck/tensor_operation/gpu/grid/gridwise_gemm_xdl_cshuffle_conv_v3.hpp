@@ -63,7 +63,9 @@ template <typename ALayout,
           BlockGemmPipelineVersion BlkGemmPipelineVer = BlockGemmPipelineVersion::v4,
           typename ComputeTypeA                       = CDataType,
           typename ComputeTypeB                       = ComputeTypeA,
-          bool DirectLoad                             = false>
+          bool DirectLoad                             = false,
+          bool ALdsScalarLoadToVgpr                   = false,
+          bool BLdsScalarLoadToVgpr                   = false>
 struct GridwiseGemm_xdl_cshuffle_conv_v3
     : public GridwiseGemm_xdl_cshuffle_base<
           ALayout,
@@ -504,7 +506,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
 
     // Disable vector load from lds to vgpr for direct load (backward weight store with continous M
     // or N dimension)
-    static constexpr bool LdsScalarLoadToVgpr = DirectLoad;
+    //static constexpr bool LdsScalarLoadToVgpr = DirectLoad;
     using BlockwiseGemmPipe                   = remove_cvref_t<
                           decltype(BlockGemmPipeline_Selector<
                                    BlkGemmPipelineVer,
@@ -531,7 +533,8 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                    NXdlPerWave,
                                    KPack,
                                    DirectLoad,
-                                   LdsScalarLoadToVgpr>())>;
+                                   ALdsScalarLoadToVgpr,
+                                   BLdsScalarLoadToVgpr>())>;
 
     template <typename DeviceArch>
     __device__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)
