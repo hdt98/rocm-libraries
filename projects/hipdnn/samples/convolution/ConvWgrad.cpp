@@ -10,6 +10,7 @@
 #include <hipdnn_frontend.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
+#include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 
 #include "../utils/Helpers.hpp"
@@ -63,20 +64,8 @@ bool SampleRunner::operator()(const TensorLayout& layout)
     auto dwAttr = graph->conv_wgrad(dyAttr, xAttr, convAttributes);
     dwAttr->set_output(true);
 
-    HIPDNN_FE_CHECK(graph->validate());
-    std::cout << "Graph validation successful.\n";
-
-    HIPDNN_FE_CHECK(graph->build_operation_graph(handle));
-    std::cout << "Operation graph build successful.\n";
-
-    HIPDNN_FE_CHECK(graph->create_execution_plans());
-    std::cout << "Execution plans created successfully.\n";
-
-    HIPDNN_FE_CHECK(graph->check_support());
-    std::cout << "Graph support check successful.\n";
-
-    HIPDNN_FE_CHECK(graph->build_plans());
-    std::cout << "Plans build successful.\n";
+    HIPDNN_FE_CHECK(graph->build(handle));
+    std::cout << "Graph build successful.\n";
 
     utilities::Tensor<InputType> dyTensor(dyAttr->get_dim(), layout);
     utilities::Tensor<InputType> xTensor(xAttr->get_dim(), layout);
@@ -119,7 +108,9 @@ bool SampleRunner::operator()(const TensorLayout& layout)
         hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::wgrad(
             xTensor, dwRefTensor, dyTensor, {u, v}, {dilH, dilW}, {padH, padW});
 
-        auto tolerance = hipdnn_test_sdk::utilities::conv::getToleranceWrw<InputType>();
+        auto tolerance
+            = hipdnn_test_sdk::utilities::conv::calculateConvWrwTolerance<InputType, float>(
+                0.0, 1.0, 0.0, 1.0, dyAttr->get_dim());
 
         auto dwValidator
             = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<InputType>(tolerance, tolerance);
