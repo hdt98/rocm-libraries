@@ -223,6 +223,18 @@ std::vector<float> generateData(T                           dgen,
                                 std::vector<size_t> const&  preSwizzleTile,
                                 std::vector<size_t> const&  preTile)
 {
+    using namespace DGen;
+
+    if(isMatrixA)
+    {
+        std::cout << "[DIRECT ASSEMBLY DEBUG] In generate data for A, customizing." << isMatrixA << std::endl;
+        opt.initMode = DataInitMode(Ones{});
+    }
+    else
+    {
+        std::cout << "[DIRECT ASSEMBLY DEBUG] In generate data for (not) A, customizing." << isMatrixA << std::endl;
+        opt.initMode = DataInitMode(Identity{});
+    }
     dgen.setSeed(seed);
     dgen.generate(sizes, strides, opt);
 

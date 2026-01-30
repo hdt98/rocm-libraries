@@ -101,6 +101,39 @@ bool allclose_check_general(char    allclose_type,
         }
     }
 
+    auto dH = std::min<int>(20, N);
+    auto dW = std::min<int>(20, M);
+
+    auto print = [&](auto& X) {
+        hipblaslt_cout << "[DIRECT ASSEMBLY DEBUG] Top left:\n";
+        for(int64_t i = 0; i < dH; i++)
+        {
+            for(int64_t j = 0; j < dW; j++)
+            {
+                size_t idx = j + i * (size_t)lda;
+                hipblaslt_cout << X[idx] << " ";
+            }
+            hipblaslt_cout << std::endl;
+        }
+
+        hipblaslt_cout << "[DIRECT ASSEMBLY DEBUG] Bottom right:\n";
+        for(int64_t i = N - dH; i < N; i++)
+        {
+            for(int64_t j = M - dW; j < M; j++)
+            {
+                size_t idx = j + i * (size_t)lda;
+                hipblaslt_cout << X[idx] << " ";
+            }
+            hipblaslt_cout << std::endl;
+        }
+    };
+
+    hipblaslt_cout << "\n\n[DIRECT ASSEMBLY DEBUG] CPU reference" << std::endl;
+    print(hCPU_double);
+
+    hipblaslt_cout << "\n\n[DIRECT ASSEMBLY DEBUG] GPU observation" << std::endl;
+    print(hGPU_double);
+
     std::vector<double> atols{1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1};
     std::vector<double> rtols{1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1};
     for(auto& atol : atols)

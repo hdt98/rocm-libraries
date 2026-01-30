@@ -74,13 +74,16 @@ void preloadCustomKernels(SolutionCache& cache)
 
 // F4 GEMM Kernel Args
 
-struct p3
+struct __attribute__((packed)) p3
 {
-    uint32_t _p0, _p1, _p2;
+    uint32_t _p0 = 0;
+    uint32_t _p1 = 0;
+    uint32_t _p2 = 0;
 };
-struct p2
+struct __attribute__((packed)) p2
 {
-    uint32_t _p0, _p1;
+    uint32_t _p0 = 0;
+    uint32_t _p1 = 0;
 };
 struct __attribute__((packed)) F4GemmKernelArgs
 {
@@ -163,6 +166,69 @@ struct __attribute__((packed)) F4GemmKernelArgs
     }
 };
 
+
+void printKernelArgs(const F4GemmKernelArgs& args)
+    {
+
+        const unsigned char* bytes = reinterpret_cast<const unsigned char*>(&args);
+        size_t               size  = sizeof(args);
+
+        std::cout << "Offset | 00 01 02 03 04 05 06 07 | 08 09 0A 0B 0C 0D 0E 0F" << std::endl;
+        std::cout << "-------|-------------------------|-------------------------" << std::endl;
+
+        for(size_t i = 0; i < size; i += 16)
+        {
+            std::cout << std::setw(4) << std::setfill('0') << std::dec << i << "   | ";
+            for(size_t j = 0; j < 16; ++j)
+            {
+                if(i + j < size)
+                {
+                    std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)bytes[i + j]
+                              << " ";
+                }
+                else
+                {
+                    std::cout << "   ";
+                }
+                if(j == 7)
+                    std::cout << "| ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << "=======================================\n" << std::endl;
+
+        std::cout << "\n========== [DIRECT ASSEMBLY REPLICATION DATA] ==========" << std::endl;
+
+        std::cout << "\n--- KernelArgs Struct Content ---" << std::endl;
+        std::cout << std::hex;
+        std::cout << "ptr_D        : " << args.ptr_D << std::endl;
+        std::cout << "ptr_C        : " << args.ptr_C << std::endl;
+        std::cout << "ptr_A        : " << args.ptr_A << std::endl;
+        std::cout << "ptr_B        : " << args.ptr_B << std::endl;
+        std::cout << "ptr_ScaleA   : " << args.ptr_ScaleA << std::endl;
+        std::cout << "ptr_ScaleB   : " << args.ptr_ScaleB << std::endl;
+        std::cout << std::dec;
+        std::cout << "alpha        : " << args.alpha << std::endl;
+        std::cout << "beta         : " << args.beta << std::endl;
+        std::cout << "M            : " << args.M << std::endl;
+        std::cout << "N            : " << args.N << std::endl;
+        std::cout << "K            : " << args.K << std::endl;
+        std::cout << "\n[Strides]" << std::endl;
+        std::cout << "stride_D0 (Out)   : " << args.stride_D0 << std::endl;
+        std::cout << "stride_D1         : " << args.stride_D1 << std::endl;
+        std::cout << "stride_C0 (Bias)  : " << args.stride_C0 << std::endl;
+        std::cout << "stride_C1         : " << args.stride_C1 << std::endl;
+        std::cout << "stride_A0 (In A)  : " << args.stride_A0 << std::endl;
+        std::cout << "stride_A1         : " << args.stride_A1 << std::endl;
+        std::cout << "stride_B0 (In B)  : " << args.stride_B0 << std::endl;
+        std::cout << "stride_B1         : " << args.stride_B1 << std::endl;
+        std::cout << "stride_ScaleA0    : " << args.stride_ScaleA0 << std::endl;
+        std::cout << "stride_ScaleA1    : " << args.stride_ScaleA1 << std::endl;
+        std::cout << "stride_ScaleB0    : " << args.stride_ScaleB0 << std::endl;
+        std::cout << "stride_ScaleB1    : " << args.stride_ScaleB1 << std::endl;
+        std::cout << "========== [DIRECT ASSEMBLY DATA END] ==========\n" << std::endl;
+    }
+
 rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
                                  const RocblasltContractionProblem& prob)
 {
@@ -180,6 +246,7 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
     dim3 block{256, 1, 1};
 
     auto   args     = F4GemmKernelArgs(prob);
+    printKernelArgs(args);
     void*  argsPtr  = &args;
     size_t argsSize = sizeof(args);
 
