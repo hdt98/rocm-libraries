@@ -2543,6 +2543,86 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
+    tile_config=TileConfig(96, 256, 64, 2, 1, True, 0, 0),
+    dtype_predicate=is16bit,
+    vector_widths=[8, 8, 8],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+    optSchedule = dict()
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    snops = []
+    if isNN(kernel) and not useLDSTr and TLDS==1:
+        syncs = SyncSchedule()
+        syncs.add(-1, dscnt=7, comment="Wait for prior local read local write")
+        syncs.add(2, dscnt=6, comment="Wait for prior local read local write")
+        syncs.add(22, dscnt=0, barrier=True, comment="Before DirectToLds load, ensure prior ds_reads have finished")
+        syncs.add(23, vlcnt=11, barrier=True, comment="Wait for previous set of global reads")
+        syncs.add(23, dscnt=0, comment="Wait for prior local read local write")
+        snopIdxs = [1, 25]
+        snops = [[x, SNop(1, comment="")] for x in snopIdxs]
+
+        lra0 = [0,0,1,1,2,2,3,3,4,5,5,6,6,7,7,8,8,9,10,11,12,13,14,15]
+        lrb0 = [4,16,17,18,19,20,21,21]
+        lra1 = [24,24, 25,25, 26,26, 27,27, 28, 29,29, 30,30, 31,31, 32,32, 33,34,35,36,37,38,39]
+        lrb1 = [28,40,41,42,43,44,45,46]
+        
+        # Packs should be ordered AFTER GrIncs.
+        packA1 = [
+            -1,-1,-1,-1,-1,-1,
+            0,0,0,0,
+            1,1,
+        ]
+        packA0 = [
+            23,23,23,23,23,23,
+            24,24,24,24,
+            25,25,
+        ]
+
+        # GRIncs should be ordered AFTER LRs.
+        grIncA = [0,1,2,3,4,5,6,7,8]
+        grIncB = [9,10,11,12,13,14,15,16,17]
+        
+        grA = [22,22,22,22,22,22,]
+        grB = [22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22]
+        lwsa = [22]
+        lwsb = [22]
+        lrsa = [22]
+        lrsb = [22]
+        num_gr = len(grA) + len(grB)
+        optSchedule = {
+            'SYNC'   : [syncs.get_indicies()],
+            'LRA0'   : [lra0],
+            'LRA1'   : [lra1],
+            'PackA0' : [packA0],
+            'PackA1' : [packA1],
+            'LRB0'   : [lrb0],
+            'LRB1'   : [lrb1],
+            'GRIncA' : [grIncA],
+            'GRIncB' : [grIncB],
+            'GRA'    : [grA],
+            'GRB'    : [grB],
+            'LRSA'   : [lrsa],
+            'LRSB'   : [lrsb],
+            'LWSA'   : [lwsa],
+            'LWSB'   : [lwsb],
+            'LCC'    : [[47, 47]],
+        }
+        nllshift = nglshift = num_gr // 2
+    else:
+        return False, None
+    
+    if snops:
+        optSchedule['SNOP'] = [[s[0] for s in snops]]
+        snopCode = [s[1] for s in snops]
+
+    opt = ScheduleInfo(2, 48, optSchedule=optSchedule, syncCode=syncs.get_code(), nglshift=nglshift, nllshift=nllshift, snopCode=snopCode)
+    opt.disableValidation()
+    return True, opt
+
+@RegisterSchedule(
     tile_config=TileConfig(128, 192, 32, 2, 0, True, 0, 0),
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
