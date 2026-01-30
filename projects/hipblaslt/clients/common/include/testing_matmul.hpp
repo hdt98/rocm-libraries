@@ -990,7 +990,7 @@ void check(hipStream_t                   stream,
             hipblaslt_error += norm_error;
             if(arg.norm_check_assert)
             {
-                CHECK_SUCCESS(norm_check(norm_error, To, arg.compute_type));
+                CHECK_SUCCESS(norm_check(norm_error, To));
             }
 
             if(arg.amaxD)
@@ -1023,7 +1023,7 @@ void check(hipStream_t                   stream,
                 hipblaslt_error += norm_error;
                 if(arg.norm_check_assert)
                 {
-                    CHECK_SUCCESS(norm_check(norm_error, Taux, arg.compute_type));
+                    CHECK_SUCCESS(norm_check(norm_error, Taux));
                 }
             }
             if(arg.gradient && arg.bias_vector)
@@ -1184,12 +1184,20 @@ std::tuple<hipDataType, hipDataType> derive_unset_compute_input_type(const Argum
     // when compute_input_type type is unset
     if(real_compute_input_typeA == HIPBLASLT_DATATYPE_INVALID)
     {
-        real_compute_input_typeA = computeTypeToRealDataType(arg.compute_type);
+        // Special case: for f32_bf16 mode, the compute input type should be bf16
+        if(arg.compute_type == HIPBLAS_COMPUTE_32F_FAST_16BF)
+            real_compute_input_typeA = HIP_R_16BF;
+        else
+            real_compute_input_typeA = computeTypeToRealDataType(arg.compute_type);
     }
 
     if(real_compute_input_typeB == HIPBLASLT_DATATYPE_INVALID)
     {
-        real_compute_input_typeB = computeTypeToRealDataType(arg.compute_type);
+        // Special case: for f32_bf16 mode, the compute input type should be bf16
+        if(arg.compute_type == HIPBLAS_COMPUTE_32F_FAST_16BF)
+            real_compute_input_typeB = HIP_R_16BF;
+        else
+            real_compute_input_typeB = computeTypeToRealDataType(arg.compute_type);
     }
 
     return {real_compute_input_typeA, real_compute_input_typeB};
