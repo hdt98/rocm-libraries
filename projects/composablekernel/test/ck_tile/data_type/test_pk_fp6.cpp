@@ -15,6 +15,7 @@ using ck_tile::fp16_t;
 using ck_tile::fp16x16_t;
 using ck_tile::fp32_t;
 using ck_tile::fp32x16_t;
+using ck_tile::fp32x8_t;
 using ck_tile::number;
 using ck_tile::pk_bf6_t;
 using ck_tile::pk_fp6_t;
@@ -34,6 +35,9 @@ template <
     bool is_device,
     std::enable_if_t<std::is_same_v<PK6, pk_fp6_t> || std::is_same_v<PK6, pk_bf6_t>, bool> = true>
 CK_TILE_HOST void test_scaled_convert();
+
+template <typename PK6, typename DST, bool Block16Mod = false>
+CK_TILE_HOST void test_pkscale_type_convert_device();
 
 // ============================================================================
 // FP6 (E2M3) Tests
@@ -136,6 +140,28 @@ TEST(PackedFp6, ScaledConvertDevice)
     test_scaled_convert<fp32_t, pk_fp6_t, bf16_t, is_device>();
     test_scaled_convert<fp16_t, pk_fp6_t, fp32_t, is_device>();
     test_scaled_convert<bf16_t, pk_fp6_t, fp32_t, is_device>();
+}
+
+TEST(PackedFp6, PkscaleTypeConvertOpsel0_3)
+{
+    if(!ck_tile::is_gfx125_supported())
+    {
+        GTEST_SKIP() << "Test for GFX1250.";
+    }
+    test_pkscale_type_convert_device<pk_fp6_t, fp32_t>();
+    test_pkscale_type_convert_device<pk_fp6_t, fp16_t>();
+    test_pkscale_type_convert_device<pk_fp6_t, bf16_t>();
+}
+
+TEST(PackedFp6, PkscaleTypeConvertOpsel4_7)
+{
+    if(!ck_tile::is_gfx125_supported())
+    {
+        GTEST_SKIP() << "Test for GFX1250.";
+    }
+    test_pkscale_type_convert_device<pk_fp6_t, fp32_t, true>();
+    test_pkscale_type_convert_device<pk_fp6_t, fp16_t, true>();
+    test_pkscale_type_convert_device<pk_fp6_t, bf16_t, true>();
 }
 
 // ============================================================================
@@ -248,6 +274,28 @@ TEST(PackedBf6, ScaledConvertDevice)
     test_scaled_convert<fp32_t, pk_bf6_t, bf16_t, is_device>();
     test_scaled_convert<fp16_t, pk_bf6_t, fp32_t, is_device>();
     test_scaled_convert<bf16_t, pk_bf6_t, fp32_t, is_device>();
+}
+
+TEST(PackedBf6, PkscaleTypeConvertOpsel0_3)
+{
+    if(!ck_tile::is_gfx125_supported())
+    {
+        GTEST_SKIP() << "Test for GFX1250.";
+    }
+    test_pkscale_type_convert_device<pk_bf6_t, fp32_t>();
+    test_pkscale_type_convert_device<pk_bf6_t, fp16_t>();
+    test_pkscale_type_convert_device<pk_bf6_t, bf16_t>();
+}
+
+TEST(PackedBf6, PkscaleTypeConvertOpsel4_7)
+{
+    if(!ck_tile::is_gfx125_supported())
+    {
+        GTEST_SKIP() << "Test for GFX1250.";
+    }
+    test_pkscale_type_convert_device<pk_bf6_t, fp32_t, true>();
+    test_pkscale_type_convert_device<pk_bf6_t, fp16_t, true>();
+    test_pkscale_type_convert_device<pk_bf6_t, bf16_t, true>();
 }
 
 // ============================================================================
@@ -596,4 +644,167 @@ CK_TILE_HOST void test_scaled_convert()
     for(int i = 0; i < N; ++i)
         EXPECT_EQ(ref[i], out[i]) << "i:" << i << " expected:" << toF32(ref[i])
                                   << " got:" << toF32(out[i]);
+}
+
+/* Kernel for testing pkscale_type_convert with Packed4Scale for FP6/BF6 */
+template <typename PK6, typename DST, int N, bool Block16Mod>
+struct TestPk6scaleTypeConvert
+{
+    CK_TILE_DEVICE void operator()([[maybe_unused]] PK6 val,
+                                   ck_tile::Packed4Scale_E8M0::raw_type* p_scale,
+                                   DST* dst_data) const
+    {
+        if(dst_data == nullptr || p_scale == nullptr)
+            return;
+
+#if defined(__gfx125__)
+        using DSTx16_t       = ck_tile::ext_vector_t<DST, 16>;
+        ck_tile::index_t lid = __lane_id();
+        ck_tile::Packed4Scale_E8M0 scale(p_scale[lid]);
+
+        ck_tile::static_for<0, 4, 1>{}([&](auto it) {
+            constexpr int opsel = (Block16Mod) ? (it + 4) : it;
+            auto vT16           = ck_tile::pk6scaled_type_convert<DSTx16_t, PK6, opsel>(val, scale);
+
+            /* Row index of dst_data:
+             * (lid & 0x0F): mapping lane0-15 and 16-31 to row 0-15
+             * Column index of p_mat:
+             *  it * 32: each iteration process 32 columns
+             * ((lid >> 4) & 1) * 16: lane 0-15 write first 16 columns
+             *                        lane 16-31 write the next 16 columns*/
+            ck_tile::static_for<0, 16, 1>{}([&](auto ii) {
+                dst_data[(lid & 0x0F) * N + it * 32 + ((lid >> 4) & 1) * 16 + ii] =
+                    vT16[static_cast<int>(ii)];
+            });
+        });
+#endif
+    }
+};
+
+template <typename PK6, typename DST, bool Block16Mod>
+void test_pkscale_type_convert_device()
+{
+    // matrix shape M x N
+    constexpr int M        = 16;
+    constexpr int N        = 128;
+    constexpr int N_scale  = N / 16; // every 16 elements share a scale in packed-16 type convert
+    constexpr int mat_fval = 1.0f;
+    std::vector<DST> out(M * N);
+
+    int scale_init_option = 0; // 0: fixed value on the same column, 1: random values
+
+    /* From a float scale matrix [M * N_scale=8] to a packed-4 scale matrix [M * 2] */
+    /*Each 16 elements share one scale factor
+      n:       [0:15]     [16:31]    [32:47]    [48:63]    [64:79]    [80:95]    [96:111] [112:127]
+      index:   0          1          2          3          4          5          6          7
+      m[0:15]  fscale[m][0] ...
+    */
+    std::vector<float> fscale(M * N_scale);
+    if(scale_init_option == 0)
+    {
+        // Option 0: Fixed pattern with wide dynamic range (same for all rows)
+        // Note: Values chosen to be safe for fp16 (max ≈ 65504)
+        for(int m = 0; m < M; m++)
+        {
+            fscale[m * N_scale + 0] = std::pow(2.0f, -10.0f); // 2^-10 ≈ 0.000977
+            fscale[m * N_scale + 1] = std::pow(2.0f, -5.0f);  // 2^-5  = 0.03125
+            fscale[m * N_scale + 2] = std::pow(2.0f, 8.0f);   // 2^8   = 256
+            fscale[m * N_scale + 3] = std::pow(2.0f, 15.0f);  // 2^15  = 32768 (safe for fp16)
+            fscale[m * N_scale + 4] = std::pow(2.0f, 2.0f);   // 2^2   = 4
+            fscale[m * N_scale + 5] = std::pow(2.0f, 4.0f);   // 2^4   = 16
+            fscale[m * N_scale + 6] = std::pow(2.0f, -2.0f);  // 2^-2  = 0.25
+            fscale[m * N_scale + 7] = std::pow(2.0f, 12.0f);  // 2^12  = 4096
+        }
+    }
+    else if(scale_init_option == 1)
+    {
+        // Option 1: Random scales - each row gets different random power-of-2 values
+        std::srand(42); // Fixed seed for reproducibility
+        for(int m = 0; m < M; m++)
+        {
+            for(int s = 0; s < N_scale; s++)
+            {
+                // Random exponent in range [-20, 20] for wide dynamic range
+                int exponent            = (std::rand() % 41) - 20;
+                fscale[m * N_scale + s] = std::pow(2.0f, static_cast<float>(exponent));
+            }
+        }
+    }
+
+    std::vector<ck_tile::Packed4Scale_E8M0::raw_type> scale(2 * M);
+    for(int m = 0; m < M; m++)
+    {
+        if constexpr(Block16Mod)
+        {
+            /* Each iteration take care of 16 x 128 matrix
+             * opsel-4, use scale[th0:15]   [7:0]->col[0:15],   [23:16]->col[16:31]
+             * opsel-5, use scale[th16:31]  [7:0]->col[0:15],   [23:16]->col[16:31]
+             * opsel-6, use scale[th0:15]   [15:8]->col[32:47], [31:24]->col[48:63]
+             * opsel-7, use scale[th16:31]  [15:8]->col[32:47], [31:24]->col[48:63] */
+            ck_tile::Packed4Scale_E8M0 scale4(fscale[m * N_scale + 5],
+                                              fscale[m * N_scale + 1],
+                                              fscale[m * N_scale + 4],
+                                              fscale[m * N_scale + 0]);
+            scale[m] = scale4.data(); // will load by th0-15
+            scale4.set_scales_from_float(fscale[m * N_scale + 7],
+                                         fscale[m * N_scale + 3],
+                                         fscale[m * N_scale + 6],
+                                         fscale[m * N_scale + 2]);
+            scale[m + M] = scale4.data(); // will load by th16-31
+        }
+        else
+        {
+            // Block32Mod
+            /* Each iteration take care of 16 x 128 matrix
+             * opsel-0, use scale[th0:15]   [7:0]->col[0:15],   [15:8]->col[16:31]
+             * opsel-1, use scale[th16:31]  [7:0]->col[0:15],   [15:8]->col[16:31]
+             * opsel-2, use scale[th0:15]   [23:16]->col[32:47], [31:24]->col[48:63]
+             * opsel-3, use scale[th16:31]  [23:16]->col[32:47], [31:24]->col[48:63] */
+            ck_tile::Packed4Scale_E8M0 scale4(fscale[m * N_scale + 5],
+                                              fscale[m * N_scale + 4],
+                                              fscale[m * N_scale + 1],
+                                              fscale[m * N_scale + 0]);
+            scale[m] = scale4.data(); // will load by th0-15
+            scale4.set_scales_from_float(fscale[m * N_scale + 7],
+                                         fscale[m * N_scale + 6],
+                                         fscale[m * N_scale + 3],
+                                         fscale[m * N_scale + 2]);
+            scale[m + M] = scale4.data(); // will load by th16-31
+        }
+    }
+
+    /* Simplified here with matrix filled with mat_fval
+     * pack 16 float data to pk_fp6_t or pk_bf6_t */
+#if CK_TILE_AVX512F_WA
+    fp32x8_t input_f32[2] = {fp32x8_t(mat_fval), fp32x8_t(mat_fval)};
+    PK6 pk6_val           = ck_tile::type_convert<PK6>(input_f32);
+#else
+    PK6 pk6_val = ck_tile::type_convert<PK6>(fp32x16_t(mat_fval));
+#endif
+
+    ck_tile::DeviceMem device_out(M * N * sizeof(DST));
+    ck_tile::DeviceMem device_scale(2 * M * sizeof(ck_tile::Packed4Scale_E8M0::raw_type));
+    device_scale.ToDevice(scale.data());
+
+    using kernel = TestPk6scaleTypeConvert<PK6, DST, N, Block16Mod>;
+    MyKernel<kernel><<<1, 32>>>(
+        pk6_val,
+        reinterpret_cast<ck_tile::Packed4Scale_E8M0::raw_type*>(device_scale.GetDeviceBuffer()),
+        reinterpret_cast<DST*>(device_out.GetDeviceBuffer()));
+
+    device_out.FromDevice(out.data());
+
+    // Verify results
+    for(int m = 0; m < M; m++)
+    {
+        for(int n = 0; n < N; n++)
+        {
+            int scale_idx  = n / 16;
+            float expected = mat_fval * fscale[m * N_scale + scale_idx];
+            DST out_val    = out[m * N + n];
+            EXPECT_FLOAT_EQ(toF32(out_val), expected)
+                << "Mismatch at [" << m << "][" << n << "]: expected " << expected << " got "
+                << toF32(out_val) << " (scale=" << fscale[m * N_scale + scale_idx] << ")";
+        }
+    }
 }

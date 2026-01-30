@@ -448,37 +448,26 @@ struct numeric<pk_bf6_t>
 #if CK_TILE_FP6_CVT_DEVICE
 namespace impl {
 #if defined(__gfx125__)
-// Device conversion functions for FP6 E2M3
-template <typename T>
-CK_TILE_DEVICE T _from_pk_fp6(pk_fp6_storage_t src, float scale = 1.0f)
+// Device conversion functions for FP6 E2M3 with pkscale and Opsel
+template <typename T, int Opsel>
+CK_TILE_DEVICE T _from_fp6x16_pkscale(pk_fp6_storage_t src, uint32_t scale)
 {
-    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
-    const int Opsel = 0;
-
-    if constexpr(std::is_same_v<T, fp32_t>)
+    if constexpr(std::is_same_v<T, fp32x16_t>)
     {
-        fp32x16_t tmp = __builtin_amdgcn_cvt_scale_pk16_f32_fp6(src, pkscale.data(), Opsel);
-        return detail::lane(tmp, 0);
-    }
-    else if constexpr(std::is_same_v<T, fp32x16_t>)
-        return __builtin_amdgcn_cvt_scale_pk16_f32_fp6(src, pkscale.data(), Opsel);
-    else if constexpr(std::is_same_v<T, fp16_t>)
-    {
-        fp16x16_t tmp = __builtin_amdgcn_cvt_scale_pk16_f16_fp6(src, pkscale.data(), Opsel);
-        return detail::lane(tmp, 0);
+        return __builtin_amdgcn_cvt_scale_pk16_f32_fp6(src, scale, Opsel);
     }
     else if constexpr(std::is_same_v<T, fp16x16_t>)
-        return __builtin_amdgcn_cvt_scale_pk16_f16_fp6(src, pkscale.data(), Opsel);
-    else if constexpr(std::is_same_v<T, bf16_t>)
     {
-        bf16x16_t tmp = __builtin_amdgcn_cvt_scale_pk16_bf16_fp6(src, pkscale.data(), Opsel);
-        return detail::lane(tmp, 0);
+        return __builtin_amdgcn_cvt_scale_pk16_f16_fp6(src, scale, Opsel);
     }
     else if constexpr(std::is_same_v<T, bf16x16_t>)
-        return __builtin_amdgcn_cvt_scale_pk16_bf16_fp6(src, pkscale.data(), Opsel);
+    {
+        return __builtin_amdgcn_cvt_scale_pk16_bf16_fp6(src, scale, Opsel);
+    }
     else
+    {
         static_assert(false_type::value, "Unsupported type.");
-    return T{};
+    }
 }
 
 template <typename T, bool stochastic_rounding = false>
@@ -539,37 +528,26 @@ CK_TILE_DEVICE pk_fp6_raw_t _to_pk_fp6(T src, float scale = 1.0f)
     return cvt.pf6[0];
 }
 
-// Device conversion functions for BF6 E3M2
-template <typename T>
-CK_TILE_DEVICE T _from_pk_bf6(pk_bf6_storage_t src, float scale = 1.0f)
+// Device conversion functions for BF6 E3M2 with pkscale and Opsel
+template <typename T, int Opsel>
+CK_TILE_DEVICE T _from_bf6x16_pkscale(pk_bf6_storage_t src, uint32_t scale)
 {
-    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
-    const int Opsel = 0;
-
-    if constexpr(std::is_same_v<T, fp32_t>)
+    if constexpr(std::is_same_v<T, fp32x16_t>)
     {
-        fp32x16_t tmp = __builtin_amdgcn_cvt_scale_pk16_f32_bf6(src, pkscale.data(), Opsel);
-        return detail::lane(tmp, 0);
-    }
-    else if constexpr(std::is_same_v<T, fp32x16_t>)
-        return __builtin_amdgcn_cvt_scale_pk16_f32_bf6(src, pkscale.data(), Opsel);
-    else if constexpr(std::is_same_v<T, fp16_t>)
-    {
-        fp16x16_t tmp = __builtin_amdgcn_cvt_scale_pk16_f16_bf6(src, pkscale.data(), Opsel);
-        return detail::lane(tmp, 0);
+        return __builtin_amdgcn_cvt_scale_pk16_f32_bf6(src, scale, Opsel);
     }
     else if constexpr(std::is_same_v<T, fp16x16_t>)
-        return __builtin_amdgcn_cvt_scale_pk16_f16_bf6(src, pkscale.data(), Opsel);
-    else if constexpr(std::is_same_v<T, bf16_t>)
     {
-        bf16x16_t tmp = __builtin_amdgcn_cvt_scale_pk16_bf16_bf6(src, pkscale.data(), Opsel);
-        return detail::lane(tmp, 0);
+        return __builtin_amdgcn_cvt_scale_pk16_f16_bf6(src, scale, Opsel);
     }
     else if constexpr(std::is_same_v<T, bf16x16_t>)
-        return __builtin_amdgcn_cvt_scale_pk16_bf16_bf6(src, pkscale.data(), Opsel);
+    {
+        return __builtin_amdgcn_cvt_scale_pk16_bf16_bf6(src, scale, Opsel);
+    }
     else
+    {
         static_assert(false_type::value, "Unsupported type.");
-    return T{};
+    }
 }
 
 template <typename T, bool stochastic_rounding = false>
@@ -637,7 +615,8 @@ CK_TILE_DEVICE pk_bf6_raw_t _to_pk_bf6(T src, float scale = 1.0f)
 CK_TILE_HOST_DEVICE constexpr float pk_fp6_t::to_float(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<fp32_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return detail::lane(impl::_from_fp6x16_pkscale<fp32x16_t, 0>(data, pkscale.data()), 0);
 #else
     pk_fp6_raw_t val = unpack(number<0>{});
     return convert_to_float<pk_fp6_t>(val, scale);
@@ -648,7 +627,8 @@ CK_TILE_HOST_DEVICE constexpr float pk_fp6_t::to_float(float scale) const
 CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_fp6_t::to_fp32x16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<fp32x16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_fp6x16_pkscale<fp32x16_t, 0>(data, pkscale.data());
 #else
     fp32x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -663,7 +643,8 @@ CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_fp6_t::to_fp32x16(float scale) const
 CK_TILE_HOST_DEVICE constexpr fp16_t pk_fp6_t::to_fp16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<fp16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return detail::lane(impl::_from_fp6x16_pkscale<fp16x16_t, 0>(data, pkscale.data()), 0);
 #else
     return fp16_t{type_convert<fp16_t>(convert_to_float<pk_fp6_t>(unpack(number<0>{}), scale))};
 #endif
@@ -672,7 +653,8 @@ CK_TILE_HOST_DEVICE constexpr fp16_t pk_fp6_t::to_fp16(float scale) const
 CK_TILE_HOST_DEVICE constexpr fp16x16_t pk_fp6_t::to_fp16x16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<fp16x16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_fp6x16_pkscale<fp16x16_t, 0>(data, pkscale.data());
 #else
     fp16x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -686,7 +668,8 @@ CK_TILE_HOST_DEVICE constexpr fp16x16_t pk_fp6_t::to_fp16x16(float scale) const
 CK_TILE_HOST_DEVICE constexpr bf16_t pk_fp6_t::to_bf16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<bf16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return detail::lane(impl::_from_fp6x16_pkscale<bf16x16_t, 0>(data, pkscale.data()), 0);
 #else
     return bf16_t{type_convert<bf16_t>(convert_to_float<pk_fp6_t>(unpack(number<0>{}), scale))};
 #endif
@@ -695,7 +678,8 @@ CK_TILE_HOST_DEVICE constexpr bf16_t pk_fp6_t::to_bf16(float scale) const
 CK_TILE_HOST_DEVICE constexpr bf16x16_t pk_fp6_t::to_bf16x16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<bf16x16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_fp6x16_pkscale<bf16x16_t, 0>(data, pkscale.data());
 #else
     bf16x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -710,7 +694,8 @@ CK_TILE_HOST_DEVICE constexpr bf16x16_t pk_fp6_t::to_bf16x16(float scale) const
 CK_TILE_HOST_DEVICE constexpr float pk_bf6_t::to_float(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<fp32_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return detail::lane(impl::_from_bf6x16_pkscale<fp32x16_t, 0>(data, pkscale.data()), 0);
 #else
     uint8_t val = unpack(number<0>{});
     return convert_to_float<pk_bf6_t>(val, scale);
@@ -721,7 +706,8 @@ CK_TILE_HOST_DEVICE constexpr float pk_bf6_t::to_float(float scale) const
 CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_bf6_t::to_fp32x16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<fp32x16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_bf6x16_pkscale<fp32x16_t, 0>(data, pkscale.data());
 #else
     fp32x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -736,7 +722,8 @@ CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_bf6_t::to_fp32x16(float scale) const
 CK_TILE_HOST_DEVICE constexpr fp16_t pk_bf6_t::to_fp16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<fp16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return detail::lane(impl::_from_bf6x16_pkscale<fp16x16_t, 0>(data, pkscale.data()), 0);
 #else
     return fp16_t{type_convert<fp16_t>(convert_to_float<pk_bf6_t>(unpack(number<0>{}), scale))};
 #endif
@@ -745,7 +732,8 @@ CK_TILE_HOST_DEVICE constexpr fp16_t pk_bf6_t::to_fp16(float scale) const
 CK_TILE_HOST_DEVICE constexpr fp16x16_t pk_bf6_t::to_fp16x16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<fp16x16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_bf6x16_pkscale<fp16x16_t, 0>(data, pkscale.data());
 #else
     fp16x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -759,7 +747,8 @@ CK_TILE_HOST_DEVICE constexpr fp16x16_t pk_bf6_t::to_fp16x16(float scale) const
 CK_TILE_HOST_DEVICE constexpr bf16_t pk_bf6_t::to_bf16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<bf16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return detail::lane(impl::_from_bf6x16_pkscale<bf16x16_t, 0>(data, pkscale.data()), 0);
 #else
     return bf16_t{type_convert<bf16_t>(convert_to_float<pk_bf6_t>(unpack(number<0>{}), scale))};
 #endif
@@ -768,7 +757,8 @@ CK_TILE_HOST_DEVICE constexpr bf16_t pk_bf6_t::to_bf16(float scale) const
 CK_TILE_HOST_DEVICE constexpr bf16x16_t pk_bf6_t::to_bf16x16(float scale) const
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<bf16x16_t>(data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_bf6x16_pkscale<bf16x16_t, 0>(data, pkscale.data());
 #else
     bf16x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -906,7 +896,8 @@ CK_TILE_HOST_DEVICE constexpr pk_bf6_t fp32x16_to_pk_bf6(fp32x16_t& x, float sca
 CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_fp6_to_fp32x16(const pk_fp6_t& x, float scale)
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_fp6<fp32x16_t>(x.data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_fp6x16_pkscale<fp32x16_t, 0>(x.data, pkscale.data());
 #else
     fp32x16_t result{};
     for(index_t i = 0; i < 16; ++i)
@@ -920,7 +911,8 @@ CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_fp6_to_fp32x16(const pk_fp6_t& x, flo
 CK_TILE_HOST_DEVICE constexpr fp32x16_t pk_bf6_to_fp32x16(const pk_bf6_t& x, float scale)
 {
 #if CK_TILE_FP6_CVT_DEVICE
-    return impl::_from_pk_bf6<fp32x16_t>(x.data, scale);
+    Packed4Scale_E8M0 pkscale(0, 0, 0, scale);
+    return impl::_from_bf6x16_pkscale<fp32x16_t, 0>(x.data, pkscale.data());
 #else
     fp32x16_t result{};
     for(index_t i = 0; i < 16; ++i)

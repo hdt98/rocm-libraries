@@ -186,6 +186,37 @@ struct pk4scaled_type_convert_impl<Y, pk_fp4x4_t, Scale_sel>
         return impl::_from_f4x8_pkscale<Y, Scale_sel>(bit_cast<uint32_t>(x), scale.data());
     }
 };
+
+// pk6scaled_type_convert for FP6 E2M3 and BF6 E3M2
+template <typename Y, typename X, int Scale_sel>
+struct pk6scaled_type_convert_impl
+{
+    CK_TILE_DEVICE static constexpr Y run(X x, Packed4Scale_E8M0 scale);
+};
+
+template <typename Y, typename X, int Scale_sel = 0>
+CK_TILE_DEVICE constexpr Y pk6scaled_type_convert(X x, Packed4Scale_E8M0 scale)
+{
+    return pk6scaled_type_convert_impl<Y, X, Scale_sel>::run(x, scale);
+}
+
+template <typename Y, int Scale_sel>
+struct pk6scaled_type_convert_impl<Y, pk_fp6_t, Scale_sel>
+{
+    CK_TILE_DEVICE static Y run(pk_fp6_t x, Packed4Scale_E8M0 scale)
+    {
+        return impl::_from_fp6x16_pkscale<Y, Scale_sel>(x.get(), scale.data());
+    }
+};
+
+template <typename Y, int Scale_sel>
+struct pk6scaled_type_convert_impl<Y, pk_bf6_t, Scale_sel>
+{
+    CK_TILE_DEVICE static Y run(pk_bf6_t x, Packed4Scale_E8M0 scale)
+    {
+        return impl::_from_bf6x16_pkscale<Y, Scale_sel>(x.get(), scale.data());
+    }
+};
 #endif
 
 #endif
