@@ -3199,12 +3199,12 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
             if(x[i] >= 0)
             {
                 x[i] = T(1);
-                isgn[i] = T(1);
+                isgn[i] = 1;
             }
             else
             {
                 x[i] = T(-1);
-                isgn[i] = T(-1);
+                isgn[i] = -1;
             }
         }
     }
