@@ -454,7 +454,7 @@ double estimate_mall_hit(const problem_t& problem,
                          size_t num_active_cus,
                          size_t splitting_factor) {
   auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
-  return estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor);
+  return estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor, cache);
 }
 
 double estimate_mall_hit(const problem_t& problem,
@@ -625,7 +625,7 @@ double compute_memory_latency(const problem_t& problem,
   // 2) Estimate mall hit-rate
   double H_mem2 =
       hardware.has_MALL()
-          ? estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor)
+          ? estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor, cache)
           : 0.0;  // MALL is not supported, so we emulate every read as a miss
 
   // 3) Total loads are loads from A and loads from B
