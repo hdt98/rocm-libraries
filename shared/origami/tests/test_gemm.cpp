@@ -24,7 +24,7 @@
  *
  *******************************************************************************/
 
- #include <catch2/catch_approx.hpp>
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "common.hpp"
@@ -228,11 +228,9 @@ TEST_CASE("GEMM: estimate_mall_hit", "[gemm]") {
       auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
 
       for (int wgm = 1; wgm < 1025; wgm++) {
-        config.workgroup_mapping        = wgm;
-        auto [mall_hit, mall_m, mall_n] = origami::estimate_mall_hit(problem, hardware, config, 304, 8);
+        config.workgroup_mapping = wgm;
+        auto mall_hit            = origami::estimate_mall_hit(problem, hardware, config, 304, 8);
         REQUIRE(mall_hit > 0.0);
-        REQUIRE(mall_m <= hardware.N_CU);
-        REQUIRE(mall_n <= hardware.N_CU);
       }
     }
   }
@@ -990,16 +988,15 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
       result_different_splitting_factors = origami::estimate_l2_hit(problem, hardware, config, -1);
       REQUIRE(result_different_splitting_factors == 0.0);
 
-      std::size_t mall_m, mall_n;
-      std::tie(result_different_splitting_factors, mall_m, mall_n) =
+      result_different_splitting_factors =
           origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 0);
       REQUIRE(result_different_splitting_factors == 0.875);
 
-      std::tie(result_different_splitting_factors, mall_m, mall_n) =
+      result_different_splitting_factors =
           origami::estimate_mall_hit(problem, hardware, config, 256, 1);
       REQUIRE(result_different_splitting_factors == 0.875);
 
-      std::tie(result_different_splitting_factors, mall_m, mall_n) =
+      result_different_splitting_factors =
           origami::estimate_mall_hit(problem, hardware, config, 200, -1);
       REQUIRE(result_different_splitting_factors == 0.875);
 
@@ -1022,7 +1019,7 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
 
       problem = make_problem(8193, 2047, 4096);
       config  = make_config(256, 128, 64, 32, 32, 8, false, 1);
-      std::tie(result_different_problem_sizes, mall_m, mall_n) =
+      result_different_problem_sizes =
           origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.923).epsilon(1e-3));
@@ -1031,7 +1028,7 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
 
       problem = make_problem(8193, 4093, 1024);
       config  = make_config(128, 256, 128, 32, 32, 8, false, 1);
-      std::tie(result_different_problem_sizes, mall_m, mall_n) =
+      result_different_problem_sizes =
           origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
       if (gpu_arch == 942)
         REQUIRE(result_different_problem_sizes == Approx(0.923).epsilon(1e-3));
@@ -1052,13 +1049,11 @@ TEST_CASE("GEMM: estimate_l2_hit and  estimate_mall_hit unit test", "[gemm]") {
         REQUIRE(result_edge_cases == Approx(0.484).epsilon(1e-3));
 
       problem           = make_problem(10, 11, 253);
-      std::tie(result_edge_cases, mall_m, mall_n) = 
-          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
+      result_edge_cases = origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
       REQUIRE(result_edge_cases == 0.0);
 
       problem           = make_problem(81930, 40930, 10240);
-      std::tie(result_edge_cases, mall_m, mall_n) =
-          origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
+      result_edge_cases = origami::estimate_mall_hit(problem, hardware, config, hardware.N_CU, 1);
       REQUIRE(result_edge_cases == Approx(0.498).epsilon(1e-3));
     }
   }

@@ -144,8 +144,7 @@ struct matrix_instruction {
   }
 
   std::size_t hash() const {
-    return std::hash<size_t>()(MI_M) ^ std::hash<size_t>()(MI_N) ^ std::hash<size_t>()(MI_K) ^
-           std::hash<data_type_t>()(mi_input_type);
+    return math::hash_combine(MI_M, MI_N, MI_K, mi_input_type);
   }
 };
 
@@ -275,10 +274,6 @@ struct runtime_options {
 
   /// Heuristics variance threshold (reads from ANALYTICAL_GEMM_HEURISTICS_VARIANCE env var)
   double heuristics_variance;
-
-  /// Cache some quantities that depend on config and problem type.
-  /// This can be enabled if configs do not change between calls to origami.
-  bool cache_kernel_info;
 
   /**
    * @brief Default constructor that reads from environment variables.
@@ -416,9 +411,6 @@ struct config_t {
   /// Grid selection algorithm.
   grid_selection_t grid_selection = grid_selection_t::k_split_aware;
 
-  /// Index of corresponding kernel (not used by Origami)
-  int index = 0;
-
   constexpr bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && 
            mi == o.mi && 
@@ -433,7 +425,7 @@ struct config_t {
     return math::hash_combine(mt.m, mt.n, mt.k, mi.m, mi.n, mi.k,
                               custom_mainloop_scheduling,
                               cache_hints_a, cache_hints_b,
-                              workgroup_mapping, 
+                              workgroup_mapping,
                               static_cast<std::uint32_t>(prediction_mode),
                               static_cast<std::uint32_t>(target));
   }
@@ -495,12 +487,6 @@ struct problem_t {
            a_mx_block_size == o.a_mx_block_size && b_mx_block_size == o.b_mx_block_size;
   }
 
-  std::size_t hash() const {
-    // problem type (ie everything here except size and batch) is used as a key
-    return math::hash_combine(static_cast<int>(a_transpose), static_cast<int>(b_transpose),
-                              static_cast<int>(a_dtype), static_cast<int>(b_dtype),
-                              static_cast<int>(c_dtype), static_cast<int>(d_dtype));
-  }
 };
 
 /**
@@ -527,15 +513,6 @@ struct workgroup_mapping_t {
  */
 inline const runtime_options& get_runtime_options(const config_t& config) {
   (void)config;  // Unused parameter - kept for API compatibility
-  return runtime_options::get();
-}
-
-/**
- * @brief Get runtime options (always uses global singleton).
- *
- * @return runtime_options& Reference to runtime options singleton
- */
-inline runtime_options& get_runtime_options() {
   return runtime_options::get();
 }
 
@@ -579,9 +556,7 @@ inline runtime_options& get_runtime_options() {
   }
 
   std::size_t hash() const {
-    return std::hash<data_type_t>()(mi_input_type) ^ 
-            std::hash<size_t>()(static_cast<size_t>(transA)) ^ std::hash<size_t>()(static_cast<size_t>(transB)) ^ 
-            std::hash<size_t>()(mt.m) ^ std::hash<size_t>()(mt.n) ^ std::hash<size_t>()(mt.k);
+    return math::hash_combine(mi_input_type, transA, transB, mt.m, mt.n, mt.k);
   }
 };
 
@@ -607,11 +582,6 @@ struct hash<origami::config_t> {
   inline std::size_t operator()(const origami::config_t& config) const noexcept {
     return config.hash();
   }
-};
-
-template <>
-struct hash<origami::problem_t> {
-  inline std::size_t operator()(const origami::problem_t& problem) const noexcept { return problem.hash(); }
 };
 
 }  // namespace std

@@ -6,7 +6,6 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <mutex>
 
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"

@@ -16,8 +16,7 @@ namespace origami {
  * @param config Kernel configuration.
  * @return double ratio of the useful problem volume to the total scheduled volume.
  */
-double calculate_work_utilization(const problem_t& problem,
-                                  const config_t& config);
+double calculate_work_utilization(const problem_t& problem, const config_t& config);
 
 /**
  * @brief calculate the output utilization which is the ratio of the useful problem volume to the total scheduled volume.
@@ -183,19 +182,19 @@ double estimate_l2_hit(const problem_t& problem,
  * @param num_active_cus
  * @param splitting_factor
  * @param cache Precomputed quantities, grid_m, etc.
- * @return tuple<double: Predicted MALL-hitrate, size_t: MALL tile rows, size_t: MALL tile columns>
+ * @return double Predicted MALL-hitrate
  */
-std::tuple<double,size_t,size_t> estimate_mall_hit(const problem_t& problem,
-                                                   const hardware_t& hardware,
-                                                   const config_t& config,
-                                                   std::size_t num_active_cus,
-                                                   std::size_t splitting_factor,
-                                                   const origami_cache_t& cache);
-std::tuple<double,size_t,size_t> estimate_mall_hit(const problem_t& problem,
-                                                   const hardware_t& hardware,
-                                                   const config_t& config,
-                                                   std::size_t num_active_cus,
-                                                   std::size_t splitting_factor);
+double estimate_mall_hit(const problem_t& problem,
+                         const hardware_t& hardware,
+                         const config_t& config,
+                         std::size_t num_active_cus,
+                         std::size_t splitting_factor,
+                         const origami_cache_t& cache);
+double estimate_mall_hit(const problem_t& problem,
+                         const hardware_t& hardware,
+                         const config_t& config,
+                         std::size_t num_active_cus,
+                         std::size_t splitting_factor);
 
 /**
  * @brief Determine the memory latency per MT_M x MT_N x MT_K Macro Tile (L_MT).

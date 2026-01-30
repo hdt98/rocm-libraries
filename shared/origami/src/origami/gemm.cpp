@@ -362,7 +362,7 @@ double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t num_acti
 double estimate_l2_hit(const problem_t& problem,
                        const hardware_t& hardware,
                        const config_t& config,
-                       size_t splitting_factor) {                       
+                       size_t splitting_factor) {
   auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
   return estimate_l2_hit(problem, hardware, config, splitting_factor, cache);
 }
@@ -447,22 +447,22 @@ double estimate_l2_hit(const problem_t& problem,
   return std::max(0.0, std::min(l2_hit_rate, 1.0));
 }
 
-// Estimate MALL hit-rate, also return mall tile
-std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
-                                                     const hardware_t& hardware,
-                                                     const config_t& config,
-                                                     size_t num_active_cus,
-                                                     size_t splitting_factor) {
+// Estimate MALL hit-rate
+double estimate_mall_hit(const problem_t& problem,
+                         const hardware_t& hardware,
+                         const config_t& config,
+                         size_t num_active_cus,
+                         size_t splitting_factor) {
   auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
   return estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor);
 }
 
-std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
-                                                     const hardware_t& hardware,
-                                                     const config_t& config,
-                                                     size_t num_active_cus,
-                                                     size_t splitting_factor,
-                                                     const origami_cache_t& cache) {
+double estimate_mall_hit(const problem_t& problem,
+                         const hardware_t& hardware,
+                         const config_t& config,
+                         size_t num_active_cus,
+                         size_t splitting_factor,
+                         const origami_cache_t& cache) {
   const size_t workgroups_m = cache.grid_m;
   const size_t workgroups_n = cache.grid_n;
 
@@ -506,7 +506,7 @@ std::tuple<double, size_t, size_t> estimate_mall_hit(const problem_t& problem,
   double mall_hit_rate = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
   // Clamp the final result to the valid [0, 1] range.
-  return {std::max(0.0, std::min(mall_hit_rate, 1.0)), mall_tile_m, mall_tile_n};
+  return std::max(0.0, std::min(mall_hit_rate, 1.0));
 }
 
 /**

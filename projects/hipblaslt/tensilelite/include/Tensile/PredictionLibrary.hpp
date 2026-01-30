@@ -46,8 +46,9 @@ namespace TensileLite
     template <typename MyProblem, typename MySolution = typename MyProblem::Solution>
     struct ProblemPredictionLibrary : public SolutionLibrary<MyProblem, MySolution>
     {
-        std::vector<std::pair<int, std::shared_ptr<MySolution>>> solution_list;
-        std::vector<origami::config_t>                           origami_config_list;
+        std::unordered_map<int, std::shared_ptr<MySolution>> solutionmap;
+        std::vector<origami::config_t>                       origami_config_list;
+        std::unordered_map<origami::config_t, int>           origami_config_map;
 
         mutable std::atomic<bool> lastFindTopRetAll = false;
 
@@ -61,19 +62,17 @@ namespace TensileLite
         }
         virtual std::string description() const override
         {
-            if(solution_list.empty())
-                return concatenate(type(), ", solution_list: empty");
-            return concatenate(type(), solution_list.size());
+            if(solutionmap.empty())
+                return concatenate(type(), ", solutionmap: empty");
+            return concatenate(type(), solutionmap.size());
         }
 
         virtual std::shared_ptr<MySolution> getSolutionByIndex(MyProblem const& problem,
                                                                Hardware const&  hardware,
                                                                const int index) const override
         {
-            auto indexMatch =
-                std::find_if(solution_list.begin(), solution_list.end(),
-                             [&index](auto& s){ return s.first == index; });
-            if(indexMatch != solution_list.end())
+            auto indexMatch = solutionmap.find(index);
+            if(indexMatch != solutionmap.end())
                 return indexMatch->second;
             return nullptr;
         }
@@ -103,7 +102,7 @@ namespace TensileLite
             if(searchType == SolutionLibrarySearchType::DEFAULT)
                 return rv;
 
-            for(auto const& row : this->solution_list)
+            for(auto const& row : this->solutionmap)
             {
                 if(debug)
                     std::cout << row.second->description() << std::endl;
@@ -124,7 +123,7 @@ namespace TensileLite
             if(searchType == SolutionLibrarySearchType::DEFAULT)
                 return rv;
 
-            for(auto const& row : this->solution_list)
+            for(auto const& row : this->solutionmap)
             {
                 if(debug)
                     std::cout << row.second->description() << std::endl;
@@ -186,14 +185,19 @@ namespace TensileLite
 
             for(const auto& r : prediction_result)
             {
-                auto& solution = solution_list[r.config.index].second;
-                if((*(solution->hardwarePredicate))(hardware)
-                   && (*(solution->problemPredicate))(problem))
+                auto mapiter  = origami_config_map.find(r.config);
+                auto smapiter = solutionmap.find(mapiter->second);
+                if(mapiter != origami_config_map.end() && smapiter != solutionmap.end())
                 {
-                    rv.emplace_back(solution);
-                    if(rv.size() == numSolutions)
+                    auto solution = smapiter->second;
+                    if((*solution->hardwarePredicate)(hardware)
+                       && (*solution->problemPredicate)(problem))
                     {
-                        break;
+                        rv.emplace_back(solution);
+                        if(rv.size() == numSolutions)
+                        {
+                            break;
+                        }
                     }
                 }
             }
