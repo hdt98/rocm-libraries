@@ -27,7 +27,7 @@
 #if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__)
 #define __gfx12__
 #endif
-#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__)
+#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
 #define __gfx13__
 #endif
 
@@ -327,6 +327,7 @@ namespace ck_tile::core {
  * @var CK_TILE_ARCH_GFX12_GENERIC Indicates if the compiler target architecture is GFX12 generic.
  * @var CK_TILE_ARCH_GFX130F Indicates if the compiler target architecture is GFX130F.
  * @var CK_TILE_ARCH_GFX1310 Indicates if the compiler target architecture is GFX1310.
+ * @var CK_TILE_ARCH_GFX131F Indicates if the compiler target architecture is GFX131F.
  * @var CK_TILE_ARCH_GFX1370 Indicates if the compiler target architecture is GFX1370.
  * @var CK_TILE_ARCH_GFX13_GENERIC Indicates if the compiler target architecture is GFX13 generic.
  */
@@ -496,6 +497,12 @@ struct amdgcn_compiler_target_state
     static constexpr bool CK_TILE_ARCH_GFX1310 = false;
 #endif // __gfx1310__
 
+#if defined(__gfx131F__)
+    static constexpr bool CK_TILE_ARCH_GFX131F = true;
+#else
+    static constexpr bool CK_TILE_ARCH_GFX131F = false;
+#endif // __gfx131F__
+
 #if defined(__gfx1370__)
     static constexpr bool CK_TILE_ARCH_GFX1370 = true;
 #else
@@ -555,6 +562,7 @@ CK_TILE_HOST_DEVICE static constexpr uint32_t count_values_of(T search, Ts... se
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX12_GENERIC,   \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX130F,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1310,         \
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX131F,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1370,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX13_GENERIC
 

@@ -5,7 +5,7 @@
 
 namespace ck {
 
-#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__)
+#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
 #define __gfx13__
 #endif
 

@@ -1,5 +1,5 @@
 # only build fp64 example for the following targets
-list(APPEND gpu_list gfx1310 gfx130F gfx1370)
+list(APPEND gpu_list gfx1310 gfx131F gfx130F gfx1370)
 set(target 0)
 foreach(gpu IN LISTS GPU_TARGETS)
     if(gpu IN_LIST gpu_list AND target EQUAL 0)

@@ -51,7 +51,7 @@ TEST(ArchTest, MakeGfx12TargetFields)
     EXPECT_EQ(target.WAVE_SIZE_ID, amdgcn_target_wave_size_id::WAVE32);
 }
 
-// Tests make_amdgcn_gfx12_target function
+// Tests make_amdgcn_gfx13_target function
 TEST(ArchTest, MakeGfx13TargetFields)
 {
     constexpr auto target = make_amdgcn_gfx13_target<amdgcn_target_id::GFX1310>();

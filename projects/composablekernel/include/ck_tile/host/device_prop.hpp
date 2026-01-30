@@ -74,7 +74,7 @@ inline bool is_load_tr_supported()
 inline bool is_gfx13_supported()
 {
     return ck_tile::get_device_name() == "gfx1310" || ck_tile::get_device_name() == "gfx1370" ||
-           ck_tile::get_device_name() == "gfx130F";
+           ck_tile::get_device_name() == "gfx130F" || ck_tile::get_device_name() == "gfx131F";
 }
 
 } // namespace ck_tile
