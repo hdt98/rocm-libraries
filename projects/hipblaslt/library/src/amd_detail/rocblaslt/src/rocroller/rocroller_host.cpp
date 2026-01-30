@@ -65,7 +65,8 @@ void rocroller_create_handle(void** handle)
 {
     auto rr_handle = new RocRollerHandle();
     *handle        = rr_handle;
-    if(getenv("HIPBLASLT_ROCROLLER_USE_CUSTOM_KERNEL") != nullptr)
+
+    if(getenv("HIPBLASLT_ROCROLLER_NO_CUSTOM_KERNEL") == nullptr)
     {
         // If these kernels are loaded, they are used instead of RocRoller kernels
         preloadCustomKernels(rr_handle->cache);
