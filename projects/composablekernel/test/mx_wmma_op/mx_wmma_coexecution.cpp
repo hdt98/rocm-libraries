@@ -79,7 +79,7 @@ bool run_mx_wmma_coexecution_test(ck::index_t init)
     return pass;
 }
 
-const ck::index_t common_init = 2;
+const ck::index_t common_init = -1;
 
 // test FP4@FP4 with 16x16x128 instruction, scale block size 32, and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA16x16x128_E8M0)
