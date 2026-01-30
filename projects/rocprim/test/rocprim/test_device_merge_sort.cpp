@@ -112,8 +112,12 @@ using RocprimDeviceSortTestsParams = ::testing::Types<
     // Test the algorithm with graphs
     DeviceSortParams<int, int, ::rocprim::less<int>, true>,
     // Test the virtual shared memory
+    // Note: these two cases can fail on gfx1151 on Windows without raising out of memory errors.
+    // Disable these tests there until this problem is resolved.
+#if !(defined(__gfx1151__) && defined(_WIN32))
     DeviceSortParams<int, common::custom_huge_type<2048, float>>,
     DeviceSortParams<common::custom_huge_type<2048, float>>,
+#endif
     // Test with iterators
     DeviceSortParams<int, int, ::rocprim::less<int>, false, true>,
     // Test with custom config
