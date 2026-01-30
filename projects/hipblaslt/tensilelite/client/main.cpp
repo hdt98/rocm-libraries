@@ -578,11 +578,13 @@ namespace TensileLite
                 auto configFiles = args["config-file"].as<std::vector<std::string>>();
                 for(auto filename : configFiles)
                 {
-                    std::cout << "loading config file " << filename << std::endl;
                     std::ifstream file(filename.c_str());
                     if(file.bad())
                         throw std::runtime_error(concatenate("Could not open ", filename));
                     po::store(po::parse_config_file(file, options), args);
+                    auto logLevel = args["log-level"].as<LogLevel>();
+                    if(logLevel > LogLevel::Error)
+                        std::cout << "loaded config file " << filename << std::endl;
                 }
             }
 
@@ -614,6 +616,7 @@ int main(int argc, const char* argv[])
     using namespace TensileLite::Client;
 
     auto args = parse_args(argc, argv);
+    auto logLevel = args["log-level"].as<LogLevel>();
 
     // Set srand
     unsigned int seed = args["init-seed"].as<unsigned int>();
@@ -621,7 +624,8 @@ int main(int argc, const char* argv[])
     {
         seed = time(NULL);
     }
-    std::cout << std::endl << "srand seed is set to " << seed << std::endl << std::endl;
+    if(logLevel >= LogLevel::Normal)
+        std::cout << std::endl << "srand seed is set to " << seed << std::endl << std::endl;
     srand(seed);
 
     ClientProblemFactory problemFactory(args);

@@ -101,7 +101,8 @@ namespace TensileLite
                 using namespace ResultKey;
                 if(level == LogLevel::Count)
                     level = args["log-level"].as<LogLevel>();
-                std::cout << "Log level: " << level << std::endl;
+                if(level > LogLevel::Error)
+                    std::cout << "Log level: " << level << std::endl;
 
                 PerformanceMetric metric = args["performance-metric"].as<PerformanceMetric>();
                 // Default to 'DeviceEfficiency' benchmarking if CUEfficiency not specified
@@ -369,7 +370,8 @@ namespace TensileLite
             virtual void postSolution() override
             {
                 std::unordered_map<std::string, std::string> curRow;
-                m_csvOutput.readCurrentRow(curRow);
+                bool quiet = (m_level == LogLevel::Error);
+                m_csvOutput.readCurrentRow(curRow, quiet);
                 bool  validation    = !(curRow[ResultKey::Validation] == "FAILED"
                                     || curRow[ResultKey::Validation] == "INVALID");
                 float currentTimeUS = std::stof(curRow[ResultKey::TimeUS]);
@@ -384,7 +386,7 @@ namespace TensileLite
                                   << curRow[ResultKey::SolutionProgress]
                                   << ",Solution Skipped (slow or doing restoration): "
                                   << curRow[ResultKey::SolutionName] << std::endl;
-                    else
+                    else if (m_level > LogLevel::Error)
                         m_csvOutput.writeCurrentRow();
                     if(validation && !std::isnan(currentTimeUS))
                     {

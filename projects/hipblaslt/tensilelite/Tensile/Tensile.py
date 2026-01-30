@@ -189,6 +189,8 @@ def addCommonArguments(argParser):
         choices=["4", "5", "V4", "V5", "default"], action="store", default="4", help="HSA code-object version")
     argParser.add_argument("-v", "--verbose", action="store_true", \
         help="set PrintLevel=2")
+    argParser.add_argument("-q", "--quiet", action="store_true", \
+        help="Quiet mode for test systems, sets PrintLevel=0, reduces output to only errors")
     argParser.add_argument("--debug", dest="debug", action="store_true", \
         help="set PrintLevel=2 and CMakeBuildType=Debug")
     argParser.add_argument("--cxx-compiler", dest="CxxCompiler", \
@@ -452,11 +454,6 @@ def restore_prob_sol_map(logfile):
 def Tensile(userArgs):
     global globalParameters
 
-    print1("")
-    print1(HR)
-    print1("#")
-    print1("#  Tensile v%s" % (__version__))
-
     argParser = argparse.ArgumentParser()
     argParser.add_argument("ConfigFile", type=os.path.realpath, nargs="+",
             help="Benchmark config.yaml file")
@@ -478,9 +475,19 @@ def Tensile(userArgs):
     altFormat = args.AlternateFormat
     useCache = args.useCache
     outputPath = Path(ensurePath(os.path.abspath(args.OutputPath)))
-    print1(f"#  OutputPath: {str(outputPath)}")
 
-    setVerbosity(2 if (args.debug or args.verbose) else 1)
+    if args.quiet:
+        setVerbosity(0)
+    elif args.debug or args.verbose:
+        setVerbosity(2)
+    else:
+        setVerbosity(1)
+
+    print1("")
+    print1(HR)
+    print1("#")
+    print1("#  Tensile v%s" % (__version__))
+    print1(f"#  OutputPath: {str(outputPath)}")
 
     if altFormat and len(configPaths) > 2:
         printExit("Only 1 or 2 config_files are accepted for the alternate config format: "
@@ -510,6 +517,10 @@ def Tensile(userArgs):
 
     print1("# Restoring default globalParameters")
     restoreDefaultGlobalParameters()
+
+    if args.quiet:
+        globalParameters['ClientLogLevel'] = 0
+        globalParameters['ShowProgressBar'] = False
 
     if args.LogicFormat:
         globalParameters['LogicFormat'] = args.LogicFormat
@@ -601,7 +612,7 @@ def Tensile(userArgs):
     debugConfig = makeDebugConfig(config["GlobalParameters"])
 
     for key, value in overrideParameters.items():
-        print("Overriding {0}={1}".format(key, value))
+        print1("Overriding {0}={1}".format(key, value))
         globalParameters[key] = value
 
     if "MaxFileName" in globalParameters or "MaxFileName" in config:

@@ -274,8 +274,10 @@ def writeRunScript(path, forBenchmark, enableTileSelection, cxxCompiler: str, cC
   if os.name != "nt":
     runScriptFile.write("#!/bin/bash\n\n")
 
-  runScriptFile.write("set -ex\n")
-
+  if globalParameters["ClientLogLevel"] == 0:
+    runScriptFile.write("set -e\n")
+  else:
+    runScriptFile.write("set -ex\n")
 
   if forBenchmark:
     if os.name == "nt":

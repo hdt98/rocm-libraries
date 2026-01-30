@@ -28,7 +28,7 @@ from subprocess import run, PIPE
 from typing import List, Optional, Set, Tuple, Union, NamedTuple, Dict
 
 from .Types import IsaVersion
-from .Utilities import print2
+from .Utilities import print1, print2
 
 import rocisa
 
@@ -239,7 +239,7 @@ def _detectGlobalCurrentISA(detectionTool, deviceId: int):
         arch = gfxToIsa(line.strip())
         if arch is not None:
             if arch in SUPPORTED_ISA:
-                print(f"# Detected GPU {deviceId} with ISA: " + isaToGfx(arch))
+                print1(f"# Detected GPU {deviceId} with ISA: " + isaToGfx(arch))
                 archList.append(arch)
     if process.returncode:
         print(f"{detectionTool} exited with code {process.returncode}")

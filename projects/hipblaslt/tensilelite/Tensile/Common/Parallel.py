@@ -30,7 +30,7 @@ import time
 
 from joblib import Parallel, delayed
 
-from .Utilities import tqdm
+from .Utilities import tqdm, print1
 
 
 def joblibParallelSupportsGenerator():
@@ -229,7 +229,7 @@ def ParallelMap2(
 
     if message != "":
         message += ": "
-    print("{0}Launching {1} threads{2}...".format(message, threadCount, countMessage))
+    print1("{0}Launching {1} threads{2}...".format(message, threadCount, countMessage))
     sys.stdout.flush()
     currentTime = time.time()
 
@@ -246,6 +246,6 @@ def ParallelMap2(
         )
 
     totalTime = time.time() - currentTime
-    print("{0}Done. ({1:.1f} secs elapsed)".format(message, totalTime))
+    print1("{0}Done. ({1:.1f} secs elapsed)".format(message, totalTime))
     sys.stdout.flush()
     return rv

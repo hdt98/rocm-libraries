@@ -274,7 +274,10 @@ class LogicAnalyzer:
     for solutionGroupIdx in range(0, len(solutionsList)):
       solutionGroup = solutionsList[solutionGroupIdx]
       totalSolutions += len(solutionGroup)
-    progressBar = ProgressBar(totalSolutions)
+    if globalParameters['ShowProgressBar']:
+      progressBar = ProgressBar(totalSolutions)
+    else:
+      progressBar = None
     for solutionGroupIdx in range(0, len(solutionsList)):
       solutionGroup = solutionsList[solutionGroupIdx]
       self.numSolutionsPerGroup.append(len(solutionGroup))
@@ -289,7 +292,8 @@ class LogicAnalyzer:
           sIdx = solutionsHash[solution]
 
         self.solutionGroupMap[solutionGroupIdx][solutionIdx] = sIdx
-        progressBar.increment()
+        if progressBar:
+          progressBar.increment()
     self.numSolutions = len(self.solutions)
     self.solutionNames = []
     self.solutionTiles = []

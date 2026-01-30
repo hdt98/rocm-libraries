@@ -37,6 +37,7 @@
 #include <cstddef>
 #include <random>
 
+#include "ResultReporter.hpp"
 #include "RunListener.hpp"
 
 namespace po = boost::program_options;
@@ -1011,6 +1012,8 @@ namespace TensileLite
             int64_t                         m_rotatingBuffer = 0;
             std::shared_ptr<RotatingMemory> m_rm;
             int32_t                         m_rotatingMode = 0;
+
+            LogLevel m_logLevel = LogLevel::Normal;
         };
 
         template <>

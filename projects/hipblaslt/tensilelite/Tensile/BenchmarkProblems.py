@@ -50,7 +50,7 @@ from .CustomKernels import getCustomKernelConfig
 from .Toolchain.Assembly import AssemblyToolchain
 from .Toolchain.Source import SourceToolchain
 from Tensile.Common import HR, print1, print2, IsaInfo, IsaVersion, \
-        printExit, printWarning, ensurePath, tqdm, state, \
+        printExit, printWarning, ensurePath, tqdm, state, getVerbosity, \
         BENCHMARK_PROBLEMS_DIR, BENCHMARK_DATA_DIR
 from Tensile.Common.Architectures import isaToGfx, gfxToVariants
 from Tensile.Common.GlobalParameters import globalParameters, startTime
@@ -215,7 +215,11 @@ def writeBenchmarkFiles(
     kernelHelperNames = set()
 
     # get unique kernels and kernel helpers
-    for solution in tqdm(solutions, "Finding unique solutions"):
+    for solution in (
+        tqdm(solutions, "Finding invalid solutions")
+        if getVerbosity() >= 1
+        else solutions
+    ):
         solutionKernels = solution.getKernels()
         for kernel in solutionKernels:
             kName = getKeyNoInternalArgs(kernel, debugConfig.splitGSU)

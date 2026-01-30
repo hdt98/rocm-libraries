@@ -26,7 +26,7 @@ from .CustomKernels import getCustomKernelConfig
 from . import SolutionLibrary
 from .CustomYamlLoader import load_yaml_stream
 from Tensile import __version__
-from Tensile.Common import printExit, printWarning, print2, \
+from Tensile.Common import printExit, printWarning, print1, print2, \
                            versionIsCompatible, IsaInfo
 from Tensile.Common.Architectures import gfxToIsa
 from Tensile.SolutionStructs import Solution, ProblemSizes
@@ -68,7 +68,7 @@ except ImportError:
 try:
     import msgpack
 except ImportError:
-    print("Message pack python library not detected. Must use YAML backend instead.")
+    print1("Message pack python library not detected. Must use YAML backend instead.")
 
 
 ###################

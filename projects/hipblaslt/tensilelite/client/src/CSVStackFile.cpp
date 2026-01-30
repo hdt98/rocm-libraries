@@ -90,10 +90,10 @@ namespace TensileLite
                 m_currentRow = m_stack.back();
         }
 
-        void CSVStackFile::readCurrentRow(std::unordered_map<std::string, std::string>& outMap)
+        void CSVStackFile::readCurrentRow(std::unordered_map<std::string, std::string>& outMap, bool quiet)
         {
             // we still write the header to csv first, then read the data to map
-            if(m_firstRow && !m_headers.empty())
+            if(m_firstRow && !m_headers.empty() && !quiet)
                 writeRow(m_headers);
 
             m_firstRow = false;

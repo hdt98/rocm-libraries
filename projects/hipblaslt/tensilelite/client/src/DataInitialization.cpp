@@ -882,7 +882,7 @@ namespace TensileLite
             , m_keepPristineCopyOnGPU(args["pristine-on-gpu"].as<bool>())
             , m_workspaceSize(problemFactory.workspaceSize())
             , m_pruneMode(args["prune-mode"].as<PruneSparseMode>())
-
+            , m_logLevel(args["log-level"].as<LogLevel>())
         {
             m_rotatingBuffer
                 = args["rotating-buffer-size"].as<int32_t>() * 1024 * 1024; // Change to bytes
@@ -1204,8 +1204,11 @@ namespace TensileLite
                     }
                     ++p;
                 }
-                std::cout << "Tensor name " << m_vdata[i].name << " init mode "
-                          << ToString(m_vdata[i].init) << std::endl;
+                if(m_logLevel >= LogLevel::Normal)
+                {
+                    std::cout << "Tensor name " << m_vdata[i].name << " init mode "
+                              << ToString(m_vdata[i].init) << std::endl;
+                }
             }
 
             // Init contants
@@ -1249,8 +1252,11 @@ namespace TensileLite
                 {
                     m_cdata[i].init = InitMode::Zero;
                 }
-                std::cout << "constant name " << m_cdata[i].name << " init mode "
-                          << ToString(m_cdata[i].init) << std::endl;
+                if(m_logLevel >= LogLevel::Normal)
+                {
+                    std::cout << "constant name " << m_cdata[i].name << " init mode "
+                              << ToString(m_cdata[i].init) << std::endl;
+                }
             }
 
             // Need refactor, gemm a, b, c, d only

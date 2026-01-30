@@ -27,6 +27,7 @@
 #pragma once
 
 #include "RunListener.hpp"
+#include "ResultReporter.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -141,6 +142,7 @@ namespace TensileLite
             int           m_currProblemIdx;
             int           m_currSolutionIdx;
             int           m_probOnlyRunSolIdx;
+            LogLevel      m_logLevel;
         };
     } // namespace Client
 } // namespace TensileLite

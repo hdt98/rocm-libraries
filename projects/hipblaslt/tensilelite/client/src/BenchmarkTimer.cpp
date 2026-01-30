@@ -65,6 +65,7 @@ namespace TensileLite
             , m_skiprun_from_map(0)
             , m_numSolutionSkip(0)
             , m_prob_sol_map(args["prob-sol-map"].as<prob_sol_map>())
+            , m_logLevel(args["log-level"].as<LogLevel>())
         {
         }
 
@@ -102,17 +103,20 @@ namespace TensileLite
         void BenchmarkTimer::postProblem()
         {
             m_currSolutionIdx = -1; // reset
-            if(m_numSolutionSkip)
+            if(m_logLevel > LogLevel::Error)
             {
-                std::cout << "########################## " << m_numSolutionSkip
-                          << " solutions were skipped in total. (Skip Ratio: "
-                          << m_skip_slow_solution_ratio << ")##########################"
-                          << std::endl;
-            }
-            else
-            {
-                // print this as an indication of end-of-problem
-                std::cout << "########################## " << std::endl;
+                if(m_numSolutionSkip)
+                {
+                    std::cout << "########################## " << m_numSolutionSkip
+                            << " solutions were skipped in total. (Skip Ratio: "
+                            << m_skip_slow_solution_ratio << ")##########################"
+                            << std::endl;
+                }
+                else
+                {
+                    // print this as an indication of end-of-problem
+                    std::cout << "########################## " << std::endl;
+                }
             }
         }
 

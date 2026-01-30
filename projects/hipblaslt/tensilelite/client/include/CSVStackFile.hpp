@@ -64,7 +64,7 @@ namespace TensileLite
             void pop();
 
             void writeCurrentRow();
-            void readCurrentRow(std::unordered_map<std::string, std::string>& outMap);
+            void readCurrentRow(std::unordered_map<std::string, std::string>& outMap, bool quiet = false);
             void clearCurrentRow();
 
         private:
