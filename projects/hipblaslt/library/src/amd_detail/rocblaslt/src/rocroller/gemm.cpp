@@ -671,6 +671,9 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
 
 size_t workspaceRequired(std::shared_ptr<GemmKernel> gemm, const RocblasltContractionProblem& prob)
 {
+    if (gemm->isCustomKernel())
+        return 0;
+
     CommandArguments commandArgs = gemm->command->createArguments();
 
     if(gemm->params->streamK)
