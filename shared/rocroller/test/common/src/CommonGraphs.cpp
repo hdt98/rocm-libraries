@@ -469,6 +469,8 @@ namespace rocRollerTest::Graphs
         auto params = std::make_shared<CommandParameters>();
 
         params->setManualKernelDimension(2);
+        params->ldsPadding[LayoutType::MATRIX_A] = m_problem.padA;
+        params->ldsPadding[LayoutType::MATRIX_B] = m_problem.padB;
 
         AssertFatal(m_problem.workgroupSizeX % m_problem.wavefrontSize == 0,
                     "Workgroup Size X must be multiply of wave front size");

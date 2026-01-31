@@ -71,7 +71,7 @@ namespace MemAddressingTest
             static void NoPadding(std::vector<size_t> addresses)
             {
                 CHECK(addresses
-                      == std::vector<uint64_t>{
+                      == std::vector<size_t>{
                           0,    256,  512,  768,  1024, 1280, 1536, 1792, 2048, 2304, 2560,
                           2816, 3072, 3328, 3584, 3840, 4096, 4352, 4608, 4864, 5120, 5376,
                           5632, 5888, 6144, 6400, 6656, 6912, 7168, 7424, 7680, 7936, 4,
@@ -79,9 +79,29 @@ namespace MemAddressingTest
                           3076, 3332, 3588, 3844, 4100, 4356, 4612, 4868, 5124, 5380, 5636,
                           5892, 6148, 6404, 6660, 6916, 7172, 7428, 7684, 7940});
             }
+
+            static void YesPadding(std::vector<size_t> addresses)
+            {
+                INFO(addresses);
+                std::vector<size_t> A_pattern
+                    = {0,    256,  512,  768,  1024, 1280, 1536, 1792, 2052, 2308, 2564, 2820, 3076,
+                       3332, 3588, 3844, 4104, 4360, 4616, 4872, 5128, 5384, 5640, 5896, 6156, 6412,
+                       6668, 6924, 7180, 7436, 7692, 7948, 4,    260,  516,  772,  1028, 1284, 1540,
+                       1796, 2056, 2312, 2568, 2824, 3080, 3336, 3592, 3848, 4108, 4364, 4620, 4876,
+                       5132, 5388, 5644, 5900, 6160, 6416, 6672, 6928, 7184, 7440, 7696, 7952};
+                std::vector<size_t> B_pattern
+                    = {0,    256,  512,  768,  1028, 1284, 1540, 1796, 2056, 2312, 2568, 2824, 3084,
+                       3340, 3596, 3852, 4112, 4368, 4624, 4880, 5140, 5396, 5652, 5908, 6168, 6424,
+                       6680, 6936, 7196, 7452, 7708, 7964, 4,    260,  516,  772,  1032, 1288, 1544,
+                       1800, 2060, 2316, 2572, 2828, 3088, 3344, 3600, 3856, 4116, 4372, 4628, 4884,
+                       5144, 5400, 5656, 5912, 6172, 6428, 6684, 6940, 7200, 7456, 7712, 7968};
+                CHECK((addresses == A_pattern || addresses == B_pattern));
+            }
         };
 
-        const auto variants = GENERATE(Variants{"No padding", Variants::NoPadding});
+        const auto variants
+            = GENERATE(Variants{"No padding", Variants::NoPadding},
+                       Variants("Yes padding", Variants::YesPadding, {32 * 64, 4}, {16 * 64, 4}));
 
         SECTION(variants.name)
         {
@@ -108,8 +128,6 @@ namespace MemAddressingTest
                 if(inst.getModelledAddresses().has_value())
                 {
                     auto addresses = inst.getModelledAddresses().value();
-                    Log::info("addresses {}", addresses);
-
                     variants.validate(addresses);
                 }
             }
