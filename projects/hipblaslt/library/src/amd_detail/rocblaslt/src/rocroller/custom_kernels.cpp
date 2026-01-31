@@ -238,12 +238,18 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
         return rocblaslt_status_internal_error;
     }
 
+    // Grid: 1 thread per element, 256 threads per block
+    // For M=128, N=64 -> 8192 threads -> 32 blocks
+    uint32_t threads   = static_cast<uint32_t>(prob.m * prob.n);
+    uint32_t blockSize = 256;
+    uint32_t blocks    = (threads + blockSize - 1) / blockSize;
+
     dim3 grid;
-    grid.x = (prob.n + gemm->params->workgroupTile.n - 1) / gemm->params->workgroupTile.n;
-    grid.y = (prob.m + gemm->params->workgroupTile.m - 1) / gemm->params->workgroupTile.m;
+    grid.x = blocks;//(prob.n + gemm->params->workgroupTile.n - 1) / gemm->params->workgroupTile.n;
+    grid.y = 1;//(prob.m + gemm->params->workgroupTile.m - 1) / gemm->params->workgroupTile.m;
     grid.z = 1;
 
-    dim3 block{256, 1, 1};
+    dim3 block{blockSize, 1, 1};
 
     auto   args     = F4GemmKernelArgs(prob);
     printKernelArgs(args);
