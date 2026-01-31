@@ -179,8 +179,7 @@ struct ThreadwiseTensorSliceTransfer_v5r1
 
             // FIX: Use full bounds check including visible index to prevent OOB access
             // when K0 coordinate exceeds tensor bounds
-            const bool is_src_valid =
-                coordinate_has_valid_offset(src_desc, src_coord_);
+            const bool is_src_valid = coordinate_has_valid_offset(src_desc, src_coord_);
 
             // copy data from src_buf to src_vector
             src_vector.template AsType<src_vector_t>()(I0) =

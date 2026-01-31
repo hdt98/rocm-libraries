@@ -440,10 +440,37 @@ struct GridwiseGemmDl_km_kn_mn_v1r3
 
             index_t k_block_data_begin = 0;
 
+#ifdef CK_DEBUG_KERNEL
+            // Debug: print loop parameters (only thread 0 of block 0)
+            if(get_thread_local_1d_id() == 0 && get_block_1d_id() == 0)
+            {
+                printf("[CK_DEBUG] Block 0 Thread 0: K0=%d, K0PerBlock=%d, loop_limit=%d\n",
+                       (int)K0,
+                       (int)K0PerBlock,
+                       (int)(K0 - 2 * K0PerBlock));
+                printf("[CK_DEBUG] HasMainKBlockLoop=%d, HasDoubleTailKBlockLoop=%d\n",
+                       (int)HasMainKBlockLoop,
+                       (int)HasDoubleTailKBlockLoop);
+                printf("[CK_DEBUG] a_global_buf size=%ld\n",
+                       (long)a_grid_desc_k0_m0_m1_k1.GetElementSpaceSize());
+                printf("[CK_DEBUG] b_global_buf size=%ld\n",
+                       (long)b_grid_desc_k0_n0_n1_k1.GetElementSpaceSize());
+            }
+#endif
+
             // LDS double buffer: main body
             // use Do-While loop instead of For loop to simplify control flow
             do
             {
+#ifdef CK_DEBUG_KERNEL
+                // Debug: print iteration info
+                if(get_thread_local_1d_id() == 0 && get_block_1d_id() == 0)
+                {
+                    printf("[CK_DEBUG] Main loop: k_block_data_begin=%d\n",
+                           (int)k_block_data_begin);
+                }
+#endif
+
                 // even iteration
                 a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc_k0_m0_m1_k1,
                                                     a_block_slice_copy_step);

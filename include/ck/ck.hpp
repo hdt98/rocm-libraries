@@ -109,7 +109,7 @@
 #define CK_USE_AMD_MFMA
 #endif
 
-#if(defined(__gfx90a__) || defined(__gfx94__))
+#if (defined(__gfx90a__) || defined(__gfx94__))
 #define CK_USE_AMD_MFMA_BF16_1K_OP
 #endif
 
@@ -135,7 +135,7 @@
 #define CK_USE_AMD_BUFFER_ATOMIC_ADD_FLOAT 0
 #endif
 
-#if(defined(__gfx90a__) || defined(__gfx94__)) // for GPU code
+#if (defined(__gfx90a__) || defined(__gfx94__)) // for GPU code
 #define CK_USE_AMD_BUFFER_ATOMIC_MAX_FLOAT64 1
 #else
 #define CK_USE_AMD_BUFFER_ATOMIC_MAX_FLOAT64 0
