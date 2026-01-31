@@ -583,6 +583,5 @@ struct hash<origami::config_t> {
     return config.hash();
   }
 };
-
 }  // namespace std
 

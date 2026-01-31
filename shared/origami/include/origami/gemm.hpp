@@ -70,15 +70,9 @@ size_t round_elements_to_128B(size_t elements, size_t element_size_bits);
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
- * @param cache Precomputed quantities, grid_m, etc.
  * @param l2_capacity_bytes l2 capacity in bytes
  * @return double
  */
-double compute_l2_hit_rate_global(const problem_t& problem,
-                                  const hardware_t& hardware,
-                                  const config_t& config,
-                                  size_t l2_capacity_bytes,
-                                  const origami_cache_t& cache);
 double compute_l2_hit_rate_global(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config,
@@ -125,8 +119,8 @@ size_t compute_number_matrix_instructions(dim3_t mt, dim3_t mi);
  * @return double Latency in cycles.
  */
 double compute_cvt_overhead(const problem_t& problem,
-                                          const hardware_t& hardware,
-                                          const config_t& config);
+                            const hardware_t& hardware,
+                            const config_t& config);
 /**
  * @brief Compute the latency to process a single macro-tile for the given problem and hardware.
  *
@@ -160,14 +154,8 @@ bool check_lds_capacity(const hardware_t& hardware,
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
  * @param splitting_factor
- * @param cache Precomputed quantities, grid_m, etc.
  * @return double Predicted L2-hitrate.
  */
-double estimate_l2_hit(const problem_t& problem,
-                       const hardware_t& hardware,
-                       const config_t& config,
-                       std::size_t splitting_factor,
-                       const origami_cache_t& cache);
 double estimate_l2_hit(const problem_t& problem,
                        const hardware_t& hardware,
                        const config_t& config,
@@ -181,15 +169,8 @@ double estimate_l2_hit(const problem_t& problem,
  * @param config Kernel configuration.
  * @param num_active_cus
  * @param splitting_factor
- * @param cache Precomputed quantities, grid_m, etc.
- * @return double Predicted MALL-hitrate
+ * @return double Predicted MALL-hitrate.
  */
-double estimate_mall_hit(const problem_t& problem,
-                         const hardware_t& hardware,
-                         const config_t& config,
-                         std::size_t num_active_cus,
-                         std::size_t splitting_factor,
-                         const origami_cache_t& cache);
 double estimate_mall_hit(const problem_t& problem,
                          const hardware_t& hardware,
                          const config_t& config,
@@ -204,15 +185,8 @@ double estimate_mall_hit(const problem_t& problem,
  * @param config Kernel configuration.
  * @param num_active_cus
  * @param splitting_factor
- * @param cache Precomputed quantities, grid_m, etc.
  * @return double Latency in cycles.
  */
-double compute_memory_latency(const problem_t& problem,
-                              const hardware_t& hardware,
-                              const config_t& config,
-                              std::size_t num_active_cus,
-                              std::size_t splitting_factor,
-                              const origami_cache_t& cache);
 double compute_memory_latency(const problem_t& problem,
                               const hardware_t& hardware,
                               const config_t& config,
@@ -227,15 +201,8 @@ double compute_memory_latency(const problem_t& problem,
  * @param config Kernel configuration.
  * @param num_active_cus
  * @param splitting_factor
- * @param cache Precomputed quantities, grid_m, etc.
  * @return double Latency in cycles.
  */
-double compute_tile_latency(const problem_t& problem,
-                            const hardware_t& hardware,
-                            const config_t& config,
-                            std::size_t num_active_cus,
-                            std::size_t splitting_factor,
-                            const origami_cache_t& cache);
 double compute_tile_latency(const problem_t& problem,
                             const hardware_t& hardware,
                             const config_t& config,
@@ -254,15 +221,8 @@ double compute_tile_latency(const problem_t& problem,
  * @param config Kernel configuration.
  * @param num_active_cus
  * @param splitting_factor
- * @param cache Precomputed quantities, grid_m, etc.
  * @return double Latency in cycles.
  */
-double compute_timestep_latency(const problem_t& problem,
-                                const hardware_t& hardware,
-                                const config_t& config,
-                                std::size_t num_active_cus,
-                                std::size_t splitting_factor,
-                                const origami_cache_t& cache);
 double compute_timestep_latency(const problem_t& problem,
                                 const hardware_t& hardware,
                                 const config_t& config,
@@ -283,32 +243,5 @@ double compute_total_latency(const problem_t& problem,
                              const hardware_t& hardware,
                              const config_t& config,
                              size_t max_cus);
-
-/**
- * @brief Creates a cache struct with origami info such as grid dimensions etc.
- *
- * @param problem Problem description (M, N, K, etc.)
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param config Kernel configuration.
- * @param num_active_cus
- * @return origami_cache_t struct
- */
-origami_cache_t create_origami_cache(const problem_t& problem,
-                                     const hardware_t& hardware,
-                                     const config_t& config,
-                                     std::size_t num_active_cus);
-
-/**
- * @brief Creates a cache struct with precomputed values depending only on the problem type,
- * i.e., the info in problem_t but not size or batch.
- *
- * @param problem Problem description (a_dtype, etc.)
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param config Kernel configuration.
- * @return origami_cache_t struct
- */
-kernel_cache_t create_kernel_cache(const problem_t& problem,
-                                   const hardware_t& hardware,
-                                   const config_t& config);
 
 }  // namespace origami

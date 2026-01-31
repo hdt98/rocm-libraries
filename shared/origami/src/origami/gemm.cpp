@@ -22,6 +22,109 @@
 #include "origami/streamk.hpp"
 
 namespace origami {
+
+origami_cache_t create_origami_cache(const problem_t& problem,
+                                     const hardware_t& hardware,
+                                     const config_t& config,
+                                     std::size_t num_active_cus);
+
+kernel_cache_t create_kernel_cache(const problem_t& problem,
+                                   const hardware_t& hardware,
+                                   const config_t& config);
+
+double compute_l2_hit_rate_global_cache(const problem_t& problem,
+                                        const hardware_t& hardware,
+                                        const config_t& config,
+                                        size_t l2_capacity_bytes,
+                                        const origami_cache_t& cache);
+
+double estimate_l2_hit_cache(const problem_t& problem,
+                             const hardware_t& hardware,
+                             const config_t& config,
+                             std::size_t splitting_factor,
+                             const origami_cache_t& cache);
+
+double estimate_mall_hit_cache(const problem_t& problem,
+                               const hardware_t& hardware,
+                               const config_t& config,
+                               std::size_t num_active_cus,
+                               std::size_t splitting_factor,
+                               const origami_cache_t& cache);
+
+double compute_memory_latency_cache(const problem_t& problem,
+                                    const hardware_t& hardware,
+                                    const config_t& config,
+                                    std::size_t num_active_cus,
+                                    std::size_t splitting_factor,
+                                    const origami_cache_t& cache);
+
+double compute_tile_latency_cache(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config,
+                                  std::size_t num_active_cus,
+                                  std::size_t splitting_factor,
+                                  const origami_cache_t& cache);
+
+double compute_timestep_latency_cache(const problem_t& problem,
+                                      const hardware_t& hardware,
+                                      const config_t& config,
+                                      std::size_t num_active_cus,
+                                      std::size_t splitting_factor,
+                                      const origami_cache_t& cache);
+
+double compute_l2_hit_rate_global(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config,
+                                  size_t l2_capacity_bytes) {
+  auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
+  return compute_l2_hit_rate_global_cache(problem, hardware, config, l2_capacity_bytes, cache);
+}
+
+double estimate_l2_hit(const problem_t& problem,
+                       const hardware_t& hardware,
+                       const config_t& config,
+                       size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
+  return estimate_l2_hit_cache(problem, hardware, config, splitting_factor, cache);
+}
+
+double estimate_mall_hit(const problem_t& problem,
+                         const hardware_t& hardware,
+                         const config_t& config,
+                         size_t num_active_cus,
+                         size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return estimate_mall_hit_cache(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
+double compute_memory_latency(const problem_t& problem,
+                              const hardware_t& hardware,
+                              const config_t& config,
+                              std::size_t num_active_cus,
+                              std::size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return compute_memory_latency_cache(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
+double compute_tile_latency(const problem_t& problem,
+                            const hardware_t& hardware,
+                            const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return compute_tile_latency_cache(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
+double compute_timestep_latency(const problem_t& problem,
+                                const hardware_t& hardware,
+                                const config_t& config,
+                                std::size_t num_active_cus,
+                                std::size_t splitting_factor) {
+  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
+  return compute_timestep_latency_cache(problem, hardware, config, num_active_cus, splitting_factor, cache);
+}
+
+
 double calculate_work_utilization(const problem_t& problem, const config_t& config) {
   const size_t M = problem.size.m;
   const size_t N = problem.size.n;
@@ -360,19 +463,11 @@ double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t num_acti
   return std::min(bw_limited, 1.0);
 }
 
-double estimate_l2_hit(const problem_t& problem,
-                       const hardware_t& hardware,
-                       const config_t& config,
-                       size_t splitting_factor) {
-  auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
-  return estimate_l2_hit(problem, hardware, config, splitting_factor, cache);
-}
-
-double estimate_l2_hit(const problem_t& problem,
-                       const hardware_t& hardware,
-                       const config_t& config,
-                       size_t splitting_factor,
-                       const origami_cache_t& cache) {
+double estimate_l2_hit_cache(const problem_t& problem,
+                             const hardware_t& hardware,
+                             const config_t& config,
+                             size_t splitting_factor,
+                             const origami_cache_t& cache) {
   // Use size_t for dimensions and counts to ensure type safety.
   const size_t workgroups_m     = cache.grid_m;
   const size_t workgroups_n     = cache.grid_n;
@@ -449,21 +544,12 @@ double estimate_l2_hit(const problem_t& problem,
 }
 
 // Estimate MALL hit-rate
-double estimate_mall_hit(const problem_t& problem,
-                         const hardware_t& hardware,
-                         const config_t& config,
-                         size_t num_active_cus,
-                         size_t splitting_factor) {
-  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
-  return estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor, cache);
-}
-
-double estimate_mall_hit(const problem_t& problem,
-                         const hardware_t& hardware,
-                         const config_t& config,
-                         size_t num_active_cus,
-                         size_t splitting_factor,
-                         const origami_cache_t& cache) {
+double estimate_mall_hit_cache(const problem_t& problem,
+                               const hardware_t& hardware,
+                               const config_t& config,
+                               size_t num_active_cus,
+                               size_t splitting_factor,
+                               const origami_cache_t& cache) {
   const size_t workgroups_m = cache.grid_m;
   const size_t workgroups_n = cache.grid_n;
 
@@ -514,19 +600,11 @@ double estimate_mall_hit(const problem_t& problem,
  * @brief L2 hit rate from a global (problem-wide) perspective using the refactored API.
  * Computes in BYTES to correctly handle differing A/B dtypes.
  */
-double compute_l2_hit_rate_global(const problem_t& problem,
-                                  const hardware_t& hardware,
-                                  const config_t& config,
-                                  size_t l2_capacity_bytes) {
-  auto cache = create_origami_cache(problem, hardware, config, hardware.N_CU);
-  return compute_l2_hit_rate_global(problem, hardware, config, l2_capacity_bytes);
-}
-
-double compute_l2_hit_rate_global(const problem_t& problem,
-                                  const hardware_t& hardware,
-                                  const config_t& config,
-                                  size_t l2_capacity_bytes,
-                                  const origami_cache_t& cache) {
+double compute_l2_hit_rate_global_cache(const problem_t& problem,
+                                        const hardware_t& hardware,
+                                        const config_t& config,
+                                        size_t l2_capacity_bytes,
+                                        const origami_cache_t& cache) {
   // --- Hardware Parameters (as requested, defined locally) ---
   // You would normally get l2_capacity_bytes from your hardware_t struct.
   if (l2_capacity_bytes == 0) throw std::runtime_error("L2 Capacity is zero");
@@ -581,22 +659,13 @@ size_t round_elements_to_128B(size_t elements, size_t element_size_bits) {
   return round_up_mul(elements, E_block);
 }
 
-double compute_memory_latency(const problem_t& problem,
-                              const hardware_t& hardware,
-                              const config_t& config,
-                              std::size_t num_active_cus,
-                              std::size_t splitting_factor) {
-  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
-  return compute_memory_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
-}
-
 // Determine the memory latency
-double compute_memory_latency(const problem_t& problem,
-                              const hardware_t& hardware,
-                              const config_t& config,
-                              std::size_t num_active_cus,
-                              std::size_t splitting_factor,
-                              const origami_cache_t& cache) {
+double compute_memory_latency_cache(const problem_t& problem,
+                                    const hardware_t& hardware,
+                                    const config_t& config,
+                                    std::size_t num_active_cus,
+                                    std::size_t splitting_factor,
+                                    const origami_cache_t& cache) {
   // Extract parameters from structured types
   const auto a_bytes = cache.kernel_cache.a_bytes;
   const auto b_bytes = cache.kernel_cache.b_bytes;
@@ -612,12 +681,12 @@ double compute_memory_latency(const problem_t& problem,
   const size_t MT_K = config.mt.k;
 
   // 1) Estimate L2 hit-rate
-  double H_mem1 = estimate_l2_hit(problem, hardware, config, splitting_factor, cache);
+  double H_mem1 = estimate_l2_hit_cache(problem, hardware, config, splitting_factor, cache);
 
   // Global cap on L2 hit-rate (prevents impossible cache residency claims)
   // (Assumes capacity is given in KiB, convert to bytes)
   double H_mem1_global =
-      compute_l2_hit_rate_global(problem, hardware, config, hardware.L2_capacity * 1024, cache);
+      compute_l2_hit_rate_global_cache(problem, hardware, config, hardware.L2_capacity * 1024, cache);
 
   H_mem1 = std::min(H_mem1, H_mem1_global);
 
@@ -626,7 +695,7 @@ double compute_memory_latency(const problem_t& problem,
   // 2) Estimate mall hit-rate
   double H_mem2 =
       hardware.has_MALL()
-          ? estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor, cache)
+          ? estimate_mall_hit_cache(problem, hardware, config, num_active_cus, splitting_factor, cache)
           : 0.0;  // MALL is not supported, so we emulate every read as a miss
 
   // 3) Total loads are loads from A and loads from B
@@ -697,22 +766,12 @@ double compute_memory_latency(const problem_t& problem,
 /* ---------------------------------------------------------------------------------------- */
 /* Tile-related functions                                                                   */
 /* ---------------------------------------------------------------------------------------- */
-
-double compute_tile_latency(const problem_t& problem,
-                            const hardware_t& hardware,
-                            const config_t& config,
-                            std::size_t num_active_cus,
-                            std::size_t splitting_factor) {
-  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
-  return compute_tile_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
-}
-
-double compute_tile_latency(const problem_t& problem,
-                            const hardware_t& hardware,
-                            const config_t& config,
-                            std::size_t num_active_cus,
-                            std::size_t splitting_factor,
-                            const origami_cache_t& cache) {
+double compute_tile_latency_cache(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config,
+                                  std::size_t num_active_cus,
+                                  std::size_t splitting_factor,
+                                  const origami_cache_t& cache) {
   // Extract parameters from structured types
   const size_t K = problem.size.k;
   size_t batch   = problem.batch;
@@ -728,7 +787,7 @@ double compute_tile_latency(const problem_t& problem,
   // 1) Compute per-tile latencies
   double L_compute = cache.kernel_cache.mt_compute_latency;
 
-  double L_mem = compute_memory_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
+  double L_mem = compute_memory_latency_cache(problem, hardware, config, num_active_cus, splitting_factor, cache);
 
   // TODO Does work utilization need to be 128-byte rounded for a cache line?
   double utilization        = calculate_work_utilization(problem, config);
@@ -821,23 +880,14 @@ double compute_tile_latency(const problem_t& problem,
   return L_tile_total;
 }
 
-double compute_timestep_latency(const problem_t& problem,
-                                const hardware_t& hardware,
-                                const config_t& config,
-                                std::size_t num_active_cus,
-                                std::size_t splitting_factor) {
-  auto cache = create_origami_cache(problem, hardware, config, num_active_cus);
-  return compute_timestep_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
-}
-
-double compute_timestep_latency(const problem_t& problem,
-                                const hardware_t& hardware,
-                                const config_t& config,
-                                std::size_t num_active_cus,
-                                std::size_t splitting_factor,
-                                const origami_cache_t& cache) {
+double compute_timestep_latency_cache(const problem_t& problem,
+                                      const hardware_t& hardware,
+                                      const config_t& config,
+                                      std::size_t num_active_cus,
+                                      std::size_t splitting_factor,
+                                      const origami_cache_t& cache) {
   // Assume latency of a timestep is latency of a single K-complete output tile computed on one CU.
-  double L_timestep = compute_tile_latency(problem, hardware, config, num_active_cus, splitting_factor, cache);
+  double L_timestep = compute_tile_latency_cache(problem, hardware, config, num_active_cus, splitting_factor, cache);
 
   return L_timestep;
 }
@@ -1036,7 +1086,7 @@ double compute_total_latency(const problem_t& problem,
   auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, num_active_cus);
 
   // 2) Compute latency of a timestep
-  double L_timestep = compute_timestep_latency(
+  double L_timestep = compute_timestep_latency_cache(
       problem, hardware, config_with_default_wgm, num_active_cus, splitting_factor, cache);
 
   // Compute latency for all timesteps and return it as the latency for the MT/problem
