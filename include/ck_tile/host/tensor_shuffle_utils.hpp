@@ -172,7 +172,7 @@ auto shuffle_b_permuteN(const ck_tile::HostTensor<T>& t, const GemmConfig& gemmC
                                        gemmConfig.N_Warp_Tile,
                                        NRepeat,
                                        k_ / ItemsPerAccess,
-                                       ItemsPerAccess /*gemmConfig.K_Warp_Tile / divisor*/});
+                                       ItemsPerAccess});
         std::copy(t.begin(), t.end(), t_view.begin());
         return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 2, 5});
     }
