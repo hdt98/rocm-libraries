@@ -12,6 +12,7 @@
 #include <set>
 #include <stdexcept>
 #include <tuple>
+#include <mutex>
 
 #include "origami/hardware.hpp"
 #include "origami/math.hpp"
@@ -944,8 +945,8 @@ origami_cache_t create_origami_cache(const problem_t& problem,
   };
 
   static std::unordered_map<key_t, kernel_cache_t, key_hasher_t, key_compare_t> kernel_cache_map;
-  // static std::mutex mut;
-  // std::unique_lock<std::mutex> lock(mut);
+  static std::mutex mut;
+  std::unique_lock<std::mutex> lock(mut);
   auto p_cache_entry = kernel_cache_map.find(key);
   if (p_cache_entry == kernel_cache_map.end())
     p_cache_entry = kernel_cache_map.insert({key, create_kernel_cache(problem_type, hardware, config)}).first;
@@ -991,6 +992,16 @@ double compute_total_latency(const problem_t& problem,
   // We don't need to compute latency for all MTs. With this, we can shortcut.
   bool shortCircuit = true;
   if (shortCircuit) {
+    // When problem dimensions are small enough that we can fit them in one tile, we should do
+    // so. This short circuit condition also decreases selection latency when problems are very
+    // small :)
+    // TODO 256 and 256 here should be largest M and N tile dimensions in library
+    if (M <= 256 && N <= 256 && K < 1024 && batch != 1 && (MT_M < M || MT_N < N))
+      return std::numeric_limits<double>::max();
+
+    // Use Dot2 only for M < 3
+    if (MI_M == 1 && MI_N == 1 && MI_K == 64 && M > 2) return std::numeric_limits<double>::max();
+
     size_t K_mod_128bytes    = K * a_bits % 1024;
     size_t MT_K_mod_128bytes = MT_K * a_bits % 1024;
     if (K_mod_128bytes == 0 && MT_K_mod_128bytes == 0) {
@@ -1010,17 +1021,6 @@ double compute_total_latency(const problem_t& problem,
     } else if (config.cache_hints_a || config.cache_hints_b) {
       return std::numeric_limits<double>::max();
     }
-
-    // When problem dimensions are small enough that we can fit them in one tile, we should do
-    // so. This short circuit condition also decreases selection latency when problems are very
-    // small :)
-    // TODO 256 and 256 here should be largest M and N tile dimensions in library
-    if (batch != 1 && M <= 256 && N <= 256 && K < 1024 && (MT_M < M || MT_N < N))
-      return std::numeric_limits<double>::max();
-
-    // Use Dot2 only for M < 3
-    if (MI_M == 1 && MI_N == 1 && MI_K == 64 && M > 2)
-      return std::numeric_limits<double>::max();
   }
 
   // 1-1) To compute the latency, use default WGM. And WGM can't be greater than one
@@ -1035,12 +1035,11 @@ double compute_total_latency(const problem_t& problem,
 
   auto cache = create_origami_cache(problem, hardware, config_with_default_wgm, num_active_cus);
 
-  // 2) Compute latency of a wave
-  // Compute latency of a wave
+  // 2) Compute latency of a timestep
   double L_timestep = compute_timestep_latency(
       problem, hardware, config_with_default_wgm, num_active_cus, splitting_factor, cache);
 
-  // Compute latency for all waves and return it as the latency for the MT/problem
+  // Compute latency for all timesteps and return it as the latency for the MT/problem
   double total_latency = L_timestep * num_timesteps;
 
   // 3) Customized heuristics
