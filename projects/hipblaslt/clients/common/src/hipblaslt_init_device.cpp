@@ -202,8 +202,8 @@ void hipblaslt_init_device(ABC_dims                 abc,
             if(abc == ABC_dims::A || abc == ABC_dims::C)
             {
                 if constexpr(is_std_complex<T>::value)
-                    fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T {                    
-                        return make_std_complex(random_int<T_real>(idx), random_int<T_real>(idx) + 1000000);
+                    fill_batch(A, M, N, lda, stride, batch_count, [make_std_complex](size_t idx) -> T {                    
+                        return make_std_complex(random_int<T_real>(idx), random_int<T_real>(idx + 1000000) );
                     });
                 else
                 fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T {                    
@@ -217,7 +217,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
                 if(stride >= lda)
                 {
                     stride = std::max(lda * N, stride);
-                    fill_batch(A, M, N, lda, stride, batch_count, [stride, lda](size_t idx) -> T {
+                    fill_batch(A, M, N, lda, stride, batch_count, [stride, lda, make_std_complex](size_t idx) -> T {
                         auto b     = idx / stride;
                         auto j     = (idx - b * stride) / lda;
                         auto i     = (idx - b * stride) - j * lda;
@@ -229,7 +229,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
                 }
                 else
                 {
-                    fill_batch(A, M, N, lda, stride, batch_count, [stride, lda](size_t idx) -> T {
+                    fill_batch(A, M, N, lda, stride, batch_count, [stride, lda, make_std_complex](size_t idx) -> T {
                         auto j     = idx / lda;
                         auto b     = (idx - j * lda) / stride;
                         auto i     = (idx - j * lda) - b * stride;
@@ -272,27 +272,29 @@ void hipblaslt_init_device(ABC_dims                 abc,
             {
                 stride = std::max(lda * N, stride);
                     fill_batch(
-                        A, M, N, lda, stride, batch_count, [M, N, stride, lda](size_t idx) -> T {
+                        A, M, N, lda, stride, batch_count, [M, N, stride, lda, make_std_complex](size_t idx) -> T {
                             auto b = idx / stride;
                             auto j = (idx - b * stride) / lda;
                             auto i = (idx - b * stride) - j * lda;
                             auto arg = double(i + j * M + b * M * N);
                             auto real_val = sin(random_int<T_real>(arg));
                             auto imag_val = cos(random_int<T_real>(arg + 1000000)); // Offset for different seed
-                            return complex_val = make_std_complex(real_val, imag_val);
+                            auto complex_val = make_std_complex(real_val, imag_val);
+                            return complex_val;
                         });
             }
             else
             {
                     fill_batch(
-                        A, M, N, lda, stride, batch_count, [M, N, stride, lda](size_t idx) -> T {
+                        A, M, N, lda, stride, batch_count, [M, N, stride, lda, make_std_complex](size_t idx) -> T {
                             auto j = idx / lda;
                             auto b = (idx - j * lda) / stride;
                             auto i = (idx - j * lda) - b * stride;
                             auto arg = double(i + j * M + b * M * N);
                             auto real_val = sin(random_int<T_real>(arg));
                             auto imag_val = cos(random_int<T_real>(arg + 1000000)); // Offset for different seed
-                            return complex_val = make_std_complex(real_val, imag_val);
+                            auto complex_val = make_std_complex(real_val, imag_val);
+                            return complex_val;
                         });
             }
             }
@@ -302,7 +304,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
             {
                 stride = std::max(lda * N, stride);
                     fill_batch(
-                        A, M, N, lda, stride, batch_count, [M, N, stride, lda](size_t idx) -> T {
+                        A, M, N, lda, stride, batch_count, [M, N, stride, abc, lda](size_t idx) -> T {
                             auto b = idx / stride;
                             auto j = (idx - b * stride) / lda;
                             auto i = (idx - b * stride) - j * lda;
@@ -313,7 +315,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
             else
             {
                     fill_batch(
-                        A, M, N, lda, stride, batch_count, [M, N, stride, lda](size_t idx) -> T {
+                        A, M, N, lda, stride, batch_count, [M, N, stride, abc, lda](size_t idx) -> T {
                             auto j = idx / lda;
                             auto b = (idx - j * lda) / stride;
                             auto i = (idx - j * lda) - b * stride;
@@ -325,8 +327,8 @@ void hipblaslt_init_device(ABC_dims                 abc,
             break;
         case hipblaslt_initialization::hpl:
             if constexpr(is_std_complex<T>::value)
-                fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T {
-                    return make_std_complex(random_hpl<T_real>(idx), random_hpl<T_real>(idx) + 1000000);
+                fill_batch(A, M, N, lda, stride, batch_count, [make_std_complex](size_t idx) -> T {
+                    return make_std_complex(random_hpl<T_real>(idx), random_hpl<T_real>(idx + 1000000));
                 });
             else
                 fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T {
@@ -349,7 +351,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
             break;
         case hipblaslt_initialization::zero:
             if constexpr(is_std_complex<T>::value)
-                fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T { 
+                fill_batch(A, M, N, lda, stride, batch_count, [make_std_complex](size_t idx) -> T { 
                     return make_std_complex(T_real(0), T_real(0));
                 });
             else
