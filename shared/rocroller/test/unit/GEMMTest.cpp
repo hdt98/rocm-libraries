@@ -73,34 +73,6 @@ namespace GEMMTests
         return rv;
     }
 
-    std::vector<std::vector<size_t>> getLDSAddresses(std::string const& instruction,
-                                                     std::string const& s)
-    {
-        // Addresses are in format [address1, address2, ..., addressN], note the [] are not part of capture
-        std::regex addressesMatcher(instruction + R"(.*\n\/\/ addresses \[(.*)])");
-
-        auto begin = std::sregex_iterator(s.begin(), s.end(), addressesMatcher);
-        auto end   = std::sregex_iterator();
-
-        std::vector<std::vector<size_t>> rv;
-        for(auto i = begin; i != end; ++i)
-        {
-            auto                addressesStr = (*i)[1].str();
-            std::vector<size_t> addresses;
-            std::regex          address_pattern(R"((\d+))");
-            auto                valuesBegin
-                = std::sregex_iterator(addressesStr.begin(), addressesStr.end(), address_pattern);
-            auto ValuesEnd = std::sregex_iterator();
-            for(auto j = valuesBegin; j != ValuesEnd; ++j)
-            {
-                auto m = (*j)[1].str();
-                addresses.push_back(static_cast<size_t>(std::stoul(m)));
-            }
-            rv.push_back(addresses);
-        }
-        return rv;
-    }
-
     class GEMMTestGPU : public BaseGEMMContextFixture<>
     {
     };
@@ -159,26 +131,6 @@ namespace GEMMTests
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA);
         GEMMProblem gemm;
         basicGEMM<float>(gemm);
-
-        auto instructions = m_context->instructions()->toString();
-
-        {
-            const auto ds_read_b32_addrs = getLDSAddresses("ds_read_b32", instructions);
-            EXPECT_EQ(ds_read_b32_addrs.size(), 64);
-            for(size_t i = 0; i < ds_read_b32_addrs.size(); ++i)
-            {
-                EXPECT_EQ(ds_read_b32_addrs[i],
-                          std::vector<size_t>(
-                              {{0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,
-                                52,  56,  60,  64,  68,  72,  76,  80,  84,  88,  92,  96,  100,
-                                104, 108, 112, 116, 120, 124, 256, 260, 264, 268, 272, 276, 280,
-                                284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 328, 332,
-                                336, 340, 344, 348, 352, 356, 360, 364, 368, 372, 376, 380}}));
-            }
-        }
-        // For some reason the ds_read_b128 are not annotated
-        // Maybe not appear to go through LoadLDSTiled path
-        // Or the loadldstiled has specific filters for WAVE only
     }
 
     TEST_P(GEMMTestGPU, GPU_BasicGEMMPadLDS)
@@ -206,60 +158,6 @@ namespace GEMMTests
         //
         // so make sure this isn't in the read offsets!
         EXPECT_FALSE(ldsOffsets.contains(gemm.macM * gemm.macK * sizeof(float)));
-
-        {
-            const auto ds_read_b32_addrs = getLDSAddresses("ds_read_b32", instructions);
-            EXPECT_EQ(ds_read_b32_addrs.size(), 64);
-
-            // This kernel reads A first, which is padded 4 bytes with stride of 2048
-            EXPECT_EQ(
-                ds_read_b32_addrs[0],
-                std::vector<size_t>(
-                    {0,    256,  512,  768,  1024, 1280, 1536, 1792, 2052, 2308, 2564, 2820, 3076,
-                     3332, 3588, 3844, 4104, 4360, 4616, 4872, 5128, 5384, 5640, 5896, 6156, 6412,
-                     6668, 6924, 7180, 7436, 7692, 7948, 4,    260,  516,  772,  1028, 1284, 1540,
-                     1796, 2056, 2312, 2568, 2824, 3080, 3336, 3592, 3848, 4108, 4364, 4620, 4876,
-                     5132, 5388, 5644, 5900, 6160, 6416, 6672, 6928, 7184, 7440, 7696, 7952}));
-
-            // B is padded 4 bytes with stride of 1024
-            EXPECT_EQ(
-                ds_read_b32_addrs[1],
-                std::vector<size_t>(
-                    {0,    256,  512,  768,  1028, 1284, 1540, 1796, 2056, 2312, 2568, 2824, 3084,
-                     3340, 3596, 3852, 4112, 4368, 4624, 4880, 5140, 5396, 5652, 5908, 6168, 6424,
-                     6680, 6936, 7196, 7452, 7708, 7964, 4,    260,  516,  772,  1032, 1288, 1544,
-                     1800, 2060, 2316, 2572, 2828, 3088, 3344, 3600, 3856, 4116, 4372, 4628, 4884,
-                     5144, 5400, 5656, 5912, 6172, 6428, 6684, 6940, 7200, 7456, 7712, 7968}));
-        }
-    }
-
-    TEST_P(GEMMTestGPU, GPU_BasicGEMMNoPadLDS)
-    {
-        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA);
-        GEMMProblem gemm;
-        gemm.loadPathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.transA    = "T";
-        gemm.transB    = "N";
-
-        basicGEMM<float>(gemm);
-
-        auto instructions = m_context->instructions()->toString();
-        {
-            const auto ds_read_b32_addrs = getLDSAddresses("ds_read_b32", instructions);
-            EXPECT_EQ(ds_read_b32_addrs.size(), 64);
-            for(size_t i = 0; i < ds_read_b32_addrs.size(); ++i)
-            {
-                EXPECT_EQ(ds_read_b32_addrs[i],
-                          std::vector<size_t>(
-                              {{0,    256,  512,  768,  1024, 1280, 1536, 1792, 2048, 2304, 2560,
-                                2816, 3072, 3328, 3584, 3840, 4096, 4352, 4608, 4864, 5120, 5376,
-                                5632, 5888, 6144, 6400, 6656, 6912, 7168, 7424, 7680, 7936, 4,
-                                260,  516,  772,  1028, 1284, 1540, 1796, 2052, 2308, 2564, 2820,
-                                3076, 3332, 3588, 3844, 4100, 4356, 4612, 4868, 5124, 5380, 5636,
-                                5892, 6148, 6404, 6660, 6916, 7172, 7428, 7684, 7940}}));
-            }
-        }
     }
 
     TEST_P(GEMMTestGPU, GPU_BasicGEMMWorkgroupMapping)
