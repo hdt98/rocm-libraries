@@ -70,6 +70,7 @@ namespace MemAddressingTest
 
             static void NoPadding(std::vector<size_t> addresses)
             {
+                // Values from rocgdb
                 CHECK(addresses
                       == std::vector<size_t>{
                           0,    256,  512,  768,  1024, 1280, 1536, 1792, 2048, 2304, 2560,
@@ -83,6 +84,7 @@ namespace MemAddressingTest
             static void YesPadding(std::vector<size_t> addresses)
             {
                 INFO(addresses);
+                // Values from rocgdb
                 std::vector<size_t> A_pattern
                     = {0,    256,  512,  768,  1024, 1280, 1536, 1792, 2052, 2308, 2564, 2820, 3076,
                        3332, 3588, 3844, 4104, 4360, 4616, 4872, 5128, 5384, 5640, 5896, 6156, 6412,
