@@ -155,9 +155,9 @@ struct __attribute__((packed)) F4GemmKernelArgs
         , K(static_cast<uint32_t>(prob.k))
         , ptr_ScaleA(prob.scaleA)
         , ptr_ScaleB(prob.scaleB)
-        , stride_ScaleA0(static_cast<uint32_t>(prob.col_stride_a / 32))
+        , stride_ScaleA0(static_cast<uint32_t>(prob.k / 32))
         , stride_ScaleA1(0)
-        , stride_ScaleB0(static_cast<uint32_t>(prob.col_stride_b / 32))
+        , stride_ScaleB0(static_cast<uint32_t>(prob.k / 32))
         , stride_ScaleB1(0)
         , log2_k_split(0)
     {

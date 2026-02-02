@@ -231,8 +231,8 @@ std::vector<float> generateData(T                           dgen,
     //
     if(isMatrixA)
     {
-        std::cout << "[DEBUG] Overriding matrix A with Ones pattern" << std::endl;
-        opt.initMode = DataInitMode(Ones{});
+        std::cout << "[DEBUG] Overriding matrix A with Identity pattern" << std::endl;
+        opt.initMode = DataInitMode(Identity{});
     }
     else
     {
