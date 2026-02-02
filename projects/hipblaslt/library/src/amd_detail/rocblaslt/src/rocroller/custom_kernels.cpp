@@ -59,8 +59,8 @@ void preloadCustomKernels(SolutionCache& cache)
 
     SolutionIndexParameters params;
     params.workgroupTile    = {256, 256, 256};
-    params.workgroupMapping = true;
-    params.streamK          = false;
+    params.workgroupMapping = false;
+    params.streamK          = true;
     params.tailLoops        = true;
 
     cache.addKernel(
@@ -137,29 +137,27 @@ struct __attribute__((packed)) F4GemmKernelArgs
 
     F4GemmKernelArgs(const RocblasltContractionProblem& prob)
         : ptr_D(prob.D)
-        , ptr_C(nullptr) // , ptr_C(const_cast<void*>(prob.C))
+        , ptr_C(nullptr)
         , ptr_A(const_cast<void*>(prob.A))
         , ptr_B(const_cast<void*>(prob.B))
         , alpha(*static_cast<const float*>(prob.alpha))
         , beta(*static_cast<const float*>(prob.beta))
-        , stride_D0(0) //, stride_D0(static_cast<uint32_t>(prob.col_stride_d))
-        , stride_D1(0) //, stride_D1(static_cast<uint32_t>(prob.row_stride_d))
+        , stride_D0(0)
+        , stride_D1(0)
         , stride_C0(static_cast<uint32_t>(prob.col_stride_c))
-        , stride_C1(0) //, stride_C1(static_cast<uint32_t>(prob.row_stride_c))
+        , stride_C1(0)
         , stride_A0(static_cast<uint32_t>(prob.col_stride_a))
-        , stride_A1(0) //, stride_A1(static_cast<uint32_t>(prob.row_stride_a))
+        , stride_A1(0)
         , stride_B0(static_cast<uint32_t>(prob.col_stride_b))
-        , stride_B1(0) //, stride_B1(static_cast<uint32_t>(prob.row_stride_b))
+        , stride_B1(0)
         , M(static_cast<uint32_t>(prob.m))
         , N(static_cast<uint32_t>(prob.n))
         , K(static_cast<uint32_t>(prob.k))
         , ptr_ScaleA(prob.scaleA)
         , ptr_ScaleB(prob.scaleB)
-        , stride_ScaleA0(static_cast<uint32_t>(
-              prob.col_stride_a / 32)) //, stride_ScaleA0(static_cast<uint32_t>(prob.m))
+        , stride_ScaleA0(static_cast<uint32_t>(prob.col_stride_a / 32))
         , stride_ScaleA1(0)
-        , stride_ScaleB0(static_cast<uint32_t>(
-              prob.col_stride_b / 32)) //, stride_ScaleB0(static_cast<uint32_t>(prob.n))
+        , stride_ScaleB0(static_cast<uint32_t>(prob.col_stride_b / 32))
         , stride_ScaleB1(0)
         , log2_k_split(0)
     {
@@ -238,18 +236,26 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
         return rocblaslt_status_internal_error;
     }
 
-    // Grid: 1 thread per element, 256 threads per block
-    // For M=128, N=64 -> 8192 threads -> 32 blocks
-    uint32_t threads   = static_cast<uint32_t>(prob.m * prob.n);
-    uint32_t blockSize = 256;
-    uint32_t blocks    = (threads + blockSize - 1) / blockSize;
-
+    // The AITER kernel processes tiles of size 256x256
+    // Grid dimensions should be based on tiles
+    const uint32_t tileM = 256;
+    const uint32_t tileN = 256;
+    const uint32_t blockSize = 256;  // Threads per workgroup
+    
+    // Number of tiles in each dimension
+    uint32_t tilesM = (prob.m + tileM - 1) / tileM;
+    uint32_t tilesN = (prob.n + tileN - 1) / tileN;
+    
     dim3 grid;
-    grid.x = blocks;//(prob.n + gemm->params->workgroupTile.n - 1) / gemm->params->workgroupTile.n;
-    grid.y = 1;//(prob.m + gemm->params->workgroupTile.m - 1) / gemm->params->workgroupTile.m;
+    grid.x = tilesN * blockSize;  // Total threads in X
+    grid.y = tilesM;              // Workgroups in Y
     grid.z = 1;
 
     dim3 block{blockSize, 1, 1};
+    
+    std::cout << "[DEBUG] Grid: (" << grid.x << ", " << grid.y << ", " << grid.z << ")" << std::endl;
+    std::cout << "[DEBUG] Block: (" << block.x << ", " << block.y << ", " << block.z << ")" << std::endl;
+    std::cout << "[DEBUG] Tiles: M=" << tilesM << ", N=" << tilesN << std::endl;
 
     auto   args     = F4GemmKernelArgs(prob);
     printKernelArgs(args);
@@ -288,6 +294,13 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
         std::cerr << "hipExtModuleLaunchKernel in runCustomKernel failed: "
                   << gemm->module->getKernelName() << std::endl
                   << " error: " << hipGetErrorString(error) << std::endl;
+        return rocblaslt_status_internal_error;
+    }
+
+    // Synchronize to ensure kernel completes before verification
+    if(hipError_t error = hipStreamSynchronize(prob.stream))
+    {
+        std::cerr << "hipStreamSynchronize failed: " << hipGetErrorString(error) << std::endl;
         return rocblaslt_status_internal_error;
     }
 

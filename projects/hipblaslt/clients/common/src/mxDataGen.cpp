@@ -225,16 +225,21 @@ std::vector<float> generateData(T                           dgen,
 {
     using namespace DGen;
 
+    // Debug code for testing specific matrix patterns - uncomment to override initMode
+    // Available patterns: Identity{}, Ones{}, Zeros{}, Sequential{}, RowIndex{},
+    //                     ColIndex{}, Checkerboard{}, ScaledDiagonal{}
+    //
     if(isMatrixA)
     {
-        std::cout << "[DIRECT ASSEMBLY DEBUG] In generate data for A, customizing." << isMatrixA << std::endl;
+        std::cout << "[DEBUG] Overriding matrix A with Ones pattern" << std::endl;
         opt.initMode = DataInitMode(Ones{});
     }
     else
     {
-        std::cout << "[DIRECT ASSEMBLY DEBUG] In generate data for (not) A, customizing." << isMatrixA << std::endl;
-        opt.initMode = DataInitMode(Identity{});
+        std::cout << "[DEBUG] Overriding matrix B with Ones pattern" << std::endl;
+        opt.initMode = DataInitMode(Ones{});
     }
+
     dgen.setSeed(seed);
     dgen.generate(sizes, strides, opt);
 
@@ -242,6 +247,13 @@ std::vector<float> generateData(T                           dgen,
     std::memcpy(data, dataBytes.data(), dataBytes.size() * sizeof(uint8_t));
 
     std::vector<uint8_t> scaleBytes = dgen.getScaleBytes();
+
+    // DEBUG: Force all scales to 1.0 (neutral) to isolate data vs scale issues
+    // For E8M0 format, scale value 127 represents 2^0 = 1.0
+    // Uncomment below to test random data with uniform scales:
+    //
+    // std::cout << "[DEBUG] Forcing all scales to 1.0 (E8M0 value 127)" << std::endl;
+    // std::fill(scaleBytes.begin(), scaleBytes.end(), static_cast<uint8_t>(127));
 
 #ifdef HIPBLASLT_USE_ROCROLLER
     // Apply pre-swizzle to scale data if preSwizzleTile is provided
@@ -335,10 +347,29 @@ std::vector<float> generateMXInput(hipDataType                dataType,
     opt.min          = initMethod == "uniform_01" ? 0. : (initMethod == "hpl" ? -.5 : min_val);
     opt.max          = initMethod == "uniform_01" ? 1. : (initMethod == "hpl" ? .5 : max_val);
     opt.blockScaling = scaleBlockRowSize * scaleBlockColSize;
-    // TODO initMethod == "hpl" should also be Bounded, but fails some tests
-    opt.initMode = (initMethod == "Bounded" || initMethod == "uniform_01")
-                       ? DataInitMode(Bounded{})
-                       : DataInitMode(TrigonometricFromFloat{});
+
+    // Map string initMethod to DataInitMode
+    if(initMethod == "Sequential")
+        opt.initMode = DataInitMode(Sequential{});
+    else if(initMethod == "RowIndex")
+        opt.initMode = DataInitMode(RowIndex{});
+    else if(initMethod == "ColIndex")
+        opt.initMode = DataInitMode(ColIndex{});
+    else if(initMethod == "Checkerboard")
+        opt.initMode = DataInitMode(Checkerboard{});
+    else if(initMethod == "ScaledDiagonal")
+        opt.initMode = DataInitMode(ScaledDiagonal{});
+    else if(initMethod == "Identity")
+        opt.initMode = DataInitMode(Identity{});
+    else if(initMethod == "Ones")
+        opt.initMode = DataInitMode(Ones{});
+    else if(initMethod == "Zeros")
+        opt.initMode = DataInitMode(Zeros{});
+    else if(initMethod == "Bounded" || initMethod == "uniform_01")
+        opt.initMode = DataInitMode(Bounded{});
+    else
+        // TODO initMethod == "hpl" should also be Bounded, but fails some tests
+        opt.initMode = DataInitMode(TrigonometricFromFloat{});
 
     const uint32_t seed = 1713573849;
 
