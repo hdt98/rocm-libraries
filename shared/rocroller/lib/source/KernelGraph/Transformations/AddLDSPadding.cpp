@@ -99,7 +99,10 @@ workitems within a workgroup.
 #include <rocRoller/KernelGraph/Transforms/AddLDSPadding_detail.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 
+#include <algorithm>
 #include <fmt/format.h>
+#include <limits>
+#include <numeric>
 
 namespace rocRoller
 {
@@ -107,6 +110,9 @@ namespace rocRoller
     {
         namespace AddLDSPaddingDetail
         {
+            /**
+             *  @brief Compute the contiguous fast dimension size in bytes used by LDS padding
+            */
             uint CalculateAutomaticContiguousBlockSize(LDSPaddingInfo const& info)
             {
                 // Typical configuration:
@@ -116,72 +122,125 @@ namespace rocRoller
                 //
                 // Example: 4 elements/load * 4 bytes/element * 64 lanes = 1024 bytes
 
+                AssertFatal(info.loadLaneWidth == 0u
+                                || info.loadInstructionByteWidth
+                                       <= std::numeric_limits<uint>::max() / info.loadLaneWidth,
+                            "LDS padding overflow: contiguousBytes does not fit in uint.",
+                            ShowValue(info.loadInstructionByteWidth),
+                            ShowValue(info.loadLaneWidth));
+
                 return info.loadInstructionByteWidth * info.loadLaneWidth;
             }
 
+            /**
+            * @brief Compute paddingBytes that reduces LDS bank conflicts by improving bank rotation
+            */
             uint CalculateAutomaticPaddingBytes(LDSPaddingInfo const& info, uint contiguousBytes)
             {
                 // LDS has 32 banks, each 4 bytes wide
                 constexpr uint LDS_NUM_BANKS      = 32;
                 constexpr uint LDS_BYTES_PER_BANK = 4;
 
-                // A "row" of banks has 128 bytes.
+                // A "row" of banks has 128 bytes
                 constexpr uint LDS_BANK_ROW_BYTES = LDS_NUM_BANKS * LDS_BYTES_PER_BANK;
 
-                auto elementBytes = DataTypeInfo::Get(info.dataType).elementBits / 8u;
-
-                // The goal is to avoid LDS bank conflicts by adding
-                // padding when rows would otherwise map to the same
-                // banks.
+                // In this transform, padding changes the slow stride of a 2D view over a flat LDS buffer:
+                // strideBytes = contiguousBytes + paddingBytes
                 //
-                // If contiguous block size + padding is NOT a
-                // multiple of 128 bytes, successive rows will hit
-                // different banks, reducing conflicts.
-                //
+                // The strategy used here works in 4B bank words: strideWords = strideBytes / 4
+                // The start bank for row r is approximately: (r * strideWords) % 32
+                // The number of distinct banks visited by row starts is: 32 / GCD(strideWords, 32)
+                // So we choose the smallest valid padding that minimizes GCD(strideWords, 32)
+                // The best is GCD==1 for full 32 bank rotation
 
-                // Calculate how the contiguous block aligns with LDS
-                // banks
-                uint remainder = contiguousBytes % LDS_BANK_ROW_BYTES;
+                if(contiguousBytes == 0u)
+                    return 0u;
 
-                // If already not aligned to 128 bytes, bank conflicts
-                // are naturally avoided
-                if(remainder != 0)
+                uint elementBits  = DataTypeInfo::Get(info.dataType).elementBits;
+                uint elementBytes = elementBits / 8u;
+
+                AssertFatal(elementBits % 8u == 0u,
+                            "Padding mismatch: elementBits is not divisible by 8.",
+                            ShowValue(elementBits),
+                            ShowValue(info.dataType));
+                AssertFatal(elementBytes > 0u,
+                            "Padding mismatch: elementBytes is 0.",
+                            ShowValue(elementBits),
+                            ShowValue(info.dataType));
+
+                // We enumerate a small set of paddings in a short range (0--64B).
+                // These paddings must be divisible by elementBytes, and
+                // divisible by 4B for bank granularity so that the strideWords model applies
+                uint stepBytes = std::lcm(elementBytes, LDS_BYTES_PER_BANK);
+
+                // Score each padding by GCD(strideWords, 32).
+                // Smaller GCD means more distinct row start banks, resulting in generally fewer conflicts.
+                auto strideGCD = [&](uint padBytes) -> uint {
+                    AssertFatal(padBytes <= std::numeric_limits<uint>::max() - contiguousBytes,
+                                "LDS padding overflow: strideBytes does not fit in uint.",
+                                ShowValue(contiguousBytes),
+                                ShowValue(padBytes));
+
+                    uint strideBytes = contiguousBytes + padBytes;
+
+                    // We choose stepBytes such that strideBytes should be 4B aligned
+                    if(strideBytes % LDS_BYTES_PER_BANK != 0u)
+                        return LDS_NUM_BANKS;
+
+                    uint strideWords = strideBytes / LDS_BYTES_PER_BANK;
+                    return std::gcd(strideWords, LDS_NUM_BANKS);
+                };
+
+                uint bestPad = 0u;
+                uint bestG   = strideGCD(0u);
+
+                // Keep the search small to avoid increasing LDS allocation and reducing occupancy
+                uint maxPadBytes = 64u;
+
+                // For very small contiguousBytes, avoid padding that is a large fraction of the row
+                if(contiguousBytes < 256u)
+                    maxPadBytes = std::min<uint>(maxPadBytes,
+                                                 std::max<uint>(stepBytes, contiguousBytes / 4));
+
+                for(uint pad = stepBytes; pad <= maxPadBytes; pad += stepBytes)
                 {
-                    return 0;
+                    uint g = strideGCD(pad);
+                    if(g < bestG)
+                    {
+                        bestG   = g;
+                        bestPad = pad;
+
+                        if(bestG == 1u)
+                            break;
+                    }
                 }
 
-                // For 128-byte aligned blocks, we need padding to
-                // shift subsequent rows:
-                //
-                // - loadInstructionByteWidth (for optimal load pattern)
-                // - or 16 bytes
-
-                uint paddingBytes = info.loadInstructionByteWidth;
-
-                // However, ensure padding is at least one element and
-                // reasonable
-                uint minPaddingBytes = elementBytes;
-                uint maxPaddingBytes = 64;
-
-                paddingBytes = std::max(paddingBytes, minPaddingBytes);
-                paddingBytes = std::min(paddingBytes, maxPaddingBytes);
-
-                // Special case: for very small element types with large vector widths,
-                // we might over-pad. Cap at a reasonable fraction of the block size.
-                if(paddingBytes > contiguousBytes / 8)
+                //If the stride is already not 128B-aligned and we did not strictly improve the GCD score,
+                //keep padding at 0 to avoid unnecessary LDS growth
+                if((contiguousBytes % LDS_BANK_ROW_BYTES) != 0u && bestPad != 0u)
                 {
-                    paddingBytes = std::max(contiguousBytes / 16, minPaddingBytes);
+                    uint baseG = strideGCD(0u);
+                    if(bestG >= baseG)
+                        bestPad = 0u;
                 }
+
+                // Ensure MakePaddedBlocks divisibility assertions hold
+                AssertFatal((bestPad * 8u) % elementBits == 0u,
+                            "Padding mismatch: padding-bytes is not divisible by elementBits.",
+                            ShowValue(bestPad),
+                            ShowValue(elementBits),
+                            ShowValue(info.dataType));
 
                 Log::debug("KernelGraph::AddLDSPadding::CalculateAutomaticPaddingBytes: "
                            "contiguousBytes={}, elementBytes={}, loadInstructionByteWidth={}, "
-                           "calculated paddingBytes={}",
+                           "selected paddingBytes={}, GCD(strideWords,32)={}",
                            contiguousBytes,
                            elementBytes,
                            info.loadInstructionByteWidth,
-                           paddingBytes);
+                           bestPad,
+                           bestG);
 
-                return paddingBytes;
+                return bestPad;
             }
 
             std::string toString(LDSPaddingInfo const& info)
