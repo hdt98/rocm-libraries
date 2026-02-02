@@ -1321,7 +1321,7 @@ CK_TILE_DEVICE_EXTERN bf16x2_t llvm_amdgcn_raw_buffer_atomic_add_bf16x2(
     int32x4_t rsrc,
     index_t voffset,
     index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16");
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16.v4i32");
 
 // buffer atomic-add i32
 CK_TILE_DEVICE_EXTERN int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(

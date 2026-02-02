@@ -1729,6 +1729,10 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                         valid = false;
                     }
                 }
+                else
+                {
+                    valid = false;
+                }
             }
             else
             {
@@ -1746,6 +1750,10 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                     {
                         valid = false;
                     }
+                }
+                else
+                {
+                    valid = false;
                 }
             }
             if(!valid)
