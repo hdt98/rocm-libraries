@@ -107,26 +107,24 @@ GetOrigamiPerformanceConfig(const Solver s,
     if(!ori_cfgs.empty())
     {
         MIOPEN_LOG_I2("Ranking PerformanceConfig");
+        MIOPEN_LOG_T("ori_cfgs size " << ori_cfgs.size());
         auto ranked_configs = origami::rank_configs(ori_prob, hardware, ori_cfgs);
+        MIOPEN_LOG_T("ranked_configs size " << ranked_configs.size());
 
-        bool first = true;
+        size_t iter = 0;
         for(auto prediction : ranked_configs)
         {
-            if(first)
-            {
-                auto ori_cfg = prediction.config;
-                MIOPEN_LOG_T("Rank 1 configs: "
-                             << "MT.M(" << ori_cfg.mt.m << ") MT.N(" << ori_cfg.mt.n << ") MT.K("
-                             << ori_cfg.mt.k << ") MI.M(" << ori_cfg.mi.m << ") MI.N("
-                             << ori_cfg.mi.n << ") MI.K(" << ori_cfg.mi.k << ")");
-            }
+            auto ori_cfg = prediction.config;
+            MIOPEN_LOG_T("Rank "<<iter<<" configs: "
+                         << "MT.M(" << ori_cfg.mt.m << ") MT.N(" << ori_cfg.mt.n << ") MT.K("
+                         << ori_cfg.mt.k << ") MI.M(" << ori_cfg.mi.m << ") MI.N("
+                         << ori_cfg.mi.n << ") MI.K(" << ori_cfg.mi.k << ")");
+
             for(auto perf_cfg : ori_to_perf_cfg[SerializeOrigamiConfig(prediction.config)])
             {
                 ret.push_back(perf_cfg);
-                if(first)
-                    MIOPEN_LOG_T(perf_cfg);
             }
-            first = false;
+            iter++;
         }
     }
     MIOPEN_LOG_I2("return perf_cfg: " << ret.size());
