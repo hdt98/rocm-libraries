@@ -65,8 +65,8 @@ GetOrigamiPerformanceConfig(const Solver s,
     ori_prob.batch = 1;
     // TransA T and TransB N is both K Contiguous (Ks next to each other in memory)
     // TransA N and TransB T is M/N contiguous (M and N next to each other in memory)
-    ori_prob.a_transpose = origami::transpose_t::T;
-    ori_prob.b_transpose = origami::transpose_t::N;
+    ori_prob.a_transpose = origami::transpose_t::N;
+    ori_prob.b_transpose = origami::transpose_t::T;
     ori_prob.a_dtype     = GetOriDataType(problem);
     ori_prob.b_dtype     = GetOriDataType(problem);
     ori_prob.c_dtype     = GetOriDataType(problem);
