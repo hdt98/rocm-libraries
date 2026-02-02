@@ -3224,7 +3224,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
 
     if(tid == 0)
     {
-        for(I k = 1; k < LACN2_BLOCKSIZE / WarpSize; k++)
+        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
             sum += sval[k];
         *norm = sum;
     }
@@ -3275,7 +3275,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump2(const I n, 
 
     if(tid == 0)
     {
-        for(I k = 1; k < LACN2_BLOCKSIZE / WarpSize; k++)
+        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
         {
             if(rocblas_abs(sval[k]) > local_max)
             {
@@ -3355,7 +3355,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
 
     if(tid == 0)
     {
-        for(I k = 1; k < LACN2_BLOCKSIZE / WarpSize; k++)
+        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
         {
             sum += sval[k];
             repeated = repeated && sval_repeated[k];
@@ -3479,7 +3479,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump4(const I n,
 
     if(tid == 0)
     {
-        for(I k = 1; k < LACN2_BLOCKSIZE / WarpSize; k++)
+        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
         {
             if(rocblas_abs(sval[k]) > local_max)
             {
@@ -3560,7 +3560,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump5(const I n, 
 
     if(tid == 0)
     {
-        for(I k = 1; k < LACN2_BLOCKSIZE / WarpSize; k++)
+        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
             sum += sval[k];
         sum = 2 * (sum / (3 * n));
         if(sum > *norm)
