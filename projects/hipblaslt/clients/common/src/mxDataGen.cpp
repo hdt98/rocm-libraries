@@ -28,6 +28,7 @@
 #include <mxDataGenerator/DataGenerator.hpp>
 #include <mxDataGenerator/PreSwizzle.hpp>
 #include <cblas.h>
+#include <cmath>
 
 
 template <typename DT>
@@ -225,19 +226,39 @@ std::vector<float> generateData(T                           dgen,
 {
     using namespace DGen;
 
-    // Debug code for testing specific matrix patterns - uncomment to override initMode
-    // Available patterns: Identity{}, Ones{}, Zeros{}, Sequential{}, RowIndex{},
-    //                     ColIndex{}, Checkerboard{}, ScaledDiagonal{}
-    //
-    if(isMatrixA)
-    {
-        std::cout << "[DEBUG] Overriding matrix A with Identity pattern" << std::endl;
-        opt.initMode = DataInitMode(Identity{});
+    // ============== DEBUG TEST CONFIGURATION ==============
+    // Set these to control test patterns:
+    //   0 = use default (random Bounded)
+    //   1 = Identity    4 = RowIndex      7 = Checkerboard
+    //   2 = Ones        5 = ColIndex      8 = ScaledDiagonal
+    //   3 = Zeros       6 = Sequential
+    constexpr int DEBUG_PATTERN_A = 4;  // Pattern for matrix A (0=default)
+    constexpr int DEBUG_PATTERN_B = 1;  // Pattern for matrix B (0=default)
+    constexpr bool DEBUG_FORCE_SCALES = true;  // Use DataGenerator's scales
+    constexpr bool DEBUG_DISABLE_PRESWIZZLE = false;  // Enable preSwizzle
+    constexpr bool DEBUG_COMPENSATE_SCALES = false;  // No scale compensation
+    
+    // DESIRED effective scale (only used when DEBUG_FORCE_SCALES=true)
+    // AITER uses E8M0 bias=128, so E8M0_value = 128 + log2(scale)
+    constexpr float DEBUG_DESIRED_EFFECTIVE_SCALE_A = 1.0f;
+    constexpr float DEBUG_DESIRED_EFFECTIVE_SCALE_B = 1.0f;
+    // ======================================================
+
+    int debugPattern = isMatrixA ? DEBUG_PATTERN_A : DEBUG_PATTERN_B;
+    const char* patternName = nullptr;
+    switch(debugPattern) {
+        case 1: opt.initMode = DataInitMode(Identity{}); patternName = "Identity"; break;
+        case 2: opt.initMode = DataInitMode(Ones{}); patternName = "Ones"; break;
+        case 3: opt.initMode = DataInitMode(Zeros{}); patternName = "Zeros"; break;
+        case 4: opt.initMode = DataInitMode(RowIndex{}); patternName = "RowIndex"; break;
+        case 5: opt.initMode = DataInitMode(ColIndex{}); patternName = "ColIndex"; break;
+        case 6: opt.initMode = DataInitMode(Sequential{}); patternName = "Sequential"; break;
+        case 7: opt.initMode = DataInitMode(Checkerboard{}); patternName = "Checkerboard"; break;
+        case 8: opt.initMode = DataInitMode(ScaledDiagonal{}); patternName = "ScaledDiagonal"; break;
     }
-    else
-    {
-        std::cout << "[DEBUG] Overriding matrix B with Ones pattern" << std::endl;
-        opt.initMode = DataInitMode(Ones{});
+    if(patternName) {
+        std::cout << "[DEBUG] Matrix " << (isMatrixA ? "A" : "B") 
+                  << " = " << patternName << std::endl;
     }
 
     dgen.setSeed(seed);
@@ -247,27 +268,80 @@ std::vector<float> generateData(T                           dgen,
     std::memcpy(data, dataBytes.data(), dataBytes.size() * sizeof(uint8_t));
 
     std::vector<uint8_t> scaleBytes = dgen.getScaleBytes();
-
-    // DEBUG: Force all scales to 1.0 (neutral) to isolate data vs scale issues
-    // For E8M0 format, scale value 127 represents 2^0 = 1.0
-    // Uncomment below to test random data with uniform scales:
-    //
-    // std::cout << "[DEBUG] Forcing all scales to 1.0 (E8M0 value 127)" << std::endl;
-    // std::fill(scaleBytes.begin(), scaleBytes.end(), static_cast<uint8_t>(127));
+    
+    // Debug: print scale buffer info
+    std::cout << "[DEBUG] Scale buffer size: " << scaleBytes.size() << " bytes" << std::endl;
+    if(scaleBytes.size() > 0) {
+        std::cout << "[DEBUG] First 16 scale bytes: ";
+        for(size_t i = 0; i < std::min(size_t(16), scaleBytes.size()); i++) {
+            std::cout << (int)scaleBytes[i] << " ";
+        }
+        std::cout << std::endl;
+    }
 
 #ifdef HIPBLASLT_USE_ROCROLLER
+    if(DEBUG_FORCE_SCALES) {
+        float desiredScale = isMatrixA ? DEBUG_DESIRED_EFFECTIVE_SCALE_A : DEBUG_DESIRED_EFFECTIVE_SCALE_B;
+        
+        uint8_t scaleValue;
+        float actualScale;
+        
+        if(DEBUG_COMPENSATE_SCALES) {
+            // AITER kernel uses E8M0 bias=128 (not OCP's bias=127!)
+            // So E8M0 value 128 = 2^(128-128) = 1.0
+            // E8M0: value = 128 + log2(desired_scale)
+            float desiredExponent = std::log2(desiredScale);
+            int actualE8M0 = static_cast<int>(std::round(128.0f + desiredExponent));
+            
+            // Clamp to valid E8M0 range (0-255, but typically 1-254 for normal values)
+            scaleValue = static_cast<uint8_t>(std::max(1, std::min(254, actualE8M0)));
+            actualScale = std::pow(2.0f, static_cast<int>(scaleValue) - 128);  // AITER uses bias=128
+            
+            std::cout << "[DEBUG] Scale" << (isMatrixA ? "A" : "B") << " (AITER bias=128):" 
+                      << " desired=" << desiredScale
+                      << ", E8M0=" << (int)scaleValue
+                      << ", actual_scale=" << actualScale << std::endl;
+        } else {
+            // Direct E8M0 value (no compensation) - AITER uses bias=128
+            float desiredExponent = std::log2(desiredScale);
+            scaleValue = static_cast<uint8_t>(std::round(128.0f + desiredExponent));
+            actualScale = std::pow(2.0f, static_cast<int>(scaleValue) - 128);
+            std::cout << "[DEBUG] Forcing scale" << (isMatrixA ? "A" : "B") << " to " << actualScale 
+                      << " (E8M0 value " << (int)scaleValue << ", AITER bias=128)" << std::endl;
+        }
+        
+        std::fill(scaleBytes.begin(), scaleBytes.end(), scaleValue);
+        
+        // Debug: print forced scale bytes
+        std::cout << "[DEBUG] After forcing, first 16 scale bytes: ";
+        for(size_t i = 0; i < std::min(size_t(16), scaleBytes.size()); i++) {
+            std::cout << (int)scaleBytes[i] << " ";
+        }
+        std::cout << std::endl;
+    }
+    // Note: DataGenerator already uses AITER-compatible E8M0 format (128 = 1.0)
+    // No conversion needed - verified by "Ones" pattern test
+    
     // Apply pre-swizzle to scale data if preSwizzleTile is provided
-    if(preSwizzleTile.size() == 3)
+    if(preSwizzleTile.size() == 3 && !DEBUG_DISABLE_PRESWIZZLE)
     {
-        // Calculate scale tensor dimensions
-        // sizes = {rowSize, colSize} where:
-        //   - For transposed A: rowSize = K, colSize = M
-        //   - For non-transposed B: rowSize = K, colSize = N
-        // The scale tensor has shape (rowSize/blockSize, colSize)
-        size_t scaleRows = sizes[0] / elementsPerMXBlock; // K / blockSize
-        size_t scaleCols = sizes[1]; // M or N
-
+        size_t scaleRows = sizes[0] / elementsPerMXBlock;
+        size_t scaleCols = sizes[1];
         scaleBytes = DGen::preSwizzle(scaleBytes, {scaleRows, scaleCols}, preSwizzleTile, preTile);
+    }
+    else if(DEBUG_DISABLE_PRESWIZZLE)
+    {
+        std::cout << "[DEBUG] PreSwizzle DISABLED for testing" << std::endl;
+    }
+#else
+    if(DEBUG_FORCE_SCALES) {
+        float desiredScale = isMatrixA ? DEBUG_DESIRED_EFFECTIVE_SCALE_A : DEBUG_DESIRED_EFFECTIVE_SCALE_B;
+        float desiredExponent = std::log2(desiredScale);
+        uint8_t scaleValue = static_cast<uint8_t>(std::round(128.0f + desiredExponent));  // AITER bias=128
+        float actualScale = std::pow(2.0f, static_cast<int>(scaleValue) - 128);
+        std::cout << "[DEBUG] Forcing scale" << (isMatrixA ? "A" : "B") << " to " << actualScale 
+                  << " (E8M0 value " << (int)scaleValue << ", AITER bias=128)" << std::endl;
+        std::fill(scaleBytes.begin(), scaleBytes.end(), scaleValue);
     }
 #endif
 
