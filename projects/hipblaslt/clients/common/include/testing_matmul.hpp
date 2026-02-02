@@ -3853,7 +3853,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Run 5 sub-iterations
                         for(int j = 0; j < num_sub_iterations; j++)
                         {
-                            CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
+                            int idx = i * num_sub_iterations + j;
+                            CHECK_HIPBLASLT_ERROR(gemmVec[idx % block_count].run(stream));
                             if(arg.flush)
                                 hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
                         }
@@ -3962,23 +3963,24 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Run 5 sub-iterations
                         for(int j = 0; j < num_sub_iterations; j++)
                         {
+                            int idx = i * num_sub_iterations + j;
                             EXPECT_HIPBLAS_STATUS(
                                 hipblasLtMatmul(
                                     handle,
                                     ptr_matmul,
                                     ptr_alpha,
                                     dA[0].as<char>()
-                                        + (i % block_count) * size_dA[0] * realDataTypeSize(TiA),
+                                        + (idx % block_count) * size_dA[0] * realDataTypeSize(TiA),
                                     matA[0],
                                     dB[0].as<char>()
-                                        + (i % block_count) * size_dB[0] * realDataTypeSize(TiB),
+                                        + (idx % block_count) * size_dB[0] * realDataTypeSize(TiB),
                                     matB[0],
                                     &(h_beta[0]),
                                     dC[0].as<char>()
-                                        + (i % block_count) * size_C[0] * realDataTypeSize(To),
+                                        + (idx % block_count) * size_C[0] * realDataTypeSize(To),
                                     matC[0],
                                     (*dDp)[0].as<char>()
-                                        + (i % block_count) * size_D[0] * realDataTypeSize(To),
+                                        + (idx % block_count) * size_D[0] * realDataTypeSize(To),
                                     matD[0],
                                     &heuristicResult[sol].algo,
                                     *dWorkspace,
