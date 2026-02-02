@@ -52,7 +52,7 @@ class TestGemmCommon : public ::testing::Test
             int StrideE = ck::is_same_v<ELayout, Row> ? N : M;
 
             all_success =
-                all_success & GetImpl()(1, 1, false, true, M, N, K, StrideA, StrideB, StrideE);
+                all_success & GetImpl()(1, 1, false, false, M, N, K, StrideA, StrideB, StrideE);
         }
 
         EXPECT_TRUE(all_success);
