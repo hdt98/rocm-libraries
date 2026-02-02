@@ -103,7 +103,7 @@ protected:
     {
         Arguments arg = gecon_setup_arguments(this->GetParam());
 
-        if(arg.peek<I>("n") == 0)
+        if(arg.peek<I>("n") == 0 && arg.peek<char>("norm_type") == '1')
             testing_gecon_bad_arg<T, I>();
 
         testing_gecon<T, I>(arg);
