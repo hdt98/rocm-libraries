@@ -66,6 +66,101 @@ ROCSOLVER_KERNEL void gecon_compute_rcond(S* rcond, const S* est, const S* anorm
     }
 }
 
+template <typename T, typename I, typename S>
+void rocsolver_gecon_getMemorySize(const I n,
+                                   const I lda,
+                                   const I batch_count,
+                                   size_t* size_work_v,
+                                   size_t* size_work_x,
+                                   size_t* size_work_isgn,
+                                   size_t* size_scalar_est,
+                                   size_t* size_scalar_max_idx,
+                                   size_t* size_scalar_kase,
+                                   size_t* size_scalar_jump,
+                                   size_t* size_work_getrs_1,
+                                   size_t* size_work_getrs_2,
+                                   size_t* size_work_getrs_3,
+                                   size_t* size_work_getrs_4)
+{
+    // if quick return no workspace needed
+    if(n == 0 || batch_count == 0)
+    {
+        *size_work_v = 0;
+        *size_work_x = 0;
+        *size_work_isgn = 0;
+        *size_scalar_est = 0;
+        *size_scalar_max_idx = 0;
+        *size_scalar_kase = 0;
+        *size_scalar_jump = 0;
+        *size_work_getrs_1 = 0;
+        *size_work_getrs_2 = 0;
+        *size_work_getrs_3 = 0;
+        *size_work_getrs_4 = 0;
+        return;
+    }
+
+    // need n elements of type T per batch for v vector
+    *size_work_v = sizeof(T) * n * batch_count;
+
+    // need n elements of type T per batch for x vector
+    *size_work_x = sizeof(T) * n * batch_count;
+
+    // need n elements of type I per batch for isgn vector (only used by real types, not complex)
+    *size_work_isgn = rocblas_is_complex<T> ? 0 : sizeof(I) * n * batch_count;
+
+    // Scalars are reused across batches (not allocated per batch)
+    // need one S (real) scalar for estimate
+    *size_scalar_est = sizeof(S);
+
+    // need one I scalar for max index
+    *size_scalar_max_idx = sizeof(I);
+
+    // need one rocblas_int scalar for kase state
+    *size_scalar_kase = sizeof(rocblas_int);
+
+    // need one rocblas_int scalar for jump state
+    *size_scalar_jump = sizeof(rocblas_int);
+
+    // workspace for getrs
+    // optim_mem is an output parameter indicating if optimized memory layout is used
+    // by getrs internally; we don't need to act on it here, just provide it to the query
+    bool optim_mem;
+    rocsolver_getrs_getMemorySize<false, false, T, I>(
+        rocblas_operation_none, n, 1, batch_count, size_work_getrs_1, size_work_getrs_2,
+        size_work_getrs_3, size_work_getrs_4, &optim_mem, lda, n);
+}
+
+template <typename T, typename I, typename S>
+rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
+                                        const rocsolver_norm_type norm_type,
+                                        const I n,
+                                        const I lda,
+                                        T A,
+                                        const I* ipiv,
+                                        const S* anorm,
+                                        S* rcond)
+{
+    // order is important for unit tests:
+
+    // 1. invalid/non-supported values
+    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity)
+        return rocblas_status_invalid_value;
+
+    // 2. invalid size
+    if(n < 0 || lda < n)
+        return rocblas_status_invalid_size;
+
+    // skip pointer check if querying memory size
+    if(rocblas_is_device_memory_size_query(handle))
+        return rocblas_status_continue;
+
+    // 3. invalid pointers
+    if((n && !A) || (n && !ipiv) || (n && !anorm) || (n && !rcond))
+        return rocblas_status_invalid_pointer;
+
+    return rocblas_status_continue;
+}
+
 // main gecon function
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename S, typename U>
 rocblas_status rocsolver_gecon_template(rocblas_handle handle,
@@ -180,101 +275,6 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
     }
 
     return rocblas_status_success;
-}
-
-template <typename T, typename I, typename S>
-void rocsolver_gecon_getMemorySize(const I n,
-                                   const I lda,
-                                   const I batch_count,
-                                   size_t* size_work_v,
-                                   size_t* size_work_x,
-                                   size_t* size_work_isgn,
-                                   size_t* size_scalar_est,
-                                   size_t* size_scalar_max_idx,
-                                   size_t* size_scalar_kase,
-                                   size_t* size_scalar_jump,
-                                   size_t* size_work_getrs_1,
-                                   size_t* size_work_getrs_2,
-                                   size_t* size_work_getrs_3,
-                                   size_t* size_work_getrs_4)
-{
-    // if quick return no workspace needed
-    if(n == 0 || batch_count == 0)
-    {
-        *size_work_v = 0;
-        *size_work_x = 0;
-        *size_work_isgn = 0;
-        *size_scalar_est = 0;
-        *size_scalar_max_idx = 0;
-        *size_scalar_kase = 0;
-        *size_scalar_jump = 0;
-        *size_work_getrs_1 = 0;
-        *size_work_getrs_2 = 0;
-        *size_work_getrs_3 = 0;
-        *size_work_getrs_4 = 0;
-        return;
-    }
-
-    // need n elements of type T per batch for v vector
-    *size_work_v = sizeof(T) * n * batch_count;
-
-    // need n elements of type T per batch for x vector
-    *size_work_x = sizeof(T) * n * batch_count;
-
-    // need n elements of type I per batch for isgn vector (only used by real types, not complex)
-    *size_work_isgn = rocblas_is_complex<T> ? 0 : sizeof(I) * n * batch_count;
-
-    // Scalars are reused across batches (not allocated per batch)
-    // need one S (real) scalar for estimate
-    *size_scalar_est = sizeof(S);
-
-    // need one I scalar for max index
-    *size_scalar_max_idx = sizeof(I);
-
-    // need one rocblas_int scalar for kase state
-    *size_scalar_kase = sizeof(rocblas_int);
-
-    // need one rocblas_int scalar for jump state
-    *size_scalar_jump = sizeof(rocblas_int);
-
-    // workspace for getrs
-    // optim_mem is an output parameter indicating if optimized memory layout is used
-    // by getrs internally; we don't need to act on it here, just provide it to the query
-    bool optim_mem;
-    rocsolver_getrs_getMemorySize<false, false, T, I>(
-        rocblas_operation_none, n, 1, batch_count, size_work_getrs_1, size_work_getrs_2,
-        size_work_getrs_3, size_work_getrs_4, &optim_mem, lda, n);
-}
-
-template <typename T, typename I, typename S>
-rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
-                                        const rocsolver_norm_type norm_type,
-                                        const I n,
-                                        const I lda,
-                                        T A,
-                                        const I* ipiv,
-                                        const S* anorm,
-                                        S* rcond)
-{
-    // order is important for unit tests:
-
-    // 1. invalid/non-supported values
-    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity)
-        return rocblas_status_invalid_value;
-
-    // 2. invalid size
-    if(n < 0 || lda < n)
-        return rocblas_status_invalid_size;
-
-    // skip pointer check if querying memory size
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_status_continue;
-
-    // 3. invalid pointers
-    if((n && !A) || (n && !ipiv) || (n && !anorm) || (n && !rcond))
-        return rocblas_status_invalid_pointer;
-
-    return rocblas_status_continue;
 }
 
 ROCSOLVER_END_NAMESPACE
