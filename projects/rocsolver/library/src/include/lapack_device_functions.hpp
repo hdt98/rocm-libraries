@@ -805,6 +805,191 @@ __device__ void iamax(const I tid, const I n, T* A, const I incA, S* sval, I* si
     // after the reduction, the maximum of the elements is in sval[0] and sidx[0]
 }
 
+/** IMAX1 finds the maximum element of a given vector.
+    MAX_THDS should be 128, 256, 512, or 1024, and sval should
+    be a shared array of size MAX_THDS. **/
+template <int MAX_THDS, typename T, typename I, typename S>
+__device__ void imax1(const I tid, const I n, T* A, const I incA, S* sval)
+{
+    // local memory setup
+    S val1, val2;
+
+    // read into shared memory while doing initial step
+    // (each thread reduce as many elements as needed to cover the original array)
+    val1 = 0;
+    for(I i = tid; i < n; i += MAX_THDS)
+    {
+        val2 = rocblas_abs(A[i * incA]);
+        if(val1 < val2)
+            val1 = val2;
+    }
+    sval[tid] = val1;
+    __syncthreads();
+
+    if(n <= 1)
+        return;
+
+        /** <========= Next do the reduction on the shared memory array =========>
+        (We halve the number of active threads at each step
+        reducing two elements in the shared array. **/
+
+#pragma unroll
+    for(I i = MAX_THDS / 2; i > warpSize; i /= 2)
+    {
+        if(tid < i)
+        {
+            val2 = sval[tid + i];
+            if(val1 < val2)
+                sval[tid] = val1 = val2;
+        }
+        __syncthreads();
+    }
+
+    // from this point, as all the active threads will form a single wavefront
+    // and work in lock-step, there is no need for synchronizations and barriers
+    if(tid < warpSize)
+    {
+        if(warpSize >= 64)
+        {
+            val2 = sval[tid + 64];
+            if(val1 < val2)
+                sval[tid] = val1 = val2;
+        }
+        val2 = sval[tid + 32];
+        if(val1 < val2)
+            sval[tid] = val1 = val2;
+        val2 = sval[tid + 16];
+        if(val1 < val2)
+            sval[tid] = val1 = val2;
+        val2 = sval[tid + 8];
+        if(val1 < val2)
+            sval[tid] = val1 = val2;
+        val2 = sval[tid + 4];
+        if(val1 < val2)
+            sval[tid] = val1 = val2;
+        val2 = sval[tid + 2];
+        if(val1 < val2)
+            sval[tid] = val1 = val2;
+        val2 = sval[tid + 1];
+        if(val1 < val2)
+            sval[tid] = val1 = val2;
+    }
+
+    // after the reduction, the maximum of the elements is in sval[0]
+}
+
+/** IMAX1 finds the maximum element of a given vector and its index.
+    MAX_THDS should be 64, 128, 256, 512, or 1024, and sval and sidx should
+    be shared arrays of size MAX_THDS. **/
+template <int MAX_THDS, typename T, typename I, typename S>
+__device__ void imax1(const I tid, const I n, T* A, const I incA, S* sval, I* sidx)
+{
+    // local memory setup
+    S val1, val2;
+    I idx1, idx2;
+
+    // read into shared memory while doing initial step
+    // (each thread reduce as many elements as needed to cover the original array)
+    val1 = 0;
+    idx1 = INT_MAX;
+    for(I i = tid; i < n; i += MAX_THDS)
+    {
+        val2 = rocblas_abs(A[i * incA]);
+        idx2 = i + 1; // add one to make it 1-based index
+        if(val1 < val2 || idx1 == INT_MAX)
+        {
+            val1 = val2;
+            idx1 = idx2;
+        }
+    }
+    sval[tid] = val1;
+    sidx[tid] = idx1;
+    __syncthreads();
+
+    if(n <= 1)
+        return;
+
+        /** <========= Next do the reduction on the shared memory array =========>
+        (We halve the number of active threads at each step
+        reducing two elements in the shared array. **/
+
+#pragma unroll
+    for(I i = MAX_THDS / 2; i > warpSize; i /= 2)
+    {
+        if(tid < i)
+        {
+            val2 = sval[tid + i];
+            idx2 = sidx[tid + i];
+            if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+            {
+                sval[tid] = val1 = val2;
+                sidx[tid] = idx1 = idx2;
+            }
+        }
+        __syncthreads();
+    }
+
+    // from this point, as all the active threads will form a single wavefront
+    // and work in lock-step, there is no need for synchronizations and barriers
+    if(tid < warpSize)
+    {
+        if(warpSize >= 64 && MAX_THDS >= 128)
+        {
+            val2 = sval[tid + 64];
+            idx2 = sidx[tid + 64];
+            if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+            {
+                sval[tid] = val1 = val2;
+                sidx[tid] = idx1 = idx2;
+            }
+        }
+        val2 = sval[tid + 32];
+        idx2 = sidx[tid + 32];
+        if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+        {
+            sval[tid] = val1 = val2;
+            sidx[tid] = idx1 = idx2;
+        }
+        val2 = sval[tid + 16];
+        idx2 = sidx[tid + 16];
+        if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+        {
+            sval[tid] = val1 = val2;
+            sidx[tid] = idx1 = idx2;
+        }
+        val2 = sval[tid + 8];
+        idx2 = sidx[tid + 8];
+        if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+        {
+            sval[tid] = val1 = val2;
+            sidx[tid] = idx1 = idx2;
+        }
+        val2 = sval[tid + 4];
+        idx2 = sidx[tid + 4];
+        if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+        {
+            sval[tid] = val1 = val2;
+            sidx[tid] = idx1 = idx2;
+        }
+        val2 = sval[tid + 2];
+        idx2 = sidx[tid + 2];
+        if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+        {
+            sval[tid] = val1 = val2;
+            sidx[tid] = idx1 = idx2;
+        }
+        val2 = sval[tid + 1];
+        idx2 = sidx[tid + 1];
+        if((val1 < val2) || (val1 == val2 && idx1 > idx2))
+        {
+            sval[tid] = val1 = val2;
+            sidx[tid] = idx1 = idx2;
+        }
+    }
+
+    // after the reduction, the maximum of the elements is in sval[0] and sidx[0]
+}
+
 /** NRM2 finds the euclidean norm of a given vector.
     MAX_THDS should be 128, 256, 512, or 1024, and sval should
     be a shared array of size MAX_THDS. **/
@@ -3234,58 +3419,37 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
  * lacn2_jump2: Find index of maximum absolute value in vector x
  * Sets all x entries to 0 except the max element which is set to 1
  * Must be called with only a single block
+ *
+ * Note: Uses imax1 device routine which computes max of sqrt(real(x[i])^2 + imag(x[i])^2) for complex types
  */
 template <typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump2(const I n, T* x, I* max_idx)
 {
     I tid = threadIdx.x;
 
-    // shared variables
-    __shared__ S sval[LACN2_BLOCKSIZE / WarpSize];
-    __shared__ I sval_indices[LACN2_BLOCKSIZE / WarpSize];
+    // shared variables for imax1
+    __shared__ S sval[LACN2_BLOCKSIZE];
+    __shared__ I sidx[LACN2_BLOCKSIZE];
 
-    // find index of maximum absolute value in vector x
-    S local_max = std::numeric_limits<S>::min();
-    I local_max_index = 0;
-    for(I i = tid; i < n; i += LACN2_BLOCKSIZE)
+    // Find index of maximum absolute value using imax1 device routine
+    // For complex types, imax1 uses sqrt(real^2 + imag^2)
+    imax1<LACN2_BLOCKSIZE, T, I, S>(tid, n, x, 1, sval, sidx);
+
+    // imax1 returns 1-based index in sidx[0], convert to 0-based
+    I local_max_index;
+    if(tid == 0)
     {
-        if(rocblas_abs(x[i]) > local_max)
-        {
-            local_max = rocblas_abs(x[i]);
-            local_max_index = i;
-        }
-        x[i] = T(0);
-    }
-
-    // reduce within Warp using shuffle on both index and value
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 1);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 2);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 4);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 8);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 16);
-    if(WarpSize > 32)
-        lacn2_max_index<S, I>(n, &local_max, &local_max_index, 32);
-
-    if(tid % WarpSize == 0)
-    {
-        sval[tid / WarpSize] = local_max;
-        sval_indices[tid / WarpSize] = local_max_index;
+        local_max_index = sidx[0] - 1;
+        *max_idx = local_max_index;
     }
     __syncthreads();
 
-    if(tid == 0)
-    {
-        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
-        {
-            if(rocblas_abs(sval[k]) > local_max)
-            {
-                local_max = rocblas_abs(sval[k]);
-                local_max_index = sval_indices[k];
-            }
-        }
-        *max_idx = local_max_index;
-        x[local_max_index] = T(1);
-    }
+    // Read the max index that was computed
+    local_max_index = *max_idx;
+
+    // Zero out all elements except the max
+    for(I i = tid; i < n; i += LACN2_BLOCKSIZE)
+        x[i] = (i == local_max_index) ? T(1) : T(0);
 }
 
 /**
@@ -3410,12 +3574,12 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
             if(v[i] >= 0)
             {
                 x[i] = T(1);
-                isgn[i] = T(1);
+                isgn[i] = 1;
             }
             else
             {
                 x[i] = T(-1);
-                isgn[i] = T(-1);
+                isgn[i] = -1;
             }
         }
     }
@@ -3430,6 +3594,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE)
 /**
  * lacn2_jump4: Update max index and check stopping conditions
  * Determines if iteration should continue or finalize
+ *
+ * Note: Uses imax1 device routine which computes max of sqrt(real(x[i])^2 + imag(x[i])^2) for complex types
  */
 template <typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump4(const I n,
@@ -3445,55 +3611,26 @@ ROCSOLVER_KERNEL void __launch_bounds__(LACN2_BLOCKSIZE) lacn2_jump4(const I n,
 
     int jlast = *max_idx;
 
-    // shared variables
-    __shared__ S sval[LACN2_BLOCKSIZE / WarpSize];
-    __shared__ I sval_indices[LACN2_BLOCKSIZE / WarpSize];
+    // shared variables for imax1
+    __shared__ S sval[LACN2_BLOCKSIZE];
+    __shared__ I sidx[LACN2_BLOCKSIZE];
 
-    // find index of maximum absolute value in vector x
-    S local_max = std::numeric_limits<S>::min();
-    I local_max_index = 0;
-    for(I i = tid; i < n; i += LACN2_BLOCKSIZE)
-    {
-        if(rocblas_abs(x[i]) > local_max)
-        {
-            local_max = rocblas_abs(x[i]);
-            local_max_index = i;
-        }
-    }
+    // Find index of maximum absolute value using imax1 device routine
+    // For complex types, imax1 uses sqrt(real^2 + imag^2)
+    imax1<LACN2_BLOCKSIZE, T, I, S>(tid, n, x, 1, sval, sidx);
 
-    // reduce within Warp using shuffle on both index and value
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 1);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 2);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 4);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 8);
-    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 16);
-    if(WarpSize > 32)
-        lacn2_max_index<S, I>(n, &local_max, &local_max_index, 32);
-
-    if(tid % WarpSize == 0)
-    {
-        sval[tid / WarpSize] = local_max;
-        sval_indices[tid / WarpSize] = local_max_index;
-    }
-    __syncthreads();
-
+    // imax1 returns 1-based index in sidx[0], convert to 0-based
+    I local_max_idx;
     if(tid == 0)
     {
-        for(I k = 1; k < std::min((I)LACN2_BLOCKSIZE / WarpSize, (n + WarpSize - 1) / WarpSize); k++)
-        {
-            if(rocblas_abs(sval[k]) > local_max)
-            {
-                local_max = rocblas_abs(sval[k]);
-                local_max_index = sval_indices[k];
-            }
-        }
-        sval_indices[0] = local_max_index;
-        *max_idx = local_max_index;
+        local_max_idx = sidx[0] - 1;
+        *max_idx = local_max_idx;
     }
-
     __syncthreads();
 
-    I local_max_idx = sval_indices[0];
+    // Broadcast the max index to all threads
+    local_max_idx = *max_idx;
+
     S val_new = rocblas_abs(x[local_max_idx]);
     S val_old = rocblas_abs(x[jlast]);
 
