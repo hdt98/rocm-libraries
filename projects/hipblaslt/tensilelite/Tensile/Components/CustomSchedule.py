@@ -1679,6 +1679,20 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
+    tile_config=TileConfig(128, 224, 64, 2, 1, True, 0, 0),
+    dtype_predicate=is16bit,
+    vector_widths=[8, 8, 8],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
+    valid, opt = _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS)
+    if not valid:
+        return False, None
+    optSchedule = switch_A_B_schedule(opt.optSchedule)
+    return True, ScheduleInfo(opt.numCodePaths, opt.numMfma, optSchedule, opt.syncCode, opt.nglshift, opt.nllshift)
+
+@RegisterSchedule(
     tile_config=TileConfig(224, 256, 64, 2, 1, True, 0, 0),
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
