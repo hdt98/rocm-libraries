@@ -3304,20 +3304,6 @@ void local_gemm(rocblas_handle handle,
 #endif
 
 /**
- * lacn2_init_vector: Initialize a vector to a constant value
- */
-template <typename T, typename I>
-ROCSOLVER_KERNEL void lacn2_init_vector(T* x, const rocblas_int n, const T value)
-{
-    rocblas_int tid = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
-    for(I i = tid; i < n; i += hipBlockDim_x * hipGridDim_x)
-    {
-        if(i < n)
-            x[i] = value;
-    }
-}
-
-/**
  * lacn2_max_index: Device helper for finding max index via warp reduction
  * Reduces within a warp using shuffle operations on both value and index
  */
@@ -3727,8 +3713,8 @@ rocblas_status rocsolver_lacn2_template(rocblas_handle handle,
     {
         // initialize x = (1/n, ..., 1/n)
         rocblas_int blocks = (n - 1) / LACN2_BLOCKSIZE + 1;
-        ROCSOLVER_LAUNCH_KERNEL((lacn2_init_vector<T, I>), dim3(blocks), dim3(LACN2_BLOCKSIZE), 0,
-                                stream, *x, n, T(1) / T(n));
+        ROCSOLVER_LAUNCH_KERNEL((reset_info<T, I, T>), dim3(blocks), dim3(LACN2_BLOCKSIZE), 0, stream,
+                                *x, n, T(1) / T(n));
         *h_kase = 1;
         *h_jump = 1;
         return rocblas_status_success;
