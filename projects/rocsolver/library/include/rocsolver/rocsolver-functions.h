@@ -349,9 +349,8 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
     handle      rocblas_handle.
     @param[in]
     norm_type   rocsolver_norm_type.
-                Specifies the norm to be used. Only rocsolver_norm_type_one and
-                rocsolver_norm_type_infinity are supported. For other norm types,
-                rocsolver_status_not_implemented is returned.
+                Specifies the norm to be used. The 1-norm and the infinity-norm
+                are supported, specified by values of '1' and 'I'.
     @param[in]
     n           rocblas_int. n >= 0.
                 The number of rows and columns of the matrix A.
@@ -366,8 +365,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
                 The pivot indices as returned by \ref rocsolver_sgetrf "GETRF".
     @param[in]
     anorm       pointer to real type. Scalar on the GPU.
-                The norm of the original matrix A (before factorization). This should be computed
-                separately using \ref rocsolver_slange "LANGE".
+                The norm of the original matrix A (before factorization) as returned by \ref rocsolver_slange "LANGE".
     @param[out]
     rcond       pointer to real type. Scalar on the GPU.
                 The reciprocal condition number estimate.

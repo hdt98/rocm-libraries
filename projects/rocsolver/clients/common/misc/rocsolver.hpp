@@ -695,104 +695,6 @@ rocblas_status rocsolver_zgesvdx_notransv_strided_batched(rocblas_handle handle,
 #endif
 /***************************************************/
 
-/******************** GECON ********************/
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      rocblas_int n,
-                                      float* A,
-                                      rocblas_int lda,
-                                      const rocblas_int* ipiv,
-                                      const float* anorm,
-                                      float* rcond)
-{
-    return rocsolver_sgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      rocblas_int n,
-                                      double* A,
-                                      rocblas_int lda,
-                                      const rocblas_int* ipiv,
-                                      const double* anorm,
-                                      double* rcond)
-{
-    return rocsolver_dgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      rocblas_int n,
-                                      rocblas_float_complex* A,
-                                      rocblas_int lda,
-                                      const rocblas_int* ipiv,
-                                      const float* anorm,
-                                      float* rcond)
-{
-    return rocsolver_cgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      rocblas_int n,
-                                      rocblas_double_complex* A,
-                                      rocblas_int lda,
-                                      const rocblas_int* ipiv,
-                                      const double* anorm,
-                                      double* rcond)
-{
-    return rocsolver_zgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      int64_t n,
-                                      float* A,
-                                      int64_t lda,
-                                      const int64_t* ipiv,
-                                      const float* anorm,
-                                      float* rcond)
-{
-    return rocsolver_sgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      int64_t n,
-                                      double* A,
-                                      int64_t lda,
-                                      const int64_t* ipiv,
-                                      const double* anorm,
-                                      double* rcond)
-{
-    return rocsolver_dgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      int64_t n,
-                                      rocblas_float_complex* A,
-                                      int64_t lda,
-                                      const int64_t* ipiv,
-                                      const float* anorm,
-                                      float* rcond)
-{
-    return rocsolver_cgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-
-inline rocblas_status rocsolver_gecon(rocblas_handle handle,
-                                      rocsolver_norm_type norm_type,
-                                      int64_t n,
-                                      rocblas_double_complex* A,
-                                      int64_t lda,
-                                      const int64_t* ipiv,
-                                      const double* anorm,
-                                      double* rcond)
-{
-    return rocsolver_zgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
-}
-/*****************************************************/
-
 /******************** GEMM ********************/
 // normal and strided_batched
 inline rocblas_status rocblas_gemm(bool STRIDED,
@@ -998,6 +900,104 @@ inline rocblas_status rocblas_gemm(bool STRIDED,
 {
     return rocblas_zgemm_batched(handle, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C,
                                  ldc, batch_count);
+}
+/*****************************************************/
+
+/******************** GECON ********************/
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int n,
+                                      float* A,
+                                      rocblas_int lda,
+                                      const rocblas_int* ipiv,
+                                      const float* anorm,
+                                      float* rcond)
+{
+    return rocsolver_sgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int n,
+                                      double* A,
+                                      rocblas_int lda,
+                                      const rocblas_int* ipiv,
+                                      const double* anorm,
+                                      double* rcond)
+{
+    return rocsolver_dgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int n,
+                                      rocblas_float_complex* A,
+                                      rocblas_int lda,
+                                      const rocblas_int* ipiv,
+                                      const float* anorm,
+                                      float* rcond)
+{
+    return rocsolver_cgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int n,
+                                      rocblas_double_complex* A,
+                                      rocblas_int lda,
+                                      const rocblas_int* ipiv,
+                                      const double* anorm,
+                                      double* rcond)
+{
+    return rocsolver_zgecon(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t n,
+                                      float* A,
+                                      int64_t lda,
+                                      const int64_t* ipiv,
+                                      const float* anorm,
+                                      float* rcond)
+{
+    return rocsolver_sgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t n,
+                                      double* A,
+                                      int64_t lda,
+                                      const int64_t* ipiv,
+                                      const double* anorm,
+                                      double* rcond)
+{
+    return rocsolver_dgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t n,
+                                      rocblas_float_complex* A,
+                                      int64_t lda,
+                                      const int64_t* ipiv,
+                                      const float* anorm,
+                                      float* rcond)
+{
+    return rocsolver_cgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+}
+
+inline rocblas_status rocsolver_gecon(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t n,
+                                      rocblas_double_complex* A,
+                                      int64_t lda,
+                                      const int64_t* ipiv,
+                                      const double* anorm,
+                                      double* rcond)
+{
+    return rocsolver_zgecon_64(handle, norm_type, n, A, lda, ipiv, anorm, rcond);
 }
 /*****************************************************/
 
