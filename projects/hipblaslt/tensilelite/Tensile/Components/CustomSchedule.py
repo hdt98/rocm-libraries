@@ -2558,6 +2558,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         syncs = SyncSchedule()
         syncs.add(-1, dscnt=7, comment="Wait for prior local read local write")
         syncs.add(2, dscnt=6, comment="Wait for prior local read local write")
+        syncs.add(17, dscnt=1, comment="Wait for second last tile of B to be read before MFMA 18")
         syncs.add(22, dscnt=0, barrier=True, comment="Before DirectToLds load, ensure prior ds_reads have finished")
         syncs.add(23, vlcnt=11, barrier=True, comment="Wait for previous set of global reads")
         syncs.add(23, dscnt=0, comment="Wait for prior local read local write")
@@ -2619,7 +2620,6 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         snopCode = [s[1] for s in snops]
 
     opt = ScheduleInfo(2, 48, optSchedule=optSchedule, syncCode=syncs.get_code(), nglshift=nglshift, nllshift=nllshift, snopCode=snopCode)
-    opt.disableValidation()
     return True, opt
 
 @RegisterSchedule(
