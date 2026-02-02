@@ -240,7 +240,7 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
         }();
 
         clear_tile(o_acc);
-        if((__builtin_isinf_sign(sink_v) >= 0) && i_split == 0)
+        if(__builtin_isinf_sign(sink_v) >= 0)
         {
             set_tile(m, init_m_val);
             set_tile(l, SMPLComputeDataType{1.0f});
