@@ -13,7 +13,7 @@
 #include "ck_tile/core/numeric/mxfp_scale.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
 
-#if defined(__HIP_DEVICE_COMPILE__) && (defined(__gfx950__) || defined(__gfx125__))
+#if defined(__HIP_DEVICE_COMPILE__) && defined(__gfx125__)
 #define CK_TILE_FP6_CVT_DEVICE 1
 #else
 #define CK_TILE_FP6_CVT_DEVICE 0
