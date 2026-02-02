@@ -191,7 +191,7 @@ TEST(PackedBf6, NumericLimits)
     EXPECT_FLOAT_EQ(denorm_min_pk.to_float(1.0f), 0.0625f);
 }
 
-TEST(PackedBf6, fill)
+TEST(PackedBf6, Fill)
 {
     std::vector<pk_bf6_t> v_bf6(2);
     ck_tile::FillUniformDistribution<pk_bf6_t>{1.f, 1.f}(v_bf6);
