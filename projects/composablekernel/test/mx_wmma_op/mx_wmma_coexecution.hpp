@@ -72,7 +72,8 @@ struct wmma_scale_type_selector<32, 16, 32, ScaleTypeA, ScaleTypeB>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125>{};
-        op.template run<32, 16, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<32, 16, 1, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
@@ -91,7 +92,8 @@ struct wmma_scale_type_selector<16, 16, 16, ScaleTypeA, ScaleTypeB>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale16_f32_16x16x128_f8f6f4_gfx125>{};
-        op.template run<16, 16, 1, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<16, 16, 1, 1, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
@@ -110,7 +112,8 @@ struct wmma_scale_type_selector<32, 16, 16, ScaleTypeA, ScaleTypeB>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::wmma_scale16_f32_32x16x128_f4_gfx125>{};
-        op.template run<32, 16, 1>(fragA, scale_a, fragB, scale_b, fragAcc);
+        op.template run<32, 16, 1, AFragT, AScaleFragT, BFragT, BScaleFragT, AccumFragT>(
+            fragA, scale_a, fragB, scale_b, fragAcc);
     }
 };
 
