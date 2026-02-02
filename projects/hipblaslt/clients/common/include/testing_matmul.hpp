@@ -713,7 +713,7 @@ auto _relu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
 };
 
 auto _drelu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
-    return static_cast<decltype(in)>(std::max(static_cast<decltype(in)>(0), 1));
+    return static_cast<decltype(in)>(in > static_cast<decltype(in)>(0) ? 1 : 0);
 };
 
 auto _gelu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
@@ -3370,15 +3370,30 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         break;
                     case hipblaslt_activation_type::relu:
-                        epilogue_func(epilogue_param,
-                                      hBias_buf,
-                                      Tbias,
-                                      arg.activation_arg1,
-                                      arg.activation_arg2,
-                                      ::_relu,
-                                      arg.gradient,
-                                      To,
-                                      Talpha);
+                        if(arg.gradient)
+                        {
+                            epilogue_func(epilogue_param,
+                                          hBias_buf,
+                                          Tbias,
+                                          arg.activation_arg1,
+                                          arg.activation_arg2,
+                                          ::_drelu,
+                                          true,
+                                          To,
+                                          Talpha);
+                        }
+                        else
+                        {
+                            epilogue_func(epilogue_param,
+                                          hBias_buf,
+                                          Tbias,
+                                          arg.activation_arg1,
+                                          arg.activation_arg2,
+                                          ::_relu,
+                                          false,
+                                          To,
+                                          Talpha);
+                        }
                         break;
                     case hipblaslt_activation_type::swish:
                         epilogue_func(epilogue_param,
