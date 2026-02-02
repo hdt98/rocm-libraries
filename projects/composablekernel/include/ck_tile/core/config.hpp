@@ -296,6 +296,15 @@
 #define CK_TILE_REFERENCE_MOE_SORTING_MOCK_ID 1
 #endif
 
+// Workaround for host CPU without AVX-512F support e.g. for fp32x16 (512-bits)
+#ifndef CK_TILE_AVX512F_WA
+#if defined(__HIP_DEVICE_COMPILE__) || defined(CK_TILE_HOST_HAS_AVX512F)
+#define CK_TILE_AVX512F_WA 0
+#else
+#define CK_TILE_AVX512F_WA 1
+#endif
+#endif
+
 #ifndef CK_TILE_USE_OCP_FP8
 #if defined(__HIP_DEVICE_COMPILE__)
 #if defined(__gfx950__) || defined(__gfx12__)
