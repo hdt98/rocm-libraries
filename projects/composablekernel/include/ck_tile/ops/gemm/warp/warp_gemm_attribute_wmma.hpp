@@ -140,6 +140,43 @@ struct WarpGemmAttributeWmma
             return Impl{}.template operator()<Params...>(a_vec, b_vec);
         }
     }
+
+    // c_vec += a_vec * b_vec
+    template <typename... Params>
+    CK_TILE_DEVICE void operator()(CVecType& c_vec,
+                                   const AVecType& a_vec,
+                                   const int32_t& a_scale,
+                                   const BVecType& b_vec,
+                                   const int32_t& b_scale) const
+    {
+        if constexpr(kTransC)
+        {
+            TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(
+                c_vec, b_vec, b_scale, a_vec, a_scale);
+        }
+        else
+        {
+            Impl{}.template operator()<Params...>(c_vec, a_vec, a_scale, b_vec, b_scale);
+        }
+    }
+
+    // c_vec = a_vec * b_vec
+    template <typename... Params>
+    CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec,
+                                       const int32_t& a_scale,
+                                       const BVecType& b_vec,
+                                       const int32_t& b_scale) const
+    {
+        if constexpr(kTransC)
+        {
+            return TransposedImpl{}.template operator()<Params..., SwapReuse_<true>>(
+                b_vec, b_scale, a_vec, a_scale);
+        }
+        else
+        {
+            return Impl{}.template operator()<Params...>(a_vec, a_scale, b_vec, b_scale);
+        }
+    }
 };
 
 template <typename ADataType,

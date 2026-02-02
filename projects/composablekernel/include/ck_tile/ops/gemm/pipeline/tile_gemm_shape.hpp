@@ -33,9 +33,16 @@ struct TileGemmShape
 
     static constexpr bool PermuteA = PermuteA_;
     static constexpr bool PermuteB = PermuteB_;
+#if defined(__gfx125__)
+    static constexpr index_t flatNIterPerWarp = WarpTile::at(number<1>{}) / 16;
 
-    static constexpr index_t flatNPerWarp  = BlockWarps::at(number<1>{});
-    static constexpr index_t flatKPerWarp  = WarpTile::at(number<2>{}) * WarpTile::at(number<1>{});
+    static constexpr index_t flatNPerWarp = BlockWarps::at(number<1>{}) * flatNIterPerWarp;
+    static constexpr index_t flatKPerWarp =
+        WarpTile::at(number<2>{}) * WarpTile::at(number<1>{}) / flatNIterPerWarp;
+#else
+    static constexpr index_t flatNPerWarp = BlockWarps::at(number<1>{});
+    static constexpr index_t flatKPerWarp = WarpTile::at(number<2>{}) * WarpTile::at(number<1>{});
+#endif
     static constexpr index_t flatKPerBlock = flatKPerWarp * kK / WarpTile::at(number<2>{});
 
     CK_TILE_HOST static std::string GetName()

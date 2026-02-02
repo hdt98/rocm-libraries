@@ -715,6 +715,74 @@ struct WmmaTraits<gfx125_t, AType, BType, float, 32, 32, 128>
         return CVecType{0};
 #endif
     }
+
+    template <typename... Params>
+    CK_TILE_DEVICE static CVecType wmma_intrinsic(const AVecType& a_vec,
+                                                  const int32_t& a_scale,
+                                                  const BVecType& b_vec,
+                                                  const int32_t& b_scale,
+                                                  const CVecType& c_vec)
+    {
+#ifdef __gfx125__
+        constexpr index_t kASliceSize = sizeof(AVecType) / sizeof(AType) / kCMBlock;
+        constexpr index_t kBSliceSize = sizeof(BVecType) / sizeof(BType) / kCNBlock;
+
+        using ASliceType = ext_vector_t<AType, kASliceSize>;
+        using BSliceType = ext_vector_t<BType, kBSliceSize>;
+        using CSliceType = fp32x8_t;
+
+        using a_buf = thread_buffer<ASliceType, kCMBlock>;
+        using b_buf = thread_buffer<BSliceType, kCNBlock>;
+        using c_buf = thread_buffer<CSliceType, kCMBlock * kCNBlock>;
+
+        static_assert(sizeof(CVecType) == sizeof(c_buf),
+                      "CVecType and c_buf must have the same size");
+        static_assert(sizeof(AVecType) == sizeof(a_buf),
+                      "AVecType and a_buf must have the same size");
+        static_assert(sizeof(BVecType) == sizeof(b_buf),
+                      "BVecType and b_buf must have the same size");
+
+        auto&& a_buffer = bit_cast<a_buf>(a_vec);
+        auto&& b_buffer = bit_cast<b_buf>(b_vec);
+        auto&& c_result = bit_cast<c_buf>(c_vec);
+
+        static_for<0, kCNBlock, 1>{}([&](auto n) {
+            static_for<0, kCMBlock, 1>{}([&](auto m) {
+                constexpr index_t c_idx = m * kCNBlock + n;
+
+                const auto& a_slice = a_buffer.template get_as<ASliceType>()[m];
+                const auto& b_slice = b_buffer.template get_as<BSliceType>()[n];
+                auto& c_slice       = c_result.template get_as<CSliceType>()[number<c_idx>{}];
+
+                c_slice = __builtin_amdgcn_wmma_scale_f32_16x16x128_f8f6f4(
+                    ATraits::OpDataType,
+                    ATraits::to_wmma_vec(bit_cast<typename ATraits::VecType>(a_slice)),
+                    BTraits::OpDataType,
+                    BTraits::to_wmma_vec(bit_cast<typename BTraits::VecType>(b_slice)),
+                    0,
+                    c_slice,
+                    m.value, // OPSEL[0]
+                    0,       // OPSEL_HI[0]
+                    a_scale,
+                    n.value, // OPSEL[1]
+                    0,       // OPSEL_HI[1]
+                    b_scale,
+                    0,  // NEG
+                    0); // NEG_HI
+            });
+        });
+
+        return bit_cast<CVecType>(c_result);
+
+#else
+        ck_tile::ignore = a_vec;
+        ck_tile::ignore = a_scale;
+        ck_tile::ignore = b_vec;
+        ck_tile::ignore = b_scale;
+        ck_tile::ignore = c_vec;
+        return CVecType{0};
+#endif
+    }
 };
 
 } // namespace ck_tile

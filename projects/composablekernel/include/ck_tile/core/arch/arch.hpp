@@ -1317,7 +1317,8 @@ enum LLVMSchedGroupMask : int32_t
     DS         = 1 << 7,
     DS_READ    = 1 << 8,
     DS_WRITE   = 1 << 9,
-    ALL        = (DS_WRITE << 1) - 1,
+    TRANS      = 1 << 10,
+    ALL        = (TRANS << 1) - 1,
 };
 
 CK_TILE_DEVICE static constexpr auto get_max_vgpr_count()

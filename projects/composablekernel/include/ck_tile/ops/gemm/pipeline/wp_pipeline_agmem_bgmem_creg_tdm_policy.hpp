@@ -60,12 +60,14 @@ struct UniversalWeightPreshufflePipelineAgBgCrTDMPolicy
 
         constexpr index_t PackedSize = numeric_traits<typename Problem::BDataType>::PackedSize;
 
-        constexpr index_t KBPerLoad = GetKBPerLoad<Problem>();
+        constexpr index_t KBPerLoad = GetKBPerLoad<Problem>(); // WarpTileK / 2
         if constexpr(problem_is_flatmm_v<Problem>)
         {
+            constexpr index_t NWarpBlock    = TileShape::WarpTile::at(I1) / 16;
             constexpr index_t MaxVecSize    = 16 / sizeof(typename Problem::BDataType) * PackedSize;
             constexpr index_t KItemsPerLoad = min(KBPerLoad, MaxVecSize);
-            constexpr index_t KFragment     = KBPerLoad / KItemsPerLoad;
+            // KFragment = how many loads iteration per thread per WarpTileK
+            constexpr index_t KFragment = KBPerLoad / KItemsPerLoad;
 
             constexpr index_t KThdPerWave = WaveSize;
             constexpr index_t KWavePerBlk = 1;
@@ -77,25 +79,30 @@ struct UniversalWeightPreshufflePipelineAgBgCrTDMPolicy
             constexpr index_t NWavePerBlk = TileShape::BlockWarps::at(number<1>{}); // N_Warp
             constexpr index_t NRepeat     = NIterPerWarp;
 
-            constexpr index_t WaveRepeat = WaveNum / TileShape::flatNPerWarp;
+            constexpr index_t WaveRepeat =
+                WaveNum * NWarpBlock / TileShape::flatNPerWarp; // which is MWarps
             return make_static_tile_distribution(
-                tile_distribution_encoding<
-                    sequence<WaveRepeat>,
-                    tuple<sequence<NRepeat, NWavePerBlk, NThdPerWave, NBPerLoad>, // second
-                                                                                  // direction
-                          sequence<KRepeat,
-                                   KFragment,
-                                   KWavePerBlk,
-                                   KThdPerWave,
-                                   KItemsPerLoad>>, // first
-                                                    // direction
-                    // wave in blk,     // thd in wave
-                    // <M, K>           // <M, K>
-                    tuple<sequence<0, 1, 2>, sequence<1, 2>>, // which direction
-                    tuple<sequence<0, 1, 2>, sequence<2, 3>>, // which index
-                    // <repeat, vec_load>
-                    sequence<1, 2, 2, 2>,
-                    sequence<0, 0, 1, 4>>{});
+                tile_distribution_encoding<sequence<WaveRepeat>,
+                                           tuple<sequence<NRepeat,
+                                                          NWavePerBlk,
+                                                          NWarpBlock, // iterations per warp in dimN
+                                                          NThdPerWave,
+                                                          NBPerLoad>, // second
+                                                                      // direction
+                                                 sequence<KRepeat,
+                                                          KFragment,
+                                                          KWavePerBlk,
+                                                          KThdPerWave,
+                                                          KItemsPerLoad>>, // first
+                                                                           // direction
+                                           // wave in blk,     // thd in wave
+                                           // <M, K>           // <M, K>
+                                           tuple<sequence<0, 1, 2>, sequence<1, 2>>, // which
+                                                                                     // direction
+                                           tuple<sequence<0, 1, 2>, sequence<3, 3>>, // which index
+                                           // <repeat, vec_load>
+                                           sequence<1, 2, 1, 2, 2>,
+                                           sequence<0, 0, 2, 1, 4>>{});
         }
         else
         {
@@ -125,6 +132,68 @@ struct UniversalWeightPreshufflePipelineAgBgCrTDMPolicy
                     sequence<1, 2, 1, 2>,
                     sequence<0, 0, 3, 3>>{});
         }
+    }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeScaleADramTileDistribution()
+    {
+        using TileShape  = typename Problem::BlockGemmShape;
+        using BlockWarps = typename TileShape::BlockWarps;
+
+        constexpr index_t MWarps     = BlockWarps::at(I0);
+        constexpr index_t NWarps     = BlockWarps::at(I1);
+        constexpr index_t kMPerBlock = TileShape::kM;
+        constexpr index_t kKPerBlock = TileShape::kK;
+
+        constexpr index_t ScaleSize = 32;
+
+        // for gfx1250 mx gemm supports 32x32x128
+        static_assert(TileShape::WarpTile::at(I0) == 32);
+
+        constexpr index_t MIterPerWarp = kMPerBlock / MWarps / TileShape::WarpTile::at(I0);
+
+        return make_static_tile_distribution(
+            tile_distribution_encoding<
+                sequence<NWarps>,
+                tuple<sequence<MIterPerWarp, MWarps, get_warp_size()>,
+                      sequence<kKPerBlock / ScaleSize / 4, 1>>, // 4 is because scale tensor is
+                                                                // int32_t data type, each int32_t
+                                                                // exists 4 fp8 scale values
+                tuple<sequence<1, 0>, sequence<1>>,
+                tuple<sequence<1, 0>, sequence<2>>,
+                sequence<1, 2, 2>,
+                sequence<0, 0, 1>>{});
+    }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeScaleBDramTileDistribution()
+    {
+        using TileShape  = typename Problem::BlockGemmShape;
+        using BlockWarps = typename TileShape::BlockWarps;
+
+        constexpr index_t MWarps     = BlockWarps::at(I0);
+        constexpr index_t NWarps     = BlockWarps::at(I1);
+        constexpr index_t kNPerBlock = TileShape::kN;
+        constexpr index_t kKPerBlock = TileShape::kK;
+
+        constexpr index_t ScaleSize = 32;
+
+        // for gfx1250 mx gemm supports 32x32x128
+        static_assert(TileShape::WarpTile::at(I1) == 32);
+
+        constexpr index_t NIterPerWarp = kNPerBlock / NWarps / TileShape::WarpTile::at(I1);
+
+        return make_static_tile_distribution(
+            tile_distribution_encoding<
+                sequence<MWarps>,
+                tuple<sequence<NIterPerWarp, NWarps, get_warp_size()>,
+                      sequence<kKPerBlock / ScaleSize / 4, 1>>, // 4 is because scale tensor is
+                                                                // int32_t data type, each int32_t
+                                                                // exists 4 fp8 scale values
+                tuple<sequence<1, 0>, sequence<1>>,
+                tuple<sequence<1, 0>, sequence<2>>,
+                sequence<1, 2, 2>,
+                sequence<0, 0, 1>>{});
     }
 
     template <typename Problem>
