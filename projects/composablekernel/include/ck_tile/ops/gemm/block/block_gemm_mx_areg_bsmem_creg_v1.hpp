@@ -12,6 +12,7 @@ namespace ck_tile {
 // B is block window on shared memory
 // B scale is block distributed tensor
 // C is block distributed tensor
+// It currently supports only warp gemms with transposed C
 template <typename Problem_, typename Policy_>
 struct BlockGemmMxARegBSmemCRegV1
 {
@@ -252,10 +253,9 @@ struct BlockGemmMxARegBSmemCRegV1
     {
         using Impl = WG::WarpGemmAttribute::Impl;
 
-        constexpr index_t ScaleGranularity = 32;
-        constexpr index_t AScaleMLane      = Impl::kAMLane;
-        constexpr index_t ABScaleKLane     = Impl::kABKLane;
-        constexpr index_t ABScaleKPerLane  = Impl::kABKPerLane / ScaleGranularity;
+        constexpr index_t AScaleMLane     = Impl::kAMLane;
+        constexpr index_t ABScaleKLane    = Impl::kABKLane;
+        constexpr index_t ABScaleKPerLane = Impl::kABKPerLane / Impl::kScaleGranularity;
 
         return ck_tile::tile_distribution_encoding<
             ck_tile::sequence<>,
@@ -272,10 +272,9 @@ struct BlockGemmMxARegBSmemCRegV1
     {
         using Impl = WG::WarpGemmAttribute::Impl;
 
-        constexpr index_t ScaleGranularity = 32;
-        constexpr index_t BScaleNLane      = Impl::kBNLane;
-        constexpr index_t ABScaleKLane     = Impl::kABKLane;
-        constexpr index_t ABScaleKPerLane  = Impl::kABKPerLane / ScaleGranularity;
+        constexpr index_t BScaleNLane     = Impl::kBNLane;
+        constexpr index_t ABScaleKLane    = Impl::kABKLane;
+        constexpr index_t ABScaleKPerLane = Impl::kABKPerLane / Impl::kScaleGranularity;
 
         return ck_tile::tile_distribution_encoding<
             ck_tile::sequence<>,
@@ -332,9 +331,8 @@ struct BlockGemmMxARegBSmemCRegV1
             Impl::kABKPerLane / WG::WarpGemmAttribute::AttrNumAccessV;
         constexpr index_t NIterPack = TargetCMPerLane / (Impl::kCM0PerLane * Impl::kCM1PerLane);
 
-        constexpr index_t ScaleGranularity = 32;
-        constexpr index_t ABScaleKLane     = Impl::kABKLane;
-        constexpr index_t ABScaleKPerLane  = Impl::kABKPerLane / ScaleGranularity;
+        constexpr index_t ABScaleKLane    = Impl::kABKLane;
+        constexpr index_t ABScaleKPerLane = Impl::kABKPerLane / Impl::kScaleGranularity;
 
         constexpr auto b_scale_block_dstr_encode = ck_tile::tile_distribution_encoding<
             ck_tile::sequence<MWarp>,

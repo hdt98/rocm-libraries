@@ -1599,6 +1599,8 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x128_f8f6f4
     static constexpr index_t kCM0PerLane = 1;
     static constexpr index_t kCM1PerLane = 4;
 
+    static constexpr index_t kScaleGranularity = 32;
+
     // c_vec += a_vec * b_vec
     template <index_t opselA, index_t opselB, bool post_nop_ = false>
     CK_TILE_DEVICE void operator()(CVecType& c_vec,
@@ -1707,6 +1709,8 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
     static constexpr index_t kCNLane     = 32;
     static constexpr index_t kCM0PerLane = 4;
     static constexpr index_t kCM1PerLane = 4;
+
+    static constexpr index_t kScaleGranularity = 32;
 
     // c_vec += a_vec * b_vec
     template <index_t opselA, index_t opselB, bool post_nop_ = false>
