@@ -50,8 +50,8 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         const CGridDesc_M0_M10_M11_N0_N10_N11 e_grid_desc_m0_m10_m11_n0_n10_n11,
         const Block2CTileMap block_2_ctile_map)
 {
-#if(defined(__gfx906__) || defined(__gfx9__) || defined(__gfx101__) || defined(__gfx103__) || \
-    defined(__gfx11__) || defined(__gfx12__))
+#if (defined(__gfx906__) || defined(__gfx9__) || defined(__gfx101__) || defined(__gfx103__) || \
+     defined(__gfx11__) || defined(__gfx12__))
 
     constexpr index_t shared_block_size =
         GridwiseGemm::GetSharedMemoryNumberOfByte() / sizeof(ABDataType);
@@ -443,20 +443,23 @@ struct DeviceGemmMultipleD_Dl : public DeviceGemmMultipleD<ALayout,
 
         float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
-            {
-                std::cout << "arg.a_grid_desc_k0_m0_m1_k1_{"
-                          << arg.a_grid_desc_k0_m_k1_.GetLength(I0) << ", "
-                          << arg.a_grid_desc_k0_m_k1_.GetLength(I1) << ", "
-                          << arg.a_grid_desc_k0_m_k1_.GetLength(I2) << "}" << std::endl;
-
-                std::cout << "arg.b_grid_desc_k0_n0_n1_k1_{"
-                          << arg.b_grid_desc_k0_n_k1_.GetLength(I0) << ", "
-                          << arg.b_grid_desc_k0_n_k1_.GetLength(I1) << ", "
-                          << arg.b_grid_desc_k0_n_k1_.GetLength(I2) << "}" << std::endl;
-
-                std::cout << "arg.e_grid_desc_m_n_{ " << arg.e_grid_desc_m_n_.GetLength(I0) << ", "
-                          << arg.e_grid_desc_m_n_.GetLength(I1) << "}" << std::endl;
-            }
+            // Debug output removed for production use - was spamming console with grid descriptors
+            // To re-enable, uncomment the block below:
+            // {
+            //     std::cout << "arg.a_grid_desc_k0_m0_m1_k1_{"
+            //               << arg.a_grid_desc_k0_m_k1_.GetLength(I0) << ", "
+            //               << arg.a_grid_desc_k0_m_k1_.GetLength(I1) << ", "
+            //               << arg.a_grid_desc_k0_m_k1_.GetLength(I2) << "}" << std::endl;
+            //
+            //     std::cout << "arg.b_grid_desc_k0_n0_n1_k1_{"
+            //               << arg.b_grid_desc_k0_n_k1_.GetLength(I0) << ", "
+            //               << arg.b_grid_desc_k0_n_k1_.GetLength(I1) << ", "
+            //               << arg.b_grid_desc_k0_n_k1_.GetLength(I2) << "}" << std::endl;
+            //
+            //     std::cout << "arg.e_grid_desc_m_n_{ " << arg.e_grid_desc_m_n_.GetLength(I0) << ",
+            //     "
+            //               << arg.e_grid_desc_m_n_.GetLength(I1) << "}" << std::endl;
+            // }
 
             if(!GridwiseGemm::CheckValidity(
                    arg.a_grid_desc_k0_m_k1_, arg.b_grid_desc_k0_n_k1_, arg.e_grid_desc_m_n_))
