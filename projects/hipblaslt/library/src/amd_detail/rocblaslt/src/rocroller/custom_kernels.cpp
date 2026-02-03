@@ -2,6 +2,8 @@
 
 #include <hip/hip_ext.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <iomanip>
 
 std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&       customKernelName,
                                                    const KernelType&        kernelType,
@@ -134,27 +136,29 @@ struct __attribute__((packed)) F4GemmKernelArgs
     uint32_t    stride_ScaleB1;
     p3          _p22;
     int         log2_k_split;
-
+    
+    // AITER kernel computes D[N,M] = B^T * A instead of C[M,N] = A^T * B
+    // So we swap A<->B pointers/scales and M<->N dimensions
     F4GemmKernelArgs(const RocblasltContractionProblem& prob)
         : ptr_D(prob.D)
         , ptr_C(nullptr)
-        , ptr_A(const_cast<void*>(prob.A))
-        , ptr_B(const_cast<void*>(prob.B))
+        , ptr_A(const_cast<void*>(prob.B))      // Swapped: kernel's A = hipBLASLt's B
+        , ptr_B(const_cast<void*>(prob.A))      // Swapped: kernel's B = hipBLASLt's A
         , alpha(*static_cast<const float*>(prob.alpha))
         , beta(*static_cast<const float*>(prob.beta))
         , stride_D0(0)
         , stride_D1(0)
         , stride_C0(static_cast<uint32_t>(prob.col_stride_c))
         , stride_C1(0)
-        , stride_A0(static_cast<uint32_t>(prob.col_stride_a))
+        , stride_A0(static_cast<uint32_t>(prob.col_stride_b))  // Swapped
         , stride_A1(0)
-        , stride_B0(static_cast<uint32_t>(prob.col_stride_b))
+        , stride_B0(static_cast<uint32_t>(prob.col_stride_a))  // Swapped
         , stride_B1(0)
-        , M(static_cast<uint32_t>(prob.m))
-        , N(static_cast<uint32_t>(prob.n))
+        , M(static_cast<uint32_t>(prob.n))      // Swapped: kernel's M = hipBLASLt's N
+        , N(static_cast<uint32_t>(prob.m))      // Swapped: kernel's N = hipBLASLt's M
         , K(static_cast<uint32_t>(prob.k))
-        , ptr_ScaleA(prob.scaleA)
-        , ptr_ScaleB(prob.scaleB)
+        , ptr_ScaleA(prob.scaleB)               // Swapped
+        , ptr_ScaleB(prob.scaleA)               // Swapped
         , stride_ScaleA0(static_cast<uint32_t>(prob.k / 32))
         , stride_ScaleA1(0)
         , stride_ScaleB0(static_cast<uint32_t>(prob.k / 32))
@@ -236,15 +240,17 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
         return rocblaslt_status_internal_error;
     }
 
+    F4GemmKernelArgs args(prob);
+
     // The AITER kernel processes tiles of size 256x256
-    // Grid dimensions should be based on tiles
+    // Note: args.M and args.N are already swapped in the constructor
     const uint32_t tileM = 256;
     const uint32_t tileN = 256;
     const uint32_t blockSize = 256;  // Threads per workgroup
     
     // Number of tiles in each dimension
-    uint32_t tilesM = (prob.m + tileM - 1) / tileM;
-    uint32_t tilesN = (prob.n + tileN - 1) / tileN;
+    uint32_t tilesM = (args.M + tileM - 1) / tileM;
+    uint32_t tilesN = (args.N + tileN - 1) / tileN;
     
     dim3 grid;
     grid.x = tilesN * blockSize;  // Total threads in X
@@ -253,11 +259,6 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
 
     dim3 block{blockSize, 1, 1};
     
-    std::cout << "[DEBUG] Grid: (" << grid.x << ", " << grid.y << ", " << grid.z << ")" << std::endl;
-    std::cout << "[DEBUG] Block: (" << block.x << ", " << block.y << ", " << block.z << ")" << std::endl;
-    std::cout << "[DEBUG] Tiles: M=" << tilesM << ", N=" << tilesN << std::endl;
-
-    auto   args     = F4GemmKernelArgs(prob);
     printKernelArgs(args);
     void*  argsPtr  = &args;
     size_t argsSize = sizeof(args);
