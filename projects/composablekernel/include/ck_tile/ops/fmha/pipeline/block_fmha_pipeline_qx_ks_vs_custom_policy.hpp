@@ -1054,7 +1054,7 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
         using BlockGemm = remove_cvref_t<decltype(GetKVBlockGemm<Problem>())>;
 
         return BlockGemm::template MakeAScaleBlockTileDistribution<Problem::BlockFmhaShape::kM0,
-                                                                   Problem::BlockFmhaShape::kN1>();
+                                                                   Problem::BlockFmhaShape::kN0>();
     }
 
     template <typename Problem>
