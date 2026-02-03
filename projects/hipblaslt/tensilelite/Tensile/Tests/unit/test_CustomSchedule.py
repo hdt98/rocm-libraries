@@ -405,12 +405,13 @@ class TestCustomScheduleBF16:
 
     @pytest.mark.parametrize(
         # fmt: off
-        "transA, transB, lds_tr_inst,  tr_lds", [
-        (  True,  False,       False,       1),  # TN
-        ( False,   True,        True,       0),  # NT
+        "transA, transB, lds_tr_inst,  tr_lds, mt0, mt1", [
+        (  True,  False,       False,       1, 224, 128),  # TN
+        ( False,   True,        True,       0, 224, 128),  # NT
+        ( False,   True,        True,       0, 128, 224),  # NT
         # fmt: on
         ])
-    def test_schedule_224x128x64_16bit(self, transA, transB, lds_tr_inst, tr_lds):
+    def test_schedule_224x128x64_128x224x64_16bit(self, transA, transB, lds_tr_inst, tr_lds, mt0, mt1):
         """Tests the 224x128x64 16-bit schedules (TN and NT)."""
         NT = (not transA and transB)
         kernel = create_base_kernel()
@@ -420,11 +421,11 @@ class TestCustomScheduleBF16:
             "TransposeA": transA, "TransposeB": transB
         })
         kernel.update({
-            "MacroTile0": 224, "MacroTile1": 128, "DepthU": 64,
+            "MacroTile0": mt0, "MacroTile1": mt1, "DepthU": 64,
             "PrefetchGlobalRead": 2, "PrefetchLocalRead": 1,
             "GlobalReadVectorWidthA": 8, "GlobalReadVectorWidthB": 8, "LocalReadVectorWidth": 8,
             "MatrixInstruction": [16,16,32,1], "MIWaveGroup": [2,2],
-            "LDSTrInst": lds_tr_inst, "TransposeLDS": tr_lds, "MIWaveTileA": 7, "MIWaveTileB": 4,
+            "LDSTrInst": lds_tr_inst, "TransposeLDS": tr_lds, "MIWaveTileA": mt0/32, "MIWaveTileB": mt1/32,
         })
 
         has_schedule, schedule_info = hasCustomSchedule(kernel)
