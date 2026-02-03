@@ -673,10 +673,12 @@ struct StreamKKernel
         __shared__ char smem_ptr_0[UniversalGemmKernel::GetSmemSize()];
 
         index_t block_idx   = ck_tile::get_block_1d_id();
+        index_t grid_size   = kargs.tile_partitioner.grid_size().x;
         index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
         index_t dp_ctas     = kargs.tile_partitioner.get_dp_ctas();
         bool is_dp_ctas     = block_idx < kargs.tile_partitioner.get_dp_ctas();
 
+        block_idx = kargs.tile_partitioner.RemapXCD(block_idx, grid_size);
         // Check if at the data parallel section
         if(is_dp_ctas)
         {
@@ -706,11 +708,14 @@ struct StreamKKernel
         __shared__ char smem_ptr_0[UniversalGemmKernel::GetSmemSize()];
 
         index_t block_idx   = ck_tile::get_block_1d_id();
+        index_t grid_size   = kargs.tile_partitioner.grid_size().x;
         index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
 
-        // Data-parallel section
-        for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
-            tile_idx += kargs.tile_partitioner.get_grid())
+        block_idx =
+            kargs.tile_partitioner.RemapXCD(block_idx, grid_size)
+            // Data-parallel section
+            for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
+                tile_idx += kargs.tile_partitioner.get_grid())
         {
             BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
             block_sync_lds();

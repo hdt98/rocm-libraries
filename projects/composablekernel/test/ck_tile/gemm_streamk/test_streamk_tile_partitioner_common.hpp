@@ -421,6 +421,23 @@ void test_get_tile_local_cta_idx(ck_tile::index_t tile_iter_start,
     EXPECT_EQ(tile_local_cta_idx, expected_tile_local_cta_idx);
 }
 
+template <typename GemmShape>
+void test_remap_xcd(
+    const std::vector<ck_tile::index_t>& initial_values,
+    const std::vector<ck_tile::index_t>& expected_values,
+    ck_tile::StreamKTilePartitioner_v2<GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>&
+        tile_partitioner)
+{
+    // ck_tile::index_t grid_size   = tile_partitioner.grid_size().x;
+    std::vector<ck_tile::index_t> remapped_values(initial_values.size());
+    for(std::size_t i = 0; i < initial_values.size(); ++i)
+    {
+        remapped_values[i] = tile_partitioner.RemapXCD(initial_values[i], initial_values.size());
+    }
+
+    EXPECT_EQ(remapped_values, expected_values);
+}
+
 // Configs for TilePartitioner Child structs
 struct StreamKTilePartitionerV2PersistentExpected
 {
