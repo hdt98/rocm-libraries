@@ -31,7 +31,7 @@ import json
 import os
 
 
-def get_changed_files(ref1, ref2):
+def get_changed_files(ref1, ref2, project: str = None):
     """Return a set of files changed between two git refs."""
     try:
         result = subprocess.run(
@@ -40,7 +40,21 @@ def get_changed_files(ref1, ref2):
             text=True,
             check=True,
         )
-        files = set(line.strip() for line in result.stdout.splitlines() if line.strip())
+
+        raw_files = set(line.strip() for line in result.stdout.splitlines() if line.strip())
+
+        if project is None:
+            files = raw_files
+            print(f"Identified {len(files)} modified files")
+        else:
+            root = f"projects/{project}/"
+            root_len = len(root)
+            files = set()
+            for f in raw_files:
+                if f.startswith(root):
+                    files.add(f[root_len:])
+            print(f"Identified {len(files)} files modified in project '{project}'")
+
         return files
     except subprocess.CalledProcessError as e:
         print(f"Error running git diff: {e}")
@@ -52,8 +66,18 @@ def load_depmap(depmap_json):
     with open(depmap_json, "r") as f:
         data = json.load(f)
     # Support both old and new formats
+    json_project = None
+    if "repo" in data and data["repo"]["type"] == "monorepo":
+        json_project = data["repo"]["project"]
     if "file_to_executables" in data:
-        return data["file_to_executables"]
+        return data["file_to_executables"], json_project
+    return data, json_project
+
+
+def load_fixturemap(fixture_file):
+    """Load the dependency mapping JSON."""
+    with open(fixture_file, "r") as f:
+        data = json.load(f)
     return data
 
 
@@ -68,6 +92,23 @@ def select_tests(file_to_executables, changed_files, filter_mode):
                 elif filter_mode == "test_prefix" and exe.startswith("test_"):
                     affected.add(exe)
     return sorted(affected)
+
+
+def get_gtest_filter(tests, fixturemap):
+    """Maps the set of tests to be executed to a gtest_filter"""
+    gtest_filter = ""
+    fixture_count = 0
+    for t in tests:
+        if t in fixturemap:
+            for f in fixturemap[t]:
+                gtest_filter += f + "*:"
+                fixture_count += 1
+        else:
+            print(f"Warning: Diff references test {t}. However, it is not in the fixturemap")
+    if gtest_filter:
+        gtest_filter = gtest_filter[:-1]
+        print(f"Added {fixture_count} fixtures to gtest_filter")
+    return gtest_filter
 
 
 def main():
@@ -118,6 +159,7 @@ def main():
     ref2 = sys.argv[3]
     filter_mode = "all"
     output_json = "tests_to_run.json"
+    fixture_file = ""
 
     if "--test-prefix" in sys.argv:
         filter_mode = "test_prefix"
@@ -127,23 +169,35 @@ def main():
         idx = sys.argv.index("--output")
         if idx + 1 < len(sys.argv):
             output_json = sys.argv[idx + 1]
-
+    if "--fixturemap" in sys.argv:
+        idx = sys.argv.index("--fixturemap")
+        if idx + 1 < len(sys.argv):
+            fixture_file = sys.argv[idx + 1]
     if not os.path.exists(depmap_json):
         print(f"Dependency map JSON not found: {depmap_json}")
         sys.exit(1)
 
-    changed_files = get_changed_files(ref1, ref2)
+    file_to_executables, json_project = load_depmap(depmap_json)
+    changed_files = get_changed_files(ref1, ref2, json_project)
     if not changed_files:
         print("No changed files detected.")
         tests = []
     else:
-        file_to_executables = load_depmap(depmap_json)
         tests = select_tests(file_to_executables, changed_files, filter_mode)
+        gtest_filter = ""
+        if tests and fixture_file and os.path.exists(fixture_file):
+            tests_to_fixtures = load_fixturemap(fixture_file)
+            gtest_filter = get_gtest_filter(tests, tests_to_fixtures)
 
     with open(output_json, "w") as f:
-        json.dump(
-            {"tests_to_run": tests, "changed_files": sorted(changed_files)}, f, indent=2
-        )
+        if gtest_filter:
+            json.dump(
+                {"tests_to_run": tests, "gtest_filter": gtest_filter, "changed_files": sorted(changed_files)}, f, indent=2
+            )
+        else:
+            json.dump(
+                {"tests_to_run": tests, "changed_files": sorted(changed_files)}, f, indent=2
+            )
 
     print(f"Exported {len(tests)} tests to run to {output_json}")
 
