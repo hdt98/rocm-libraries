@@ -259,6 +259,21 @@ namespace rocRoller
         return stream << toString(m);
     }
 
+    bool IsMemoryTypeLDS(MemoryType m)
+    {
+        switch(m)
+        {
+        case MemoryType::LDS:
+        case MemoryType::WAVE_LDS:
+        case MemoryType::WAVE_Direct2LDS:
+        case MemoryType::WAVE_LDS_FROM_GLOBAL:
+            return true;
+        default:
+            break;
+        }
+        return false;
+    }
+
     std::string toString(LayoutType l)
     {
         switch(l)

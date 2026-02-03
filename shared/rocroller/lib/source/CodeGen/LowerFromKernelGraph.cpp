@@ -501,10 +501,29 @@ namespace rocRoller
                 auto conditionResult = m_context->brancher()->resultRegister(expr);
 
                 co_yield Expression::generate(conditionResult, expr, m_context);
+                // -------------------------------------------------------------------------------
+                // TODO: remove this once we better handle data-flow across loops
+                if(op.loopName.find("LoopTail") != std::string::npos)
+                {
+                    co_yield Instruction::Wait(WaitCount::Zero(
+                        m_context->targetArchitecture(),
+                        "REMOVEME: Wait before branching into Bottom of TailLoop!"));
+                }
+                // -------------------------------------------------------------------------------
                 co_yield m_context->brancher()->branchIfZero(
                     botLabel,
                     conditionResult,
                     concatenate("Condition: Top (jump to " + botLabel->toString() + " if false)"));
+
+                // -------------------------------------------------------------------------------
+                // TODO: remove this once we better handle data-flow across loops
+                if(op.loopName.find("LoopTail") != std::string::npos)
+                {
+                    co_yield Instruction::Wait(
+                        WaitCount::Zero(m_context->targetArchitecture(),
+                                        "REMOVEME: Wait before falling through to TailLoop!"));
+                }
+                // -------------------------------------------------------------------------------
 
                 co_yield Instruction::Label(topLabel);
 
