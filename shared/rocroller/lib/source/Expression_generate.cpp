@@ -1190,11 +1190,10 @@ namespace rocRoller
         };
 
         /**
-         * @brief Helper class to manage state during expression tree code generation.
+         * @brief Helper class to manage state during expression DAG code generation.
          *
          * This class encapsulates the scheduling state for generating code from an
-         * expression tree. Nodes are processed in dependency order, with ready nodes
-         * (whose dependencies are satisfied) queued by register type category.
+         * expression DAG (tree with shared nodes due to CSE).
          *
          * Nodes go from pending -> ready -> generating -> completed.
          */
@@ -1209,11 +1208,15 @@ namespace rocRoller
                 , m_options(context->kernelOptions())
                 , m_pendingNodes(iota<int>(0, tree.size()).to<std::set>())
             {
+                // Compute weights and traversal order for prioritization
+                computeWeights();
+                computeOrdering();
+
                 // Get register types of nodes to be generated
                 std::set<Register::Type> categories;
                 for(auto nodeIdx : m_pendingNodes)
                     categories.insert(m_tree.at(nodeIdx).regType());
-            
+
                 // Initialize ready queues for each register type
                 auto comparator = [this](int a, int b) { return comparePriorities(a, b); };
                 for(auto category : categories)
@@ -1293,18 +1296,95 @@ namespace rocRoller
 
         private:
             /**
-             * @brief Compares node priorities for post-order traversal.
+             * @brief Computes Sethi-Ullman inspired weights for each node.
              *
-             * The ExpressionTree is already in topological order (dependencies have
-             * smaller indices than their dependents)
-             *   - All dependencies are processed before nodes that depend on them
+             * Weights approximate the minimum number of registers needed to evaluate
+             * a subtree. The algorithm processes nodes bottom-up:
              *
-             * Used with std::priority_queue (max-heap), so returning a > b means
-             * smaller indices have higher priority and are popped first.
+             * - Leaf nodes: weight = 0 for literals (immediate operands),
+             *               weight = 1 for values needing a register
+             * - Internal nodes: sort dependency weights descending, then
+             *               weight = max(w[0], w[1]+1, w[2]+2, w[3]+3, ...)
+             */
+            void computeWeights()
+            {
+                m_weights.resize(m_tree.size());
+
+                // Process in topological order (the tree is already sorted this way)
+                for(size_t i = 0; i < m_tree.size(); ++i)
+                {
+                    auto const& node = m_tree.at(i);
+
+                    // Leaf node - base case
+                    if(node.deps.empty())
+                    {
+                        m_weights[i] = (node.regType() == Register::Type::Literal) ? 0 : 1;
+                        continue;
+                    }
+
+                    // Collect and sort dependency weights (heaviest first)
+                    std::vector<int> depWeights;
+                    depWeights.reserve(node.deps.size());
+                    for(int dep : node.deps)
+                        depWeights.push_back(m_weights[dep]);
+                    std::sort(depWeights.begin(), depWeights.end(), std::greater<int>());
+
+                    // Child j needs +j registers to hold results of children 0..j-1.
+                    m_weights[i] = depWeights[0];
+                    for(int j = 1; j < depWeights.size(); ++j)
+                        m_weights[i] = std::max(m_weights[i], depWeights[j] + j);
+                }
+            }
+
+            /**
+             * @brief Computes the Sethi-Ullman inspired traversal order.
+             *
+             * Traverses the DAG in post-order, visiting the heaviest child
+             * first at each node. This minimizes register pressure by
+             * evaluating heavier subtrees first, so their results can be
+             * consumed before lighter subtrees need registers.
+             */
+            void computeOrdering()
+            {
+                m_order.resize(m_tree.size(), -1); // -1 means not visited
+                int orderCounter = 0;
+
+                // Start from the root (last node in the tree)
+                int rootIdx = static_cast<int>(m_tree.size()) - 1;
+                computeOrderRecursive(rootIdx, orderCounter);
+            }
+
+            void computeOrderRecursive(int nodeIdx, int& orderCounter)
+            {
+                if(m_order[nodeIdx] != -1) // already visited
+                    return;
+
+                auto const& node = m_tree.at(nodeIdx);
+
+                // Get dependencies sorted by weight
+                std::vector<int> deps(node.deps.begin(), node.deps.end());
+                std::sort(deps.begin(), deps.end(), [this](int a, int b) {
+                    if(m_weights[a] != m_weights[b])
+                        return m_weights[a] > m_weights[b]; // heaviest first
+                    return a < b; // tie-breaker
+                });
+
+                for(int dep : deps)
+                    computeOrderRecursive(dep, orderCounter);
+
+                // Assign order to this node after all children are processed
+                m_order[nodeIdx] = orderCounter++;
+            }
+
+            /**
+             * @brief Compares node priorities for the ready queue.
+             *
+             * Smaller order = earlier in traversal = higher priority.
+             * Used with std::priority_queue (max-heap).
              */
             bool comparePriorities(int a, int b) const
             {
-                return a > b;
+                return m_order[a] > m_order[b];
             }
 
             bool allDependenciesSatisfied(int nodeIdx) const
@@ -1344,8 +1424,10 @@ namespace rocRoller
             CodeGeneratorVisitor& m_visitor;
             KernelOptions const&  m_options;
 
-            std::set<int> m_pendingNodes;
-            std::set<int> m_completedNodes;
+            std::set<int>    m_pendingNodes;
+            std::set<int>    m_completedNodes;
+            std::vector<int> m_weights;
+            std::vector<int> m_order;
 
             using PriorityQueue
                 = std::priority_queue<int, std::vector<int>, std::function<bool(int, int)>>;
@@ -1358,11 +1440,11 @@ namespace rocRoller
          *
          * There are two scheduling strategies depending on scheduler capabilities:
          *
-         * **Batch scheduling** (when scheduler doesn't support adding streams):
+         * **Batch scheduling**:
          *   - All generators in `schedulable` are processed as a fixed batch
          *   - New nodes cannot be added until the entire batch completes
          *
-         * **Incremental scheduling** (when scheduler supports adding streams):
+         * **Incremental scheduling**:
          *   - Generators are processed one instruction at a time
          *   - After each instruction, checks if any expression node completed
          *   - When a node completes, its dependents may become ready
@@ -1372,10 +1454,9 @@ namespace rocRoller
          * @param state       Tracks node readiness and completion
          * @param schedulable Vector of instruction generators to execute (may grow during execution)
          */
-        Generator<Instruction>
-            scheduleFromList(std::shared_ptr<Scheduling::Scheduler>& scheduler,
-                             TreeGenerationState&                    state,
-                             std::vector<Generator<Instruction>>&    schedulable)
+        Generator<Instruction> scheduleFromList(std::shared_ptr<Scheduling::Scheduler>& scheduler,
+                                                TreeGenerationState&                    state,
+                                                std::vector<Generator<Instruction>>&    schedulable)
         {
             if(!scheduler->supportsAddingStreams())
             {
@@ -1409,16 +1490,16 @@ namespace rocRoller
         }
 
         /**
-         * @brief Generates code from an expression tree using dependency-driven scheduling.
+         * @brief Generates code from an expression DAG.
          *
          * The algorithm processes nodes in waves:
          * 1. Identify nodes whose dependencies are satisfied (ready nodes)
-         * 2. Schedule ready nodes for code generation, respecting concurrency limits
+         * 2. Schedule ready nodes for code generation, respecting concurrency limits and prioritization
          * 3. Execute scheduled generators through the scheduler
          * 4. Repeat until all nodes are processed
          *
          * @param dest    Output register for the final expression result
-         * @param tree    Expression tree with nodes ordered by dependencies
+         * @param tree    Expression DAG (tree with shared nodes from CSE)
          * @param visitor Code generator visitor for individual expressions
          * @param context Kernel context for scheduling and options
          */
@@ -1427,7 +1508,6 @@ namespace rocRoller
                                                 CodeGeneratorVisitor& visitor,
                                                 ContextPtr            context)
         {
-            // Emit debug information if tracing is enabled
             if(Log::getLogger()->should_log(LogLevel::Trace))
             {
                 co_yield Instruction::Comment("generateFromTree()");
