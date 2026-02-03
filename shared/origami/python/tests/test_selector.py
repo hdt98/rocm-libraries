@@ -503,6 +503,9 @@ def test_selector_cache_hints_property(rocm_device):
     assert isinstance(cache_hints[1], int)
     assert cache_hints[0] >= 0
     assert cache_hints[1] >= 0
+    # Verify property matches underlying data
+    assert cache_hints[0] == selector._result.config.cache_hints_a
+    assert cache_hints[1] == selector._result.config.cache_hints_b
 
 
 @pytest.mark.integration
@@ -526,6 +529,10 @@ def test_selector_matrix_instruction_dimensions_property(rocm_device):
     assert len(mi_dims) == 3
     assert all(isinstance(dim, int) for dim in mi_dims)
     assert all(dim > 0 for dim in mi_dims)
+    # Verify property matches underlying data
+    assert mi_dims[0] == selector._result.config.mi.m
+    assert mi_dims[1] == selector._result.config.mi.n
+    assert mi_dims[2] == selector._result.config.mi.k
 
 
 @pytest.mark.integration
@@ -546,6 +553,8 @@ def test_selector_workspace_size_property(rocm_device):
 
     assert isinstance(selector.workspace_size, int)
     assert selector.workspace_size >= 0
+    # Verify property matches underlying data
+    assert selector.workspace_size == selector._result.config.workspace_size
 
 
 @pytest.mark.integration
@@ -566,6 +575,8 @@ def test_selector_workspace_size_per_elem_c_property(rocm_device):
 
     assert isinstance(selector.workspace_size_per_elem_c, int)
     assert selector.workspace_size_per_elem_c >= 0
+    # Verify property matches underlying data
+    assert selector.workspace_size_per_elem_c == selector._result.config.workspace_size_per_elem_c
 
 
 @pytest.mark.integration
@@ -586,6 +597,8 @@ def test_selector_wgmxcc_property(rocm_device):
 
     assert isinstance(selector.wgmxcc, int)
     assert selector.wgmxcc > 0
+    # Verify property matches underlying data
+    assert selector.wgmxcc == selector._workgroup_mapping.wgmxcc
 
 
 @pytest.mark.integration
@@ -606,6 +619,8 @@ def test_selector_wgmxccchunk_property(rocm_device):
 
     assert isinstance(selector.wgmxccchunk, int)
     assert selector.wgmxccchunk >= 0
+    # Verify property matches underlying data
+    assert selector.wgmxccchunk == selector._workgroup_mapping.wgmxccchunk
 
 
 @pytest.mark.integration
@@ -626,6 +641,8 @@ def test_selector_grid_selection_algorithm_property(rocm_device):
 
     grid_selection = selector.grid_selection_algorithm
     assert isinstance(grid_selection, origami.grid_selection_t)
+    # Verify property matches underlying data
+    assert grid_selection == selector._result.config.grid_selection
 
 
 #####
