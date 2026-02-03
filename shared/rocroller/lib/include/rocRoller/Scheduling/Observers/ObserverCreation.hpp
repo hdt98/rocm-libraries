@@ -91,9 +91,8 @@ namespace rocRoller
             }
             else
             {
-                if(Current::runtimeRequired())
+                if(Current obs(ctx); obs.runtimeRequired())
                 {
-                    Current obs(ctx);
                     return createMetaObserverFiltered<Target>(ctx, remaining, observers..., obs);
                 }
                 else

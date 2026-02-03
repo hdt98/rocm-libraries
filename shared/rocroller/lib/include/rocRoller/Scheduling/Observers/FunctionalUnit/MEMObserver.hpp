@@ -54,11 +54,6 @@ namespace rocRoller
 
             void observe(Instruction const& inst);
 
-            constexpr static bool required(GPUArchitectureTarget const& target)
-            {
-                return true;
-            }
-
             static Scheduling::Weights getWeights(ContextPtr ctx);
 
         protected:
@@ -95,6 +90,11 @@ namespace rocRoller
 
             bool isMEMInstruction(Instruction const& inst) const override;
             int  getWait(Instruction const& inst) const override;
+
+            constexpr static bool required(GPUArchitectureTarget const& target)
+            {
+                return true;
+            }
         };
 
         class DSMEMObserver : public MEMObserver<DSMEMObserver>
@@ -104,15 +104,14 @@ namespace rocRoller
 
             bool isMEMInstruction(Instruction const& inst) const override;
             int  getWait(Instruction const& inst) const override;
+
+            bool runtimeRequired();
         };
 
         template <typename Derived>
         MEMObserver<Derived>::MEMObserver()
         {
         }
-
-        static_assert(CObserverConst<VMEMObserver>);
-        static_assert(CObserverConst<DSMEMObserver>);
 
         struct WeightlessDSMemObserver
         {
@@ -124,15 +123,16 @@ namespace rocRoller
 
             void observe(Instruction const& inst);
 
-            constexpr static bool required(GPUArchitectureTarget const& target)
-            {
-                return true;
-            }
+            bool runtimeRequired();
 
         private:
             std::weak_ptr<Context>                     m_context;
             mutable std::optional<LDSModel::LDSModule> m_scheduler;
         };
+
+        static_assert(CObserverConst<VMEMObserver>);
+        static_assert(CObserverRuntime<DSMEMObserver>);
+        static_assert(CObserverRuntime<WeightlessDSMemObserver>);
     }
 }
 
