@@ -202,3 +202,5 @@ def all(problems_dir=None):
         elif "gfx120" in target_arch:
             # FIXME- please replace the examples with the real interested problems for gfx120?
             yield from matmul_set_3()
+            yield from matmul_set_5()
+            yield from matmul_set_6()
