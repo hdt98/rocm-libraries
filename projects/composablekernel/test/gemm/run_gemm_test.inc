@@ -50,6 +50,8 @@ int run_gemm_test(int argc, char* argv[])
         const auto gemmPtrs =
             ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
                 DeviceOp>::GetInstances();
+        std::cout << "found " << gemmPtrs.size() << " instances" << std::endl;
+
         ck::index_t num_instance = 0;
         for(auto& gemmPtr : gemmPtrs)
         {
