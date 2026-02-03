@@ -66,6 +66,9 @@ def main():
     parser_test.add_argument(
         "--output", help="Output JSON file", default="tests_to_run.json"
     )
+    parser_test.add_argument(
+        "--fixturemap", help="Optional path to file containing the test <-> gtest fixture mapping", default=""
+    )
 
     # Code auditing
     parser_audit = subparsers.add_parser(
@@ -95,6 +98,8 @@ def main():
             filter_args.append("--all")
         if args.output:
             filter_args += ["--output", args.output]
+        if args.fixturemap:
+            filter_args += ["--fixturemap", args.fixturemap]
         run_selective_test_filter(filter_args)
     elif args.command == "audit":
         run_selective_test_filter([args.depmap_json, "--audit"])
