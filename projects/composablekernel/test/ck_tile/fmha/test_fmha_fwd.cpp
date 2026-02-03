@@ -1,6 +1,11 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <vector>
+
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
 #include "example/ck_tile/01_fmha/fmha_fwd_runner.hpp"
 
@@ -934,12 +939,6 @@ using PaddingParam = std::tuple<mode_enum,        // mode
                                 bool,             // o_perm
                                 std::string>;     // mask_str
 
-// Ensure headers for containers / algorithms used in padding param builder.
-#include <vector>
-#include <array>
-#include <cmath>
-#include <algorithm>
-
 class PaddingCases : public TestWithParam<PaddingParam>
 {
 };
@@ -950,6 +949,12 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(PaddingCases);
 static std::vector<PaddingParam> BuildPaddingParams()
 {
     std::vector<PaddingParam> params;
+
+    if constexpr(ck_tile::is_any_of<DataTypeConfig, FmhaFwdFp8Bf16, FmhaFwdMxFp8, FmhaFwdMxFp4>::
+                     value)
+    {
+        return params;
+    }
 
     // mask variants to cover
     const std::vector<std::string> mask_variants{"0", "t:50,64", "b:32,40"};
@@ -1139,15 +1144,10 @@ static std::vector<PaddingParam> BuildPaddingParams()
 
 static const std::vector<PaddingParam> kPaddingParams = BuildPaddingParams();
 
-INSTANTIATE_TEST_SUITE_P(TestCkTileFmhaFwd_Padding, PaddingCases, ValuesIn(kPaddingParams));
+INSTANTIATE_TEST_SUITE_P(TestCkTileFmhaFwd, PaddingCases, ValuesIn(kPaddingParams));
 
 TEST_P(PaddingCases, DataTypeConfig)
 {
-    if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdFp8Bf16>)
-    {
-        GTEST_SKIP() << "Skip for fp8";
-    }
-
     auto [mode,
           batch,
           nhead,
