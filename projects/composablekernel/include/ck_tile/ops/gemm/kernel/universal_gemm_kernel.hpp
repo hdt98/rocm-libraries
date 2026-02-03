@@ -427,6 +427,19 @@ struct UniversalGemmKernel
             return false;
         }
 
+        if(GemmPipeline::GetPipelineName() == "COMPUTE_V7")
+        {
+            if(GemmPipeline::kPadK == false || GemmPipeline::kPadM == false ||
+               GemmPipeline::kPadN == false)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("Compute pipeline v7 needs all paddings enabled!");
+                }
+                return false;
+            }
+        }
+
         const auto vectorSizeA = is_wave32() ? GemmPipeline::template GetVectorSizeA<true>()
                                              : GemmPipeline::template GetVectorSizeA<false>();
         bool AsTensorIsValid   = {true};
@@ -445,7 +458,7 @@ struct UniversalGemmKernel
                     }
                     AsTensorIsValid = false;
                 }
-                if(kargs.K % vectorSizeA != 0)
+                if(kargs.K % vectorSizeA != 0 && GemmPipeline::GetPipelineName() != "COMPUTE_V7")
                 {
                     const auto remainder = kargs.K % vectorSizeA;
                     constexpr ck_tile::index_t APackedSize =
@@ -477,7 +490,7 @@ struct UniversalGemmKernel
                     }
                     AsTensorIsValid = false;
                 }
-                if(kargs.M % vectorSizeA != 0)
+                if(kargs.M % vectorSizeA != 0 && GemmPipeline::GetPipelineName() != "COMPUTE_V7")
                 {
                     const auto remainder = kargs.M % vectorSizeA;
                     constexpr ck_tile::index_t APackedSize =
@@ -517,7 +530,7 @@ struct UniversalGemmKernel
                     }
                     BsTensorIsValid = false;
                 }
-                if(kargs.N % vectorSizeB != 0)
+                if(kargs.N % vectorSizeB != 0 && GemmPipeline::GetPipelineName() != "COMPUTE_V7")
                 {
                     const auto remainder = kargs.N % vectorSizeB;
                     constexpr ck_tile::index_t BPackedSize =
@@ -550,7 +563,8 @@ struct UniversalGemmKernel
                         }
                         BsTensorIsValid = false;
                     }
-                    if(kargs.K % vectorSizeB != 0)
+                    if(kargs.K % vectorSizeB != 0 &&
+                       GemmPipeline::GetPipelineName() != "COMPUTE_V7")
                     {
                         const auto remainder = kargs.K % vectorSizeB;
                         constexpr ck_tile::index_t BPackedSize =

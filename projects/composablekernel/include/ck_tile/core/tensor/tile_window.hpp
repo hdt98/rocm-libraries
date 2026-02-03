@@ -282,6 +282,112 @@ struct tile_window_with_static_distribution
         });
     }
 
+    template <typename TileWindow_,
+              typename ElementWise_,
+              index_t i_access_unsupport_ = -1,
+              bool oob_conditional_check  = true>
+    CK_TILE_DEVICE auto load_vectorload1(const TileWindow_& tile_window,
+                                         ElementWise_ elementwise,
+                                         number<i_access_unsupport_>          = {},
+                                         bool_constant<oob_conditional_check> = {}) const
+    {
+        constexpr auto tile_dstr = typename Base::TileDstr{};
+        auto dst_tensor = make_static_distributed_tensor<typename Base::DataType>(tile_dstr);
+        load_vectorload1(dst_tensor,
+                         tile_window,
+                         elementwise,
+                         number<i_access_unsupport_>{},
+                         bool_constant<oob_conditional_check>{});
+        return dst_tensor;
+    }
+
+    template <typename DistributedTensor,
+              typename TileWindow_,
+              typename ElementWise_,
+              index_t i_access_unsupport_ = -1,
+              bool oob_conditional_check  = true>
+    CK_TILE_DEVICE void load_vectorload1(DistributedTensor& dst_tensor,
+                                         const TileWindow_& tile_window,
+                                         ElementWise_ elementwise,
+                                         number<i_access_unsupport_>          = {},
+                                         bool_constant<oob_conditional_check> = {}) const
+    {
+        using OldTraits = typename Base::Traits;
+        using Traits    = typename Base::TraitsVectorload1;
+        using vector_t  = thread_buffer<typename Base::DataType, 1>;
+        using SFC_Ys    = typename Traits::SFC_Ys;
+
+        constexpr auto tile_dstr   = typename Base::TileDstr{};
+        constexpr auto sizeOfTuple = TileWindow_::size();
+        //  loop over thread tensor space [y0, y1, ...]
+        static_for<0, NumCoord, 1>{}([&](auto iCoord) {
+            /// TODO: use structure binding (to be captured later) if compiled in C++20
+            auto window_adaptor_thread_coord =
+                tile_window[number<0>{}].pre_computed_coords_[iCoord][I0];
+            auto bottom_tensor_thread_coord =
+                tile_window[number<0>{}].pre_computed_coords_[iCoord][I1];
+
+            static_for<0, NumAccessPerCoord * OldTraits::ScalarPerVector, 1>{}(
+                [&](auto iCoordAccess) {
+                    constexpr auto iAccess =
+                        number<iCoord * NumAccessPerCoord * OldTraits::ScalarPerVector +
+                               iCoordAccess>{};
+
+                    // data index [y0, y1, ...]
+                    constexpr auto idx_ys_start = SFC_Ys::get_index(iAccess);
+
+                    // read from bottom tensor
+                    const auto idx_vec_value = generate_tuple(
+                        [&](auto jj) {
+                            return tile_window[number<jj>{}]
+                                .get_bottom_tensor_view()
+                                .template get_vectorized_elements<vector_t>(
+                                    bottom_tensor_thread_coord,
+                                    0, // linear offset
+                                    bool_constant<oob_conditional_check>{});
+                        },
+                        number<sizeOfTuple>{});
+
+                    static_for<0, 1, Traits::PackedSize>{}([&](auto j) {
+                        // write into distributed tensor
+                        constexpr auto idx_ys = generate_tuple(
+                            [&](auto jj) {
+                                return jj == Traits::VectorDimY ? (idx_ys_start[jj] + j)
+                                                                : idx_ys_start[jj];
+                            },
+                            number<Base::NDimY>{});
+
+                        constexpr index_t d =
+                            tile_dstr.get_ys_to_d_descriptor().calculate_offset(idx_ys) /
+                            Traits::PackedSize;
+
+                        ck_tile::apply(
+                            [&](auto&&... t) {
+                                elementwise(dst_tensor.get_thread_buffer().template at<d>(),
+                                            t.template get_as<typename Base::DataType>()[0]...);
+                            },
+                            idx_vec_value);
+                    });
+                    // move thread coordinate
+                    if constexpr(iCoordAccess !=
+                                 (NumAccessPerCoord * OldTraits::ScalarPerVector - 1))
+                    {
+                        constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
+
+                        constexpr auto idx_diff_ps_ys =
+                            container_concat(generate_tuple([&](auto) { return number<0>{}; },
+                                                            number<Base::NDimP>{}),
+                                             idx_diff_ys);
+
+                        Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
+                            window_adaptor_thread_coord,
+                            bottom_tensor_thread_coord,
+                            idx_diff_ps_ys);
+                    }
+                });
+        });
+    }
+
     template <typename DistributedTensor,
               index_t i_access_unsupport_ = -1,
               bool oob_conditional_check  = true>
