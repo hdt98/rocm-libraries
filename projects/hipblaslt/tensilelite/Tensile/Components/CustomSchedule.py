@@ -1686,7 +1686,6 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     mfma_wave_group=[2, 2]
 )
 def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
-    print("Using CMS!!!!")
     valid, opt = _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS)
     if not valid:
         return False, None
