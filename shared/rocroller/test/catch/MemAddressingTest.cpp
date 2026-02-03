@@ -107,7 +107,7 @@ namespace MemAddressingTest
 
         SECTION(variants.name)
         {
-            auto context = TestContext::ForTestDevice();
+            auto context = TestContext::ForTestDevice({}, variants.name);
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
 
             example.setUseLDS(true, true, false);
