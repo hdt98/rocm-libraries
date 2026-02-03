@@ -17,6 +17,12 @@ template <>
 struct FilterExtent<1>
 {
     size_t width = 1;
+
+    template <typename T>
+    std::array<T, 1> to_array() const
+    {
+        return {static_cast<T>(width)};
+    }
 };
 
 template <>
@@ -24,6 +30,12 @@ struct FilterExtent<2>
 {
     size_t width  = 1;
     size_t height = 1;
+
+    template <typename T>
+    std::array<T, 2> to_array() const
+    {
+        return {static_cast<T>(height), static_cast<T>(width)};
+    }
 };
 
 template <>
@@ -32,6 +44,12 @@ struct FilterExtent<3>
     size_t width  = 1;
     size_t height = 1;
     size_t depth  = 1;
+
+    template <typename T>
+    std::array<T, 3> to_array() const
+    {
+        return {static_cast<T>(depth), static_cast<T>(height), static_cast<T>(width)};
+    }
 };
 
 template <int SPATIAL_DIM>

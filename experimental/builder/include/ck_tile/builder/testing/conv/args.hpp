@@ -53,31 +53,6 @@ struct ConvTensorLengths
     FilterExtent<SPATIAL_DIM> filter = {}; // X, Y, Z
 };
 
-/// @brief Convolution parameters derived from `Args`.
-///
-/// This structure contains all runtime convolution parameters needed by:
-/// - descriptor generation (output spatial sizes)
-/// - kernel invocation (stride/dilation/pads)
-///
-/// It intentionally does NOT depend on old CK utility types (e.g. ConvParam).
-template <int SPATIAL_DIM>
-struct ConvFwdProblem
-{
-    int G = 1;
-    int N = 1;
-    int C = 1;
-    int K = 1;
-
-    std::array<long_index_t, SPATIAL_DIM> input_spatial  = {};
-    std::array<long_index_t, SPATIAL_DIM> filter_spatial = {};
-    std::array<long_index_t, SPATIAL_DIM> output_spatial = {};
-
-    std::array<long_index_t, SPATIAL_DIM> conv_strides   = {};
-    std::array<long_index_t, SPATIAL_DIM> conv_dilations = {};
-    std::array<long_index_t, SPATIAL_DIM> left_pads      = {};
-    std::array<long_index_t, SPATIAL_DIM> right_pads     = {};
-};
-
 namespace detail {
 
 /// @brief Calculate memory strides for a tensor with custom dimension ordering.
@@ -222,32 +197,29 @@ struct Args<SIGNATURE>
 
     int k_batch = 1;
 
-    /// @brief Convert `Args` into a testing-owned forward convolution problem description.
-    ConvFwdProblem<SPATIAL_DIM> make_conv_problem() const
+    /// @brief Compute output spatial dimensions from convolution parameters.
+    ///
+    /// @returns FilterExtent with computed output height, width, (and depth for 3D)
+    FilterExtent<SPATIAL_DIM> compute_output_spatial() const
     {
-        ConvFwdProblem<SPATIAL_DIM> problem;
+        const auto input_spatial_arr  = detail::to_spatial_array<SPATIAL_DIM>(this->lengths.image);
+        const auto filter_spatial_arr = detail::to_spatial_array<SPATIAL_DIM>(this->lengths.filter);
+        const auto conv_strides_arr   = detail::to_spatial_array<SPATIAL_DIM>(this->filter_strides);
+        const auto conv_dilations_arr =
+            detail::to_spatial_array<SPATIAL_DIM>(this->filter_dilation);
+        const auto left_pads_arr  = detail::to_spatial_array<SPATIAL_DIM>(this->input_left_pad);
+        const auto right_pads_arr = detail::to_spatial_array<SPATIAL_DIM>(this->input_right_pad);
 
-        problem.G = static_cast<int>(this->lengths.groups);
-        problem.N = static_cast<int>(this->lengths.batch_size);
-        problem.C = static_cast<int>(this->lengths.input_channels);
-        problem.K = static_cast<int>(this->lengths.output_channels);
+        const auto output_spatial_arr =
+            detail::compute_output_spatial<SPATIAL_DIM>(input_spatial_arr,
+                                                        filter_spatial_arr,
+                                                        conv_strides_arr,
+                                                        conv_dilations_arr,
+                                                        left_pads_arr,
+                                                        right_pads_arr);
 
-        problem.input_spatial  = detail::to_spatial_array<SPATIAL_DIM>(this->lengths.image);
-        problem.filter_spatial = detail::to_spatial_array<SPATIAL_DIM>(this->lengths.filter);
-
-        problem.conv_strides   = detail::to_spatial_array<SPATIAL_DIM>(this->filter_strides);
-        problem.conv_dilations = detail::to_spatial_array<SPATIAL_DIM>(this->filter_dilation);
-        problem.left_pads      = detail::to_spatial_array<SPATIAL_DIM>(this->input_left_pad);
-        problem.right_pads     = detail::to_spatial_array<SPATIAL_DIM>(this->input_right_pad);
-
-        problem.output_spatial = detail::compute_output_spatial<SPATIAL_DIM>(problem.input_spatial,
-                                                                             problem.filter_spatial,
-                                                                             problem.conv_strides,
-                                                                             problem.conv_dilations,
-                                                                             problem.left_pads,
-                                                                             problem.right_pads);
-
-        return problem;
+        return filter_extent_from_vector<SPATIAL_DIM>(
+            std::vector<std::size_t>(output_spatial_arr.begin(), output_spatial_arr.end()));
     }
 
     /// This function returns the `TensorDescriptor` corresponding to
@@ -418,25 +390,25 @@ struct Args<SIGNATURE>
         using Extent = typename OutputDescriptor::Extent;
         Extent lens  = {};
 
-        const auto problem = make_conv_problem();
+        const auto output_spatial = compute_output_spatial();
 
         lens[0] = this->lengths.groups;
         lens[1] = this->lengths.batch_size;
         lens[2] = this->lengths.output_channels;
         if constexpr(SPATIAL_DIM == 1)
         {
-            lens[3] = static_cast<size_t>(problem.output_spatial[0]);
+            lens[3] = output_spatial.width;
         }
         else if constexpr(SPATIAL_DIM == 2)
         {
-            lens[3] = static_cast<size_t>(problem.output_spatial[0]);
-            lens[4] = static_cast<size_t>(problem.output_spatial[1]);
+            lens[3] = output_spatial.height;
+            lens[4] = output_spatial.width;
         }
         else
         {
-            lens[3] = static_cast<size_t>(problem.output_spatial[0]);
-            lens[4] = static_cast<size_t>(problem.output_spatial[1]);
-            lens[5] = static_cast<size_t>(problem.output_spatial[2]);
+            lens[3] = output_spatial.depth;
+            lens[4] = output_spatial.height;
+            lens[5] = output_spatial.width;
         }
 
         const auto make_default_strides = [&] {

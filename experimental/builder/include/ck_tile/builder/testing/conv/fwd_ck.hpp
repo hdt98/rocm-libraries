@@ -103,23 +103,11 @@ template <auto SIGNATURE>
 {
     constexpr auto spatial_dim = SIGNATURE.spatial_dim;
 
-    const auto copy = [](const auto& src, auto& dst) {
-        std::copy(src.begin(), src.end(), dst.begin());
-    };
-
     const auto to_ck_lengths = [&](const auto& src) {
         std::array<ck::index_t, spatial_dim + 3> result;
-        copy(src, result);
+        std::copy(src.begin(), src.end(), result.begin());
         return result;
     };
-
-    const auto to_ck_extent = [&](const auto& extent) {
-        std::array<ck::index_t, spatial_dim> result;
-        copy(extent, result);
-        return result;
-    };
-
-    const auto problem = args.make_conv_problem();
 
     const auto input_desc  = args.make_input_descriptor();
     const auto weight_desc = args.make_weight_descriptor();
@@ -140,10 +128,10 @@ template <auto SIGNATURE>
                                      {},
                                      to_ck_lengths(output_desc.get_lengths()),
                                      to_ck_lengths(output_desc.get_strides()),
-                                     to_ck_extent(problem.conv_strides),
-                                     to_ck_extent(problem.conv_dilations),
-                                     to_ck_extent(problem.left_pads),
-                                     to_ck_extent(problem.right_pads),
+                                     args.filter_strides.to_array<ck::index_t>(),
+                                     args.filter_dilation.to_array<ck::index_t>(),
+                                     args.input_left_pad.to_array<ck::index_t>(),
+                                     args.input_right_pad.to_array<ck::index_t>(),
                                      args.a_elementwise_op,
                                      args.b_elementwise_op,
                                      args.cde_elementwise_op);
