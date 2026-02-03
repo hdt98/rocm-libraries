@@ -480,6 +480,154 @@ def test_selector_problem_creation(rocm_device):
     assert selector._problem.batch == 1
 
 
+@pytest.mark.integration
+def test_selector_cache_hints_property(rocm_device):
+    """Test cache_hints property returns a tuple of two integers."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    cache_hints = selector.cache_hints
+    assert isinstance(cache_hints, tuple)
+    assert len(cache_hints) == 2
+    assert isinstance(cache_hints[0], int)
+    assert isinstance(cache_hints[1], int)
+    assert cache_hints[0] >= 0
+    assert cache_hints[1] >= 0
+
+
+@pytest.mark.integration
+def test_selector_matrix_instruction_dimensions_property(rocm_device):
+    """Test matrix_instruction_dimensions property returns a tuple of three positive integers."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    mi_dims = selector.matrix_instruction_dimensions
+    assert isinstance(mi_dims, tuple)
+    assert len(mi_dims) == 3
+    assert all(isinstance(dim, int) for dim in mi_dims)
+    assert all(dim > 0 for dim in mi_dims)
+
+
+@pytest.mark.integration
+def test_selector_workspace_size_property(rocm_device):
+    """Test workspace_size property returns a non-negative integer."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    assert isinstance(selector.workspace_size, int)
+    assert selector.workspace_size >= 0
+
+
+@pytest.mark.integration
+def test_selector_workspace_size_per_elem_c_property(rocm_device):
+    """Test workspace_size_per_elem_c property returns a non-negative integer."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    assert isinstance(selector.workspace_size_per_elem_c, int)
+    assert selector.workspace_size_per_elem_c >= 0
+
+
+@pytest.mark.integration
+def test_selector_wgmxcc_property(rocm_device):
+    """Test wgmxcc (workgroup mapping across XCCs) property."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    assert isinstance(selector.wgmxcc, int)
+    assert selector.wgmxcc > 0
+
+
+@pytest.mark.integration
+def test_selector_wgmxccchunk_property(rocm_device):
+    """Test wgmxccchunk (workgroup mapping chunk size) property."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    assert isinstance(selector.wgmxccchunk, int)
+    assert selector.wgmxccchunk >= 0
+
+
+@pytest.mark.integration
+def test_selector_grid_selection_algorithm_property(rocm_device):
+    """Test grid_selection_algorithm property returns a valid grid_selection_t enum."""
+    config_gen = create_mock_config_gen()
+
+    selector = OrigamiMatmulSelector(
+        config_gen=config_gen,
+        m=2048,
+        n=2048,
+        k=2048,
+        a_dtype=torch.float16,
+        b_dtype=torch.float16,
+        out_dtype=torch.float16,
+        device=rocm_device
+    )
+
+    grid_selection = selector.grid_selection_algorithm
+    assert isinstance(grid_selection, origami.grid_selection_t)
+
+
 #####
 # Tests for _check_transpose_type functionality
 #####
