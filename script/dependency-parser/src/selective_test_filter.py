@@ -95,14 +95,19 @@ def select_tests(file_to_executables, changed_files, filter_mode):
 
 
 def get_gtest_filter(tests, fixturemap):
-    """Maps the set of texts to be executed to a gtest_filter"""
+    """Maps the set of tests to be executed to a gtest_filter"""
     gtest_filter = ""
+    fixture_count = 0
     for t in tests:
         if t in fixturemap:
-            for f in t:
-                gtest_filter += fixturemap[t][f] + "*:"
+            for f in fixturemap[t]:
+                gtest_filter += f + "*:"
+                fixture_count += 1
+        else:
+            print(f"Warning: Diff references test {t}. However, it is not in the fixturemap")
     if gtest_filter:
         gtest_filter = gtest_filter[:-1]
+        print(f"Added {fixture_count} fixtures to gtest_filter")
     return gtest_filter
 
 
@@ -154,6 +159,7 @@ def main():
     ref2 = sys.argv[3]
     filter_mode = "all"
     output_json = "tests_to_run.json"
+    fixture_file = ""
 
     if "--test-prefix" in sys.argv:
         filter_mode = "test_prefix"
@@ -179,7 +185,7 @@ def main():
     else:
         tests = select_tests(file_to_executables, changed_files, filter_mode)
         gtest_filter = ""
-        if tests and os.path.exists(fixture_file):
+        if tests and fixture_file and os.path.exists(fixture_file):
             tests_to_fixtures = load_fixturemap(fixture_file)
             gtest_filter = get_gtest_filter(tests, tests_to_fixtures)
 

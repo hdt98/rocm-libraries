@@ -55,7 +55,7 @@ def main(directory: str, output_file: str):
             fixtures = list_gtest_fixtures(file)
             if fixtures:
 #                src_file = file.name[5:] + ".cpp" # For MIOpen gtests, src_file.cpp <-> test_src_file
-                src_file = file.name # however, we're currently using the exe's name
+                src_file = f"bin/{file.name}" # however, we're currently using the exe's name
                 results[src_file] = fixtures
                 fixture_count += len(fixtures)
 
