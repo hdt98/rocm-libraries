@@ -569,9 +569,9 @@ struct GemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Problem>
                         load_tile_with_elementwise(b_copy_dram_window, b_element_func);
                     move_tile_window(b_copy_dram_window, b_dram_tile_window_step);
 
-                    block_gemm(c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
-
-                    block_sync_lds();
+                    block_gemm.template operator()<false>(
+                        c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
+                    // block_sync_lds();
 
                     block_gemm.LocalPrefetch(
                         a_lds_gemm_window, b_lds_gemm_window, is_a_load_tr_v, is_b_load_tr_v);
@@ -586,12 +586,14 @@ struct GemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Problem>
             {
                 // Leak last MFMA block to epilogue region, cover the potential lds-shuffle
                 // latency
-                block_gemm(c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
+                block_gemm.template operator()<false>(
+                    c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
             }
             else
             {
-                block_gemm(c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
-                block_sync_lds();
+                block_gemm.template operator()<false>(
+                    c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
+                // block_sync_lds();
 
                 if constexpr(is_a_col_major && !is_a_load_tr_v())
                 {
@@ -616,9 +618,8 @@ struct GemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Problem>
                     Base::LocalPrefill(b_copy_lds_window, elementwise_Bs_res);
                 }
                 block_sync_lds();
-                block_gemm.LocalPrefetch(
-                    a_lds_gemm_window, b_lds_gemm_window, is_a_load_tr_v, is_b_load_tr_v);
-                block_gemm(c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
+                block_gemm.template operator()<true>(
+                    c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
             }
             // __builtin_amdgcn_sched_barrier(0);
             return c_block_tile;

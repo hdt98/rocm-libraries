@@ -224,20 +224,27 @@ struct BlockUniversalGemmAsBsCr
         }
 
         // C += A * B
-        template <typename CBlockTensor,
+        template <bool DoLocalPrefetch = true,
+                  typename CBlockTensor,
                   typename ASmemBlockWindow,
                   typename BSmemBlockWindow,
                   bool ALoadTranspose = false,
                   bool BLoadTranspose = false>
         CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
-                                       const ASmemBlockWindow&,
-                                       const BSmemBlockWindow&,
-                                       bool_constant<ALoadTranspose> = {},
-                                       bool_constant<BLoadTranspose> = {})
+                                       const ASmemBlockWindow& a_block_window,
+                                       const BSmemBlockWindow& b_block_window,
+                                       bool_constant<ALoadTranspose> a_load_tr = {},
+                                       bool_constant<BLoadTranspose> b_load_tr = {})
         {
             static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
                           "The CDataType as defined in traits should be the same as correspoinding "
                           "C block tensor data type!");
+
+            // LocalPrefetch can be controlled by pipeline via DoLocalPrefetch parameter
+            if constexpr(DoLocalPrefetch)
+            {
+                LocalPrefetch(a_block_window, b_block_window, a_load_tr, b_load_tr);
+            }
 
             // hot loop:
             static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
@@ -275,6 +282,7 @@ struct BlockUniversalGemmAsBsCr
                     });
                 });
             });
+            block_sync_lds();
         }
     };
 
@@ -355,7 +363,8 @@ struct BlockUniversalGemmAsBsCr
         }
 
         // C += A * B
-        template <typename CBlockTensor,
+        template <bool DoLocalPrefetch = true,
+                  typename CBlockTensor,
                   typename ASmemBlockWindow,
                   typename BSmemBlockWindow,
                   bool ALoadTranspose = false,
@@ -372,7 +381,14 @@ struct BlockUniversalGemmAsBsCr
 
             // hot loop:
             static_for<0, KRepeat, 1>{}([&](auto kIter) {
-                LocalPrefetch<kIter.value>(a_block_window, b_block_window, a_load_tr, b_load_tr);
+                // Note: Interwave scheduler requires LocalPrefetch as part of its design
+                // The DoLocalPrefetch flag is provided for API consistency but should typically be
+                // true
+                if constexpr(DoLocalPrefetch)
+                {
+                    LocalPrefetch<kIter.value>(
+                        a_block_window, b_block_window, a_load_tr, b_load_tr);
+                }
                 __builtin_amdgcn_sched_barrier(
                     0); // Complete scheduling all pending instruction groups before this point
 
@@ -494,7 +510,8 @@ struct BlockUniversalGemmAsBsCr
     }
 
     // C += A * B
-    template <typename CBlockTensor,
+    template <bool DoLocalPrefetch = true,
+              typename CBlockTensor,
               typename ASmemBlockWindow,
               typename BSmemBlockWindow,
               bool ALoadTranspose = false,
@@ -505,7 +522,8 @@ struct BlockUniversalGemmAsBsCr
                                    bool_constant<ALoadTranspose> a_load_tr = {},
                                    bool_constant<BLoadTranspose> b_load_tr = {})
     {
-        block_gemm_impl_(c_block_tensor, a_block_window, b_block_window, a_load_tr, b_load_tr);
+        block_gemm_impl_.template operator()<DoLocalPrefetch>(
+            c_block_tensor, a_block_window, b_block_window, a_load_tr, b_load_tr);
     }
 
     // C = A * B
