@@ -2004,19 +2004,33 @@ struct intrin_wmma_scale16_f32_16x16x128_f8f6f4<16,
 };
 #endif // #ifndef CK_CODE_GEN_RTC
 
-template <index_t MPerWave, index_t NPerWave, index_t ScaleOpselB>
+template <index_t MPerWave,
+          index_t NPerWave,
+          index_t ScaleOpselB,
+          typename ScaleTypeA,
+          typename ScaleTypeB>
 struct intrin_wmma_scale_f32_32x16x128_f4;
 
-template <index_t ScaleOpselB>
-struct intrin_wmma_scale_f32_32x16x128_f4<32, 16, ScaleOpselB>
+#ifndef CK_CODE_GEN_RTC
+template <index_t ScaleOpselB, typename ScaleTypeA, typename ScaleTypeB>
+struct intrin_wmma_scale_f32_32x16x128_f4<32, 16, ScaleOpselB, ScaleTypeA, ScaleTypeB>
 {
     template <class FloatC>
     __device__ static void Run(const f4x128_t& reg_a,
-                               const int32_t scale_a,
+                               const ScaleTypeA& scale_a,
                                const f4x64_t& reg_b,
-                               const int32_t scale_b,
+                               const ScaleTypeB& scale_b,
                                FloatC& reg_c)
     {
+        // keep int32_t for backward compatibility
+        static_assert(is_same_v<ScaleTypeA, e8m0x4_bexp_t> ||
+                          is_same_v<ScaleTypeA, e5m3x4_scale_t> ||
+                          is_same_v<ScaleTypeA, e4m3x4_scale_t>,
+                      "ScaleTypeA must be e8m0x4_bexp_t, e5m3x4_scale_t, or e4m3x4_scale_t");
+        static_assert(is_same_v<ScaleTypeB, e8m0x4_bexp_t> ||
+                          is_same_v<ScaleTypeB, e5m3x4_scale_t> ||
+                          is_same_v<ScaleTypeB, e4m3x4_scale_t>,
+                      "ScaleTypeB must be e8m0x4_bexp_t, e5m3x4_scale_t, or e4m3x4_scale_t");
 #if defined(__gfx125__)
         int32x16_t arg_a = bit_cast<int32x16_t>(reg_a);
         int32x8_t arg_b  = bit_cast<int32x8_t>(reg_b);
@@ -2027,11 +2041,11 @@ struct intrin_wmma_scale_f32_32x16x128_f4<32, 16, ScaleOpselB>
                 0,
                 reg_c.template AsType<float16_t>()[Number<0>{}],
                 1, // fix ScaleOpselA as 1
-                0,
-                scale_a,
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
+                bit_cast<int32_t>(scale_a),
                 ScaleOpselB,
-                0,
-                scale_b,
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
+                bit_cast<int32_t>(scale_b),
                 0,
                 0);
 #else
@@ -2043,6 +2057,61 @@ struct intrin_wmma_scale_f32_32x16x128_f4<32, 16, ScaleOpselB>
 #endif
     }
 };
+#endif // #ifndef CK_CODE_GEN_RTC
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          index_t ScaleOpselB,
+          typename ScaleTypeA,
+          typename ScaleTypeB>
+struct intrin_wmma_scale16_f32_32x16x128_f4;
+
+#ifndef CK_CODE_GEN_RTC
+template <index_t ScaleOpselB, typename ScaleTypeA, typename ScaleTypeB>
+struct intrin_wmma_scale16_f32_32x16x128_f4<32, 16, ScaleOpselB, ScaleTypeA, ScaleTypeB>
+{
+    template <class FloatC>
+    __device__ static void Run(const f4x128_t& reg_a,
+                               const ScaleTypeA& scale_a,
+                               const f4x64_t& reg_b,
+                               const ScaleTypeB& scale_b,
+                               FloatC& reg_c)
+    {
+        static_assert(is_same_v<ScaleTypeA, e8m0x8_bexp_t> ||
+                          is_same_v<ScaleTypeA, e5m3x8_scale_t> ||
+                          is_same_v<ScaleTypeA, e4m3x8_scale_t>,
+                      "ScaleTypeA must be e8m0x8_bexp_t, e5m3x8_scale_t, or e4m3x8_scale_t");
+        static_assert(is_same_v<ScaleTypeB, e8m0x8_bexp_t> ||
+                          is_same_v<ScaleTypeB, e5m3x8_scale_t> ||
+                          is_same_v<ScaleTypeB, e4m3x8_scale_t>,
+                      "ScaleTypeB must be e8m0x8_bexp_t, e5m3x8_scale_t, or e4m3x8_scale_t");
+#if defined(__gfx125__)
+        int32x16_t arg_a = bit_cast<int32x16_t>(reg_a);
+        int32x8_t arg_b  = bit_cast<int32x8_t>(reg_b);
+        reg_c.template AsType<float16_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_scale16_f32_32x16x128_f4(
+                arg_a,
+                arg_b,
+                0,
+                reg_c.template AsType<float16_t>()[Number<0>{}],
+                1, // fix ScaleOpselA as 1
+                wmma_impl::ScaleTypeSelector<ScaleTypeA>::value,
+                bit_cast<int64_t>(scale_a),
+                ScaleOpselB,
+                wmma_impl::ScaleTypeSelector<ScaleTypeB>::value,
+                bit_cast<int64_t>(scale_b),
+                0,
+                0);
+#else
+        ignore = reg_a;
+        ignore = scale_a;
+        ignore = reg_b;
+        ignore = scale_b;
+        ignore = reg_c;
+#endif
+    }
+};
+#endif // #ifndef CK_CODE_GEN_RTC
 
 } // namespace ck
 #endif

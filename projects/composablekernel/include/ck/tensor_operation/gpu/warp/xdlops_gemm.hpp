@@ -113,7 +113,7 @@ enum struct MfmaInstr
     wmma_f32_16x16x128_f8f6f4_gfx125, // not implemented
     wmma_scale16_f32_16x16x128_f8f6f4_gfx125,
     wmma_scale_f32_16x16x128_f8f6f4_gfx125,
-    wmma_scale16_f32_32x16x128_f4_gfx125, // not implemented
+    wmma_scale16_f32_32x16x128_f4_gfx125,
     wmma_scale_f32_32x16x128_f4_gfx125,
 
     wmma_f32_16x16x4_f32_gfx125,
@@ -1505,8 +1505,46 @@ struct mfma_type<MfmaInstr::wmma_scale_f32_32x16x128_f4_gfx125> : public mfma_ty
                         FloatC& reg_c) const
     {
 
-        intrin_wmma_scale_f32_32x16x128_f4<MPerWmma, NPerWmma, ScaleOpselB>::Run(
-            a, bit_cast<int32_t>(scale_a), b, bit_cast<int32_t>(scale_b), reg_c);
+        intrin_wmma_scale_f32_32x16x128_f4<MPerWmma, NPerWmma, ScaleOpselB, ScaleA, ScaleB>::Run(
+            a, scale_a, b, scale_b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_scale16_f32_32x16x128_f4_gfx125> : public mfma_type_gfx125_base_128
+{
+    // clang-format off
+    static constexpr index_t group_size          = 16;
+    static constexpr index_t num_groups_per_blk  = 1;
+    static constexpr index_t num_regs_per_blk    = 16;
+    static constexpr index_t num_threads_per_blk = 16;
+    static constexpr index_t wave_size           = 32;
+    static constexpr index_t num_input_blks      = 2;
+    static constexpr index_t num_output_blks     = 1;
+    static constexpr index_t m_per_blk           = 32;
+    static constexpr index_t n_per_blk           = 16;
+    static constexpr index_t k_per_blk           = 64;
+    static constexpr index_t scale_blk_size      = 16;
+    static constexpr bool is_k_reduction         = true;
+    // clang-format on
+
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              index_t ScaleOpselB,
+              class FloatA,
+              class ScaleA,
+              class FloatB,
+              class ScaleB,
+              class FloatC>
+    __device__ void run(const FloatA& a,
+                        const ScaleA& scale_a,
+                        const FloatB& b,
+                        const ScaleB& scale_b,
+                        FloatC& reg_c) const
+    {
+
+        intrin_wmma_scale16_f32_32x16x128_f4<MPerWmma, NPerWmma, ScaleOpselB, ScaleA, ScaleB>::Run(
+            a, scale_a, b, scale_b, reg_c);
     }
 };
 
