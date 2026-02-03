@@ -177,6 +177,10 @@ class OrigamiMatmulSelector:
         )
 
 
+    #####
+    # Selection result properties
+    #####
+
     @property
     def macrotile_m(self):
         """
@@ -221,7 +225,8 @@ class OrigamiMatmulSelector:
             int: Workgroup mapping size.
         """
         return self._workgroup_mapping.wgm
-    
+
+
     @property
     def wgmxcc(self):
         """
@@ -234,7 +239,8 @@ class OrigamiMatmulSelector:
             int: Number of workgroups mapped per XCC.
         """
         return self._workgroup_mapping.wgmxcc
-    
+
+
     @property
     def wgmxccchunk(self):
         """
@@ -246,6 +252,7 @@ class OrigamiMatmulSelector:
             int: Chunk size for XCC workgroup mapping.
         """
         return self._workgroup_mapping.wgmxccchunk
+
 
     @property
     def number_of_cus(self):
@@ -280,6 +287,61 @@ class OrigamiMatmulSelector:
 
 
     @property
+    def cache_hints(self):
+        """
+        Cache hint bitmasks for operands A and B.
+        
+        Bitmask values corresponding to Triton's cache hint flags, controlling cache
+        behavior when loading matrix operands.
+        
+        Returns:
+            tuple[int, int]: A tuple of (cache_hints_a, cache_hints_b) bitmask values.
+        """
+        return (self._result.config.cache_hints_a, self._result.config.cache_hints_b)
+
+
+    @property
+    def matrix_instruction_dimensions(self):
+        """
+        Matrix instruction dimensions (M, N, K) for the selected configuration.
+        
+        These are the hardware matrix instruction dimensions used by the GEMM kernel,
+        determined by the GPU architecture and data types.
+        
+        Returns:
+            tuple[int, int, int]: A tuple of (mi_m, mi_n, mi_k) dimensions.
+        """
+        return (self._result.config.mi.m, self._result.config.mi.n, self._result.config.mi.k)
+
+
+    @property
+    def workspace_size(self):
+        """
+        Workspace buffer size in bytes required for the kernel.
+        
+        For StreamK and other algorithms that require temporary storage,
+        this indicates the total workspace memory needed.
+        
+        Returns:
+            int: Workspace size in bytes.
+        """
+        return self._result.config.workspace_size
+
+
+    @property
+    def workspace_size_per_elem_c(self):
+        """
+        Workspace size per output element in bytes.
+        
+        Used to calculate partial tile workspace requirements for StreamK scheduling.
+        
+        Returns:
+            int: Bytes of workspace required per output matrix element.
+        """
+        return self._result.config.workspace_size_per_elem_c
+
+
+    @property
     def even_k(self):
         """
         Whether the K dimension is evenly divisible by the macrotile K size.
@@ -306,6 +368,68 @@ class OrigamiMatmulSelector:
         """
         return self._grid
 
+
+    #####
+    # Selection decision properties - for examining how selections were made after-the-fact
+    #####
+
+    @property
+    def reduction_strategy_algorithm(self):
+        """
+        Reduction strategy used for StreamK scheduling.
+        
+        Indicates the algorithm used for partial tile reductions in StreamK.
+        
+        Returns:
+            origami.reduction_t: The reduction strategy enum value.
+        """
+        return self._result.config.reduction_strategy
+
+
+    @property
+    def prediction_mode(self):
+        """
+        Prediction mode used for latency estimation during config selection.
+        
+        Controls whether fast analytical estimation or slower simulation-based
+        prediction was used to rank configurations.
+        
+        Returns:
+            origami.prediction_modes_t: The prediction mode enum value.
+        """
+        return self._result.config.prediction_mode
+
+
+    @property
+    def targeted_backend(self):
+        """
+        Target backend for kernel execution.
+        
+        Indicates which backend (e.g., Triton, TensileLite) the configuration
+        was selected for.
+        
+        Returns:
+            origami.target_t: The target backend enum value.
+        """
+        return self._result.config.target
+
+
+    @property
+    def grid_selection_algorithm(self):
+        """
+        Grid selection algorithm used for determining grid size.
+        
+        Indicates which algorithm was used to select the number of workgroups.
+        
+        Returns:
+            origami.grid_selection_t: The grid selection algorithm enum value.
+        """
+        return self._result.config.grid_selection
+
+
+    #####
+    # Internal helper functions
+    #####
 
     def _generate_configs(self, config_gen) -> [origami.config_t]:
         """
