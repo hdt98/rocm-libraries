@@ -348,6 +348,9 @@ class ActivationModule:
 
     # Public function
     def getModule(self, cDataType, activationType, vgprIn, vgprOut):
+        # @Siavash
+        print(f"activationType: {activationType}, cDataType: {cDataType}, vgprIn: {vgprIn}, vgprOut: {vgprOut}")
+
         if self.useCache:
             module = self.getCache(cDataType, activationType, vgprIn, vgprOut)
             if module:
@@ -854,6 +857,9 @@ class ActivationModule:
         return module
     
     def getDReluModule(self, cDataType, vgprIn, vgprOut):
+
+        import pdb
+        pdb.set_trace()
         ti = rocIsa.getInstance()
         self.needCombine = True
         module = Module("Gradient Relu")
@@ -1406,6 +1412,8 @@ class ActivationInline:
       kStr += addSpace(asm, ": \"+v\"(value) : \"s\"(alpha), \"s\"(beta)\n")
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter)
     elif (activationType == 'dgelu'):
+      import pdb
+      pdb.set_trace()
       kStr += (asm + " // dgelu\n")
       module = activation.getDGeluModule(self.dataType, 0, 0)
       kStr += self.getActivationAsmStr(activation, module, (len(asm) * " "))
@@ -1413,6 +1421,8 @@ class ActivationInline:
       needExec = True if self.enableGuard else False
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter, needExec=needExec)
     elif (activationType == 'drelu'):
+      import pdb
+      pdb.set_trace()
       kStr += (asm + " // drelu\n")
       module = activation.getDReluModule(self.dataType, 0, 0)
       kStr += self.getActivationAsmStr(activation, module, (len(asm) * " "))

@@ -279,7 +279,13 @@ def writeSolutionsAndKernels(
         itertools.repeat(splitGSU),
         asmKernels
     )
-    asmResults = ParallelMap2(processKernelSource, asmIter, "Generating assembly kernels", return_as="list")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Serial Build ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    asmResults = [] 
+    for item in asmIter: 
+        result = processKernelSource(*item) 
+        asmResults.append(result)
+    # asmResults = ParallelMap2(processKernelSource, asmIter, "Generating assembly kernels", return_as="list")
+    
     removeInvalidSolutionsAndKernels(
         asmResults, asmKernels, solutions, errorTolerant, getVerbosity(), splitGSU
     )
@@ -354,6 +360,8 @@ def writeSolutionsAndKernelsTCL(
     compress: bool=True,
     removeTemporaries: bool=True
 ):
+    import pdb
+    pdb.set_trace()
     outputPath = Path(outputPath)
     destLibPath = ensurePath(
         outputPath / "library"
@@ -392,7 +400,7 @@ def writeSolutionsAndKernelsTCL(
     unaryAssemble = functools.partial(assemble, removeTemporaries=removeTemporaries)
 
     outOptions = rocisa.rocIsa.getInstance().getOutputOptions()
-    outOptions.outputNoComment = not disableAsmComments
+    outOptions.outputNoComment = disableAsmComments
 
     unaryProcessKernelSource = functools.partial(
         processKernelSource,
@@ -404,13 +412,12 @@ def writeSolutionsAndKernelsTCL(
 
     unaryWriteAssembly = functools.partial(writeAssembly, assemblyTmpPath)
     compose = lambda *F: functools.reduce(lambda f, g: lambda x: f(g(x)), F)
-    ret = ParallelMap2(
-        compose(unaryAssemble, unaryWriteAssembly, unaryProcessKernelSource),
-        uniqueAsmKernels,
-        "Generating assembly kernels",
-        multiArg=False,
-        return_as="list"
-    )
+
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Serial Build ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    processAsmKernel = compose(unaryAssemble, unaryWriteAssembly, unaryProcessKernelSource)
+    ret = []
+    for kernel in uniqueAsmKernels:
+        ret.append(processAsmKernel(kernel))
     passPostKernelInfoToSolution(
         ret, uniqueAsmKernels, solutions, splitGSU
     )
