@@ -374,47 +374,6 @@ class OrigamiMatmulSelector:
     #####
 
     @property
-    def reduction_strategy_algorithm(self):
-        """
-        Reduction strategy used for StreamK scheduling.
-        
-        Indicates the algorithm used for partial tile reductions in StreamK.
-        
-        Returns:
-            origami.reduction_t: The reduction strategy enum value.
-        """
-        return self._result.config.reduction_strategy
-
-
-    @property
-    def prediction_mode(self):
-        """
-        Prediction mode used for latency estimation during config selection.
-        
-        Controls whether fast analytical estimation or slower simulation-based
-        prediction was used to rank configurations.
-        
-        Returns:
-            origami.prediction_modes_t: The prediction mode enum value.
-        """
-        return self._result.config.prediction_mode
-
-
-    @property
-    def targeted_backend(self):
-        """
-        Target backend for kernel execution.
-        
-        Indicates which backend (e.g., Triton, TensileLite) the configuration
-        was selected for.
-        
-        Returns:
-            origami.target_t: The target backend enum value.
-        """
-        return self._result.config.target
-
-
-    @property
     def grid_selection_algorithm(self):
         """
         Grid selection algorithm used for determining grid size.
