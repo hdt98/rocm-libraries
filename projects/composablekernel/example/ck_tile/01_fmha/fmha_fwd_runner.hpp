@@ -466,6 +466,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
         {
             s = ck_tile::integer_least_multiple(s, ck_tile::numeric_traits<VDataType>::PackedSize);
         }
+        for(auto& s : kv_eff_lens_per_batch)
+        {
+            s = ck_tile::integer_least_multiple(s, ck_tile::numeric_traits<VDataType>::PackedSize);
+        }
     }
 
     for(ck_tile::index_t wb = 0; wb < batch; ++wb)
