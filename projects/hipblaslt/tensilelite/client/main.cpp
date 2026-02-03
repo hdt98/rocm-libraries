@@ -845,7 +845,7 @@ int main(int argc, const char* argv[])
 
                                         for(int j = 0; j < enq; j++)
                                         {
-                                            size_t kIdx = ((i * enq) + j) % kernels.size();
+                                            size_t kIdx = ((i * enq) + j + warmupInvocations) % kernels.size();
                                             HIP_CHECK_EXC(adapter.launchKernels(
                                                 kernels[kIdx], stream, nullptr, nullptr));
 

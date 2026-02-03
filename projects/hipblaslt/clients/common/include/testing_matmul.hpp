@@ -3853,7 +3853,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Run 5 sub-iterations
                         for(int j = 0; j < num_sub_iterations; j++)
                         {
-                            int idx = i * num_sub_iterations + j;
+                            int idx = i * num_sub_iterations + j + number_cold_calls;
                             CHECK_HIPBLASLT_ERROR(gemmVec[idx % block_count].run(stream));
                             if(arg.flush)
                                 hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
@@ -3958,7 +3958,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Run 5 sub-iterations
                         for(int j = 0; j < num_sub_iterations; j++)
                         {
-                            int idx = i * num_sub_iterations + j;
+                            int idx = i * num_sub_iterations + j + number_cold_calls;
                             auto ptr_matmul = matmul[idx % block_count][0];
                             auto ptr_alpha  = arg.scaleAlpha_vector
                                                   ? (dScaleAlphaVec[0].as<char>())
