@@ -113,12 +113,21 @@ public:
 
         if((size == 0) && (names.size() == 1) && (names.front().empty()))
         {
+            throw(std::domain_error("Error at work_items_impl::item(): item is empty"));
             return false;
         }
 
         for(auto& name : names)
         {
-            map_names_to_ids_[name] = id;
+            if(!name.empty())
+            {
+                if(map_names_to_ids_.find(name) != map_names_to_ids_.end())
+                {
+                    throw(std::domain_error("Error at work_items_impl::item(): non unique name"));
+                    return false;
+                }
+                map_names_to_ids_[name] = id;
+            }
         }
         items_sizes_[id] = size;
         items_names_[id] = names;
@@ -126,23 +135,35 @@ public:
         return true;
     }
 
-    /* bool merge_item(std::size_t id, std::vector<std::string> names, std::size_t size) */
-    /* { */
-    /*     if(id >= N) */
-    /*     { */
-    /*         throw(std::domain_error("Error at rocsolver_work_items_n::merge_item(): id >= N")); */
-    /*         return false; */
-    /*     } */
+    bool merge_item(std::size_t id, std::vector<std::string> names, std::size_t size)
+    {
+        if(id >= N)
+        {
+            throw(std::domain_error("Error at rocsolver_work_items_n::merge_item(): id >= N"));
+            return false;
+        }
 
-    /*     for(auto& name : names) */
-    /*     { */
-    /*         map_names_to_ids_[name] = id; */
-    /*     } */
-    /*     items_sizes_[id] = std::max(size, items_sizes_[id]); */
-    /*     items_names_[id].insert(items_names_[id].end(), names.begin(), names.end()); */
+        for(auto& name : names)
+        {
+            auto iter = map_names_to_ids_.find(name);
+            if(iter == map_names_to_ids_.end())
+            {
+                if(!name.empty())
+                {
+                    map_names_to_ids_[name] = id;
+                }
+                items_sizes_[id] = std::max(size, items_sizes_[id]);
+                items_names_[id].push_back(name);
+            }
+            else
+            {
+                auto [_, old_id] = *iter;
+                items_sizes_[old_id] = std::max(size, items_sizes_[old_id]);
+            }
+        }
 
-    /*     return true; */
-    /* } */
+        return true;
+    }
 
     std::size_t id(std::string item_name) const
     {
@@ -181,7 +202,7 @@ public:
     //
     // \return std::string with debug information.
     //
-    auto print_debug_str(std::string s) -> std::string
+    auto print_debug_str(std::string s = {}) -> std::string
     {
         std::ostringstream os;
         os << s;
@@ -203,8 +224,7 @@ public:
     [[maybe_unused]] auto print_debug(K& os) -> K&
     {
         std::size_t total{0};
-        os << ">>>\n";
-        /* os << ":: :: work_items_impl::print_debug()\n\n" << std::flush; */
+        os << std::endl;
         for(std::size_t i = 0; i < N; ++i)
         {
             os << ":: Item = " << i;
@@ -224,7 +244,6 @@ public:
             total += items_sizes_[i];
         }
         os << ":: Total size = " << total << std::endl;
-        os << "<<<\n" << std::flush;
 
         return os;
     }
@@ -304,6 +323,11 @@ public:
         return impl_.item(id, names, size);
     }
 
+    bool merge_item(std::size_t id, std::vector<std::string> names, std::size_t size)
+    {
+        return impl_.merge_item(id, names, size);
+    }
+
     std::size_t id(std::string item_name) const
     {
         return impl_.id(item_name);
@@ -361,9 +385,9 @@ auto create_work_items_sorted_by_size(const work_items_list_t& list)
 }
 
 template <std::size_t N>
-auto create_work_items(const work_items_list_t& list)
-{ 
-    return create_work_items_sorted_by_size<N>(list);
+constexpr auto create_work_items(const work_items_list_t& list)
+{
+    /* return create_work_items_sorted_by_size<N>(list); */
 
     rocsolver_work_items_n<N> w_out;
     if(list.size() > N)
@@ -382,24 +406,26 @@ auto create_work_items(const work_items_list_t& list)
     return w_out;
 }
 
+inline auto create_work_item(const std::pair<std::string, std::size_t>& pair)
+{
+    rocsolver_work_items_n<1> w_out;
+    auto [name, size] = pair;
+    w_out.item(0, name, size);
+
+    return w_out;
+}
+
+inline auto empty_work_item()
+{
+    return rocsolver_work_items_n<0>();
+}
+
 template <std::size_t N1, std::size_t N2>
 auto merge(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2>& w2)
 {
     constexpr std::size_t N = std::max({N1, N2});
     rocsolver_work_items_n<N> w_out;
-
-    auto merge_item = [&](std::size_t id, std::vector<std::string> names_, std::size_t size_) {
-        if(id >= N)
-        {
-            throw(std::domain_error("Error at merge::merge_item(): id >= N"));
-        }
-
-        std::size_t size = std::max(size_, w_out.size(id));
-        auto names = w_out.names(id);
-        names.insert(names.end(), names_.begin(), names_.end());
-
-        w_out.item(id, names, size);
-    };
+    [[maybe_unused]] bool success = true;
 
     auto item_not_empty = [&](std::vector<std::string> names_, std::size_t size_) {
         for(auto& name : names_)
@@ -417,7 +443,7 @@ auto merge(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2
     {
         if(item_not_empty(w1.names(i), w1.size(i)))
         {
-            merge_item(i, w1.names(i), w1.size(i));
+            success &= w_out.merge_item(i, w1.names(i), w1.size(i));
         }
     }
 
@@ -425,7 +451,7 @@ auto merge(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2
     {
         if(item_not_empty(w2.names(i), w2.size(i)))
         {
-            merge_item(i, w2.names(i), w2.size(i));
+            success &= w_out.merge_item(i, w2.names(i), w2.size(i));
         }
     }
 
@@ -437,18 +463,67 @@ auto join(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2>
 {
     constexpr std::size_t N = N1 + N2;
     rocsolver_work_items_n<N> w_out;
+    [[maybe_unused]] bool success = true;
 
-    for(std::size_t i = 0; i < N1; ++i)
-    {
-        w_out.item(i, w1.names(i), w1.size(i));
-    }
+    std::size_t i1 = 0, i2 = 0;
 
-    for(std::size_t i = 0; i < N2; ++i)
+    /* for(std::size_t i = 0; i < N1; ++i) */
+    /* { */
+    /*     success &= w_out.item(i, w1.names(i), w1.size(i)); */
+    /* } */
+
+    /* for(std::size_t i = 0; i < N2; ++i) */
+    /* { */
+    /*     success &= w_out.item(i + N1, w2.names(i), w2.size(i)); */
+    /* } */
+
+    while(i1 + i2 < N)
     {
-        w_out.item(i + N1, w2.names(i), w2.size(i));
+        if((i1 < N1) && (i2 < N2))
+        {
+            if(w1.size(i1) >= w2.size(i2))
+            {
+                success &= w_out.item(i1 + i2, w1.names(i1), w1.size(i1));
+                ++i1;
+            }
+            else
+            {
+                success &= w_out.item(i1 + i2, w2.names(i2), w2.size(i2));
+                ++i2;
+            }
+        }
+        else if(i1 < N1)
+        {
+            success &= w_out.item(i1 + i2, w1.names(i1), w1.size(i1));
+            ++i1;
+        }
+        else
+        {
+            success &= w_out.item(i1 + i2, w2.names(i2), w2.size(i2));
+            ++i2;
+        }
     }
 
     return w_out;
+}
+
+template <std::size_t N1, std::size_t N2>
+auto operator|(const rocsolver_work_items_n<N1>& lhs, const rocsolver_work_items_n<N2>& rhs)
+{
+    return merge(lhs, rhs);
+}
+
+template <std::size_t N1, std::size_t N2>
+auto operator|=(rocsolver_work_items_n<N1>& lhs, const rocsolver_work_items_n<N2>& rhs)
+{
+    lhs = merge(lhs, rhs);
+    return lhs;
+}
+
+template <std::size_t N1, std::size_t N2>
+auto operator+(const rocsolver_work_items_n<N1>& lhs, const rocsolver_work_items_n<N2>& rhs)
+{
+    return join(lhs, rhs);
 }
 
 template <std::size_t N1, std::size_t N2 = 0>
@@ -463,13 +538,18 @@ auto cond(bool condition,
 }
 
 template <std::size_t N1, std::size_t N2, std::size_t N3>
-auto merge(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2>& w2, const rocsolver_work_items_n<N3>& w3)
+auto merge(const rocsolver_work_items_n<N1>& w1,
+           const rocsolver_work_items_n<N2>& w2,
+           const rocsolver_work_items_n<N3>& w3)
 {
     return merge(w1, merge(w2, w3));
 }
 
 template <std::size_t N1, std::size_t N2, std::size_t N3, std::size_t N4>
-auto merge(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2>& w2, const rocsolver_work_items_n<N3>& w3, const rocsolver_work_items_n<N4>& w4)
+auto merge(const rocsolver_work_items_n<N1>& w1,
+           const rocsolver_work_items_n<N2>& w2,
+           const rocsolver_work_items_n<N3>& w3,
+           const rocsolver_work_items_n<N4>& w4)
 {
     return merge(w1, merge(w2, w3, w4));
 }
@@ -553,6 +633,21 @@ public:
         return work(item_id);
     }
 
+    auto set_work(std::size_t item_id, rocblas_int value = 0)
+    {
+        void* ptr = work(item_id);
+        std::size_t num_bytes = size(item_id);
+        HIP_CHECK(hipMemset(ptr, 0, num_bytes));
+
+        return rocblas_status_success;
+    }
+
+    auto set_work(const std::string& item_name, rocblas_int value = 0)
+    {
+        auto item_id = id(item_name);
+        return set_work(item_id);
+    }
+
     ///
     /// For debugging
     ///
@@ -620,17 +715,23 @@ auto rocsolver_geqrf_getWorkItems(rocblas_handle handle,
     //
     // Create a list of work items with previously computed sizes and return it
     //
-    work_items_list_t wlist = {{"geqrf_scalars", size_scalars},
-                               {"geqrf_work_workArr", size_work_workArr},
-                               {"geqrf_workArr", size_workArr},
-                               {"geqrf_Abyx_norms_trfact", size_Abyx_norms_trfact},
-                               {"geqrf_diag_tmptr", size_diag_tmptr}};
+    /* work_items_list_t wlist = {{"geqrf_scalars", size_scalars}, */
+    /*                            {"geqrf_work_workArr", size_work_workArr}, */
+    /*                            {"geqrf_workArr", size_workArr}, */
+    /*                            {"geqrf_Abyx_norms_trfact", size_Abyx_norms_trfact}, */
+    /*                            {"geqrf_diag_tmptr", size_diag_tmptr}}; */
 
-    // Note: Number of elements in `wlist` must be known at compile time
-    // if we are to use rocBLAS' methods for device memory management
-    constexpr std::size_t N{5};
+    /* // Note: Number of elements in `wlist` must be known at compile time */
+    /* // if we are to use rocBLAS' methods for device memory management */
+    /* constexpr std::size_t N{5}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"geqrf_scalars", size_scalars})
+        + create_work_item({"geqrf_work_workArr", size_work_workArr})
+        + create_work_item({"geqrf_workArr", size_workArr})
+        + create_work_item({"geqrf_Abyx_norms_trfact", size_Abyx_norms_trfact})
+        + create_work_item({"geqrf_diag_tmptr", size_diag_tmptr});
 
     return work_items;
 }
@@ -739,14 +840,21 @@ auto rocsolver_gelqf_getWorkItems(rocblas_handle handle,
                                               &size_Abyx_norms_trfact, &size_diag_tmptr,
                                               &size_workArr);
 
-    constexpr std::size_t N{5};
-    work_items_list_t wlist = {{"gelqf_scalars", size_scalars},
-                               {"gelqf_work_workArr", size_work_workArr},
-                               {"gelqf_workArr", size_workArr},
-                               {"gelqf_Abyx_norms_trfact", size_Abyx_norms_trfact},
-                               {"gelqf_diag_tmptr", size_diag_tmptr}};
+    /* constexpr std::size_t N{5}; */
+    /* work_items_list_t wlist = {{"gelqf_scalars", size_scalars}, */
+    /*                            {"gelqf_work_workArr", size_work_workArr}, */
+    /*                            {"gelqf_workArr", size_workArr}, */
+    /*                            {"gelqf_Abyx_norms_trfact", size_Abyx_norms_trfact}, */
+    /*                            {"gelqf_diag_tmptr", size_diag_tmptr}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"gelqf_scalars", size_scalars})
+        + create_work_item({"gelqf_work_workArr", size_work_workArr})
+        + create_work_item({"gelqf_workArr", size_workArr})
+        + create_work_item({"gelqf_Abyx_norms_trfact", size_Abyx_norms_trfact})
+        + create_work_item({"gelqf_diag_tmptr", size_diag_tmptr});
+
     return work_items;
 }
 
@@ -817,12 +925,17 @@ auto rocsolver_bdsqr_getWorkItems(rocblas_handle handle,
     rocsolver_bdsqr_getMemorySize<S>(n, nv, nu, nc, batch_count, &size_splits_map, &size_work,
                                      &size_completed);
 
-    constexpr std::size_t N{3};
-    work_items_list_t wlist = {{"bdsqr_splits_map", size_splits_map},
-                               {"bdsqr_work", size_work},
-                               {"bdsqr_completed", size_completed}};
+    /* constexpr std::size_t N{3}; */
+    /* work_items_list_t wlist = {{"bdsqr_splits_map", size_splits_map}, */
+    /*                            {"bdsqr_work", size_work}, */
+    /*                            {"bdsqr_completed", size_completed}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"bdsqr_splits_map", size_splits_map})
+        + create_work_item({"bdsqr_work", size_work})
+        + create_work_item({"bdsqr_completed", size_completed});
+
     return work_items;
 }
 
@@ -860,7 +973,7 @@ rocblas_status rocsolver_bdsqr_template(rocblas_handle handle,
     }
 
     void* splits_map = dwptr->work("bdsqr_splits_map");
-    void* work = dwptr->work("bdsqr_splits_map");
+    void* work = dwptr->work("bdsqr_work");
     void* completed = dwptr->work("bdsqr_completed");
 
     return rocsolver_bdsqr_template<T>(handle, uplo, n, nv, nu, nc, D, strideD, E, strideE, V,
@@ -909,14 +1022,20 @@ auto rocsolver_gebrd_getWorkItems(
     rocsolver_gebrd_getMemorySize<false, T>(m, n, batch_count, &size_scalars, &size_work_workArr,
                                             &size_Abyx_norms, &size_X, &size_Y);
 
-    constexpr std::size_t N{5};
-    work_items_list_t wlist = {{"gebrd_scalars", size_scalars},
-                               {"gebrd_work_workArr", size_work_workArr},
-                               {"gebrd_Abyx_norms", size_Abyx_norms},
-                               {"gebrd_X", size_X},
-                               {"gebrd_Y", size_Y}};
+    /* constexpr std::size_t N{5}; */
+    /* work_items_list_t wlist = {{"gebrd_scalars", size_scalars}, */
+    /*                            {"gebrd_work_workArr", size_work_workArr}, */
+    /*                            {"gebrd_Abyx_norms", size_Abyx_norms}, */
+    /*                            {"gebrd_X", size_X}, */
+    /*                            {"gebrd_Y", size_Y}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"gebrd_scalars", size_scalars})
+        + create_work_item({"gebrd_work_workArr", size_work_workArr})
+        + create_work_item({"gebrd_Abyx_norms", size_Abyx_norms})
+        + create_work_item({"gebrd_X", size_X}) + create_work_item({"gebrd_Y", size_Y});
+
     return work_items;
 }
 
@@ -947,10 +1066,10 @@ rocblas_status rocsolver_gebrd_template(rocblas_handle handle,
                                         const rocblas_int batch_count,
                                         DevWorkPtr dwptr)
 {
-    ROCSOLVER_INIT_DEVICE_WORKSPACE(
-        dwptr,
-        rocsolver_gerbd_getWorkItems(handle, m, n, A, shiftA, lda, strideA, D, strideD, E, strideE,
-                                     tauq, strideQ, taup, strideP, batch_count));
+    ROCSOLVER_INIT_DEVICE_WORKSPACE(dwptr,
+                                    rocsolver_gebrd_getWorkItems<BATCHED, STRIDED>(
+                                        handle, m, n, A, shiftA, lda, strideA, D, strideD, E,
+                                        strideE, tauq, strideQ, taup, strideP, batch_count));
 
     void* scalars = dwptr->work("gebrd_scalars");
     void* work_workArr = dwptr->work("gebrd_work_workArr");
@@ -995,17 +1114,17 @@ rocblas_status rocsolver_gebrd_template(rocblas_handle handle,
 
 template <bool BATCHED, bool STRIDED, typename T, typename U>
 auto rocsolver_orgbr_ungbr_getWorkItems(rocblas_handle handle,
-                                              const rocblas_storev storev,
-                                              const rocblas_int m,
-                                              const rocblas_int n,
-                                              const rocblas_int k,
-                                              U /* A */,
-                                              const rocblas_int shiftA,
-                                              const rocblas_int lda,
-                                              const rocblas_stride strideA,
-                                              T* /* ipiv */,
-                                              const rocblas_stride strideP,
-                                              const rocblas_int batch_count)
+                                        const rocblas_storev storev,
+                                        const rocblas_int m,
+                                        const rocblas_int n,
+                                        const rocblas_int k,
+                                        U /* A */,
+                                        const rocblas_int shiftA,
+                                        const rocblas_int lda,
+                                        const rocblas_stride strideA,
+                                        T* /* ipiv */,
+                                        const rocblas_stride strideP,
+                                        const rocblas_int batch_count)
 {
     // memory workspace sizes:
     // size for constants in rocblas calls
@@ -1022,19 +1141,26 @@ auto rocsolver_orgbr_ungbr_getWorkItems(rocblas_handle handle,
                                                   &size_work, &size_Abyx_tmptr, &size_trfact,
                                                   &size_workArr);
 
-    constexpr std::size_t N{5};
-    work_items_list_t wlist = {{"orgbr_ungbr_scalars", size_scalars},
-                               {"orgbr_ungbr_workArr", size_workArr},
-                               {"orgbr_ungbr_work", size_work},
-                               {"orgbr_ungbr_Abyx_tmptr", size_Abyx_tmptr},
-                               {"orgbr_ungbr_trfact", size_trfact}};
+    /* constexpr std::size_t N{5}; */
+    /* work_items_list_t wlist = {{"orgbr_ungbr_scalars", size_scalars}, */
+    /*                            {"orgbr_ungbr_workArr", size_workArr}, */
+    /*                            {"orgbr_ungbr_work", size_work}, */
+    /*                            {"orgbr_ungbr_Abyx_tmptr", size_Abyx_tmptr}, */
+    /*                            {"orgbr_ungbr_trfact", size_trfact}}; */
+    /* auto work_items = create_work_items<N>(wlist); */
 
-    auto work_items = create_work_items<N>(wlist);
+    auto work_items = create_work_item({"orgbr_ungbr_scalars", size_scalars})
+        + create_work_item({"orgbr_ungbr_work", size_work})
+        + create_work_item({"orgbr_ungbr_Abyx_tmptr", size_Abyx_tmptr})
+        + create_work_item({"orgbr_ungbr_trfact", size_trfact})
+        + create_work_item({"orgbr_ungbr_workArr", size_workArr});
+
     return work_items;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U, typename DevWorkPtr>
 rocblas_status rocsolver_orgbr_ungbr_template(rocblas_handle handle,
+                                              const rocblas_storev storev,
                                               const rocblas_int m,
                                               const rocblas_int n,
                                               const rocblas_int k,
@@ -1064,9 +1190,9 @@ rocblas_status rocsolver_orgbr_ungbr_template(rocblas_handle handle,
         init_scalars(handle, (T*)scalars);
     }
 
-    return rocsolver_orgbr_ungbr_template<BATCHED, STRIDED>(handle, m, n, k, A, shiftA, lda, strideA,
-                                                            ipiv, strideP, batch_count, scalars,
-                                                            work, Abyx_tmptr, trfact, workArr);
+    return rocsolver_orgbr_ungbr_template<BATCHED, STRIDED>(
+        handle, storev, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, batch_count, scalars, work,
+        Abyx_tmptr, trfact, workArr);
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U, bool COMPLEX = rocblas_is_complex<T>>
@@ -1099,14 +1225,21 @@ auto rocsolver_ormbr_unmbr_getWorkItems(rocblas_handle handle,
                                                   &size_AbyxORwork, &size_diagORtmptr, &size_trfact,
                                                   &size_workArr);
 
-    constexpr std::size_t N{5};
-    work_items_list_t wlist = {{"ormbr_unmbr_scalars", size_scalars},
-                               {"ormbr_unmbr_AbyxORwork", size_AbyxORwork},
-                               {"ormbr_unmbr_diagORtmptr", size_diagORtmptr},
-                               {"ormbr_unmbr_trfact", size_trfact},
-                               {"ormbr_unmbr_workArr", size_workArr}};
+    /* constexpr std::size_t N{5}; */
+    /* work_items_list_t wlist = {{"ormbr_unmbr_scalars", size_scalars}, */
+    /*                            {"ormbr_unmbr_AbyxORwork", size_AbyxORwork}, */
+    /*                            {"ormbr_unmbr_diagORtmptr", size_diagORtmptr}, */
+    /*                            {"ormbr_unmbr_trfact", size_trfact}, */
+    /*                            {"ormbr_unmbr_workArr", size_workArr}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"ormbr_unmbr_scalars", size_scalars})
+        + create_work_item({"ormbr_unmbr_AbyxORwork", size_AbyxORwork})
+        + create_work_item({"ormbr_unmbr_diagORtmptr", size_diagORtmptr})
+        + create_work_item({"ormbr_unmbr_trfact", size_trfact})
+        + create_work_item({"ormbr_unmbr_workArr", size_workArr});
+
     return work_items;
 }
 
@@ -1195,14 +1328,21 @@ auto rocsolver_orgqr_ungqr_getWorkItems(rocblas_handle handle,
     rocsolver_orgqr_ungqr_getMemorySize<BATCHED, T>(m, n, k, batch_count, &size_scalars, &size_work,
                                                     &size_Abyx_tmptr, &size_trfact, &size_workArr);
 
-    constexpr std::size_t N{5};
-    work_items_list_t wlist = {{"orgqr_ungqr_scalars", size_scalars},
-                               {"orgqr_ungqr_workArr", size_workArr},
-                               {"orgqr_ungqr_work", size_work},
-                               {"orgqr_ungqr_Abyx_tmptr", size_Abyx_tmptr},
-                               {"orgqr_ungqr_trfact", size_trfact}};
+    /* constexpr std::size_t N{5}; */
+    /* work_items_list_t wlist = {{"orgqr_ungqr_scalars", size_scalars}, */
+    /*                            {"orgqr_ungqr_workArr", size_workArr}, */
+    /*                            {"orgqr_ungqr_work", size_work}, */
+    /*                            {"orgqr_ungqr_Abyx_tmptr", size_Abyx_tmptr}, */
+    /*                            {"orgqr_ungqr_trfact", size_trfact}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"orgqr_ungqr_scalars", size_scalars})
+        + create_work_item({"orgqr_ungqr_workArr", size_workArr})
+        + create_work_item({"orgqr_ungqr_work", size_work})
+        + create_work_item({"orgqr_ungqr_Abyx_tmptr", size_Abyx_tmptr})
+        + create_work_item({"orgqr_ungqr_trfact", size_trfact});
+
     return work_items;
 }
 
@@ -1269,14 +1409,21 @@ auto rocsolver_orglq_unglq_getWorkItems(rocblas_handle handle,
     rocsolver_orglq_unglq_getMemorySize<BATCHED, T>(m, n, k, batch_count, &size_scalars, &size_work,
                                                     &size_Abyx_tmptr, &size_trfact, &size_workArr);
 
-    constexpr std::size_t N{5};
-    work_items_list_t wlist = {{"orglq_unglq_scalars", size_scalars},
-                               {"orglq_unglq_workArr", size_workArr},
-                               {"orglq_unglq_work", size_work},
-                               {"orglq_unglq_Abyx_tmptr", size_Abyx_tmptr},
-                               {"orglq_unglq_trfact", size_trfact}};
+    /* constexpr std::size_t N{5}; */
+    /* work_items_list_t wlist = {{"orglq_unglq_scalars", size_scalars}, */
+    /*                            {"orglq_unglq_workArr", size_workArr}, */
+    /*                            {"orglq_unglq_work", size_work}, */
+    /*                            {"orglq_unglq_Abyx_tmptr", size_Abyx_tmptr}, */
+    /*                            {"orglq_unglq_trfact", size_trfact}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"orglq_unglq_scalars", size_scalars})
+        + create_work_item({"orglq_unglq_workArr", size_workArr})
+        + create_work_item({"orglq_unglq_work", size_work})
+        + create_work_item({"orglq_unglq_Abyx_tmptr", size_Abyx_tmptr})
+        + create_work_item({"orglq_unglq_trfact", size_trfact});
+
     return work_items;
 }
 
@@ -1349,13 +1496,21 @@ auto rocsolver_stedc_getWorkItems(rocblas_handle handle,
                                                  &size_tempvect, &size_tempgemm, &size_tmpz,
                                                  &size_splits_map, &size_workArr);
 
-    constexpr std::size_t N{6}; // num of work items
-    work_items_list_t wlist
-        = {{"stedc_work_stack", size_work_stack}, {"stedc_tempvect", size_tempvect},
-           {"stedc_tempgemm", size_tempgemm},     {"stedc_workArr", size_workArr},
-           {"stedc_splits_map", size_splits_map}, {"stedc_tmpz", size_tmpz}};
+    /* constexpr std::size_t N{6}; // num of work items */
+    /* work_items_list_t wlist */
+    /*     = {{"stedc_work_stack", size_work_stack}, {"stedc_tempvect", size_tempvect}, */
+    /*        {"stedc_tempgemm", size_tempgemm},     {"stedc_workArr", size_workArr}, */
+    /*        {"stedc_splits_map", size_splits_map}, {"stedc_tmpz", size_tmpz}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"stedc_work_stack", size_work_stack})
+        + create_work_item({"stedc_tempvect", size_tempvect})
+        + create_work_item({"stedc_tempgemm", size_tempgemm})
+        + create_work_item({"stedc_workArr", size_workArr})
+        + create_work_item({"stedc_splits_map", size_splits_map})
+        + create_work_item({"stedc_tmpz", size_tmpz});
+
     return work_items;
 }
 
@@ -1394,18 +1549,29 @@ auto rocsolver_syevd_heevd_getWorkItems(rocblas_handle handle,
         handle, evect, uplo, n, batch_count, &size_scalars, &size_work1, &size_work2, &size_work3,
         &size_tmpz, &size_splits, &size_tmptau_W, &size_tau, &size_workArr);
 
-    constexpr std::size_t N{9}; // num of work items
-    work_items_list_t wlist = {{"syevd_heevd_scalars", size_scalars},
-                               {"syevd_heevd_work1", size_work1},
-                               {"syevd_heevd_work2", size_work2},
-                               {"syevd_heevd_work3", size_work3},
-                               {"syevd_heevd_tmptau_W", size_tmptau_W},
-                               {"syevd_heevd_splits", size_splits},
-                               {"syevd_heevd_tmpz", size_tmpz},
-                               {"syevd_heevd_workArr", size_workArr},
-                               {"syevd_heevd_tau", size_tau}};
+    /* constexpr std::size_t N{9}; // num of work items */
+    /* work_items_list_t wlist = {{"syevd_heevd_scalars", size_scalars}, */
+    /*                            {"syevd_heevd_work1", size_work1}, */
+    /*                            {"syevd_heevd_work2", size_work2}, */
+    /*                            {"syevd_heevd_work3", size_work3}, */
+    /*                            {"syevd_heevd_tmptau_W", size_tmptau_W}, */
+    /*                            {"syevd_heevd_splits", size_splits}, */
+    /*                            {"syevd_heevd_tmpz", size_tmpz}, */
+    /*                            {"syevd_heevd_workArr", size_workArr}, */
+    /*                            {"syevd_heevd_tau", size_tau}}; */
 
-    auto work_items = create_work_items<N>(wlist);
+    /* auto work_items = create_work_items<N>(wlist); */
+
+    auto work_items = create_work_item({"syevd_heevd_scalars", size_scalars})
+        + create_work_item({"syevd_heevd_work1", size_work1})
+        + create_work_item({"syevd_heevd_work2", size_work2})
+        + create_work_item({"syevd_heevd_work3", size_work3})
+        + create_work_item({"syevd_heevd_tmptau_W", size_tmptau_W})
+        + create_work_item({"syevd_heevd_splits", size_splits})
+        + create_work_item({"syevd_heevd_tmpz", size_tmpz})
+        + create_work_item({"syevd_heevd_workArr", size_workArr})
+        + create_work_item({"syevd_heevd_tau", size_tau});
+
     return work_items;
 }
 
