@@ -158,6 +158,9 @@ namespace rocRoller
 
         friend class ::ContextFixture;
 
+        // TODO: make this private
+        std::map<int, std::vector<size_t>> m_modelledAddresses;
+
     private:
         static ContextPtr Create(int                    deviceIndex,
                                  GPUArchitecture const& arch,

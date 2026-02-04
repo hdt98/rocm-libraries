@@ -449,6 +449,7 @@ namespace rocRoller
         transforms.push_back(std::make_shared<KernelGraph::MergeAdjacentDeallocates>());
         transforms.push_back(std::make_shared<KernelGraph::Simplify>());
         transforms.push_back(std::make_shared<KernelGraph::SetWorkitemCount>(m_context));
+        transforms.push_back(std::make_shared<KernelGraph::ModelAddresses>(m_context));
 
         for(auto const& t : transforms)
         {

@@ -757,23 +757,15 @@ namespace rocRoller
 
             Generator<Instruction> operator()(int tag, LoadLDSTile const& load)
             {
-                const auto addresses
-                    = getLDSAddresses(*m_graph, tag, load.varType).to<std::vector>();
-
-                std::vector<size_t> normalizedAddresses;
-                auto minAddress = *std::min_element(addresses.begin(), addresses.end());
-                for(auto addr : addresses)
-                {
-                    normalizedAddresses.push_back(addr - minAddress);
-                }
-
                 for(auto instr : m_loadStoreTileGenerator.genLoadLDSTile(
                         tag, load, m_graph->buildTransformer(tag)))
                 {
-                    if(GPUInstructionInfo::isLDS(instr.getOpCode()))
+                    if(GPUInstructionInfo::isLDS(instr.getOpCode())
+                       && m_context->m_modelledAddresses.contains(tag))
                     {
-                        instr.setModelledAddresses(normalizedAddresses);
-                        instr.addComment(fmt::format("addresses {}", normalizedAddresses));
+                        const auto addresses = m_context->m_modelledAddresses.at(tag);
+                        instr.setModelledAddresses(addresses);
+                        instr.addComment(fmt::format("addresses {}", addresses));
                     }
                     co_yield std::move(instr);
                 }
