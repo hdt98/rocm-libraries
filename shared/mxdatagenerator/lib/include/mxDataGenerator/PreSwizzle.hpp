@@ -445,61 +445,27 @@ namespace DGen
             throw std::runtime_error(msg.str());
         }
 
-        std::vector<T> output(input.size());
-
-        // AITER shuffle algorithm:
+        // AITER shuffle algorithm using shuffleDims:
         // view as (numRows // 32, 2, 16, numCols // 8, 2, 4)
         // permute (0, 3, 5, 2, 4, 1)
         // view as (numRows, numCols)
-        //
-        // For output linear index, decompose into 6D output indices,
-        // then map to 6D input indices via inverse permute,
-        // then compute source row/col.
 
-        size_t numColBlocks = numCols / 8;
+        // 6D view of the 2D row-major input
+        std::vector<size_t> srcSizes = {numRows / 32, 2, 16, numCols / 8, 2, 4};
 
-#pragma omp parallel for
-        for(size_t outRow = 0; outRow < numRows; ++outRow)
-        {
-            for(size_t outCol = 0; outCol < numCols; ++outCol)
-            {
-                // Compute linear index in output
-                size_t linear = outRow * numCols + outCol;
+        // Row-major strides for the 6D view:
+        // row = d0*32 + d1*16 + d2, col = d3*8 + d4*4 + d5
+        // linear = row*numCols + col
+        std::vector<size_t> srcStrides = {32 * numCols, 16 * numCols, numCols, 8, 4, 1};
 
-                // Decompose into 6D indices for output layout:
-                // (numRows // 32, numCols // 8, 4, 16, 2, 2)
-                // Dimensions are ordered from slowest to fastest varying
-                size_t d5 = linear % 2;        linear /= 2;
-                size_t d4 = linear % 2;        linear /= 2;
-                size_t d3 = linear % 16;       linear /= 16;
-                size_t d2 = linear % 4;        linear /= 4;
-                size_t d1 = linear % numColBlocks; linear /= numColBlocks;
-                size_t d0 = linear;
+        // Dimension order derived from inverse of permute(0, 3, 5, 2, 4, 1).
+        // The inverse permutation is {0, 5, 3, 1, 4, 2}.
+        // For row-major output (last dimension fastest), we process dimensions
+        // in the order that makes the output contiguous: {1, 4, 2, 5, 3, 0}
+        std::vector<size_t> dimOrder = {1, 4, 2, 5, 3, 0};
+        auto                dstStrides = computeShuffledStrides(srcSizes, dimOrder);
 
-                // Apply inverse permutation
-                // Permute was (0, 3, 5, 2, 4, 1), so:
-                // out[0]=in[0], out[1]=in[3], out[2]=in[5], out[3]=in[2], out[4]=in[4], out[5]=in[1]
-                // Inverse: in[0]=d0, in[1]=d5, in[2]=d3, in[3]=d1, in[4]=d4, in[5]=d2
-                size_t i0 = d0;  // block32
-                size_t i1 = d5;  // row2 (0 or 1, selects which half of 32)
-                size_t i2 = d3;  // row16 (0-15)
-                size_t i3 = d1;  // colBlock8
-                size_t i4 = d4;  // col2 (0 or 1, selects which half of 8)
-                size_t i5 = d2;  // col4 (0-3)
-
-                // Compute source row and column
-                size_t srcRow = i0 * 32 + i1 * 16 + i2;
-                size_t srcCol = i3 * 8 + i4 * 4 + i5;
-
-                // Bounds check
-                if(srcRow < numRows && srcCol < numCols)
-                {
-                    output[outRow * numCols + outCol] = input[srcRow * numCols + srcCol];
-                }
-            }
-        }
-
-        return output;
+        return shuffleDims(input, srcSizes, dstStrides, srcStrides);
     }
 
 } // namespace DGen
