@@ -20,7 +20,7 @@ on:
         type: string
         default: ""
       expect_failure:
-        type: boolean
+        type: string
 
 permissions:
   contents: read
@@ -154,7 +154,7 @@ jobs:
   therock-test-linux:
     name: Test (${{ inputs.amdgpu_families }})
     needs: [therock-build-linux]
-    if: ${{ inputs.expect_failure == false }}
+    if: ${{ inputs.expect_failure == 'false' }}
     uses: ./.github/workflows/therock-test-packages.yml
     with:
       project_to_test: ${{ inputs.project_to_test }}
