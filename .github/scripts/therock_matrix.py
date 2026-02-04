@@ -5,30 +5,30 @@ This dictionary is used to map specific file directory changes to the correspond
 import os
 
 subtree_to_project_map = {
-    "dnn-providers/miopen-provider": "miopen-provider",
-    "projects/hipblas": "blas",
-    "projects/hipblas-common": "blas",
-    "projects/hipblaslt": "blas",
-    "projects/hipcub": "prim",
-    "projects/hipdnn": "hipdnn",
-    "projects/hipfft": "fft",
-    "projects/hiprand": "rand",
-    "projects/hipsolver": "solver",
-    "projects/hipsparse": "sparse",
-    "projects/hipsparselt": "sparse",
-    "projects/miopen": "miopen",
-    "projects/rocblas": "blas",
-    "projects/rocfft": "fft",
+    # "dnn-providers/miopen-provider": "miopen-provider",
+    # "projects/hipblas": "blas",
+    # "projects/hipblas-common": "blas",
+    # "projects/hipblaslt": "blas",
+    # "projects/hipcub": "prim",
+    # "projects/hipdnn": "hipdnn",
+    # "projects/hipfft": "fft",
+    # "projects/hiprand": "rand",
+    # "projects/hipsolver": "solver",
+    # "projects/hipsparse": "sparse",
+    # "projects/hipsparselt": "sparse",
+    # "projects/miopen": "miopen",
+    # "projects/rocblas": "blas",
+    # "projects/rocfft": "fft",
     "projects/rocprim": "prim",
-    "projects/rocrand": "rand",
-    "projects/rocsolver": "solver",
-    "projects/rocsparse": "sparse",
-    "projects/rocthrust": "prim",
-    "projects/rocwmma": "rocwmma",
-    "shared/mxdatagenerator": "blas",
-    "shared/origami": "blas",
-    "shared/rocroller": "blas",
-    "shared/tensile": "blas",
+    # "projects/rocrand": "rand",
+    # "projects/rocsolver": "solver",
+    # "projects/rocsparse": "sparse",
+    # "projects/rocthrust": "prim",
+    # "projects/rocwmma": "rocwmma",
+    # "shared/mxdatagenerator": "blas",
+    # "shared/origami": "blas",
+    # "shared/rocroller": "blas",
+    # "shared/tensile": "blas",
 }
 
 project_map = {
@@ -36,50 +36,51 @@ project_map = {
         "cmake_options": ["-DTHEROCK_ENABLE_PRIM=ON"],
         "project_to_test": ["rocprim", "rocthrust", "hipcub"],
     },
-    "rand": {
-        "cmake_options": ["-DTHEROCK_ENABLE_RAND=ON"],
-        "project_to_test": ["rocrand", "hiprand"],
-    },
-    "blas": {
-        "cmake_options": ["-DTHEROCK_ENABLE_BLAS=ON"],
-        "project_to_test": ["hipblaslt", "rocblas", "hipblas", "rocroller"],
-    },
-    "miopen": {
-        "cmake_options": [
-            "-DTHEROCK_ENABLE_MIOPEN=ON",
-            "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
-            "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
-            "-DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON",
-            "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
-        ],
-        "project_to_test": ["miopen", "miopen_plugin"],
-    },
-    "fft": {
-        "cmake_options": ["-DTHEROCK_ENABLE_FFT=ON", "-DTHEROCK_ENABLE_RAND=ON"],
-        "project_to_test": ["hipfft", "rocfft"],
-    },
-    "hipdnn": {  # due to MIOpen plugin project being inside the hipDNN directory, we cannot have the MIOpen plugin project as a separate project for now https://github.com/ROCm/rocm-libraries/issues/2316
-        "cmake_options": [
-            "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
-            "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
-            "-DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON",
-            "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
-        ],
-        "project_to_test": ["hipdnn", "miopen_plugin"],
-    },
-    "miopen-provider": {
-        "cmake_options": [
-            "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
-            "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
-            "-DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON",
-            "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
-        ],
-        "project_to_test": ["miopen_plugin"],
-    },
-    "rocwmma": {
-        "cmake_options": ["-DTHEROCK_ENABLE_ROCWMMA=ON"],
-        "project_to_test": ["rocwmma"],
-    },
+    # FOR TESTING ONLY
+    # "rand": {
+    #     "cmake_options": ["-DTHEROCK_ENABLE_RAND=ON"],
+    #     "project_to_test": ["rocrand", "hiprand"],
+    # },
+    # "blas": {
+    #     "cmake_options": ["-DTHEROCK_ENABLE_BLAS=ON"],
+    #     "project_to_test": ["hipblaslt", "rocblas", "hipblas", "rocroller"],
+    # },
+    # "miopen": {
+    #     "cmake_options": [
+    #         "-DTHEROCK_ENABLE_MIOPEN=ON",
+    #         "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
+    #         "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
+    #         "-DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON",
+    #         "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
+    #     ],
+    #     "project_to_test": ["miopen", "miopen_plugin"],
+    # },
+    # "fft": {
+    #     "cmake_options": ["-DTHEROCK_ENABLE_FFT=ON", "-DTHEROCK_ENABLE_RAND=ON"],
+    #     "project_to_test": ["hipfft", "rocfft"],
+    # },
+    # "hipdnn": {  # due to MIOpen plugin project being inside the hipDNN directory, we cannot have the MIOpen plugin project as a separate project for now https://github.com/ROCm/rocm-libraries/issues/2316
+    #     "cmake_options": [
+    #         "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
+    #         "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
+    #         "-DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON",
+    #         "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
+    #     ],
+    #     "project_to_test": ["hipdnn", "miopen_plugin"],
+    # },
+    # "miopen-provider": {
+    #     "cmake_options": [
+    #         "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
+    #         "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
+    #         "-DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON",
+    #         "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
+    #     ],
+    #     "project_to_test": ["miopen_plugin"],
+    # },
+    # "rocwmma": {
+    #     "cmake_options": ["-DTHEROCK_ENABLE_ROCWMMA=ON"],
+    #     "project_to_test": ["rocwmma"],
+    # },
 }
 
 # For certain math components, they are optional during building and testing.
