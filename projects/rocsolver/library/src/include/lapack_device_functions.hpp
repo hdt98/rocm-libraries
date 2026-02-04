@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1372,22 +1372,10 @@ __device__ I slaed6(I kniter,
                     S ssfmin = std::numeric_limits<S>::min(),
                     I MAXIT = 50)
 {
-    auto lam_abs = [](auto x) -> auto
-    {
-        return std::abs(x);
-    };
-    auto lam_sqrt = [](auto x) -> auto
-    {
-        return std::sqrt(x);
-    };
-    auto lam_max = [](auto x, auto y, auto z) -> auto
-    {
-        return std::max(std::max(x, y), z);
-    };
-    auto lam_min = [](auto x, auto y) -> auto
-    {
-        return std::min(x, y);
-    };
+    auto lam_abs = [](auto x) -> auto { return std::abs(x); };
+    auto lam_sqrt = [](auto x) -> auto { return std::sqrt(x); };
+    auto lam_max = [](auto x, auto y, auto z) -> auto { return std::max(std::max(x, y), z); };
+    auto lam_min = [](auto x, auto y) -> auto { return std::min(x, y); };
 
     S dscale[3]{}, zscale[3]{};
     struct X_t
@@ -1717,26 +1705,11 @@ __device__ I slaed4(I n,
                     S ssfmin = std::numeric_limits<S>::min(),
                     I MAXIT = 50)
 {
-    auto lam_abs = [](auto x) -> auto
-    {
-        return std::abs(x);
-    };
-    auto lam_sqr = [](auto x) -> auto
-    {
-        return x * x;
-    };
-    auto lam_sqrt = [](auto x) -> auto
-    {
-        return std::sqrt(x);
-    };
-    auto lam_max = [](auto x, auto y) -> auto
-    {
-        return std::max(x, y);
-    };
-    auto lam_min = [](auto x, auto y) -> auto
-    {
-        return std::min(x, y);
-    };
+    auto lam_abs = [](auto x) -> auto { return std::abs(x); };
+    auto lam_sqr = [](auto x) -> auto { return x * x; };
+    auto lam_sqrt = [](auto x) -> auto { return std::sqrt(x); };
+    auto lam_max = [](auto x, auto y) -> auto { return std::max(x, y); };
+    auto lam_min = [](auto x, auto y) -> auto { return std::min(x, y); };
 
     i = i + 1;
     S zz[3]{};
@@ -3260,7 +3233,7 @@ void local_gemm(rocblas_handle handle,
 /******************************************************************************
  * LACN2: 1-Norm Estimator for Inverse Matrices
  *
- * This is an internal utility routine that estimates ||A⁻¹||₁ using a
+ * This is an internal utility routine that estimates ||A?1||1 using a
  * reverse-communication iterative algorithm based on power iteration.
  *
  * ALGORITHM OVERVIEW:
@@ -3273,7 +3246,7 @@ void local_gemm(rocblas_handle handle,
  *
  * STATE MACHINE:
  * -------------
- * kase = 0: Converged (d_est contains the final estimate of ||A⁻¹||₁)
+ * kase = 0: Converged (d_est contains the final estimate of ||A?1||1)
  * kase = 1: Caller should solve A*x = x and call LACN2 again
  * kase = 2: Caller should solve A'*x = x and call LACN2 again
  *
@@ -3287,7 +3260,7 @@ void local_gemm(rocblas_handle handle,
  * DESIGN NOTES:
  * ------------
  * - This is an INTERNAL template utility, not a public API
- * - LACN2 only computes the estimate; the caller computes rcond = 1/(||A|| * ||A⁻¹||)
+ * - LACN2 only computes the estimate; the caller computes rcond = 1/(||A|| * ||A?1||)
  * - Typically converges in 3-5 iterations
  * - Thread-safe and suitable for batched operations (process one batch at a time)
  *
@@ -3713,8 +3686,16 @@ rocblas_status rocsolver_lacn2_template(rocblas_handle handle,
     {
         // initialize x = (1/n, ..., 1/n)
         rocblas_int blocks = (n - 1) / LACN2_BLOCKSIZE + 1;
-        ROCSOLVER_LAUNCH_KERNEL((reset_info<T, I, T>), dim3(blocks), dim3(LACN2_BLOCKSIZE), 0, stream,
-                                *x, n, T(1) / T(n));
+
+        // Get device properties and cap grid size to maxGridSize[0]
+        int device;
+        HIP_CHECK(hipGetDevice(&device));
+        hipDeviceProp_t props;
+        HIP_CHECK(hipGetDeviceProperties(&props, device));
+        blocks = std::min(blocks, static_cast<rocblas_int>(props.maxGridSize[0]));
+
+        ROCSOLVER_LAUNCH_KERNEL((reset_info<T, I, T>), dim3(blocks), dim3(LACN2_BLOCKSIZE), 0,
+                                stream, *x, n, T(1) / T(n));
         *h_kase = 1;
         *h_jump = 1;
         return rocblas_status_success;
