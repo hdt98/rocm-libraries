@@ -8,10 +8,6 @@ on:
       projects:
         type: string
         description: "Insert space-separated list of projects to test or 'all' to test all projects. ex: 'projects/rocprim projects/hipcub'"
-  # FOR TESTING ONLY
-  push:
-    branches:
-      - users/geomin12/therock-ci-asan
 
 permissions:
   contents: read
