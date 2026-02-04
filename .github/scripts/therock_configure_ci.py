@@ -215,7 +215,7 @@ def run(args):
             "test_type": test_type,
             "build_variant_cmake_preset": build_variant_cmake_preset,
             "build_variant_label": build_variant_label,
-            "expect_failure": json.dumps(expect_failure),
+            "expect_failure": expect_failure,
         }
     )
 
