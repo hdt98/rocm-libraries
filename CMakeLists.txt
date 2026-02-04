@@ -17,6 +17,7 @@ include(CMakeDependentOption)
 include(GNUInstallDirs)
 include(add_subdirectory_with_message)
 include(fetch_rocm_cmake)
+include(sanitizer_prehook)
 
 # --- Options and cache variables ---
 option(ROCM_LIBS_SUPERBUILD "Enable superbuild mode" ON)
