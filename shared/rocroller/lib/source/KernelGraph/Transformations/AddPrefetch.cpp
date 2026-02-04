@@ -742,14 +742,11 @@ namespace rocRoller
 
                     auto maybeSetCoordinate = graph.control.get<SetCoordinate>(load.globalChain);
                     auto loadUnrollCoord    = graph.mapper.get<Unroll>(load.globalChain);
-                    if(maybeSetCoordinate && loadUnrollCoord == unrollCoord)
-                    {
-                        graph.control.setElement(load.globalChain, setPrefetchCoord);
-                    }
-                    else
-                    {
-                        Throw<FatalError>("Mismatched SetCoordinate node above LoadTile.");
-                    }
+
+                    AssertFatal(maybeSetCoordinate && loadUnrollCoord == unrollCoord,
+                                "Mismatched SetCoordinate node above LoadTile.");
+
+                    graph.control.setElement(load.globalChain, setPrefetchCoord);
                 }
             }
 
@@ -843,21 +840,6 @@ namespace rocRoller
 
                 // Commit in-flight to LDS
                 auto globalStores = loadsByUnroll[ldsPrefetchU];
-                if(separateMemOps)
-                {
-                    graph.control.addElement(Sequence(), {nop}, {globalStores[0].ldsChain});
-                }
-                else if(u == 0)
-                {
-                    graph.control.addElement(
-                        Body(), {segmentBoundaries[u]}, {globalStores[0].ldsChain});
-                }
-                else
-                {
-                    graph.control.addElement(
-                        Sequence(), {segmentBoundaries[u]}, {globalStores[0].ldsChain});
-                }
-
                 logger->debug("  prefetch: in-loop: commit lds {} user {}",
                               ldsPrefetchU,
                               globalStores[0].user);
