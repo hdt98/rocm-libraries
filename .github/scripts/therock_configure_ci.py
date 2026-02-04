@@ -20,9 +20,7 @@ from config_loader import load_repo_config
 
 logging.basicConfig(level=logging.INFO)
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_DIR = SCRIPT_DIR.parent
-
-print(REPO_DIR)
+REPO_DIR = SCRIPT_DIR.parent.parent
 
 # Importing TheRock amdgpu_family_matrix.py
 sys.path.append(str(REPO_DIR / "TheRock" / "build_tools" / "github_actions"))
