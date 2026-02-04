@@ -41,6 +41,7 @@
 #include "roclapack_geqrf.hpp"
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_device_workspace.hpp"
+#include "rocsolver_device_workspace_common_impl.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -1375,8 +1376,8 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
     if(n == 0 || m == 0 || batch_count == 0)
         return rocblas_status_success;
 
-    /* static int runs = 0; */
-    /* std::cout << dwptr->print_debug_str("New gesvd, run " + std::to_string(++runs)); */
+    static int runs = 0;
+    std::cout << dwptr->print_debug_str("New gesvd, run " + std::to_string(++runs));
 
     /* T* scalars = (T*)dwptr->work("gesvd_scalars"); */
     /* void* work_workArr = dwptr->work("gesvd_work_workArr"); */

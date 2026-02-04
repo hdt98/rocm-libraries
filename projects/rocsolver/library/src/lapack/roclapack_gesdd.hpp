@@ -41,6 +41,7 @@
 #include "roclapack_syevj_heevj.hpp"
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_device_workspace.hpp"
+#include "rocsolver_device_workspace_common_impl.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
