@@ -117,8 +117,13 @@ def _compileSourceObjectFile(
             "-Wno-deprecated-declarations",
         ]
 
+    # Respect CXXFLAGS environment variable for additional compiler flags
+    # This allows build systems to inject include paths and other flags
+    cxxflags = os.environ.get("CXXFLAGS", "").strip()
+    cxxflags_list = shlex.split(cxxflags) if cxxflags else []
+    
     args = (
-        launcher + [cxxCompiler] + hipFlags + archFlags + [str(cxxSrcPath), "-c", "-o", objDestPath]
+        launcher + [cxxCompiler] + hipFlags + archFlags + cxxflags_list + [str(cxxSrcPath), "-c", "-o", objDestPath]
     )
 
     tPrint(2, f"Compile source object file command: {args}")
