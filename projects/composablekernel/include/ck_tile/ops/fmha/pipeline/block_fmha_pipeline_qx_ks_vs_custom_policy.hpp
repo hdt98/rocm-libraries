@@ -128,6 +128,29 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                                           AttrNumAccess>{};
             }();
 
+            // Ensure that QKBlockGemm's C (S) can be used as KVBlockGemm's A (P)
+            constexpr index_t TargetCMPerLane = [] {
+                // Must be consistent with GetKVBlockGemm()
+                constexpr auto AttrNumAccess = std::is_same_v<typename Problem::PDataType, pk_fp4_t>
+                                                   ? WGAttrNumAccessEnum::Single
+                                                   : WGAttrNumAccessEnum::Double;
+                using WarpGemm =
+                    WarpGemmDispatcher<typename Problem::PDataType,
+                                       typename Problem::VDataType,
+                                       typename Problem::OaccDataType,
+                                       Problem::BlockFmhaShape::Gemm1WarpTile::at(number<0>{}),
+                                       Problem::BlockFmhaShape::Gemm1WarpTile::at(number<1>{}),
+                                       Problem::BlockFmhaShape::Gemm1WarpTile::at(number<2>{}),
+                                       true,  // TransposeC
+                                       false, // SwizzleA
+                                       false,
+                                       AttrNumAccess>;
+                // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
+                // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
+                return WarpGemm::WarpGemmAttribute::Impl::kABKPerLane /
+                       WarpGemm::WarpGemmAttribute::AttrNumAccessV;
+            }();
+
             using BlockGemmPolicy = BlockGemmMxARegBSmemCRegV1CustomPolicy<
                 typename Problem::QDataType,
                 typename Problem::KDataType,
@@ -135,7 +158,7 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                 typename Problem::BlockFmhaShape::Gemm0BlockWarps,
                 decltype(warp_gemm)>;
 
-            return BlockGemmMxARegBSmemCRegV1<GemmProblem, BlockGemmPolicy>{};
+            return BlockGemmMxARegBSmemCRegV1<GemmProblem, BlockGemmPolicy, TargetCMPerLane>{};
         }
         else
         {

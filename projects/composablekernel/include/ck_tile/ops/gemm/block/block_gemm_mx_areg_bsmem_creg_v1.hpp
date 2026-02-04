@@ -12,8 +12,9 @@ namespace ck_tile {
 // B is block window on shared memory
 // B scale is block distributed tensor
 // C is block distributed tensor
-// It currently supports only warp gemms with transposed C
-template <typename Problem_, typename Policy_>
+// It supports only warp gemms with transposed C.
+// TargetCMPerLane_ controls how many consecutive elements of matrix C are calculated by each lane.
+template <typename Problem_, typename Policy_, index_t TargetCMPerLane_ = -1>
 struct BlockGemmMxARegBSmemCRegV1
 {
     using Problem        = remove_cvref_t<Problem_>;
@@ -40,14 +41,12 @@ struct BlockGemmMxARegBSmemCRegV1
     static constexpr index_t NIterPerWarp = NPerBlock / (NWarp * WarpGemm::kN);
     static constexpr index_t KIterPerWarp = KPerBlock / WarpGemm::kK;
 
-    // TODO: Pass TargetCMPerLane as struct's template parameter?
-    // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
-    // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
-    static constexpr index_t TargetCMPerLane = WarpGemm::WarpGemmAttribute::Impl::kABKPerLane /
-                                               WarpGemm::WarpGemmAttribute::AttrNumAccessV;
-    static constexpr index_t NIterPack =
-        TargetCMPerLane / (WarpGemm::WarpGemmAttribute::Impl::kCM0PerLane *
-                           WarpGemm::WarpGemmAttribute::Impl::kCM1PerLane);
+    static constexpr index_t CMPerLane = WarpGemm::WarpGemmAttribute::Impl::kCM0PerLane *
+                                         WarpGemm::WarpGemmAttribute::Impl::kCM1PerLane;
+    static constexpr index_t TargetCMPerLane = max(CMPerLane, TargetCMPerLane_);
+
+    static_assert(TargetCMPerLane % CMPerLane == 0);
+    static constexpr index_t NIterPack = TargetCMPerLane / CMPerLane;
 
     // C += A * B
     template <typename CBlockTensor,
@@ -86,7 +85,10 @@ struct BlockGemmMxARegBSmemCRegV1
                 MakeBScaleBlockTileDistribution());
         b_scale_block_tensor.get_thread_buffer() = b_scale_block_tensor_tmp.get_thread_buffer();
 
-        // construct B-warp-window
+        // Construct B-warp-window
+        // Matrix B is shuffled in such a way that each lane calculates TargetCMPerLane consecutive
+        // elements of matrix C. See MakeBScaleBlockTileDistribution and MakeCBlockTile that shuffle
+        // B scale and C in the same way.
         auto b_warp_window_tmp = [&] {
             using Impl = WarpGemm::WarpGemmAttribute::Impl;
 
