@@ -177,10 +177,6 @@ class OrigamiMatmulSelector:
         )
 
 
-    #####
-    # Selection result properties
-    #####
-
     @property
     def macrotile_m(self):
         """
@@ -369,10 +365,6 @@ class OrigamiMatmulSelector:
         return self._grid
 
 
-    #####
-    # Selection decision properties - for examining how selections were made after-the-fact
-    #####
-
     @property
     def grid_selection_algorithm(self):
         """
@@ -385,10 +377,6 @@ class OrigamiMatmulSelector:
         """
         return self._result.config.grid_selection
 
-
-    #####
-    # Internal helper functions
-    #####
 
     def _generate_configs(self, config_gen) -> [origami.config_t]:
         """
