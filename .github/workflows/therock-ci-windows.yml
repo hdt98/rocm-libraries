@@ -13,6 +13,14 @@ on:
         type: string
       test_runs_on:
         type: string
+      build_variant_cmake_preset:
+        type: string
+        default: ""
+      build_variant_label:
+        type: string
+        default: ""
+      expect_failure:
+        type: boolean
 
 permissions:
   contents: read
@@ -108,6 +116,7 @@ jobs:
 
       - name: Configure Projects
         env:
+          cmake_preset: ${{ inputs.build_variant_cmake_preset }}
           amdgpu_families: ${{ env.AMDGPU_FAMILIES }}
           package_version: "ADHOCBUILD"
           extra_cmake_options: "-DTHEROCK_ROCM_LIBRARIES_SOURCE_DIR=${{ github.workspace }} ${{ inputs.cmake_options }}"
@@ -167,6 +176,7 @@ jobs:
   therock-test-windows:
     name: Test (${{ inputs.amdgpu_families }})
     needs: [therock-build-windows]
+    if: ${{ inputs.expect_failure == false }}
     uses: ./.github/workflows/therock-test-packages.yml
     with:
       project_to_test: ${{ inputs.project_to_test }}

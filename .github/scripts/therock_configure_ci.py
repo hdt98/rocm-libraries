@@ -20,6 +20,11 @@ from config_loader import load_repo_config
 
 logging.basicConfig(level=logging.INFO)
 SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_DIR = SCRIPT_DIR.parent
+
+# Importing TheRock amdgpu_family_matrix.py
+sys.path.append(str(REPO_DIR / "TheRock" / "build_tools" / "github_actions"))
+from amdgpu_family_matrix import all_build_variants
 
 # Paths matching any of these patterns are considered to have no influence over
 # build or test workflows so any related jobs can be skipped if all paths
@@ -176,11 +181,42 @@ def retrieve_projects(args):
     return project_to_run, test_type
 
 
+def retrieve_build_variant(args):
+    # Determine build variant cmake preset from build variant
+    platform = args.get("platform")
+    build_variant = args.get("build_variant")
+    if platform in all_build_variants and build_variant in all_build_variants[platform]:
+        build_variant_cmake_preset = all_build_variants[platform][build_variant][
+            "build_variant_cmake_preset"
+        ]
+        build_variant_label = all_build_variants[platform][build_variant][
+            "build_variant_label"
+        ]
+        expect_failure = all_build_variants[platform][build_variant].get(
+            "expect_failure", False
+        )
+    else:
+        build_variant_cmake_preset = ""
+        build_variant_label = ""
+        expect_failure = False
+
+    return build_variant_cmake_preset, build_variant_label, expect_failure
+
+
 def run(args):
     platform = args.get("platform")
     project_to_run, test_type = retrieve_projects(args)
+    build_variant_cmake_preset, build_variant_label, expect_failure = (
+        retrieve_build_variant(args)
+    )
     set_github_output(
-        {f"{platform}_projects": json.dumps(project_to_run), "test_type": test_type}
+        {
+            f"{platform}_projects": json.dumps(project_to_run),
+            "test_type": test_type,
+            "build_variant_cmake_preset": build_variant_cmake_preset,
+            "build_variant_label": build_variant_label,
+            "expect_failure": json.dumps(expect_failure),
+        }
     )
 
 
@@ -198,6 +234,8 @@ if __name__ == "__main__":
     args["input_projects"] = input_projects
 
     args["base_ref"] = os.environ.get("BASE_REF", "HEAD^")
+
+    args["build_variant"] = os.getenv("BUILD_VARIANT", "release")
 
     logging.info(f"Retrieved arguments {args}")
 
