@@ -239,8 +239,16 @@ class Compiler(Component):
         """
         archFlags = [f"--offload-arch={gfx}" for gfx in target_list]
         args = [
-            *(self.default_args), "-I", include_path, *archFlags, srcPath, "-c", "-o", destPath
+            *(self.default_args), "-I", include_path, *archFlags
         ]
+        
+        # Respect CXXFLAGS environment variable for additional compiler flags
+        # This allows build systems to inject include paths and other flags
+        cxxflags = environ.get("CXXFLAGS", "").strip()
+        if cxxflags:
+            args.extend(split(cxxflags))
+        
+        args.extend([srcPath, "-c", "-o", destPath])
         return _invoke(args, f"Compiling HIP source kernels into objects (.cpp -> .o)")
 
 
