@@ -29,6 +29,7 @@
 #include <miopen/conv_algo_name.hpp>
 #include <miopen/config.h>
 #include <miopen/env.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 #include <miopen/mlo_internal.hpp>
 #include <miopen/perf_field.hpp>
 #include <miopen/conv/problem_description.hpp>
@@ -47,6 +48,7 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_FIND_CONV_INSUFFICIENT_WORKSPACE_ALLOW_FINDDB
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_SEARCH_CUTOFF, false)
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_SKIP_PCT, 130)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_KERNEL_NAMES)
 
 namespace miopen {
 
@@ -283,6 +285,10 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
         try
         {
+            // Log solution name for grouped kernel logging
+            const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+            LogSolutionName(sol.solver_id, log_level);
+            
             // Run invoker max 8 times, with ~5 sec time limit.
             using elapsed_t                 = decltype(handle.GetKernelTime());
             constexpr elapsed_t TIME_MS_MAX = 5000.0;
@@ -294,6 +300,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
             while(i < N_RUNS_MAX && elapsed < TIME_MS_MAX)
             {
+                IncrementKernelExecutionCounter();
                 invoker(handle, invoke_ctx);
 
                 // don't include warm-up run in our samples.

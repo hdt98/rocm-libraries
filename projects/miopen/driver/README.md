@@ -147,3 +147,119 @@ MIOpenDriver example usages:
 `./bin/MIOpenDriver *base_arg* -?` **OR**  `./bin/MIOpenDriver *base_arg* -h (--help)`
 
 Note: By default the CPU verification is turned on. Verification can be disabled using `-V 0`.
+
+## Environment Variables
+
+### Kernel Name and Execution Time Logging
+
+The `MIOPEN_LOG_KERNEL_NAMES` environment variable enables lightweight logging of kernel names and their execution times during MIOpenDriver runs. This is useful for debugging, performance analysis, and understanding which kernels are being executed under different configurations (e.g., different `MIOPEN_FIND_MODE` or `MIOPEN_FORCE` settings).
+
+**Logging Levels:**
+
+The variable supports five levels with varying detail and scope:
+
+- **Level 0** (default): No kernel logging
+- **Level 1**: Log only **main convolution kernel** per executed solution with **total solution time** - filters out transpose/transform kernels, excludes find/search
+- **Level 2**: Log **all kernels** for executed solutions individually - includes transpose/transform kernels, excludes find/search
+- **Level 3**: Log only **main convolution kernel** per solution with **total solution time** - filters out transpose/transform kernels, includes find/search
+- **Level 4**: Log **all kernels** individually - includes transpose/transform kernels and find/search kernels
+
+**Usage Examples:**
+
+```bash
+# Level 1: Log only the chosen/executed kernels
+export MIOPEN_LOG_KERNEL_NAMES=1
+./bin/MIOpenDriver conv -W 32 -H 32 -c 3 -k 32 -x 5 -y 5 -p 2 -q 2
+
+# Level 2: Log all kernels including find/search
+export MIOPEN_LOG_KERNEL_NAMES=2
+./bin/MIOpenDriver conv -W 32 -H 32 -c 3 -k 32 -x 5 -y 5 -p 2 -q 2
+```
+
+**Output Format:**
+
+The logging uses a hierarchical format where solution names are printed first, followed by the kernels for that solution:
+
+```
+[SOLUTION:solution_name]
+[KERNEL:exec_id] kernel_name : execution_time ms
+[KERNEL:exec_id] kernel_name : execution_time ms
+...
+```
+
+Where `exec_id` is an execution counter that groups related kernels together (e.g., transpose kernels and their main computation kernel).
+
+**Example Output (Level 1 - main kernels only with total time):**
+```
+[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
+[KERNEL:1] igemm_fwd_gtcx3_nhwc_bf16... : 1.520 ms (+4 transpose/transform kernels)
+[KERNEL:2] igemm_fwd_gtcx3_nhwc_bf16... : 1.489 ms (+4 transpose/transform kernels)
+[KERNEL:3] igemm_fwd_gtcx3_nhwc_bf16... : 1.407 ms (+4 transpose/transform kernels)
+```
+
+**Example Output (Level 2 - all kernels individually):**
+```
+[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
+[KERNEL:1] SubTensorOpWithScalar1d : 0.083 ms
+[KERNEL:1] batched_transpose_32x32_half : 0.330 ms
+[KERNEL:1] batched_transpose_16x32_half : 0.014 ms
+[KERNEL:1] igemm_fwd_gtcx3_nhwc_bf16... : 0.893 ms
+[KERNEL:1] batched_transpose_32x32_half : 0.269 ms
+[KERNEL:2] SubTensorOpWithScalar1d : 0.104 ms
+[KERNEL:2] batched_transpose_32x32_half : 0.342 ms
+[KERNEL:2] batched_transpose_16x32_half : 0.017 ms
+[KERNEL:2] igemm_fwd_gtcx3_nhwc_bf16... : 0.763 ms
+[KERNEL:2] batched_transpose_32x32_half : 0.272 ms
+```
+
+**Example Output (Level 3 - main kernels only, including find/search):**
+```
+[SOLUTION:SearchCandidate1]
+[KERNEL:1] miopenConv1x1u_search_candidate1 : 1.523 ms
+[SOLUTION:SearchCandidate2]
+[KERNEL:2] miopenConv1x1u_search_candidate2 : 1.612 ms
+[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
+[KERNEL:3] igemm_fwd_gtcx3_nhwc_bf16... : 1.520 ms (+4 transpose/transform kernels)
+```
+
+**Example Output (Level 4 - all kernels including find/search):**
+```
+[SOLUTION:SearchCandidate1]
+[KERNEL:1] miopenConv1x1u_search_candidate1 : 1.523 ms
+[SOLUTION:SearchCandidate2]
+[KERNEL:2] miopenConv1x1u_search_candidate2 : 1.612 ms
+[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
+[KERNEL:3] SubTensorOpWithScalar1d : 0.083 ms
+[KERNEL:3] batched_transpose_32x32_half : 0.012 ms
+[KERNEL:3] igemm_fwd_gtcx3_nhwc_bf16... : 0.234 ms
+[KERNEL:3] batched_transpose_32x32_half : 0.013 ms
+```
+
+**Key Features:**
+- **Multi-level control**: Five levels from no logging to comprehensive kernel-by-kernel logging
+- **Noise reduction**: Levels 1 and 3 filter out transpose/transform kernels to focus on core computation
+- **Solution-level timing**: Levels 1 and 3 aggregate timing across all kernels in a solution
+- **Execution tracking**: `exec_id` groups related kernels that execute together
+- **Accurate timing**: Uses GPU events for precise measurement (HIP events for HIP backend, OpenCL profiling for OpenCL backend)
+- **Independent of log levels**: Works without changing `MIOPEN_ENABLE_LOGGING`
+- **Easy filtering**: Simple `[KERNEL]` prefix for grep/parsing
+- **Both backends**: Full support for HIP and OpenCL
+
+**Performance Impact:**
+- **Level 0**: No overhead
+- **Level 1**: Minimal overhead - only times executed kernels, aggregates at solution level
+- **Level 2**: Moderate overhead - times all executed kernels individually
+- **Level 3**: Higher overhead - times all solutions including find/search, aggregates at solution level
+- **Level 4**: Highest overhead - times every kernel individually including benchmarking runs; synchronizes after each kernel
+
+**Filtering Output:**
+```bash
+# Show only kernel logs
+./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]"
+
+# Extract just kernel names
+./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]" | awk '{print $2}'
+
+# Extract kernel names and times
+./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]" | awk '{print $2, $4, $5}'
+```

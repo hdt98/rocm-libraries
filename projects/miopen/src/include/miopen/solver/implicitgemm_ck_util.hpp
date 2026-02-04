@@ -30,6 +30,8 @@
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/batched_transpose_sol.hpp>
 #include <miopen/buffer_info.hpp>
+#include <miopen/env.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 #include <miopen/tensor_ops.hpp>
 #include <miopen/miopen_internal.h>
 #include <miopen/fusion/fusion_invoke_params.hpp>
@@ -404,17 +406,46 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
 #endif
 
     result.invoker_factory =
-        [ck_args     = CKArgsType{problem},
+        [kernel_id  = kernel_id,
+         ck_args    = CKArgsType{problem},
          sh_conv_ptr = std::shared_ptr{std::move(*ptr_iter)}](const std::vector<Kernel>&) mutable {
-            return [ck_args = std::move(ck_args), sh_conv_ptr = std::move(sh_conv_ptr)](
+            return [kernel_id = kernel_id, ck_args = std::move(ck_args), sh_conv_ptr = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
+                const auto exec_id = IncrementKernelExecutionCounter();
+                
                 const auto& data_ctx = primitive_parameters.CastTo<CastType>();
                 auto argument_ptr    = ck_args.MakeArgPtr(sh_conv_ptr, data_ctx);
                 auto invoker_ptr     = sh_conv_ptr->MakeInvokerPointer();
+                
+                // Kernel logging for CK kernels
+                const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                const bool is_tuning_mode = GetKernelTuningMode();
+                const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+                
+                HipEventPtr log_start = nullptr;
+                HipEventPtr log_stop  = nullptr;
+                
+                if(should_log)
+                {
+                    log_start = make_hip_event();
+                    log_stop  = make_hip_event();
+                    hipEventRecord(log_start.get(), handle.GetStream());
+                }
+                
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
+                
+                if(should_log)
+                {
+                    hipEventRecord(log_stop.get(), handle.GetStream());
+                    hipEventSynchronize(log_stop.get());
+                    float kernel_time = 0.0f;
+                    hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
+                    std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
+                }
+                
                 if(handle.IsProfilingEnabled())
                 {
                     float elapsed_time = handle.GetKernelTime();
@@ -1205,6 +1236,8 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 output_init_tr_inst = std::move(output_init_tr_inst),
                 ck_buff_des         = ck_buff_des](const Handle& handle,
                                            const AnyInvokeParams& primitive_parameters) mutable {
+            const auto exec_id = IncrementKernelExecutionCounter();
+            
             handle.ResetKernelTime();
 
             const auto& data_ctx = primitive_parameters.CastTo<CastType>();
@@ -1269,10 +1302,35 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             }
 
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
+            
+            // Kernel logging for CK kernels
+            const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+            const bool is_tuning_mode = GetKernelTuningMode();
+            const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+            
+            HipEventPtr log_start = nullptr;
+            HipEventPtr log_stop  = nullptr;
+            
+            if(should_log)
+            {
+                log_start = make_hip_event();
+                log_stop  = make_hip_event();
+                hipEventRecord(log_start.get(), handle.GetStream());
+            }
+            
             {
                 WorkAroundHipEventProfiler prf(handle);
                 MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                 invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
+            }
+            
+            if(should_log)
+            {
+                hipEventRecord(log_stop.get(), handle.GetStream());
+                hipEventSynchronize(log_stop.get());
+                float kernel_time = 0.0f;
+                hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
+                std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
             }
 
             if(handle.IsProfilingEnabled())
@@ -1348,6 +1406,8 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     should_allocated_wrw_buffer = should_allocated_wrw_buffer,
                     sh_conv_ptr                 = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
+                const auto exec_id = IncrementKernelExecutionCounter();
+                
                 const auto& data_ctx = primitive_parameters.CastTo<CastType>();
                 std::unique_ptr<ck::tensor_operation::device::BaseArgument> argument_ptr =
                     MakeNHWCCKArgPtr<IsSplitKNeeded<DeviceOpType>(),
@@ -1379,10 +1439,35 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 }
 
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
+                
+                // Kernel logging for CK kernels
+                const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                const bool is_tuning_mode = GetKernelTuningMode();
+                const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+                
+                HipEventPtr log_start = nullptr;
+                HipEventPtr log_stop  = nullptr;
+                
+                if(should_log)
+                {
+                    log_start = make_hip_event();
+                    log_stop  = make_hip_event();
+                    hipEventRecord(log_start.get(), handle.GetStream());
+                }
+                
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
+                }
+                
+                if(should_log)
+                {
+                    hipEventRecord(log_stop.get(), handle.GetStream());
+                    hipEventSynchronize(log_stop.get());
+                    float kernel_time = 0.0f;
+                    hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
+                    std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
                 }
 
                 if(handle.IsProfilingEnabled())
@@ -1410,6 +1495,8 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     ck_args     = std::move(ck_args),
                     sh_conv_ptr = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
+                const auto exec_id = IncrementKernelExecutionCounter();
+                
                 const auto& data_ctx = primitive_parameters.CastTo<CastType>();
 
                 std::unique_ptr<ck::tensor_operation::device::BaseArgument> argument_ptr =
@@ -1434,10 +1521,34 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     }
                 }
 
+                // Kernel logging for CK kernels
+                const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                const bool is_tuning_mode = GetKernelTuningMode();
+                const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+                
+                HipEventPtr log_start = nullptr;
+                HipEventPtr log_stop  = nullptr;
+                
+                if(should_log)
+                {
+                    log_start = make_hip_event();
+                    log_stop  = make_hip_event();
+                    hipEventRecord(log_start.get(), handle.GetStream());
+                }
+
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
+                }
+                
+                if(should_log)
+                {
+                    hipEventRecord(log_stop.get(), handle.GetStream());
+                    hipEventSynchronize(log_stop.get());
+                    float kernel_time = 0.0f;
+                    hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
+                    std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
                 }
 
                 if(handle.IsProfilingEnabled())

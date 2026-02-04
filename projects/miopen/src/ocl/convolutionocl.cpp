@@ -39,6 +39,7 @@
 #include <miopen/generic_search_controls.hpp>
 #include <miopen/invoker.hpp>
 #include <miopen/kernel.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 #include <miopen/solution.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/visit_float.hpp>
@@ -838,6 +839,11 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
                                                             this->attribute.gfx90aFp16alt.GetFwd(),
                                                             alpha_val,
                                                             beta_val};
+            const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+            const auto& solver = handle.GetInvoker(network_config, {}, algorithm_name);
+            if(solver)
+                LogSolutionName(algorithm_name.ToString(), log_level);
+            IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_ctx);
             return;
         }
@@ -1108,6 +1114,9 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetFwd()};
+        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        LogSolutionName(solver_id.ToString(), log_level);
+        IncrementKernelExecutionCounter();
         invoker(handle, invoke_ctx);
     });
 }
@@ -1254,6 +1263,9 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
                                                         this->attribute.gfx90aFp16alt.GetBwd(),
                                                         alpha_val,
                                                         beta_val};
+        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        LogSolutionName(algorithm_name.ToString(), log_level);
+        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     });
 }
@@ -1320,6 +1332,9 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetBwd()};
+        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        LogSolutionName(solver_id.ToString(), log_level);
+        IncrementKernelExecutionCounter();
         invoker(handle, invoke_ctx);
     });
 }
@@ -1463,6 +1478,9 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
                                                       this->attribute.gfx90aFp16alt.GetWrW(),
                                                       alpha_val,
                                                       beta_val};
+        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        LogSolutionName(algorithm_name.ToString(), log_level);
+        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     });
 }
@@ -1527,6 +1545,9 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::WrWInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetWrW()};
+        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        LogSolutionName(solver_id.ToString(), log_level);
+        IncrementKernelExecutionCounter();
         invoker(handle, invoke_ctx);
     });
 }

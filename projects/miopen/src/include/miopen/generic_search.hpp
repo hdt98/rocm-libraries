@@ -30,9 +30,11 @@
 #include <miopen/binary_cache.hpp>
 #include <miopen/config.hpp>
 #include <miopen/conv_solution.hpp>
+#include <miopen/env.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/invoke_params.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 #include <miopen/logger.hpp>
 #include <miopen/timer.hpp>
 #include <miopen/mt_queue.hpp>
@@ -50,6 +52,8 @@
 #include <random>
 #include <thread>
 #include <vector>
+
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_KERNEL_NAMES)
 
 namespace miopen {
 namespace solver {
@@ -572,10 +576,20 @@ auto GenericSearch(const Solver s,
                     invoker = profile_h.PrepareInvoker(*current_solution.invoker_factory,
                                                        current_solution.construction_params);
 
+                    // Set tuning mode flag for kernel logging - extends to all runs in this scope
+                    ScopedKernelTuningMode tuning_mode_scope;
+                    
+                    // Log solution name for grouped kernel logging
+                    const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                    const auto solver_name = s.SolverDbId();
+                    LogSolutionName(solver_name, log_level);
+
                     // Warm-up run for every configuration to eliminate cold-start bias
+                    IncrementKernelExecutionCounter();
                     invoker(profile_h, invoke_ctx);
                     profile_h.ResetKernelTime();
 
+                    IncrementKernelExecutionCounter();
                     invoker(profile_h, invoke_ctx);
                     elapsed_time = profile_h.GetKernelTime();
                     samples.push_back(elapsed_time);
@@ -630,6 +644,7 @@ auto GenericSearch(const Solver s,
                     {
                         for(int i = 1; i < N_RUNS; ++i)
                         {
+                            IncrementKernelExecutionCounter();
                             invoker(profile_h, invoke_ctx);
                             samples.push_back(profile_h.GetKernelTime());
                             profile_h.ResetKernelTime();
@@ -738,6 +753,7 @@ auto GenericSearch(const Solver s,
         // Run once with the default config and show score.
         const auto& invoker = profile_h.PrepareInvoker(*default_solution.invoker_factory,
                                                        default_solution.construction_params);
+        IncrementKernelExecutionCounter();
         invoker(profile_h, invoke_ctx);
         const auto default_time = profile_h.GetKernelTime();
         const auto score        = (best_time > 0.0f) ? default_time / best_time : 0.0f;

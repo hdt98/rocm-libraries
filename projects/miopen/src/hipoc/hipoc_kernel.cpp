@@ -29,6 +29,7 @@
 #include <miopen/hipoc_kernel.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/handle_lock.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 #include <miopen/logger.hpp>
 
 #include <hip/hip_ext.h>
@@ -37,6 +38,7 @@
 #define WORKAROUND_SWDEV_448157 1
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_KERNEL_NAMES)
 
 namespace miopen {
 
@@ -86,6 +88,56 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
                   << GetName() << ", global_work_dim = " << DimToFormattedString(gdims.data(), 3)
                   << ", local_work_dim = " << DimToFormattedString(ldims.data(), 3));
 
+    const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+    const bool is_tuning_mode = GetKernelTuningMode();
+    const bool is_transpose = IsTransposeOrTransformKernel(GetName());
+    const auto exec_id = GetKernelExecutionCounter();
+    
+    // Enhanced logging levels:
+    // Level 0: No logging
+    // Level 1: Only main conv kernel per executed solution (not find/search)
+    // Level 2: All kernels for executed solution (not find/search)
+    // Level 3: Only main conv kernels for all solutions (including find/search)
+    // Level 4: All kernels for all solutions (including find/search)
+    
+    bool should_log_individual = false;
+    bool should_accumulate = false;
+    
+    if(log_level == 0)
+    {
+        // No logging
+    }
+    else if(log_level == 1)
+    {
+        // Only main kernels, only executed (not tuning)
+        should_accumulate = !is_tuning_mode;
+    }
+    else if(log_level == 2)
+    {
+        // All kernels, only executed (not tuning)
+        should_log_individual = !is_tuning_mode;
+    }
+    else if(log_level == 3)
+    {
+        // Only main kernels, all solutions (including tuning)
+        should_accumulate = true;
+    }
+    else // log_level >= 4
+    {
+        // All kernels, all solutions (including tuning)
+        should_log_individual = true;
+    }
+    
+    HipEventPtr log_start = nullptr;
+    HipEventPtr log_stop  = nullptr;
+
+    if(should_log_individual || should_accumulate)
+    {
+        log_start = make_hip_event();
+        log_stop  = make_hip_event();
+        hipEventRecord(log_start.get(), stream);
+    }
+
     HipEventPtr start = nullptr;
     HipEventPtr stop  = nullptr;
     void* config[]    = {// HIP_LAUNCH_PARAM_* are macros that do horrible things
@@ -127,6 +179,55 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
     if(status != hipSuccess)
         MIOPEN_THROW_HIP_STATUS(status, "Failed to launch kernel");
 
+    if(should_log_individual || should_accumulate)
+    {
+        hipEventRecord(log_stop.get(), stream);
+        hipEventSynchronize(log_stop.get());
+        float elapsed_time = 0.0f;
+        hipEventElapsedTime(&elapsed_time, log_start.get(), log_stop.get());
+        
+        if(should_log_individual)
+        {
+            // Log each kernel individually
+            std::cerr << "[KERNEL:" << exec_id << "] " << GetName() << " : " << elapsed_time << " ms" << std::endl;
+        }
+        else if(should_accumulate)
+        {
+            // Accumulate for solution-level reporting
+            auto& accum = GetSolutionTimingAccumulator();
+            
+            // Reset accumulator if we're starting a new execution
+            if(accum.exec_id != exec_id)
+            {
+                // Print previous solution if we have data
+                if(accum.exec_id > 0 && !accum.main_kernel_name.empty())
+                {
+                    std::cerr << "[KERNEL:" << accum.exec_id << "] " << accum.main_kernel_name 
+                              << " : " << accum.total_time << " ms";
+                    if(accum.skipped_count > 0)
+                    {
+                        std::cerr << " (+" << accum.skipped_count << " transpose/transform kernels)";
+                    }
+                    std::cerr << std::endl;
+                }
+                accum.Reset(exec_id);
+            }
+            
+            accum.total_time += elapsed_time;
+            accum.kernel_count++;
+            
+            if(is_transpose)
+            {
+                accum.skipped_count++;
+            }
+            else if(accum.main_kernel_name.empty())
+            {
+                // Store the first non-transpose kernel as the main kernel
+                accum.main_kernel_name = GetName();
+            }
+        }
+    }
+
     if(callback)
     {
 #if 0
@@ -154,6 +255,46 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
     MIOPEN_LOG_I2("kernel_name = "
                   << GetName() << ", global_work_dim = " << DimToFormattedString(gdims.data(), 3)
                   << ", local_work_dim = " << DimToFormattedString(ldims.data(), 3));
+
+    const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+    const bool is_tuning_mode = GetKernelTuningMode();
+    const bool is_transpose = IsTransposeOrTransformKernel(GetName());
+    const auto exec_id = GetKernelExecutionCounter();
+    
+    // Enhanced logging levels (same as run())
+    bool should_log_individual = false;
+    bool should_accumulate = false;
+    
+    if(log_level == 0)
+    {
+        // No logging
+    }
+    else if(log_level == 1)
+    {
+        should_accumulate = !is_tuning_mode;
+    }
+    else if(log_level == 2)
+    {
+        should_log_individual = !is_tuning_mode;
+    }
+    else if(log_level == 3)
+    {
+        should_accumulate = true;
+    }
+    else // log_level >= 4
+    {
+        should_log_individual = true;
+    }
+    
+    HipEventPtr log_start = nullptr;
+    HipEventPtr log_stop  = nullptr;
+
+    if(should_log_individual || should_accumulate)
+    {
+        log_start = make_hip_event();
+        log_stop  = make_hip_event();
+        hipEventRecord(log_start.get(), stream);
+    }
 
     const auto& arch = env::value(MIOPEN_DEVICE_ARCH);
     if(!arch.empty())
@@ -202,6 +343,52 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
                                               kern_args);
     if(status != hipSuccess)
         MIOPEN_THROW_HIP_STATUS(status, "Failed to launch kernel");
+
+    if(should_log_individual || should_accumulate)
+    {
+        hipEventRecord(log_stop.get(), stream);
+        hipEventSynchronize(log_stop.get());
+        float elapsed_time = 0.0f;
+        hipEventElapsedTime(&elapsed_time, log_start.get(), log_stop.get());
+        
+        if(should_log_individual)
+        {
+            // Log each kernel individually
+            std::cerr << "[KERNEL:" << exec_id << "] " << GetName() << " : " << elapsed_time << " ms" << std::endl;
+        }
+        else if(should_accumulate)
+        {
+            // Accumulate for solution-level reporting
+            auto& accum = GetSolutionTimingAccumulator();
+            
+            if(accum.exec_id != exec_id)
+            {
+                if(accum.exec_id > 0 && !accum.main_kernel_name.empty())
+                {
+                    std::cerr << "[KERNEL:" << accum.exec_id << "] " << accum.main_kernel_name 
+                              << " : " << accum.total_time << " ms";
+                    if(accum.skipped_count > 0)
+                    {
+                        std::cerr << " (+" << accum.skipped_count << " transpose/transform kernels)";
+                    }
+                    std::cerr << std::endl;
+                }
+                accum.Reset(exec_id);
+            }
+            
+            accum.total_time += elapsed_time;
+            accum.kernel_count++;
+            
+            if(is_transpose)
+            {
+                accum.skipped_count++;
+            }
+            else if(accum.main_kernel_name.empty())
+            {
+                accum.main_kernel_name = GetName();
+            }
+        }
+    }
 
     if(callback)
     {
