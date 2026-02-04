@@ -23,8 +23,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_DIR = SCRIPT_DIR.parent
 
 # Importing TheRock amdgpu_family_matrix.py
-sys.path.append(str(REPO_DIR / "TheRock" / "build_tools" / "github_actions"))
-from amdgpu_family_matrix import all_build_variants
+sys.path.append(str(REPO_DIR / "TheRock" / "build_tools" / "github_actions" / "amdgpu_family_matrix"))
+import all_build_variants
 
 # Paths matching any of these patterns are considered to have no influence over
 # build or test workflows so any related jobs can be skipped if all paths
