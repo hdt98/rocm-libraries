@@ -4085,7 +4085,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Run 5 sub-iterations
                         for(int j = 0; j < num_sub_iterations; j++)
                         {
-                            int idx = i * num_sub_iterations + j;
+                            int idx = i * num_sub_iterations + j + number_cold_calls;
                             CHECK_HIPBLASLT_ERROR(groupedGemmVec[idx % block_count].run(
                                 d_userArgsVec[idx % block_count], stream));
                         }
@@ -4171,7 +4171,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Run 5 sub-iterations
                         for(int j = 0; j < num_sub_iterations; j++)
                         {
-                             int idx = i * num_sub_iterations + j;
+                             int idx = i * num_sub_iterations + j + number_cold_calls;
                              CHECK_HIPBLASLT_ERROR(groupedGemmVec[idx % block_count].run(stream));
                         }
                         if(arg.use_gpu_timer)
