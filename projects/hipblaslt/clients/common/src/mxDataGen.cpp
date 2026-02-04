@@ -227,35 +227,6 @@ std::vector<float> generateData(T                           dgen,
 {
     using namespace DGen;
 
-    // ============== DEBUG TEST CONFIGURATION ==============
-    // Set these to control test patterns:
-    //   0 = use default (random Bounded)
-    //   1 = Identity    4 = RowIndex      7 = Checkerboard
-    //   2 = Ones        5 = ColIndex      8 = ScaledDiagonal
-    //   3 = Zeros       6 = Sequential
-    constexpr int DEBUG_PATTERN_A = 0;  // Pattern for matrix A (0=default)
-    constexpr int DEBUG_PATTERN_B = 0;  // Pattern for matrix B (0=default)
-    constexpr bool DEBUG_FORCE_SCALES = false;  // Force uniform scales to 1.0 (E8M0=127)
-    constexpr bool DEBUG_DISABLE_PRESWIZZLE = false;  // Disable preSwizzle
-    // ======================================================
-
-    int debugPattern = isMatrixA ? DEBUG_PATTERN_A : DEBUG_PATTERN_B;
-    const char* patternName = nullptr;
-    switch(debugPattern) {
-        case 1: opt.initMode = DataInitMode(Identity{}); patternName = "Identity"; break;
-        case 2: opt.initMode = DataInitMode(Ones{}); patternName = "Ones"; break;
-        case 3: opt.initMode = DataInitMode(Zeros{}); patternName = "Zeros"; break;
-        case 4: opt.initMode = DataInitMode(RowIndex{}); patternName = "RowIndex"; break;
-        case 5: opt.initMode = DataInitMode(ColIndex{}); patternName = "ColIndex"; break;
-        case 6: opt.initMode = DataInitMode(Sequential{}); patternName = "Sequential"; break;
-        case 7: opt.initMode = DataInitMode(Checkerboard{}); patternName = "Checkerboard"; break;
-        case 8: opt.initMode = DataInitMode(ScaledDiagonal{}); patternName = "ScaledDiagonal"; break;
-    }
-    if(patternName) {
-        std::cout << "[DEBUG] Matrix " << (isMatrixA ? "A" : "B") 
-                  << " = " << patternName << std::endl;
-    }
-
     dgen.setSeed(seed);
     dgen.generate(sizes, strides, opt);
 
@@ -263,57 +234,23 @@ std::vector<float> generateData(T                           dgen,
     std::memcpy(data, dataBytes.data(), dataBytes.size() * sizeof(uint8_t));
 
     std::vector<uint8_t> scaleBytes = dgen.getScaleBytes();
-    
-    // Debug: print scale buffer info
-    std::cout << "[DEBUG] Scale buffer size: " << scaleBytes.size() << " bytes" << std::endl;
-    if(scaleBytes.size() > 0) {
-        std::cout << "[DEBUG] First 16 scale bytes: ";
-        for(size_t i = 0; i < std::min(size_t(16), scaleBytes.size()); i++) {
-            std::cout << (int)scaleBytes[i] << " ";
-        }
-        std::cout << std::endl;
-    }
 
 #ifdef HIPBLASLT_USE_ROCROLLER
-    if(DEBUG_FORCE_SCALES) {
-        // Force all scales to E8M0=127 (scale=1.0 with OCP standard bias 127)
-        constexpr uint8_t SCALE_ONE = 127;
-        std::fill(scaleBytes.begin(), scaleBytes.end(), SCALE_ONE);
-        std::cout << "[DEBUG] Scale" << (isMatrixA ? "A" : "B") 
-                  << " forced to E8M0=127 (scale=1.0)" << std::endl;
-    }
-    
     // Apply pre-swizzle to scale data
-    if(!DEBUG_DISABLE_PRESWIZZLE)
-    {
-        size_t scaleRows = sizes[0] / elementsPerMXBlock;
-        size_t scaleCols = sizes[1];
+    size_t scaleRows = sizes[0] / elementsPerMXBlock;
+    size_t scaleCols = sizes[1];
 
-        if(useAITERSwizzle)
-        {
-            // Use AITER kernel swizzle pattern
-            // AITER expects scales in M × (K/32) layout, but generator produces (K/32) × M
-            // Swap dimensions for AITER swizzle: {scaleCols, scaleRows} = {M, K/32}
-            scaleBytes = DGen::preSwizzleAITER(scaleBytes, {scaleCols, scaleRows});
-            std::cout << "[DEBUG] Applied AITER scale swizzle (" << scaleCols << "x" << scaleRows << ")" << std::endl;
-        }
-        else if(preSwizzleTile.size() == 3)
-        {
-            // Use RocRoller swizzle pattern
-            scaleBytes = DGen::preSwizzle(scaleBytes, {scaleRows, scaleCols}, preSwizzleTile, preTile);
-        }
-    }
-    else
+    if(useAITERSwizzle)
     {
-        std::cout << "[DEBUG] PreSwizzle DISABLED for testing" << std::endl;
+        // Use AITER kernel swizzle pattern
+        // AITER expects scales in M × (K/32) layout, but generator produces (K/32) × M
+        // Swap dimensions for AITER swizzle: {scaleCols, scaleRows} = {M, K/32}
+        scaleBytes = DGen::preSwizzleAITER(scaleBytes, {scaleCols, scaleRows});
     }
-#else
-    if(DEBUG_FORCE_SCALES) {
-        // Force all scales to E8M0=127 (scale=1.0 with OCP standard bias 127)
-        constexpr uint8_t SCALE_ONE = 127;
-        std::fill(scaleBytes.begin(), scaleBytes.end(), SCALE_ONE);
-        std::cout << "[DEBUG] Forcing scale" << (isMatrixA ? "A" : "B") 
-                  << " to E8M0=127 (scale=1.0)" << std::endl;
+    else if(preSwizzleTile.size() == 3)
+    {
+        // Use RocRoller swizzle pattern
+        scaleBytes = DGen::preSwizzle(scaleBytes, {scaleRows, scaleCols}, preSwizzleTile, preTile);
     }
 #endif
 
