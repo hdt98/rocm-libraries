@@ -54,7 +54,15 @@ if(NOT HIPBLASLT_LIBLOGIC_PATH)
 endif()
 
 set(output_stamp "${CMAKE_CURRENT_BINARY_DIR}/Tensile.stamp")
+
+# Get HIP include directory for Tensile's compiler
+# We set CXXFLAGS to pass HIP include paths to Tensile's compiler
+# Tensile now respects CXXFLAGS environment variable (patched in Component.py)
+get_filename_component(_HIP_ROOT "${hip_DIR}/../../.." ABSOLUTE)
+set(_TENSILE_HIP_INCLUDE_DIR "${_HIP_ROOT}/include")
+
 set(TENSILE_CREATE_LIBRARY_COMMAND
+    ${CMAKE_COMMAND} -E env "CXXFLAGS=-I${_TENSILE_HIP_INCLUDE_DIR}"
     ${HIPBLASLT_PYTHON_COMMAND} -m Tensile.TensileCreateLibrary
     ${TENSILELITE_BUILD_OPTS}
     ${HIPBLASLT_LIBLOGIC_PATH}
