@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     April 2012
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -552,8 +552,7 @@ auto rocsolver_gesdd_getWorkItems_alt(Handle handle,
     // Requirements for external methods
     //
 
-    auto get_dc_qr_work_items = [&]() -> auto
-    {
+    auto get_dc_qr_work_items = [&]() -> auto {
         if(m >= n)
         {
             // Requirements for Divide-and-Conquer eigensolver
@@ -571,7 +570,7 @@ auto rocsolver_gesdd_getWorkItems_alt(Handle handle,
                                      strideA, (rocblas_int*)nullptr, strideP, batch_count));
 
             // Return combined requirements of DC and QR
-            return merge(wi_syevd, merge(wi_geqrf, wi_orgqr));
+            return wi_syevd | wi_geqrf | wi_orgqr;
         }
         else
         {
@@ -590,7 +589,7 @@ auto rocsolver_gesdd_getWorkItems_alt(Handle handle,
                                      strideA, (rocblas_int*)nullptr, strideP, batch_count));
 
             // Return combined requirements of and QR
-            return merge(wi_syevd, merge(wi_gelqf, wi_orglq));
+            return wi_syevd | wi_gelqf | wi_orglq;
         }
     };
     auto wi_dc_qr = get_dc_qr_work_items();
@@ -634,14 +633,11 @@ auto rocsolver_gesdd_getWorkItems_alt(Handle handle,
 
     size_workArr = std::max({size_off_diag_e, size_work_batched});
 
-    work_items_list_t wlist = {{"gesdd_workArr", size_workArr},
-                               {"gesdd_ipiv", size_ipiv},
-                               {"gesdd_VUtmp", size_VUtmp},
-                               {"gesdd_UVtmp", size_UVtmp}};
+    auto wi_gesdd = create_work_item({"gesdd_workArr", size_workArr})
+        + create_work_item({"gesdd_ipiv", size_ipiv}) + create_work_item({"gesdd_VUtmp", size_VUtmp})
+        + create_work_item({"gesdd_UVtmp", size_UVtmp});
 
-    constexpr std::size_t N{4};
-    auto wi_gesdd = create_work_items_sorted_by_size<N>(wlist);
-    auto gesdd_work_items = join(wi_dc_qr, wi_gesdd);
+    auto gesdd_work_items = wi_dc_qr + wi_gesdd;
 
     return gesdd_work_items;
 }

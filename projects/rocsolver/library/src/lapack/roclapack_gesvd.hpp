@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     April 2012
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1243,7 +1243,7 @@ auto rocsolver_gesvd_getWorkItems(rocblas_handle handle,
     auto orgbr_ungbr_wiA1 = cond(!othervN, orgbr_ungbr_getWorkItems(storev_other, k, k, k));
     auto orgbr_ungbr_wiA2
         = cond(fast_thinSVD && !leadvN, orgbr_ungbr_getWorkItems(storev_lead, k, k, k));
-    auto orgbr_ungbr_wiA = merge(orgbr_ungbr_wiA1, orgbr_ungbr_wiA2);
+    auto orgbr_ungbr_wiA = orgbr_ungbr_wiA1 | orgbr_ungbr_wiA2;
 
     auto mn_row_l = (row && leftvS) ? n : m;
     auto orgbr_ungbr_wiB1 = orgbr_ungbr_getWorkItems(rocblas_column_wise, m, mn_row_l, n);
@@ -1255,8 +1255,7 @@ auto rocsolver_gesvd_getWorkItems(rocblas_handle handle,
     auto orgbr_ungbr_wiC2 = cond(rightvO, orgbr_ungbr_getWorkItems(rocblas_row_wise, k, n, m));
     auto orgbr_ungbr_wiC = cond(rightvS || rightvA, orgbr_ungbr_wiC1, orgbr_ungbr_wiC2);
 
-    auto orgbr_ungbr_work_items
-        = cond(thinSVD, orgbr_ungbr_wiA, merge(orgbr_ungbr_wiB, orgbr_ungbr_wiC));
+    auto orgbr_ungbr_work_items = cond(thinSVD, orgbr_ungbr_wiA, orgbr_ungbr_wiB | orgbr_ungbr_wiC);
     /* std::cout << orgbr_ungbr_work_items.impl().print_debug_str("orgbr_ungbr, _getWorkItems()"); */
 
     /* // orgqr/orglq */
@@ -1376,8 +1375,14 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
     if(n == 0 || m == 0 || batch_count == 0)
         return rocblas_status_success;
 
-    static int runs = 0;
-    std::cout << dwptr->print_debug_str("New gesvd, run " + std::to_string(++runs));
+    /* static int runs = 0; */
+    /* auto [size, status] = rocsolver_device_workspace::Size(handle, */
+    /*                                 rocsolver_gesvd_getWorkItems<BATCHED, STRIDED, T, TT, W>( */
+    /*                                     handle, left_svect, right_svect, m, n, A, shiftA, lda, */
+    /*                                     strideA, S, strideS, U, ldu, strideU, V, ldv, strideV, E, */
+    /*                                     strideE, fast_alg, info, batch_count)); */
+
+    /* std::cout << dwptr->print_debug_str("New gesvd, run " + std::to_string(++runs) + ", total size = " + std::to_string(size)); */
 
     /* T* scalars = (T*)dwptr->work("gesvd_scalars"); */
     /* void* work_workArr = dwptr->work("gesvd_work_workArr"); */
