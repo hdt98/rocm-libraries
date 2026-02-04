@@ -66,6 +66,7 @@ typedef enum class _hipblaslt_scaling_format
     Vector                  = 2,
     Block_32_UE8M0          = 3,
     Block_32_UE8M0_32_8_EXT = 1001,
+    Block_32_UE8M0_AITER    = 1002,  // AITER kernel swizzle pattern
 } hipblaslt_scaling_format;
 
 inline bool isBlockScaling(hipblaslt_scaling_format s)
@@ -74,6 +75,7 @@ inline bool isBlockScaling(hipblaslt_scaling_format s)
     {
     case hipblaslt_scaling_format::Block_32_UE8M0:
     case hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT:
+    case hipblaslt_scaling_format::Block_32_UE8M0_AITER:
         return true;
     default:
         return false;
@@ -86,6 +88,7 @@ inline int blockSize(hipblaslt_scaling_format s)
     {
     case hipblaslt_scaling_format::Block_32_UE8M0:
     case hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT:
+    case hipblaslt_scaling_format::Block_32_UE8M0_AITER:
         return 32;
     default:
         return 1;
@@ -127,6 +130,11 @@ inline std::vector<size_t> preTileSizeForScaleB(hipblaslt_scaling_format s)
     default:
         return {};
     }
+}
+
+inline bool isAITERScaleSwizzle(hipblaslt_scaling_format s)
+{
+    return s == hipblaslt_scaling_format::Block_32_UE8M0_AITER;
 }
 
 inline hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os,

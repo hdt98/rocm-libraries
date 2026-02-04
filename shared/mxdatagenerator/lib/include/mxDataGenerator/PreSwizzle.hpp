@@ -37,6 +37,16 @@
 namespace DGen
 {
     /**
+     * @brief Swizzle mode for scale data
+     */
+    enum class ScaleSwizzleMode
+    {
+        None,      // No swizzle
+        RocRoller, // RocRoller kernel pattern (existing preSwizzle)
+        AITER      // AITER kernel pattern
+    };
+
+    /**
      * @brief Helper to compute product of elements in a range
      */
     template <typename T>
@@ -378,6 +388,118 @@ namespace DGen
         auto dstStrides = computeShuffledStrides(srcSizes, dimOrder);
 
         return shuffleDims(input, srcSizes, dstStrides, srcStrides);
+    }
+
+    /**
+     * @brief Pre-swizzle scale data for AITER kernel.
+     *
+     * This implements the AITER e8m0_shuffle algorithm from:
+     * https://github.com/ROCm/aiter/blob/main/aiter/utility/fp4_utils.py
+     *
+     * The algorithm is:
+     *   scale = scale.view(sm // 32, 2, 16, sn // 8, 2, 4)
+     *   scale = scale.permute(0, 3, 5, 2, 4, 1).contiguous()
+     *   scale = scale.view(sm, sn)
+     *
+     * For output position (outRow, outCol), we compute the source position
+     * by decomposing into 6D indices and applying the inverse permutation.
+     *
+     * @param input The input scale data vector (row-major, M x numScaleCols)
+     * @param sizes The dimension sizes {numScaleRows, numScaleCols} where numScaleRows = M
+     * @return The AITER-swizzled scale data
+     */
+    template <typename T>
+    inline std::vector<T> preSwizzleAITER(std::vector<T> const&      input,
+                                          std::vector<size_t> const& sizes)
+    {
+        if(sizes.size() != 2)
+        {
+            std::ostringstream msg;
+            msg << "preSwizzleAITER: sizes must have 2 elements, got " << sizes.size();
+            throw std::runtime_error(msg.str());
+        }
+
+        size_t numRows = sizes[0]; // M dimension (number of scale rows)
+        size_t numCols = sizes[1]; // K/32 dimension (number of scale columns)
+
+        size_t totalElements = numRows * numCols;
+        if(totalElements != input.size())
+        {
+            std::ostringstream msg;
+            msg << "preSwizzleAITER: input size " << input.size() << " doesn't match sizes product "
+                << totalElements;
+            throw std::runtime_error(msg.str());
+        }
+
+        if(numRows % 32 != 0)
+        {
+            std::ostringstream msg;
+            msg << "preSwizzleAITER: numRows must be a multiple of 32, got " << numRows;
+            throw std::runtime_error(msg.str());
+        }
+
+        if(numCols % 8 != 0)
+        {
+            std::ostringstream msg;
+            msg << "preSwizzleAITER: numCols must be a multiple of 8, got " << numCols;
+            throw std::runtime_error(msg.str());
+        }
+
+        std::vector<T> output(input.size());
+
+        // AITER shuffle algorithm:
+        // view as (numRows // 32, 2, 16, numCols // 8, 2, 4)
+        // permute (0, 3, 5, 2, 4, 1)
+        // view as (numRows, numCols)
+        //
+        // For output linear index, decompose into 6D output indices,
+        // then map to 6D input indices via inverse permute,
+        // then compute source row/col.
+
+        size_t numColBlocks = numCols / 8;
+
+#pragma omp parallel for
+        for(size_t outRow = 0; outRow < numRows; ++outRow)
+        {
+            for(size_t outCol = 0; outCol < numCols; ++outCol)
+            {
+                // Compute linear index in output
+                size_t linear = outRow * numCols + outCol;
+
+                // Decompose into 6D indices for output layout:
+                // (numRows // 32, numCols // 8, 4, 16, 2, 2)
+                // Dimensions are ordered from slowest to fastest varying
+                size_t d5 = linear % 2;        linear /= 2;
+                size_t d4 = linear % 2;        linear /= 2;
+                size_t d3 = linear % 16;       linear /= 16;
+                size_t d2 = linear % 4;        linear /= 4;
+                size_t d1 = linear % numColBlocks; linear /= numColBlocks;
+                size_t d0 = linear;
+
+                // Apply inverse permutation
+                // Permute was (0, 3, 5, 2, 4, 1), so:
+                // out[0]=in[0], out[1]=in[3], out[2]=in[5], out[3]=in[2], out[4]=in[4], out[5]=in[1]
+                // Inverse: in[0]=d0, in[1]=d5, in[2]=d3, in[3]=d1, in[4]=d4, in[5]=d2
+                size_t i0 = d0;  // block32
+                size_t i1 = d5;  // row2 (0 or 1, selects which half of 32)
+                size_t i2 = d3;  // row16 (0-15)
+                size_t i3 = d1;  // colBlock8
+                size_t i4 = d4;  // col2 (0 or 1, selects which half of 8)
+                size_t i5 = d2;  // col4 (0-3)
+
+                // Compute source row and column
+                size_t srcRow = i0 * 32 + i1 * 16 + i2;
+                size_t srcCol = i3 * 8 + i4 * 4 + i5;
+
+                // Bounds check
+                if(srcRow < numRows && srcCol < numCols)
+                {
+                    output[outRow * numCols + outCol] = input[srcRow * numCols + srcCol];
+                }
+            }
+        }
+
+        return output;
     }
 
 } // namespace DGen

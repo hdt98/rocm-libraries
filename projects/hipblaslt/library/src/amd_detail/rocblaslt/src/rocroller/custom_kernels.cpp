@@ -51,6 +51,9 @@ void preloadCustomKernels(SolutionCache& cache)
     mxfp4Kernel.scaleTypeA.mode           = rocRoller::Operations::ScaleMode::Separate;
     mxfp4Kernel.scaleTypeA.blockRowSize   = 32;
     mxfp4Kernel.scaleTypeA.blockColSize   = 1;
+    // Note: AITER kernel uses its own scale swizzle pattern.
+    // Use --scaleA 1002 --scaleB 1002 to enable AITER scale swizzle in the data generator
+    // instead of the rocRoller preSwizzle pattern defined here.
     mxfp4Kernel.scaleTypeA.preSwizzleTile = {32, 8, 4};
     mxfp4Kernel.scaleTypeA.preTile        = {32, 8};
     mxfp4Kernel.scaleTypeB.mode           = rocRoller::Operations::ScaleMode::Separate;
@@ -59,19 +62,28 @@ void preloadCustomKernels(SolutionCache& cache)
     mxfp4Kernel.scaleTypeB.preSwizzleTile = {32, 8, 4};
     mxfp4Kernel.scaleTypeB.preTile        = {8, 32};
 
-    SolutionIndexParameters params;
-    params.workgroupTile    = {256, 256, 256};
-    params.workgroupMapping = false;
-    params.streamK          = true;
-    params.tailLoops        = true;
+    for(bool workgroupMapping : {false, true})
+    {
+        for(bool streamK : {false, true})
+        {
+            for(bool tailLoops : {false, true})
+            {
+                SolutionIndexParameters params;
+                params.workgroupTile    = {256, 256, 256};
+                params.workgroupMapping = workgroupMapping;
+                params.streamK          = streamK;
+                params.tailLoops        = tailLoops;
 
-    cache.addKernel(
-        mxfp4Kernel,
-        params,
-        createCustomGemmKernel("_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
-                               mxfp4Kernel,
-                               params.workgroupTile,
-                               getCoPath("f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co")));
+                cache.addKernel(
+                    mxfp4Kernel,
+                    params,
+                    createCustomGemmKernel("_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
+                                           mxfp4Kernel,
+                                           params.workgroupTile,
+                                           getCoPath("f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co")));
+            }
+        }
+    }
 }
 
 // F4 GEMM Kernel Args
@@ -136,7 +148,7 @@ struct __attribute__((packed)) F4GemmKernelArgs
     uint32_t    stride_ScaleB1;
     p3          _p22;
     int         log2_k_split;
-    
+
     // AITER kernel computes D[N,M] = B^T * A instead of C[M,N] = A^T * B
     // So we swap A<->B pointers/scales and M<->N dimensions
     F4GemmKernelArgs(const RocblasltContractionProblem& prob)
