@@ -621,10 +621,57 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
             'LWSB'   : [[42]],  # swap after last gr b
             'LCC'   : [[47, 47]],
         }
+    elif isNN(kernel) and useLDSTr and TLDS == 1:
 
+        nglshift = nllshift = 11
+
+        syncTable = [
+            -1, SWaitCnt(dscnt=2, vlcnt=-1, vscnt=-1, comment="Wait for LRB1 in prev iteration"),
+            
+            7, SWaitCnt(dscnt=5, vlcnt=-1, vscnt=-1, comment="Wait for prior 5 LRA0"),
+            20, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="All LRA0 is launched"),
+            20, SBarrier(comment=""),
+            
+            21, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="All LRB0 launched"),
+            21, SBarrier(comment=""),
+
+            36, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="All GRA launched"),
+            36, SBarrier(comment=""),
+
+            43, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="All GRB launched"),
+            43, SBarrier(comment=""),
+        ]
+        
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            
+            'GRIncA' : [[1,1,1, 2,2,2, 3,3,3]],
+            'GRIncB' : [[4,4,4, 5,5,5, 6,6,6]],
+            
+            'LRA0'   : [[1, 3,3, 5,5,   7,7, 9,9, 11,11, 13,13, 15,15, 17],
+                        [2, 4,4, 6,6,   8,8, 10,10, 12,12, 14,14, 16,16, 18]],
+            'LRB0'   : [[13, 15, 17],
+                        [14, 16, 18]],
+
+            'GRA'    : [[21,21, 23,23, 25,25, 27,27, 29,29, 31,31, 33,33, 35,35],
+                        [20,20, 22,22, 24,24, 26,26, 28,28, 30,30, 32,32, 34,34]],
+            'GRB'    : [[37,37, 39,39, 41,41],
+                        [38,38, 40,40, 42,42]],
+
+            'LRSA'   : [[30]],
+            'LRSB'   : [[31]],
+
+            'LWSA'   : [[36]],
+            'LWSB'   : [[43]],
+
+            'LRA1'   : [[36,36, 37,37, 38,38, 39,39, 40,40, 41,41, 42,42, 43,43]],
+            'LRB1'   : [[43, 44, 45]],
+
+            'LCC'    : [[47, 47]],
+        }
     else:
         return False, None
-
 
     numMfma = 48
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
