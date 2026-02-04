@@ -56,6 +56,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/program_options.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <memory>
@@ -672,12 +673,22 @@ int main(int argc, const char* argv[])
     }
 
     if(firstSolutionIdx < 0)
-        firstSolutionIdx = library->solutions.begin()->first;
+    {
+        // Find minimum key in unordered_map
+        firstSolutionIdx = std::min_element(
+            library->solutions.begin(),
+            library->solutions.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; })->first;
+    }
 
     if(numSolutions < 0)
     {
-        auto iter = library->solutions.end();
-        iter--;
+        // Find maximum key in unordered_map (result unused but kept for consistency)
+        auto maxIt = std::max_element(
+            library->solutions.begin(),
+            library->solutions.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+        (void)maxIt; // Suppress unused variable warning
     }
 
     auto dataInit = std::make_shared<DataInitialization>(args, problemFactory);

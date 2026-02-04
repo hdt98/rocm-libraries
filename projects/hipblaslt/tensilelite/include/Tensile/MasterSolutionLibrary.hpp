@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <unordered_map>
 
 #include <Tensile/Debug.hpp>
 #include <Tensile/SolutionLibrary.hpp>
@@ -45,8 +46,9 @@ namespace TensileLite
     /**
  * \ingroup SolutionLibrary
  */
+    // Using unordered_map for O(1) lookups instead of std::map's O(log n)
     template <typename MySolution>
-    using SolutionMap = std::map<int, std::shared_ptr<MySolution>>;
+    using SolutionMap = std::unordered_map<int, std::shared_ptr<MySolution>>;
 
     template <typename MySolution>
     struct LibraryIOContext

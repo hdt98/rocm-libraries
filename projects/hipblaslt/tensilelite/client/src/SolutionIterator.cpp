@@ -28,6 +28,7 @@
 
 #include "ResultReporter.hpp"
 #include <Tensile/Debug.hpp>
+#include <algorithm>
 
 namespace TensileLite
 {
@@ -187,12 +188,21 @@ namespace TensileLite
             m_firstSolutionIdx = firstSolutionIdx;
 
             if(m_firstSolutionIdx < 0)
-                m_firstSolutionIdx = library->solutions.begin()->first;
+            {
+                // Find minimum key in unordered_map
+                m_firstSolutionIdx = std::min_element(
+                    library->solutions.begin(),
+                    library->solutions.end(),
+                    [](const auto& a, const auto& b) { return a.first < b.first; })->first;
+            }
 
             if(numSolutions < 0)
             {
-                auto iter         = library->solutions.rbegin();
-                m_lastSolutionIdx = iter->first;
+                // Find maximum key in unordered_map
+                m_lastSolutionIdx = std::max_element(
+                    library->solutions.begin(),
+                    library->solutions.end(),
+                    [](const auto& a, const auto& b) { return a.first < b.first; })->first;
             }
             else
             {
