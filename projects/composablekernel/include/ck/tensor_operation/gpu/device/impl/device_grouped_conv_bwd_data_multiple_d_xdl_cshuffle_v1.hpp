@@ -1921,6 +1921,11 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
             << CShuffleMXdlPerWavePerShuffle << ", "
             << CShuffleNXdlPerWavePerShuffle;
 
+            if constexpr(NumGroupsToMerge > 1)
+            {
+                str << ", " << NumGroupsToMerge;
+            }
+
             if constexpr(is_NGCHW_NGKHW<ELayout, BLayout, ALayout>() ||
                         is_NGCDHW_NGKDHW<ELayout, BLayout, ALayout>()) {
                     str << ", TransposeTransferInScalarPerVectorAligned: "
