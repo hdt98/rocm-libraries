@@ -248,9 +248,14 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     endif()
   else() # WIN32
     if (LINK_BLIS)
-      # Check for AOCL: prefer build/deps (for testing), fall back to system
+      # Check for AOCL: prefer CMake package (TheRock), then build/deps (rmake.py), then system
       
-      # Priority 1 (TEMPORARY): AOCL built from source by rdeps.py
+      # Priority 1: AOCL via CMake package configuration (TheRock builds)
+      if(NOT BLAS_LIBRARY)
+        find_aocl_cmake_package()
+      endif()
+      
+      # Priority 2: AOCL built from source by rdeps.py/rmake.py
       if(EXISTS "${BUILD_DIR}/deps/aocl/install_package/lib/aocl.lib")
         set(AOCL_BLIS_DIR "${BUILD_DIR}/deps/aocl/install_package")
         set(AOCL_LIB_PATH "${BUILD_DIR}/deps/aocl/install_package/lib/aocl.lib")
