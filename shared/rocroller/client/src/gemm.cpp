@@ -1840,13 +1840,12 @@ int main(int argc, const char* argv[])
         "--type_acc=float.");
 
     std::string preset = "legacy";
-    app.add_option(
-        "--preset",
-        preset,
-        "Solution parameter preset.\n"
-        "  legacy   - rocroller-gemm legacy defaults\n"
-        "  hipblaslt - hipblaslt production defaults\n"
-        "Default: legacy.")
+    app.add_option("--preset",
+                   preset,
+                   "Solution parameter preset.\n"
+                   "  legacy   - rocroller-gemm legacy defaults\n"
+                   "  hipblaslt - hipblaslt production defaults\n"
+                   "Default: legacy.")
         ->check(CLI::IsMember({"legacy", "hipblaslt"}));
 
     app.add_flag("--visualize",
