@@ -231,8 +231,16 @@ function(TensileCreateLibraryFiles
     string(REPLACE ";" "$<SEMICOLON>" ESC_PATH "${ESC_PATH}")
   endif()
   set(ENV_PATH_ARG "PATH=${ESC_PATH}")
+  
+  # Add HIP include directory to CXXFLAGS so Tensile's compiler can find HIP headers
+  # Get HIP package location from find_package(hip)
+  if(hip_DIR)
+    get_filename_component(_HIP_ROOT "${hip_DIR}/../../.." ABSOLUTE)
+    set(_TENSILE_CXXFLAGS "-I${_HIP_ROOT}/include")
+  endif()
+  
   set(CommandLine
-    "${CMAKE_COMMAND}" -E env "PATH=${ESC_PATH}" --
+    "${CMAKE_COMMAND}" -E env "PATH=${ESC_PATH}" "CXXFLAGS=${_TENSILE_CXXFLAGS}" --
     ${CommandLine})
   message(STATUS "Tensile_CREATE_COMMAND: ${CommandLine}")
 
