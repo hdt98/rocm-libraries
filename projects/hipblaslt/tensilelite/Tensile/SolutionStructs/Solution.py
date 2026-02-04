@@ -1170,7 +1170,7 @@ class Solution(collections.abc.Mapping):
         state["MIWaveTileB"] = state["MIWaveTile"][0]
 
     if state["ProblemType"]["Sparse"] == 2 and state["DirectToVgprSparseMetadata"]:
-      reject(state, printRejectionReason, "Sparse B does not supprot DirectToVgprSparseMetadata")
+      reject(state, printRejectionReason, "Sparse B does not supprot DirectToVgprSparseMetadata!")
       return
 
 
