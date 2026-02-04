@@ -15,7 +15,7 @@ template <typename InDataType,
           typename ComputeDataType>
 CK_TILE_HOST HostTensor<OutDataType>
 reference_batched_mx_descale(const HostTensor<InDataType>& a_b_m_k,
-                             const HostTensor<ScaleDataType>& scales,
+                             const HostTensor<ScaleDataType>& scales_b_m_ks,
                              const std::size_t scale_granularity)
 {
     const std::size_t B = a_b_m_k.get_length(0);
@@ -31,8 +31,8 @@ reference_batched_mx_descale(const HostTensor<InDataType>& a_b_m_k,
         {
             for(std::size_t k = 0; k < K; k += packed_size)
             {
-                auto scale =
-                    ck_tile::type_convert<ComputeDataType>(scales(batch, m, k / scale_granularity));
+                const auto scale = ck_tile::type_convert<ComputeDataType>(
+                    scales_b_m_ks(batch, m, k / scale_granularity));
 
                 if constexpr(std::is_same_v<InDataType, pk_fp4_t>)
                 {
