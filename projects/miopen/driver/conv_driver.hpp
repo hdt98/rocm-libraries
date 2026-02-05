@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (c) 2017 Advanced Micro Devices, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 #ifndef GUARD_MIOPEN_CONV_DRIVER_HPP
 #define GUARD_MIOPEN_CONV_DRIVER_HPP
 
@@ -48,6 +25,7 @@
 #include <miopen/miopen.h>
 #include <miopen/conv/solvers.hpp>
 #include <miopen/tensor.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 
 #include <../test/cpu_bias.hpp>
 #include <../test/cpu_conv.hpp>
@@ -429,7 +407,7 @@ private:
         return total_time;
     }
 
-    void PrintForwardTime(float kernel_total_time, float kernel_first_time) const;
+    void PrintForwardTime(float kernel_total_time, float kernel_first_time, bool json_mode) const;
     int RunForwardGpuImmed(bool is_transform);
     int RunForwardGpuFind(bool is_transform);
     void PrintBackwardDataTime(float kernel_total_time, float kernel_first_time);
@@ -1702,15 +1680,18 @@ int ConvDriver<Tgpu, Tref>::FindForward(int& ret_algo_count,
 
 template <typename Tgpu, typename Tref>
 void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
-                                              const float kernel_first_time) const
+                                              const float kernel_first_time,
+                                              const bool json_mode) const
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
-    printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
-
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        printf("stats: <not implemented> for conv%ud\n", num_dim);
+        if(!json_mode)
+        {
+            printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+            printf("stats: <not implemented> for conv%ud\n", num_dim);
+        }
         return;
     }
 
@@ -1738,26 +1719,49 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         size_t outputBytes = 1.0 * out_n * out_c * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
 
-        printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-               "GB/s, timeMs\n");
-        printf("stats: %s%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, %.0f, %f\n",
-               "fwd-conv",
-               wei_h,
-               wei_w,
-               miopen::deref(convDesc).GetConvStrides()[0],
-               in_n,
-               in_c,
-               out_h,
-               out_w,
-               wei_h,
-               wei_w,
-               out_c,
-               flopCnt,
-               readBytes,
-               outputBytes,
-               flopCnt / kernel_average_time / 1e6,
-               (readBytes + outputBytes) / kernel_average_time / 1e6,
-               kernel_average_time);
+        if(json_mode)
+        {
+            std::cout << "{\"performance\":{"
+                      << "\"name\":\"fwd-conv" << wei_h << wei_w << "x" <<  miopen::deref(convDesc).GetConvStrides()[0] << ","
+                      << "\"n\":" << in_n << ","
+                      << "\"c\":" << in_c << ","
+                      << "\"ho\":" << out_h << ","
+                      << "\"wo\":" << out_w << ","
+                      << "\"y\":" << wei_h << ","
+                      << "\"x\":" << wei_w << ","
+                      << "\"k\":" << out_c << ","
+                      << "\"flop_count\":" << flopCnt << ","
+                      << "\"bytes_read\":" << readBytes << ","
+                      << "\"bytes_writter\":" << outputBytes << ","
+                      << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
+                      << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6) << ","
+                      << "\"average_time_ms\":" << kernel_average_time 
+                      << "}}" << std::endl;
+        }
+        else
+        {
+            printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+            printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+                   "GB/s, timeMs\n");
+            printf("stats: %s%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, %.0f, %f\n",
+                   "fwd-conv",
+                   wei_h,
+                   wei_w,
+                   miopen::deref(convDesc).GetConvStrides()[0],
+                   in_n,
+                   in_c,
+                   out_h,
+                   out_w,
+                   wei_h,
+                   wei_w,
+                   out_c,
+                   flopCnt,
+                   readBytes,
+                   outputBytes,
+                   flopCnt / kernel_average_time / 1e6,
+                   (readBytes + outputBytes) / kernel_average_time / 1e6,
+                   kernel_average_time);
+        }
     }
     else
     { // 3d
@@ -1782,31 +1786,49 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         size_t outputBytes = 1.0 * out_n * out_c * out_d * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
 
-        printf("stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, "
-               "GFLOPs, "
-               "GB/s, timeMs\n");
-        printf("stats: %s%dx%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, "
-               "%.0f, %.0f, %f\n",
-               "fwd-conv",
-               wei_d,
-               wei_h,
-               wei_w,
-               miopen::deref(convDesc).GetConvStrides()[0],
-               in_n,
-               in_c,
-               out_d,
-               out_h,
-               out_w,
-               wei_d,
-               wei_h,
-               wei_w,
-               out_c,
-               flopCnt,
-               readBytes,
-               outputBytes,
-               flopCnt / kernel_average_time / 1e6,
-               (readBytes + outputBytes) / kernel_average_time / 1e6,
-               kernel_average_time);
+                             if(json_mode)
+        {
+            std::cout << "{\"performance\":{"
+                      << "\"direction\":\"forward\","
+                      << "\"operation\":\"conv\","
+                      << "\"dimensions\":\"3\","
+                      << "\"results\":{"
+                      << "\"average_time_ms\":" << kernel_average_time << ","
+                      << "\"flop_count\":" << flopCnt << ","
+                      << "\"bytes_read\":" << readBytes << ","
+                      << "\"bytes_writter\":" << outputBytes << ","
+                      << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
+                      << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
+                      << "}}}" << std::endl;
+        }
+        else
+        {
+            printf("stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, "
+                "GFLOPs, "
+                "GB/s, timeMs\n");
+            printf("stats: %s%dx%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, "
+                "%.0f, %.0f, %f\n",
+                "fwd-conv",
+                wei_d,
+                wei_h,
+                wei_w,
+                miopen::deref(convDesc).GetConvStrides()[0],
+                in_n,
+                in_c,
+                out_d,
+                out_h,
+                out_w,
+                wei_d,
+                wei_h,
+                wei_w,
+                out_c,
+                flopCnt,
+                readBytes,
+                outputBytes,
+                flopCnt / kernel_average_time / 1e6,
+                (readBytes + outputBytes) / kernel_average_time / 1e6,
+                kernel_average_time);
+        }
     }
 }
 
@@ -2146,8 +2168,21 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         miopenConvSolution_t solution;
         GetSolutionAfterFind(
             perf_results[0], Direction::Fwd, in_tens, wei_tens, outputTensor, solution);
-        std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(solution) << std::endl;
-        PrintForwardTime(kernel_total_time, kernel_first_time);
+
+         
+        const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+        const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+        if(!json_mode)
+        {
+            std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(solution) << std::endl;
+            PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
+        }
+        else
+        {
+            std::cout << "{solution: \"" << AlgorithmSolutionToString(solution) << "\", ";
+            PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
+            std::cout << "}";
+        }
     }
 
     return rc;
@@ -3577,14 +3612,35 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     if(is_fwd_igemm)
         tolerance = tolerance * 10;
 
+    const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+    
     if(!std::isfinite(error) || error > tolerance)
     {
-        std::cout << "Forward Convolution FAILED: " << error << " > " << tolerance << std::endl;
+        if(json_mode)
+        {
+            std::cout << "\"verification\":{\"direction\":\"forward\",\"status\":\"FAILED\","
+                      << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                      << "\"error\":" << error << ",\"tolerance\":" << tolerance << "}";
+        }
+        else
+        {
+            std::cout << "Forward Convolution FAILED: " << error << " > " << tolerance << std::endl;
+        }
         return EC_VerifyFwd;
     }
 
-    std::cout << "Forward Convolution Verifies OK on " << (UseGPUReference() ? "GPU" : "CPU")
-              << " reference (" << error << " < " << tolerance << ')' << std::endl;
+    if(json_mode)
+    {
+        std::cout << "\"verification\":{\"direction\":\"forward\",\"status\":\"OK\","
+                  << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                  << "\"error\":" << error << ",\"tolerance\":" << tolerance << "}";
+    }
+    else
+    {
+        std::cout << "Forward Convolution Verifies OK on " << (UseGPUReference() ? "GPU" : "CPU")
+                  << " reference (" << error << " < " << tolerance << ')' << std::endl;
+    }
 
     return 0;
 }
@@ -3626,15 +3682,34 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
 
         if(!std::isfinite(error_data) || error_data > tolerance)
         {
-            std::cout << "Backward Convolution Data FAILED: " << error_data << " > " << tolerance
+            if(json_mode)
+            {
+                std::cout << "\"verification\":{\"direction\":\"backward\",\"status\":\"FAILED\","
+                        << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                        << "\"error\":" << error_data << ",\"tolerance\":" << tolerance << "}";
+            }
+            else
+            {
+                std::cout << "Backward Convolution Data FAILED: " << error_data << " > " << tolerance
                       << std::endl;
+            }
             cumulative_rc |= EC_VerifyBwd;
         }
         else
         {
-            std::cout << "Backward Convolution Data Verifies OK on "
+            
+            if(json_mode)
+            {
+                std::cout << "\"verification\":{\"direction\":\"backward\",\"status\":\"OK\","
+                        << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                        << "\"error\":" << error_data << ",\"tolerance\":" << tolerance << "}";
+            }
+            else
+            {
+                std::cout << "Backward Convolution Data Verifies OK on "
                       << (UseGPUReference() ? "GPU" : "CPU") << " reference (" << error_data
                       << " < " << tolerance << ')' << std::endl;
+            }
         }
     }
 

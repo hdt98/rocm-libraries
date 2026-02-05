@@ -152,7 +152,7 @@ Note: By default the CPU verification is turned on. Verification can be disabled
 
 ### Kernel Name and Execution Time Logging
 
-The `MIOPEN_LOG_KERNEL_NAMES` environment variable enables lightweight logging of kernel names and their execution times during MIOpenDriver runs. This is useful for debugging, performance analysis, and understanding which kernels are being executed under different configurations (e.g., different `MIOPEN_FIND_MODE` or `MIOPEN_FORCE` settings).
+The `MIOPEN_PERFORMANCE_LOGS` environment variable enables lightweight logging of kernel names and their execution times during MIOpenDriver runs. This is useful for debugging, performance analysis, and understanding which kernels are being executed under different configurations (e.g., different `MIOPEN_FIND_MODE` or `MIOPEN_FORCE` settings).
 
 **Logging Levels:**
 
@@ -168,11 +168,11 @@ The variable supports five levels with varying detail and scope:
 
 ```bash
 # Level 1: Log only the chosen/executed kernels
-export MIOPEN_LOG_KERNEL_NAMES=1
+export MIOPEN_PERFORMANCE_LOGS=1
 ./bin/MIOpenDriver conv -W 32 -H 32 -c 3 -k 32 -x 5 -y 5 -p 2 -q 2
 
 # Level 2: Log all kernels including find/search
-export MIOPEN_LOG_KERNEL_NAMES=2
+export MIOPEN_PERFORMANCE_LOGS=2
 ./bin/MIOpenDriver conv -W 32 -H 32 -c 3 -k 32 -x 5 -y 5 -p 2 -q 2
 ```
 
@@ -252,7 +252,67 @@ Where `exec_id` is an execution counter that groups related kernels together (e.
 - **Level 3**: Higher overhead - times all solutions including find/search, aggregates at solution level
 - **Level 4**: Highest overhead - times every kernel individually including benchmarking runs; synchronizes after each kernel
 
-**Filtering Output:**
+**JSON Output Mode:**
+
+To enable JSON formatted output, add 256 to the desired log level. JSON mode outputs kernel execution data as structured JSON objects grouped by solution.
+
+```bash
+# Level 2 with JSON (2 + 256 = 258)
+export MIOPEN_PERFORMANCE_LOGS=258
+./bin/MIOpenDriver convbfp16 -W 1024 -H 1024 -c 128 -k 128 -x 3 -y 3
+```
+
+**JSON Output Format:**
+
+Each solution outputs a single JSON object containing all its kernels:
+
+```json
+{
+  "solution": "miopenConvolutionFwdAlgoImplicitGEMM",
+  "phase": "execution",
+  "kernels": [
+    {
+      "exec_id": 1,
+      "kernel_name": "igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt128x128x32...",
+      "time_ms": 1.60839,
+      "timestamp": "2026-02-04T09:32:39.123456",
+      "is_transform": false
+    },
+    {
+      "exec_id": 1,
+      "kernel_name": "batched_transpose_32x32_half",
+      "time_ms": 0.234,
+      "timestamp": "2026-02-04T09:32:39.125012",
+      "is_transform": true
+    }
+  ]
+}
+```
+
+**JSON Fields:**
+- `solution`: Name of the solver/algorithm
+- `phase`: Either "execution" (actual computation) or "tuning" (find/search phase)
+- `kernels`: Array of kernel execution records with:
+  - `exec_id`: Execution counter grouping related kernels
+  - `kernel_name`: Full kernel name
+  - `time_ms`: Execution time in milliseconds
+  - `timestamp`: ISO 8601 timestamp with microsecond precision
+  - `is_transform`: Boolean indicating if kernel is transpose/transform operation
+
+**Parsing JSON Output:**
+```bash
+# Extract kernel times with jq
+export MIOPEN_PERFORMANCE_LOGS=258
+./bin/MIOpenDriver conv ... 2>&1 | grep "^{" | jq '.kernels[].time_ms'
+
+# Get solution names
+./bin/MIOpenDriver conv ... 2>&1 | grep "^{" | jq -r '.solution'
+
+# Filter by phase
+./bin/MIOpenDriver conv ... 2>&1 | grep "^{" | jq 'select(.phase == "execution")'
+```
+
+**Filtering Output (Traditional Format):**
 ```bash
 # Show only kernel logs
 ./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]"

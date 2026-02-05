@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (c) 2017 Advanced Micro Devices, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 #include <miopen/env.hpp>
 #include <miopen/handle_lock.hpp>
 #include <miopen/kernel_tuning_mode.hpp>
@@ -32,7 +9,7 @@
 namespace miopen {
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_KERNEL_NAMES)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
 
 static std::string DimToFormattedString(const size_t* dims, size_t count)
 {
@@ -58,7 +35,7 @@ void OCLKernelInvoke::run() const
                   << ", global_work_dim = " << DimToFormattedString(gdims.data(), work_dim)
                   << ", local_work_dim = " << DimToFormattedString(ldims.data(), work_dim));
 
-    const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     const bool is_tuning_mode = GetKernelTuningMode();
     const bool is_transpose = IsTransposeOrTransformKernel(GetName());
     const auto exec_id = GetKernelExecutionCounter();
@@ -69,27 +46,28 @@ void OCLKernelInvoke::run() const
     // Level 2: All kernels for executed solution (not find/search)
     // Level 3: Only main conv kernels for all solutions (including find/search)
     // Level 4: All kernels for all solutions (including find/search)
+    // Add 256 to enable JSON mode
     
     bool should_log_individual = false;
     bool should_accumulate = false;
     
-    if(log_level == 0)
+    if(base_level == 0)
     {
         // No logging
     }
-    else if(log_level == 1)
+    else if(base_level == 1)
     {
         should_accumulate = !is_tuning_mode;
     }
-    else if(log_level == 2)
+    else if(base_level == 2)
     {
         should_log_individual = !is_tuning_mode;
     }
-    else if(log_level == 3)
+    else if(base_level == 3)
     {
         should_accumulate = true;
     }
-    else // log_level >= 4
+    else // base_level >= 4
     {
         should_log_individual = true;
     }
@@ -132,41 +110,12 @@ void OCLKernelInvoke::run() const
         
         float elapsed_time = (end_time - start_time) / 1000000.0f; // Convert nanoseconds to milliseconds
         
-        if(should_log_individual)
+        if(should_log_individual || should_accumulate)
         {
-            // Log each kernel individually
-            std::cerr << "[KERNEL:" << exec_id << "] " << GetName() << " : " << elapsed_time << " ms" << std::endl;
-        }
-        else if(should_accumulate)
-        {
-            // Accumulate for solution-level reporting
-            auto& accum = GetSolutionTimingAccumulator();
-            
-            if(accum.exec_id != exec_id)
+            // Log to JSON accumulator
+            if(IsJsonModeEnabled(log_level))
             {
-                if(accum.exec_id > 0 && !accum.main_kernel_name.empty())
-                {
-                    std::cerr << "[KERNEL:" << accum.exec_id << "] " << accum.main_kernel_name 
-                              << " : " << accum.total_time << " ms";
-                    if(accum.skipped_count > 0)
-                    {
-                        std::cerr << " (+" << accum.skipped_count << " transpose/transform kernels)";
-                    }
-                    std::cerr << std::endl;
-                }
-                accum.Reset(exec_id);
-            }
-            
-            accum.total_time += elapsed_time;
-            accum.kernel_count++;
-            
-            if(is_transpose)
-            {
-                accum.skipped_count++;
-            }
-            else if(accum.main_kernel_name.empty())
-            {
-                accum.main_kernel_name = GetName();
+                AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose);
             }
         }
         

@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (c) 2023 Advanced Micro Devices, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -418,9 +395,10 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                 auto invoker_ptr     = sh_conv_ptr->MakeInvokerPointer();
                 
                 // Kernel logging for CK kernels
-                const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                const uint64_t base_level = log_level & 0xFF;
                 const bool is_tuning_mode = GetKernelTuningMode();
-                const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+                const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
                 
                 HipEventPtr log_start = nullptr;
                 HipEventPtr log_stop  = nullptr;
@@ -443,7 +421,11 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                     hipEventSynchronize(log_stop.get());
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                    std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
+                    
+                    if(IsJsonModeEnabled(log_level))
+                    {
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
+                    }
                 }
                 
                 if(handle.IsProfilingEnabled())
@@ -1304,9 +1286,10 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
             
             // Kernel logging for CK kernels
-            const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+            const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+            const uint64_t base_level = log_level & 0xFF;
             const bool is_tuning_mode = GetKernelTuningMode();
-            const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+            const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
             
             HipEventPtr log_start = nullptr;
             HipEventPtr log_stop  = nullptr;
@@ -1330,7 +1313,11 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 hipEventSynchronize(log_stop.get());
                 float kernel_time = 0.0f;
                 hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
+                
+                if(IsJsonModeEnabled(log_level))
+                {
+                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
+                }
             }
 
             if(handle.IsProfilingEnabled())
@@ -1441,9 +1428,10 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
                 
                 // Kernel logging for CK kernels
-                const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                const uint64_t base_level = log_level & 0xFF;
                 const bool is_tuning_mode = GetKernelTuningMode();
-                const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+                const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
                 
                 HipEventPtr log_start = nullptr;
                 HipEventPtr log_stop  = nullptr;
@@ -1467,7 +1455,11 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     hipEventSynchronize(log_stop.get());
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                    std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
+                    
+                    if(IsJsonModeEnabled(log_level))
+                    {
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
+                    }
                 }
 
                 if(handle.IsProfilingEnabled())
@@ -1522,9 +1514,10 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 }
 
                 // Kernel logging for CK kernels
-                const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+                const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                const uint64_t base_level = log_level & 0xFF;
                 const bool is_tuning_mode = GetKernelTuningMode();
-                const bool should_log = (log_level == 2) || (log_level == 1 && !is_tuning_mode);
+                const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
                 
                 HipEventPtr log_start = nullptr;
                 HipEventPtr log_stop  = nullptr;
@@ -1548,7 +1541,11 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     hipEventSynchronize(log_stop.get());
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                    std::cerr << "[KERNEL:" << exec_id << "] " << kernel_id << " : " << kernel_time << " ms" << std::endl;
+                    
+                    if(IsJsonModeEnabled(log_level))
+                    {
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
+                    }
                 }
 
                 if(handle.IsProfilingEnabled())

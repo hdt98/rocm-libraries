@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (c) 2020 Advanced Micro Devices, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #include <miopen/convolution.hpp>
 
@@ -839,7 +816,7 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
                                                             this->attribute.gfx90aFp16alt.GetFwd(),
                                                             alpha_val,
                                                             beta_val};
-            const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+            const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
             const auto& solver = handle.GetInvoker(network_config, {}, algorithm_name);
             if(solver)
                 LogSolutionName(algorithm_name.ToString(), log_level);
@@ -1114,7 +1091,7 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetFwd()};
-        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         LogSolutionName(solver_id.ToString(), log_level);
         IncrementKernelExecutionCounter();
         invoker(handle, invoke_ctx);
@@ -1263,7 +1240,7 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
                                                         this->attribute.gfx90aFp16alt.GetBwd(),
                                                         alpha_val,
                                                         beta_val};
-        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         LogSolutionName(algorithm_name.ToString(), log_level);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
@@ -1332,7 +1309,7 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetBwd()};
-        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         LogSolutionName(solver_id.ToString(), log_level);
         IncrementKernelExecutionCounter();
         invoker(handle, invoke_ctx);
@@ -1478,7 +1455,7 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
                                                       this->attribute.gfx90aFp16alt.GetWrW(),
                                                       alpha_val,
                                                       beta_val};
-        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         LogSolutionName(algorithm_name.ToString(), log_level);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
@@ -1545,7 +1522,7 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::WrWInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetWrW()};
-        const auto log_level = env::value(MIOPEN_LOG_KERNEL_NAMES);
+        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         LogSolutionName(solver_id.ToString(), log_level);
         IncrementKernelExecutionCounter();
         invoker(handle, invoke_ctx);
