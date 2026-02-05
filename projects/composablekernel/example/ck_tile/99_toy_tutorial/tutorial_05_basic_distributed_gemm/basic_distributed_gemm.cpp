@@ -267,13 +267,14 @@ void print_matrix(const std::vector<T>& mat,
                   bool col_major          = true,
                   const std::string& name = "Matrix")
 {
-    std::cout << name << " (" << rows << "×" << cols << "):\n";
+    std::cout << name << " (" << rows << "x" << cols << "):\n";
     for(index_t i = 0; i < std::min(rows, index_t(8)); ++i)
     {
         for(index_t j = 0; j < std::min(cols, index_t(8)); ++j)
         {
             index_t idx = col_major ? (i + j * ld) : (i * ld + j);
-            std::cout << std::setw(8) << std::setprecision(3) << mat[idx] << " ";
+            std::cout << std::setw(8) << std::setprecision(3) << static_cast<float>(mat[idx])
+                      << " ";
         }
         if(cols > 8)
             std::cout << "...";
@@ -315,7 +316,7 @@ int main()
     constexpr AccumType beta  = 1.5f;
 
     std::cout << "Problem configuration:\n";
-    std::cout << "  M×N×K: " << M << "×" << N << "×" << K << "\n";
+    std::cout << "  MxNxK: " << M << "x" << N << "x" << K << "\n";
     std::cout << "  A: column-major, lda=" << lda << " (fp16)\n";
     std::cout << "  B: row-major, ldb=" << ldb << " (fp16)\n";
     std::cout << "  C/D: column-major, ldc=" << ldc << ", ldd=" << ldd << " (fp32)\n";
@@ -359,7 +360,7 @@ int main()
     std::cout << "Launching kernel:\n";
     std::cout << "  Grid: " << grid_size << " blocks\n";
     std::cout << "  Block: " << block_size << " threads (1 wave)\n";
-    std::cout << "  Output blocks: " << (M / 16) << "×" << (N / 16) << " = " << grid_size << "\n";
+    std::cout << "  Output blocks: " << (M / 16) << "x" << (N / 16) << " = " << grid_size << "\n";
     std::cout << "  MFMA instructions per block: " << K / 16 << "\n\n";
 
     stream_config stream;
@@ -461,7 +462,7 @@ int main()
     std::cout << "  GPU time: " << gpu_time_ms << " ms (" << gpu_tflops << " TFLOPS)\n";
     std::cout << "  Speedup: " << cpu_time_ms / gpu_time_ms << "x\n\n";
 
-#ifdef DEBUG_OUTPUT
+#if 1
     // Print sample outputs for debugging
     print_matrix(h_a, M, K, lda, true, "A (col-major)");
     print_matrix(h_b, K, N, ldb, false, "B (row-major)");
@@ -475,7 +476,7 @@ int main()
     std::cout << "• move_tile_window efficiently advances along K dimension\n";
     std::cout << "• Column-major A and row-major B require different distributions\n";
     std::cout << "• Each thread loads 4 elements (2x fp16 = 32 bits per load)\n";
-    std::cout << "• MFMA efficiently computes 16×16×16 in one instruction\n";
+    std::cout << "• MFMA efficiently computes 16x16x16 in one instruction\n";
     std::cout << "• This pattern extends to production GEMM kernels\n\n";
 
     return passed ? 0 : 1;
