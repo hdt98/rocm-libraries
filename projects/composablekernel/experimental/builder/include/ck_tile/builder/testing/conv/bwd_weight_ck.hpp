@@ -170,14 +170,6 @@ template <auto SIGNATURE>
         return result;
     };
 
-    const auto to_ck_extent = [&](const auto& extent) {
-        std::array<ck::index_t, spatial_dim> result;
-        copy(extent, result);
-        return result;
-    };
-
-    const auto param = args.to_ck_conv_param();
-
     const auto input_desc  = args.make_input_descriptor();
     const auto weight_desc = args.make_weight_descriptor();
     const auto output_desc = args.make_output_descriptor();
@@ -191,10 +183,10 @@ template <auto SIGNATURE>
                                      to_ck_lengths(weight_desc.get_strides()),
                                      to_ck_lengths(output_desc.get_lengths()),
                                      to_ck_lengths(output_desc.get_strides()),
-                                     to_ck_extent(param.conv_filter_strides_),
-                                     to_ck_extent(param.conv_filter_dilations_),
-                                     to_ck_extent(param.input_left_pads_),
-                                     to_ck_extent(param.input_right_pads_),
+                                     args.filter_strides.template to_array<ck::index_t>(),
+                                     args.filter_dilation.template to_array<ck::index_t>(),
+                                     args.input_left_pad.template to_array<ck::index_t>(),
+                                     args.input_right_pad.template to_array<ck::index_t>(),
                                      args.a_elementwise_op,
                                      args.b_elementwise_op,
                                      args.cde_elementwise_op,
