@@ -271,6 +271,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                                                              ComputeTypeA,
                                                              is_single_rate_mfma,
                                                              is_scale_mfma>{};
+<<<<<<< HEAD
     static constexpr index_t KPack  = math::max(lcm_AK1_BK1, mfma.selected_mfma.k_per_blk);
     static constexpr index_t KGroup = []() {
         // A memory instruction can only read 16 bytes at a time. If K1PerXdlops *
@@ -287,6 +288,14 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
     static constexpr index_t KRepeat       = KPerBlock / KLane / KPackPerGroup;
     static constexpr index_t NLane         = NPerXdl;
     static constexpr index_t NWave         = NPerBlock / NPerXdl / NXdlPerWave;
+=======
+    static constexpr index_t KPack = math::max(lcm_AK1_BK1, mfma.selected_mfma.k_per_blk);
+    static constexpr index_t KLane = mfma.GetKPerXdlops() / mfma.GetK1PerXdlops();
+
+    static constexpr index_t KRepeat = KPerBlock / KLane / KPack;
+    static constexpr index_t NLane   = NPerXdl;
+    static constexpr index_t NWave   = NPerBlock / NPerXdl / NXdlPerWave;
+>>>>>>> develop
 
     static constexpr index_t APackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<ADataType>, pk_i4_t>)
@@ -835,6 +844,7 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                  NPerXdl,
                  MXdlPerWave,
                  NXdlPerWave,
+<<<<<<< HEAD
                  KPack,
                  false,
                  TransposeC>())>;
@@ -872,6 +882,11 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
         }
         return true;
     }
+=======
+                 KPack>())>;
+
+    IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
+>>>>>>> develop
 
     // block_id to matrix tile idx (m0, n0) mapping are controlled by {M01, N01}
     __host__ static constexpr bool CheckValidity(const Argument& karg)
@@ -1255,7 +1270,11 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
+<<<<<<< HEAD
         Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
+=======
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+>>>>>>> develop
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,
@@ -1456,7 +1475,11 @@ struct GridwiseGemm_xdl_cshuffle_v3_b_preshuffle
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
+<<<<<<< HEAD
         Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
+=======
+        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+>>>>>>> develop
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,

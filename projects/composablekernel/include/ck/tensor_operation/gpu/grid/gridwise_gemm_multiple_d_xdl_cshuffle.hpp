@@ -4,7 +4,10 @@
 #pragma once
 
 #include "ck/utility/common_header.hpp"
+<<<<<<< HEAD
 #include "ck/utility/env.hpp"
+=======
+>>>>>>> develop
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
@@ -353,6 +356,7 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         return true;
     }
 
+<<<<<<< HEAD
     template <bool IsGfx11>
     static constexpr index_t GetEstimateVgprCount()
     {
@@ -401,6 +405,12 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
             return Base::GetSharedMemoryNumberOfByte(gfx125_t{});
         }
         else if(ck::get_device_name() == "gfx950")
+=======
+    __host__ static index_t GetSharedMemoryNumberOfByteOnHost()
+    {
+#if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
+        if(ck::get_device_name() == "gfx950")
+>>>>>>> develop
         {
             return Base::GetSharedMemoryNumberOfByte(gfx950_t{});
         }
@@ -415,7 +425,11 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         InMemoryDataOperationEnum CGlobalMemoryDataOperation_ = InMemoryDataOperationEnum::Set>
     __device__ static bool constexpr IsValidCompilationParameter()
     {
+<<<<<<< HEAD
 #if defined(__gfx11__) || defined(__gfx120__)
+=======
+#if defined(__gfx11__) || defined(__gfx12__)
+>>>>>>> develop
         if constexpr(is_same_v<AComputeDataType_, float>)
         {
 
@@ -423,6 +437,7 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         }
 #endif
 
+<<<<<<< HEAD
 #if defined(__gfx125__)
         if constexpr(sizeof(AComputeDataType) == 1)
         {
@@ -440,12 +455,15 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         }
 #endif
 
+=======
+>>>>>>> develop
         if constexpr(Base::GetSharedMemoryNumberOfByte(get_device_arch()) >
                      get_lds_size(get_device_arch()))
         {
             return false;
         }
 
+<<<<<<< HEAD
         constexpr bool IsGfx11            = is_same_v<decltype(get_device_arch()), gfx11_t>;
         constexpr auto EstimateVgprCount  = GetEstimateVgprCount<IsGfx11>();
         constexpr auto AvailableVgprCount = get_max_vgpr_count(get_device_arch());
@@ -454,6 +472,8 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
             return false;
         }
 
+=======
+>>>>>>> develop
         return ck::tensor_operation::device::IsValidGemmCompilationParameter<
             BlockSize,
             MPerBlock,
@@ -536,6 +556,7 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         {
             return false;
         }
+<<<<<<< HEAD
 
 #if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
         if(!is_xdl_wmma_k_supported<AComputeDataType, KPerBlock>())
@@ -543,10 +564,14 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
             return false;
         }
 
+=======
+#if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
+>>>>>>> develop
         if(GetSharedMemoryNumberOfByteOnHost() > get_lds_size())
         {
             return false;
         }
+<<<<<<< HEAD
         const auto availableVgprCount = []() {
             if(ck::is_gfx125_supported())
             {
@@ -580,6 +605,9 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         }
 #endif
 
+=======
+#endif
+>>>>>>> develop
         return true;
     }
 

@@ -885,6 +885,7 @@ struct GridwiseGemm_xdl_cshuffle_v3
                  NXdlPerWave,
                  KPack>())>;
 
+<<<<<<< HEAD
     template <bool IsGfx11>
     static constexpr index_t GetEstimateVgprCount()
     {
@@ -945,6 +946,9 @@ struct GridwiseGemm_xdl_cshuffle_v3
             CDataType,
             CGlobalMemoryDataOperation_>();
     }
+=======
+    IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
+>>>>>>> develop
 
     // block_id to matrix tile idx (m0, n0) mapping are controlled by {M01, N01}
     __host__ static constexpr bool CheckValidity(const Argument& karg)

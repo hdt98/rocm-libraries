@@ -219,7 +219,7 @@ struct UniversalGemmBasePolicy
                 constexpr auto K0PerThreadRead  = AK0 / KThreadRead;
 
                 // check if we exceed all LDS banks
-                constexpr auto LdsBanksWidth = get_n_lds_banks() * get_n_words_per_128b();
+                constexpr auto LdsBanksWidth = get_n_lds_banks() * get_n_dwords_per_128b();
                 constexpr auto kfold         = (AK1 * M0 * sizeof(ADataType) > LdsBanksWidth)
                                                    ? 1
                                                    : LdsBanksWidth / (AK1 * M0 * sizeof(ADataType));
@@ -305,10 +305,18 @@ struct UniversalGemmBasePolicy
             }
             else // A is in RowMajor
             {
+<<<<<<< HEAD
                 constexpr auto DataTypeSize = sizeof(ADataType);
                 constexpr index_t MLdsLayerRequired =
                     get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
                 constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
+=======
+                constexpr auto DataTypeSize    = sizeof(ADataType);
+                constexpr uint64_t MinLdsLayer = 1ULL;
+                constexpr auto MLdsLayer =
+                    max(MinLdsLayer,
+                        get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize);
+>>>>>>> develop
 
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
@@ -488,7 +496,7 @@ struct UniversalGemmBasePolicy
                 constexpr auto K0PerThreadRead  = BK0 / KThreadRead;
 
                 // check if we exceed all LDS banks
-                constexpr auto LdsBanksWidth = get_n_lds_banks() * get_n_words_per_128b();
+                constexpr auto LdsBanksWidth = get_n_lds_banks() * get_n_dwords_per_128b();
                 constexpr auto kfold         = (BK1 * N0 * sizeof(BDataType) > LdsBanksWidth)
                                                    ? 1
                                                    : LdsBanksWidth / (BK1 * N0 * sizeof(BDataType));
@@ -575,12 +583,22 @@ struct UniversalGemmBasePolicy
             }
             else // B is Column Major
             {
+<<<<<<< HEAD
                 constexpr index_t KPack     = GetSmemPackB<Problem>();
                 constexpr auto BK0          = number<KPerBlock / KPack>{};
                 constexpr auto DataTypeSize = sizeof(BDataType);
                 constexpr index_t NLdsLayerRequired =
                     get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
                 constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
+=======
+                constexpr index_t KPack        = GetSmemPackB<Problem>();
+                constexpr auto BK0             = number<KPerBlock / KPack>{};
+                constexpr auto DataTypeSize    = sizeof(BDataType);
+                constexpr uint64_t MinLdsLayer = 1ULL;
+                constexpr auto NLdsLayer =
+                    max(MinLdsLayer,
+                        get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize);
+>>>>>>> develop
 
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");

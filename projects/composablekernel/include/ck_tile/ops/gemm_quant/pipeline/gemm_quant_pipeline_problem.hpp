@@ -21,10 +21,11 @@ template <typename ADataType_,
           typename AQuantGroupSize_,
           typename BQuantGroupSize_,
           bool TransposeC_,
-          typename ComputeDataType_        = BDataType_,
+          typename ComputeDataType_        = void,
           GemmPipelineScheduler Scheduler_ = GemmPipelineScheduler::Intrawave,
           bool HasHotLoop_                 = true,
           TailNumber TailNum_              = TailNumber::Full>
+<<<<<<< HEAD
 struct GemmQuantPipelineProblemBase : public GemmPipelineProblemBase<ADataType_,
                                                                      BDataType_,
                                                                      CDataType_,
@@ -40,6 +41,25 @@ struct GemmQuantPipelineProblemBase : public GemmPipelineProblemBase<ADataType_,
                                          Traits_,
                                          ComputeDataType_,
                                          ComputeDataType_>;
+=======
+struct GemmQuantPipelineProblemBase
+    : public GemmPipelineProblemBase<
+          ADataType_,
+          BDataType_,
+          CDataType_,
+          BlockGemmShape_,
+          Traits_,
+          mixed_prec_compute_type_t<ComputeDataType_, ADataType_, BDataType_>>
+{
+
+    using Base = GemmPipelineProblemBase<
+        ADataType_,
+        BDataType_,
+        CDataType_,
+        BlockGemmShape_,
+        Traits_,
+        mixed_prec_compute_type_t<ComputeDataType_, ADataType_, BDataType_>>;
+>>>>>>> develop
 
     using Traits = typename Base::Traits;
 
@@ -122,7 +142,7 @@ template <typename ADataType_,
           typename CDataType_,
           typename BlockGemmShape_,
           typename Traits_,
-          typename QuantGroupSize_,
+          typename AQuantGroupSize_,
           bool TransposeC_,
           typename ComputeDataType_        = BDataType_,
           GemmPipelineScheduler Scheduler_ = GemmPipelineScheduler::Intrawave,
@@ -135,7 +155,7 @@ using GemmAQuantPipelineProblem = GemmQuantPipelineProblemBase<ADataType_,
                                                                CDataType_,
                                                                BlockGemmShape_,
                                                                Traits_,
-                                                               QuantGroupSize_,
+                                                               AQuantGroupSize_,
                                                                void,
                                                                TransposeC_,
                                                                ComputeDataType_,
@@ -149,7 +169,7 @@ template <typename ADataType_,
           typename CDataType_,
           typename BlockGemmShape_,
           typename Traits_,
-          typename QuantGroupSize_,
+          typename BQuantGroupSize_,
           typename ComputeDataType_        = ADataType_,
           GemmPipelineScheduler Scheduler_ = GemmPipelineScheduler::Intrawave,
           bool HasHotLoop_                 = true,
@@ -162,7 +182,7 @@ using GemmBQuantPipelineProblem = GemmQuantPipelineProblemBase<ADataType_,
                                                                BlockGemmShape_,
                                                                Traits_,
                                                                void,
-                                                               QuantGroupSize_,
+                                                               BQuantGroupSize_,
                                                                false, // no TransposeC
                                                                ComputeDataType_,
                                                                Scheduler_,

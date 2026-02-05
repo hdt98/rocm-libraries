@@ -27,6 +27,7 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
     template <typename PipelineProblem_, typename GemmPolicy_>
     struct GemmTraits_
     {
+<<<<<<< HEAD
         using Problem          = remove_cvref_t<PipelineProblem_>;
         using Policy           = remove_cvref_t<GemmPolicy_>;
         using ADataType        = remove_cvref_t<typename Problem::ADataType>;
@@ -40,6 +41,21 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
         using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
         using AQuantGroupSize  = remove_cvref_t<typename Problem::AQuantGroupSize>;
         using BQuantGroupSize  = remove_cvref_t<typename Problem::BQuantGroupSize>;
+=======
+        using Problem         = remove_cvref_t<PipelineProblem_>;
+        using Policy          = remove_cvref_t<GemmPolicy_>;
+        using ADataType       = remove_cvref_t<typename Problem::ADataType>;
+        using AQDataType      = remove_cvref_t<typename Problem::AQDataType>;
+        using BDataType       = remove_cvref_t<typename Problem::BDataType>;
+        using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
+        using BLayout         = remove_cvref_t<typename Problem::BLayout>;
+        using BQLayout        = remove_cvref_t<typename Problem::BQLayout>;
+        using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
+        using CDataType       = remove_cvref_t<typename Problem::CDataType>;
+        using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>;
+        using AQuantGroupSize = remove_cvref_t<typename Problem::AQuantGroupSize>;
+        using BQuantGroupSize = remove_cvref_t<typename Problem::BQuantGroupSize>;
+>>>>>>> develop
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;
@@ -76,7 +92,8 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
         static constexpr index_t NIterPerWarp = NPerBlock / (NWarp * WarpGemm::kN);
         static constexpr index_t KIterPerWarp = KPerBlock / WarpGemm::kK;
 
-        static constexpr bool PreshuffleQuant = Problem::Traits::PreshuffleQuant;
+        static constexpr bool APreshuffleQuant = Problem::Traits::APreshuffleQuant;
+        static constexpr bool BPreshuffleQuant = Problem::Traits::BPreshuffleQuant;
 
         static constexpr index_t QScalesPerBlockRow =
             integer_divide_ceil(KPerBlock, BQuantGroupSize::kK);
@@ -107,9 +124,11 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
         // 4. i4,  bf8, (fp8/fp32) -> f32
         static_assert(
             (std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, bf8_t> ||
-             std::is_same_v<ADataType, ck_tile::pk_int4_t>) &&
+             std::is_same_v<ADataType, ck_tile::pk_int4_t> ||
+             std::is_same_v<ADataType, ck_tile::pk_fp4_t>) &&
             (std::is_same_v<BDataType, fp8_t> || std::is_same_v<BDataType, bf8_t> ||
-             std::is_same_v<BDataType, ck_tile::pk_int4_t>) &&
+             std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
+             std::is_same_v<BDataType, ck_tile::pk_fp4_t>) &&
             (std::is_same_v<AQDataType, float> || std::is_same_v<AQDataType, ck_tile::fp8_t> ||
              std::is_same_v<AQDataType, ck_tile::bf8_t>) &&
             (std::is_same_v<BQDataType, float> || std::is_same_v<BQDataType, ck_tile::fp8_t> ||
@@ -136,9 +155,10 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
     using BComputeDataType = remove_cvref_t<typename Traits::BComputeDataType>;
     using CDataType        = remove_cvref_t<typename Traits::CDataType>;
 
-    // BDataType gets converted from PkInt4 during loading
-    using OverrideBDataType =
-        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ADataType, BDataType>;
+    // A/B DataType get converted from PkInt4/PkFp4 during loading
+    using OverrideADataType = ComputeDataType;
+    using OverrideBDataType = ComputeDataType;
+
     using Base     = BlockGemmQuantBase;
     using WarpGemm = remove_cvref_t<typename Traits::WarpGemm>;
 
@@ -159,7 +179,8 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
     using BWarpTensor = typename WarpGemm::BWarpTensor;
     using CWarpTensor = typename WarpGemm::CWarpTensor;
 
-    static constexpr bool PreshuffleQuant = Traits::PreshuffleQuant;
+    static constexpr bool APreshuffleQuant = Traits::APreshuffleQuant;
+    static constexpr bool BPreshuffleQuant = Traits::BPreshuffleQuant;
 
     static_assert(std::is_same_v<typename WarpGemm::CDataType, float>);
 
@@ -264,10 +285,17 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
                                           bool_constant<ALoadTranspose> = {},
                                           bool_constant<BLoadTranspose> = {})
         {
+<<<<<<< HEAD
             load_int4_tile<ADataType, AComputeDataType, UnaryOpSize_, ALoadTranspose>(
                 a_warp_tile_, a_block_window);
             // If B datatype were pkint4 it would be converted prior to storing in LDS
             load_int4_tile<OverrideBDataType, BComputeDataType, UnaryOpSize_, BLoadTranspose>(
+=======
+            // If A/B datatype were pkint4/pkfp4 it would be converted prior to storing in LDS
+            load_int4_tile<OverrideADataType, ComputeDataType, UnaryOpSize_, ALoadTranspose>(
+                a_warp_tile_, a_block_window);
+            load_int4_tile<OverrideBDataType, ComputeDataType, UnaryOpSize_, BLoadTranspose>(
+>>>>>>> develop
                 b_warp_tile_, b_block_window);
         }
 
@@ -357,11 +385,24 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
                         AQPickerCommon<AQBlockTensor, Traits, mIter, kQScale> aq_picker(
                             aq_block_tensor);
 
-                        if constexpr(PreshuffleQuant)
+                        if constexpr(BPreshuffleQuant)
                         {
-                            constexpr index_t reg_offset = nIter;
+                            constexpr index_t reg_offset = [&]() {
+                                if constexpr(GemmTraits::BQuantGroupSize::kN >
+                                                 (NWarp * WarpGemm::kN) &&
+                                             Traits::NPerBlock == GemmTraits::BQuantGroupSize::kN)
+                                {
+                                    return kQScale;
+                                }
+                                else
+                                {
+                                    return nIter;
+                                }
+                            }();
+
                             auto pull_from_lane =
                                 (__lane_id() & (WarpGemm::kN - 1)) * Traits::KQPerBlock + kQScale;
+
                             auto& scale_reg = bq_block_tensor.get_thread_buffer()[reg_offset];
                             // cross lane ops
                             uint32_t scale_reg_dword;

@@ -475,6 +475,7 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_v2r4r2
         return gemm_padder.PadCDescriptor_M_N(c_grid_desc_m_n);
     }
 
+<<<<<<< HEAD
     template <
         InMemoryDataOperationEnum CGlobalMemoryDataOperation_ = InMemoryDataOperationEnum::Set>
     __device__ static bool constexpr IsValidCompilationParameter()
@@ -505,6 +506,13 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_v2r4r2
     }
 
     __host__ static bool CheckValidity(const Argument& karg)
+=======
+    static constexpr auto MXdlPerWave = MRepeat;
+    static constexpr auto NXdlPerWave = NRepeat;
+    IS_VALID_COMPILATION_PARAMETER_IMPL(FloatC)
+
+    __host__ __device__ static constexpr bool CheckValidity(const Argument& karg)
+>>>>>>> develop
     {
         if(!is_xdl_wmma_k_supported<ComputeTypeA, K1Value * K0PerBlock, K1Value>())
         {
