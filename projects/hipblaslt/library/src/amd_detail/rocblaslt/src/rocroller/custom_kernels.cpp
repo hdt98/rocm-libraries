@@ -41,15 +41,15 @@ std::string getCoPath(const std::string& filename)
 void preloadCustomKernels(SolutionCache& cache)
 {
     KernelType mxfp4Kernel;
-    mxfp4Kernel.typeA                     = rocRoller::DataType::FP4;
-    mxfp4Kernel.typeB                     = rocRoller::DataType::FP4;
-    mxfp4Kernel.typeC                     = rocRoller::DataType::BFloat16;
-    mxfp4Kernel.typeD                     = rocRoller::DataType::BFloat16;
-    mxfp4Kernel.transA                    = true;
-    mxfp4Kernel.transB                    = false;
-    mxfp4Kernel.scaleTypeA.mode           = rocRoller::Operations::ScaleMode::Separate;
-    mxfp4Kernel.scaleTypeA.blockRowSize   = 32;
-    mxfp4Kernel.scaleTypeA.blockColSize   = 1;
+    mxfp4Kernel.typeA                   = rocRoller::DataType::FP4;
+    mxfp4Kernel.typeB                   = rocRoller::DataType::FP4;
+    mxfp4Kernel.typeC                   = rocRoller::DataType::BFloat16;
+    mxfp4Kernel.typeD                   = rocRoller::DataType::BFloat16;
+    mxfp4Kernel.transA                  = true;
+    mxfp4Kernel.transB                  = false;
+    mxfp4Kernel.scaleTypeA.mode         = rocRoller::Operations::ScaleMode::Separate;
+    mxfp4Kernel.scaleTypeA.blockRowSize = 32;
+    mxfp4Kernel.scaleTypeA.blockColSize = 1;
     // Note: AITER kernel uses its own scale swizzle pattern.
     // Use --scaleA 1002 --scaleB 1002 to enable AITER scale swizzle in the data generator
     // instead of the rocRoller preSwizzle pattern defined here.
@@ -73,13 +73,13 @@ void preloadCustomKernels(SolutionCache& cache)
                 params.streamK          = streamK;
                 params.tailLoops        = tailLoops;
 
-                cache.addKernel(
-                    mxfp4Kernel,
-                    params,
-                    createCustomGemmKernel("_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
-                                           mxfp4Kernel,
-                                           params.workgroupTile,
-                                           getCoPath("f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co")));
+                cache.addKernel(mxfp4Kernel,
+                                params,
+                                createCustomGemmKernel(
+                                    "_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
+                                    mxfp4Kernel,
+                                    params.workgroupTile,
+                                    getCoPath("f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co")));
             }
         }
     }
@@ -153,23 +153,23 @@ struct __attribute__((packed)) F4GemmKernelArgs
     F4GemmKernelArgs(const RocblasltContractionProblem& prob)
         : ptr_D(prob.D)
         , ptr_C(nullptr)
-        , ptr_A(const_cast<void*>(prob.B))      // Swapped: kernel's A = hipBLASLt's B
-        , ptr_B(const_cast<void*>(prob.A))      // Swapped: kernel's B = hipBLASLt's A
+        , ptr_A(const_cast<void*>(prob.B)) // Swapped: kernel's A = hipBLASLt's B
+        , ptr_B(const_cast<void*>(prob.A)) // Swapped: kernel's B = hipBLASLt's A
         , alpha(*static_cast<const float*>(prob.alpha))
         , beta(*static_cast<const float*>(prob.beta))
         , stride_D0(0)
         , stride_D1(0)
         , stride_C0(static_cast<uint32_t>(prob.col_stride_c))
         , stride_C1(0)
-        , stride_A0(static_cast<uint32_t>(prob.col_stride_b))  // Swapped
+        , stride_A0(static_cast<uint32_t>(prob.col_stride_b)) // Swapped
         , stride_A1(0)
-        , stride_B0(static_cast<uint32_t>(prob.col_stride_a))  // Swapped
+        , stride_B0(static_cast<uint32_t>(prob.col_stride_a)) // Swapped
         , stride_B1(0)
-        , M(static_cast<uint32_t>(prob.n))      // Swapped: kernel's M = hipBLASLt's N
-        , N(static_cast<uint32_t>(prob.m))      // Swapped: kernel's N = hipBLASLt's M
+        , M(static_cast<uint32_t>(prob.n)) // Swapped: kernel's M = hipBLASLt's N
+        , N(static_cast<uint32_t>(prob.m)) // Swapped: kernel's N = hipBLASLt's M
         , K(static_cast<uint32_t>(prob.k))
-        , ptr_ScaleA(prob.scaleB)               // Swapped
-        , ptr_ScaleB(prob.scaleA)               // Swapped
+        , ptr_ScaleA(prob.scaleB) // Swapped
+        , ptr_ScaleB(prob.scaleA) // Swapped
         , stride_ScaleA0(static_cast<uint32_t>(prob.k / 32))
         , stride_ScaleA1(0)
         , stride_ScaleB0(static_cast<uint32_t>(prob.k / 32))
@@ -192,17 +192,17 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
 
     // The AITER kernel processes tiles of size 256x256
     // Note: args.M and args.N are already swapped in the constructor
-    const uint32_t tileM = 256;
-    const uint32_t tileN = 256;
-    const uint32_t blockSize = 256;  // Threads per workgroup
-    
+    const uint32_t tileM     = 256;
+    const uint32_t tileN     = 256;
+    const uint32_t blockSize = 256; // Threads per workgroup
+
     // Number of tiles in each dimension
     uint32_t tilesM = (args.M + tileM - 1) / tileM;
     uint32_t tilesN = (args.N + tileN - 1) / tileN;
-    
+
     dim3 grid;
-    grid.x = tilesN * blockSize;  // Total threads in X
-    grid.y = tilesM;              // Workgroups in Y
+    grid.x = tilesN * blockSize; // Total threads in X
+    grid.y = tilesM; // Workgroups in Y
     grid.z = 1;
 
     dim3 block{blockSize, 1, 1};
