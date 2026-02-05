@@ -3120,11 +3120,13 @@ class Solution(collections.abc.Mapping):
       # TODO:
       # Disable StoreSwapAddr to ensure LdsOffsetA_Blk is always a power of 2
       # This is consistent with referenc implementation which doesn't have StoreSwapAddr
-      state["StoreSwapAddr"] = False
+      if state["ProblemType"]["MXBlockA"]:
+        state["StoreSwapAddr"] = False
+      else:
       # Original logic (disabled):
-      # state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
-      #   (state["1LDSBuffer"] == 0) and \
-      #   (offsetBlk + int(2**(math.ceil(math.log(offsetBlk, 2)))) > state["MaxLDS"])
+        state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
+          (state["1LDSBuffer"] == 0) and \
+          (offsetBlk + int(2**(math.ceil(math.log(offsetBlk, 2)))) > state["MaxLDS"])
 
       if offsetBlk > 0 and not state["StoreSwapAddr"]:
         # Rounds offsetBlk to a power of two to enable inlining {s,v}_xor constants for swapping offsets
