@@ -1,0 +1,447 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
+#include "test_bf16_common.hpp"
+#include <cmath>
+#include <iostream>
+
+using namespace ck_tile;
+using namespace ck_tile_test;
+
+class Bf16ConversionTest : public Bf16TestBase
+{
+};
+
+// Test float to bf16 conversion with default rounding mode
+TEST_F(Bf16ConversionTest, FloatToBf16Basic)
+{
+    // Test exact representable values
+    {
+        float f  = 1.0f;
+        bf16_t b = float_to_bf16(f);
+        EXPECT_EQ(bf16_to_bits(b), 0x3F80);
+        EXPECT_EQ(static_cast<float>(b), 1.0f);
+    }
+
+    {
+        float f  = -1.0f;
+        bf16_t b = float_to_bf16(f);
+        EXPECT_EQ(bf16_to_bits(b), 0xBF80);
+        EXPECT_EQ(static_cast<float>(b), -1.0f);
+    }
+
+    {
+        float f  = 2.0f;
+        bf16_t b = float_to_bf16(f);
+        EXPECT_EQ(bf16_to_bits(b), 0x4000);
+        EXPECT_EQ(static_cast<float>(b), 2.0f);
+    }
+
+    {
+        float f  = 0.5f;
+        bf16_t b = float_to_bf16(f);
+        EXPECT_EQ(bf16_to_bits(b), 0x3F00);
+        EXPECT_EQ(static_cast<float>(b), 0.5f);
+    }
+}
+
+// Test special values
+TEST_F(Bf16ConversionTest, FloatToBf16SpecialValues)
+{
+    // Zero
+    {
+        bf16_t b = float_to_bf16(0.0f);
+        EXPECT_EQ(bf16_to_bits(b), 0x0000);
+        EXPECT_EQ(static_cast<float>(b), 0.0f);
+    }
+
+    // Negative zero
+    {
+        bf16_t b = float_to_bf16(-0.0f);
+        EXPECT_EQ(bf16_to_bits(b), 0x8000);
+        EXPECT_EQ(static_cast<float>(b), -0.0f);
+    }
+
+    // Infinity
+    {
+        bf16_t b = float_to_bf16(std::numeric_limits<float>::infinity());
+        EXPECT_EQ(bf16_to_bits(b), 0x7F80);
+        EXPECT_TRUE(std::isinf(static_cast<float>(b)));
+        EXPECT_TRUE(static_cast<float>(b) > 0);
+    }
+
+    // Negative infinity
+    {
+        bf16_t b = float_to_bf16(-std::numeric_limits<float>::infinity());
+        EXPECT_EQ(bf16_to_bits(b), 0xFF80);
+        EXPECT_TRUE(std::isinf(static_cast<float>(b)));
+        EXPECT_TRUE(static_cast<float>(b) < 0);
+    }
+
+    // NaN
+    {
+        bf16_t b = float_to_bf16(std::numeric_limits<float>::quiet_NaN());
+        EXPECT_TRUE(isnan(b));
+        EXPECT_TRUE((bf16_to_bits(b) & 0x7F80) == 0x7F80); // Exponent all 1s
+        EXPECT_TRUE((bf16_to_bits(b) & 0x007F) != 0);      // Mantissa not zero
+    }
+}
+
+// Test rounding behavior
+TEST_F(Bf16ConversionTest, FloatToBf16Rounding)
+{
+    // Test round-to-nearest-even (default mode)
+    {
+        // Value exactly between two bf16 values, rounds to even
+        float f      = 1.001953125f; // Exactly halfway between two bf16 values
+        bf16_t b     = float_to_bf16(f);
+        float result = static_cast<float>(b);
+        // Should round to nearest even
+        EXPECT_TRUE(result == 1.0f || result == 1.0078125f);
+    }
+
+    // Test values that require rounding
+    {
+        float f      = 1.0009765625f; // Not exactly representable in bf16
+        bf16_t b     = float_to_bf16(f);
+        float result = static_cast<float>(b);
+        EXPECT_NEAR(result, f, 0.001f);
+    }
+}
+
+// Test different rounding modes
+TEST_F(Bf16ConversionTest, FloatToBf16RoundingModes)
+{
+    // Standard rounding (round-to-nearest)
+    {
+        bf16_t b = float_to_bf16(1.001953125f, constant<bf16_rounding_mode::standard>{});
+        // Check it produces a valid result
+        float result = static_cast<float>(b);
+        EXPECT_NEAR(result, 1.001953125f, 0.01f);
+    }
+
+    // Truncation mode
+    {
+        bf16_t b     = float_to_bf16(1.001953125f, constant<bf16_rounding_mode::truncate>{});
+        float result = static_cast<float>(b);
+        EXPECT_LE(result, 1.001953125f); // Truncation should not increase value
+    }
+
+    // Truncation with NaN preservation
+    {
+        bf16_t b = float_to_bf16(std::numeric_limits<float>::quiet_NaN(),
+                                 constant<bf16_rounding_mode::truncate_with_nan>{});
+        EXPECT_TRUE(isnan(b));
+    }
+}
+
+// Test double to bf16 conversion
+TEST_F(Bf16ConversionTest, DoubleToBf16)
+{
+    {
+        double d = 1.0;
+        bf16_t b = double_to_bf16(d);
+        EXPECT_EQ(bf16_to_bits(b), 0x3F80);
+        EXPECT_EQ(static_cast<float>(b), 1.0f);
+    }
+
+    {
+        double d     = -3.141592653589793;
+        bf16_t b     = double_to_bf16(d);
+        float result = static_cast<float>(b);
+        EXPECT_NEAR(result, -3.141592653589793, 0.01);
+    }
+
+    // Large double value
+    {
+        double d = 1e100; // Much larger than bf16 can represent
+        bf16_t b = double_to_bf16(d);
+        EXPECT_TRUE(std::isinf(static_cast<float>(b)));
+    }
+}
+
+// Test integer to bf16 conversion
+TEST_F(Bf16ConversionTest, IntToBf16)
+{
+#if CK_TILE_USE_CUSTOM_DATA_TYPE
+    {
+        int i = 42;
+        bf16_t b(i);
+        EXPECT_EQ(static_cast<float>(b), 42.0f);
+    }
+
+    {
+        int i = -100;
+        bf16_t b(i);
+        EXPECT_EQ(static_cast<float>(b), -100.0f);
+    }
+
+    {
+        int i = 0;
+        bf16_t b(i);
+        EXPECT_EQ(static_cast<float>(b), 0.0f);
+    }
+
+    // Large int that requires rounding in bf16
+    {
+        int i = 16777217; // 2^24 + 1, not exactly representable in float
+        bf16_t b(i);
+        float result = static_cast<float>(b);
+        EXPECT_NEAR(result, static_cast<float>(i), 256.0f);
+    }
+#endif
+}
+
+// Test bf16 to float conversion
+TEST_F(Bf16ConversionTest, Bf16ToFloat)
+{
+    // Test all special bf16 values
+    auto special_values = generate_special_bf16_values();
+    for(const auto& bf16_val : special_values)
+    {
+        uint16_t bits = bf16_to_bits(bf16_val);
+        float f       = bf16_to_float(bf16_val);
+
+        if(isnan(bf16_val))
+        {
+            // Debug: Check bit pattern and float value
+            uint32_t f_bits = bit_cast<uint32_t>(f);
+            EXPECT_TRUE(std::isnan(f))
+                << "bf16 NaN (bits=0x" << std::hex << bits << std::dec
+                << ") should convert to float NaN, but got float with bits=0x" << std::hex << f_bits
+                << std::dec << " value=" << f;
+        }
+        else if(bits == 0x7F80)
+        {
+            EXPECT_TRUE(std::isinf(f) && f > 0) << "bf16 +inf should convert to float +inf";
+        }
+        else if(bits == 0xFF80)
+        {
+            EXPECT_TRUE(std::isinf(f) && f < 0) << "bf16 -inf should convert to float -inf";
+        }
+        else
+        {
+            // For normal values, conversion should be exact
+            bf16_t b_back = float_to_bf16(f);
+            EXPECT_EQ(bf16_to_bits(bf16_val), bf16_to_bits(b_back))
+                << "Round-trip conversion should preserve bf16 value";
+        }
+    }
+}
+
+// Test bf16 to double conversion
+TEST_F(Bf16ConversionTest, Bf16ToDouble)
+{
+    {
+        bf16_t b = float_to_bf16(1.0f);
+        double d = bf16_to_double(b);
+        EXPECT_EQ(d, 1.0);
+    }
+
+    {
+        bf16_t b = numeric<bf16_t>::infinity();
+        double d = bf16_to_double(b);
+        EXPECT_TRUE(std::isinf(d) && d > 0);
+    }
+
+    {
+        bf16_t b = numeric<bf16_t>::quiet_NaN();
+        double d = bf16_to_double(b);
+        EXPECT_TRUE(std::isnan(d));
+    }
+}
+
+// Test bf16 to int conversion
+TEST_F(Bf16ConversionTest, Bf16ToInt)
+{
+#if CK_TILE_USE_CUSTOM_DATA_TYPE
+    {
+        bf16_t b = float_to_bf16(42.0f);
+        int i    = static_cast<int>(b);
+        EXPECT_EQ(i, 42);
+    }
+
+    {
+        bf16_t b = float_to_bf16(-100.0f);
+        int i    = static_cast<int>(b);
+        EXPECT_EQ(i, -100);
+    }
+
+    {
+        bf16_t b = float_to_bf16(0.0f);
+        int i    = static_cast<int>(b);
+        EXPECT_EQ(i, 0);
+    }
+
+    // Test rounding behavior
+    {
+        bf16_t b = float_to_bf16(42.7f);
+        int i    = static_cast<int>(b);
+        EXPECT_EQ(i, 42); // Should truncate
+    }
+
+    {
+        bf16_t b = float_to_bf16(-42.7f);
+        int i    = static_cast<int>(b);
+        EXPECT_EQ(i, -42); // Should truncate towards zero
+    }
+#endif
+}
+
+// // Test fp16 to bf16 conversion
+TEST_F(Bf16ConversionTest, Fp16ToBf16)
+{
+    {
+        fp16_t h = static_cast<fp16_t>(1.0f);
+        bf16_t b = fp16_to_bf16(h);
+        EXPECT_EQ(static_cast<float>(b), 1.0f);
+    }
+
+    {
+        fp16_t h = static_cast<fp16_t>(-0.5f);
+        bf16_t b = fp16_to_bf16(h);
+        EXPECT_EQ(static_cast<float>(b), -0.5f);
+    }
+
+    // fp16 infinity
+    {
+        fp16_t h = numeric<fp16_t>::infinity();
+        bf16_t b = fp16_to_bf16(h);
+        EXPECT_TRUE(std::isinf(static_cast<float>(b)));
+    }
+
+    // fp16 NaN
+    {
+        fp16_t h = numeric<fp16_t>::quiet_NaN();
+        bf16_t b = fp16_to_bf16(h);
+        EXPECT_TRUE(isnan(b));
+    }
+}
+
+// // Test bf16 to fp16 conversion
+TEST_F(Bf16ConversionTest, Bf16ToFp16)
+{
+    {
+        bf16_t b = float_to_bf16(1.0f);
+        fp16_t h = bf16_to_fp16(b);
+        EXPECT_EQ(static_cast<float>(h), 1.0f);
+    }
+
+    // Test value that's representable in bf16 but may lose precision in fp16
+    {
+        bf16_t b = float_to_bf16(131072.0f); // 2^17
+        fp16_t h = bf16_to_fp16(b);
+        // fp16 max is 65504, so this should overflow to infinity
+        EXPECT_TRUE(std::isinf(static_cast<float>(h)));
+    }
+}
+
+// // Test round-trip conversions
+TEST_F(Bf16ConversionTest, RoundTripConversions)
+{
+    // Generate test values
+    auto test_floats = generate_test_floats();
+
+    for(float f : test_floats)
+    {
+        // Skip if the float is too large for bf16
+        if(std::abs(f) > 3.38953139e38f && !std::isinf(f) && !std::isnan(f))
+        {
+            continue;
+        }
+
+        // float -> bf16 -> float
+        bf16_t b     = float_to_bf16(f);
+        float f_back = static_cast<float>(b);
+
+        if(std::isnan(f))
+        {
+            EXPECT_TRUE(std::isnan(f_back)) << "NaN should be preserved";
+        }
+        else if(std::isinf(f))
+        {
+            EXPECT_TRUE(std::isinf(f_back)) << "Infinity should be preserved";
+            EXPECT_EQ(std::signbit(f), std::signbit(f_back)) << "Sign should be preserved";
+        }
+        else
+        {
+            // For normal values, check if round-trip preserves the bf16 value
+            bf16_t b_back = float_to_bf16(f_back);
+            EXPECT_EQ(bf16_to_bits(b), bf16_to_bits(b_back))
+                << "Round-trip should preserve bf16 representation for " << f;
+        }
+    }
+}
+
+// // Test denormal handling
+TEST_F(Bf16ConversionTest, DenormalHandling)
+{
+    // bf16 doesn't have denormal values, so small values should flush to zero
+    {
+        float f  = std::numeric_limits<float>::denorm_min();
+        bf16_t b = float_to_bf16(f);
+        EXPECT_EQ(bf16_to_bits(b), 0x0000) << "Float denormal should flush to zero in bf16";
+    }
+
+    {
+        float f  = -std::numeric_limits<float>::denorm_min();
+        bf16_t b = float_to_bf16(f);
+        EXPECT_EQ(bf16_to_bits(b), 0x8000)
+            << "Negative float denormal should flush to negative zero in bf16";
+    }
+
+    // Test smallest normal bf16 value
+    {
+        bf16_t b = numeric<bf16_t>::min();
+        float f  = static_cast<float>(b);
+        EXPECT_GT(f, 0.0f);
+        EXPECT_TRUE(std::isnormal(f)) << "bf16 min should convert to normal float";
+    }
+}
+
+// Test overflow handling
+TEST_F(Bf16ConversionTest, OverflowHandling)
+{
+    // Note: BF16 has the same 8-bit exponent as float32, so they have the same range.
+    // Float max does NOT overflow to bf16 infinity - it rounds to bf16 max.
+    // Only values larger than bf16 max (which would require more than 8 exponent bits) overflow.
+
+    // Test float max -> bf16 max (not infinity, since same exponent range)
+    {
+        float f      = std::numeric_limits<float>::max();
+        bf16_t b     = float_to_bf16(f);
+        float result = bf16_to_float(b);
+        // Should be bf16 max (0x7F7F), not infinity
+        // bf16 max is approximately 3.39e38
+        EXPECT_FALSE(std::isinf(result))
+            << "Float max should NOT overflow to bf16 infinity (same exponent range)";
+        EXPECT_GT(result, 3.0e38f) << "Float max should convert to a very large bf16 value";
+    }
+
+    {
+        float f      = -std::numeric_limits<float>::max();
+        bf16_t b     = float_to_bf16(f);
+        float result = bf16_to_float(b);
+        EXPECT_FALSE(std::isinf(result))
+            << "Negative float max should NOT overflow to bf16 -infinity";
+        EXPECT_LT(result, -3.0e38f)
+            << "Negative float max should convert to a very large negative bf16 value";
+    }
+
+    // Test infinity passthrough
+    {
+        float f      = std::numeric_limits<float>::infinity();
+        bf16_t b     = float_to_bf16(f);
+        float result = bf16_to_float(b);
+        EXPECT_TRUE(std::isinf(result) && result > 0)
+            << "Float +infinity should convert to bf16 +infinity";
+    }
+
+    {
+        float f      = -std::numeric_limits<float>::infinity();
+        bf16_t b     = float_to_bf16(f);
+        float result = bf16_to_float(b);
+        EXPECT_TRUE(std::isinf(result) && result < 0)
+            << "Float -infinity should convert to bf16 -infinity";
+    }
+}
