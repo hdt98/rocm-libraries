@@ -169,7 +169,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
     using T_real = get_real_type_t<T>;
 
     // Helper to construct std::complex types from two real components
-    auto make_std_complex = [](T_real r, T_real i) -> T {
+    auto make_std_complex = [] __device__ __host__ (T_real r, T_real i) -> T {
         if constexpr(std::is_same_v<T, std::complex<float>>)
             return std::complex<float>(r, i);
         else if constexpr(std::is_same_v<T, std::complex<double>>)
