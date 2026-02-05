@@ -65,7 +65,7 @@ namespace rocRoller::KernelGraph
                             normalizedAddresses.push_back(addr - minAddress);
                         }
 
-                        m_context->m_modelledAddresses[node] = std::move(normalizedAddresses);
+                        graph.modelledAddresses[node] = std::move(normalizedAddresses);
                     }
                 },
                 [&](auto op) {}};

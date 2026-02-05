@@ -761,9 +761,9 @@ namespace rocRoller
                         tag, load, m_graph->buildTransformer(tag)))
                 {
                     if(GPUInstructionInfo::isLDS(instr.getOpCode())
-                       && m_context->m_modelledAddresses.contains(tag))
+                       && m_graph->modelledAddresses.contains(tag))
                     {
-                        const auto addresses = m_context->m_modelledAddresses.at(tag);
+                        const auto addresses = m_graph->modelledAddresses.at(tag);
                         instr.setModelledAddresses(addresses);
                         instr.addComment(fmt::format("addresses {}", addresses));
                     }
