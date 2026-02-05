@@ -41,7 +41,7 @@ struct DescriptorVsAdaptorKernel
             constexpr index_t M  = 128;
             constexpr index_t K  = 64;
             constexpr index_t M0 = 4;
-            constexpr index_t M1 = 32;
+            constexpr index_t M1 = M / M0; // M1 = 32
 
             printf("Input: [M=%ld, K=%ld]\n", static_cast<long>(M), static_cast<long>(K));
             printf("Output: [M0=%ld, M1=%ld, K=%ld]\n",
@@ -59,7 +59,7 @@ struct DescriptorVsAdaptorKernel
             printf("\nAdaptor properties:\n");
             printf("  - Stores: Transformation logic only\n");
             printf("  - Does NOT store: Memory size, vectorization info\n");
-            printf("  - Can do: Map coordinates [M0, M1, K] -> [M, K]\n");
+            printf("  - Can do: Map coordinates [M0, M1, K] -> [M, K]     !!!!!!!!!\n");
             printf("  - Cannot do: Calculate memory offsets\n\n");
 
             // Test coordinate mapping
@@ -163,7 +163,7 @@ struct DescriptorVsAdaptorKernel
             constexpr index_t M  = 256;
             constexpr index_t K  = 128;
             constexpr index_t M0 = 4;
-            constexpr index_t M1 = 64;
+            constexpr index_t M1 = M / M0; // M1 = 64
 
             printf("Step 1: Create initial descriptor\n");
             auto desc_initial =
@@ -278,7 +278,7 @@ struct DescriptorVsAdaptorKernel
             constexpr index_t M  = 128;
             constexpr index_t K  = 64;
             constexpr index_t M0 = 4;
-            constexpr index_t M1 = 32;
+            constexpr index_t M1 = M / M0; // M1 = 32;
 
             // Create tiled descriptor
             auto desc = make_naive_tensor_descriptor_packed(make_tuple(number<M>{}, number<K>{}));
@@ -333,7 +333,8 @@ struct DescriptorVsAdaptorKernel
         printf("  ✓ Need to know total memory footprint\n");
         printf("  ✓ Require vectorization guarantees\n");
         printf("  ✓ Creating tensor_view for data access\n");
-        printf("  ✓ Working with physical memory buffers\n\n");
+        printf("  ✓ Working with physical memory buffers\n");
+        printf("  X No OOB checks\n\n");
 
         printf("Relationship:\n");
         printf("  tensor_descriptor IS-A tensor_adaptor (inheritance)\n");
