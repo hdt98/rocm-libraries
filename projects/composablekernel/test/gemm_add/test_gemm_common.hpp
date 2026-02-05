@@ -93,7 +93,7 @@ class TestGemmD0Common : public ::testing::Test
 
             all_success =
                 all_success &
-                GetImpl()(1, 1, false, true, M, N, K, StrideA, StrideB, StrideD0, StrideE);
+                GetImpl()(1, 1, false, false, M, N, K, StrideA, StrideB, StrideD0, StrideE);
         }
 
         EXPECT_TRUE(all_success);
@@ -138,7 +138,7 @@ class TestGemmD0D1Common : public ::testing::Test
             all_success =
                 all_success &
                 GetImpl()(
-                    1, 1, false, true, M, N, K, StrideA, StrideB, StrideD0, StrideD1, StrideE);
+                    1, 1, false, false, M, N, K, StrideA, StrideB, StrideD0, StrideD1, StrideE);
         }
 
         EXPECT_TRUE(all_success);
