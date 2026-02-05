@@ -162,8 +162,13 @@
 #else
 #define CK_USE_AMD_V_DOT_INLINE_ASM 0
 #endif
+
+#ifdef __gfx12__
+#define CK_USE_AMD_V_DOT_DPP8_INLINE_ASM 0
+#else
 // inner product using V_DOT with DPP8 modifiers
 #define CK_USE_AMD_V_DOT_DPP8_INLINE_ASM 1
+#endif
 
 // LDS direct loads using inline assembly
 #if defined(__gfx125__)
