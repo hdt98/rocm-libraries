@@ -7018,8 +7018,14 @@ catch(...)
 }
 
 /******************** GETRF_BATCHED ********************/
-hipsolverStatus_t hipsolverSgetrfBatched_bufferSize(
-    hipsolverHandle_t handle, int m, int n, float* A[], int lda, int* lwork, int batch_count)
+hipsolverStatus_t hipsolverSgetrfBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    float*            A[],
+                                                    int               lda,
+                                                    int               strideP,
+                                                    int*              lwork,
+                                                    int               batch_count)
 try
 {
     if(!handle)
@@ -7032,7 +7038,7 @@ try
 
     rocblas_start_device_memory_size_query((rocblas_handle)handle);
     hipsolverStatus_t status = hipsolver::rocblas2hip_status(rocsolver_sgetrf_batched(
-        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, std::min(m, n), nullptr, batch_count));
+        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, strideP, nullptr, batch_count));
     rocsolver_sgetrf_npvt_batched((rocblas_handle)handle, m, n, nullptr, lda, nullptr, batch_count);
     rocblas_stop_device_memory_size_query((rocblas_handle)handle, &sz);
 
@@ -7049,8 +7055,14 @@ catch(...)
     return hipsolver::exception2hip_status();
 }
 
-hipsolverStatus_t hipsolverDgetrfBatched_bufferSize(
-    hipsolverHandle_t handle, int m, int n, double* A[], int lda, int* lwork, int batch_count)
+hipsolverStatus_t hipsolverDgetrfBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    double*           A[],
+                                                    int               lda,
+                                                    int               strideP,
+                                                    int*              lwork,
+                                                    int               batch_count)
 try
 {
     if(!handle)
@@ -7063,7 +7075,7 @@ try
 
     rocblas_start_device_memory_size_query((rocblas_handle)handle);
     hipsolverStatus_t status = hipsolver::rocblas2hip_status(rocsolver_dgetrf_batched(
-        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, std::min(m, n), nullptr, batch_count));
+        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, strideP, nullptr, batch_count));
     rocsolver_dgetrf_npvt_batched((rocblas_handle)handle, m, n, nullptr, lda, nullptr, batch_count);
     rocblas_stop_device_memory_size_query((rocblas_handle)handle, &sz);
 
@@ -7085,6 +7097,7 @@ hipsolverStatus_t hipsolverCgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               n,
                                                     hipFloatComplex*  A[],
                                                     int               lda,
+                                                    int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
 try
@@ -7099,7 +7112,7 @@ try
 
     rocblas_start_device_memory_size_query((rocblas_handle)handle);
     hipsolverStatus_t status = hipsolver::rocblas2hip_status(rocsolver_cgetrf_batched(
-        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, std::min(m, n), nullptr, batch_count));
+        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, strideP, nullptr, batch_count));
     rocsolver_cgetrf_npvt_batched((rocblas_handle)handle, m, n, nullptr, lda, nullptr, batch_count);
     rocblas_stop_device_memory_size_query((rocblas_handle)handle, &sz);
 
@@ -7121,6 +7134,7 @@ hipsolverStatus_t hipsolverZgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               n,
                                                     hipDoubleComplex* A[],
                                                     int               lda,
+                                                    int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
 try
@@ -7135,7 +7149,7 @@ try
 
     rocblas_start_device_memory_size_query((rocblas_handle)handle);
     hipsolverStatus_t status = hipsolver::rocblas2hip_status(rocsolver_zgetrf_batched(
-        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, std::min(m, n), nullptr, batch_count));
+        (rocblas_handle)handle, m, n, nullptr, lda, nullptr, strideP, nullptr, batch_count));
     rocsolver_zgetrf_npvt_batched((rocblas_handle)handle, m, n, nullptr, lda, nullptr, batch_count);
     rocblas_stop_device_memory_size_query((rocblas_handle)handle, &sz);
 
@@ -7160,6 +7174,7 @@ hipsolverStatus_t hipsolverSgetrfBatched(hipsolverHandle_t handle,
                                          float*            work,
                                          int               lwork,
                                          int*              devIpiv,
+                                         int               strideP,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -7169,13 +7184,13 @@ try
     else
     {
         CHECK_HIPSOLVER_ERROR(hipsolverSgetrfBatched_bufferSize(
-            (rocblas_handle)handle, m, n, A, lda, &lwork, batch_count));
+            (rocblas_handle)handle, m, n, A, lda, strideP, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
     if(devIpiv != nullptr)
         return hipsolver::rocblas2hip_status(rocsolver_sgetrf_batched(
-            (rocblas_handle)handle, m, n, A, lda, devIpiv, std::min(m, n), devInfo, batch_count));
+            (rocblas_handle)handle, m, n, A, lda, devIpiv, strideP, devInfo, batch_count));
     else
         return hipsolver::rocblas2hip_status(rocsolver_sgetrf_npvt_batched(
             (rocblas_handle)handle, m, n, A, lda, devInfo, batch_count));
@@ -7193,6 +7208,7 @@ hipsolverStatus_t hipsolverDgetrfBatched(hipsolverHandle_t handle,
                                          double*           work,
                                          int               lwork,
                                          int*              devIpiv,
+                                         int               strideP,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -7202,13 +7218,13 @@ try
     else
     {
         CHECK_HIPSOLVER_ERROR(hipsolverDgetrfBatched_bufferSize(
-            (rocblas_handle)handle, m, n, A, lda, &lwork, batch_count));
+            (rocblas_handle)handle, m, n, A, lda, strideP, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
     if(devIpiv != nullptr)
         return hipsolver::rocblas2hip_status(rocsolver_dgetrf_batched(
-            (rocblas_handle)handle, m, n, A, lda, devIpiv, std::min(m, n), devInfo, batch_count));
+            (rocblas_handle)handle, m, n, A, lda, devIpiv, strideP, devInfo, batch_count));
     else
         return hipsolver::rocblas2hip_status(rocsolver_dgetrf_npvt_batched(
             (rocblas_handle)handle, m, n, A, lda, devInfo, batch_count));
@@ -7226,6 +7242,7 @@ hipsolverStatus_t hipsolverCgetrfBatched(hipsolverHandle_t handle,
                                          hipFloatComplex*  work,
                                          int               lwork,
                                          int*              devIpiv,
+                                         int               strideP,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -7235,7 +7252,7 @@ try
     else
     {
         CHECK_HIPSOLVER_ERROR(hipsolverCgetrfBatched_bufferSize(
-            (rocblas_handle)handle, m, n, A, lda, &lwork, batch_count));
+            (rocblas_handle)handle, m, n, A, strideP, lda, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
@@ -7246,7 +7263,7 @@ try
                                                                       (rocblas_float_complex**)A,
                                                                       lda,
                                                                       devIpiv,
-                                                                      std::min(m, n),
+                                                                      strideP,
                                                                       devInfo,
                                                                       batch_count));
     else
@@ -7266,6 +7283,7 @@ hipsolverStatus_t hipsolverZgetrfBatched(hipsolverHandle_t handle,
                                          hipDoubleComplex* work,
                                          int               lwork,
                                          int*              devIpiv,
+                                         int               strideP,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -7275,7 +7293,7 @@ try
     else
     {
         CHECK_HIPSOLVER_ERROR(hipsolverZgetrfBatched_bufferSize(
-            (rocblas_handle)handle, m, n, A, lda, &lwork, batch_count));
+            (rocblas_handle)handle, m, n, A, lda, strideP, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
@@ -7286,7 +7304,7 @@ try
                                                                       (rocblas_double_complex**)A,
                                                                       lda,
                                                                       devIpiv,
-                                                                      std::min(m, n),
+                                                                      strideP,
                                                                       devInfo,
                                                                       batch_count));
     else
