@@ -67,11 +67,9 @@ namespace rocRoller
         {
         }
 
-        bool DSMEMObserver::runtimeRequired()
+        bool DSMEMObserver::runtimeRequired(ContextPtr const& ctx)
         {
-            auto context = m_context.lock();
-            AssertFatal(context != nullptr);
-            return context->kernelOptions()->dsObserver == DSObserverType::DSMEMObserver;
+            return ctx->kernelOptions()->dsObserver == DSObserverType::DSMEMObserver;
         }
 
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
@@ -89,11 +87,9 @@ namespace rocRoller
         {
         }
 
-        bool WeightlessDSMemObserver::runtimeRequired()
+        bool WeightlessDSMemObserver::runtimeRequired(ContextPtr const& ctx)
         {
-            auto context = m_context.lock();
-            AssertFatal(context != nullptr);
-            return context->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver;
+            return ctx->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver;
         }
 
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const

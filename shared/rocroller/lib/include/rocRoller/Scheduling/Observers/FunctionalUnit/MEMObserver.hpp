@@ -105,7 +105,7 @@ namespace rocRoller
             bool isMEMInstruction(Instruction const& inst) const override;
             int  getWait(Instruction const& inst) const override;
 
-            bool runtimeRequired();
+            static bool runtimeRequired(ContextPtr const& ctx);
         };
 
         template <typename Derived>
@@ -123,7 +123,7 @@ namespace rocRoller
 
             void observe(Instruction const& inst);
 
-            bool runtimeRequired();
+            static bool runtimeRequired(ContextPtr const& ctx);
 
         private:
             std::weak_ptr<Context>                     m_context;
@@ -131,8 +131,8 @@ namespace rocRoller
         };
 
         static_assert(CObserverConst<VMEMObserver>);
-        static_assert(CObserverRuntime<DSMEMObserver>);
-        static_assert(CObserverRuntime<WeightlessDSMemObserver>);
+        static_assert(CObserverRuntimeWithContext<DSMEMObserver>);
+        static_assert(CObserverRuntimeWithContext<WeightlessDSMemObserver>);
     }
 }
 

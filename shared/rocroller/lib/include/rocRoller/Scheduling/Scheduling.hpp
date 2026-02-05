@@ -135,6 +135,17 @@ namespace rocRoller
                 } -> std::convertible_to<bool>;
         };
 
+        template <typename T>
+        concept CObserverRuntimeWithContext = requires(T a, ContextPtr const& ctx)
+        {
+            requires CObserver<T>;
+
+            //> This observer requires ctx to determine if it's required at runtime.
+            {
+                a.runtimeRequired(ctx)
+            } -> std::convertible_to<bool>;
+        };
+
         struct IObserver
         {
             virtual ~IObserver();
