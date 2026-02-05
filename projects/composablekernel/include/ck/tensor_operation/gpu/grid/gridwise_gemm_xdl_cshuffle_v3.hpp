@@ -1238,6 +1238,14 @@ struct GridwiseGemm_xdl_cshuffle_v3
         {
             if(num_k_loop <= BlockwiseGemmPipe::PrefetchStages)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Insufficient number of K-block loops for the selected pipeline! "
+                              << "Number of K-block loops: " << num_k_loop
+                              << ", Prefetch stages: " << BlockwiseGemmPipe::PrefetchStages << " "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
         }
@@ -1246,6 +1254,13 @@ struct GridwiseGemm_xdl_cshuffle_v3
             BlkGemmPipelineVer == BlockGemmPipelineVersion::v4 ? 2 : 1;
         if(GetSharedMemoryNumberOfByteOnHost() * ldsBufferCount > get_lds_size())
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Required LDS size exceeds the available LDS size! Required LDS size: "
+                          << GetSharedMemoryNumberOfByteOnHost() * ldsBufferCount
+                          << ", Available LDS size: " << get_lds_size() << " " << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
@@ -1285,6 +1300,13 @@ struct GridwiseGemm_xdl_cshuffle_v3
 
         if(estimateVgprCount > (availableVgprCount + availableVgprCount / 4))
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout
+                    << "Estimated VGPR count exceeds available VGPR count! Estimated VGPR count: "
+                    << estimateVgprCount << ", Available VGPR count: " << availableVgprCount << " "
+                    << __FILE__ << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 

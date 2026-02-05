@@ -453,8 +453,9 @@ struct GridwiseGemm_xdlops_splitk_lds_direct_load
         InMemoryDataOperationEnum CGlobalMemoryDataOperation_ = InMemoryDataOperationEnum::Set>
     __device__ static bool constexpr IsValidCompilationParameter()
     {
-        if constexpr(K1 % MfmaSelector<ComputeType, MPerXdl, NPerXdl, ComputeType, true>::
-                              selected_mfma.k_per_blk !=
+        if constexpr((K0PerBlock * K1Value) %
+                         MfmaSelector<ComputeType, MPerXdl, NPerXdl, ComputeType, true>::
+                             GetKPerXdlops() !=
                      0)
         {
             return false;
@@ -559,7 +560,7 @@ struct GridwiseGemm_xdlops_splitk_lds_direct_load
             return false;
         }
 
-        if(!is_xdl_wmma_k_supported<ComputeType, K0PerBlock * K1Value, K1Value>())
+        if(!is_xdl_wmma_k_supported<ComputeType, K0PerBlock * K1Value>())
         {
             return false;
         }
@@ -727,6 +728,11 @@ struct GridwiseGemm_xdlops_splitk_lds_direct_load
                 b_b_k0_n_k1_block_desc,
                 make_multi_index(0, 0, 0, 0));
 
+        constexpr index_t KPack =
+            math::max(K1Value,
+                      MfmaSelector<ComputeType, MPerXdl, NPerXdl, ComputeType, true>::selected_mfma
+                          .k_per_blk);
+
         auto blockwise_gemm = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_Selector<
             BlockSize,
             ComputeType, // ComputeType A
@@ -738,7 +744,7 @@ struct GridwiseGemm_xdlops_splitk_lds_direct_load
             NPerXdl,
             MRepeat,
             NRepeat,
-            K1,
+            KPack,
             LoopSched>();
 
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();

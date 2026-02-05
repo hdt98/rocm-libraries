@@ -68,7 +68,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
         const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
 #if defined(__gfx9__) || defined(__gfx11__) || defined(__gfx12__)
-    if constexpr(GridwiseGemm::template IsValidCompilationParameter<>())
+    if constexpr(GridwiseGemm::IsValidCompilationParameter())
     {
         const index_t num_blocks_per_batch =
             __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
@@ -979,13 +979,27 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
             return false;
         }
 
-        if(!is_xdl_wmma_k_supported<ComputeTypeA, Number<K0PerBlock * K1>{}, K1>())
+        if(is_gfx11_supported())
         {
-            return false;
+            if(!is_xdl_wmma_k_supported<ComputeTypeA, Number<K0PerBlock * K1>{}, K1>())
+            {
+                return false;
+            }
+            if(!is_xdl_wmma_k_supported<ComputeTypeB, Number<K0PerBlock * K1>{}, K1>())
+            {
+                return false;
+            }
         }
-        if(!is_xdl_wmma_k_supported<ComputeTypeB, Number<K0PerBlock * K1>{}, K1>())
+        else
         {
-            return false;
+            if(!is_xdl_wmma_k_supported<ComputeTypeA, Number<K0PerBlock * K1>{}>())
+            {
+                return false;
+            }
+            if(!is_xdl_wmma_k_supported<ComputeTypeB, Number<K0PerBlock * K1>{}>())
+            {
+                return false;
+            }
         }
         if constexpr(is_same_v<ComputeTypeA, ck::tf32_t> || is_same_v<ComputeTypeB, ck::tf32_t>)
         {

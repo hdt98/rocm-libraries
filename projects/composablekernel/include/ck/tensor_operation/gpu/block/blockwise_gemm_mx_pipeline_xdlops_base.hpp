@@ -249,6 +249,7 @@ struct BlockwiseGemmXdlops_mx_pipeline_base
 
         static_assert(MPerBlock % (MPerXDL * MRepeat) == 0 && NPerBlock % (NPerXDL * NRepeat) == 0,
                       "wrong!");
+        static_assert(MRepeat % MXdlPack == 0);
 #endif
     }
 
