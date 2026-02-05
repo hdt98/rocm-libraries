@@ -614,6 +614,14 @@ class TestCustomScheduleBF16:
 
 
 class TestCustomScheduleTF32:
+    @staticmethod
+    def get_num_mfma(kernel):
+        numMfma = (kernel["MIWaveTileA"] * kernel["MIWaveTileB"] *
+                    3 * # tf32 emulated with 3 bf16
+                    kernel["DepthU"] / kernel["MatrixInstruction"][2]   # two sub-iterations due to DepthU=64
+        )
+        return numMfma
+    
     @pytest.mark.parametrize("transA, transB", [(True, False), (False, False)])
     def test_schedule_192x256x32_TF32(self, transA, transB):
         """Tests the 192x256x32 TF32 schedule."""        
@@ -857,14 +865,15 @@ class TestCustomScheduleTF32:
         assert valid, message
 
     @pytest.mark.parametrize(
-        # fmt: off
         "transA, transB, lds_tr_inst,  tr_lds, mt0, mt1", [
         (  True,  False,       False,       1, 128, 160),
         ( False,  False,        True,       1, 160, 128),
+        (  True,  False,       False,       1, 160,  128),
         # fmt: on
         ])
-    def test_schedule_128x160x64(self, transA, transB, lds_tr_inst, tr_lds, mt0, mt1):
-        """Tests the 128x160x64 and 160x128x64 TF32 schedule."""
+    def test_schedule_128x160x64_160x128x64(self, transA, transB, lds_tr_inst, tr_lds, mt0, mt1):
+        """Tests the 128x160x64, 160x128x64 TF32 TN schedule and 160x128x64 TF32 NN."""
+
         kernel = create_base_kernel()
         kernel["ProblemType"].update({
             "TransposeA": transA, "TransposeB": transB
@@ -883,15 +892,13 @@ class TestCustomScheduleTF32:
             "MatrixInstruction": mi, "MIWaveGroup": mi_wave_group,
             "LDSTrInst": lds_tr_inst, "TransposeLDS": tr_lds, "MIWaveTileA": mi_wave_tile[0], "MIWaveTileB": mi_wave_tile[1],
         })
-
         has_schedule, schedule_info = hasCustomSchedule(kernel)
         assert has_schedule
         assert isinstance(schedule_info, ScheduleInfo)
         assert schedule_info.numCodePaths == 2
-        numMfma = (mi_wave_tile[0] * mi_wave_tile[1] *
-                    3 * # tf32 emulated with 3 bf16
-                    2   # two sub-iterations due to DepthU=64
-        )
+        assert schedule_info.numMfma == TestCustomScheduleTF32.get_num_mfma(kernel)
+        valid, message = isValid(schedule_info, {"kernel" : kernel})
+        assert valid, message
 
     @pytest.mark.parametrize(
         # fmt: off

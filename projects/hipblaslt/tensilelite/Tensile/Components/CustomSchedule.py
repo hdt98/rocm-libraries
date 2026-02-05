@@ -4328,6 +4328,13 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
         opt1 = ScheduleInfo(2, n_mfma, optSchedule, syncCode, nglshift, nllshift)
         return True, opt1
 
+    elif isTN(kernel) and not useLDSTr and TLDS==1:
+        valid, opt = _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS)
+        if not valid:
+            return False, None
+        optSchedule = switch_A_B_schedule(opt.optSchedule)
+        return True, ScheduleInfo(opt.numCodePaths, opt.numMfma, optSchedule, opt.syncCode, opt.nglshift, opt.nllshift)
+
     else:
         return False, None
         
