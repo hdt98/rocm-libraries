@@ -61,6 +61,14 @@ MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DUMP_TENSOR_PATH)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK)
 
+namespace miopen::debug {
+// Forward declaration of logging function defined in convolution_api.cpp
+void LogConvolutionExecution(const miopen::Handle& handle,
+                             const miopen::conv::ProblemDescription& problem,
+                             const std::string& network_config,
+                             const miopen::AlgorithmName& algorithm_name);
+} // namespace miopen::debug
+
 namespace miopen {
 
 struct SolutionTimeComparator
@@ -839,6 +847,10 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
                                                             alpha_val,
                                                             beta_val};
             (*invoker)(handle, invoke_ctx);
+
+            // Log convolution execution summary (only if MIOPEN_LOG_LEVEL >= 5)
+            // This logs: Problem, Solver, Config, and Time for easy kernel tracking
+            miopen::debug::LogConvolutionExecution(handle, problem, network_config, algorithm_name);
             return;
         }
 
@@ -1255,6 +1267,10 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
                                                         alpha_val,
                                                         beta_val};
         (*invoker)(handle, invoke_ctx);
+
+        // Log convolution execution summary (only if MIOPEN_LOG_LEVEL >= 5)
+        // This logs: Problem, Solver, Config, and Time for easy kernel tracking
+        miopen::debug::LogConvolutionExecution(handle, problem, network_config, algorithm_name);
     });
 }
 
@@ -1464,6 +1480,10 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
                                                       alpha_val,
                                                       beta_val};
         (*invoker)(handle, invoke_ctx);
+
+        // Log convolution execution summary (only if MIOPEN_LOG_LEVEL >= 5)
+        // This logs: Problem, Solver, Config, and Time for easy kernel tracking
+        miopen::debug::LogConvolutionExecution(handle, problem, network_config, algorithm_name);
     });
 }
 
