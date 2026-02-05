@@ -49,7 +49,7 @@ class TestGemmBilinear : public ::testing::Test
             all_success =
                 all_success &
                 ProfileGemmBilinearImpl(
-                    1, 1, false, true, M, N, K, StrideA, StrideB, StrideD0, StrideE, 1.F, 1.F);
+                    1, 1, false, false, M, N, K, StrideA, StrideB, StrideD0, StrideE, 1.F, 1.F);
         }
 
         EXPECT_TRUE(all_success);

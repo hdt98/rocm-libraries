@@ -51,7 +51,7 @@ class TestGemmQuantizationCommon : public ::testing::Test
 
             all_success =
                 all_success &
-                GetImpl()(1, 1, false, true, M, N, K, StrideA, StrideB, StrideE, requant_scale);
+                GetImpl()(1, 1, false, false, M, N, K, StrideA, StrideB, StrideE, requant_scale);
         }
 
         EXPECT_TRUE(all_success);
