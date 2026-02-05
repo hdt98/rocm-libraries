@@ -50,6 +50,8 @@ set_target_properties(
                                                                            "hidden"
 )
 
+set_target_propertieS(hipsparselt PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libhipsparselt.map")
+
 target_include_directories(
     hipsparselt
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

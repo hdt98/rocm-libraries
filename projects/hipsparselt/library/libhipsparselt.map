@@ -1,0 +1,10 @@
+{
+    global:
+        hipsparseLt*;
+        *hipsparselt*;
+        *string_to_hip_datatype*;
+
+    local:
+        *;
+};
+
