@@ -298,7 +298,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-<<<<<<< HEAD
     template <>
     __device__ __host__ constexpr auto
     GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1<gfx125_t>(gfx125_t)
@@ -491,8 +490,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-=======
->>>>>>> develop
     template <typename DeviceArch>
     __device__ __host__ static constexpr auto
     GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(DeviceArch)
@@ -650,7 +647,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-<<<<<<< HEAD
     template <>
     __device__ __host__ constexpr auto
     GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1<gfx125_t>(gfx125_t)
@@ -843,8 +839,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-=======
->>>>>>> develop
     template <typename DeviceArch>
     __device__ __host__ static constexpr auto
     GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(DeviceArch)
@@ -862,7 +856,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         return c_shuffle_block_desc_mblock_mperblock_nblock_nperblock;
     }
 
-<<<<<<< HEAD
     template <>
     __device__ __host__ constexpr auto
     GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock<gfx125_t>(gfx125_t)
@@ -929,8 +922,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-=======
->>>>>>> develop
     template <typename DeviceArch>
     __host__ __device__ static constexpr auto
     GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl(DeviceArch)
@@ -951,7 +942,6 @@ struct GridwiseGemm_xdl_cshuffle_base
         return c_block_desc_mblock_mxdlperwave_mwavemperxdl_nblock_nxdlperwave_nwavenperxdl;
     }
 
-<<<<<<< HEAD
     template <>
     __host__ __device__ constexpr auto
     GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl<gfx125_t>(
@@ -974,8 +964,6 @@ struct GridwiseGemm_xdl_cshuffle_base
             make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}, Sequence<4, 5>{}));
     }
 
-=======
->>>>>>> develop
     template <typename ABlockDescriptor_AK0PerBlock_MPerBlock_AK1>
     __host__ __device__ static constexpr auto GetABlockDescriptor_AKB_AK0PerBlock_MPerBlock_AK1(
         const ABlockDescriptor_AK0PerBlock_MPerBlock_AK1&)
@@ -1071,7 +1059,6 @@ struct GridwiseGemm_xdl_cshuffle_base
     {
         if constexpr(TransposeC)
         {
-<<<<<<< HEAD
             if constexpr(IsMxGemm)
             {
                 return BlockwiseGemmPipe::GetCThreadDescriptor_M0_N0_M1_N1_M2_N2_M3_N3_N4_N5();
@@ -1080,11 +1067,6 @@ struct GridwiseGemm_xdl_cshuffle_base
             {
                 return BlockwiseGemmPipe::GetCThreadDescriptor_M0_N0_M1_N1_M2_N2_N3_N4();
             }
-=======
-            // TODO: Support transposed MXGEMM
-            static_assert(IsMxGemm == false);
-            return BlockwiseGemmPipe::GetCThreadDescriptor_M0_N0_M1_N1_M2_N2_N3_N4();
->>>>>>> develop
         }
         else
         {
@@ -1102,7 +1084,6 @@ struct GridwiseGemm_xdl_cshuffle_base
     template <bool TransposeC, typename BlockwiseGemmPipe, typename CBlockDescriptor>
     __device__ static constexpr auto GetCBlockThreadDescriptor()
     {
-<<<<<<< HEAD
         static_assert(
             CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock::Size() == 4 ||
                 IsMxGemm == false,
@@ -1126,62 +1107,11 @@ struct GridwiseGemm_xdl_cshuffle_base
                 constexpr auto N4 = c_block_desc_m0_n0_m1_n1_m2_n2_m3_n3_n4_n5_tmp.GetLength(I8);
                 constexpr auto N5 = c_block_desc_m0_n0_m1_n1_m2_n2_m3_n3_n4_n5_tmp.GetLength(I9);
 
-=======
-        if constexpr(TransposeC)
-        {
-            static_assert(IsMxGemm == false);
-            // c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp is only used to get lengths
-            constexpr auto c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp =
-                BlockwiseGemmPipe::GetCBlockDescriptor_M0_N0_M1_N1_M2_N2_N3_N4();
-
-            constexpr auto M1 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I2);
-            constexpr auto N1 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I3);
-            constexpr auto M2 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I4);
-            constexpr auto N2 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I5);
-            constexpr auto N3 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I6);
-            constexpr auto N4 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I7);
-
-            if constexpr(CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock::
-                             Size() == 6)
-            {
-                return transform_tensor_descriptor(
-                    CBlockDescriptor{},
-                    make_tuple(make_freeze_transform(I0),
-                               make_pass_through_transform(
-                                   Number<CShuffleMXdlPerWavePerShuffle>{}), // M0 (MXdlPerWave) per
-                                                                             // shuffle
-                               make_unmerge_transform(make_tuple(M1,         // M1 = MWave
-                                                                 M2)),       // M2 = MPerXdl
-                               make_freeze_transform(I0),
-                               make_pass_through_transform(
-                                   Number<CShuffleNXdlPerWavePerShuffle>{}), // N0 (NXdlPerWave) per
-                                                                             // shuffle
-                               make_unmerge_transform(make_tuple(N1,         // N1 = NWave
-                                                                 N2, // N2 * N3 * N4 = NPerXdl
-                                                                 N3,
-                                                                 N4))),
-                    make_tuple(Sequence<0>{},
-                               Sequence<1>{},
-                               Sequence<2>{},
-                               Sequence<3>{},
-                               Sequence<4>{},
-                               Sequence<5>{}),
-                    make_tuple(Sequence<>{},
-                               Sequence<0>{},
-                               Sequence<2, 4>{},
-                               Sequence<>{},
-                               Sequence<1>{},
-                               Sequence<3, 5, 6, 7>{}));
-            }
-            else
-            {
->>>>>>> develop
                 return transform_tensor_descriptor(
                     CBlockDescriptor{},
                     make_tuple(
                         make_freeze_transform(I0),
                         make_unmerge_transform(make_tuple(
-<<<<<<< HEAD
                             Number<CShuffleMXdlPerWavePerShuffle / MXdlPack>{}, // M0 (MXdlPerWave)
                                                                                 // per shuffle
                             M1,                                                 // M1 = MWave
@@ -1271,23 +1201,6 @@ struct GridwiseGemm_xdl_cshuffle_base
                                    Sequence<>{},
                                    Sequence<1, 3, 5, 6, 7>{}));
                 }
-=======
-                            Number<CShuffleMXdlPerWavePerShuffle>{}, // M0 (MXdlPerWave) per shuffle
-                            M1,                                      // M1 = MWave
-                            M2)),                                    // M2 = MPerXdl
-                        make_freeze_transform(I0),
-                        make_unmerge_transform(make_tuple(
-                            Number<CShuffleNXdlPerWavePerShuffle>{}, // N0 (NXdlPerWave) per shuffle
-                            N1,                                      // N1 = NWave
-                            N2,                                      // N2 * N3 * N4 = NPerXdl
-                            N3,
-                            N4))),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
-                    make_tuple(Sequence<>{},
-                               Sequence<0, 2, 4>{},
-                               Sequence<>{},
-                               Sequence<1, 3, 5, 6, 7>{}));
->>>>>>> develop
             }
         }
         else
@@ -1425,7 +1338,6 @@ struct GridwiseGemm_xdl_cshuffle_base
 
         if constexpr(TransposeC)
         {
-<<<<<<< HEAD
             if constexpr(IsMxGemm)
             {
                 constexpr auto MXdlPack = BlockwiseGemmPipe::MXdlPack;
@@ -1572,75 +1484,6 @@ struct GridwiseGemm_xdl_cshuffle_base
                                      n_thread_data_on_block_idx[I4]),
                     cde_element_op};
             }
-=======
-            static_assert(IsMxGemm == false);
-            // TODO: hacky, fix it!
-            // c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp is only used to get lengths
-            constexpr auto c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp =
-                BlockwiseGemmPipe::GetCBlockDescriptor_M0_N0_M1_N1_M2_N2_N3_N4();
-
-            constexpr auto M0 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I0);
-            constexpr auto N0 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I1);
-            constexpr auto M1 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I2);
-            constexpr auto N1 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I3);
-            constexpr auto M2 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I4);
-            constexpr auto N2 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I5);
-            constexpr auto N3 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I6);
-            constexpr auto N4 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I7);
-
-            // calculate origin of thread output tensor on global memory
-            //     blockwise GEMM c matrix starting index
-            const auto m_thread_data_on_block_to_m0_m1_m2_adaptor =
-                make_single_stage_tensor_adaptor(
-                    make_tuple(make_merge_transform(make_tuple(M0, M1, M2))),
-                    make_tuple(Sequence<0, 1, 2>{}),
-                    make_tuple(Sequence<0>{}));
-
-            const auto m_thread_data_on_block_idx =
-                m_thread_data_on_block_to_m0_m1_m2_adaptor.CalculateBottomIndex(
-                    make_multi_index(m_thread_data_on_block));
-
-            const auto n_thread_data_on_block_to_n0_n1_n2_n3_n4_adaptor =
-                make_single_stage_tensor_adaptor(
-                    make_tuple(make_merge_transform(make_tuple(N0, N1, N2, N3, N4))),
-                    make_tuple(Sequence<0, 1, 2, 3, 4>{}),
-                    make_tuple(Sequence<0>{}));
-
-            const auto n_thread_data_on_block_idx =
-                n_thread_data_on_block_to_n0_n1_n2_n3_n4_adaptor.CalculateBottomIndex(
-                    make_multi_index(n_thread_data_on_block));
-
-            // shuffle: threadwise copy C from VGPR to LDS
-            return ThreadwiseTensorSliceTransfer_v1r3<AccDataType,
-                                                      CShuffleDataType,
-                                                      CThreadDescriptor,
-                                                      CBlockThreadDescriptor,
-                                                      CDEElementwiseOperation,
-                                                      Sequence<CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               I1,
-                                                               I1,
-                                                               I1,
-                                                               N2,
-                                                               I1,
-                                                               N4>,
-                                                      Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                      7,
-                                                      1,
-                                                      InMemoryDataOperationEnum::Set,
-                                                      1,
-                                                      true>{
-                c_block_thread_desc,
-                make_multi_index(0,
-                                 0,
-                                 m_thread_data_on_block_idx[I1],
-                                 n_thread_data_on_block_idx[I1],
-                                 m_thread_data_on_block_idx[I2],
-                                 n_thread_data_on_block_idx[I2],
-                                 n_thread_data_on_block_idx[I3],
-                                 n_thread_data_on_block_idx[I4]),
-                cde_element_op};
->>>>>>> develop
         }
         else
         {
@@ -1796,7 +1639,6 @@ struct GridwiseGemm_xdl_cshuffle_base
     {
         if constexpr(TransposeC)
         {
-<<<<<<< HEAD
             if constexpr(IsMxGemm)
             {
                 constexpr auto MXdlPack = BlockwiseGemmPipe::MXdlPack;
@@ -1848,24 +1690,6 @@ struct GridwiseGemm_xdl_cshuffle_base
                                                   1,
                                                   N4>>{};
             }
-=======
-            constexpr auto c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp =
-                BlockwiseGemmPipe::GetCBlockDescriptor_M0_N0_M1_N1_M2_N2_N3_N4();
-
-            constexpr auto N2 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I5);
-            constexpr auto N4 = c_block_desc_m0_n0_m1_n1_m2_n2_n3_n4_tmp.GetLength(I7);
-
-            return SpaceFillingCurve<Sequence<MXdlPerWave, NXdlPerWave, 1, 1, 1, N2, 1, N4>,
-                                     Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                     Sequence<CShuffleMXdlPerWavePerShuffle,
-                                              CShuffleNXdlPerWavePerShuffle,
-                                              1,
-                                              1,
-                                              1,
-                                              N2,
-                                              1,
-                                              N4>>{};
->>>>>>> develop
         }
         else
         {
@@ -1876,13 +1700,8 @@ struct GridwiseGemm_xdl_cshuffle_base
                 constexpr auto c_block_desc_m0_n0_m1_n1_m2_n2_m3_m4_m5_n3_tmp =
                     BlockwiseGemmPipe::GetCBlockDescriptor_M0_N0_M1_N1_M2_N2_M3_M4_M5_N3();
 
-<<<<<<< HEAD
                 constexpr auto M3 = c_block_desc_m0_n0_m1_n1_m2_n2_m3_m4_m5_n3_tmp.GetLength(I6);
                 constexpr auto M5 = c_block_desc_m0_n0_m1_n1_m2_n2_m3_m4_m5_n3_tmp.GetLength(I8);
-=======
-                constexpr auto M2 = c_block_desc_m0_n0_m1_n1_m2_n2_m3_m4_m5_n3_tmp.GetLength(I4);
-                constexpr auto M4 = c_block_desc_m0_n0_m1_n1_m2_n2_m3_m4_m5_n3_tmp.GetLength(I7);
->>>>>>> develop
 
                 return SpaceFillingCurve<Sequence<MXdlPerWave / MXdlPack,
                                                   NXdlPerWave / NXdlPack,
@@ -1890,15 +1709,9 @@ struct GridwiseGemm_xdl_cshuffle_base
                                                   1,
                                                   MXdlPack,
                                                   NXdlPack,
-<<<<<<< HEAD
                                                   M3,
                                                   1,
                                                   M5,
-=======
-                                                  M2,
-                                                  1,
-                                                  M4,
->>>>>>> develop
                                                   1>,
                                          Sequence<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>,
                                          Sequence<CShuffleMXdlPerWavePerShuffle / MXdlPack,
@@ -1907,15 +1720,9 @@ struct GridwiseGemm_xdl_cshuffle_base
                                                   1,
                                                   MXdlPack,
                                                   NXdlPack,
-<<<<<<< HEAD
                                                   M3,
                                                   1,
                                                   M5,
-=======
-                                                  M2,
-                                                  1,
-                                                  M4,
->>>>>>> develop
                                                   1>>{};
             }
             else

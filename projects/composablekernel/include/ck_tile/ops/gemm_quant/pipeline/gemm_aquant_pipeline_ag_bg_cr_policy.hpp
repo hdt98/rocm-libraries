@@ -31,7 +31,6 @@ struct GemmAQuantPipelineAgBgCrDefaultPolicy
         using AQLayout       = remove_cvref_t<typename Problem::AQLayout>;
         using BlockGemmShape = typename Problem::BlockGemmShape;
 
-<<<<<<< HEAD
         constexpr index_t BlockSize    = Problem::kBlockSize;
         constexpr index_t MPerBlock    = Problem::BlockGemmShape::kM;
         constexpr index_t KPerBlock    = Problem::BlockGemmShape::kK;
@@ -46,22 +45,6 @@ struct GemmAQuantPipelineAgBgCrDefaultPolicy
                                                             WarpTile::at(I1),
                                                             WarpTile::at(I2),
                                                             Problem::TransposeC>;
-=======
-        constexpr index_t BlockSize     = Problem::kBlockSize;
-        constexpr index_t MPerBlock     = Problem::BlockGemmShape::kM;
-        constexpr index_t KPerBlock     = Problem::BlockGemmShape::kK;
-        constexpr index_t KPerBlockAQ   = KPerBlock / Problem::AQuantGroupSize::kK;
-        constexpr index_t VecLoadSize   = GetVectorSizeAQ<Problem>();
-        constexpr bool APreshuffleQuant = Problem::Traits::APreshuffleQuant;
-        using WarpTile                  = typename Problem::BlockGemmShape::WarpTile;
-        using WarpGemm                  = WarpGemmDispatcher<typename Problem::ComputeDataType,
-                                                             typename Problem::ComputeDataType,
-                                                             typename Problem::CDataType,
-                                                             WarpTile::at(I0),
-                                                             WarpTile::at(I1),
-                                                             WarpTile::at(I2),
-                                                             Problem::TransposeC>;
->>>>>>> develop
 
         if constexpr(APreshuffleQuant)
         {

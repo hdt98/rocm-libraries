@@ -14,10 +14,7 @@
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_softmax.hpp"
-<<<<<<< HEAD
 #include "ck/host_utility/device_prop.hpp"
-=======
->>>>>>> develop
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
 
 namespace ck {
@@ -298,7 +295,6 @@ struct GridwiseBatchedGemmSoftmaxGemm_Xdl_CShuffle
             static_assert(B1K0 == BBlockDesc_BK0_N_BK1{}.GetLength(Number<0>{}));
             static_assert(B1K1 == BBlockDesc_BK0_N_BK1{}.GetLength(Number<2>{}));
 
-<<<<<<< HEAD
             constexpr auto K0 = Gemm1KPerBlock / KPerXdlops;
             constexpr auto K1 = KGroup;
             constexpr auto K2 = K0PerXdlops;
@@ -333,8 +329,6 @@ struct GridwiseBatchedGemmSoftmaxGemm_Xdl_CShuffle
         }
     }
 
-=======
->>>>>>> develop
     __host__ __device__ static constexpr index_t GetSharedMemoryNumberOfByte()
     {
         const index_t gemm0_bytes_end = (SharedMemTrait::a_block_space_size_aligned +

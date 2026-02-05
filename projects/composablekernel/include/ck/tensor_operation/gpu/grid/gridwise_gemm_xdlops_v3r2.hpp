@@ -571,10 +571,6 @@ struct GridwiseGemm_k0mk1_k0nk1_mn_xdlops_v3r2
 
             constexpr auto c_thread_desc_m0_n0_m1_n1_m2_m3_m4_n2 =
                 Base::template GetCThreadDescriptor<false, decltype(blockwise_gemm)>();
-<<<<<<< HEAD
-
-=======
->>>>>>> develop
             constexpr auto
                 c_block_desc_mblock_mxdlperwave_mwavemperxdl_nblock_nxdlperwave_nwavenperxdl = Base::
                     GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl(

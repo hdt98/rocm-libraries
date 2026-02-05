@@ -189,7 +189,6 @@ template <typename Tuple_, std::size_t Idx, typename DefaultType>
 using tuple_element_or_default_t =
     typename tuple_element_or_default<Tuple_, Idx, DefaultType>::type;
 
-<<<<<<< HEAD
 // =====================================================================
 // Problem member detection traits (SFINAE-based)
 // =====================================================================
@@ -289,7 +288,7 @@ inline constexpr bool problem_is_flatmm_v = []() {
     else
         return false;
 }();
-=======
+
 // Helper struct to determine if a type is packed (more than 1 element per byte)
 template <typename T>
 struct is_packed_type
@@ -304,6 +303,5 @@ static constexpr bool is_packed_type_v = is_packed_type<T>::value;
 template <typename ADataType, typename BDataType>
 using largest_type_t =
     std::conditional_t<sizeof(ADataType) >= sizeof(BDataType), ADataType, BDataType>;
->>>>>>> develop
 
 } // namespace ck_tile

@@ -851,12 +851,8 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
     };
 
     template <typename DeviceArch>
-<<<<<<< HEAD
     __device__ __host__ static constexpr auto
     GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(DeviceArch)
-=======
-    __device__ static constexpr auto GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(DeviceArch)
->>>>>>> develop
     {
         if constexpr(is_same_v<DeviceArch, gfx950_t>)
         {
@@ -880,12 +876,8 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
     }
 
     template <typename DeviceArch>
-<<<<<<< HEAD
     __device__ __host__ static constexpr auto
     GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(DeviceArch)
-=======
-    __device__ static constexpr auto GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(DeviceArch)
->>>>>>> develop
     {
         if constexpr(is_same_v<DeviceArch, gfx950_t>)
         {
@@ -935,11 +927,7 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
                  DirectLoad>())>;
 
     template <typename DeviceArch>
-<<<<<<< HEAD
     __device__ __host__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)
-=======
-    __device__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)
->>>>>>> develop
     {
         // LDS allocation for A and B: be careful of alignment
         constexpr auto a_block_desc_ak0_m_ak1 =

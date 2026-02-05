@@ -12,10 +12,7 @@
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r1.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
-<<<<<<< HEAD
-=======
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_direct_load.hpp"
->>>>>>> develop
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
 
 namespace ck {
@@ -114,54 +111,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
           ComputeTypeB,
           false> // ForceNaiveLayout
 {
-<<<<<<< HEAD
-    using Base = GridwiseGemm_xdl_cshuffle_base<
-        ALayout,
-        BLayout,
-        CLayout,
-        ADataType,
-        BDataType,
-        AccDataType,
-        CShuffleDataType,
-        Tuple<>,
-        CDataType,
-        AElementwiseOperation,
-        BElementwiseOperation,
-        BlockSize,
-        MPerBlock,
-        NPerBlock,
-        KPerBlock,
-        AK1Value,
-        BK1Value,
-        MPerXdl,
-        NPerXdl,
-        MXdlPerWave,
-        NXdlPerWave,
-        ABlockTransferThreadClusterLengths_AK0_M_AK1,
-        ABlockTransferThreadClusterArrangeOrder,
-        ABlockTransferSrcAccessOrder,
-        ABlockTransferSrcVectorDim,
-        ABlockTransferSrcScalarPerVector,
-        ABlockTransferDstScalarPerVector_AK1,
-        AThreadTransferSrcResetCoordinateAfterRun,
-        ABlockLdsExtraMCustom,
-        BBlockTransferThreadClusterLengths_BK0_N_BK1,
-        BBlockTransferThreadClusterArrangeOrder,
-        BBlockTransferSrcAccessOrder,
-        BBlockTransferSrcVectorDim,
-        BBlockTransferSrcScalarPerVector,
-        BBlockTransferDstScalarPerVector_BK1,
-        BThreadTransferSrcResetCoordinateAfterRun,
-        BBlockLdsExtraNCustom,
-        CShuffleMXdlPerWavePerShuffle,
-        CShuffleNXdlPerWavePerShuffle,
-        CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
-        Sequence<CShuffleBlockTransferScalarPerVector_NPerBlock>,
-        ComputeTypeA,
-        ComputeTypeB,
-        false>; // ForceNaiveLayout
-
-=======
     static_assert((is_same_v<AElementwiseOperation, tensor_operation::element_wise::PassThrough> &&
                    is_same_v<BElementwiseOperation, tensor_operation::element_wise::PassThrough>) ||
                   !DirectLoad);
@@ -212,7 +161,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
         ComputeTypeB,
         false>; // ForceNaiveLayout
 
->>>>>>> develop
     using Base::AK0Number;
     using Base::AK1Number;
     using Base::BK0Number;
@@ -221,11 +169,8 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
     using Base::I1;
     using Base::I2;
     using ThisThreadBlock = typename Base::ThisThreadBlock;
-<<<<<<< HEAD
-=======
 
     static constexpr bool DirectLoadEnabled = DirectLoad;
->>>>>>> develop
 
     static constexpr auto lcm_AK1_BK1 = math::lcm(AK1Number, BK1Number);
     static constexpr bool is_single_rate_mfma =
@@ -416,11 +361,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
     template <typename DeviceArch>
     __device__ static constexpr auto GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(DeviceArch)
     {
-<<<<<<< HEAD
-        if constexpr(is_same_v<DeviceArch, gfx950_t>)
-=======
         if constexpr(DirectLoad)
->>>>>>> develop
         {
             // Force use padded layout on gfx950 to reduce bank conflicts
             constexpr index_t ABlockLdsExtraM = 1;
@@ -445,11 +386,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
     template <typename DeviceArch>
     __device__ static constexpr auto GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(DeviceArch)
     {
-<<<<<<< HEAD
-        if constexpr(is_same_v<DeviceArch, gfx950_t>)
-=======
         if constexpr(DirectLoad)
->>>>>>> develop
         {
             constexpr index_t BBlockLdsExtraN = 1;
             return make_naive_tensor_descriptor(
@@ -471,33 +408,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
 
     IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
 
-<<<<<<< HEAD
-    using BlockwiseGemmPipe = remove_cvref_t<
-        decltype(BlockGemmPipeline_Selector<
-                 BlkGemmPipelineVer,
-                 BlkGemmPipeSched,
-                 BlockSize,
-                 ADataType,
-                 BDataType,
-                 ComputeTypeA,
-                 AccDataType,
-                 decltype(GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch())),
-                 decltype(GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch())),
-                 decltype(MakeAMmaTileDescriptor_M0_M1_M2_K(
-                     GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch()))),
-                 decltype(MakeBMmaTileDescriptor_N0_N1_N2_K(
-                     GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch()))),
-                 ABlockTransferSrcScalarPerVector,
-                 BBlockTransferSrcScalarPerVector,
-                 MPerBlock,
-                 NPerBlock,
-                 KPerBlock,
-                 MPerXdl,
-                 NPerXdl,
-                 MXdlPerWave,
-                 NXdlPerWave,
-                 KPack>())>;
-=======
     // Disable vector load from lds to vgpr for direct load (backward weight store with continous M
     // or N dimension)
     static constexpr bool LdsScalarLoadToVgpr = DirectLoad;
@@ -528,7 +438,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                    KPack,
                                    DirectLoad,
                                    LdsScalarLoadToVgpr>())>;
->>>>>>> develop
 
     template <typename DeviceArch>
     __device__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)

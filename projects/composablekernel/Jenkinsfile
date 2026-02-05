@@ -353,14 +353,10 @@ def check_arch_name(){
         return "gfx11"
     }
     else if ( runShell('grep -n "gfx120" rocminfo.log') ) {
-<<<<<<< HEAD
-        arch_name = "gfx120"
+        return "gfx120"
     }
     else if ( runShell('grep -n "gfx125" rocminfo.log') ) {
-        arch_name = "gfx125"
-=======
-        return "gfx12"
->>>>>>> develop
+        return "gfx125"
     }
     else if ( runShell('grep -n "gfx908" rocminfo.log') ) {
         return "gfx908"
@@ -675,13 +671,8 @@ def cmake_build(Map conf=[:]){
             }
         }
 
-<<<<<<< HEAD
         //run tests except when NO_CK_BUILD or BUILD_LEGACY_OS are set
         if(!setup_args.contains("NO_CK_BUILD") && !params.BUILD_LEGACY_OS  && !setup_args.contains("gfx1250")){
-=======
-        //run tests except when NO_CK_BUILD is set
-        if(!setup_args.contains("NO_CK_BUILD")){
->>>>>>> develop
             sh "python3 ../script/ninja_json_converter.py .ninja_log --legacy-format --output ck_build_trace_${arch_name}.json"
             archiveArtifacts "ck_build_trace_${arch_name}.json"
             sh "python3 ../script/parse_ninja_trace.py ck_build_trace_${arch_name}.json"
@@ -823,11 +814,7 @@ def Build_CK(Map conf=[:]){
                     //check whether to run performance tests on this node
                     def arch = check_arch_name()
                     cmake_build(conf)
-<<<<<<< HEAD
                     if ( params.RUN_INDUCTOR_TESTS && !params.BUILD_LEGACY_OS && arch == "gfx90a" ){
-=======
-                    if ( params.RUN_INDUCTOR_TESTS && arch == "gfx90a" ){
->>>>>>> develop
                             echo "Run inductor codegen tests"
                             sh """
                                   python3 -m venv ${env.WORKSPACE}
@@ -1450,9 +1437,7 @@ pipeline {
                 }
             }
         }
-<<<<<<< HEAD
 */
-=======
         stage("Run Full Grouped Conv Tile Tests")
         {
             when {
@@ -1482,7 +1467,6 @@ pipeline {
                 }
             }
         }
->>>>>>> develop
         stage("Run Grouped Conv Large Case Tests")
         {
             when {

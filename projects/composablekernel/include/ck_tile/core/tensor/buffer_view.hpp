@@ -941,14 +941,6 @@ struct buffer_view<address_space_enum::lds,
 
             return tmp;
 #else
-<<<<<<< HEAD
-            using buf_t = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
-                                       scalar_per_t_vector * scalar_per_x_vector>;
-            // using buf_t = ushort __attribute__((ext_vector_type(8)));
-            auto rtn =
-                *c_style_pointer_cast<const buf_t*>(&p_data_[i + linear_offset + static_offset]);
-            return bit_cast<X>(rtn);
-=======
             constexpr index_t load_elts = scalar_per_t_vector * scalar_per_x_vector;
             if constexpr(load_elts == 12 && sizeof(typename X::value_type) == 1)
             {
@@ -966,7 +958,6 @@ struct buffer_view<address_space_enum::lds,
                 auto rtn    = *c_style_pointer_cast<const buf_t*>(&p_data_[i + linear_offset]);
                 return bit_cast<X>(rtn);
             }
->>>>>>> develop
 #endif
         }
         else

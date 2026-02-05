@@ -94,11 +94,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
     }
 #else
     ignore = karg;
-<<<<<<< HEAD
 #endif
-=======
-#endif // end of if (defined(__gfx9__))
->>>>>>> develop
 }
 
 template <typename ALayout,
@@ -906,14 +902,11 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         index_t c_reduce_offset;
     };
 
-<<<<<<< HEAD
 #if defined(__gfx125__)
     static constexpr index_t TransposeC = true;
 #else
     static constexpr index_t TransposeC = false;
 #endif
-=======
->>>>>>> develop
     using BlockwiseGemmPipe = remove_cvref_t<
         decltype(BlockGemmMXPipeline_Selector<
                  BlkGemmPipelineVer,
@@ -941,12 +934,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                  NPerXdl,
                  MXdlPerWave,
                  NXdlPerWave,
-<<<<<<< HEAD
                  KPack,
                  TransposeC>())>;
-=======
-                 KPack>())>;
->>>>>>> develop
 
     IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
 
@@ -1416,11 +1405,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-<<<<<<< HEAD
         Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
-=======
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
->>>>>>> develop
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,
@@ -1731,11 +1716,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-<<<<<<< HEAD
         Base::template RunEpilogue<CGlobalMemoryDataOperation, false, TransposeC>(
-=======
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
->>>>>>> develop
             blockwise_gemm_pipeline,
             c_grid_desc_mblock_mperblock_nblock_nperblock,
             c_thread_buf,

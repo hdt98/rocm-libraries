@@ -286,7 +286,6 @@ struct GridwiseBatchedGemmGemm_Xdl_CShuffle
             static_assert(B1K0 == BBlockDesc_BK0_N_BK1{}.GetLength(Number<0>{}));
             static_assert(B1K1 == BBlockDesc_BK0_N_BK1{}.GetLength(Number<2>{}));
 
-<<<<<<< HEAD
             constexpr auto K0 = Gemm1KPerBlock / KPerXdlops;
             constexpr auto K1 = KGroup;
             constexpr auto K2 = K0PerXdlops;
@@ -321,8 +320,6 @@ struct GridwiseBatchedGemmGemm_Xdl_CShuffle
         }
     }
 
-=======
->>>>>>> develop
     __host__ __device__ static constexpr index_t GetSharedMemoryNumberOfByte()
     {
         const index_t gemm0_bytes_end = (SharedMemTrait::a_block_space_size_aligned +

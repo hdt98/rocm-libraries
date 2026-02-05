@@ -351,7 +351,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
     using Base::I0;
     using Base::I1;
     using Base::I2;
-<<<<<<< HEAD
     using ThisThreadBlock = typename Base::ThisThreadBlock;
 
 #if defined(__gfx12__)
@@ -359,17 +358,12 @@ struct GridwiseGemm_xdl_cshuffle_v3
 #else
     static constexpr index_t TransposeC = false;
 #endif
-=======
-    using ThisThreadBlock                = typename Base::ThisThreadBlock;
-    static constexpr index_t TransposeC  = false;
->>>>>>> develop
     static constexpr index_t APackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<ADataType>, pk_i4_t>)
             return 2;
         else
             return 1;
     }();
-<<<<<<< HEAD
 
     static constexpr index_t BPackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
@@ -377,8 +371,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
         else
             return 1;
     }();
-=======
->>>>>>> develop
 
     static constexpr index_t BPackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
@@ -926,7 +918,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
         index_t c_reduce_offset;
     };
 
-<<<<<<< HEAD
     using BlockwiseGemmPipe = remove_cvref_t<
         decltype(BlockGemmPipeline_Selector<
                  BlkGemmPipelineVer,
@@ -992,33 +983,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
             static_assert(0);
         }
     }
-=======
-    using BlockwiseGemmPipe =
-        remove_cvref_t<decltype(BlockGemmPipeline_Selector<
-                                BlkGemmPipelineVer,
-                                BlkGemmPipeSched,
-                                BlockSize,
-                                ADataType,
-                                BDataType,
-                                ComputeTypeA,
-                                AccDataType,
-                                decltype(GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch())),
-                                decltype(GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch())),
-                                decltype(MakeAMmaTileDescriptor_M0_M1_M2_K(
-                                    GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch()))),
-                                decltype(MakeBMmaTileDescriptor_N0_N1_N2_K(
-                                    GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch()))),
-                                ABlockTransferSrcScalarPerVector,
-                                BBlockTransferSrcScalarPerVector,
-                                MPerBlock,
-                                NPerBlock,
-                                KPerBlock,
-                                MPerXdl,
-                                NPerXdl,
-                                MXdlPerWave,
-                                NXdlPerWave,
-                                KPack>())>;
->>>>>>> develop
 
     template <InMemoryDataOperationEnum CGlobalMemoryDataOperation>
     __device__ static bool constexpr IsValidCompilationParameter()
@@ -1438,19 +1402,12 @@ struct GridwiseGemm_xdl_cshuffle_v3
         constexpr auto max_lds_align = math::lcm(AK1Number, BK1Number);
 
         // A matrix in LDS memory, dst of blockwise copy
-<<<<<<< HEAD
         constexpr auto a_block_desc_ak0_m_ak1 =
             GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch());
 
         // B matrix in LDS memory, dst of blockwise copy
         constexpr auto b_block_desc_bk0_n_bk1 =
             GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
-=======
-        constexpr auto a_block_desc_ak0_m_ak1 = GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch());
-
-        // B matrix in LDS memory, dst of blockwise copy
-        constexpr auto b_block_desc_bk0_n_bk1 = GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
->>>>>>> develop
 
         // A matrix blockwise copy
         auto a_blockwise_copy =
@@ -1564,11 +1521,7 @@ struct GridwiseGemm_xdl_cshuffle_v3
                                                block_n_id,
                                                p_shared,
                                                p_c_grid,
-<<<<<<< HEAD
                                                problem.c_element_op_);
-=======
-                                               problem.c_element_op_);        
->>>>>>> develop
     }
 
     template <bool HasMainKBlockLoop,
@@ -1655,19 +1608,12 @@ struct GridwiseGemm_xdl_cshuffle_v3
         constexpr auto max_lds_align = math::lcm(AK1Number, BK1Number);
 
         // A matrix in LDS memory, dst of blockwise copy
-<<<<<<< HEAD
         constexpr auto a_block_desc_ak0_m_ak1 =
             GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch());
 
         // B matrix in LDS memory, dst of blockwise copy
         constexpr auto b_block_desc_bk0_n_bk1 =
             GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
-=======
-        constexpr auto a_block_desc_ak0_m_ak1 = GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch());
-
-        // B matrix in LDS memory, dst of blockwise copy
-        constexpr auto b_block_desc_bk0_n_bk1 = GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
->>>>>>> develop
 
         // A matrix blockwise copy
         auto a_blockwise_copy =
@@ -1782,7 +1728,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
                                                                          num_k_block_main_loop);
 
         // shuffle C and write out
-<<<<<<< HEAD
         Base::template RunEpilogue<CGlobalMemoryDataOperation,
                                    DoElementwiseBeforeCShuffle,
                                    TransposeC>(blockwise_gemm_pipeline,
@@ -1793,17 +1738,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
                                                p_shared_0,
                                                p_c_grid,
                                                problem.c_element_op_);
-=======
-        Base::template RunEpilogue<CGlobalMemoryDataOperation, DoElementwiseBeforeCShuffle, TransposeC>(
-            blockwise_gemm_pipeline,
-            c_grid_desc_mblock_mperblock_nblock_nperblock,
-            c_thread_buf,
-            block_m_id,
-            block_n_id,
-            p_shared_0,
-            p_c_grid,
-            problem.c_element_op_);
->>>>>>> develop
     }
 
     template <bool HasMainKBlockLoop,

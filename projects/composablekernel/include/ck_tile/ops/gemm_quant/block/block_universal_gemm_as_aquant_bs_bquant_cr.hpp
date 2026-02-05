@@ -27,7 +27,6 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
     template <typename PipelineProblem_, typename GemmPolicy_>
     struct GemmTraits_
     {
-<<<<<<< HEAD
         using Problem          = remove_cvref_t<PipelineProblem_>;
         using Policy           = remove_cvref_t<GemmPolicy_>;
         using ADataType        = remove_cvref_t<typename Problem::ADataType>;
@@ -41,21 +40,6 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
         using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
         using AQuantGroupSize  = remove_cvref_t<typename Problem::AQuantGroupSize>;
         using BQuantGroupSize  = remove_cvref_t<typename Problem::BQuantGroupSize>;
-=======
-        using Problem         = remove_cvref_t<PipelineProblem_>;
-        using Policy          = remove_cvref_t<GemmPolicy_>;
-        using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-        using AQDataType      = remove_cvref_t<typename Problem::AQDataType>;
-        using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-        using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
-        using BLayout         = remove_cvref_t<typename Problem::BLayout>;
-        using BQLayout        = remove_cvref_t<typename Problem::BQLayout>;
-        using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-        using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-        using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>;
-        using AQuantGroupSize = remove_cvref_t<typename Problem::AQuantGroupSize>;
-        using BQuantGroupSize = remove_cvref_t<typename Problem::BQuantGroupSize>;
->>>>>>> develop
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;
@@ -285,17 +269,10 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
                                           bool_constant<ALoadTranspose> = {},
                                           bool_constant<BLoadTranspose> = {})
         {
-<<<<<<< HEAD
             load_int4_tile<ADataType, AComputeDataType, UnaryOpSize_, ALoadTranspose>(
                 a_warp_tile_, a_block_window);
             // If B datatype were pkint4 it would be converted prior to storing in LDS
             load_int4_tile<OverrideBDataType, BComputeDataType, UnaryOpSize_, BLoadTranspose>(
-=======
-            // If A/B datatype were pkint4/pkfp4 it would be converted prior to storing in LDS
-            load_int4_tile<OverrideADataType, ComputeDataType, UnaryOpSize_, ALoadTranspose>(
-                a_warp_tile_, a_block_window);
-            load_int4_tile<OverrideBDataType, ComputeDataType, UnaryOpSize_, BLoadTranspose>(
->>>>>>> develop
                 b_warp_tile_, b_block_window);
         }
 

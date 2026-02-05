@@ -12,14 +12,10 @@
 #include "ck_tile/core/numeric/mxfp_scale.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
 
-<<<<<<< HEAD
-#if defined(__gfx950__) || defined(__gfx125__)
-=======
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
-#if defined(__gfx950__)
->>>>>>> develop
+#if defined(__gfx950__) || defined(__gfx125__)
 #define CK_TILE_FP4_CVT_DEVICE 1
 #else
 #define CK_TILE_FP4_CVT_DEVICE 0
@@ -29,8 +25,6 @@
 
 namespace ck_tile {
 
-<<<<<<< HEAD
-=======
 using fp32_t   = float;
 using fp32x2_t = float __attribute__((ext_vector_type(2)));
 using fp16x2_t = _Float16 __attribute__((ext_vector_type(2)));
@@ -42,7 +36,6 @@ using fp8x2_t = fp8_raw_t __attribute__((ext_vector_type(2)));
 using fp8x2_t = fp8_t __attribute__((ext_vector_type(2)));
 #endif
 
->>>>>>> develop
 // Helpers: constexpr-safe access to elements of ext_vector_type(2)
 // Some compilers don't allow operator[] in constant expressions for vector types.
 // We use bit_cast to a trivially copyable representation to extract lanes.

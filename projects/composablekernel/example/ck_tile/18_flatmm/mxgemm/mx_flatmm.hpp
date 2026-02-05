@@ -12,7 +12,6 @@
 #include "ck_tile/ops/gemm.hpp"
 #include "mx_flatmm_arch_traits.hpp"
 
-<<<<<<< HEAD
 // FlatmmConfig types are now defined via CurrentArchTraits:
 //   - MXfp4_FlatmmConfig16  = CurrentArchTraits::Fp4Fp4Config
 //   - MXfp8_FlatmmConfig16  = CurrentArchTraits::Fp8Fp8Config
@@ -21,7 +20,6 @@
 //
 // For GFX1250 TDM: these map to MXFlatmmConfigBase32TDM (32x32 warp tile)
 // For others:  these map to MXFlatmmConfigBase16 (16x16 warp tile)
-=======
 // GEMM config with 16x16 warp tile
 struct MXfp4_FlatmmConfig16
 {
@@ -181,7 +179,6 @@ struct MXf4f8_FlatmmConfig16
     static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
     static constexpr bool TiledMMAPermuteN = false;
 };
->>>>>>> develop
 
 template <typename FlatmmConfig,
           typename ADataType,

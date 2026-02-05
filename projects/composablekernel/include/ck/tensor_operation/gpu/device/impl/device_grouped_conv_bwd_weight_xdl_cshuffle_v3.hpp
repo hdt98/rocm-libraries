@@ -414,9 +414,6 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
     using BGridDesc_K0_N_K1 = remove_cvref_t<decltype(ABCGridDescs{}[I1])>;
     using CGridDesc_M_N     = remove_cvref_t<decltype(ABCGridDescs{}[I2])>;
 
-<<<<<<< HEAD
-    template <typename WarpTileConfig>
-=======
     // Disable vector load = 4. It is not supported for Direct Load. Align to 2 in such case.
     static constexpr index_t ABlockTransferSrcScalarPerVectorAligned =
         ABlockTransferSrcScalarPerVector * sizeof(ADataType) == 8
@@ -428,7 +425,6 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             : BBlockTransferSrcScalarPerVector;
 
     template <index_t NXdlPerWave_>
->>>>>>> develop
     using GridwiseGemmBase = GridwiseGemm_xdl_cshuffle_conv_v3<
         tensor_layout::gemm::RowMajor,
         tensor_layout::gemm::ColumnMajor,
@@ -475,16 +471,10 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         BlkGemmPipeSched,
         BlkGemmPipelineVer,
         ComputeTypeA,
-<<<<<<< HEAD
-        ComputeTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
-=======
         ComputeTypeB,
         DirectLoad>;
     using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
     using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
->>>>>>> develop
 
     // Argument
     using CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock =

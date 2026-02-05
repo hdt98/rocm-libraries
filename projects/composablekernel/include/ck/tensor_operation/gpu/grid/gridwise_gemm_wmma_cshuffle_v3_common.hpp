@@ -382,7 +382,6 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
                                                    BK1Value,
                                                    WaveSize>;
 
-<<<<<<< HEAD
     // Limitations of the current implementation:
     //  - no multiAB
     //  - GemmSpecialization Default with transpose
@@ -402,27 +401,6 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
          is_same_v<BLayout, tensor_layout::gemm::ColumnMajor>) &&
         BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8 &&
         BTransferWaveTiles::KRepeat_ > 0 && BTransferWaveTiles::MNRepeat_ > 0;
-=======
-    __host__ __device__ static constexpr bool AWaveTransferApplicable()
-    {
-        return !ForceThreadTileTransfer && APackedSize == 1 &&
-               ABlockTransferSrcScalarPerVector == 8 && ABlockTransferDstScalarPerVector_AK1 == 8 &&
-               BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 &&
-               !IsBPreShuffled;
-    }
-
-    __host__ __device__ static constexpr bool BWaveTransferApplicable()
-    {
-        return !ForceThreadTileTransfer && BPackedSize == 1 &&
-               BBlockTransferSrcScalarPerVector == 8 && BBlockTransferDstScalarPerVector_BK1 == 8 &&
-               BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8;
-    }
-
-#ifdef __gfx12__
-    static constexpr bool IsAWaveTransferApplicable = AWaveTransferApplicable();
-
-    static constexpr bool IsBWaveTransferApplicable = BWaveTransferApplicable();
->>>>>>> develop
 
     static constexpr bool IsWaveTileInterleavedFitting =
         (NPerBlock / NPerWmma / NRepeat) * (KPerBlock / KPack) >= (BlockSize / WaveSize);

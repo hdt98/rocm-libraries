@@ -213,10 +213,7 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_streamk
     using ThisThreadBlock = typename Base::ThisThreadBlock;
     using Base::GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1;
     using Base::GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1;
-<<<<<<< HEAD
     using Base::GetSharedMemoryNumberOfByte;
-=======
->>>>>>> develop
 
     // K1 should be Number<...>
     static constexpr auto K1        = Number<K1Value>{};
@@ -286,7 +283,6 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_streamk
 
     __host__ static constexpr index_t GetSharedMemoryNumberOfByteOnHost()
     {
-<<<<<<< HEAD
         if(is_gfx125_supported())
         {
             return GetSharedMemoryNumberOfByte(gfx125_t{});
@@ -298,15 +294,6 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_streamk
         else
         {
             return GetSharedMemoryNumberOfByte(gfx_invalid_t{});
-=======
-        if(ck::get_device_name() == "gfx950")
-        {
-            return Base::GetSharedMemoryNumberOfByte(gfx950_t{});
-        }
-        else
-        {
-            return Base::GetSharedMemoryNumberOfByte(gfx_invalid_t{});
->>>>>>> develop
         }
     }
     __host__ __device__ static auto CalculateK0(index_t KPad) { return KPad / K1; }

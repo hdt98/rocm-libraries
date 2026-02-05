@@ -261,8 +261,6 @@ if ((SUPPORTED_GPU_TARGETS MATCHES "gfx94" OR SUPPORTED_GPU_TARGETS MATCHES "gfx
     add_definitions(-DCK_USE_GFX94)
     set(CK_USE_GFX94 "ON")
 endif()
-<<<<<<< HEAD
-=======
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx950" AND NOT FORCE_DISABLE_XDL)
     message(STATUS "Enabling XDL FP8 gemms on gfx950")
     add_definitions(-DCK_USE_GFX950)
@@ -272,7 +270,6 @@ endif()
 # new macro CK_TILE_USE_WMMA in order to separately compile examples for MFMA/WMMA
 set(CK_TILE_USE_WMMA 0)
 
->>>>>>> develop
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx10")
     add_definitions(-DCK_GFX1030_SUPPORT)
 endif()

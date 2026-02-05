@@ -1100,7 +1100,6 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-<<<<<<< HEAD
 #if DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
         if(arg.k_batch_ < 0)
         {
@@ -1121,9 +1120,6 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffle
             return false;
         }
         if(!is_xdl_wmma_k_supported<ComputeTypeB, Number<K0PerBlock * K1>{}, K1>())
-=======
-        if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
->>>>>>> develop
         {
             return false;
         }

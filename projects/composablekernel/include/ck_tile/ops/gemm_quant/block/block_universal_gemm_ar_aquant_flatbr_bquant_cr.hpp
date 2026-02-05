@@ -123,7 +123,6 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
     };
 
     public:
-<<<<<<< HEAD
     using Traits           = GemmTraits_<Problem_, BlockPolicy_>;
     using Problem          = remove_cvref_t<Problem_>;
     using BlockPolicy      = remove_cvref_t<BlockPolicy_>;
@@ -135,18 +134,6 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
     using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
     using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>; // TileFlatmmShape
     using QuantGroupSize   = remove_cvref_t<typename Problem::BQuantGroupSize>;
-=======
-    using Traits          = GemmTraits_<Problem_, BlockPolicy_>;
-    using Problem         = remove_cvref_t<Problem_>;
-    using BlockPolicy     = remove_cvref_t<BlockPolicy_>;
-    using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-    using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-    using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
-    using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-    using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-    using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>; // TileFlatmmShape
-    using BQuantGroupSize = remove_cvref_t<typename Problem::BQuantGroupSize>;
->>>>>>> develop
 
     static_assert(BQuantGroupSize::kM == 1, "only N/K blocks for BQuant preshuffle kernel!");
 

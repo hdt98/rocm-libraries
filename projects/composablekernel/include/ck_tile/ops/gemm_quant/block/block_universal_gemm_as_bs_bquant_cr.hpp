@@ -26,7 +26,6 @@ struct BQuantBlockUniversalGemmAsBsCr
     template <typename PipelineProblem_, typename GemmPolicy_>
     struct GemmTraits_
     {
-<<<<<<< HEAD
         using Problem          = remove_cvref_t<PipelineProblem_>;
         using Policy           = remove_cvref_t<GemmPolicy_>;
         using ADataType        = remove_cvref_t<typename Problem::ADataType>;
@@ -39,19 +38,6 @@ struct BQuantBlockUniversalGemmAsBsCr
         using CDataType        = remove_cvref_t<typename Problem::CDataType>;
         using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
         using QuantGroupSize   = remove_cvref_t<typename Problem::BQuantGroupSize>;
-=======
-        using Problem         = remove_cvref_t<PipelineProblem_>;
-        using Policy          = remove_cvref_t<GemmPolicy_>;
-        using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-        using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-        using BQDataType      = remove_cvref_t<typename Problem::BQDataType>;
-        using BLayout         = remove_cvref_t<typename Problem::BLayout>;
-        using BQLayout        = remove_cvref_t<typename Problem::BQLayout>;
-        using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
-        using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-        using BlockGemmShape  = remove_cvref_t<typename Problem::BlockGemmShape>;
-        using BQuantGroupSize = remove_cvref_t<typename Problem::BQuantGroupSize>;
->>>>>>> develop
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;
