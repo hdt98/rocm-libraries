@@ -4,6 +4,7 @@
 #define GUARD_RANDOM_GEN_
 
 #include <miopen/env.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 
 #include <cassert>
 #include <iostream>

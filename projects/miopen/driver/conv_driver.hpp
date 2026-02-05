@@ -1722,7 +1722,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         if(json_mode)
         {
             std::cout << "{\"performance\":{"
-                      << "\"name\":\"fwd-conv" << wei_h << wei_w << "x" <<  miopen::deref(convDesc).GetConvStrides()[0] << ","
+                      << "\"name\":\"fwd-conv" << wei_h << wei_w << "x" <<  miopen::deref(convDesc).GetConvStrides()[0] << "\","
                       << "\"n\":" << in_n << ","
                       << "\"c\":" << in_c << ","
                       << "\"ho\":" << out_h << ","
@@ -1732,7 +1732,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                       << "\"k\":" << out_c << ","
                       << "\"flop_count\":" << flopCnt << ","
                       << "\"bytes_read\":" << readBytes << ","
-                      << "\"bytes_writter\":" << outputBytes << ","
+                      << "\"bytes_written\":" << outputBytes << ","
                       << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
                       << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6) << ","
                       << "\"average_time_ms\":" << kernel_average_time 
@@ -1791,12 +1791,12 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
             std::cout << "{\"performance\":{"
                       << "\"direction\":\"forward\","
                       << "\"operation\":\"conv\","
-                      << "\"dimensions\":\"3\","
+                      << "\"dimensions\":3,"
                       << "\"results\":{"
                       << "\"average_time_ms\":" << kernel_average_time << ","
                       << "\"flop_count\":" << flopCnt << ","
                       << "\"bytes_read\":" << readBytes << ","
-                      << "\"bytes_writter\":" << outputBytes << ","
+                      << "\"bytes_written\":" << outputBytes << ","
                       << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
                       << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
                       << "}}}" << std::endl;
@@ -2175,14 +2175,8 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         if(!json_mode)
         {
             std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(solution) << std::endl;
-            PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
         }
-        else
-        {
-            std::cout << "{solution: \"" << AlgorithmSolutionToString(solution) << "\", ";
-            PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
-            std::cout << "}";
-        }
+        PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
     }
 
     return rc;
@@ -2338,8 +2332,13 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
     }
     if(time_enabled)
     {
-        std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(*selected) << std::endl;
-        PrintForwardTime(kernel_total_time, kernel_first_time);
+        const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+        const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+        if(!json_mode)
+        {
+            std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(*selected) << std::endl;
+        }
+        PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
     }
 
     is_fwd_igemm = (selected->algorithm == miopenConvolutionAlgoImplicitGEMM);
@@ -3619,9 +3618,9 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     {
         if(json_mode)
         {
-            std::cout << "\"verification\":{\"direction\":\"forward\",\"status\":\"FAILED\","
+            std::cout << "{\"verification\":{\"direction\":\"forward\",\"status\":\"FAILED\","
                       << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
-                      << "\"error\":" << error << ",\"tolerance\":" << tolerance << "}";
+                      << "\"error\":" << error << ",\"tolerance\":" << tolerance << "}}" << std::endl;
         }
         else
         {
@@ -3632,9 +3631,9 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
 
     if(json_mode)
     {
-        std::cout << "\"verification\":{\"direction\":\"forward\",\"status\":\"OK\","
+        std::cout << "{\"verification\":{\"direction\":\"forward\",\"status\":\"OK\","
                   << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
-                  << "\"error\":" << error << ",\"tolerance\":" << tolerance << "}";
+                  << "\"error\":" << error << ",\"tolerance\":" << tolerance << "}}" << std::endl;
     }
     else
     {
@@ -3658,6 +3657,9 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         return 0;
 
     MIOPEN_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
+
+    const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool json_mode = miopen::IsJsonModeEnabled(log_level);
 
     int cumulative_rc = 0;
     if(is_bwd)
@@ -3684,9 +3686,9 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         {
             if(json_mode)
             {
-                std::cout << "\"verification\":{\"direction\":\"backward\",\"status\":\"FAILED\","
+                std::cout << "{\"verification\":{\"direction\":\"backward_data\",\"status\":\"FAILED\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
-                        << "\"error\":" << error_data << ",\"tolerance\":" << tolerance << "}";
+                        << "\"error\":" << error_data << ",\"tolerance\":" << tolerance << "}}" << std::endl;
             }
             else
             {
@@ -3697,12 +3699,11 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         }
         else
         {
-            
             if(json_mode)
             {
-                std::cout << "\"verification\":{\"direction\":\"backward\",\"status\":\"OK\","
+                std::cout << "{\"verification\":{\"direction\":\"backward_data\",\"status\":\"OK\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
-                        << "\"error\":" << error_data << ",\"tolerance\":" << tolerance << "}";
+                        << "\"error\":" << error_data << ",\"tolerance\":" << tolerance << "}}" << std::endl;
             }
             else
             {
@@ -3758,15 +3759,33 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
 
         if(!std::isfinite(error_weights) || error_weights > tolerance)
         {
-            std::cout << "Backward Convolution Weights FAILED: " << error_weights << " > "
-                      << tolerance << std::endl;
+            if(json_mode)
+            {
+                std::cout << "{\"verification\":{\"direction\":\"backward_weights\",\"status\":\"FAILED\","
+                        << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                        << "\"error\":" << error_weights << ",\"tolerance\":" << tolerance << "}}" << std::endl;
+            }
+            else
+            {
+                std::cout << "Backward Convolution Weights FAILED: " << error_weights << " > "
+                          << tolerance << std::endl;
+            }
             cumulative_rc |= EC_VerifyWrw;
         }
         else
         {
-            std::cout << "Backward Convolution Weights Verifies OK on "
-                      << (UseGPUReference() ? "GPU" : "CPU") << " reference (" << error_weights
-                      << " < " << tolerance << ')' << std::endl;
+            if(json_mode)
+            {
+                std::cout << "{\"verification\":{\"direction\":\"backward_weights\",\"status\":\"OK\","
+                        << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                        << "\"error\":" << error_weights << ",\"tolerance\":" << tolerance << "}}" << std::endl;
+            }
+            else
+            {
+                std::cout << "Backward Convolution Weights Verifies OK on "
+                          << (UseGPUReference() ? "GPU" : "CPU") << " reference (" << error_weights
+                          << " < " << tolerance << ')' << std::endl;
+            }
         }
     }
 
@@ -3781,15 +3800,33 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         const auto tolerance = GetDefaultTolerance();
         if(!std::isfinite(error_bias) || error_bias > tolerance)
         {
-            std::cout << "Backward Convolution Bias FAILED: " << error_bias << " > " << tolerance
-                      << std::endl;
+            if(json_mode)
+            {
+                std::cout << "{\"verification\":{\"direction\":\"backward_bias\",\"status\":\"FAILED\","
+                        << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                        << "\"error\":" << error_bias << ",\"tolerance\":" << tolerance << "}}" << std::endl;
+            }
+            else
+            {
+                std::cout << "Backward Convolution Bias FAILED: " << error_bias << " > " << tolerance
+                          << std::endl;
+            }
             cumulative_rc |= EC_VerifyBwdBias;
         }
         else
         {
-            std::cout << "Backward Convolution Bias Verifies OK on "
-                      << (UseGPUReference() ? "GPU" : "CPU") << " reference (" << error_bias << ')'
-                      << std::endl;
+            if(json_mode)
+            {
+                std::cout << "{\"verification\":{\"direction\":\"backward_bias\",\"status\":\"OK\","
+                        << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
+                        << "\"error\":" << error_bias << ",\"tolerance\":" << tolerance << "}}" << std::endl;
+            }
+            else
+            {
+                std::cout << "Backward Convolution Bias Verifies OK on "
+                          << (UseGPUReference() ? "GPU" : "CPU") << " reference (" << error_bias << ')'
+                          << std::endl;
+            }
         }
     }
 

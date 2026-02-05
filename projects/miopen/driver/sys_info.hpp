@@ -22,8 +22,6 @@
 #include <hip/hip_runtime.h>
 #endif
 
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
-
 namespace RocmPerf {
 
 #define HIP_CHECK(call)                                                         \
