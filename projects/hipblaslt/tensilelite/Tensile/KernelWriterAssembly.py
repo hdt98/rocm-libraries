@@ -4164,7 +4164,9 @@ class KernelWriterAssembly(KernelWriter):
     if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] != 0:
       tmpVgpr = self.vgprPool.checkOutAligned(2, 2)
       tmpVgprRes = ContinuousRegister(tmpVgpr, 2)
-      module.add(vectorStaticDivide(tmpVgpr, destVgpr, kernel["LdsBlockSizePerPad%s"%tc], tmpVgprRes, \
+      # Need to explicitly convert kernel["LdsBlockSizePerPad%s"%tc] to Int to match
+      # the signature of nanobind
+      module.add(vectorStaticDivide(tmpVgpr, destVgpr, int(kernel["LdsBlockSizePerPad%s"%tc]), tmpVgprRes, \
         "padding %u per block %u" % (int(kernel["LdsPad%s"%tc] * tP["bpeDS"]), kernel["LdsBlockSizePerPad%s"%tc])))
       with self.allocTmpSgpr(1) as tmpSgprInfo:
         module.add(vectorStaticMultiplyAdd(vgpr(destVgpr), vgpr(tmpVgpr), int(kernel["LdsPad%s"%tc] * tP["bpeDS"]), vgpr(destVgpr), tmpSgprInfo, \
@@ -4369,7 +4371,7 @@ class KernelWriterAssembly(KernelWriter):
 
       # LdsBlockSizePerPad: add padding
       if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] !=0:
-        module.add(vectorStaticDivide(rReg, "LocalReadAddr%s"%tc, kernel["LdsBlockSizePerPad%s"%tc], tmpVgprRes, \
+        module.add(vectorStaticDivide(rReg, "LocalReadAddr%s"%tc, int(kernel["LdsBlockSizePerPad%s"%tc]), tmpVgprRes, \
           "Final Offset: padding %u per block %u" % (int(kernel["LdsPad%s"%tc] * tP["bpeDS"]), kernel["LdsBlockSizePerPad%s"%tc])))
         with self.allocTmpSgpr(1) as tmpSgprInfo:
           module.add(vectorStaticMultiplyAdd(vgpr("LocalReadAddr%s"%tc), vgpr(rReg), int(kernel["LdsPad%s"%tc] * tP["bpeDS"]), vgpr("LocalReadAddr%s"%tc), tmpSgprInfo, \
@@ -4429,7 +4431,7 @@ class KernelWriterAssembly(KernelWriter):
         with self.allocTmpSgpr(1) as tmpSgprInfo:
           tmpSgpr = tmpSgprInfo.idx
           rReg    = self.vgprPool.checkOut(1) # remainder, unused here
-          module.add(vectorStaticDivide(rReg, "LocalReadAddr%s"%tc, kernel["LdsBlockSizePerPad%s"%tc], tmpSgpr, \
+          module.add(vectorStaticDivide(rReg, "LocalReadAddr%s"%tc, int(kernel["LdsBlockSizePerPad%s"%tc]), tmpSgpr, \
             "Final Offset: padding %u per block %u" % (kernel["LdsPad%s"%tc], kernel["LdsBlockSizePerPad%s"%tc])))
           module.add(vectorStaticMultiplyAdd(vgpr("LocalReadAddr%s"%tc), vgpr(rReg), int(kernel["LdsPad%s"%tc] * tP["bpe"]), vgpr("LocalReadAddr%s"%tc), tmpSgprInfo, \
             "Final Offset: padding %u per block %u" % (int(kernel["LdsPad%s"%tc] * tP["bpeDS"]), kernel["LdsBlockSizePerPad%s"%tc])))
@@ -5518,9 +5520,11 @@ class KernelWriterAssembly(KernelWriter):
         jumpLabel(tP, sLoadTileIdx, checkAddrLabel)
         imod.add(checkAddrLabel)
         imod.add(VSubU32(dst=vgpr(tmpVgpr), src0=vgpr(tmpVgpr),
-                         src1=self.states.srdShiftLeft[tc] * tP["bpeGR"], comment="sub prepad"))
+                         src1=int(self.states.srdShiftLeft[tc] * tP["bpeGR"]), comment="sub prepad"))
+                         #src1=self.states.srdShiftLeft[tc] * tP["bpeGR"], comment="sub prepad"))
         loadRangePerThread = tP["glvw"] * tP["bpeGR"] - 1
-        imod.add(VAddU32(dst=vgpr(tmpVgpr+1), src0=vgpr(tmpVgpr), src1=loadRangePerThread, \
+        #imod.add(VAddU32(dst=vgpr(tmpVgpr+1), src0=vgpr(tmpVgpr), src1=loadRangePerThread, \
+        imod.add(VAddU32(dst=vgpr(tmpVgpr+1), src0=vgpr(tmpVgpr), src1=int(loadRangePerThread), \
                          comment="Calculate load range per thread"))
         imod.add(VCmpLtI32(dst=sgpr(sCmpLoadStartAddrStatusx2, 2), src0=vgpr(tmpVgpr), \
                            src1=sgpr(sValidBytes), \
@@ -12787,7 +12791,8 @@ class KernelWriterAssembly(KernelWriter):
 
     if useBuffer:
       rv = Module("Global Read")
-      mubuf = MUBUFModifiers(offen=True, offset12=offset, glc=glc, slc=slc, nt=nt, lds=lds)
+
+      mubuf = MUBUFModifiers(offen=True, offset12=int(offset), glc=glc, slc=slc, nt=nt, lds=lds)
 
       # Nested buffer load implementation function for easy branching for soffset
       def bufferLoadImpl(soffset):
@@ -12824,7 +12829,7 @@ class KernelWriterAssembly(KernelWriter):
           dst = None if lds else vgpr(destVgpr, 4)
           rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
                                 soffset=soffset, mubuf=mubuf, comment=comment))
-          mubuf2 = MUBUFModifiers(offen=True, offset12=offset+16, glc=glc, slc=slc, nt=nt, lds=lds)
+          mubuf2 = MUBUFModifiers(offen=True, offset12=int(offset+16), glc=glc, slc=slc, nt=nt, lds=lds)
           if isinstance(destVgpr, str):
             dst2 = destVgpr + "+" + str(int(4))
           elif isinstance(destVgpr, int):
@@ -12858,7 +12863,6 @@ class KernelWriterAssembly(KernelWriter):
           dst = vgpr(destVgpr, rpv//4)
           rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
                                 soffset=soffset, mubuf=mubuf, comment=comment))
-
           mubuf2 = MUBUFModifiers(offen=True, offset12=int(offset + bpl/4), glc=glc, slc=slc, nt=nt, lds=lds)
           dst2 = destVgpr + "+" + str(int(rpv//4)) if isinstance(destVgpr, str) else int(destVgpr + int(rpv//4))
 
@@ -12922,6 +12926,7 @@ class KernelWriterAssembly(KernelWriter):
         return FlatLoadB128(dst=vgpr(destVgpr, rpv), vaddr=addr0, flat=flat, comment=comment)
       else:
         assert 0, "chooseGlobalRead: bad bpl"
+
 
   ##############################################################################
   def chooseGlobalWrite(self, useBuffer, bps, srcVgpr, rpv, \

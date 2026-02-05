@@ -918,12 +918,17 @@ class Solution(collections.abc.Mapping):
 
     # TODO: Currently DTL with input types of different size is not support. There are functional issues
     # This needs to be fixed.
+    # Should this be changed to? I think this is also needed as it might fail like line 931
+    #if state["ProblemType"]["DataType%s"%tc].numBytes() != state["ProblemType"]["MacDataType%s"%tc].numBytes():
     if state["ProblemType"]["DataType%s"%tc].numBytes() != state["ProblemType"]["MacDataTypeA"].numBytes():
       reject(state, printRejectionReason, "DirectToLds%s with conversion to different sized data types is not supported"%tc)
       return False
 
     # DTL + input type conversion
-    if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["MacDataTypeA"]:
+    # This is required, otherwise it might compare DataTypesB to MacDataTypeA
+    # Should examine all places that hardcoding "MacDataTypeA"
+    #if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["MacDataTypeA"]:
+    if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["MacDataType%s"%tc]:
       if not state["ConvertAfterDS"]:
         reject(state, printRejectionReason, "DirectToLds%s + input conversion + ConvertAfterDS=False not supported"%(tc))
         return False
@@ -1958,63 +1963,69 @@ class Solution(collections.abc.Mapping):
         return ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB, ldsNumBytesMetadata, ldsNumBytesAlignedMetadata, \
                ldsNumBytesMXSA, ldsNumBytesAlignedMXSA, ldsNumBytesMXSB, ldsNumBytesAlignedMXSB
 
+
       if state["LocalReadVectorWidthA"] == -1:
         state["LocalReadVectorWidthA"] = state["LocalReadVectorWidth"]
 
       if state["LocalReadVectorWidthB"] == -1:
         state["LocalReadVectorWidthB"] = state["LocalReadVectorWidth"]
 
+
+      # This function calculates LRVW by separating MX and non-MX types
+      def calLRVW(name) -> int:
+        if state["ProblemType"]["MXBlock%s"%name]:
+          # This is for MX data types
+          autoLRVW = 0
+          if state["LocalReadVectorWidth%s"%name] != -1:
+            tmplrvw = (state["LocalReadVectorWidth%s"%name] // 2) if state["ProblemType"]["Sparse"] else state["LocalReadVectorWidth%s"%name]
+            if tmplrvw * state["ProblemType"]["MacDataType%s"%name].numRegisters() < 1:
+              reject(state, "LocalReadVectorWidth * dataRegister < 1")
+            if state["LocalReadVectorWidth%s" % name] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, "LocalReadVectorWidth require Transpose LDS")
+          else:
+            if state["ProblemType"]["MacDataType%s" % name].is6bitFloat():
+              state["LocalReadVectorWidth%s" % name] = 32 if state["UnrollMajorLDS%s" % name] else 16
+            else:
+              autoLRVW = 1
+              if state["TransposeLDS"] and (not state["DirectToLds"]):
+                state["LocalReadVectorWidth%s" % name] = int(16 // state["ProblemType"]["MacDataType%s" % name].numBytes())
+              else:
+                if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"]["MacDataType%s" % name].numBytes() > 16:
+                  state["LocalReadVectorWidth%s" % name] = int(16 // state["ProblemType"]["MacDataType%s" % name].numBytes())
+                else:
+                  state["LocalReadVectorWidth%s" % name] = state["MIInputPerThread"]
+
+              if state["LocalReadVectorWidth%s" % name] // state["MIInputPerThread"] > 1:
+                if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidth%s" % name] // state["MIInputPerThread"]):
+                  # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                  state["LocalReadVectorWidth%s" % name] //= 2
+          return autoLRVW
+        #else:
+        else:
+          # This is for non-MX data types
+          autoLRVW = 0
+          if state["LocalReadVectorWidth"] == -1:
+            autoLRVW = 1
+            if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["DataType"].numBytes() > 16):
+              state["LocalReadVectorWidth"] = 16 // state["ProblemType"]["DataType"].numBytes()
+            else:
+              state["LocalReadVectorWidth"] = state["MIInputPerThread"]
+          else:
+            if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"]["DataType"].numBytes() > 16:
+              if state["LocalReadVectorWidth"] < state["MIInputPerThread"] // 2:
+                reject(state, printRejectionReason, "LocalReadVectorWidth < %u" %(state["MIInputPerThread"] // 2))
+            elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["DataType"].is8bitFloat() and (state["MatrixInstK"] == 64 or state["MatrixInstK"] == 128)):
+              if state["LocalReadVectorWidth"] < state["MIInputPerThread"]:
+                reject(state, printRejectionReason, "LocalReadVectorWidth < %u" %(state["MIInputPerThread"]))
+            if state["LocalReadVectorWidth"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidth require Transpose LDS")
+          return autoLRVW
+
+
       # Default LocalReadVectorWidth
       if state["EnableMatrixInstruction"]:
-        autoLRVWA = 0
-        if state["LocalReadVectorWidthA"] != -1:
-          tmplrvw = (state["LocalReadVectorWidthA"] // 2) if state["ProblemType"]["Sparse"] else state["LocalReadVectorWidthA"]
-          if tmplrvw * state["ProblemType"]["MacDataTypeA"].numRegisters() < 1:
-            reject(state, "LocalReadVectorWidth * dataRegister < 1")
-          if state["LocalReadVectorWidthA"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
-            reject(state, "LocalReadVectorWidth require Transpose LDS")
-        else:
-          if state["ProblemType"]["MacDataTypeA"].is6bitFloat():
-            state["LocalReadVectorWidthA"] = 32 if state["UnrollMajorLDSA"] else 16
-          else:
-            autoLRVWA = 1
-            if state["TransposeLDS"] and (not state["DirectToLds"]):
-              state["LocalReadVectorWidthA"] = int(16 // state["ProblemType"]["MacDataTypeA"].numBytes())
-            else:
-              if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeA"].numBytes() > 16:
-                state["LocalReadVectorWidthA"] = int(16 // state["ProblemType"]["MacDataTypeA"].numBytes())
-              else:
-                state["LocalReadVectorWidthA"] = state["MIInputPerThread"]
-
-            if state["LocalReadVectorWidthA"] // state["MIInputPerThread"] > 1:
-              if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthA"] // state["MIInputPerThread"]):
-                # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
-                state["LocalReadVectorWidthA"] //= 2
-
-        autoLRVWB = 0
-        if state["LocalReadVectorWidthB"] != -1:
-          tmplrvw = (state["LocalReadVectorWidthB"] // 2) if state["ProblemType"]["Sparse"] else state["LocalReadVectorWidthB"]
-          if tmplrvw * state["ProblemType"]["MacDataTypeB"].numRegisters() < 1:
-            reject(state, "LocalReadVectorWidth * dataRegister < 1")
-          if state["LocalReadVectorWidthB"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
-            reject(state, "LocalReadVectorWidth require Transpose LDS")
-        else:
-          if state["ProblemType"]["MacDataTypeB"].is6bitFloat():
-            state["LocalReadVectorWidthB"] = 32 if state["UnrollMajorLDSB"] else 16
-          else:
-            autoLRVWB = 1
-            if state["TransposeLDS"] and (not state["DirectToLds"]):
-              state["LocalReadVectorWidthB"] = int(16 // state["ProblemType"]["MacDataTypeB"].numBytes())
-            else:
-              if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeB"].numBytes() > 16:
-                state["LocalReadVectorWidthB"] = int(16 // state["ProblemType"]["MacDataTypeB"].numBytes())
-              else:
-                state["LocalReadVectorWidthB"] = state["MIInputPerThread"]
-
-            if state["LocalReadVectorWidthB"] // state["MIInputPerThread"] > 1:
-              if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthB"] // state["MIInputPerThread"]):
-                # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
-                state["LocalReadVectorWidthB"] //= 2
+        autoLRVWA = calLRVW("A")
+        autoLRVWB = calLRVW("B")
 
         if autoLRVWA or autoLRVWB:
           wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
@@ -2428,12 +2439,17 @@ class Solution(collections.abc.Mapping):
                 if not Solution.setGlobalReadVectorWidth(state, "Metadata", tvm, glvwMlimit, printRejectionReason):
                   validDepthU = False
 
-        if validDepthU and state["KernelLanguage"] == "Assembly":
-          if isaInfoMap[isa].archCaps["HasEccHalf"]:
-            if state["ProblemType"]["MacDataTypeA"].numRegisters() == 0.5 and (not state["ProblemType"]["HighPrecisionAccumulate"]):
-                if state["GlobalReadVectorWidthA"] == 1 or state["GlobalReadVectorWidthB"] == 1:
-                  reject(state, "HalfEcc requires HPA if glvw = 1")
-                  break
+        # This was modified from develop branch, but it only looks at MacDataTypeA.
+        # Will be trigggered (rejected) during build. Comment out this for workaround.
+        #if validDepthU and state["KernelLanguage"] == "Assembly":
+        #  if isaInfoMap[isa].archCaps["HasEccHalf"]:
+        #    if state["ProblemType"]["MacDataTypeA"].numRegisters() == 0.5 and (not state["ProblemType"]["HighPrecisionAccumulate"]):
+        #        if state["GlobalReadVectorWidthA"] == 1 or state["GlobalReadVectorWidthB"] == 1:
+        #          print("Hello")
+        #          print(state["ProblemType"]["MacDataTypeA"])
+        #          print("Hello2")
+        #          reject(state, "HalfEcc requires HPA if glvw = 1")
+        #          break
 
         if state["ProblemType"]["Sparse"] and state["DirectToVgprSparseMetadata"]:
           if state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1 :
@@ -3117,6 +3133,8 @@ class Solution(collections.abc.Mapping):
 
     if state["PrefetchGlobalRead"]:
       offsetBlk = state["LdsOffsetB"] + state["LdsNumElementsAlignedB"]
+
+      # Separate MX and non-MX, otherwise, will hit LDS overflow issue.
       # TODO:
       # Disable StoreSwapAddr to ensure LdsOffsetA_Blk is always a power of 2
       # This is consistent with referenc implementation which doesn't have StoreSwapAddr
