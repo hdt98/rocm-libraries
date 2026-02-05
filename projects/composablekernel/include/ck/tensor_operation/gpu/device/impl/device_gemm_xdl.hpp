@@ -203,6 +203,15 @@ struct DeviceGemmXdl : public DeviceGemm<ALayout,
 
     static bool IsSupportedArgument(const Argument& karg)
     {
+        if(!ck::is_xdl_wmma_supported<ADataType,
+                                      BDataType,
+                                      MPerXDL,
+                                      NPerXDL,
+                                      WarpTileConfig32.At(0),
+                                      WarpTileConfig32.At(1)>())
+        {
+            return false;
+        }
         if(ck::get_device_name() == "gfx908")
         {
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, float> ||

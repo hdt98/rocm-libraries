@@ -386,6 +386,8 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
     const auto op_ptrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOp>::GetInstances();
 
+    std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
+
     std::array<ck::index_t, NDimSpatial + 3> out_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> out_strides{};
     std::array<ck::index_t, NDimSpatial + 3> wei_lengths{};

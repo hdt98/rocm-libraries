@@ -164,6 +164,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                                                     StrideE,
                                                     KBatch,
                                                     block_2_etile_map);
+                __syncthreads();
             }
 
             id_off += grid_size_grp;

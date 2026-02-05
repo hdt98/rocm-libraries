@@ -206,7 +206,7 @@ class TestGroupedConvndBwdData : public ::testing::Test
         // get device op instances
         const auto op_ptrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
             DeviceOp>::GetInstances();
-
+        std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
         int num_kernel = 0;
 
         for(std::size_t i = 0; i < op_ptrs.size(); ++i)

@@ -297,6 +297,8 @@ bool profile_reduce_impl_impl(bool do_verification,
             ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
                 ReduceOp>::GetInstances();
 
+        std::cout << "found " << reduce_ptrs.size() << " instances" << std::endl;
+
         if(reduce_ptrs.empty())
         {
             throw std::runtime_error("Wrong! No device REDUCE instance found");

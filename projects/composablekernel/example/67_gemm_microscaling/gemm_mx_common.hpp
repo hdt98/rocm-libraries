@@ -9,7 +9,6 @@
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/element/unary_element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/device/gemm_specialization.hpp"
-#include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle_v3_mx.hpp"
 #include "ck/library/utility/host_tensor_generator.hpp"
 #include "ck/utility/blkgemmpipe_scheduler.hpp"
 #include "ck/utility/data_type.hpp"
@@ -27,9 +26,10 @@ using ::ck::Tensor;
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
 
-using Row  = ck::tensor_layout::gemm::RowMajor;
-using Col  = ck::tensor_layout::gemm::ColumnMajor;
-using MFMA = ck::tensor_layout::gemm::MFMA;
+using Row    = ck::tensor_layout::gemm::RowMajor;
+using Col    = ck::tensor_layout::gemm::ColumnMajor;
+using MFMA   = ck::tensor_layout::gemm::MFMA;
+using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
 using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 

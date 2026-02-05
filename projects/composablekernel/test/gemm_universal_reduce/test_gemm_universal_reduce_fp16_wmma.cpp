@@ -26,6 +26,6 @@ TEST(GemmUniversalReduce, FP16)
                                                                     Row,
                                                                     ck::Tuple<>,
                                                                     Row>(
-                       true, 1, false, true, M, N, K, K, N, N, KBatch, 1, 10);
+                       true, 1, false, false, M, N, K, K, N, N, KBatch, 1, 10);
     EXPECT_TRUE(pass);
 }
