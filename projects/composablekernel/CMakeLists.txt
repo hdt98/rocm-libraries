@@ -72,6 +72,13 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
+# Include debug configuration if building in debug mode
+# option(CK_ENABLE_DEBUG_CONFIG "Enable debug-friendly configuration" ON)
+# if(CK_ENABLE_DEBUG_CONFIG AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+#    include(DebugConfig)
+# endif()
+
+
 if (DTYPES)
     add_definitions(-DDTYPES)
     if (DTYPES MATCHES "int8")
@@ -126,10 +133,10 @@ add_compile_options(-Wno-switch-default)
 add_compile_options(-Wno-unique-object-duplication)
 
 # add -Og -gdwarf64 for debug builds
-add_compile_options(
-    "$<$<CONFIG:Debug>:-Og>"
-    "$<$<CONFIG:Debug>:-gdwarf64>"
-)
+# add_compile_options(
+#     "$<$<CONFIG:Debug>:-Og>"
+#     "$<$<CONFIG:Debug>:-gdwarf64>"
+# )
 
 # Recent change in compiler makes this warning ON by default, which led to compile errors.
 add_compile_options(-Wno-nrvo)
@@ -390,11 +397,11 @@ if(USE_BITINT_EXTENSION_INT4)
     message(STATUS "CK compiled with USE_BITINT_EXTENSION_INT4 set to ${USE_BITINT_EXTENSION_INT4}")
 endif()
 
-if(ENABLE_ASM_DUMP)
-    add_compile_options(--save-temps) 
-    add_compile_options(-Wno-gnu-line-marker)
-    message("CK compiled with ENABLE_ASM_DUMP set to ${ENABLE_ASM_DUMP}")
-endif()
+# if(ENABLE_ASM_DUMP)
+#     add_compile_options(--save-temps) 
+#     add_compile_options(-Wno-gnu-line-marker)
+#     message("CK compiled with ENABLE_ASM_DUMP set to ${ENABLE_ASM_DUMP}")
+# endif()
 
 if (ENABLE_JSON_DUMP)
     add_compile_definitions(CK_ENABLE_JSON_DUMP)
@@ -643,7 +650,7 @@ endif()
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    add_compile_options(-fcolor-diagnostics)
+ #   add_compile_options(-fcolor-diagnostics)
 endif()
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.9)
     add_compile_options(-fdiagnostics-color=always)
