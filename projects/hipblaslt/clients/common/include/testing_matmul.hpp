@@ -3871,8 +3871,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                             float ms;
                             CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
                             hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
-                            if(arg.flush && flush_time_used > 0)
-                                hot_iter_times[i] -= flush_time_used;
                         }
                         gpu_time_used += hot_iter_times[i];
                     }
@@ -4004,8 +4002,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                             float ms;
                             CHECK_HIP_ERROR(hipEventElapsedTime(&ms, hot_events_start[i], hot_events_end[i]));
                             hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
-                            if(arg.flush && flush_time_used > 0)
-                                hot_iter_times[i] -= flush_time_used;
                         }
                         gpu_time_used += hot_iter_times[i];
                     }
@@ -4361,13 +4357,31 @@ void testing_matmul_with_bias(const Arguments& arg,
                     // Calculate filtered mean using Modified Z-Score (z_threshold=2.0)
                     double cold_filtered_avg = removeHighOutliersAndGetMean(cold_iter_times, 2.0);
                     double hot_filtered_avg  = removeHighOutliersAndGetMean(hot_iter_times, 2.0);
+
+                    double hot_filtered_avg_with_flush = hot_filtered_avg;
+                    if(arg.flush && flush_time_used > 0)
+                    {
+                        hot_filtered_avg_with_flush -= flush_time_used;
+                    }
                     
                     hipblaslt_cout << "    Cold stats: avg=" << cold_sum / number_cold_calls
                                    << " us, min=" << cold_min << " us, max=" << cold_max << " us"
                                    << ", filtered_avg=" << cold_filtered_avg << " us" << std::endl;
                     hipblaslt_cout << "    Hot stats:  avg=" << hot_sum / number_hot_calls
                                    << " us, min=" << hot_min << " us, max=" << hot_max << " us"
-                                   << ", filtered_avg=" << hot_filtered_avg << " us" << std::endl;
+                                   << ", filtered_avg=" << hot_filtered_avg << " us";
+
+                    if(arg.flush && flush_time_used > 0)
+                    {
+                        hipblaslt_cout << ", " << "flush time: " << flush_time_used << " us"
+                                       << " (with flush: " << hot_filtered_avg_with_flush << " us)"
+                                       << std::endl;
+                    }
+                    else
+                    {
+                        hipblaslt_cout << std::endl;
+                    }
+                                  
                     
                     // Update gpu_time_used to use filtered average for more accurate performance calculation
                     gpu_time_used = hot_filtered_avg * number_hot_calls;
