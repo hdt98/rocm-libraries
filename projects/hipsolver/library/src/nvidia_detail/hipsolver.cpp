@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -3937,6 +3937,192 @@ catch(...)
     return hipsolver::exception2hip_status();
 }
 
+/******************** GETRF_BATCHED ********************/
+hipsolverStatus_t hipsolverSgetrfBatched_bufferSize(
+    hipsolverHandle_t handle, int m, int n, float* A[], int lda, int* lwork, int batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDgetrfBatched_bufferSize(
+    hipsolverHandle_t handle, int m, int n, double* A[], int lda, int* lwork, int batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverCgetrfBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    hipFloatComplex*  A[],
+                                                    int               lda,
+                                                    int*              lwork,
+                                                    int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverZgetrfBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    hipDoubleComplex* A[],
+                                                    int               lda,
+                                                    int*              lwork,
+                                                    int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverSgetrfBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         float*            A[],
+                                         int               lda,
+                                         float*            work,
+                                         int               lwork,
+                                         int*              devIpiv,
+                                         int*              devInfo,
+                                         int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    return hipsolver::cuda2hip_status(cublasSgetrfBatched((cublasHandle_t) handle, n, A, lda, devIpiv, devInfo, batch_count);
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDgetrfBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         double*           A[],
+                                         int               lda,
+                                         double*           work,
+                                         int               lwork,
+                                         int*              devIpiv,
+                                         int*              devInfo,
+                                         int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    return hipsolver::cuda2hip_status(cublasSgetrfBatched((cublasHandle_t) handle, n, A, lda, devIpiv, devInfo, batch_count);
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverCgetrfBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         hipFloatComplex*  A[],
+                                         int               lda,
+                                         hipFloatComplex*  work,
+                                         int               lwork,
+                                         int*              devIpiv,
+                                         int*              devInfo,
+                                         int               batch_count) try
+    if(!handle) return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+if(m != n)
+    return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    return hipsolver::cuda2hip_status(cublasSgetrfBatched((cublasHandle_t) handle, n, (cuComplex**)A, lda, devIpiv, devInfo, batch_count);
+{
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverZgetrfBatched(hipsolverHandle_t handle,
+                                  int               m,
+                                  int               n,
+                                  hipDoubleComplex* A[],
+                                  int               lda,
+                                  hipDoubleComplex* work,
+                                  int               lwork,
+                                  int*              devIpiv,
+                                  int*              devInfo,
+                                  int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    if(m != n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    return hipsolver::cuda2hip_status(cublasSgetrfBatched((cublasHandle_t) handle, n, (cuDoubleComplex**)A, lda, devIpiv, devInfo, batch_count);
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+
 /******************** GETRS ********************/
 hipsolverStatus_t hipsolverSgetrs_bufferSize(hipsolverHandle_t    handle,
                                              hipsolverOperation_t trans,
@@ -7686,4 +7872,4 @@ catch(...)
     return hipsolver::exception2hip_status();
 }
 
-} // extern C
+    } // extern C
