@@ -628,8 +628,9 @@ void LogConvolutionExecution(const miopen::Handle& handle,
 
         // Query perf database for tunable configuration
         // Note: we cannot at present map back from invoker to the kernel config.
-        // So we will simply query the perf db and assume that this (still) matches the kernel that will be executed.
-        
+        // So we will simply query the perf db and assume that this (still) matches the kernel that
+        // will be executed.
+
         // Create a simple wrapper to use the public template GetValues method
         struct ConfigString
         {
