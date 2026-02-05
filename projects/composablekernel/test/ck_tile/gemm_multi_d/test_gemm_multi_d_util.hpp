@@ -36,21 +36,6 @@ struct MultiplyMultiply
     }
 };
 
-#if CK_TILE_USE_WMMA
-template <typename PrecType>
-constexpr ck_tile::index_t get_k_warp_tile()
-{
-#if defined(CK_USE_GFX1250)
-    constexpr bool is_8bit = std::is_same_v<PrecType, ck_tile::fp8_t> ||
-                             std::is_same_v<PrecType, ck_tile::bf8_t> ||
-                             std::is_same_v<PrecType, ck_tile::int8_t>;
-    return is_8bit ? 64 : 32;
-#else
-    return 16;
-#endif
-}
-#endif
-
 template <typename ADataType,
           typename BDataType,
           typename AccDataType,
@@ -110,7 +95,8 @@ class TestCkTileGemmMultiD : public ::testing::Test
         static constexpr ck_tile::index_t K_Tile      = 64;
         static constexpr ck_tile::index_t M_Warp_Tile = 16;
         static constexpr ck_tile::index_t N_Warp_Tile = 16;
-        static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<ComputeType>();
+        static constexpr ck_tile::index_t K_Warp_Tile =
+            ck_tile::get_k_warp_tile<ComputeType, M_Warp_Tile>();
     };
 #else
     struct GemmWarpConfig_Mfma
