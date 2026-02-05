@@ -49,6 +49,24 @@ namespace detail
         while(0)
 #endif // ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR
 
+#ifndef ROCPRIM_DETAIL_HIP_SYNC
+    #define ROCPRIM_DETAIL_HIP_SYNC(name, size, start)                                               \
+        do                                                                                           \
+        {                                                                                            \
+            if(debug_synchronous)                                                                    \
+            {                                                                                        \
+                std::cout << name << "(" << size << ")";                                             \
+                auto __error = hipStreamSynchronize(stream);                                         \
+                if(__error != hipSuccess)                                                            \
+                    return __error;                                                                  \
+                auto _end = std::chrono::steady_clock::now();                                        \
+                auto _d   = std::chrono::duration_cast<std::chrono::duration<double>>(_end - start); \
+                std::cout << " " << _d.count() * 1000 << " ms" << '\n';                              \
+            }                                                                                        \
+        }                                                                                            \
+        while(0)
+#endif // ROCPRIM_DETAIL_HIP_SYNC
+
 #ifndef ROCPRIM_RETURN_ON_ERROR
     #define ROCPRIM_RETURN_ON_ERROR(...)                                        \
         do                                                                      \

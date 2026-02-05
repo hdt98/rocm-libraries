@@ -45,18 +45,6 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-#define ROCPRIM_DETAIL_HIP_SYNC(name, size, start)                                           \
-    if(debug_synchronous)                                                                    \
-    {                                                                                        \
-        std::cout << name << "(" << size << ")";                                             \
-        auto _error = hipStreamSynchronize(stream);                                          \
-        if(_error != hipSuccess)                                                             \
-            return _error;                                                                   \
-        auto _end = std::chrono::steady_clock::now();                                        \
-        auto _d   = std::chrono::duration_cast<std::chrono::duration<double>>(_end - start); \
-        std::cout << " " << _d.count() * 1000 << " ms" << '\n';                              \
-    }
-
 #define SINGLE_REDUCE_KERNEL(fit_larger, fit_items)                                               \
     do                                                                                            \
     {                                                                                             \
@@ -282,7 +270,6 @@ inline hipError_t reduce_impl(void*               temporary_storage,
 }
 
 #undef SINGLE_REDUCE_KERNEL
-#undef ROCPRIM_DETAIL_HIP_SYNC
 
 } // namespace detail
 

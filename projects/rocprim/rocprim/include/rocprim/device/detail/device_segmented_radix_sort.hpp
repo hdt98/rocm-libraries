@@ -28,7 +28,7 @@
 #include "../../detail/various.hpp"
 
 #include "../../functional.hpp"
-#include "../../intrinsics.hpp"
+#include "../../intrinsics/thread.hpp"
 #include "../../type_traits.hpp"
 #include "../../types.hpp"
 
@@ -87,26 +87,24 @@ public:
         typename sort_and_scatter_helper::storage_type sort_and_scatter_helper;
     };
 
-    template<
-        class KeysInputIterator,
-        class KeysOutputIterator,
-        class ValuesInputIterator,
-        class ValuesOutputIterator
-    >
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-    void sort(KeysInputIterator keys_input,
-              key_type * keys_tmp,
-              KeysOutputIterator keys_output,
-              ValuesInputIterator values_input,
-              value_type * values_tmp,
+    template<class KeysInputIterator,
+             class KeysOutputIterator,
+             class ValuesInputIterator,
+             class ValuesOutputIterator>
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void sort(KeysInputIterator    keys_input,
+              key_type*            keys_tmp,
+              KeysOutputIterator   keys_output,
+              ValuesInputIterator  values_input,
+              value_type*          values_tmp,
               ValuesOutputIterator values_output,
-              bool to_output,
-              unsigned int begin_offset,
-              unsigned int end_offset,
-              unsigned int bit,
-              unsigned int begin_bit,
-              unsigned int end_bit,
-              storage_type& storage)
+              bool                 to_output,
+              unsigned int         begin_offset,
+              unsigned int         end_offset,
+              unsigned int         bit,
+              unsigned int         begin_bit,
+              unsigned int         end_bit,
+              storage_type&        storage)
     {
         // Handle cases when (end_bit - bit) is not divisible by radix_bits, i.e. the last
         // iteration has a shorter mask.
@@ -171,19 +169,19 @@ public:
     }
 
     // When all iterators are raw pointers, this overload is used to minimize code duplication in the kernel
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-    void sort(key_type * keys_input,
-              key_type * keys_tmp,
-              key_type * keys_output,
-              value_type * values_input,
-              value_type * values_tmp,
-              value_type * values_output,
-              bool to_output,
-              unsigned int begin_offset,
-              unsigned int end_offset,
-              unsigned int bit,
-              unsigned int begin_bit,
-              unsigned int end_bit,
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void sort(key_type*     keys_input,
+              key_type*     keys_tmp,
+              key_type*     keys_output,
+              value_type*   values_input,
+              value_type*   values_tmp,
+              value_type*   values_output,
+              bool          to_output,
+              unsigned int  begin_offset,
+              unsigned int  end_offset,
+              unsigned int  bit,
+              unsigned int  begin_bit,
+              unsigned int  end_bit,
               storage_type& storage)
     {
         // Handle cases when (end_bit - bit) is not divisible by radix_bits, i.e. the last
@@ -242,22 +240,20 @@ public:
     }
 
 private:
-    template<
-        class KeysInputIterator,
-        class KeysOutputIterator,
-        class ValuesInputIterator,
-        class ValuesOutputIterator
-    >
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-    void sort(KeysInputIterator keys_input,
-              KeysOutputIterator keys_output,
-              ValuesInputIterator values_input,
+    template<class KeysInputIterator,
+             class KeysOutputIterator,
+             class ValuesInputIterator,
+             class ValuesOutputIterator>
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void sort(KeysInputIterator    keys_input,
+              KeysOutputIterator   keys_output,
+              ValuesInputIterator  values_input,
               ValuesOutputIterator values_output,
-              unsigned int begin_offset,
-              unsigned int end_offset,
-              unsigned int bit,
-              unsigned int current_radix_bits,
-              storage_type& storage)
+              unsigned int         begin_offset,
+              unsigned int         end_offset,
+              unsigned int         bit,
+              unsigned int         current_radix_bits,
+              storage_type&        storage)
     {
         unsigned int digit_count;
         count_helper_type().count_digits(keys_input,
@@ -300,13 +296,13 @@ class segmented_radix_sort_single_block_helper
         = decltype(::rocprim::traits::get<Key>().template radix_key_codec<Descending>());
     using bit_key_type = typename key_codec::bit_key_type;
     using sort_type    = ::rocprim::block_radix_sort<Key,
-                                                  BlockSize,
-                                                  ItemsPerThread,
-                                                  Value,
-                                                  1,
-                                                  1,
-                                                  8,
-                                                  block_radix_rank_algorithm::match>;
+                                                     BlockSize,
+                                                     ItemsPerThread,
+                                                     Value,
+                                                     1,
+                                                     1,
+                                                     8,
+                                                     block_radix_rank_algorithm::match>;
 
     static constexpr bool with_values = !std::is_same<Value, ::rocprim::empty_type>::value;
 
@@ -736,28 +732,26 @@ public:
     }
 };
 
-template<
-    class TargetConfig,
-    bool Descending,
-    class KeysInputIterator,
-    class KeysOutputIterator,
-    class ValuesInputIterator,
-    class ValuesOutputIterator,
-    class OffsetIterator
->
-ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-void segmented_sort(KeysInputIterator keys_input,
-                    typename std::iterator_traits<KeysInputIterator>::value_type * keys_tmp,
-                    KeysOutputIterator keys_output,
-                    ValuesInputIterator values_input,
-                    typename std::iterator_traits<ValuesInputIterator>::value_type * values_tmp,
-                    ValuesOutputIterator values_output,
-                    bool to_output,
-                    OffsetIterator begin_offsets,
-                    OffsetIterator end_offsets,
-                    unsigned int iterations,
-                    unsigned int begin_bit,
-                    unsigned int end_bit)
+template<class TargetConfig,
+         bool Descending,
+         class KeysInputIterator,
+         class KeysOutputIterator,
+         class ValuesInputIterator,
+         class ValuesOutputIterator,
+         class OffsetIterator>
+ROCPRIM_DEVICE ROCPRIM_INLINE
+void segmented_sort(KeysInputIterator                                               keys_input,
+                    typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
+                    KeysOutputIterator                                              keys_output,
+                    ValuesInputIterator                                             values_input,
+                    typename std::iterator_traits<ValuesInputIterator>::value_type* values_tmp,
+                    ValuesOutputIterator                                            values_output,
+                    bool                                                            to_output,
+                    OffsetIterator                                                  begin_offsets,
+                    OffsetIterator                                                  end_offsets,
+                    unsigned int                                                    iterations,
+                    unsigned int                                                    begin_bit,
+                    unsigned int                                                    end_bit)
 {
     static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
 
@@ -870,30 +864,30 @@ void segmented_sort(KeysInputIterator keys_input,
     }
 }
 
-template<
-    class TargetConfig,
-    bool Descending,
-    class KeysInputIterator,
-    class KeysOutputIterator,
-    class ValuesInputIterator,
-    class ValuesOutputIterator,
-    class SegmentIndexIterator,
-    class OffsetIterator
->
-ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-void segmented_sort_large(KeysInputIterator keys_input,
-                          typename std::iterator_traits<KeysInputIterator>::value_type * keys_tmp,
-                          KeysOutputIterator keys_output,
-                          ValuesInputIterator values_input,
-                          typename std::iterator_traits<ValuesInputIterator>::value_type * values_tmp,
-                          ValuesOutputIterator values_output,
-                          bool to_output,
-                          SegmentIndexIterator segment_indices,
-                          OffsetIterator begin_offsets,
-                          OffsetIterator end_offsets,
-                          unsigned int iterations,
-                          unsigned int begin_bit,
-                          unsigned int end_bit)
+template<class TargetConfig,
+         bool Descending,
+         class KeysInputIterator,
+         class KeysOutputIterator,
+         class ValuesInputIterator,
+         class ValuesOutputIterator,
+         class SegmentIndexIterator,
+         class OffsetIterator>
+ROCPRIM_DEVICE ROCPRIM_INLINE
+void segmented_sort_large(
+    const unsigned int*                                             segment_counts,
+    KeysInputIterator                                               keys_input,
+    typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
+    KeysOutputIterator                                              keys_output,
+    ValuesInputIterator                                             values_input,
+    typename std::iterator_traits<ValuesInputIterator>::value_type* values_tmp,
+    ValuesOutputIterator                                            values_output,
+    const bool                                                      buffer_to_output,
+    SegmentIndexIterator                                            segment_indices,
+    OffsetIterator                                                  begin_offsets,
+    OffsetIterator                                                  end_offsets,
+    unsigned int                                                    iterations,
+    unsigned int                                                    begin_bit,
+    unsigned int                                                    end_bit)
 {
     static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
 
@@ -920,84 +914,93 @@ void segmented_sort_large(KeysInputIterator keys_input,
                                       Descending,
                                       TargetConfig::wavefront>;
 
+    const auto num_segments   = segment_counts[0];
+    const auto start_block_id = ::rocprim::detail::block_id<0>();
+    const auto grid_size      = ::rocprim::detail::grid_size<0>();
+
     ROCPRIM_SHARED_MEMORY union
     {
         typename single_block_helper_type::storage_type single_block_helper;
         typename long_radix_helper_type::storage_type   long_radix_helper;
     } storage;
 
-    const unsigned int block_id     = ::rocprim::detail::block_id<0>();
-    const unsigned int segment_id   = segment_indices[block_id];
-    const unsigned int begin_offset = begin_offsets[segment_id];
-    const unsigned int end_offset   = end_offsets[segment_id];
-
-    if(end_offset <= begin_offset)
+    for(auto block_id = start_block_id; block_id < num_segments; block_id += grid_size)
     {
-        return;
-    }
+        bool segment_to_output = buffer_to_output;
+        const unsigned int segment_id   = segment_indices[block_id];
+        const unsigned int begin_offset = begin_offsets[segment_id];
+        const unsigned int end_offset   = end_offsets[segment_id];
 
-    if(end_offset - begin_offset > items_per_block)
-    {
-        for(unsigned int bit = begin_bit; bit < end_bit; bit += radix_bits)
+        const bool use_long_radix_sort = end_offset - begin_offset > items_per_block;
+        if(end_offset <= begin_offset)
         {
-            long_radix_helper_type().sort(keys_input,
-                                          keys_tmp,
-                                          keys_output,
-                                          values_input,
-                                          values_tmp,
-                                          values_output,
-                                          to_output,
-                                          begin_offset,
-                                          end_offset,
-                                          bit,
-                                          begin_bit,
-                                          end_bit,
-                                          storage.long_radix_helper);
-
-            to_output = !to_output;
+            continue;
         }
-    }
-    else
-    {
-        single_block_helper_type().sort(keys_input,
-                                        keys_tmp,
-                                        keys_output,
-                                        values_input,
-                                        values_tmp,
-                                        values_output,
-                                        (iterations % 2 == 0) != to_output,
-                                        begin_offset,
-                                        end_offset,
-                                        begin_bit,
-                                        end_bit,
-                                        storage.single_block_helper);
+
+        if(use_long_radix_sort)
+        {
+            for(unsigned int bit = begin_bit; bit < end_bit; bit += radix_bits)
+            {
+                long_radix_helper_type().sort(keys_input,
+                                              keys_tmp,
+                                              keys_output,
+                                              values_input,
+                                              values_tmp,
+                                              values_output,
+                                              segment_to_output,
+                                              begin_offset,
+                                              end_offset,
+                                              bit,
+                                              begin_bit,
+                                              end_bit,
+                                              storage.long_radix_helper);
+
+                segment_to_output = !segment_to_output;
+                ::rocprim::syncthreads();
+            }
+        }
+        else
+        {
+            single_block_helper_type().sort(keys_input,
+                                            keys_tmp,
+                                            keys_output,
+                                            values_input,
+                                            values_tmp,
+                                            values_output,
+                                            (iterations % 2 == 0) != segment_to_output,
+                                            begin_offset,
+                                            end_offset,
+                                            begin_bit,
+                                            end_bit,
+                                            storage.single_block_helper);
+        }
+        ::rocprim::syncthreads();
     }
 }
 
-template<
-    class TargetConfig,
-    bool Descending,
-    class KeysInputIterator,
-    class KeysOutputIterator,
-    class ValuesInputIterator,
-    class ValuesOutputIterator,
-    class SegmentIndexIterator,
-    class OffsetIterator
->
-ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-void segmented_sort_small(KeysInputIterator keys_input,
-                          typename std::iterator_traits<KeysInputIterator>::value_type * keys_tmp,
-                          KeysOutputIterator keys_output,
-                          ValuesInputIterator values_input,
-                          typename std::iterator_traits<ValuesInputIterator>::value_type * values_tmp,
-                          ValuesOutputIterator values_output,
-                          bool to_output,
-                          unsigned int num_segments,
-                          SegmentIndexIterator segment_indices,
-                          OffsetIterator begin_offsets,
-                          OffsetIterator end_offsets,
-                          unsigned int begin_bit,
-                          unsigned int end_bit)
+template<class TargetConfig,
+         bool Descending,
+         class KeysInputIterator,
+         class KeysOutputIterator,
+         class ValuesInputIterator,
+         class ValuesOutputIterator,
+         class SegmentIndexIterator,
+         class OffsetIterator>
+ROCPRIM_DEVICE ROCPRIM_INLINE
+void segmented_sort_small(
+    const unsigned int*                                             segments_counts,
+    KeysInputIterator                                               keys_input,
+    typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
+    KeysOutputIterator                                              keys_output,
+    ValuesInputIterator                                             values_input,
+    typename std::iterator_traits<ValuesInputIterator>::value_type* values_tmp,
+    ValuesOutputIterator                                            values_output,
+    bool                                                            to_output,
+    SegmentIndexIterator                                            segment_indices,
+    OffsetIterator                                                  begin_offsets,
+    OffsetIterator                                                  end_offsets,
+    unsigned int                                                    begin_bit,
+    unsigned int                                                    end_bit)
 {
     static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
 
@@ -1021,37 +1024,44 @@ void segmented_sort_small(KeysInputIterator keys_input,
         block_size,
         Descending>;
 
-    ROCPRIM_SHARED_MEMORY typename warp_sort_helper_type::storage_type storage;
+    ROCPRIM_SHARED_MEMORY
+    typename warp_sort_helper_type::storage_type storage;
 
-    const unsigned int block_id        = ::rocprim::detail::block_id<0>();
-    const unsigned int logical_warp_id = ::rocprim::detail::logical_warp_id<logical_warp_size>();
-    const unsigned int segment_index   = block_id * warps_per_block + logical_warp_id;
-    if(segment_index >= num_segments)
+    const auto num_segments = segments_counts[2] /* total */ - segments_counts[1] /* medium */
+                              - segments_counts[0] /* large */;
+    const auto start_block_id  = ::rocprim::detail::block_id<0>();
+    const auto grid_size       = ::rocprim::detail::grid_size<0>();
+    const auto logical_warp_id = ::rocprim::detail::logical_warp_id<logical_warp_size>();
+    for(auto block_id = start_block_id; true; block_id += grid_size)
     {
-        return;
+        const auto segment_index = (block_id * warps_per_block) + logical_warp_id;
+        if(segment_index >= num_segments)
+        {
+            return;
+        }
+
+        const unsigned int segment_id   = segment_indices[segment_index];
+        const unsigned int begin_offset = begin_offsets[segment_id];
+        const unsigned int end_offset   = end_offsets[segment_id];
+
+        if(end_offset <= begin_offset)
+        {
+            continue;
+        }
+
+        warp_sort_helper_type().sort(keys_input,
+                                     keys_tmp,
+                                     keys_output,
+                                     values_input,
+                                     values_tmp,
+                                     values_output,
+                                     to_output,
+                                     begin_offset,
+                                     end_offset,
+                                     begin_bit,
+                                     end_bit,
+                                     storage);
     }
-
-    const unsigned int segment_id   = segment_indices[segment_index];
-    const unsigned int begin_offset = begin_offsets[segment_id];
-    const unsigned int end_offset   = end_offsets[segment_id];
-
-    if(end_offset <= begin_offset)
-    {
-        return;
-    }
-
-    warp_sort_helper_type().sort(keys_input,
-                                 keys_tmp,
-                                 keys_output,
-                                 values_input,
-                                 values_tmp,
-                                 values_output,
-                                 to_output,
-                                 begin_offset,
-                                 end_offset,
-                                 begin_bit,
-                                 end_bit,
-                                 storage);
 }
 
 template<class TargetConfig,
@@ -1062,7 +1072,9 @@ template<class TargetConfig,
          class ValuesOutputIterator,
          class SegmentIndexIterator,
          class OffsetIterator>
-ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void segmented_sort_medium(
+ROCPRIM_DEVICE ROCPRIM_INLINE
+void segmented_sort_medium(
+    const unsigned int*                                             segments_counts,
     KeysInputIterator                                               keys_input,
     typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
     KeysOutputIterator                                              keys_output,
@@ -1070,7 +1082,6 @@ ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void segmented_sort_medium(
     typename std::iterator_traits<ValuesInputIterator>::value_type* values_tmp,
     ValuesOutputIterator                                            values_output,
     bool                                                            to_output,
-    unsigned int                                                    num_segments,
     SegmentIndexIterator                                            segment_indices,
     OffsetIterator                                                  begin_offsets,
     OffsetIterator                                                  end_offsets,
@@ -1099,36 +1110,43 @@ ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void segmented_sort_medium(
         block_size,
         Descending>;
 
-    ROCPRIM_SHARED_MEMORY typename warp_sort_helper_type::storage_type storage;
+    ROCPRIM_SHARED_MEMORY
+    typename warp_sort_helper_type::storage_type storage;
 
-    const unsigned int block_id        = ::rocprim::detail::block_id<0>();
-    const unsigned int logical_warp_id = ::rocprim::detail::logical_warp_id<logical_warp_size>();
-    const unsigned int segment_index   = block_id * warps_per_block + logical_warp_id;
-    if(segment_index >= num_segments)
+    const auto num_segments    = segments_counts[1] /* medium */;
+    const auto start_block_id  = ::rocprim::detail::block_id<0>();
+    const auto grid_size       = ::rocprim::detail::grid_size<0>();
+    const auto logical_warp_id = ::rocprim::detail::logical_warp_id<logical_warp_size>();
+    for(auto block_id = start_block_id; true; block_id += grid_size)
     {
-        return;
-    }
+        const auto segment_index = (block_id * warps_per_block) + logical_warp_id;
+        if(segment_index >= num_segments)
+        {
+            return;
+        }
 
-    const unsigned int segment_id   = segment_indices[segment_index];
-    const unsigned int begin_offset = begin_offsets[segment_id];
-    const unsigned int end_offset   = end_offsets[segment_id];
-    if(end_offset <= begin_offset)
-    {
-        return;
-    }
+        const unsigned int segment_id   = segment_indices[segment_index];
+        const unsigned int begin_offset = begin_offsets[segment_id];
+        const unsigned int end_offset   = end_offsets[segment_id];
 
-    warp_sort_helper_type().sort(keys_input,
-                                 keys_tmp,
-                                 keys_output,
-                                 values_input,
-                                 values_tmp,
-                                 values_output,
-                                 to_output,
-                                 begin_offset,
-                                 end_offset,
-                                 begin_bit,
-                                 end_bit,
-                                 storage);
+        if(end_offset <= begin_offset)
+        {
+            continue;
+        }
+
+        warp_sort_helper_type().sort(keys_input,
+                                     keys_tmp,
+                                     keys_output,
+                                     values_input,
+                                     values_tmp,
+                                     values_output,
+                                     to_output,
+                                     begin_offset,
+                                     end_offset,
+                                     begin_bit,
+                                     end_bit,
+                                     storage);
+    }
 }
 
 } // end namespace detail

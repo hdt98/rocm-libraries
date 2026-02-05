@@ -625,14 +625,21 @@ struct launch_plan
     kernel_type kernel;
     Kernel      device_callback;
 
-    void launch(dim3 grid_size, dim3 block_size, size_t shared_mem, hipStream_t stream) const
+    hipError_t launch(dim3 grid_size, dim3 block_size, size_t shared_mem, hipStream_t stream) const
     {
-        hipLaunchKernelGGL(HIP_KERNEL_NAME(kernel),
-                           grid_size,
-                           block_size,
-                           shared_mem,
-                           stream,
-                           device_callback);
+        kernel<<<grid_size, block_size, shared_mem, stream>>>(device_callback);
+        return hipGetLastError();
+    }
+
+    hipError_t launch_with_max_active_blocks(dim3 block_size, size_t shared_mem, hipStream_t stream) const
+    {
+        int grid_size;
+        ROCPRIM_RETURN_ON_ERROR(::rocprim::detail::grid_dim_for_max_active_blocks(grid_size,
+                                                                                  block_size.x * block_size.y * block_size.z,
+                                                                                  kernel,
+                                                                                  stream));
+        kernel<<<grid_size, block_size, shared_mem, stream>>>(device_callback);
+        return hipGetLastError();
     }
 };
 
@@ -820,8 +827,7 @@ hipError_t execute_launch_plan(
     target t, Kernel kernel, dim3 grid_size, dim3 block_size, size_t shmem, hipStream_t stream)
 {
     const auto launch_plan = make_launch_plan<Config, ConfigSelector, LaunchSelector>(t, kernel);
-    launch_plan.launch(grid_size, block_size, shmem, stream);
-    return hipGetLastError();
+    return launch_plan.launch(grid_size, block_size, shmem, stream);
 }
 
 } // end namespace detail

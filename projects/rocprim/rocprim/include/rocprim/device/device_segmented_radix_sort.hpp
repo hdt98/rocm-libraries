@@ -78,11 +78,12 @@ struct Partitioner
                           const bool                  debug_synchronous)
     {
         using input_type = typename std::iterator_traits<InputIterator>::value_type;
+
         if(three_way_partitioning)
         {
             constexpr auto params = partition_config_params_base<input_type, true>();
             using config          = select_config<params.kernel_config.block_size,
-                                         params.kernel_config.items_per_thread>;
+                                                  params.kernel_config.items_per_thread>;
             return partition_three_way<config>(temporary_storage,
                                                storage_size,
                                                input,
@@ -100,7 +101,7 @@ struct Partitioner
         {
             constexpr auto params = partition_config_params_base<input_type, false>();
             using config          = select_config<params.kernel_config.block_size,
-                                         params.kernel_config.items_per_thread>;
+                                                  params.kernel_config.items_per_thread>;
             return partition<config>(temporary_storage,
                                      storage_size,
                                      input,
@@ -164,14 +165,9 @@ inline hipError_t segmented_radix_sort_impl(
     const bool            partitioning_allowed     = params.warp_sort_config.partitioning_allowed;
     const unsigned int    max_small_segment_length = params.warp_sort_config.items_per_thread_small
                                                   * params.warp_sort_config.logical_warp_size_small;
-    const unsigned int small_segments_per_block = params.warp_sort_config.block_size_small
-                                                  / params.warp_sort_config.logical_warp_size_small;
     const unsigned int max_medium_segment_length
         = params.warp_sort_config.items_per_thread_medium
           * params.warp_sort_config.logical_warp_size_medium;
-    const unsigned int medium_segments_per_block
-        = params.warp_sort_config.block_size_medium
-          / params.warp_sort_config.logical_warp_size_medium;
 
     const bool  three_way_partitioning = max_small_segment_length < max_medium_segment_length;
     Partitioner partitioner(three_way_partitioning);
@@ -198,12 +194,12 @@ inline hipError_t segmented_radix_sort_impl(
         = partitioning_allowed && segments >= params.warp_sort_config.partitioning_threshold;
 
     const size_t medium_segment_indices_size = three_way_partitioning ? segments : 0;
-    const size_t segment_count_output_size   = three_way_partitioning ? 2 : 1;
+    const size_t segment_count_output_size   = 3;
     const size_t segment_count_output_bytes
         = segment_count_output_size * sizeof(segment_index_type);
 
     segment_index_type* large_segment_indices_output{};
-    // The total number of large and small segments is not above the number of segments
+    // The total number of large and small segmeby default knts is not above the number of segments
     // The same buffer is filled with the large and small indices from both directions
     auto small_segment_indices_output
         = make_reverse_iterator(large_segment_indices_output + segments);
@@ -214,24 +210,20 @@ inline hipError_t segmented_radix_sort_impl(
     size_t              partition_storage_size{};
     void*               partition_temporary_storage{};
 
-    const auto partitioner_result = partitioner(nullptr,
-                                                partition_storage_size,
-                                                segment_index_iterator{},
-                                                large_segment_indices_output,
-                                                medium_segment_indices_output,
-                                                small_segment_indices_output,
-                                                segment_count_output,
-                                                segments,
-                                                large_segment_selector,
-                                                medium_segment_selector,
-                                                stream,
-                                                debug_synchronous);
-    if(hipSuccess != partitioner_result)
-    {
-        return partitioner_result;
-    }
+    ROCPRIM_RETURN_ON_ERROR(partitioner(nullptr,
+                                        partition_storage_size,
+                                        segment_index_iterator{},
+                                        large_segment_indices_output,
+                                        medium_segment_indices_output,
+                                        small_segment_indices_output,
+                                        segment_count_output,
+                                        segments,
+                                        large_segment_selector,
+                                        medium_segment_selector,
+                                        stream,
+                                        debug_synchronous));
 
-    const hipError_t partition_result = detail::temp_storage::partition(
+    ROCPRIM_RETURN_ON_ERROR(detail::temp_storage::partition(
         temporary_storage,
         storage_size,
         detail::temp_storage::make_linear_partition(
@@ -251,16 +243,13 @@ inline hipError_t segmented_radix_sort_impl(
                                                             !with_double_buffer ? size : 0),
                     detail::temp_storage::ptr_aligned_array(
                         &values_tmp_storage,
-                        !with_double_buffer && with_values ? size : 0)))));
-    if(partition_result != hipSuccess || temporary_storage == nullptr)
-    {
-        return partition_result;
-    }
+                        !with_double_buffer && with_values ? size : 0))))));
 
-    if(segments == 0u)
+    if(segments == 0u || temporary_storage == nullptr)
     {
         return hipSuccess;
     }
+
     if(debug_synchronous)
     {
         std::cout << "begin_bit " << begin_bit << '\n';
@@ -273,11 +262,7 @@ inline hipError_t segmented_radix_sort_impl(
         std::cout << "params.kernel_config.block_size: " << params.kernel_config.block_size << '\n';
         std::cout << "params.kernel_config.items_per_thread: "
                   << params.kernel_config.items_per_thread << '\n';
-        hipError_t error = hipStreamSynchronize(stream);
-        if(error != hipSuccess)
-        {
-            return error;
-        }
+        ROCPRIM_RETURN_ON_ERROR(hipStreamSynchronize(stream));
     }
 
     if(!with_double_buffer)
@@ -287,85 +272,80 @@ inline hipError_t segmented_radix_sort_impl(
     }
     small_segment_indices_output = make_reverse_iterator(large_segment_indices_output + segments);
 
+    std::chrono::steady_clock::time_point start;
     if(do_partitioning)
     {
-        hipError_t result = partitioner(partition_temporary_storage,
-                                        partition_storage_size,
-                                        segment_index_iterator{},
-                                        large_segment_indices_output,
-                                        medium_segment_indices_output,
-                                        small_segment_indices_output,
-                                        segment_count_output,
-                                        segments,
-                                        large_segment_selector,
-                                        medium_segment_selector,
-                                        stream,
-                                        debug_synchronous);
-        if(hipSuccess != result)
-        {
-            return result;
-        }
+        segment_index_type segment_count_prefill[3] = {0, 0, segments};
+        ROCPRIM_RETURN_ON_ERROR(hipMemcpyAsync(segment_count_output,
+                                               segment_count_prefill,
+                                               3 * sizeof(segment_index_type),
+                                               hipMemcpyHostToDevice,
+                                               stream));
+
+        ROCPRIM_RETURN_ON_ERROR(partitioner(partition_temporary_storage,
+                                            partition_storage_size,
+                                            segment_index_iterator{},
+                                            large_segment_indices_output,
+                                            medium_segment_indices_output,
+                                            small_segment_indices_output,
+                                            segment_count_output,
+                                            segments,
+                                            large_segment_selector,
+                                            medium_segment_selector,
+                                            stream,
+                                            debug_synchronous));
         std::vector<segment_index_type> segment_counts(segment_count_output_size,
                                                        segment_index_type{});
-        result = detail::memcpy_and_sync(segment_counts.data(),
-                                         segment_count_output,
-                                         segment_count_output_bytes,
-                                         hipMemcpyDeviceToHost,
-                                         stream);
-        if(hipSuccess != result)
-        {
-            return result;
-        }
-        const auto large_segment_count  = segment_counts[0];
-        const auto medium_segment_count = three_way_partitioning ? segment_counts[1] : 0;
-        const auto small_segment_count  = segments - large_segment_count - medium_segment_count;
+        segment_index_type              large_segment_count  = 0;
+        segment_index_type              medium_segment_count = 0;
+        segment_index_type              small_segment_count  = 0;
+
+        // We actually do not need the segment counts on host, but this is
+        // nice to have for debugging purposes.
         if(debug_synchronous)
         {
-            std::cout << "large_segment_count " << large_segment_count << '\n';
-            std::cout << "medium_segment_count " << medium_segment_count << '\n';
-            std::cout << "small_segment_count " << small_segment_count << '\n';
+            ROCPRIM_RETURN_ON_ERROR(detail::memcpy_and_sync(segment_counts.data(),
+                                                            segment_count_output,
+                                                            segment_count_output_bytes,
+                                                            hipMemcpyDeviceToHost,
+                                                            stream));
+            large_segment_count  = segment_counts[0];
+            medium_segment_count = three_way_partitioning ? segment_counts[1] : 0;
+            small_segment_count  = segments - large_segment_count - medium_segment_count;
         }
-        if(large_segment_count > 0)
-        {
-            std::chrono::steady_clock::time_point start;
-            if(debug_synchronous)
-            {
-                start = std::chrono::steady_clock::now();
-            }
-            auto segmented_sort_large_kernel = [=](auto target_config)
-            {
-                segmented_sort_large<decltype(target_config), Descending>(
-                    keys_input,
-                    keys_tmp,
-                    keys_output,
-                    values_input,
-                    values_tmp,
-                    values_output,
-                    to_output,
-                    large_segment_indices_output,
-                    begin_offsets,
-                    end_offsets,
-                    iterations,
-                    begin_bit,
-                    end_bit);
-            };
 
-            ROCPRIM_RETURN_ON_ERROR(
-                execute_launch_plan<Config, Selector>(current_target,
-                                                      segmented_sort_large_kernel,
-                                                      dim3(large_segment_count),
-                                                      dim3(params.kernel_config.block_size),
-                                                      0,
-                                                      stream));
-            ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR("segmented_sort:large_segments",
-                                                        large_segment_count,
-                                                        start);
-        }
-        if(three_way_partitioning && medium_segment_count > 0)
+        // Sort large segments using block-level algorithm.
+        if(debug_synchronous)
         {
-            const auto medium_segment_grid_size
-                = ::rocprim::detail::ceiling_div(medium_segment_count, medium_segments_per_block);
-            std::chrono::steady_clock::time_point start;
+            start = std::chrono::steady_clock::now();
+        }
+        auto segmented_sort_large_kernel = [=](auto arch_config)
+        {
+            segmented_sort_large<decltype(arch_config), Descending>(segment_count_output,
+                                                                    keys_input,
+                                                                    keys_tmp,
+                                                                    keys_output,
+                                                                    values_input,
+                                                                    values_tmp,
+                                                                    values_output,
+                                                                    to_output,
+                                                                    large_segment_indices_output,
+                                                                    begin_offsets,
+                                                                    end_offsets,
+                                                                    iterations,
+                                                                    begin_bit,
+                                                                    end_bit);
+        };
+
+        ROCPRIM_RETURN_ON_ERROR(
+            make_launch_plan<Config, Selector>(current_target, segmented_sort_large_kernel)
+                .launch_with_max_active_blocks(params.kernel_config.block_size, 0, stream));
+        ROCPRIM_DETAIL_HIP_SYNC("segmented_sort:large_segments", large_segment_count, start);
+
+        // When using 3-way partitioning, we have medium segments.
+        // Sort medium segments using warp sort.
+        if(three_way_partitioning)
+        {
             if(debug_synchronous)
             {
                 start = std::chrono::steady_clock::now();
@@ -373,6 +353,7 @@ inline hipError_t segmented_radix_sort_impl(
             auto segmented_sort_medium_kernel = [=](auto target_config)
             {
                 segmented_sort_medium<decltype(target_config), Descending>(
+                    segment_count_output,
                     keys_input,
                     keys_tmp,
                     keys_output,
@@ -380,7 +361,6 @@ inline hipError_t segmented_radix_sort_impl(
                     values_tmp,
                     values_output,
                     is_result_in_output,
-                    medium_segment_count,
                     medium_segment_indices_output,
                     begin_offsets,
                     end_offsets,
@@ -389,64 +369,51 @@ inline hipError_t segmented_radix_sort_impl(
             };
 
             ROCPRIM_RETURN_ON_ERROR(
-                execute_launch_plan<Config,
-                                    Selector,
-                                    segmented_radix_sort_warp_sort_medium_config_static_selector>(
+                make_launch_plan<Config,
+                                 Selector,
+                                 segmented_radix_sort_warp_sort_medium_config_static_selector>(
                     current_target,
-                    segmented_sort_medium_kernel,
-                    dim3(medium_segment_grid_size),
-                    dim3(params.warp_sort_config.block_size_medium),
-                    0,
-                    stream));
-            ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR("segmented_sort:medium_segments",
-                                                        medium_segment_count,
-                                                        start);
+                    segmented_sort_medium_kernel)
+                    .launch_with_max_active_blocks(params.warp_sort_config.block_size_medium,
+                                                   0,
+                                                   stream));
+            ROCPRIM_DETAIL_HIP_SYNC("segmented_sort:medium_segments", medium_segment_count, start);
         }
-        if(small_segment_count > 0)
-        {
-            const auto small_segment_grid_size
-                = ::rocprim::detail::ceiling_div(small_segment_count, small_segments_per_block);
-            std::chrono::steady_clock::time_point start;
-            if(debug_synchronous)
-            {
-                start = std::chrono::steady_clock::now();
-            }
-            auto segmented_sort_small_kernel = [=](auto target_config)
-            {
-                segmented_sort_small<decltype(target_config), Descending>(
-                    keys_input,
-                    keys_tmp,
-                    keys_output,
-                    values_input,
-                    values_tmp,
-                    values_output,
-                    is_result_in_output,
-                    small_segment_count,
-                    small_segment_indices_output,
-                    begin_offsets,
-                    end_offsets,
-                    begin_bit,
-                    end_bit);
-            };
 
-            ROCPRIM_RETURN_ON_ERROR(
-                execute_launch_plan<Config,
-                                    Selector,
-                                    segmented_radix_sort_warp_sort_small_config_static_selector>(
-                    current_target,
-                    segmented_sort_small_kernel,
-                    dim3(small_segment_grid_size),
-                    dim3(params.warp_sort_config.block_size_small),
-                    0,
-                    stream));
-            ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR("segmented_sort:small_segments",
-                                                        small_segment_count,
-                                                        start);
+        // Sort small segments using warp sort
+        if(debug_synchronous)
+        {
+            start = std::chrono::steady_clock::now();
         }
+        auto segmented_sort_small_kernel = [=](auto arch_config)
+        {
+            segmented_sort_small<decltype(arch_config), Descending>(segment_count_output,
+                                                                    keys_input,
+                                                                    keys_tmp,
+                                                                    keys_output,
+                                                                    values_input,
+                                                                    values_tmp,
+                                                                    values_output,
+                                                                    is_result_in_output,
+                                                                    small_segment_indices_output,
+                                                                    begin_offsets,
+                                                                    end_offsets,
+                                                                    begin_bit,
+                                                                    end_bit);
+        };
+        ROCPRIM_RETURN_ON_ERROR(
+            make_launch_plan<Config,
+                             Selector,
+                             segmented_radix_sort_warp_sort_small_config_static_selector>(
+                current_target,
+                segmented_sort_small_kernel)
+                .launch_with_max_active_blocks(params.warp_sort_config.block_size_small,
+                                               0,
+                                               stream));
+        ROCPRIM_DETAIL_HIP_SYNC("segmented_sort:small_segments", small_segment_count, start);
     }
     else
     {
-        std::chrono::steady_clock::time_point start;
         if(debug_synchronous)
         {
             start = std::chrono::steady_clock::now();
