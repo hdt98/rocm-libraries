@@ -4,7 +4,6 @@
 #pragma once
 
 #include "ck_tile/builder/testing/testing.hpp"
-#include "ck/library/utility/convolution_parameter.hpp"
 #include <stdexcept>
 #include <vector>
 
@@ -40,9 +39,20 @@ concept RefConvInstance = requires(Conv& conv,
                                    InDataType* input,
                                    WeiDataType* weight,
                                    OutDataType* output,
-                                   ck::utils::conv::ConvParam param) {
+                                   int G,
+                                   int N,
+                                   int K,
+                                   int C,
+                                   std::vector<long_index_t> input_spatial,
+                                   std::vector<long_index_t> filter_spatial,
+                                   std::vector<long_index_t> strides,
+                                   std::vector<long_index_t> dilations,
+                                   std::vector<long_index_t> left_pads,
+                                   std::vector<long_index_t> right_pads) {
     requires ValidConvSignature<SIGNATURE>;
-    { conv.Run(input, weight, output, param) };
+    { conv.Run(input, weight, output, G, N, K, C, 
+               input_spatial, filter_spatial, strides,
+               dilations, left_pads, right_pads) };
 };
 
 /// @brief Generic `run` implementation for forward/backwards reference kernels.
@@ -60,9 +70,11 @@ run(RefConvInstance<SIGNATURE, InDataType, WeiDataType, OutDataType> auto& conv,
     WeiDataType* weight,
     OutDataType* output)
 {
-    // We don't want to compute the output dims manually, just get
-    // them via the existing infrastructure
-    const auto param = args.to_ck_conv_param();
+    // Helper to convert FilterExtent to std::vector
+    const auto to_vec = [](const auto& extent) {
+        auto arr = extent.template to_array<long_index_t>();
+        return std::vector<long_index_t>(arr.begin(), arr.end());
+    };
 
     // TODO: The reference convolution is currently missing a few features.
     // Just throw for now, but regard these as TODO items that should be resolved
@@ -77,7 +89,20 @@ run(RefConvInstance<SIGNATURE, InDataType, WeiDataType, OutDataType> auto& conv,
     if(!args.make_output_descriptor().is_packed())
         return RunResult::not_supported("TODO: Support non-packed output tensor in reference conv");
 
-    conv.Run(input, weight, output, param);
+    conv.Run(input,
+             weight,
+             output,
+             static_cast<int>(args.lengths.groups),
+             static_cast<int>(args.lengths.batch_size),
+             static_cast<int>(args.lengths.output_channels),
+             static_cast<int>(args.lengths.input_channels),
+             to_vec(args.lengths.image),
+             to_vec(args.lengths.filter),
+             to_vec(args.filter_strides),      // strides (not output_spatial!)
+             to_vec(args.filter_dilation),     // dilations
+             to_vec(args.input_left_pad),      // left_pads
+             to_vec(args.input_right_pad));    // right_pads (was missing!)
+    
     return RunResult::from_runtime(0); // ref conv does not return a meaningful runtime.
 }
 

@@ -3,6 +3,7 @@
 
 #include "utils/ckb_conv_tile_test_configs.hpp"
 #include "utils/ckb_conv_test_utils.hpp"
+#include "ck_tile/builder/testing/conv/fwd.hpp"
 #include "ck_tile/builder/testing/conv/ck_tile.hpp"
 #include "ck_tile/builder/testing/conv/reference.hpp"
 #include "ck_tile/host/device_prop.hpp"
@@ -102,10 +103,12 @@ TEST(Fwd2DFp16_TileV3_NHWGC, EndToEnd)
     ckt::init_inputs(args, inputs.get());
 
     auto tile_conv = TileConv{};
-    ckt::run(tile_conv, args, inputs.get(), outputs.get());
+    EXPECT_THAT(ckt::run(tile_conv, args, inputs.get(), outputs.get()), 
+                ck_tile::test::SuccessfulRun());
 
     auto ref_conv = Reference{};
-    ckt::run(ref_conv, args, inputs.get(), reference.get());
+    EXPECT_THAT(ckt::run(ref_conv, args, inputs.get(), reference.get()), 
+                ck_tile::test::SuccessfulRun());
 
     EXPECT_THAT(outputs.get(), MatchesReference(args, reference.get()));
 }
