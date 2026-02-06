@@ -372,12 +372,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
             return 1;
     }();
 
-    static constexpr index_t BPackedSize = []() {
-        if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
-            return 2;
-        else
-            return 1;
-    }();
     static constexpr auto lcm_AK1_BK1 = math::lcm(AK1Number, BK1Number);
     static constexpr bool is_single_rate_mfma =
         (((is_same<ComputeTypeA, half_t>::value || is_same<ComputeTypeA, bhalf_t>::value) &&
