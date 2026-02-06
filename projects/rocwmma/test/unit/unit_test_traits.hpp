@@ -85,6 +85,7 @@ namespace rocwmma
             IsGfx1200 = (ArchId == Constants::AMDGCN_ARCH_ID_GFX1200),
             IsGfx1201 = (ArchId == Constants::AMDGCN_ARCH_ID_GFX1201),
 
+            // clang-format off
             IsGfx9  =  IsGfx908
                     || IsGfx90A
                     || IsGfx942
@@ -102,6 +103,7 @@ namespace rocwmma
             IsGfx12 =  IsGfx1200
                     || IsGfx1201
                     ,
+            // clang-format on
         };
     };
 

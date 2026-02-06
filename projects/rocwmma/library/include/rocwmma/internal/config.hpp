@@ -145,16 +145,19 @@ static_assert(0, "Unsupported architecture");
 /// ROCWMMA_BLOCK_DIM_16_SUPPORTED
 /// ROCWMMA_BLOCK_DIM_32_SUPPORTED
 ///
+// clang-format off
 #if ROCWMMA_ARCH_GFX908 \
         || ROCWMMA_ARCH_GFX90A \
         || ROCWMMA_ARCH_GFX942 \
         || ROCWMMA_ARCH_GFX950
+// clang-format on
 #define ROCWMMA_ARCH_GFX9 1
 #define ROCWMMA_WAVE64_MODE 1
 #define ROCWMMA_BLOCK_DIM_16_SUPPORTED 1
 #define ROCWMMA_BLOCK_DIM_32_SUPPORTED 1
 #endif
 
+// clang-format off
 #if ROCWMMA_ARCH_GFX1100 \
         || ROCWMMA_ARCH_GFX1101 \
         || ROCWMMA_ARCH_GFX1102 \
@@ -163,13 +166,16 @@ static_assert(0, "Unsupported architecture");
         || ROCWMMA_ARCH_GFX1151 \
         || ROCWMMA_ARCH_GFX1152 \
         || ROCWMMA_ARCH_GFX1153
+// clang-format on
 #define ROCWMMA_ARCH_GFX11 1
 #define ROCWMMA_WAVE32_MODE 1
 #define ROCWMMA_BLOCK_DIM_16_SUPPORTED 1
 #endif
 
+// clang-format off
 #if ROCWMMA_ARCH_GFX1200 \
         || ROCWMMA_ARCH_GFX1201
+// clang-format on
 #define ROCWMMA_ARCH_GFX12 1
 #define ROCWMMA_WAVE32_MODE 1
 #define ROCWMMA_BLOCK_DIM_16_SUPPORTED 1

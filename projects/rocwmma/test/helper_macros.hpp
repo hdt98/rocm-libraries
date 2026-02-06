@@ -86,7 +86,6 @@
     default:;                                                                  \
     }
 
-
 // First arg is always case label, second is a constant
 #define ROCWMMA_SWITCH_BODY2_ARG2(SWITCH_ARG, CASE_IMPL, CASE_LABEL0, CASE_LABEL1, FWD_ARG_0) \
     switch(SWITCH_ARG)                                                                        \

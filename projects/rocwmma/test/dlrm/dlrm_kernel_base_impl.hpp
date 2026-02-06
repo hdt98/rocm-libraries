@@ -106,6 +106,7 @@ namespace rocwmma
         auto  deviceArch = deviceInfo->getGcnArch();
 
         // Arch
+        // clang-format off
         auto isGfx908 = deviceArch == DeviceInfo::GFX908;
         auto isGfx11  = (deviceArch == DeviceInfo::GFX1100)
                        || (deviceArch == DeviceInfo::GFX1101)
@@ -120,6 +121,7 @@ namespace rocwmma
         auto isGfx12 = (deviceArch == DeviceInfo::GFX1200)
                       || (deviceArch == DeviceInfo::GFX1201)
                       ;
+        // clang-format on
 
         // Datatypes
         auto isF64 = std::is_same<DataT, float64_t>::value;

@@ -95,10 +95,9 @@ namespace rocwmma
     ROCWMMA_SWITCH_BODY2_ARG2(         \
         waveSize, SWITCH_BODY_TBLOCK_Y, HipDevice::Wave32, HipDevice::Wave64, ARCH_ID)
 
-#define CASE_BODY(CASE_LABEL)                                        \
-    ROCWMMA_CASE_BODY_ARG1(CASE_LABEL, SWITCH_BODY_WAVE_SIZE, CASE_LABEL)
+#define CASE_BODY(CASE_LABEL) ROCWMMA_CASE_BODY_ARG1(CASE_LABEL, SWITCH_BODY_WAVE_SIZE, CASE_LABEL)
 
-            switch (deviceArch)
+            switch(deviceArch)
             {
                 CASE_BODY(HipDevice::GFX908)
                 CASE_BODY(HipDevice::GFX90A)
@@ -114,7 +113,7 @@ namespace rocwmma
                 CASE_BODY(HipDevice::GFX1153)
                 CASE_BODY(HipDevice::GFX1200)
                 CASE_BODY(HipDevice::GFX1201)
-                default:;
+            default:;
             }
 
 #undef CASE_IMPL_ASSIGN4
@@ -193,10 +192,9 @@ namespace rocwmma
     ROCWMMA_SWITCH_BODY2_ARG2(         \
         waveSize, SWITCH_BODY_TBLOCK_Y, HipDevice::Wave32, HipDevice::Wave64, ARCH_ID)
 
-#define CASE_BODY(CASE_LABEL)                                        \
-    ROCWMMA_CASE_BODY_ARG1(CASE_LABEL, SWITCH_BODY_WAVE_SIZE, CASE_LABEL)
+#define CASE_BODY(CASE_LABEL) ROCWMMA_CASE_BODY_ARG1(CASE_LABEL, SWITCH_BODY_WAVE_SIZE, CASE_LABEL)
 
-            switch (deviceArch)
+            switch(deviceArch)
             {
                 CASE_BODY(HipDevice::GFX908)
                 CASE_BODY(HipDevice::GFX90A)
@@ -212,7 +210,7 @@ namespace rocwmma
                 CASE_BODY(HipDevice::GFX1153)
                 CASE_BODY(HipDevice::GFX1200)
                 CASE_BODY(HipDevice::GFX1201)
-                default:;
+            default:;
             }
 
 #undef CASE_IMPL_ASSIGN4
