@@ -68,7 +68,7 @@ target_include_directories(TensileClient PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/inc
 target_link_libraries(TensileClient PRIVATE TensileHost ${Boost_LIBRARIES})
 
 if(amd_smi_FOUND)
-    target_link_libraries(TensileClient PRIVATE TensileHost amd_smi)
+    target_link_libraries(TensileClient PRIVATE amd_smi)
 endif()
 
 if(TENSILE_USE_OPENMP)
