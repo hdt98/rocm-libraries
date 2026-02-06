@@ -73,9 +73,6 @@ def main():
             dest='output_base',
             default=None,
             help='base name for output files (default: suite_precision_case)')
-    parser.add_argument('--no-graph',
-            action='store_true',
-            help='skip graph generation')
     parser.add_argument('--separate-groups',
             action='store_true',
             help='generate separate graph for each parameter group')
@@ -120,35 +117,25 @@ def main():
     run_command(benchmark_cmd, "Running benchmarks")
 
     # Step 2: Generate graph (unless disabled)
-    if not args.no_graph:
-        if not os.path.exists(csv_path):
-            sys.exit(f"Error: Benchmark CSV not found: {csv_path}")
+    if not os.path.exists(csv_path):
+        sys.exit(f"Error: Benchmark CSV not found: {csv_path}")
 
-        graph_cmd = [
-            sys.executable,
-            graph_script,
-            csv_path,
-            '-o', graph_path
-        ]
+    graph_cmd = [
+        sys.executable,
+        graph_script,
+        csv_path,
+        '-o', graph_path
+    ]
 
-        if args.separate_groups:
-            graph_cmd.append('--separate-groups')
+    if args.separate_groups:
+        graph_cmd.append('--separate-groups')
 
-        run_command(graph_cmd, "Generating performance graph")
+    run_command(graph_cmd, "Generating performance graph")
 
-        print(f"\n{'='*60}")
-        print("SUCCESS")
-        print(f"{'='*60}")
-        print(f"Benchmark results: {csv_path}")
-        if args.separate_groups:
-            print(f"Performance graphs: {output_base}_*.png")
-        else:
-            print(f"Performance graph: {graph_path}")
+    if args.separate_groups:
+        print(f"Performance graphs: {output_base}_*.png")
     else:
-        print(f"\n{'='*60}")
-        print("SUCCESS")
-        print(f"{'='*60}")
-        print(f"Benchmark results: {csv_path}")
+        print(f"Performance graph: {graph_path}")
 
 
 if __name__ == '__main__':
