@@ -48,8 +48,12 @@ auto create_args(int argc, char* argv[])
         .insert("scale_s", "0", "scale factor of S. 0 means equal to 1/sqrt(hdim)")
         .insert("qscale",
                 "n",
-                "n or 0, no scale\n"
-                "pt or 1, per-tensor scale\n")
+                "quant scale:\n"
+                "  n or 0, no scale\n"
+                "  pt or 1, per-tensor scale\n"
+                "  bs or 2, block scale\n"
+                "  kvbs or 3, Q per-tensor, K/V per-page block scale\n"
+                "  mx or 4, microscaling (exclusively for data types like mxfp8 and mxfp4)")
         .insert("logits_soft_cap", "0", "attention logits soft capping value.")
         .insert("iperm",
                 "1",
