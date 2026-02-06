@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -63,7 +64,6 @@ struct SolutionTimingAccumulator
     size_t exec_id = 0;
     float total_time = 0.0f;
     int kernel_count = 0;
-    int skipped_count = 0;
     std::string main_kernel_name;
     
     void Reset(size_t new_exec_id)
@@ -71,7 +71,6 @@ struct SolutionTimingAccumulator
         exec_id = new_exec_id;
         total_time = 0.0f;
         kernel_count = 0;
-        skipped_count = 0;
         main_kernel_name.clear();
     }
 };
@@ -82,14 +81,43 @@ inline SolutionTimingAccumulator& GetSolutionTimingAccumulator()
     return accumulator;
 }
 
-/// Structure to hold kernel execution data for JSON output
+/// Structure to hold kernel execution data for JSON output (single execution)
 struct KernelExecutionData
 {
     size_t exec_id;
     std::string kernel_name;
     float time_ms;
-    std::string timestamp;
-    bool is_transform;
+    int transformation_count;
+    bool is_transformation;
+};
+
+/// Structure to hold grouped kernel data by kernel_name (multiple executions)
+struct GroupedKernelData
+{
+    std::string kernel_name;
+    std::vector<float> time_ms_array;
+    int number_of_transformations;
+    size_t exec_number;  // First/lowest exec_id
+    bool is_transformation;
+};
+
+/// Structure to accumulate kernels by exec_id
+struct ExecIdAccumulator
+{
+    size_t exec_id = 0;
+    std::string main_kernel_name;
+    float total_time_ms = 0.0f;
+    int transformation_count = 0;
+    bool has_data = false;
+    
+    void Reset()
+    {
+        exec_id = 0;
+        main_kernel_name.clear();
+        total_time_ms = 0.0f;
+        transformation_count = 0;
+        has_data = false;
+    }
 };
 
 /// Structure to hold solution data for JSON output
@@ -106,28 +134,6 @@ struct SolutionExecutionData
         kernels.clear();
     }
 };
-
-/// Get current timestamp in ISO 8601 format
-inline std::string GetCurrentTimestamp()
-{
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
-        now.time_since_epoch()) % 1000000;
-    
-    std::tm tm_buf;
-#ifdef _WIN32
-    localtime_s(&tm_buf, &time_t_now);
-#else
-    localtime_r(&time_t_now, &tm_buf);
-#endif
-    
-    std::ostringstream oss;
-    oss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%S");
-    oss << '.' << std::setfill('0') << std::setw(6) << microseconds.count();
-    
-    return oss.str();
-}
 
 /// Escape string for JSON
 inline std::string JsonEscape(const std::string& str)
@@ -166,27 +172,89 @@ inline SolutionExecutionData& GetJsonAccumulator()
     return accumulator;
 }
 
+/// Thread-local exec_id accumulator for kernel grouping
+inline ExecIdAccumulator& GetCurrentExecIdAccumulator()
+{
+    thread_local ExecIdAccumulator accumulator;
+    return accumulator;
+}
+
+/// Finalize the current exec_id accumulator and add it to the solution kernels
+inline void FinalizeCurrentExecId()
+{
+    auto& exec_accum = GetCurrentExecIdAccumulator();
+    
+    if(!exec_accum.has_data)
+        return;
+    
+    auto& data = GetJsonAccumulator();
+    data.kernels.push_back({
+        exec_accum.exec_id,
+        exec_accum.main_kernel_name,
+        exec_accum.total_time_ms,
+        exec_accum.transformation_count,
+        false  // is_transformation - this is the accumulated main kernel
+    });
+    
+    exec_accum.Reset();
+}
+
 /// Output accumulated JSON data
 inline void FlushJsonAccumulator()
 {
+    // Finalize any pending exec_id before flushing
+    FinalizeCurrentExecId();
+    
     auto& data = GetJsonAccumulator();
     
     if(data.kernels.empty())
         return;
     
+    // Group kernels by kernel_name
+    std::map<std::string, GroupedKernelData> grouped_kernels;
+    
+    for(const auto& k : data.kernels)
+    {
+        auto& grouped = grouped_kernels[k.kernel_name];
+        
+        // Initialize on first occurrence
+        if(grouped.time_ms_array.empty())
+        {
+            grouped.kernel_name = k.kernel_name;
+            grouped.number_of_transformations = k.transformation_count;
+            grouped.exec_number = k.exec_id;  // First/lowest exec_id
+            grouped.is_transformation = k.is_transformation;
+        }
+        
+        // Append timing data
+        grouped.time_ms_array.push_back(k.time_ms);
+    }
+    
+    // Output JSON
     std::cerr << "{\"solution\":\"" << JsonEscape(data.solution_name) << "\","
               << "\"phase\":\"" << data.phase << "\","
               << "\"kernels\":[";
     
-    for(size_t i = 0; i < data.kernels.size(); ++i)
+    bool first = true;
+    for(const auto& entry : grouped_kernels)
     {
-        const auto& k = data.kernels[i];
-        if(i > 0) std::cerr << ",";
-        std::cerr << "{\"exec_id\":" << k.exec_id << ","
-                  << "\"kernel_name\":\"" << JsonEscape(k.kernel_name) << "\","
-                  << "\"time_ms\":" << k.time_ms << ","
-                  << "\"timestamp\":\"" << k.timestamp << "\","
-                  << "\"is_transform\":" << (k.is_transform ? "true" : "false") << "}";
+        const auto& g = entry.second;
+        if(!first) std::cerr << ",";
+        first = false;
+        
+        std::cerr << "{\"kernel_name\":\"" << JsonEscape(g.kernel_name) << "\","
+                  << "\"time_ms\":[";
+        
+        for(size_t i = 0; i < g.time_ms_array.size(); ++i)
+        {
+            if(i > 0) std::cerr << ",";
+            std::cerr << g.time_ms_array[i];
+        }
+        
+        std::cerr << "],"
+                  << "\"number_of_transformations\":" << g.number_of_transformations << ","
+                  << "\"exec_number\":" << g.exec_number << ","
+                  << "\"is_transformation\":" << (g.is_transformation ? "true" : "false") << "}";
     }
     
     std::cerr << "]}" << std::endl;
@@ -199,21 +267,82 @@ inline void FinalizeJsonLogging()
     FlushJsonAccumulator();
 }
 
-/// Add kernel to JSON accumulator
+/// Add kernel to JSON accumulator with optional exec_id grouping
+/// If in individual kernel listing mode (log_level 2 or 4), kernels are added individually
+/// Otherwise, kernels are accumulated by exec_id
 inline void AddKernelToJsonAccumulator(size_t exec_id,
                                        const std::string& kernel_name,
                                        float time_ms,
-                                       bool is_transform)
+                                       bool is_transform,
+                                       uint64_t log_level)
 {
-    auto& data = GetJsonAccumulator();
-    data.kernels.push_back({exec_id, kernel_name, time_ms, GetCurrentTimestamp(), is_transform});
+    // Check if we should list kernels individually
+    if(IsIndividualKernelListingMode(log_level))
+    {
+        // Individual kernel listing mode - add directly without exec_id accumulation
+        auto& data = GetJsonAccumulator();
+        data.kernels.push_back({
+            exec_id,
+            kernel_name,
+            time_ms,
+            0,  // transformation_count is 0 for individual kernels
+            is_transform
+        });
+    }
+    else
+    {
+        // Standard mode - accumulate by exec_id
+        auto& exec_accum = GetCurrentExecIdAccumulator();
+        
+        // Check if we've moved to a new exec_id
+        if(exec_accum.has_data && exec_accum.exec_id != exec_id)
+        {
+            // Finalize the previous exec_id before starting a new one
+            FinalizeCurrentExecId();
+        }
+        
+        // Initialize or update the current exec_id accumulator
+        if(!exec_accum.has_data)
+        {
+            exec_accum.exec_id = exec_id;
+            exec_accum.has_data = true;
+        }
+        
+        // Add timing to total
+        exec_accum.total_time_ms += time_ms;
+        
+        // Track transformation kernels or set main kernel name
+        if(is_transform)
+        {
+            exec_accum.transformation_count++;
+        }
+        else
+        {
+            // This is a main kernel - use it as the representative kernel name
+            // If there are multiple non-transform kernels, the last one wins
+            exec_accum.main_kernel_name = kernel_name;
+        }
+    }
 }
 
 /// Check if JSON mode is enabled (bit flag in MIOPEN_PERFORMANCE_LOGS)
 /// JSON mode is enabled when bit 8 is set (value >= 256)
-inline bool IsJsonModeEnabled(uint64_t log_level)
+inline bool IsPerformanceLoggingEnabled(uint64_t log_level)
 {
     return log_level > 0;
+}
+
+/// Check if we should list kernels individually without exec_id accumulation
+/// This is enabled when MIOPEN_PERFORMANCE_LOGS is 2 or 4
+inline bool IsIndividualKernelListingMode(uint64_t log_level)
+{
+    return log_level == 2 || log_level == 4;
+}
+
+/// Check if this kernel should be logged
+inline bool IsLoggingKernel(uint64_t log_level, bool is_tuning)
+{
+    return IsPerformanceLoggingEnabled(log_level) && (!is_tuning || (is_tuning && log_level > 2));
 }
 
 /// Log solution name if appropriate for the current log level
@@ -221,48 +350,20 @@ inline bool IsJsonModeEnabled(uint64_t log_level)
 inline void LogSolutionName(const std::string& solution_name, uint64_t log_level)
 {
     const bool is_tuning_mode = GetKernelTuningMode();
-    const bool json_mode = IsJsonModeEnabled(log_level);
-    const uint64_t base_level = log_level & 0xFF; // Get base level without JSON flag
-    
-    // Determine if we should log based on level and mode
-    bool should_log = false;
-    
-    if(base_level == 0)
-    {
-        // No logging
-    }
-    else if(base_level == 1 || base_level == 2)
-    {
-        // Only executed solutions (not tuning)
-        should_log = !is_tuning_mode;
-    }
-    else // base_level >= 3
-    {
-        // All solutions including tuning
-        should_log = true;
-    }
-    
-    if(should_log && !solution_name.empty())
+    const bool logging_enabled = IsLoggingKernel(log_level, is_tuning_mode);
+    if(logging_enabled && !solution_name.empty())
     {
         auto& last_solution = GetLastPrintedSolutionName();
         // Only print if solution name has changed
         if(solution_name != last_solution)
         {
-            if(json_mode)
-            {
-                // Flush previous solution's JSON data
-                FlushJsonAccumulator();
-                
-                // Set up new solution in accumulator
-                auto& data = GetJsonAccumulator();
-                data.solution_name = solution_name;
-                data.phase = is_tuning_mode ? "tuning" : "execution";
-            }
-            else
-            {
-                // Traditional text output
-                std::cerr << "[SOLUTION:" << solution_name << "]" << std::endl;
-            }
+            // Flush previous solution's JSON data
+            FlushJsonAccumulator();
+            
+            // Set up new solution in accumulator
+            auto& data = GetJsonAccumulator();
+            data.solution_name = solution_name;
+            data.phase = is_tuning_mode ? "tuning" : "execution";
             last_solution = solution_name;
         }
     }

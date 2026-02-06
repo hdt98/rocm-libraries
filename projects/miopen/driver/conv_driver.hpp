@@ -2171,7 +2171,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
 
          
         const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+        const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
         if(!json_mode)
         {
             std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(solution) << std::endl;
@@ -2333,7 +2333,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
     if(time_enabled)
     {
         const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+        const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
         if(!json_mode)
         {
             std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(*selected) << std::endl;
@@ -3612,7 +3612,7 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
         tolerance = tolerance * 10;
 
     const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+    const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
     
     if(!std::isfinite(error) || error > tolerance)
     {
@@ -3659,7 +3659,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
     MIOPEN_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
 
     const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+    const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
 
     int cumulative_rc = 0;
     if(is_bwd)

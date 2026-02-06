@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 
     
     const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool json_mode = miopen::IsJsonModeEnabled(performance_log_level);
+    const bool json_mode = miopen::IsPerformanceLoggingEnabled(performance_log_level);
 
     if(!json_mode){
         // show command

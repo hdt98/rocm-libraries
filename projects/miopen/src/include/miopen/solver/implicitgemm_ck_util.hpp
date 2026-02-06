@@ -388,7 +388,6 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
          sh_conv_ptr = std::shared_ptr{std::move(*ptr_iter)}](const std::vector<Kernel>&) mutable {
             return [kernel_id = kernel_id, ck_args = std::move(ck_args), sh_conv_ptr = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
-                const auto exec_id = IncrementKernelExecutionCounter();
                 
                 const auto& data_ctx = primitive_parameters.CastTo<CastType>();
                 auto argument_ptr    = ck_args.MakeArgPtr(sh_conv_ptr, data_ctx);
@@ -398,12 +397,12 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                 const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                 const uint64_t base_level = log_level & 0xFF;
                 const bool is_tuning_mode = GetKernelTuningMode();
-                const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
                 
                 HipEventPtr log_start = nullptr;
                 HipEventPtr log_stop  = nullptr;
                 
-                if(should_log)
+                // Log to JSON accumulator
+                if(IsLoggingKernel(base_level, is_tuning_mode))
                 {
                     log_start = make_hip_event();
                     log_stop  = make_hip_event();
@@ -415,17 +414,15 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
                 
-                if(should_log)
+                if(IsLoggingKernel(base_level, is_tuning_mode))
                 {
                     hipEventRecord(log_stop.get(), handle.GetStream());
                     hipEventSynchronize(log_stop.get());
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
                     
-                    if(IsJsonModeEnabled(log_level))
-                    {
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
-                    }
+                    const auto exec_id = IncrementKernelExecutionCounter();
+                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
                 }
                 
                 if(handle.IsProfilingEnabled())
@@ -1286,15 +1283,13 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
             
             // Kernel logging for CK kernels
-            const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-            const uint64_t base_level = log_level & 0xFF;
+            const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
             const bool is_tuning_mode = GetKernelTuningMode();
-            const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
             
             HipEventPtr log_start = nullptr;
             HipEventPtr log_stop  = nullptr;
             
-            if(should_log)
+            if(IsLoggingKernel(base_level, is_tuning_mode))
             {
                 log_start = make_hip_event();
                 log_stop  = make_hip_event();
@@ -1307,17 +1302,15 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
             }
             
-            if(should_log)
+            if(IsLoggingKernel(base_level, is_tuning_mode))
             {
                 hipEventRecord(log_stop.get(), handle.GetStream());
                 hipEventSynchronize(log_stop.get());
                 float kernel_time = 0.0f;
                 hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
                 
-                if(IsJsonModeEnabled(log_level))
-                {
-                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
-                }
+                const auto exec_id = GetKernelExecutionCounter();
+                AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
             }
 
             if(handle.IsProfilingEnabled())
@@ -1428,15 +1421,13 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
                 
                 // Kernel logging for CK kernels
-                const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-                const uint64_t base_level = log_level & 0xFF;
+                const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                 const bool is_tuning_mode = GetKernelTuningMode();
-                const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
-                
+
                 HipEventPtr log_start = nullptr;
                 HipEventPtr log_stop  = nullptr;
                 
-                if(should_log)
+                if(IsLoggingKernel(base_level, is_tuning_mode))
                 {
                     log_start = make_hip_event();
                     log_stop  = make_hip_event();
@@ -1449,17 +1440,15 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
                 
-                if(should_log)
+                if(IsLoggingKernel(base_level, is_tuning_mode))
                 {
                     hipEventRecord(log_stop.get(), handle.GetStream());
                     hipEventSynchronize(log_stop.get());
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                    
-                    if(IsJsonModeEnabled(log_level))
-                    {
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
-                    }
+
+                    const auto exec_id = GetKernelExecutionCounter();
+                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
                 }
 
                 if(handle.IsProfilingEnabled())
@@ -1514,15 +1503,13 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 }
 
                 // Kernel logging for CK kernels
-                const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-                const uint64_t base_level = log_level & 0xFF;
+                const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                 const bool is_tuning_mode = GetKernelTuningMode();
-                const bool should_log = (base_level == 2 && !is_tuning_mode) || (base_level >= 4);
                 
                 HipEventPtr log_start = nullptr;
                 HipEventPtr log_stop  = nullptr;
                 
-                if(should_log)
+                if(IsLoggingKernel(base_level, is_tuning_mode))
                 {
                     log_start = make_hip_event();
                     log_stop  = make_hip_event();
@@ -1535,17 +1522,15 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
                 
-                if(should_log)
+                if(IsLoggingKernel(base_level, is_tuning_mode))
                 {
                     hipEventRecord(log_stop.get(), handle.GetStream());
                     hipEventSynchronize(log_stop.get());
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
                     
-                    if(IsJsonModeEnabled(log_level))
-                    {
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false);
-                    }
+                    const auto exec_id = GetKernelExecutionCounter();
+                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
                 }
 
                 if(handle.IsProfilingEnabled())

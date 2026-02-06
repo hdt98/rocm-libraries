@@ -37,40 +37,6 @@ void OCLKernelInvoke::run() const
 
     const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     const bool is_tuning_mode = GetKernelTuningMode();
-    const bool is_transpose = IsTransposeOrTransformKernel(GetName());
-    const auto exec_id = GetKernelExecutionCounter();
-    
-    // Enhanced logging levels:
-    // Level 0: No logging
-    // Level 1: Only main conv kernel per executed solution (not find/search)
-    // Level 2: All kernels for executed solution (not find/search)
-    // Level 3: Only main conv kernels for all solutions (including find/search)
-    // Level 4: All kernels for all solutions (including find/search)
-    // Add 256 to enable JSON mode
-    
-    bool should_log_individual = false;
-    bool should_accumulate = false;
-    
-    if(base_level == 0)
-    {
-        // No logging
-    }
-    else if(base_level == 1)
-    {
-        should_accumulate = !is_tuning_mode;
-    }
-    else if(base_level == 2)
-    {
-        should_log_individual = !is_tuning_mode;
-    }
-    else if(base_level == 3)
-    {
-        should_accumulate = true;
-    }
-    else // base_level >= 4
-    {
-        should_log_individual = true;
-    }
 
     MIOPEN_HANDLE_LOCK
 
@@ -92,16 +58,17 @@ void OCLKernelInvoke::run() const
                                            ((ldims[0] == 0) ? nullptr : ldims.data()),
                                            0,
                                            nullptr,
-                                           (callback || should_log_individual || should_accumulate) ? &ev : nullptr);
+                                           (callback || IsLoggingKernel(base_level, is_tuning_mode)) ? &ev : nullptr);
 
     if(status != CL_SUCCESS)
     {
         MIOPEN_THROW_CL_STATUS(status, "Running kernel failed: ");
     }
-    else if(should_log_individual || should_accumulate)
+    // Log to JSON accumulator
+    if(IsLoggingKernel(base_level, is_tuning_mode))
     {
         clWaitForEvents(1, &ev);
-        
+
         cl_ulong start_time = 0;
         cl_ulong end_time = 0;
         
@@ -109,16 +76,11 @@ void OCLKernelInvoke::run() const
         clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end_time, nullptr);
         
         float elapsed_time = (end_time - start_time) / 1000000.0f; // Convert nanoseconds to milliseconds
-        
-        if(should_log_individual || should_accumulate)
-        {
-            // Log to JSON accumulator
-            if(IsJsonModeEnabled(log_level))
-            {
-                AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose);
-            }
-        }
-        
+
+        const bool is_transpose = IsTransposeOrTransformKernel(GetName());
+        const auto exec_id = GetKernelExecutionCounter();
+        AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
+            
         if(callback)
         {
             callback(ev);

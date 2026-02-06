@@ -46,7 +46,7 @@ public:
 #ifdef __linux__
         // Check if JSON mode is enabled
         const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+        const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
         
         // System information collection
         const std::string timestamp = GetTimestamp();
@@ -92,7 +92,7 @@ public:
         miopMinor;
         miopPatch;
         const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsJsonModeEnabled(log_level);
+        const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
         if(json_mode)
         {
             std::cout << "{\"build_info\":{"
