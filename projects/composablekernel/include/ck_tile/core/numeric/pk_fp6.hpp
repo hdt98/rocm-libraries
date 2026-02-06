@@ -1137,6 +1137,9 @@ type_convert(const S& x, fp32x8_t (&result)[2])
 }
 #endif
 
+using pk_fp6x16_t = pk_fp6_t<16>;
+using pk_fp6x32_t = pk_fp6_t<32>;
+
 // Arithmetic operations using float conversion
 // Note: Arithmetic operations on packed types containing 32 elements
 // may not be semantically meaningful for element-wise operations
