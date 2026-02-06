@@ -267,6 +267,13 @@ inline void FinalizeJsonLogging()
     FlushJsonAccumulator();
 }
 
+/// Check if we should list kernels individually without exec_id accumulation
+/// This is enabled when MIOPEN_PERFORMANCE_LOGS is 2 or 4
+inline bool IsIndividualKernelListingMode(uint64_t log_level)
+{
+    return log_level == 2 || log_level == 4;
+}
+
 /// Add kernel to JSON accumulator with optional exec_id grouping
 /// If in individual kernel listing mode (log_level 2 or 4), kernels are added individually
 /// Otherwise, kernels are accumulated by exec_id
@@ -330,13 +337,6 @@ inline void AddKernelToJsonAccumulator(size_t exec_id,
 inline bool IsPerformanceLoggingEnabled(uint64_t log_level)
 {
     return log_level > 0;
-}
-
-/// Check if we should list kernels individually without exec_id accumulation
-/// This is enabled when MIOPEN_PERFORMANCE_LOGS is 2 or 4
-inline bool IsIndividualKernelListingMode(uint64_t log_level)
-{
-    return log_level == 2 || log_level == 4;
 }
 
 /// Check if this kernel should be logged

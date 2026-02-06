@@ -1215,8 +1215,6 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 output_init_tr_inst = std::move(output_init_tr_inst),
                 ck_buff_des         = ck_buff_des](const Handle& handle,
                                            const AnyInvokeParams& primitive_parameters) mutable {
-            const auto exec_id = IncrementKernelExecutionCounter();
-            
             handle.ResetKernelTime();
 
             const auto& data_ctx = primitive_parameters.CastTo<CastType>();
@@ -1386,8 +1384,6 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     should_allocated_wrw_buffer = should_allocated_wrw_buffer,
                     sh_conv_ptr                 = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
-                const auto exec_id = IncrementKernelExecutionCounter();
-                
                 const auto& data_ctx = primitive_parameters.CastTo<CastType>();
                 std::unique_ptr<ck::tensor_operation::device::BaseArgument> argument_ptr =
                     MakeNHWCCKArgPtr<IsSplitKNeeded<DeviceOpType>(),
@@ -1447,8 +1443,8 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
 
-                    const auto exec_id = GetKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
+                    const auto log_exec_id = IncrementKernelExecutionCounter();
+                    AddKernelToJsonAccumulator(log_exec_id, kernel_id, kernel_time, false, base_level);
                 }
 
                 if(handle.IsProfilingEnabled())
@@ -1476,8 +1472,6 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     ck_args     = std::move(ck_args),
                     sh_conv_ptr = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
-                const auto exec_id = IncrementKernelExecutionCounter();
-                
                 const auto& data_ctx = primitive_parameters.CastTo<CastType>();
 
                 std::unique_ptr<ck::tensor_operation::device::BaseArgument> argument_ptr =
@@ -1529,8 +1523,8 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     float kernel_time = 0.0f;
                     hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
                     
-                    const auto exec_id = GetKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
+                    const auto log_exec_id = IncrementKernelExecutionCounter();
+                    AddKernelToJsonAccumulator(log_exec_id, kernel_id, kernel_time, false, base_level);
                 }
 
                 if(handle.IsProfilingEnabled())
