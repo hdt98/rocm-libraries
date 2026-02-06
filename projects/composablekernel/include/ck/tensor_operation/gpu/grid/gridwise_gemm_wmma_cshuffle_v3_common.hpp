@@ -382,10 +382,25 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
                                                    BK1Value,
                                                    WaveSize>;
 
+    __host__ __device__ static constexpr bool AWaveTransferApplicable()
+    {
+        return !ForceThreadTileTransfer && APackedSize == 1 &&
+               ABlockTransferSrcScalarPerVector == 8 && ABlockTransferDstScalarPerVector_AK1 == 8 &&
+               BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 &&
+               !IsBPreShuffled;
+    }
+
+    __host__ __device__ static constexpr bool BWaveTransferApplicable()
+    {
+        return !ForceThreadTileTransfer && BPackedSize == 1 &&
+               BBlockTransferSrcScalarPerVector == 8 && BBlockTransferDstScalarPerVector_BK1 == 8 &&
+               BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8;
+    }
+
     // Limitations of the current implementation:
     //  - no multiAB
     //  - GemmSpecialization Default with transpose
-#ifdef __gfx120__
+#if defined(__gfx120__)
     static constexpr bool IsAWaveTransferApplicable =
         !ForceThreadTileTransfer && NumATensor == 1 && APackedSize == 1 &&
         ((GemmSpec == tensor_operation::device::GemmSpecialization::Default &&
@@ -401,6 +416,11 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
          is_same_v<BLayout, tensor_layout::gemm::ColumnMajor>) &&
         BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8 &&
         BTransferWaveTiles::KRepeat_ > 0 && BTransferWaveTiles::MNRepeat_ > 0;
+
+#elif defined(__gfx12__)
+    static constexpr bool IsAWaveTransferApplicable = AWaveTransferApplicable();
+
+    static constexpr bool IsBWaveTransferApplicable = BWaveTransferApplicable();
 
     static constexpr bool IsWaveTileInterleavedFitting =
         (NPerBlock / NPerWmma / NRepeat) * (KPerBlock / KPack) >= (BlockSize / WaveSize);
