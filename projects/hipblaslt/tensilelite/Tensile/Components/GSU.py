@@ -307,9 +307,9 @@ class GSUOn(GSU):
         _DepthU = kernel["_DepthU%s" % tc]
         # swizzle
         if (tP["isSwizzled"] and tc == 'A'):
-            _DepthU = (_DepthU * 16) # MI_M = 16
+            _DepthU = (_DepthU * 16) # MI_M = 16 -TODO:
         elif (tP["isSwizzled"] and tc == 'B'):
-            _DepthU = (_DepthU * 16) # MI_N = 16
+            _DepthU = (_DepthU * 16) # MI_N = 16 -TODO:
 
         gsucLabel    = Label(label=writer.labels.getNameInc(f"GSUC_{tc}"), comment="")
         gsucLabelEnd = Label(label=writer.labels.getNameInc(f"GSUC_{tc}_End"), comment="")
@@ -353,10 +353,12 @@ class GSUOn(GSU):
             with writer.allocTmpSgpr(3) as tmpSgprInfo:
                 tmpSgpr = tmpSgprInfo.idx
                 gsuSgpr = tmpSgpr + 2
+                du = kernel["_DepthU%s"%tc]
+                duBpe = int(du * tP["bpeGR"])
                 module.add(SAndB32(dst=sgpr(tmpSgpr), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
-                module.add(SMulI32(dst=sgpr(gsuSgpr), src0=sgpr(tmpSgpr), src1="DepthU*%d"%(tP["bpeGR"]), comment="GSU*DepthU*Bpe"))
+                module.add(SMulI32(dst=sgpr(gsuSgpr), src0=sgpr(tmpSgpr), src1=duBpe, comment="GSU*DepthU*Bpe"))
                 module.add(SAndB32(dst=sgpr(tmpSgpr), src0=sgpr("GSU"), src1=hex(0x8000), comment="SCC = (GSUC == 1) ?"))
-                module.add(SCMovB32(dst=sgpr(gsuSgpr), src="DepthU*%d"%(tP["bpeGR"]), comment="DepthU*Bpe if GSUC = 1"))
+                module.add(SCMovB32(dst=sgpr(gsuSgpr), src=duBpe, comment="DepthU*Bpe if GSUC = 1"))
                 module.add(SMulI32(dst=sgpr(tmpSgpr+0), src0=sgpr(gsuSgpr), src1=stride, \
                     comment="incr%s%s = %s*DepthU*bpeGR (unrollIdx)"%(tc, loopChar, stride) ))
                 # TODO - this should be mul-H??
@@ -378,9 +380,9 @@ class GSUOn(GSU):
                 # swizzle
                 mult_MI_Dim = 1
                 if tc == "A" and kernel["ProblemType"]["SwizzleTensorA"]:
-                    mult_MI_Dim = mult_MI_Dim * 16 # MI_M = 16
+                    mult_MI_Dim = mult_MI_Dim * 16 # MI_M = 16 -TODO:
                 elif tc == "B" and kernel["ProblemType"]["SwizzleTensorB"]:
-                    mult_MI_Dim = mult_MI_Dim * 16 # MI_N = 16
+                    mult_MI_Dim = mult_MI_Dim * 16 # MI_N = 16 -TODO:
 
                 duBpe = int(kernel["_DepthU%s" % tc] * tP["bpeGR"] * mult_MI_Dim)
                 module.add(SAndB32(dst=sgpr(gsuSgpr), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
