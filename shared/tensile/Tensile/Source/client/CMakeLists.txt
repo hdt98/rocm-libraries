@@ -58,11 +58,7 @@ set_target_properties(TensileClient
 find_package(Boost COMPONENTS program_options REQUIRED)
 
 if (NOT WIN32)
-    find_package(ROCmSMI QUIET)
-    if(NOT ROCmSMI_FOUND)
-        set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${Tensile_DIR}" "${Tensile_DIR}/../Source/cmake" "${CMAKE_HOME_DIRECTORY}/cmake")
-        find_package(ROCmSMI REQUIRED)
-    endif()
+    find_package(amd_smi REQUIRED)
 endif()
 
 include_directories(${Boost_INCLUDE_DIR})
@@ -71,8 +67,8 @@ target_include_directories(TensileClient PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/inc
 
 target_link_libraries(TensileClient PRIVATE TensileHost ${Boost_LIBRARIES})
 
-if(NOT WIN32)
-    target_link_libraries(TensileClient PRIVATE TensileHost rocm_smi)
+if(amd_smi_FOUND)
+    target_link_libraries(TensileClient PRIVATE TensileHost amd_smi)
 endif()
 
 if(TENSILE_USE_OPENMP)

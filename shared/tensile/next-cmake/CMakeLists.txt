@@ -38,7 +38,7 @@ option(TENSILE_ENABLE_DEVICE "Build device libraries" ON)
 option(TENSILE_ENABLE_CLIENT "Build client app" ON)
 option(TENSILE_ENABLE_MSGPACK "Enable MessagePack support" ON)
 option(TENSILE_ENABLE_LLVM "Use llvm yaml library" OFF)
-cmake_dependent_option(TENSILE_ENABLE_ROCM_SMI "Use rocm_smi." ON "NOT WIN32" OFF)
+cmake_dependent_option(TENSILE_ENABLE_AMD_SMI "Use amd-smi." ON "NOT WIN32" OFF)
 set(TENSILE_SOURCE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/../Tensile/Source")
 set(TENSILE_CONFIG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../HostLibraryTests/configs")
 set(TENSILE_CXX_STANDARD
@@ -126,8 +126,8 @@ if(TENSILE_ENABLE_DEVICE)
   add_subdirectory(device-library)
 endif()
 
-if(TENSILE_ENABLE_ROCM_SMI)
-  find_package(rocm_smi REQUIRED)
+if(TENSILE_ENABLE_AMD_SMI)
+  find_package(amd_smi REQUIRED)
 endif()
 
 if(TENSILE_ENABLE_CLIENT)
@@ -138,8 +138,8 @@ if(TENSILE_ENABLE_CLIENT)
     tensile-client-lib PRIVATE Boost::boost Boost::program_options tensile-host OpenMP::OpenMP_CXX)
     target_compile_features(tensile-client-lib PUBLIC cxx_std_${TENSILE_CXX_STANDARD})
 
-  if(rocm_smi_FOUND)
-    target_link_libraries(tensile-client-lib PRIVATE rocm_smi64)
+  if(amd_smi_FOUND)
+    target_link_libraries(tensile-client-lib PRIVATE amd_smi)
   endif()
   target_include_directories(
     tensile-client-lib
