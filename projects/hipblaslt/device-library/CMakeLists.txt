@@ -86,3 +86,4 @@ add_custom_target(tensilelite-device-libraries ALL
 
 add_subdirectory(extops)
 add_subdirectory(matrix-transform)
+add_subdirectory(custom-kernels)
