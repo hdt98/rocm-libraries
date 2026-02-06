@@ -98,9 +98,12 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
     # endif()
     
     foreach(test_target ${BF16_TEST_TARGETS})
-        # Apply LLVM builtin BF16 flag if enabled
-        if(CK_TILE_USE_LLVM_BUILTIN_BF16)
-            target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_LLVM_BUILTIN_BF16=1)
+
+        # Apply LLVM builtin BF16 flag if explicitly set as a CMake variable.
+        # If not set here, config.hpp will automatically define CK_TILE_USE_LLVM_BUILTIN_BF16 based on HIP version (ROCm 6.5.50421+ or ROCm 7.0+)
+        # This allows the user to explicitly set the flag at CMake configure time (e.g., via -DCK_TILE_USE_LLVM_BUILTIN_BF16=ON/OFF), allowing them to override the header's default.
+        if(DEFINED CK_TILE_USE_LLVM_BUILTIN_BF16)
+            target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_LLVM_BUILTIN_BF16=${CK_TILE_USE_LLVM_BUILTIN_BF16})
         endif()
         
         # Apply custom data type flag if enabled (except for arithmetic which already has it)
