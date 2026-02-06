@@ -355,10 +355,11 @@ struct numeric<bfloat16_t>
         return bit_cast<bfloat16_t>(static_cast<bf16_raw_t>(0x7f7f));
     }
 
-    // difference between 1.0 and next value representable by float
+    // difference between 1.0 and next value representable by bf16
+    // 1.0 = 0x3F80, next value = 0x3F81, difference = 2^-7 = 0.0078125
     CK_TILE_HOST_DEVICE static constexpr bfloat16_t epsilon()
     {
-        return bit_cast<bfloat16_t>(static_cast<bf16_raw_t>(0x1000));
+        return bit_cast<bfloat16_t>(static_cast<bf16_raw_t>(0x3C00));
     }
 
     // maximum rounding error
