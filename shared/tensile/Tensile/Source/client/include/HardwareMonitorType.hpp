@@ -38,8 +38,7 @@ namespace Tensile
             CLK_TYPE_DCEF,
             CLK_TYPE_SOC,
             CLK_TYPE_MEM,
-            CLK_TYPE_LAST = CLK_TYPE_MEM,
-            CLK_INVALID   = 0xFFFFFFFF
+            CLK_TYPE_LAST = CLK_TYPE_MEM
         } ClockType;
     }
 }

@@ -72,8 +72,6 @@ namespace Tensile
                 return AMDSMI_CLK_TYPE_SOC;
             case CLK_TYPE_MEM:
                 return AMDSMI_CLK_TYPE_MEM;
-            case CLK_INVALID:
-                return AMDSMI_CLK_INVALID;
             default:
                 return AMDSMI_CLK_TYPE_SYS;
             }
@@ -89,7 +87,6 @@ namespace Tensile
         uint32_t HardwareMonitor::GetAMDSMIIndex(int hipDeviceIndex)
         {
             InitAMDSMI();
-            InitAMDSMIHandles();
 
             hipDeviceProp_t props;
 
