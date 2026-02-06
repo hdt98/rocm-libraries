@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -5350,6 +5350,125 @@ inline hipsolverStatus_t hipsolver_getrf(testAPI_t               API,
     default:
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
+}
+
+// batched
+inline hipsolverStatus_t hipsolver_getrfBatched_bufferSize(
+    hipsolverHandle_t handle, int m, int n, float** A, int lda, int strideP, int* lwork, int bc)
+{
+    return hipsolverSgetrfBatched_bufferSize(handle, m, n, A, lda, strideP, lwork, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched_bufferSize(
+    hipsolverHandle_t handle, int m, int n, double** A, int lda, int strideP, int* lwork, int bc)
+{
+    return hipsolverDgetrfBatched_bufferSize(handle, m, n, A, lda, strideP, lwork, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched_bufferSize(hipsolverHandle_t  handle,
+                                                           int                m,
+                                                           int                n,
+                                                           hipsolverComplex** A,
+                                                           int                lda,
+                                                           int                strideP,
+                                                           int*               lwork,
+                                                           int                bc)
+{
+    return hipsolverCgetrfBatched_bufferSize(
+        handle, m, n, (hipFloatComplex**)A, lda, strideP, lwork, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched_bufferSize(hipsolverHandle_t        handle,
+                                                           int                      m,
+                                                           int                      n,
+                                                           hipsolverDoubleComplex** A,
+                                                           int                      lda,
+                                                           int                      strideP,
+                                                           int*                     lwork,
+                                                           int                      bc)
+{
+    return hipsolverZgetrfBatched_bufferSize(
+        handle, m, n, (hipDoubleComplex**)A, lda, strideP, lwork, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched(hipsolverHandle_t handle,
+                                                int               m,
+                                                int               n,
+                                                float**           A,
+                                                int               lda,
+                                                float*            work,
+                                                int               lwork,
+                                                int*              devIpiv,
+                                                int               strideP,
+                                                int*              devInfo,
+                                                int               bc)
+{
+    return hipsolverSgetrfBatched(handle, m, n, A, lda, work, lwork, devIpiv, strideP, devInfo, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched(hipsolverHandle_t handle,
+                                                int               m,
+                                                int               n,
+                                                double**          A,
+                                                int               lda,
+                                                double*           work,
+                                                int               lwork,
+                                                int*              devIpiv,
+                                                int               strideP,
+                                                int*              devInfo,
+                                                int               bc)
+{
+    return hipsolverDgetrfBatched(handle, m, n, A, lda, work, lwork, devIpiv, strideP, devInfo, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched(hipsolverHandle_t  handle,
+                                                int                m,
+                                                int                n,
+                                                hipsolverComplex** A,
+                                                int                lda,
+                                                hipsolverComplex*  work,
+                                                int                lwork,
+                                                int*               devIpiv,
+                                                int                strideP,
+                                                int*               devInfo,
+                                                int                bc)
+{
+    return hipsolverCgetrfBatched(handle,
+                                  m,
+                                  n,
+                                  (hipFloatComplex**)A,
+                                  lda,
+                                  (hipFloatComplex*)work,
+                                  lwork,
+                                  devIpiv,
+                                  strideP,
+                                  devInfo,
+                                  bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrfBatched(hipsolverHandle_t        handle,
+                                                int                      m,
+                                                int                      n,
+                                                hipsolverDoubleComplex** A,
+                                                int                      lda,
+                                                hipsolverDoubleComplex*  work,
+                                                int                      lwork,
+                                                int*                     devIpiv,
+                                                int                      strideP,
+                                                int*                     devInfo,
+                                                int                      bc)
+{
+    return hipsolverZgetrfBatched(handle,
+                                  m,
+                                  n,
+                                  (hipDoubleComplex**)A,
+                                  lda,
+                                  (hipDoubleComplex*)work,
+                                  lwork,
+                                  devIpiv,
+                                  strideP,
+                                  devInfo,
+                                  bc);
 }
 /********************************************************/
 
