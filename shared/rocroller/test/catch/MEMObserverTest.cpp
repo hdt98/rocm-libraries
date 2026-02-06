@@ -277,15 +277,15 @@ namespace MEMObserverTest
             m_context->schedule(k->preamble());
             m_context->schedule(k->prolog());
 
-            const auto m_workgroupSize = 64;
-            const auto m_instrDwords   = 4;
+            const auto workgroupSize = 64;
+            const auto instrDwords   = 4;
 
-            auto m_ldsWithOffset = Register::Value::Placeholder(
+            auto ldsWithOffset = Register::Value::Placeholder(
                 m_context, Register::Type::Vector, DataType::UInt32, 1);
-            auto m_workitemIndex = m_context->kernel()->workitemIndex()[0];
+            auto workitemIndex = m_context->kernel()->workitemIndex()[0];
 
             const auto baseAddresses
-                = generateLDSAddresses(m_workgroupSize, m_strideMultiplier, m_instrDwords);
+                = generateLDSAddresses(workgroupSize, m_strideMultiplier, instrDwords);
 
             auto agpr
                 = Register::Value::Placeholder(m_context,
@@ -319,47 +319,41 @@ namespace MEMObserverTest
                 DataType::Raw32,
                 64,
                 Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
-                                            .alignment = static_cast<int>(m_instrDwords)});
+                                            .alignment            = static_cast<int>(instrDwords)});
 
             auto prereq = [&]() -> Generator<Instruction> {
                 co_yield Expression::generate(
-                    m_ldsWithOffset,
+                    ldsWithOffset,
                     Expression::literal(ldsData->getLDSAllocation()->offset())
-                        + m_workitemIndex->expression()
+                        + workitemIndex->expression()
                               * Expression::literal(
-                                  (4 * m_strideMultiplier * m_instrDwords)
+                                  (4 * m_strideMultiplier * instrDwords)
                                       % ldsData->getLDSAllocation()->size(),
-                                  resultType(m_workitemIndex->expression()).varType),
+                                  resultType(workitemIndex->expression()).varType),
                     m_context);
 
                 co_yield m_ldsDst->allocate();
             };
 
             auto ldsInstructions = [&]() -> Generator<Instruction> {
-                for(int i = 0; i < 8; ++i)
+                for(int i = 0; i < 12; ++i)
                 {
                     const auto [start, end]
-                        = getAlignedSubset(m_ldsDst->registerCount(), m_instrDwords, counter++);
+                        = getAlignedSubset(m_ldsDst->registerCount(), instrDwords, counter++);
                     auto dstRegs = m_ldsDst->subset(Generated(iota(start, end)));
                     for(auto inst :
-                        m_context->mem()->loadLocal(dstRegs, m_ldsWithOffset, 0, 4 * m_instrDwords))
+                        m_context->mem()->loadLocal(dstRegs, ldsWithOffset, 0, 4 * instrDwords))
                     {
                         inst.setModelledAddresses(baseAddresses);
                         co_yield inst;
-                    }
-                    if(i % 4 == 3)
-                    {
-                        co_yield Instruction::Wait(
-                            WaitCount::DSCnt(m_context->targetArchitecture(), 2));
                     }
                 }
                 co_yield Instruction::Wait(WaitCount::Zero(m_context->targetArchitecture()));
             };
 
             auto addInstructions = [&]() -> Generator<Instruction> {
-                for(int i = 1; i < 8; ++i)
+                for(int i = 1; i < 12; ++i)
                 {
-                    // co_yield generateOp<Expression::Add>(g0, g0, g1);
                     co_yield Instruction("v_mfma_f32_32x32x2f32", {agpr}, {v0, v1, agpr}, {}, "");
                 }
             };
@@ -382,9 +376,14 @@ namespace MEMObserverTest
 
     TEST_CASE("DSObserver scheduling", "[rocprofiler][lds-model][gpu]")
     {
+        /*
+        Schedules a stream of ds_read_b128s and a stream of mfmas (does no meaningful work)
+        Checks scheduler interweaves based on information from observers
+        */
+
         const auto dsObserver
             = GENERATE(DSObserverType::WeightlessDSMemObserver, DSObserverType::DSMEMObserver);
-        const auto strideMultiplier = GENERATE(4, 8);
+        const auto strideMultiplier = GENERATE(1, 16);
 
         KernelOptions kernelOps;
         kernelOps->dsObserver = dsObserver;
@@ -396,9 +395,8 @@ namespace MEMObserverTest
 
         SECTION(fmt::format("{}, stride {}", toString(dsObserver), strideMultiplier))
         {
-            INFO(NormalizedSource(context.output()));
             std::string expected;
-            if(strideMultiplier == 8 && dsObserver == DSObserverType::WeightlessDSMemObserver)
+            if(strideMultiplier == 1 && dsObserver == DSObserverType::WeightlessDSMemObserver)
             {
                 expected = R"(
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
@@ -406,22 +404,28 @@ namespace MEMObserverTest
                     ds_read_b128 v[12:15], v5
                     ds_read_b128 v[16:19], v5
                     ds_read_b128 v[20:23], v5
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    s_waitcnt lgkmcnt(2)
                     ds_read_b128 v[24:27], v5
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     ds_read_b128 v[28:31], v5
                     ds_read_b128 v[32:35], v5
                     ds_read_b128 v[36:39], v5
+                    ds_read_b128 v[40:43], v5
+                    ds_read_b128 v[44:47], v5
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    s_waitcnt lgkmcnt(2)
+                    ds_read_b128 v[48:51], v5
+                    ds_read_b128 v[52:55], v5
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     s_waitcnt vmcnt(0) lgkmcnt(0) expcnt(0)
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                 )";
             }
-            else if(strideMultiplier == 4 && dsObserver == DSObserverType::WeightlessDSMemObserver)
+            else if(strideMultiplier == 16 && dsObserver == DSObserverType::WeightlessDSMemObserver)
             {
                 expected = R"(
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
@@ -429,19 +433,25 @@ namespace MEMObserverTest
                     ds_read_b128 v[12:15], v5
                     ds_read_b128 v[16:19], v5
                     ds_read_b128 v[20:23], v5
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    s_waitcnt lgkmcnt(2)
                     ds_read_b128 v[24:27], v5
-                    ds_read_b128 v[28:31], v5
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    ds_read_b128 v[28:31], v5
                     ds_read_b128 v[32:35], v5
                     ds_read_b128 v[36:39], v5
-                    s_waitcnt lgkmcnt(2)
+                    ds_read_b128 v[40:43], v5
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    ds_read_b128 v[44:47], v5
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    ds_read_b128 v[48:51], v5
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    ds_read_b128 v[52:55], v5
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     s_waitcnt vmcnt(0) lgkmcnt(0) expcnt(0)
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
-                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                 )";
             }
             else if(dsObserver == DSObserverType::DSMEMObserver)
@@ -458,12 +468,19 @@ namespace MEMObserverTest
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     ds_read_b128 v[20:23], v5
-                    s_waitcnt lgkmcnt(2)
                     ds_read_b128 v[24:27], v5
                     ds_read_b128 v[28:31], v5
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
+                    v_mfma_f32_32x32x2f32 a[0:15], v0, v4, a[0:15]
                     ds_read_b128 v[32:35], v5
                     ds_read_b128 v[36:39], v5
-                    s_waitcnt lgkmcnt(2)
+                    ds_read_b128 v[40:43], v5
+                    ds_read_b128 v[44:47], v5
+                    ds_read_b128 v[48:51], v5
+                    ds_read_b128 v[52:55], v5
+                    s_waitcnt vmcnt(0) lgkmcnt(0) expcnt(0)
                 )";
             }
             else
