@@ -160,6 +160,8 @@ namespace rocRoller
 
     /**
      * @brief Common test harness function for LDS tests
+     * Handles workgroup/item set up, kernel generation, profiling, latency collection, and validation based on the provided configuration
+     * Test need only implement the kernel body generation and validation logic
      */
     void runLDSTest(const LDSTestConfig& config);
 
