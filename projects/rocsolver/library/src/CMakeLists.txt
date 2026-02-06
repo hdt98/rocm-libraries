@@ -360,6 +360,16 @@ else()
   set(ROCSOLVER_ASYNC_LOGGER_DEFINITION "ROCSOLVER_USE_ASYNC_LOGGER=0")
 endif()
 
+# ROCTX tracing option
+option(ROCSOLVER_USE_ROCTX "Enable ROCTX tracing markers" ON)
+
+# Configure ROCTX compile definition
+if(ROCSOLVER_USE_ROCTX)
+  set(ROCSOLVER_ROCTX_DEFINITION "")
+else()
+  set(ROCSOLVER_ROCTX_DEFINITION "ROCSOLVER_DISABLE_ROCTX")
+endif()
+
 set(auxiliaries
   common/buildinfo.cpp
   common/rocsolver_handle.cpp
@@ -406,6 +416,22 @@ target_link_libraries(rocsolver
 )
 if(NOT USE_HIPCXX)
   target_link_libraries(rocsolver PRIVATE hip::device)
+endif()
+
+# Link with roctx library if enabled
+if(ROCSOLVER_USE_ROCTX)
+  find_library(ROCTX_LIBRARY
+    NAMES roctx64
+    PATHS ${ROCM_PATH}/lib /opt/rocm/lib
+    NO_DEFAULT_PATH
+  )
+  if(ROCTX_LIBRARY)
+    target_link_libraries(rocsolver PRIVATE ${ROCTX_LIBRARY})
+    message(STATUS "ROCTX support enabled - linked with ${ROCTX_LIBRARY}")
+  else()
+    message(WARNING "ROCTX library not found - disabling ROCTX support")
+    set(ROCSOLVER_ROCTX_DEFINITION "ROCSOLVER_DISABLE_ROCTX")
+  endif()
 endif()
 
 if(NOT BUILD_WITH_SPARSE)
@@ -504,6 +530,7 @@ target_compile_definitions(rocsolver PRIVATE
   ROCBLAS_INTERNAL_API
   ROCSOLVER_LIBRARY
   ${ROCSOLVER_ASYNC_LOGGER_DEFINITION}
+  ${ROCSOLVER_ROCTX_DEFINITION}
 )
 
 add_armor_flags(rocsolver "${ARMOR_LEVEL}")

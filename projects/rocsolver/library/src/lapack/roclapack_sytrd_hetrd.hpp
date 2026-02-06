@@ -36,6 +36,11 @@
 #include "rocblas.hpp"
 #include "roclapack_sytd2_hetd2.hpp"
 #include "rocsolver/rocsolver.h"
+#include <iostream>
+
+#ifndef ROCSOLVER_DISABLE_ROCTX
+#include <roctracer/roctx.h>
+#endif
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -145,12 +150,23 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                                               T** workArr,
                                               bool recover_A = true)
 {
+#ifndef ROCSOLVER_DISABLE_ROCTX
+    roctxRangePush("rocsolver_sytrd_hetrd_template");
+#endif
+
     ROCSOLVER_ENTER("sytrd_hetrd", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
 
+    std::cout << "Entering rocsolver_sytrd_hetrd_template with n=" << n << ", batch_count=" << batch_count << std::endl;
+
     // quick return
     if(n == 0 || batch_count == 0)
+    {
+#ifndef ROCSOLVER_DISABLE_ROCTX
+        roctxRangePop();
+#endif
         return rocblas_status_success;
+    }
 
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
@@ -280,6 +296,13 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     }
 
     rocblas_set_pointer_mode(handle, old_mode);
+
+    std::cout << "Exiting rocsolver_sytrd_hetrd_template" << std::endl;
+
+#ifndef ROCSOLVER_DISABLE_ROCTX
+    roctxRangePop();
+#endif
+
     return rocblas_status_success;
 }
 
