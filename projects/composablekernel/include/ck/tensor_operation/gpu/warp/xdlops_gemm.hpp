@@ -1272,8 +1272,8 @@ struct mfma_type<MfmaInstr::wmma_unsupport_16x16_gfx12> : public mfma_type_gfx12
 // gfx13
 struct mfma_type_gfx13_base
 {
-    static constexpr index_t group_size          = 8;
-    static constexpr index_t num_groups_per_blk  = 1;
+    static constexpr index_t group_size          = 2;  // Changed from 8 to 2 for correct row mapping
+    static constexpr index_t num_groups_per_blk  = 4;  // Changed from 1 to 4 to keep num_regs_per_blk=8
     static constexpr index_t num_regs_per_blk    = 8;
     static constexpr index_t num_threads_per_blk = 16;
     static constexpr index_t wave_size           = 32;
@@ -2867,6 +2867,19 @@ struct XdlopsGemm
         const auto laneId       = GetLaneId();
         constexpr auto num_blks = mfma_instr.m_per_blk / mfma_instr.num_regs_per_blk;
 
+#if defined(__gfx13__)
+        constexpr auto threadidx_to_blk_idx_adaptor = make_single_stage_tensor_adaptor(
+            make_tuple(
+                make_merge_transform(make_tuple(1, mfma_instr.num_threads_per_blk, num_blks))),
+            make_tuple(Sequence<0, 1, 2>{}),
+            make_tuple(Sequence<0>{}));
+
+        const auto blk_idx =
+            threadidx_to_blk_idx_adaptor.CalculateBottomIndex(make_multi_index(laneId));
+
+        const auto blk_id = blk_idx[I2];
+        const auto blk_td = blk_idx[I1];
+#else
         constexpr auto threadidx_to_blk_idx_adaptor = make_single_stage_tensor_adaptor(
             make_tuple(
                 make_merge_transform(make_tuple(1, num_blks, mfma_instr.num_threads_per_blk))),
@@ -2878,7 +2891,7 @@ struct XdlopsGemm
 
         const auto blk_id = blk_idx[I1];
         const auto blk_td = blk_idx[I2];
-
+#endif
         return make_tuple(blk_id, blk_td);
     }
 
