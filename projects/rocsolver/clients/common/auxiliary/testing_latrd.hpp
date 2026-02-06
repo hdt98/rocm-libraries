@@ -114,16 +114,40 @@ void latrd_initData(const rocblas_handle handle,
         rocblas_init<T>(hA, true);
 
         // scale A to avoid singularities
+        /* for(rocblas_int i = 0; i < n; i++) */
+        /* { */
+        /*     for(rocblas_int j = 0; j < n; j++) */
+        /*     { */
+        /*         if(i == j || (i == j + 1) || (i == j - 1)) */
+        /*             hA[0][i + j * lda] += 400; */
+        /*         else */
+        /*             hA[0][i + j * lda] -= 4; */
+        /*     } */
+        /* } */
+
         for(rocblas_int i = 0; i < n; i++)
         {
-            for(rocblas_int j = 0; j < n; j++)
+            for(rocblas_int j = 0; j <= i; j++)
             {
-                if(i == j || (i == j + 1) || (i == j - 1))
-                    hA[0][i + j * lda] += 400;
+                if(i == j)
+                {
+                    hA[0][i + j * lda] = hA[0][i + j * lda] + 400;
+                }
+                else if((i == j + 1) || (i == j - 1))
+                {
+                    auto tmp = hA[0][j + i * lda] + 400;
+                    hA[0][i + j * lda] = tmp;
+                    hA[0][j + i * lda] = tmp;
+                }
                 else
-                    hA[0][i + j * lda] -= 4;
+                {
+                    auto tmp = hA[0][j + i * lda] - 4;
+                    hA[0][i + j * lda] = tmp;
+                    hA[0][j + i * lda] = tmp;
+                }
             }
         }
+
     }
 
     if(GPU)
@@ -133,28 +157,51 @@ void latrd_initData(const rocblas_handle handle,
     }
 }
 
-template <bool CPU, bool GPU, typename T, typename Td, typename Th, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
+    template <bool CPU, bool GPU, typename T, typename Td, typename Th, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
 void latrd_initData(const rocblas_handle handle,
-                    const rocblas_int n,
-                    Td& dA,
-                    const rocblas_int lda,
-                    Th& hA)
+        const rocblas_int n,
+        Td& dA,
+        const rocblas_int lda,
+        Th& hA)
 {
     if(CPU)
     {
         rocblas_init<T>(hA, true);
 
         // scale A to avoid singularities
+        /* for(rocblas_int i = 0; i < n; i++) */
+        /* { */
+        /*     for(rocblas_int j = 0; j < n; j++) */
+        /*     { */
+        /*         if(i == j) */
+        /*             hA[0][i + j * lda] = hA[0][i + j * lda].real() + 400; */
+        /*         else if((i == j + 1) || (i == j - 1)) */
+        /*             hA[0][i + j * lda] += 400; */
+        /*         else */
+        /*             hA[0][i + j * lda] -= 4; */
+        /*     } */
+        /* } */
+
         for(rocblas_int i = 0; i < n; i++)
         {
-            for(rocblas_int j = 0; j < n; j++)
+            for(rocblas_int j = 0; j <= i; j++)
             {
                 if(i == j)
+                {
                     hA[0][i + j * lda] = hA[0][i + j * lda].real() + 400;
+                }
                 else if((i == j + 1) || (i == j - 1))
-                    hA[0][i + j * lda] += 400;
+                {
+                    auto tmp = hA[0][j + i * lda] + 400;
+                    hA[0][i + j * lda] = tmp;
+                    hA[0][j + i * lda] = sconj(tmp);
+                }
                 else
-                    hA[0][i + j * lda] -= 4;
+                {
+                    auto tmp = hA[0][j + i * lda] - 4;
+                    hA[0][i + j * lda] = tmp;
+                    hA[0][j + i * lda] = sconj(tmp);
+                }
             }
         }
     }
@@ -166,24 +213,24 @@ void latrd_initData(const rocblas_handle handle,
     }
 }
 
-template <typename T, typename Sd, typename Td, typename Sh, typename Th>
+    template <typename T, typename Sd, typename Td, typename Sh, typename Th>
 void latrd_getError(const rocblas_handle handle,
-                    const rocblas_fill uplo,
-                    const rocblas_int n,
-                    const rocblas_int k,
-                    Td& dA,
-                    const rocblas_int lda,
-                    Sd& dE,
-                    Td& dTau,
-                    Td& dW,
-                    const rocblas_int ldw,
-                    Th& hA,
-                    Th& hARes,
-                    Sh& hE,
-                    Th& hTau,
-                    Th& hW,
-                    Th& hWRes,
-                    double* max_err)
+        const rocblas_fill uplo,
+        const rocblas_int n,
+        const rocblas_int k,
+        Td& dA,
+        const rocblas_int lda,
+        Sd& dE,
+        Td& dTau,
+        Td& dW,
+        const rocblas_int ldw,
+        Th& hA,
+        Th& hARes,
+        Sh& hE,
+        Th& hTau,
+        Th& hW,
+        Th& hWRes,
+        double* max_err)
 {
     using S = decltype(std::real(T{}));
     using HMat = HostMatrix<T, rocblas_int>;
@@ -196,16 +243,18 @@ void latrd_getError(const rocblas_handle handle,
     // input data initialization
     latrd_initData<true, true, T>(handle, n, dA, lda, hA);
 
+    // Create thin wrapper of input matrix
     rocblas_int b = 0;
-    /* auto iAWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n); */
-    /* auto iA = (*iAWrap).block(BDesc().nrows(n).ncols(n)); */
-    /* std::cout << "Input Matrix A:" << std::endl; */
+    auto iAWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n);
+    auto iA = (*iAWrap).block(BDesc().nrows(n).ncols(n));
+    std::cout << "max|A - A^*| = " << (iA - adjoint(iA)).max_coeff_norm() << std::endl;
     /* iA.print(); */
+
 
     // execute computations
     // GPU lapack
     CHECK_ROCBLAS_ERROR(rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(), dTau.data(),
-                                        dW.data(), ldw));
+                dW.data(), ldw));
     CHECK_HIP_ERROR(hARes.transfer_from(dA));
     CHECK_HIP_ERROR(hWRes.transfer_from(dW));
     CHECK_HIP_ERROR(hERes.transfer_from(dE));
@@ -213,7 +262,7 @@ void latrd_getError(const rocblas_handle handle,
     // CPU lapack
     cpu_latrd(uplo, n, k, hA[0], lda, hE[0], hTau[0], hW[0], ldw);
 
-    // Create thin wrappers of input matrices A and B
+    // Create thin wrappers of matrices A and W
     auto AWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n);
     auto WWrap = HMat::Wrap(hW[0] + b * ldw * n, ldw, n);
     auto AResWrap = HMat::Wrap(hARes[0] + b * lda * n, lda, n);
@@ -265,10 +314,10 @@ void latrd_getError(const rocblas_handle handle,
         auto Tl_k = Tl.block(BDesc().nrows(k+1).ncols(k+1));
         auto Tr_k = Tr.block(BDesc().nrows(k+1).ncols(k+1));
 
-        std::cout << "Matrix Tl (lapack):" << std::endl;
-        Tl_k.print();
-        std::cout << "Matrix Tr (rocsolver):" << std::endl;
-        Tr_k.print();
+        /* std::cout << "Matrix Tl (lapack):" << std::endl; */
+        /* Tl_k.print(); */
+        /* std::cout << "Matrix Tr (rocsolver):" << std::endl; */
+        /* Tr_k.print(); */
 
         auto [Ul_k, eig_Tl_k] = eig_lower(real(Tl_k));
         std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
@@ -285,10 +334,10 @@ void latrd_getError(const rocblas_handle handle,
         auto Tl_k = Tl.block(BDesc().from_row(n-k-2).nrows(k+1).from_col(n-k-2).ncols(k+1));
         auto Tr_k = Tr.block(BDesc().from_row(n-k-2).nrows(k+1).from_col(n-k-2).ncols(k+1));
 
-        std::cout << "Matrix Tl (lapack):" << std::endl;
-        Tl_k.print();
-        std::cout << "Matrix Tr (rocsolver):" << std::endl;
-        Tr_k.print();
+        /* std::cout << "Matrix Tl (lapack):" << std::endl; */
+        /* Tl_k.print(); */
+        /* std::cout << "Matrix Tr (rocsolver):" << std::endl; */
+        /* Tr_k.print(); */
 
         auto [Ul_k, eig_Tl_k] = eig_lower(real(Tl_k));
         std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
@@ -297,32 +346,32 @@ void latrd_getError(const rocblas_handle handle,
         std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
         eig_Tr_k.print();
 
-        err = (eig_Tl_k - eig_Tr_k).norm()/(eig_Tl_k.max_coeff_norm());
+        err = (eig_Tl_k - eig_Tr_k).max_coeff_norm()/(eig_Tl_k.max_coeff_norm());
         *max_err = err > *max_err ? err : *max_err;
     }
 }
 
-template <typename T, typename Sd, typename Td, typename Sh, typename Th>
+    template <typename T, typename Sd, typename Td, typename Sh, typename Th>
 void latrd_getPerfData(const rocblas_handle handle,
-                       const rocblas_fill uplo,
-                       const rocblas_int n,
-                       const rocblas_int k,
-                       Td& dA,
-                       const rocblas_int lda,
-                       Sd& dE,
-                       Td& dTau,
-                       Td& dW,
-                       const rocblas_int ldw,
-                       Th& hA,
-                       Sh& hE,
-                       Th& hTau,
-                       Th& hW,
-                       double* gpu_time_used,
-                       double* cpu_time_used,
-                       const rocblas_int hot_calls,
-                       const int profile,
-                       const bool profile_kernels,
-                       const bool perf)
+        const rocblas_fill uplo,
+        const rocblas_int n,
+        const rocblas_int k,
+        Td& dA,
+        const rocblas_int lda,
+        Sd& dE,
+        Td& dTau,
+        Td& dW,
+        const rocblas_int ldw,
+        Th& hA,
+        Sh& hE,
+        Th& hTau,
+        Th& hW,
+        double* gpu_time_used,
+        double* cpu_time_used,
+        const rocblas_int hot_calls,
+        const int profile,
+        const bool profile_kernels,
+        const bool perf)
 {
     if(!perf)
     {
@@ -343,7 +392,7 @@ void latrd_getPerfData(const rocblas_handle handle,
         latrd_initData<false, true, T>(handle, n, dA, lda, hA);
 
         CHECK_ROCBLAS_ERROR(rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(),
-                                            dTau.data(), dW.data(), ldw));
+                    dTau.data(), dW.data(), ldw));
     }
 
     // gpu-lapack performance
@@ -355,7 +404,7 @@ void latrd_getPerfData(const rocblas_handle handle,
     {
         if(profile_kernels)
             rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
-                                         | rocblas_layer_mode_ex_log_kernel);
+                    | rocblas_layer_mode_ex_log_kernel);
         else
             rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
         rocsolver_log_set_max_levels(profile);
@@ -372,7 +421,7 @@ void latrd_getPerfData(const rocblas_handle handle,
     *gpu_time_used = timer.get_combined();
 }
 
-template <typename T>
+    template <typename T>
 void testing_latrd(Arguments& argus)
 {
     using S = decltype(std::real(T{}));
@@ -392,8 +441,8 @@ void testing_latrd(Arguments& argus)
     if(uplo != rocblas_fill_upper && uplo != rocblas_fill_lower)
     {
         EXPECT_ROCBLAS_STATUS(rocsolver_latrd(handle, uplo, n, k, (T*)nullptr, lda, (S*)nullptr,
-                                              (T*)nullptr, (T*)nullptr, ldw),
-                              rocblas_status_invalid_value);
+                    (T*)nullptr, (T*)nullptr, ldw),
+                rocblas_status_invalid_value);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_args);
@@ -416,8 +465,8 @@ void testing_latrd(Arguments& argus)
     if(invalid_size)
     {
         EXPECT_ROCBLAS_STATUS(rocsolver_latrd(handle, uplo, n, k, (T*)nullptr, lda, (S*)nullptr,
-                                              (T*)nullptr, (T*)nullptr, ldw),
-                              rocblas_status_invalid_size);
+                    (T*)nullptr, (T*)nullptr, ldw),
+                rocblas_status_invalid_size);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_size);
@@ -430,7 +479,7 @@ void testing_latrd(Arguments& argus)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         CHECK_ALLOC_QUERY(rocsolver_latrd(handle, uplo, n, k, (T*)nullptr, lda, (S*)nullptr,
-                                          (T*)nullptr, (T*)nullptr, ldw));
+                    (T*)nullptr, (T*)nullptr, ldw));
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
@@ -463,8 +512,8 @@ void testing_latrd(Arguments& argus)
     if(k == 0 || n == 0)
     {
         EXPECT_ROCBLAS_STATUS(rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(),
-                                              dTau.data(), dW.data(), ldw),
-                              rocblas_status_success);
+                    dTau.data(), dW.data(), ldw),
+                rocblas_status_success);
         if(argus.timing)
             rocsolver_bench_inform(inform_quick_return);
 
@@ -474,13 +523,13 @@ void testing_latrd(Arguments& argus)
     // check computations
     if(argus.unit_check || argus.norm_check)
         latrd_getError<T>(handle, uplo, n, k, dA, lda, dE, dTau, dW, ldw, hA, hARes, hE, hTau, hW,
-                          hWRes, &max_error);
+                hWRes, &max_error);
 
     // collect performance data
     if(argus.timing && hot_calls > 0)
         latrd_getPerfData<T>(handle, uplo, n, k, dA, lda, dE, dTau, dW, ldw, hA, hE, hTau, hW,
-                             &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
-                             argus.profile_kernels, argus.perf);
+                &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
+                argus.profile_kernels, argus.perf);
 
     // validate results for rocsolver-test
     // using k*n * machine_precision as tolerance
