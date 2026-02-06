@@ -116,6 +116,7 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
+                    AssertFatal(inst.getModelledAddresses().has_value());
                     std::vector<size_t> addresses = inst.getModelledAddresses().value();
                     auto [stallCycles, additionalCycles]
                         = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
