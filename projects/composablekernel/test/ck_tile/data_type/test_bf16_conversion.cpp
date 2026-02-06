@@ -3,7 +3,6 @@
 
 #include "test_bf16_common.hpp"
 #include <cmath>
-#include <iostream>
 
 using namespace ck_tile;
 using namespace ck_tile_test;
@@ -92,39 +91,47 @@ TEST_F(Bf16ConversionTest, FloatToBf16Rounding)
 {
     // Test round-to-nearest-even (default mode)
     {
-        // Value exactly between two bf16 values, rounds to even
-        float f      = 1.001953125f; // Exactly halfway between two bf16 values
+        // Value that requires rounding, should round to nearest bf16 value
+        float f      = 1.001953125f; // Between 1.0 and 1.0078125, closer to 1.0
         bf16_t b     = float_to_bf16(f);
         float result = static_cast<float>(b);
-        // Should round to nearest even
-        EXPECT_TRUE(result == 1.0f || result == 1.0078125f);
+        // Should round to nearest: 1.0f (since 1.001953125 is closer to 1.0 than 1.0078125)
+        EXPECT_EQ(result, 1.0f);
     }
 
     // Test values that require rounding
     {
-        float f      = 1.0009765625f; // Not exactly representable in bf16
+        float f      = 1.0009765625f; // Not exactly representable in bf16, closer to 1.0
         bf16_t b     = float_to_bf16(f);
         float result = static_cast<float>(b);
-        EXPECT_NEAR(result, f, 0.001f);
+        // Should round to nearest: 1.0f (since 1.0009765625 is closer to 1.0 than 1.0078125)
+        EXPECT_EQ(result, 1.0f);
     }
 }
 
 // Test different rounding modes
 TEST_F(Bf16ConversionTest, FloatToBf16RoundingModes)
 {
-    // Standard rounding (round-to-nearest)
+    // Standard rounding (round-to-nearest-even)
     {
         bf16_t b = float_to_bf16(1.001953125f, constant<bf16_rounding_mode::standard>{});
-        // Check it produces a valid result
+        // Verify exact bit pattern to validate rounding mode semantics
+        // 1.001953125f (0x3f804000) should round to 1.0f (0x3F80) with round-to-nearest
+        EXPECT_EQ(bf16_to_bits(b), 0x3F80);
         float result = static_cast<float>(b);
-        EXPECT_NEAR(result, 1.001953125f, 0.01f);
+        EXPECT_EQ(result, 1.0f);
     }
 
-    // Truncation mode
+    // Truncation mode (round-toward-zero, no rounding)
     {
-        bf16_t b     = float_to_bf16(1.001953125f, constant<bf16_rounding_mode::truncate>{});
+        bf16_t b = float_to_bf16(1.001953125f, constant<bf16_rounding_mode::truncate>{});
+        // Verify exact bit pattern: truncate just shifts right by 16 bits
+        // 1.001953125f (0x3f804000) >> 16 = 0x3f80 = 1.0f
+        EXPECT_EQ(bf16_to_bits(b), 0x3F80);
         float result = static_cast<float>(b);
-        EXPECT_LE(result, 1.001953125f); // Truncation should not increase value
+        EXPECT_EQ(result, 1.0f);
+        // Truncation should not increase value (rounds toward zero)
+        EXPECT_LE(result, 1.001953125f);
     }
 
     // Truncation with NaN preservation
@@ -376,7 +383,10 @@ TEST_F(Bf16ConversionTest, RoundTripConversions)
 // // Test denormal handling
 TEST_F(Bf16ConversionTest, DenormalHandling)
 {
-    // bf16 doesn't have denormal values, so small values should flush to zero
+    // Float denormals are much smaller than bf16 denormals (float has 23 mantissa bits,
+    // bf16 has 7), so float denormals flush to zero when converted to bf16.
+    // Note: bf16 does support denormals (see numeric<bf16_t>::denorm_min() = 0x0001),
+    // but float denormals are below the smallest representable bf16 value.
     {
         float f  = std::numeric_limits<float>::denorm_min();
         bf16_t b = float_to_bf16(f);

@@ -4,41 +4,16 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "test_common.hpp"
 #include <gtest/gtest.h>
 #include <vector>
 #include <cmath>
 #include <limits>
 #include <random>
+#include <string>
+#include <cstdio>
 
 namespace ck_tile_test {
-
-// ULP comparison utilities
-template <typename T>
-inline int32_t ulp_distance(T a, T b)
-{
-    static_assert(std::is_floating_point<T>::value, "ULP distance only for floating point types");
-
-    if(std::isnan(a) || std::isnan(b))
-        return std::numeric_limits<int32_t>::max();
-    if(std::isinf(a) || std::isinf(b))
-    {
-        if(a == b)
-            return 0;
-        return std::numeric_limits<int32_t>::max();
-    }
-
-    using IntType = std::conditional_t<sizeof(T) == 4, int32_t, int64_t>;
-    IntType ia    = ck_tile::bit_cast<IntType>(a);
-    IntType ib    = ck_tile::bit_cast<IntType>(b);
-
-    // Make ia and ib lexicographically ordered as a twos-complement int
-    if(ia < 0)
-        ia = 0x80000000 - ia;
-    if(ib < 0)
-        ib = 0x80000000 - ib;
-
-    return static_cast<int32_t>(std::abs(ia - ib));
-}
 
 // Bit pattern verification for bf16
 inline uint16_t bf16_to_bits(ck_tile::bf16_t x) { return ck_tile::bit_cast<uint16_t>(x); }
@@ -143,22 +118,24 @@ inline std::vector<ck_tile::bf16_t> generate_special_bf16_values()
     return values;
 }
 
-// Helper function to check if two bf16 values are equal considering NaN
+// Helper function to check if two bf16 values are equal (IEEE-compliant: NaN != NaN)
 inline bool bf16_equal(ck_tile::bf16_t a, ck_tile::bf16_t b)
 {
-    if(ck_tile::isnan(a) && ck_tile::isnan(b))
+    // IEEE 754: NaN is never equal to NaN (or anything else)
+    if(ck_tile::isnan(a) || ck_tile::isnan(b))
     {
-        return true; // Both are NaN
+        return false;
     }
     return bf16_to_bits(a) == bf16_to_bits(b);
 }
 
-// Helper function for near equality with ULP tolerance
+// Helper function for near equality with ULP tolerance (IEEE-compliant: NaN != NaN)
 inline bool bf16_near_equal(ck_tile::bf16_t a, ck_tile::bf16_t b, int ulp_tolerance = 1)
 {
-    if(ck_tile::isnan(a) && ck_tile::isnan(b))
+    // IEEE 754: NaN is never equal to NaN (or anything else)
+    if(ck_tile::isnan(a) || ck_tile::isnan(b))
     {
-        return true;
+        return false;
     }
     // Use bf16_to_float for proper conversion regardless of bf16_t implementation
     float fa = ck_tile::bf16_to_float(a);

@@ -107,7 +107,7 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
         endif()
         
         # Apply custom data type flag if enabled (except for arithmetic which already has it)
-        if(CK_TILE_USE_CUSTOM_DATA_TYPE AND NOT ${test_target} STREQUAL "test_ck_tile_bf16_arithmetic")
+        if(CK_TILE_USE_CUSTOM_DATA_TYPE AND NOT "${test_target}" STREQUAL "test_ck_tile_bf16_arithmetic")
             target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_CUSTOM_DATA_TYPE=1)
         endif()
         
