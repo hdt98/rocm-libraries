@@ -54,6 +54,19 @@ S cholqr_getToleranceByAlgo(rocsolver_cholqr_algo algo, int m, int n)
 {
     switch(algo)
     {
+    case rocsolver_cholqr_cholqr1: return 100;
+    case rocsolver_cholqr_cholqr2: return 100;
+    case rocsolver_cholqr_cholqr3_compute: return 100;
+    case rocsolver_cholqr_cholqr3_user: return 100;
+    default: return 100;
+    }
+}
+
+template <typename S>
+S cholqr_getToleranceByAlgo_org(rocsolver_cholqr_algo algo, int m, int n)
+{
+    switch(algo)
+    {
     case rocsolver_cholqr_cholqr1: return 10 * m * n;
     case rocsolver_cholqr_cholqr2: return 10 * m * n;
     case rocsolver_cholqr_cholqr3_compute: return 10 * m * n;
