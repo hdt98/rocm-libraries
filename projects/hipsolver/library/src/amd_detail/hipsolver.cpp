@@ -7252,7 +7252,7 @@ try
     else
     {
         CHECK_HIPSOLVER_ERROR(hipsolverCgetrfBatched_bufferSize(
-            (rocblas_handle)handle, m, n, A, strideP, lda, &lwork, batch_count));
+            (rocblas_handle)handle, m, n, A, lda, strideP, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
