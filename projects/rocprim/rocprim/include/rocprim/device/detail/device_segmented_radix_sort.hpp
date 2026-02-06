@@ -926,10 +926,10 @@ void segmented_sort_large(
 
     for(auto block_id = start_block_id; block_id < num_segments; block_id += grid_size)
     {
-        bool segment_to_output = buffer_to_output;
-        const unsigned int segment_id   = segment_indices[block_id];
-        const unsigned int begin_offset = begin_offsets[segment_id];
-        const unsigned int end_offset   = end_offsets[segment_id];
+        bool               segment_to_output = buffer_to_output;
+        const unsigned int segment_id        = segment_indices[block_id];
+        const unsigned int begin_offset      = begin_offsets[segment_id];
+        const unsigned int end_offset        = end_offsets[segment_id];
 
         const bool use_long_radix_sort = end_offset - begin_offset > items_per_block;
         if(end_offset <= begin_offset)
