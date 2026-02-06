@@ -260,6 +260,9 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
                                             const std::vector<solver::ConvSolution> solutions,
                                             bool model_result = false)
 {
+    // Set verification phase for kernel logging
+    ScopedKernelTuningMode tuning_mode_scope;
+    
     std::vector<Solution> eval_sols;
 
     // test timing of solver reported by system db
