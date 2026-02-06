@@ -2558,17 +2558,25 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         syncs = SyncSchedule()
         syncs.add(-1, dscnt=7, comment="Wait for prior local read local write")
         syncs.add(2, dscnt=6, comment="Wait for prior local read local write")
-        syncs.add(17, dscnt=1, comment="Wait for second last tile of B to be read before MFMA 18")
-        syncs.add(22, dscnt=0, barrier=True, comment="Before DirectToLds load, ensure prior ds_reads have finished")
-        syncs.add(23, vlcnt=11, barrier=True, comment="Wait for previous set of global reads")
-        syncs.add(23, dscnt=0, comment="Wait for prior local read local write")
+        syncs.add(16, dscnt=0, barrier=True, comment="Wait for LRA0 to complete before starting LRB0+GRA")
+        syncs.add(23, dscnt=0, vlcnt=3, barrier=True, comment="Wait for LRB0+GRA")
+        syncs.add(39, dscnt=23, vlcnt=11, barrier=True, comment="Wait for GRB to complete before starting LRB1")
+
         snopIdxs = [1, 25]
         snops = [[x, SNop(1, comment="")] for x in snopIdxs]
 
         lra0 = [0,0,1,1,2,2,3,3,4,5,5,6,6,7,7,8,8,9,10,11,12,13,14,15]
-        lrb0 = [4,16,17,18,19,20,21,21]
+
+        # Issue LRB0+GRA after LRA0 completes.
+        lrb0 = [16, 17, 18, 19, 20, 21, 22, 22]
+        grA =  [18, 18, 20, 20, 21, 21]
+
+        # Issue LRA1+GRB after LRB0+GRA complete.
         lra1 = [24,24, 25,25, 26,26, 27,27, 28, 29,29, 30,30, 31,31, 32,32, 33,34,35,36,37,38,39]
-        lrb1 = [28,40,41,42,43,44,45,46]
+        grB  = [24,24,26,26,28,28,30,30,32,32,34,34,36,36,38,38]
+
+        # Issue LRB1 after GRB completes.
+        lrb1 = [39,40,41,42,43,44,45,46]
         
         # Packs should be ordered AFTER GrIncs.
         packA1 = [
@@ -2586,13 +2594,11 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         grIncA = [0,1,2,3,4,5,6,7,8]
         grIncB = [9,10,11,12,13,14,15,16,17]
         
-        grA = [22,22,22,22,22,22,]
-        grB = [22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22]
-        lwsa = [22]
-        lwsb = [22]
+        lwsa = [46]
+        lwsb = [46]
         lrsa = [22]
         lrsb = [22]
-        num_gr = len(grA) + len(grB)
+        num_gr = (len(grA) + len(grB)) // 2
         optSchedule = {
             'SYNC'   : [syncs.get_indicies()],
             'LRA0'   : [lra0],
@@ -2611,7 +2617,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
             'LWSB'   : [lwsb],
             'LCC'    : [[47, 47]],
         }
-        nllshift = nglshift = num_gr // 2
+        nllshift = nglshift = num_gr
     else:
         return False, None
     
