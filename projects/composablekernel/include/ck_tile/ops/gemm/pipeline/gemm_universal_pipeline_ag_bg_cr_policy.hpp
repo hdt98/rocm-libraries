@@ -307,7 +307,7 @@ struct UniversalGemmBasePolicy
             {
                 constexpr auto DataTypeSize = sizeof(ADataType);
                 constexpr index_t MLdsLayerRequired =
-                    get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+                    get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize;
                 constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
 
                 constexpr index_t NBanks = get_n_lds_banks();
@@ -369,7 +369,7 @@ struct UniversalGemmBasePolicy
         // for gfx1250, always use KPack based on 128bits
         constexpr index_t BytesPerDword = sizeof(int32_t);
         constexpr index_t KPack =
-            get_n_words_per_128b() * BytesPerDword / DataTypeSize * PackedSize;
+            get_n_dwords_per_128b() * BytesPerDword / DataTypeSize * PackedSize;
 
         if constexpr(is_a_load_tr<Problem>)
         {
@@ -385,7 +385,7 @@ struct UniversalGemmBasePolicy
             constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigA[I1] : -1;
 
             constexpr index_t MLdsLayerRequired =
-                get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+                get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize;
 
             constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
 
@@ -575,12 +575,13 @@ struct UniversalGemmBasePolicy
             }
             else // B is Column Major
             {
-                constexpr index_t KPack     = GetSmemPackB<Problem>();
-                constexpr auto BK0          = number<KPerBlock / KPack>{};
-                constexpr auto DataTypeSize = sizeof(BDataType);
-                constexpr index_t NLdsLayerRequired =
-                    get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
-                constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
+                constexpr index_t KPack        = GetSmemPackB<Problem>();
+                constexpr auto BK0             = number<KPerBlock / KPack>{};
+                constexpr auto DataTypeSize    = sizeof(BDataType);
+                constexpr uint64_t MinLdsLayer = 1ULL;
+                constexpr auto NLdsLayer =
+                    max(MinLdsLayer,
+                        get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize);
 
                 constexpr index_t NBanks = get_n_lds_banks();
                 static_assert(NBanks == 32 || NBanks == 64, "Unexpected LDS bank count");
@@ -639,7 +640,7 @@ struct UniversalGemmBasePolicy
         // for gfx1250, always use KPack based on 128bits
         constexpr index_t BytesPerDword = sizeof(int32_t);
         constexpr index_t KPack =
-            get_n_words_per_128b() * BytesPerDword / DataTypeSize * PackedSize;
+            get_n_dwords_per_128b() * BytesPerDword / DataTypeSize * PackedSize;
 
         if constexpr(is_b_load_tr<Problem>)
         {
@@ -654,7 +655,7 @@ struct UniversalGemmBasePolicy
             constexpr auto PaddingAmount = IsNeedPadding ? LdsPaddingConfigB[I1] : -1;
 
             constexpr index_t NLdsLayerRequired =
-                get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize;
+                get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize;
             constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
 
             constexpr auto PaddingDataAmount = (PaddingAmount + 1) * BytesPerDword / DataTypeSize;
@@ -1138,7 +1139,7 @@ struct UniversalGemmBasePolicy
                                                  ? constexpr_log2_floor(get_n_lds_banks()) - 1
                                                  : constexpr_log2_floor(banks_per_kblk) - 1;
             // always use b128 to ds_load; this value calculate the bank number per 128 bits
-            constexpr index_t banks_per_128b = get_n_words_per_128b();
+            constexpr index_t banks_per_128b = get_n_dwords_per_128b();
             // amount of padding to add in dwords 0 means 1 dword padding; 1 means 2 dwords
             // padding
             // ...
