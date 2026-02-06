@@ -35,6 +35,7 @@
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
 #include "common/misc/rocsolver_timer.hpp"
+#include "common/matrix_utils/matrix_utils.hpp"
 
 template <typename T, typename S>
 void latrd_checkBadArgs(const rocblas_handle handle,
@@ -184,8 +185,22 @@ void latrd_getError(const rocblas_handle handle,
                     Th& hWRes,
                     double* max_err)
 {
+    using S = decltype(std::real(T{}));
+    using HMat = HostMatrix<T, rocblas_int>;
+    using HMatS = HostMatrix<S, rocblas_int>;
+    using BDesc = typename HMat::BlockDescriptor;
+
+    std::size_t size_E = n;
+    host_strided_batch_vector<S> hERes(size_E, 1, size_E, 1);
+
     // input data initialization
     latrd_initData<true, true, T>(handle, n, dA, lda, hA);
+
+    rocblas_int b = 0;
+    /* auto iAWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n); */
+    /* auto iA = (*iAWrap).block(BDesc().nrows(n).ncols(n)); */
+    /* std::cout << "Input Matrix A:" << std::endl; */
+    /* iA.print(); */
 
     // execute computations
     // GPU lapack
@@ -193,20 +208,98 @@ void latrd_getError(const rocblas_handle handle,
                                         dW.data(), ldw));
     CHECK_HIP_ERROR(hARes.transfer_from(dA));
     CHECK_HIP_ERROR(hWRes.transfer_from(dW));
+    CHECK_HIP_ERROR(hERes.transfer_from(dE));
 
     // CPU lapack
     cpu_latrd(uplo, n, k, hA[0], lda, hE[0], hTau[0], hW[0], ldw);
+
+    // Create thin wrappers of input matrices A and B
+    auto AWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n);
+    auto WWrap = HMat::Wrap(hW[0] + b * ldw * n, ldw, n);
+    auto AResWrap = HMat::Wrap(hARes[0] + b * lda * n, lda, n);
+    auto WResWrap = HMat::Wrap(hWRes[0] + b * ldw * n, ldw, n);
+
+    // We want the sub-blocks starting from row 0, col 0 and with size n x n of A and B
+    auto A = (*AWrap).block(BDesc().nrows(n).ncols(n));
+    /* std::cout << "Matrix A.diag() (lapack):" << std::endl; */
+    /* A.diag().print(); */
+    auto E = *HMat::Convert(hE[0], 1, n - 1);
+    /* std::cout << "Matrix E (lapack):" << std::endl; */
+    /* E.print(); */
+    auto Tl = HMat::Zeros(n, n);
+    Tl.diag(A.diag());
+    Tl.sub_diag(E);
+    Tl.sup_diag(E);
+    /* auto W = (*WWrap).block(BDesc().nrows(n).ncols(k)); */
+    /* std::cout << "Matrix W (lapack):" << std::endl; */
+    /* W.print(); */
+
+    auto ARes = (*AResWrap).block(BDesc().nrows(n).ncols(n));
+    /* std::cout << "Matrix Ares.diag() (rocsolver):" << std::endl; */
+    /* ARes.diag().print(); */
+    auto ERes = *HMat::Convert(hERes[0], 1, n - 1);
+    /* std::cout << "Matrix E (rocsolver):" << std::endl; */
+    /* E.print(); */
+    auto Tr = HMat::Zeros(n, n);
+    Tr.diag(ARes.diag());
+    Tr.sub_diag(ERes);
+    Tr.sup_diag(ERes);
+
+    /* auto WRes = (*WResWrap).block(BDesc().nrows(n).ncols(k)); */
+    /* std::cout << "Matrix Wres (rocsolver):" << std::endl; */
+    /* WRes.print(); */
 
     // error is max(||hA - hARes|| / ||hA||, ||hW - hWRes|| / ||hW||)
     // (THIS DOES NOT ACCOUNT FOR NUMERICAL REPRODUCIBILITY
     // ISSUES. IT MIGHT BE REVISITED IN THE FUTURE) using frobenius norm
     double err;
-    rocblas_int offset = (uplo == rocblas_fill_lower) ? k : 0;
+    /* rocblas_int offset = (uplo == rocblas_fill_lower) ? k : 0; */
     *max_err = 0;
-    err = norm_error('F', n, n, lda, hA[0], hARes[0]);
-    *max_err = err > *max_err ? err : *max_err;
-    err = norm_error('F', n - k, k, ldw, hW[0] + offset, hWRes[0] + offset);
-    *max_err = err > *max_err ? err : *max_err;
+    /* err = norm_error('F', n, n, lda, hA[0], hARes[0]); */
+    /* *max_err = err > *max_err ? err : *max_err; */
+    /* err = norm_error('F', n - k, k, ldw, hW[0] + offset, hWRes[0] + offset); */
+    /* *max_err = err > *max_err ? err : *max_err; */
+
+    if(uplo == rocblas_fill_lower)
+    {
+        auto Tl_k = Tl.block(BDesc().nrows(k+1).ncols(k+1));
+        auto Tr_k = Tr.block(BDesc().nrows(k+1).ncols(k+1));
+
+        std::cout << "Matrix Tl (lapack):" << std::endl;
+        Tl_k.print();
+        std::cout << "Matrix Tr (rocsolver):" << std::endl;
+        Tr_k.print();
+
+        auto [Ul_k, eig_Tl_k] = eig_lower(real(Tl_k));
+        std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
+        eig_Tl_k.print();
+        auto [Ur_k, eig_Tr_k] = eig_lower(real(Tr_k));
+        std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
+        eig_Tr_k.print();
+
+        err = (eig_Tl_k - eig_Tr_k).norm()/(eig_Tl_k.max_coeff_norm());
+        *max_err = err > *max_err ? err : *max_err;
+    }
+    else // if(uplo == rocblas_fill_upper)
+    {
+        auto Tl_k = Tl.block(BDesc().from_row(n-k-2).nrows(k+1).from_col(n-k-2).ncols(k+1));
+        auto Tr_k = Tr.block(BDesc().from_row(n-k-2).nrows(k+1).from_col(n-k-2).ncols(k+1));
+
+        std::cout << "Matrix Tl (lapack):" << std::endl;
+        Tl_k.print();
+        std::cout << "Matrix Tr (rocsolver):" << std::endl;
+        Tr_k.print();
+
+        auto [Ul_k, eig_Tl_k] = eig_lower(real(Tl_k));
+        std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
+        eig_Tl_k.print();
+        auto [Ur_k, eig_Tr_k] = eig_lower(real(Tr_k));
+        std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
+        eig_Tr_k.print();
+
+        err = (eig_Tl_k - eig_Tr_k).norm()/(eig_Tl_k.max_coeff_norm());
+        *max_err = err > *max_err ? err : *max_err;
+    }
 }
 
 template <typename T, typename Sd, typename Td, typename Sh, typename Th>

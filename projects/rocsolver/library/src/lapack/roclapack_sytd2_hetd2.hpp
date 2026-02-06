@@ -37,6 +37,8 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
+#include <rocprofiler-sdk-roctx/roctx.h>
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 template <int MAX_THDS, typename T, typename I, typename S, typename U>
@@ -589,6 +591,7 @@ rocblas_status rocsolver_sytd2_hetd2_template(rocblas_handle handle,
 {
     ROCSOLVER_ENTER("sytd2_hetd2", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
+    roctxRangePush("rocsolver_sytd2_hetd2");
 
     // quick return
     if(n == 0 || batch_count == 0)
@@ -708,6 +711,7 @@ rocblas_status rocsolver_sytd2_hetd2_template(rocblas_handle handle,
                             strideA, D, strideD, E, strideE);
 
     rocblas_set_pointer_mode(handle, old_mode);
+    roctxRangePop();
     return rocblas_status_success;
 }
 
