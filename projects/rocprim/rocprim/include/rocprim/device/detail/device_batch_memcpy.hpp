@@ -1350,7 +1350,10 @@ static hipError_t batch_memcpy_func(void*              temporary_storage,
 
             // Launch batch_memcpy_blev_kernel.
             start_timer();
-            blev_memcpy_launch_plan.launch(batch_memcpy_blev_grid_size, blev_block_size, 0, stream);
+            ROCPRIM_RETURN_ON_ERROR(blev_memcpy_launch_plan.launch(batch_memcpy_blev_grid_size,
+                                                                   blev_block_size,
+                                                                   0,
+                                                                   stream));
             ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR("blev_memcpy_kernel",
                                                         batch_memcpy_grid_size - 1,
                                                         start);

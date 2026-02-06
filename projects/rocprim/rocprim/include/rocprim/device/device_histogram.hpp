@@ -351,10 +351,10 @@ inline hipError_t histogram_impl(void*          temporary_storage,
         plan.device_callback.shared_histograms = chosen_shared_histograms;
         plan.device_callback.rows_per_block    = rows_per_block;
 
-        plan.launch(grid_size,
-                    dim3(block_size, 1),
-                    chosen_shared_histograms * block_histogram_bytes,
-                    stream);
+        ROCPRIM_RETURN_ON_ERROR(plan.launch(grid_size,
+                                            dim3(block_size, 1),
+                                            chosen_shared_histograms * block_histogram_bytes,
+                                            stream));
 
         ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR("histogram_shared",
                                                     grid_size.x * grid_size.y * block_size,

@@ -176,10 +176,10 @@ hipError_t adjacent_find_impl(void* const       temporary_storage,
         }
 
         // Launch adjacent_find_impl_kernels::block_reduce_kernel
-        adjacent_find_block_reduce_kernel.launch(min_grid_size,
-                                                 block_size,
-                                                 shared_mem_bytes,
-                                                 stream);
+        ROCPRIM_RETURN_ON_ERROR(adjacent_find_block_reduce_kernel.launch(min_grid_size,
+                                                                         block_size,
+                                                                         shared_mem_bytes,
+                                                                         stream));
         ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR(
             "rocprim::detail::adjacent_find::block_reduce_kernel",
             size,
