@@ -2556,11 +2556,11 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     snops = []
     if isNN(kernel) and not useLDSTr and TLDS==1:
         syncs = SyncSchedule()
-        syncs.add(-1, dscnt=7, comment="Wait for prior local read local write")
-        syncs.add(2, dscnt=6, comment="Wait for prior local read local write")
+        syncs.add(-1, dscnt=4, comment="Wait for prior local read local write")
+        syncs.add(2, dscnt=3, comment="Wait for prior local read local write")
+        syncs.add(8, dscnt=6, comment="Wait for partial LRA0")
         syncs.add(16, dscnt=0, barrier=True, comment="Wait for LRA0 to complete before starting LRB0+GRA")
         syncs.add(23, dscnt=0, vlcnt=3, barrier=True, comment="Wait for LRB0+GRA")
-        syncs.add(39, dscnt=23, vlcnt=11, barrier=True, comment="Wait for GRB to complete before starting LRB1")
 
         snopIdxs = [1, 25]
         snops = [[x, SNop(1, comment="")] for x in snopIdxs]
@@ -2573,9 +2573,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
 
         # Issue LRA1+GRB after LRB0+GRA complete.
         lra1 = [24,24, 25,25, 26,26, 27,27, 28, 29,29, 30,30, 31,31, 32,32, 33,34,35,36,37,38,39]
-        grB  = [24,24,26,26,28,28,30,30,32,32,34,34,36,36,38,38]
-
-        # Issue LRB1 after GRB completes.
+        grB  = [24,24,26,26,28,28,30,30,32,32,36,36,38,38,40,40]
         lrb1 = [39,40,41,42,43,44,45,46]
         
         # Packs should be ordered AFTER GrIncs.
