@@ -270,7 +270,7 @@
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
     Use64bShadowLimit: 1
-    UseCustomMainLoopSchedule: 1
+    UseCustomMainLoopSchedule: 0
     UseDot2F32XEmulation: true
     UseDotInstruction: false
     UseF32XEmulation: false
@@ -287,7 +287,7 @@
     WaveSplitK: false
     WavefrontSize: 64
     WorkGroup: [32, 8, 1]
-    WorkGroupMapping: 06
+    WorkGroupMapping: 6
     WorkGroupMappingXCC: -1
     WorkGroupMappingXCCGroup: -1
     WorkGroupReduction: false
