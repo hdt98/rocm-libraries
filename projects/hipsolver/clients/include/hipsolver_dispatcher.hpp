@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -87,6 +87,7 @@ class hipsolver_dispatcher
             {"gesvdj", testing_gesvdj<API_NORMAL, false, false, T>},
             {"gesvdj_batched", testing_gesvdj<API_NORMAL, false, true, T>},
             {"getrf", testing_getrf<API_NORMAL, false, false, false, T, int, int>},
+            {"getrf_batched", testing_getrf<API_NORMAL, true, false, false, T, int, int>},
             {"getrf_64", testing_getrf<API_COMPAT, false, false, false, T, int64_t, size_t>},
             {"getrs", testing_getrs<API_NORMAL, false, false, T, int, int>},
             {"getrs_64", testing_getrs<API_COMPAT, false, false, T, int64_t, size_t>},
