@@ -364,7 +364,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
         if constexpr(DirectLoad)
         {
             // Force use padded layout on gfx950 to reduce bank conflicts
-            constexpr index_t ABlockLdsExtraM = 1;
             return make_naive_tensor_descriptor(
                 make_tuple(AK0Number, Number<MPerBlock>{}, AK1Number),
                 make_tuple(Number<MPerBlock * AK1Number>{}, I1, Number<MPerBlock>{}));
@@ -388,7 +387,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
     {
         if constexpr(DirectLoad)
         {
-            constexpr index_t BBlockLdsExtraN = 1;
             return make_naive_tensor_descriptor(
                 make_tuple(BK0Number, Number<NPerBlock>{}, BK1Number),
                 make_tuple(Number<NPerBlock * BK1Number>{}, I1, Number<NPerBlock>{}));
