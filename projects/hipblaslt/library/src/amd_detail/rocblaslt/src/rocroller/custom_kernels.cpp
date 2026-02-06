@@ -4,10 +4,10 @@
 #include <hip/hip_runtime.h>
 #include <iostream>
 
-std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&       customKernelName,
-                                                   const KernelType&        kernelType,
-                                                   const WorkGroupTileSize& wgt,
-                                                   const std::string&       path)
+std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&           customKernelName,
+                                                   const KernelType&            kernelType,
+                                                   const WorkGroupTileSize&     wgt,
+                                                   const std::filesystem::path& path)
 {
     auto gemmKernel = std::make_shared<GemmKernel>();
 
@@ -20,22 +20,40 @@ std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&       cust
     return gemmKernel;
 }
 
-std::string getCoPath(const std::string& filename)
+std::filesystem::path getCoPath()
 {
-    const char* env = std::getenv("HIPBLASLT_ROCROLLER_CUSTOM_KERNEL_DIR");
+    std::filesystem::path libraryPath;
+    bool staticLib = false;
+
+#ifdef HIPBLASLT_STATIC_LIB
+    staticLib = true;
+#endif
+
+    const char* env = getenv("HIPBLASLT_TENSILE_LIBPATH");
     if(env)
     {
-        std::string path = env;
-        // Ensure trailing slash
-        if(!path.empty() && path.back() != '/')
+        libraryPath = env;
+    }
+    else
+    {
+        // Find the location of librocblaslt.so
+        // Fall back on hard-coded path if static library or not found
+        std::optional<std::filesystem::path> default_lib_path;
+        if(staticLib)
         {
-            path += "/";
+            // Assume library files are in "/opt/rocm"
+            default_lib_path = "/opt/rocm/lib";
         }
-        return path + filename;
+
+        if(auto maybe_path = rocblaslt_find_library_relative_path(
+               /*relpath=*/std::nullopt, default_lib_path))
+        {
+            // Worst case use "./"
+            libraryPath = maybe_path.value_or(".");
+        }
     }
 
-    // TODO: Fallback should be where the kernels are packaged
-    return "./" + filename;
+    return libraryPath;
 }
 
 void preloadCustomKernels(SolutionCache& cache)
@@ -73,13 +91,14 @@ void preloadCustomKernels(SolutionCache& cache)
                 params.streamK          = streamK;
                 params.tailLoops        = tailLoops;
 
-                cache.addKernel(mxfp4Kernel,
-                                params,
-                                createCustomGemmKernel(
-                                    "_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
-                                    mxfp4Kernel,
-                                    params.workgroupTile,
-                                    getCoPath("f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co")));
+                cache.addKernel(
+                    mxfp4Kernel,
+                    params,
+                    createCustomGemmKernel(
+                        "_ZN5aiter44f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256E",
+                        mxfp4Kernel,
+                        params.workgroupTile,
+                        getCoPath() / "f4gemm_bf16_per1x32Fp4_noBpreShuffle_256x256.co"));
             }
         }
     }
