@@ -22,21 +22,70 @@
 #include "ck_tile/host.hpp"
 #include "ck_tile/ops/common.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm.hpp"
+#include "ck_tile/ops/gemm/warp/warp_wmma_gemm.hpp"
 
 using namespace ck_tile;
 
+// define general macros for various architectures
+#if defined(__gfx908__) || defined(__gfx90a__) || defined(__gfx942__) || defined(__gfx950__) || \
+    defined(__gfx9_4_generic__)
+#define __gfx9__
+#endif
+
+#if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__)
+#define __gfx12__
+#endif
+
+__device__ constexpr index_t get_warp_size()
+{
+#if defined(__HIP_DEVICE_COMPILE__)
+#if defined(__gfx9__)
+    return 64;
+#else
+    return 32;
+#endif
+#else
+    return 64;
+#endif
+}
+
+inline __host__ index_t get_warp_size()
+{
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
+    int device  = 0;
+    int result  = 0;
+    auto status = hipGetDevice(&device);
+    if(status == hipSuccess)
+    {
+        status = hipDeviceGetAttribute(&result, hipDeviceAttributeWarpSize, device);
+        if(status == hipSuccess)
+        {
+            return result;
+        }
+    }
+#endif
+    return 64;
+}
+
 // Distributed HGEMM kernel using proper tile_distribution
-template <typename ADataType, typename BDataType, typename CDataType, typename AccDataType>
+template <typename ADataType,
+          typename BDataType,
+          typename CDataType,
+          typename AccDataType,
+          index_t BlockSize = 64>
 struct DistributedHgemmKernel
 {
-    static constexpr index_t kWaveSize = 64; // AMD wave size
-    static constexpr index_t kBlockM   = 16; // MFMA M dimension
-    static constexpr index_t kBlockN   = 16; // MFMA N dimension
-    static constexpr index_t kBlockK   = 16; // MFMA K dimension per instruction
+    static constexpr index_t kBlockM = 16; // MFMA M dimension
+    static constexpr index_t kBlockN = 16; // MFMA N dimension
+    static constexpr index_t kBlockK = 16; // MFMA K dimension per instruction
 
-    // Use ck_tile's WarpGemm for MFMA
-    using WarpGemm                      = WarpGemmMfmaF16F16F32M16N16K16;
-    static constexpr index_t kBlockSize = kWaveSize;
+// Use ck_tile's WarpGemm for MFMA
+#if defined(__gfx12__)
+    using WarpGemm = WarpGemmWmma_f32_16x16x16_f16_f16<false>;
+#else
+    using WarpGemm = WarpGemmMfmaF16F16F32M16N16K16;
+#endif
+    static constexpr index_t kBlockSize = BlockSize;
 
     CK_TILE_DEVICE void operator()(const ADataType* a,
                                    const BDataType* b,
@@ -52,13 +101,18 @@ struct DistributedHgemmKernel
                                    AccDataType alpha,
                                    AccDataType beta) const
     {
+        // Early return to fix distributions before running
         // Calculate which 16×16 block this wave computes
         // const index_t wave_id = get_block_id() * get_block_size() / kWaveSize + threadIdx.x /
         // kWaveSize;
+
+        constexpr index_t kWaveSize = get_warp_size();
+
         const index_t wave_id = get_warp_id();
-        const index_t wave_m  = wave_id / (N / kBlockN);
+        const index_t wave_m  = wave_id / (M / kBlockM);
         const index_t wave_n  = wave_id % (N / kBlockN);
 
+        // top left coordinates of the output block
         const index_t m_offset = wave_m * kBlockM;
         const index_t n_offset = wave_n * kBlockN;
 
@@ -84,8 +138,8 @@ struct DistributedHgemmKernel
             b,
             make_tuple(K, N),   // Shape: K×N
             make_tuple(ldb, 1), // Strides: row-major
-            number<4>{},
-            number<1>{});
+            number<4>{},        // GuaranteedLastDimensionVectorLength
+            number<1>{});       // GuaranteedLastDimensionVectorStride
 
         // C is column-major: M×N with stride ldc between columns
         const auto c_tensor = make_naive_tensor_view<address_space_enum::global>(
@@ -106,6 +160,10 @@ struct DistributedHgemmKernel
         // Use our tested custom distributions from test_a_distribution.cpp and
         // test_b_distribution.cpp A: Column-major M×K with each thread loading 4 consecutive K
         // values from one M position
+
+#if defined(__gfx12__)
+        constexpr auto a_distribution = WarpGemm::AWarpDstr{};
+#else
         constexpr auto a_distribution = make_static_tile_distribution(
             tile_distribution_encoding<sequence<>,            // No replication
                                        tuple<sequence<16>,    // H0 (M): 16 lanes for M
@@ -115,8 +173,15 @@ struct DistributedHgemmKernel
                                        sequence<2>,           // Y maps to K dimension only
                                        sequence<1>>{}         // Y at position 1
         );
+#endif
 
-        // B: Row-major K×N with each thread loading 4 consecutive K values from one N position
+// CK_PRINT<remove_cvref_t<decltype(a_distribution)>>();
+// CK_PRINT<WarpGemm::AWarpDstr>();
+
+// B: Row-major K×N with each thread loading 4 consecutive K values from one N position
+#if defined(__gfx12__)
+        constexpr auto b_distribution = WarpGemm::BWarpDstr{};
+#else
         constexpr auto b_distribution = make_static_tile_distribution(
             tile_distribution_encoding<
                 sequence<>,            // No replication
@@ -127,7 +192,7 @@ struct DistributedHgemmKernel
                 sequence<1>,           // Y maps to K dimension (H0)
                 sequence<1>>{}         // Y at position 1 in H0 (the second 4 in sequence<4,4>)
         );
-
+#endif
         // Create windows for A and B that we'll move along K
         auto a_window = make_tile_window(a_tensor,
                                          make_tuple(number<kBlockM>{}, number<kBlockK>{}),
@@ -139,7 +204,10 @@ struct DistributedHgemmKernel
                                          {0, n_offset},
                                          b_distribution);
 
-        // C distribution (column-major M×N output) - tested in test_c_distribution.cpp
+        // C distribution (column-major M×N output)
+#if defined(__gfx12__)
+        constexpr auto c_distribution = WarpGemm::CWarpDstr{};
+#else
         constexpr auto c_distribution = make_static_tile_distribution(
             tile_distribution_encoding<
                 sequence<>,            // No replication
@@ -150,8 +218,11 @@ struct DistributedHgemmKernel
                 sequence<1>,           // Y maps to M dimension (H0)
                 sequence<1>>{}         // Y at position 1 in H0 (the second 4 in sequence<4,4>)
         );
+#endif
+        // CK_PRINT<remove_cvref_t<decltype(c_distribution)>>();
+        // CK_PRINT<WarpGemm::CWarpDstr>();
 
-        // Create accumulator using our tested C distribution
+        //  Create accumulator using our tested C distribution
         auto acc_tile = make_static_distributed_tensor<AccDataType>(c_distribution);
 
         // Initialize accumulator to zero using set_tile
@@ -335,12 +406,30 @@ int main()
     fill_random(h_a, InputType(-1), InputType(1));
     fill_random(h_b, InputType(-1), InputType(1));
     fill_random(h_c, AccumType(-1), AccumType(1));
+    fill_random(h_c, AccumType(0), AccumType(0));
 
     // CPU reference
+    constexpr auto warmup_iterations = 10;
+    constexpr auto timed_iterations  = 30;
+
+    // warmup
+    static_for<1, warmup_iterations + 1, 1>{}([&](auto i) {
+        reference_gemm_mixed(
+            h_a, h_b, h_c, h_d_ref, M, N, K, lda, ldb, ldc, ldd, alpha / i, beta / i);
+    });
+
+    // Benchmark CPU reference
     auto cpu_start = std::chrono::high_resolution_clock::now();
-    reference_gemm_mixed(h_a, h_b, h_c, h_d_ref, M, N, K, lda, ldb, ldc, ldd, alpha, beta);
-    auto cpu_end       = std::chrono::high_resolution_clock::now();
-    double cpu_time_ms = std::chrono::duration<double, std::milli>(cpu_end - cpu_start).count();
+    static_for<1, timed_iterations + 1, 1>{}([&](auto i) {
+        reference_gemm_mixed(
+            h_a, h_b, h_c, h_d_ref, M, N, K, lda, ldb, ldc, ldd, alpha / i, beta / i);
+    });
+    auto cpu_end = std::chrono::high_resolution_clock::now();
+    double cpu_time_ms =
+        std::chrono::duration<double, std::milli>(cpu_end - cpu_start).count() / timed_iterations;
+    ignore = cpu_time_ms;
+    reference_gemm_mixed(
+        h_a, h_b, h_c, h_d_ref, M, N, K, lda, ldb, ldc, ldd, alpha, beta); // Reference run
 
     // Device memory
     DeviceMem d_a(M * K * sizeof(InputType));
@@ -354,8 +443,14 @@ int main()
     d_d.ToDevice(h_d.data(), M * N * sizeof(AccumType));
 
     // Launch kernel
-    constexpr index_t block_size = 64;                  // One wave
-    const index_t grid_size      = (M / 16) * (N / 16); // One wave per 16×16 output block
+
+    constexpr index_t block_size = 64; // thread block size
+
+    using GemmKernel =
+        DistributedHgemmKernel<InputType, InputType, AccumType, AccumType, block_size>;
+
+    const index_t grid_size =
+        (M / GemmKernel::kBlockM) * (N / GemmKernel::kBlockN); // One wave per output block
 
     std::cout << "Launching kernel:\n";
     std::cout << "  Grid: " << grid_size << " blocks\n";
@@ -365,58 +460,84 @@ int main()
 
     stream_config stream;
 
-    // Warmup
-    for(int i = 0; i < 5; ++i)
-    {
+#if 0
+
+    // warmup
+    static_for<1, warmup_iterations + 1, 1>{}([&](auto i) {
         launch_kernel(stream,
-                      make_kernel<block_size>(
-                          DistributedHgemmKernel<InputType, InputType, AccumType, AccumType>{},
-                          dim3(grid_size),
-                          dim3(block_size),
-                          0,
-                          static_cast<const InputType*>(d_a.GetDeviceBuffer()),
-                          static_cast<const InputType*>(d_b.GetDeviceBuffer()),
-                          static_cast<const AccumType*>(d_c.GetDeviceBuffer()),
-                          static_cast<AccumType*>(d_d.GetDeviceBuffer()),
-                          M,
-                          N,
-                          K,
-                          lda,
-                          ldb,
-                          ldc,
-                          ldd,
-                          alpha,
-                          beta));
-    }
+                      make_kernel<block_size>(GemmKernel{},
+                                              dim3(grid_size),
+                                              dim3(block_size),
+                                              0,
+                                              static_cast<const InputType*>(d_a.GetDeviceBuffer()),
+                                              static_cast<const InputType*>(d_b.GetDeviceBuffer()),
+                                              static_cast<const AccumType*>(d_c.GetDeviceBuffer()),
+                                              static_cast<AccumType*>(d_d.GetDeviceBuffer()),
+                                              M,
+                                              N,
+                                              K,
+                                              lda,
+                                              ldb,
+                                              ldc,
+                                              ldd,
+                                              alpha / i,
+                                              beta / i));
+    });
+
     hip_check_error(hipDeviceSynchronize());
 
+#endif
     // Timed run
     auto gpu_start = std::chrono::high_resolution_clock::now();
-
-    launch_kernel(stream,
-                  make_kernel<block_size>(
-                      DistributedHgemmKernel<InputType, InputType, AccumType, AccumType>{},
-                      dim3(grid_size),
-                      dim3(block_size),
-                      0,
-                      static_cast<const InputType*>(d_a.GetDeviceBuffer()),
-                      static_cast<const InputType*>(d_b.GetDeviceBuffer()),
-                      static_cast<const AccumType*>(d_c.GetDeviceBuffer()),
-                      static_cast<AccumType*>(d_d.GetDeviceBuffer()),
-                      M,
-                      N,
-                      K,
-                      lda,
-                      ldb,
-                      ldc,
-                      ldd,
-                      alpha,
-                      beta));
+#if 0
+    static_for<1, timed_iterations + 1, 1>{}([&](auto i) {
+        launch_kernel(stream,
+                      make_kernel<block_size>(GemmKernel{},
+                                              dim3(grid_size),
+                                              dim3(block_size),
+                                              0,
+                                              static_cast<const InputType*>(d_a.GetDeviceBuffer()),
+                                              static_cast<const InputType*>(d_b.GetDeviceBuffer()),
+                                              static_cast<const AccumType*>(d_c.GetDeviceBuffer()),
+                                              static_cast<AccumType*>(d_d.GetDeviceBuffer()),
+                                              M,
+                                              N,
+                                              K,
+                                              lda,
+                                              ldb,
+                                              ldc,
+                                              ldd,
+                                              alpha / i,
+                                              beta / i));
+    });
 
     hip_check_error(hipDeviceSynchronize());
 
-    auto gpu_end       = std::chrono::high_resolution_clock::now();
-    double gpu_time_ms = std::chrono::duration<double, std::milli>(gpu_end - gpu_start).count();
+#endif
+    auto gpu_end = std::chrono::high_resolution_clock::now();
+    double gpu_time_ms =
+        std::chrono::duration<double, std::milli>(gpu_end - gpu_start).count() / timed_iterations;
+
+    // verification run
+    launch_kernel(stream,
+                  make_kernel<block_size>(GemmKernel{},
+                                          dim3(grid_size),
+                                          dim3(block_size),
+                                          0,
+                                          static_cast<const InputType*>(d_a.GetDeviceBuffer()),
+                                          static_cast<const InputType*>(d_b.GetDeviceBuffer()),
+                                          static_cast<const AccumType*>(d_c.GetDeviceBuffer()),
+                                          static_cast<AccumType*>(d_d.GetDeviceBuffer()),
+                                          M,
+                                          N,
+                                          K,
+                                          lda,
+                                          ldb,
+                                          ldc,
+                                          ldd,
+                                          alpha,
+                                          beta));
+    hip_check_error(hipDeviceSynchronize());
 
     // Get result
     d_d.FromDevice(h_d.data(), M * N * sizeof(AccumType));
