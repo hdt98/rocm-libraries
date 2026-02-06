@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -108,7 +108,7 @@ protected:
         if(arg.peek<rocblas_int>("m") == -1 && arg.peek<rocblas_int>("n") == -1)
             testing_getrf_bad_arg<API, BATCHED, STRIDED, T, I, SIZE>();
 
-        arg.batch_count = 1;
+        arg.batch_count = (BATCHED || STRIDED ? 3 : 1);
         testing_getrf<API, BATCHED, STRIDED, NPVT, T, I, SIZE>(arg);
     }
 };
@@ -257,6 +257,48 @@ TEST_P(GETRF_COMPAT_NPVT_64, __float_complex)
 TEST_P(GETRF_COMPAT_NPVT_64, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
+}
+
+// batched tests
+
+TEST_P(GETRF, batched__float)
+{
+    run_tests<true, false, float>();
+}
+
+TEST_P(GETRF, batched__double)
+{
+    run_tests<true, false, double>();
+}
+
+TEST_P(GETRF, batched__float_complex)
+{
+    run_tests<true, false, hipsolverComplex>();
+}
+
+TEST_P(GETRF, batched__double_complex)
+{
+    run_tests<true, false, hipsolverDoubleComplex>();
+}
+
+TEST_P(GETRF_NPVT, batched__float)
+{
+    run_tests<true, false, float>();
+}
+
+TEST_P(GETRF_NPVT, batched__double)
+{
+    run_tests<true, false, double>();
+}
+
+TEST_P(GETRF_NPVT, batched__float_complex)
+{
+    run_tests<true, false, hipsolverComplex>();
+}
+
+TEST_P(GETRF_NPVT, batched__double_complex)
+{
+    run_tests<true, false, hipsolverDoubleComplex>();
 }
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
