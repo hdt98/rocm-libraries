@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "gemm_utils.hpp"
+#include "ck_tile/ops/gemm/kernel/gemm_tile_partitioner.hpp"
 
 struct WeightPreshuffleInvoker
 {

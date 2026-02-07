@@ -3,6 +3,8 @@
 
 #pragma once
 #include "device_prop.hpp"
+#include "host_tensor.hpp"
+#include "reference/reference_permute.hpp"
 #include <stdexcept>
 
 namespace ck_tile {

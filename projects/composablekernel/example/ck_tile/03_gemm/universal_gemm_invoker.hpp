@@ -5,8 +5,10 @@
 #include <chrono>
 #include <thread>
 #include "gemm_utils.hpp"
-#include "ck_tile/host/hip_check_error.hpp"
 #include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/hip_check_error.hpp"
+#include "ck_tile/host/rotating_buffers.hpp"
+#include "ck_tile/ops/gemm/kernel/gemm_tile_partitioner.hpp"
 
 struct UniversalInvoker
 {
