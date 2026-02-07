@@ -2537,7 +2537,6 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
                    ]
         nglshift = nllshift = 11 # vmcnt shift for ngl and nll
     elif isNT(kernel) and useLDSTr and TLDS == 0:
-        print("Using CMS!!!")
         valid, opt = _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS)
         if not valid:
             return False, None
