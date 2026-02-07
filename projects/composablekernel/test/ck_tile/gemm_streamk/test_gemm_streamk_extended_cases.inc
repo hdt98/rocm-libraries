@@ -22,3 +22,159 @@ TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK)
 
     this->Run(M, N, K);
 }
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSKA)
+{
+    const ck_tile::index_t num_cu     = get_cu_count();
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = (M_Tile * num_cu * 2) + (M_Tile * 2);
+    ck_tile::index_t N = N_Tile;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::TreeReduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSKB)
+{
+    const ck_tile::index_t num_cu     = get_cu_count();
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = (M_Tile * num_cu * 2) + (M_Tile * 2);
+    ck_tile::index_t N = N_Tile;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::Reduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK0)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 61;
+    ck_tile::index_t N = num_cu * 5;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::TreeReduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK1)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 11;
+    ck_tile::index_t N = num_cu * 29;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::TreeReduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK2)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 19;
+    ck_tile::index_t N = num_cu * 20;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::TreeReduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK3)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 24;
+    ck_tile::index_t N = num_cu * 19;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::TreeReduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK4)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 38;
+    ck_tile::index_t N = num_cu * 14;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::TreeReduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK0b)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 61;
+    ck_tile::index_t N = num_cu * 5;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::Reduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK1b)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 11;
+    ck_tile::index_t N = num_cu * 29;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::Reduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK2b)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 19;
+    ck_tile::index_t N = num_cu * 20;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::Reduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK3b)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 24;
+    ck_tile::index_t N = num_cu * 19;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::Reduction);
+}
+
+TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK4b)
+{
+    const ck_tile::index_t num_cu = get_cu_count();
+    // constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
+    // constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+
+    ck_tile::index_t M = num_cu * 38;
+    ck_tile::index_t N = num_cu * 14;
+    ck_tile::index_t K = 2048;
+
+    this->Run(M, N, K, ck_tile::StreamKReductionStrategy::Reduction);
+}
