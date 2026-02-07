@@ -7,6 +7,7 @@
 #include "ck_tile/ops/common/load_and_convert_tile.hpp"
 #include "ck_tile/host/concat.hpp"
 #include "ck_tile/ops/gemm/pipeline/wp_pipeline_agmem_bgmem_creg_base_policy.hpp"
+#include "ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_base.hpp"
 
 namespace ck_tile {
 

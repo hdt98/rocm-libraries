@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 #pragma once
+#include "ck_tile/host/check_err.hpp"
+#include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/fill.hpp"
 #include "ck_tile/host/permute_pk_int4.hpp"
+#include "ck_tile/host/reference/reference_gemm.hpp"
 #include "ck_tile/host/tensor_shuffle_utils.hpp"
 #include "ck_tile/ops/common/utils.hpp"
 

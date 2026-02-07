@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core/config.hpp"
+#include "ck_tile/host/flush_icache.hpp"
 #include "ck_tile/host/hip_check_error.hpp"
 #include <hip/hip_runtime.h>
 

@@ -4,9 +4,14 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_scheduler.hpp"
-#include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 #include "ck_tile/host/concat.hpp"
+#include "ck_tile/ops/common/tensor_layout.hpp"
+#include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
+#include "ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_scheduler.hpp"
+#include "ck_tile/ops/gemm/pipeline/wp_pipeline_agmem_bgmem_creg_base_policy.hpp"
+#include <string>
+#include <tuple>
+#include <type_traits>
 
 namespace ck_tile {
 

@@ -4,9 +4,11 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
+#include "ck_tile/ops/gemm/block/block_gemm_areg_breg_creg_v1_custom_policy.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
+#include "ck_tile/ops/gemm/block/block_gemm_areg_breg_creg_v1.hpp"
 
 namespace ck_tile {
 // Default policy for GemmPipelineAGmemBGmemCregComputeV4, except the block gemm method, it shares
