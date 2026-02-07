@@ -225,7 +225,7 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         }
         else
         {
-            const index_t WmmaK    = ck::is_gfx125_supported() ? 64 / sizeof(ADataType) : 16;
+            const index_t WmmaK    = get_wmma_k<ADataType, K1>();
             constexpr auto A_KRow  = 2;
             const auto A_K0PerWmma = WmmaK / A_KRow / K1Number;
             const auto A_KWmma     = K / WmmaK;
@@ -318,7 +318,7 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         }
         else
         {
-            const index_t WmmaK    = ck::is_gfx125_supported() ? 64 / sizeof(BDataType) : 16;
+            const index_t WmmaK    = get_wmma_k<BDataType, K1>();
             constexpr auto B_KRow  = 2;
             const auto B_K0PerWmma = WmmaK / B_KRow / K1Number;
             const auto B_KWmma     = K / WmmaK;
@@ -848,7 +848,10 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         {
             return false;
         }
-
+        if(!is_xdl_wmma_k_supported<ADataType, KPerBlock>())
+        {
+            return false;
+        }
         if(!GridwiseOp::CheckValidity(arg.a_grid_desc_,
                                       arg.b_grid_desc_,
                                       arg.ds_grid_desc_m_n_,
