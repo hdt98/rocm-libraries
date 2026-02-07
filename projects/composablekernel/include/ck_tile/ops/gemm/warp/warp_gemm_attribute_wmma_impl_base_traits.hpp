@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 #pragma once
+
+#include "ck_tile/core.hpp"
+
 namespace ck_tile {
 template <typename Arch, typename ADType, typename BDType, typename CDType>
 struct WmmaTraitsBase;

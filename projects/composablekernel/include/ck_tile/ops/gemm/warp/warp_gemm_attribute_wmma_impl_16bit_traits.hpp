@@ -3,7 +3,10 @@
 
 #pragma once
 
+#include "ck_tile/core.hpp"
 #include "warp_gemm_attribute_wmma_impl_base_traits.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_attribute_wmma_impl.hpp"
+
 namespace ck_tile {
 // fp16 specialization - GFX11
 template <>

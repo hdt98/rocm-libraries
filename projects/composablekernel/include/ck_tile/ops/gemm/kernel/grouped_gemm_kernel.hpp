@@ -7,11 +7,12 @@
 #include "ck_tile/core/utility/literals.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
 #include "ck_tile/host/stream_utils.hpp"
+#include "ck_tile/ops/gemm/kernel/gemm_kernel.hpp"
+#include "ck_tile/ops/gemm/kernel/gemm_tile_partitioner.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_comp_v3.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_scheduler.hpp"
-#include "ck_tile/ops/gemm/kernel/gemm_kernel.hpp"
 #include "ck_tile/host.hpp"
-
+#include <array>
 #include <hip/hip_runtime.h>
 
 namespace ck_tile {
@@ -159,8 +160,8 @@ struct GroupedGemmKernel
         // clang-format on
     }
 
-    CK_TILE_HOST static auto
-    GetWorkSpaceSize(const std::vector<GroupedGemmHostArgs<>>& gemm_descs) -> std::size_t
+    CK_TILE_HOST static auto GetWorkSpaceSize(const std::vector<GroupedGemmHostArgs<>>& gemm_descs)
+        -> std::size_t
     {
         return gemm_descs.size() * sizeof(GemmTransKernelArg<NumDTensor_>);
     }

@@ -735,6 +735,7 @@ if(NOT GPU_ARCHS AND USER_GPU_TARGETS AND NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTE
         LIBRARY_NAME composablekernel
         PACKAGE_NAME tutorials
    )
+   add_subdirectory(test)
 endif()
 
 if (NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_LIBS_ONLY)
