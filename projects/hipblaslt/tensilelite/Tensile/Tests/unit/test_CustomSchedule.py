@@ -414,7 +414,7 @@ class TestCustomScheduleBF16:
         ( True,  False,        False,       1, 224, 128),  # TN
         ( False,  True,        True,        0, 224, 128),  # NT
         ( False,  False,       True,        1, 224, 128),  # NN
-        ( False,  True,        True,        1, 128, 224),  # NT
+        ( False,  True,        True,        0, 128, 224),  # NT
 
         # fmt: on
         ])
