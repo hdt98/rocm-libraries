@@ -8627,6 +8627,15 @@ class KernelWriterAssembly(KernelWriter):
                       hi16 = False if tP["glvw"]==1 else (r%4)//2
                       comment="load one buffer value"
 
+                  if (dataType.isFloat4()) and not tP["isM"]:
+                    if numElementsPerLoad==8:
+                      # Pack 8 FP4 elements into a single load dword
+                      r += numElementsPerLoad-1 # skip next (numElementsPerLoad-1) element since we loaded dword here
+                      comment = "Load 8 elements for Float4 in single VGPR."
+                  if dataType.is6bitFloat() and not tP["isM"]:
+                    r += numElementsPerLoad-1
+                    comment = f"Load {numElementsPerLoad} elements for 6 bits"
+
                   useBuffer = not isTr
                   bpl = numElementsPerLoad*(tP["bpeGR"] if not tP["isM"] else tP["bpe"]) # bytesPerLoad
 

@@ -3821,7 +3821,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           bufIdxA = (bufIdxDTV if kernel["DirectToVgprA"] else bufIdx) // self.states.numReadsIterCoalescedA
           if kernel["ProblemType"]["MXBlockA"]:
             bufIdxMXSA = (bufIdxDTV if kernel["DirectToVgprMXSA"] else bufIdx) // self.states.numReadsIterCoalescedMXSA
-          if kernel["ProblemType"]["MXBlockA"]:
+          if kernel["ProblemType"]["MXBlockB"]:
             bufIdxMXSB = (bufIdxDTV if kernel["DirectToVgprMXSB"] else bufIdx) // self.states.numReadsIterCoalescedMXSB
           bufIdxB = (bufIdxDTV if kernel["DirectToVgprB"] else bufIdx) // self.states.numReadsIterCoalescedB
           if mValue < mEnd and mValue % self.states.numReadsIterCoalescedA == 0:
@@ -4829,7 +4829,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     numVgprG2LAllocatedLocal = roundUp((kernel["NumLoadsCoalescedB"] * kernel["NumLoadsPerpendicularB"] * \
         tpBLocal) / (float)(self.states.bpr))
     if (self.states.archCaps["HasEccHalf"] or not self.states.asmCaps["HasWMMA_V1"]) and (bpeMax * vwb < self.states.bpr):
-      # This check is to reserve porential usage of VGPRs for gfx12 8-bit code gen
+      # This check is to reserve porential usage of VGPRs -TODO
       # We should optimize the usage for better performance.
       statesBNumVgprG2LAllocated = statesBNumVgprG2L * (int)(self.states.bpr/(bpeMax * vwb))
     else:
