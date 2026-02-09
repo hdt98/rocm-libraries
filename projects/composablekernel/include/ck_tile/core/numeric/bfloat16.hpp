@@ -389,9 +389,20 @@ struct numeric<bfloat16_t>
 template <>
 struct numeric_traits<bfloat16_t>
 {
-    static constexpr int exp        = 8;
-    static constexpr int mant       = 7;
-    static constexpr int PackedSize = 1;
+    static constexpr int exp            = 8;
+    static constexpr int mant           = 7;
+    static constexpr int bias           = 127;
+    static constexpr uint16_t nan_mask  = 0x7F80;
+    static constexpr uint16_t head_mask = 0xFF80;
+    static constexpr uint16_t mant_mask = 0x007F;
+    static constexpr uint16_t exp_mask  = 0xFF;
+    static constexpr uint16_t abs_mask  = 0x7FFF;
+    static constexpr uint16_t Inf       = 0x7F80;
+    static constexpr uint16_t NegInf    = 0xFF80;
+    static constexpr uint16_t NaN       = 0x7F81;
+    static constexpr uint16_t Neg0      = 0x8000;
+    static constexpr int PackedSize     = 1;
+    using bitwise_type                  = uint16_t;
 };
 
 #if CK_TILE_USE_CUSTOM_DATA_TYPE
