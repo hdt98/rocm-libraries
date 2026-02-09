@@ -380,7 +380,6 @@ namespace MEMObserverTest
         Schedules a stream of ds_read_b128s and a stream of mfmas (does no meaningful work)
         Checks scheduler interweaves based on information from observers
         */
-
         const auto dsObserver
             = GENERATE(DSObserverType::WeightlessDSMemObserver, DSObserverType::DSMEMObserver);
         const auto strideMultiplier = GENERATE(1, 16);
@@ -389,6 +388,14 @@ namespace MEMObserverTest
         kernelOps->dsObserver = dsObserver;
 
         auto context = TestContext::ForTestDevice(kernelOps);
+
+        if(not context->targetArchitecture().target().isCDNA35GPU())
+        {
+            // LDS bandwidth and observer weights being different in different architectures
+            // results in different scheduling decisions.
+            // Purpose of this test is to verify scheduling differences between the two observers.
+            SKIP("Test tailored for gfx950 behavior");
+        }
 
         WeaveLDSAndSAddKernel testKernel(context.get(), strideMultiplier);
         testKernel({});
