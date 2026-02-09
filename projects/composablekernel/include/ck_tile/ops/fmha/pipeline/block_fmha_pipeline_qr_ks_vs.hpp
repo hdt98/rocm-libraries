@@ -202,6 +202,8 @@ struct BlockFmhaPipelineQRKSVS
             "wrong!");
 
         static_assert(kM0 == QDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
+                          kSubQKHeaddim ==
+                              QDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] &&
                           kN0 == KDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
                           kK0 == KDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] &&
                           kN1 == VDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
@@ -222,6 +224,9 @@ struct BlockFmhaPipelineQRKSVS
                 std::is_same_v<VScaleDataType,
                                remove_cvref_t<typename VScaleDramBlockWindowTmp::DataType>>);
             static_assert(kM0 == QScaleDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
+                          kSubQKHeaddim ==
+                              QScaleDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] *
+                                  kQKScaleGranularity &&
                           kN0 == KScaleDramBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
                           kK0 == KScaleDramBlockWindowTmp{}.get_window_lengths()[number<1>{}] *
                                      kQKScaleGranularity &&
