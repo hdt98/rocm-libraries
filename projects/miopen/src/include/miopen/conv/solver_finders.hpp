@@ -181,7 +181,11 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
                         bool force_attach_binary                  = false);
 
 namespace conv {
+// Check if algorithm is globally disabled via environment variable
 bool MIOPEN_INTERNALS_EXPORT IsAlgorithmDisabled(miopenConvAlgorithm_t algo);
+// Check if algorithm is disabled (globally or for specific problem)
+bool MIOPEN_INTERNALS_EXPORT IsAlgorithmDisabled(miopenConvAlgorithm_t algo,
+                                                 const ProblemDescription& problem);
 bool MIOPEN_INTERNALS_EXPORT IsEnoughWorkspace(std::string_view where,
                                                const miopen::solver::Id& solver_id,
                                                std::size_t required_size,
