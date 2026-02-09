@@ -239,10 +239,18 @@ struct BlockFmhaV3PipelineDefaultPolicy
                                            typename Problem::BlockFmhaShape::Gemm0BlockWarps,
                                            typename Problem::BlockFmhaShape::Gemm0WarpTile>>;
 
-        constexpr auto warp_gemm = []() {
-            if constexpr(std::is_same_v<typename Problem::QDataType, half_t> &&
-                         std::is_same_v<typename Problem::KDataType, half_t> &&
+        constexpr auto warp_gemm = [] {
+            if constexpr(std::is_same_v<typename Problem::QDataType, fp8_t> &&
+                         std::is_same_v<typename Problem::KDataType, fp8_t> &&
                          std::is_same_v<typename Problem::SaccDataType, float>)
+            {
+                // Use SwizzleB variant to get 8 contiguous K positions per lane,
+                // matching the V tile distribution for PV GEMM
+                return WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<>{};
+            }
+            else if constexpr(std::is_same_v<typename Problem::QDataType, half_t> &&
+                              std::is_same_v<typename Problem::KDataType, half_t> &&
+                              std::is_same_v<typename Problem::SaccDataType, float>)
             {
                 /// NOTICE: in order to use load_tile_transpose() later for V tile, we cannot use
                 /// WarpGemmMfmaF16F16F32M32N32K16SwizzleBTransposedCDistribution here
