@@ -2,8 +2,7 @@
 
 rocFFT is a software library for computing fast Fourier transforms (FFTs) written in the HIP
 programming language. It's part of the AMD software ecosystem based on
-[ROCm](https://github.com/ROCm/ROCm). The rocFFT library can be used with AMD and
-NVIDIA GPUs.
+[ROCm](https://github.com/ROCm/ROCm). The rocFFT library can be used with AMD GPUs.
 
 ## Documentation
 
@@ -78,7 +77,7 @@ You can install rocFFT using pre-built packages or building from source.
     To install client dependencies on Ubuntu, run:
 
     ```bash
-    sudo apt install libgtest-dev libfftw3-dev libboost-dev
+    sudo apt install libgtest-dev libfftw3-dev
     ```
 
     rocFFT uses version 1.11 of GoogleTest.

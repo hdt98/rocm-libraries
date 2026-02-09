@@ -1842,6 +1842,18 @@ hipblasGemmEx + Batched, StridedBatched
 
 The ``gemmEx``, ``gemmBatchedEx``, and ``gemmStridedBatchedEx`` functions support the 64-bit integer interface. See the :ref:`ILP64 API` section.
 
+.. _hipblas_syrkex:
+
+hipblasSyrkEx
+------------------------------------------
+.. doxygenfunction:: hipblasSyrkEx
+
+.. _hipblas_herkex:
+   
+hipblasHerkEx
+------------------------------------------
+.. doxygenfunction:: hipblasHerkEx
+
 .. _hipblas_trsmex:
 
 hipblasTrsmEx + Batched, StridedBatched
@@ -2149,4 +2161,3 @@ hipblasGetAtomicsMode
 hipblasStatusToString
 ----------------------
 .. doxygenfunction:: hipblasStatusToString
-

@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -75,14 +75,17 @@ namespace TensileLite
                 m_solutionName = valueStr;
                 m_output.setHeaderForKey(valueStr, valueStr);
             }
+            else if(key == ResultKey::SolutionIndex)
+            {
+                m_currSolutionIdx = std::stod(valueStr);
+            }
             else if(key == ResultKey::TimeUS)
             {
-                // cascade from BenchmarkTimer, Time-US first
-                ++m_currSolutionIdx;
                 if(!m_invalidSolution)
                 {
-                    double timeUS = std::stod(valueStr);
-                    if(m_fasterTimeUS < 0 || m_fasterTimeUS > timeUS)
+                    double timeUS    = std::stod(valueStr);
+                    bool   timeIsNan = std::isnan(timeUS);
+                    if((!timeIsNan) && (m_fasterTimeUS < 0 || m_fasterTimeUS > timeUS))
                     {
                         m_fasterTimeUS = timeUS;
                         if(m_extraCol)

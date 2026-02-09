@@ -59,6 +59,8 @@ std::random_device default_seed_dev;
 double test_prob;
 // Probability of running tests from the emulation suite
 double emulation_prob;
+// Probability of running unit tests
+double unittest_prob;
 // Modifier for probability of running tests with complex interleaved data
 double complex_interleaved_prob_factor;
 // Modifier for probability of running tests with real data
@@ -259,10 +261,14 @@ void precompile_test_kernels(const std::string& precompile_file)
 
                     params_forward.free();
 
-                    rocfft_params params_inverse;
-                    params_inverse.inverse_from_forward(params_forward);
-                    params_inverse.validate();
-                    params_inverse.setup_structs();
+                    // some adhoc tokens might be inverse already
+                    if(params_forward.is_forward())
+                    {
+                        rocfft_params params_inverse;
+                        params_inverse.inverse_from_forward(params_forward);
+                        params_inverse.validate();
+                        params_inverse.setup_structs();
+                    }
                 }
                 catch(std::exception& e)
                 {
@@ -330,8 +336,11 @@ int main(int argc, char* argv[])
     app.add_option("--test_prob", test_prob, "Probability of running individual tests")
         ->default_val(1.0)
         ->check(CLI::Range(0.0, 1.0));
+    app.add_option("--unittest_prob", unittest_prob, "Probability of running individual unit tests")
+        ->default_val(1.0)
+        ->check(CLI::Range(0.0, 1.0));
     app.add_option(
-           "--emulation_prob", test_prob, "Probability of running individual emulation tests")
+           "--emulation_prob", emulation_prob, "Probability of running individual emulation tests")
         ->default_val(1.0)
         ->check(CLI::Range(0.0, 1.0));
     app.add_option("--real_prob",
@@ -412,8 +421,11 @@ int main(int argc, char* argv[])
         ->check(CLI::NonNegativeNumber);
     app.add_option("--mp_launch",
                    mp_launch,
-                   "Command line prefix to launch multi-process transforms, e.g. \"mpirun --np 4 "
-                   "/path/to/rocfft_mpi_worker\"")
+                   "Command line prefix to launch multi-process transforms, e.g. \n"
+                   "\"mpirun --np 4 /path/to/rocfft_mpi_worker\"\n"
+                   "NOTE: embedded quotes must be used for all command arguments that contain "
+                   "space character(s). For instance,\n"
+                   "\"mpirun --np 4 \\\"/path with spaces/to/rocfft_mpi_worker\\\"\"")
         ->default_val("")
         ->each([&](const std::string&) {
             if(mp_lib == fft_params::fft_mp_lib_none)
@@ -428,8 +440,9 @@ int main(int argc, char* argv[])
         ->each([&](const std::string&) {
             // The objective is to have an test that takes about 5 minutes, so just set the
             // probability per test to a small value to achieve this result.
-            test_prob      = 0.001;
-            emulation_prob = 0.01;
+            test_prob      = 0.0005;
+            emulation_prob = 0.005;
+            unittest_prob  = 0.2;
             n_random_tests = 10;
         });
 
@@ -480,6 +493,11 @@ int main(int argc, char* argv[])
                      "Type of transform:\n0) complex forward\n1) complex inverse\n2) real "
                      "forward\n3) real inverse")
         ->default_val(fft_transform_type_complex_forward);
+    non_token
+        ->add_option("--auto_allocation",
+                     manual_params.auto_allocate,
+                     "rocFFT's auto-allocation behavior: \"on\", \"off\", or \"default\"")
+        ->default_val("default");
     non_token
         ->add_option("--precision",
                      manual_params.precision,
@@ -810,15 +828,15 @@ TEST(manual, vs_fftw) // MANUAL TESTS HERE
     {
         // explicitly clear test cache
         last_cpu_fft_data = last_cpu_fft_cache();
-        GTEST_SKIP() << e.msg;
+        GTEST_SKIP() << e.what();
     }
     catch(ROCFFT_SKIP& e)
     {
-        GTEST_SKIP() << e.msg;
+        GTEST_SKIP() << e.what();
     }
     catch(ROCFFT_FAIL& e)
     {
-        GTEST_FAIL() << e.msg;
+        GTEST_FAIL() << e.what();
     }
 }
 
@@ -846,17 +864,21 @@ TEST(manual, bitwise_reproducibility) // MANUAL TESTS HERE
     {
         bitwise_repro(params);
     }
-    catch(std::bad_alloc&)
+    catch(const std::bad_alloc&)
     {
         GTEST_SKIP() << "host memory allocation failure";
     }
-    catch(ROCFFT_SKIP& e)
+    catch(const ROCFFT_SKIP& e)
     {
-        GTEST_SKIP() << e.msg;
+        GTEST_SKIP() << e.what();
     }
-    catch(ROCFFT_FAIL& e)
+    catch(const ROCFFT_FAIL& e)
     {
-        GTEST_FAIL() << e.msg;
+        GTEST_FAIL() << e.what();
+    }
+    catch(const HOSTBUF_MEM_USAGE& e)
+    {
+        GTEST_SKIP() << e.what();
     }
     SUCCEED();
 }

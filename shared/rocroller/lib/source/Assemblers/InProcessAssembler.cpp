@@ -47,13 +47,12 @@
             msg << "amd comgr failure at line " << __LINE__ << ": " << std::string(statusMsg) \
                 << std::endl;                                                                 \
             Log::error(msg.str());                                                            \
-            AssertFatal(false, msg.str());                                                    \
+            Throw<FatalError>(msg.str());                                                     \
         }                                                                                     \
     } while(0)
 
 namespace rocRoller
 {
-    RegisterComponent(InProcessAssembler);
     static_assert(Component::Component<InProcessAssembler>);
 
     bool InProcessAssembler::Match(Argument arg)

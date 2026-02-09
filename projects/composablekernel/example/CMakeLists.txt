@@ -1,7 +1,39 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 include_directories(BEFORE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/library/include
 )
+
+if(WIN32)
+    # On Windows, HIP uses -nostdlib which prevents C runtime linking
+    # We need legacy_stdio_definitions.lib to provide vfprintf and other legacy C functions
+    # This is mainly needed for the getopt library.
+    set(LEGACY_STDIO_SEARCH_PATHS)
+    
+    # Try to use Visual C++ Tools environment variable (if build executes from Visual Studio Developer Command Prompt)
+    if(DEFINED ENV{VCToolsInstallDir})
+        list(APPEND LEGACY_STDIO_SEARCH_PATHS "$ENV{VCToolsInstallDir}/lib/x64")
+    endif()
+    
+    # Fallback: Search common Visual Studio installation locations
+    file(GLOB MSVC_LIB_PATHS "C:/Program Files/Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/lib/x64")
+    list(APPEND LEGACY_STDIO_SEARCH_PATHS ${MSVC_LIB_PATHS})
+    
+    # Use find_library to locate the library
+    find_library(LEGACY_STDIO_LIB legacy_stdio_definitions 
+        PATHS ${LEGACY_STDIO_SEARCH_PATHS} 
+        NO_DEFAULT_PATH
+    )
+    
+    if(LEGACY_STDIO_LIB)
+        message(STATUS "Found legacy_stdio_definitions.lib: ${LEGACY_STDIO_LIB}")
+        add_link_options("SHELL:-Xlinker \"${LEGACY_STDIO_LIB}\"")
+    else()
+        message(WARNING "Could not find legacy_stdio_definitions.lib - examples may fail to link.")
+    endif()
+endif()
 
 add_custom_target(examples)
 
@@ -69,7 +101,7 @@ function(add_example_executable EXAMPLE_NAME FILE_NAME)
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
         #Do not build any XDL examples if gfx9 targets are not on the list
-        if(NOT EX_TARGETS MATCHES "gfx9" AND source_name MATCHES "_xdl")
+        if(NOT EX_TARGETS MATCHES "gfx9" AND NOT EX_TARGETS MATCHES "gfx11" AND NOT EX_TARGETS MATCHES "gfx12" AND source_name MATCHES "_xdl")
             message(DEBUG "removing xdl example ${source} ")
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
@@ -93,8 +125,8 @@ function(add_example_executable EXAMPLE_NAME FILE_NAME)
             message(DEBUG "removing bf8 example ${source} ")
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
-        # Build fp8 gemm_multiply_multiply and moe only on gfx94/95
-        if(NOT EX_TARGETS MATCHES "gfx94" AND NOT EX_TARGETS MATCHES "gfx95")
+        # Build fp8 gemm_multiply_multiply and moe only on gfx94/95 and gfx12
+        if(NOT EX_TARGETS MATCHES "gfx94" AND NOT EX_TARGETS MATCHES "gfx95" AND NOT EX_TARGETS MATCHES "gfx12")
             if(source_name MATCHES "fp8" AND source_name MATCHES "(gemm_multiply_multiply|moe)")
                 message(DEBUG "Skipping ${source} example for current target")
                 list(REMOVE_ITEM FILE_NAME "${source}")
@@ -109,14 +141,14 @@ function(add_example_executable EXAMPLE_NAME FILE_NAME)
     endforeach()
     if(FILE_NAME)
         if(source_name_list MATCHES "_xdl" AND NOT source_name_list MATCHES "_pk_i4")
-            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx10-3-generic)
         elseif(source_name_list MATCHES "_wmma")
             list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         elseif(source_name_list MATCHES "_mx") #only build mx example for gfx950
-            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
-        elseif(source_name_list MATCHES "_pk_i4") #only build these examples for gfx942 and gfx950
+            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+        elseif(source_name_list MATCHES "_pk_i4") #only build these examples for gfx942 gfx950 and rdna3/4
             message(DEBUG "trimming targets for ${FILE_NAME}")
-            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx1030 gfx10-3-generic)
         endif()
         set_source_files_properties(${FILE_NAME} PROPERTIES LANGUAGE HIP)
         add_executable(${EXAMPLE_NAME} ${FILE_NAME})
@@ -192,7 +224,7 @@ function(add_example_executable_no_testing EXAMPLE_NAME FILE_NAME)
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
         #Do not build any XDL examples if gfx9 targets are not on the list
-        if(NOT EX_TARGETS MATCHES "gfx9" AND source_name MATCHES "_xdl")
+        if(NOT EX_TARGETS MATCHES "gfx9" AND NOT EX_TARGETS MATCHES "gfx11" AND NOT EX_TARGETS MATCHES "gfx12" AND source_name MATCHES "_xdl")
             message(DEBUG "removing xdl example ${source} ")
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
@@ -206,13 +238,14 @@ function(add_example_executable_no_testing EXAMPLE_NAME FILE_NAME)
     #only continue if there are some source files left on the list
     if(FILE_NAME)
         if(source_name_list MATCHES "_xdl")
-            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
+            list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx10-3-generic)
         elseif(source_name_list MATCHES "_wmma")
             list(REMOVE_ITEM EX_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         endif()
         set_source_files_properties(${FILE_NAME} PROPERTIES LANGUAGE HIP)
         add_executable(${EXAMPLE_NAME} ${FILE_NAME})
         target_link_libraries(${EXAMPLE_NAME} PRIVATE utility)
+        target_link_libraries(${EXAMPLE_NAME} PRIVATE getopt::getopt)
         add_dependencies(examples ${EXAMPLE_NAME})
         set_property(TARGET ${EXAMPLE_NAME} PROPERTY HIP_ARCHITECTURES ${EX_TARGETS})
         rocm_install(TARGETS ${EXAMPLE_NAME} COMPONENT examples)

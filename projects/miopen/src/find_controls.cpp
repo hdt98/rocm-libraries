@@ -33,13 +33,11 @@
 #include <miopen/solver_id.hpp>
 #include <miopen/stringutils.hpp>
 
-#include <boost/optional.hpp>
-
-#include <ostream>
 #include <cstdlib>
 #include <cstring>
-#include <string_view>
 #include <optional>
+#include <ostream>
+#include <string_view>
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_FIND_ENFORCE)
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEBUG_FIND_ONLY_SOLVER)
@@ -54,6 +52,16 @@ namespace debug {
 MIOPEN_EXPORT bool FindEnforceDisable = false;
 
 } // namespace debug
+
+static_assert(FindEnforceAction::None == static_cast<FindEnforceAction>(miopenTuningPolicyNone));
+static_assert(FindEnforceAction::DbUpdate ==
+              static_cast<FindEnforceAction>(miopenTuningPolicyDbUpdate));
+static_assert(FindEnforceAction::Search ==
+              static_cast<FindEnforceAction>(miopenTuningPolicySearch));
+static_assert(FindEnforceAction::SearchDbUpdate ==
+              static_cast<FindEnforceAction>(miopenTuningPolicySearchDbUpdate));
+static_assert(FindEnforceAction::DbClean ==
+              static_cast<FindEnforceAction>(miopenTuningPolicyDbClean));
 
 namespace {
 
@@ -107,7 +115,7 @@ FindEnforceAction GetFindEnforceActionImpl()
     return FindEnforceAction::Default_;
 }
 
-boost::optional<std::vector<solver::Id>> GetEnvFindOnlySolverImpl()
+std::optional<std::vector<solver::Id>> GetEnvFindOnlySolverImpl()
 {
     static_assert(miopen::solver::Id::invalid_value == 0, "miopen::solver::Id::invalid_value == 0");
     const auto slv_str = env::value(MIOPEN_DEBUG_FIND_ONLY_SOLVER);
@@ -149,7 +157,7 @@ boost::optional<std::vector<solver::Id>> GetEnvFindOnlySolverImpl()
         }
     }
     if(res.empty())
-        return boost::none;
+        return {};
     else
         return {res};
 }
@@ -163,10 +171,10 @@ std::ostream& operator<<(std::ostream& os, const FindEnforce& val)
     return os << ToCString(val.action) << '(' << static_cast<int>(val.action) << ')';
 }
 
-boost::optional<std::vector<solver::Id>> GetEnvFindOnlySolver()
+std::optional<std::vector<solver::Id>> GetEnvFindOnlySolver()
 {
     if(miopen::debug::IsWarmupOngoing)
-        return boost::none;
+        return {};
     static const auto once = GetEnvFindOnlySolverImpl();
     return once;
 }

@@ -60,8 +60,6 @@
 #include <cstddef>
 #include <memory>
 
-namespace po = boost::program_options;
-
 namespace TensileLite
 {
     namespace Client
@@ -286,6 +284,8 @@ namespace TensileLite
                 ("problem-size,p",           vector_default_empty<std::string>(), "Specify a problem size.  Comma-separated list of "
                                                                                   "sizes, in the order of the Einstein notation.")
 
+                ("prob-sol-map",             vector_default_empty<std::string>(), "[probIdx, solIdx]")
+
                 ("a-strides",                vector_default_empty<std::string>(), "Unspecified means default stride "
                                                                                   "(prev_dim_stride*prev_dim_size)"
                                                                                   "specifying once applies to all problem sizes, "
@@ -333,11 +333,16 @@ namespace TensileLite
                                                                                       "comment in library update "
                                                                                       "file.")
 
+                ("a-ops",                    vector_default_empty<TensorOp>(), "Operations applied to A.")
+                ("b-ops",                    vector_default_empty<TensorOp>(), "Operations applied to B.")
+                ("c-ops",                    vector_default_empty<TensorOp>(), "Operations applied to C.")
+                ("d-ops",                    vector_default_empty<TensorOp>(), "Operations applied to D.")
 
                 ("exit-on-error",            po::value<bool>()->default_value(false), "Exit run early on failed kernels or other errors.")
                 ("selection-only",           po::value<bool>()->default_value(false), "Don't run any solutions, only print kernel selections.")
                 ("max-workspace-size",       po::value<size_t>()->default_value(32*1024*1024), "Max workspace for training")
                 ("granularity-threshold",    po::value<double>()->default_value(0.0), "Don't run a solution if total granularity is below")
+                ("prediction-threshold",     po::value<double>()->default_value(2.0), "Don't run a solution if predicted performance is low")
 
                 ("activation-type",           po::value<ActivationType>()->default_value(ActivationType::None), "An activation type")
                 ("activation-hpa",            po::value<bool>()->default_value(false), "Use the same data type as high precision accumulate.")
@@ -511,6 +516,28 @@ namespace TensileLite
             args.at(name).value() = boost::any(type);
         }
 
+        template <typename T>
+        void parse_arg_nums_map(po::variables_map& args, std::string const& name)
+        {
+            auto inValue = args[name].as<std::vector<std::string>>();
+
+            std::map<int, int> outValue;
+            for(auto const& str : inValue)
+            {
+                auto vec         = split_nums<T>(str);
+                outValue[vec[0]] = vec[1];
+            }
+
+            boost::any v(outValue);
+
+            args.at(name).value() = v;
+        }
+
+        void parse_arg_ints_map(po::variables_map& args, std::string const& name)
+        {
+            parse_arg_nums_map<int>(args, name);
+        }
+
         void fix_data_types(po::variables_map& args)
         {
             auto type = args["type"].as<rocisa::DataType>();
@@ -571,6 +598,8 @@ namespace TensileLite
             parse_activation_enum_args(args, "activation-enum-args");
             parse_arg_double(args, "activation-additional-args");
             parse_arg_bools(args, "icache-flush-args");
+            // std::cout << "Pasring parse_arg_ints_map()" << std::endl;
+            parse_arg_ints_map(args, "prob-sol-map");
             return args;
         }
 
@@ -598,7 +627,11 @@ int main(int argc, const char* argv[])
     auto        hardware = GetHardware(args);
     hipStream_t stream   = GetStream(args);
 
-    auto                              library = LoadSolutionLibrary(args);
+    std::shared_ptr<MasterSolutionLibrary<ContractionProblemGemm>> library
+        = LoadSolutionLibrary(args);
+    if(!library)
+        throw std::runtime_error("Failed to load solution library");
+
     TensileLite::hip::SolutionAdapter adapter;
     LoadCodeObjects(args, adapter);
 
@@ -743,7 +776,7 @@ int main(int argc, const char* argv[])
                     if(solution == nullptr)
                         throw std::runtime_error("Could not find a solution");
 
-                    listeners.preSolution(*solution);
+                    listeners.preSolution(solution.get());
                     if(solutionIterator->runCurrentSolution() && runKernels)
                     {
                         try
