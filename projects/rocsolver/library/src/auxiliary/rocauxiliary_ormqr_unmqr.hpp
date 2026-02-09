@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -247,9 +247,11 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
         }
 
         // generate triangular factor of current block reflector
-        rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise, nq - i,
-                                    ib, A, shiftA + idx2D(i, i, lda), lda, strideA, ipiv + i, strideP,
-                                    trfact, ldw, strideW, batch_count, scalars, AbyxORwork, workArr);
+        using I = rocblas_int;
+        rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
+                                    (I)(nq - i), (I)ib, A, (I)(shiftA + idx2D(i, i, lda)), (I)lda,
+                                    strideA, ipiv + i, strideP, trfact, (I)ldw, strideW,
+                                    (I)batch_count, scalars, AbyxORwork, workArr);
 
         // apply current block reflector
         rocsolver_larfb_template<BATCHED, STRIDED, T>(
@@ -364,10 +366,11 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
         }
 
         // generate triangular factor of current block reflector
+        using I = rocblas_int;
         rocsolver_larft_inverse_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                            nq - i, ib, A, shiftA + idx2D(i, i, lda), lda, strideA,
-                                            ipiv + i, strideP, trfact, ldw, strideW, batch_count,
-                                            AbyxORwork, workArr);
+                                            (I)(nq - i), (I)ib, A, (I)(shiftA + idx2D(i, i, lda)),
+                                            (I)lda, strideA, ipiv + i, strideP, trfact, (I)ldw,
+                                            strideW, (I)batch_count, AbyxORwork, workArr);
 
         // apply current block reflector
         rocsolver_larfb_inverse_template<BATCHED, STRIDED, T>(

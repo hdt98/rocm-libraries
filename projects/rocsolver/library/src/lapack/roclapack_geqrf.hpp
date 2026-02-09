@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     November 2019
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -152,9 +152,9 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
         {
             // compute block reflector
             rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                        m - j, jb, A, shiftA + idx2D(j, j, lda), lda, strideA,
-                                        (ipiv + j), strideP, Abyx_norms_trfact, ldw, strideW,
-                                        batch_count, scalars, (T*)work_workArr, workArr);
+                                        (I)(m - j), (I)jb, A, (I)(shiftA + idx2D(j, j, lda)), (I)lda,
+                                        strideA, (ipiv + j), strideP, Abyx_norms_trfact, (I)ldw,
+                                        strideW, (I)batch_count, scalars, (T*)work_workArr, workArr);
 
             // apply the block reflector
             rocsolver_larfb_template<BATCHED, STRIDED, T>(
@@ -303,9 +303,9 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
         {
             // compute block reflector
             rocsolver_larft_inverse_template<T>(
-                handle, rocblas_forward_direction, rocblas_column_wise, m - j, jb, A,
-                shiftA + idx2D(j, j, lda), lda, strideA, (ipiv + j), strideP, Abyx_norms_trfact,
-                ldw, strideW, batch_count, (T*)work_workArr_work1, workArr);
+                handle, rocblas_forward_direction, rocblas_column_wise, (I)(m - j), (I)jb, A,
+                (I)(shiftA + idx2D(j, j, lda)), (I)lda, strideA, (ipiv + j), strideP,
+                Abyx_norms_trfact, (I)ldw, strideW, (I)batch_count, (T*)work_workArr_work1, workArr);
 
             rocsolver_larfb_inverse_template<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
