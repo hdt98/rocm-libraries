@@ -67,6 +67,7 @@ if(HIPBLASLT_ENABLE_CLIENT)
     option(HIPBLASLT_ENABLE_SAMPLES "Build client samples." ON)
     # amd-smi is not presently available on Windows so we do not require it.
     cmake_dependent_option(HIPBLASLT_ENABLE_AMD_SMI "Require amd_smi." ON "NOT WIN32" OFF)
+    cmake_dependent_option(BUILD_FORTRAN_CLIENTS "Build hipBLASLt clients requiring Fortran capabilities" ON "NOT WIN32" OFF)
     option(HIPBLASLT_ENABLE_BLIS "Enable BLIS support." ON)
 endif()
 
@@ -134,10 +135,12 @@ else()
 endif()
 
 if(HIPBLASLT_ENABLE_CLIENT)
-    if (NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC})
-        set(CMAKE_Fortran_COMPILER  "gfortran")
+    if(BUILD_FORTRAN_CLIENTS)
+        if (NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC})
+            set(CMAKE_Fortran_COMPILER  "gfortran")
+        endif()
+        enable_language(Fortran)
     endif()
-    enable_language(Fortran)
 
     if(HIPBLASLT_ENABLE_BLIS)
         find_package(BLIS REQUIRED)
