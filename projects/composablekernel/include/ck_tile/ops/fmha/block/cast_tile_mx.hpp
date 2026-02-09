@@ -87,6 +87,8 @@ CK_TILE_DEVICE void cast_tile_mx(const SrcTensor& src_tensor,
             });
 
             // Save scale for the corresponding lane
+            // No additional processing is needed because each lane computes scale based only on its
+            // own values.
             dst_scale_tensor.get_thread_buffer()(i) = type_convert<DstScaleDataType>(scale);
         });
     }
@@ -102,6 +104,7 @@ CK_TILE_DEVICE void cast_tile_mx(const SrcTensor& src_tensor,
                 max_value =
                     max(max_value, type_convert<float>(src_tensor.get_thread_buffer()[i * 16 + j]));
             });
+            // 2 lanes, 16 values per lane share one scale
             max_value = max(max_value, warp_shuffle(max_value, lane ^ MLane));
             max_value = min(1.0f, max_value);
 
@@ -154,7 +157,16 @@ CK_TILE_DEVICE void cast_tile_mx(const SrcTensor& src_tensor,
             });
 
             // Save scale for the corresponding lane
-            if constexpr(MLane == 16)
+            // Two iterations are needed to compute scales for all kABKLane lanes.
+            // 32x32x64, 2 lanes per row (kABKLane = 2):
+            //   scale_result for lanes 00..31 <- scale for lanes 00..31, iteration 0
+            //   scale_result for lanes 32..63 <- scale for lanes 32..63, iteration 1
+            // 16x16x128, 4 lanes per row (kABKLane = 4), one extra exchange is needed:
+            //   scale_result for lanes 00..15 <- scale for lanes 00..31, iteration 0
+            //   scale_result for lanes 16..31 <- scale for lanes 32..63, iteration 0
+            //   scale_result for lanes 32..47 <- scale for lanes 00..31, iteration 1
+            //   scale_result for lanes 48..64 <- scale for lanes 32..63, iteration 1
+            if constexpr(MLane == 16) // 16x16x128
             {
                 scale = warp_shuffle(scale, (lane % MLane) | ((lane & MLane) << 1));
             }
