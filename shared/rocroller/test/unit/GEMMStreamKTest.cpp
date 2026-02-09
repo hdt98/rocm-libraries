@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2024-2025 AMD ROCm(TM) Software
+ * Copyright 2024-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,8 @@
 #endif /* ROCROLLER_USE_HIP */
 
 #include "GEMMTestBase.hpp"
+
+#include <rocRoller/GPUArchitecture/GPUCapability.hpp>
 
 namespace GEMMTests
 {
@@ -75,9 +77,10 @@ namespace GEMMTests
 
     TEST_P(StreamKMultipleFixupsTestGPU, GPU_BasicGEMM)
     {
-        if(m_context->targetArchitecture().target().isCDNA1GPU())
+        if(m_context->targetArchitecture().HasCapability(GPUCapability::HasWMMA))
         {
-            GTEST_SKIP() << "Skipping GPU_BasicGEMM test: CDNA1 not supported";
+            GTEST_SKIP() << "Skipping StreamKMultipleFixupsTestGPU on architecture "
+                         << m_context->targetArchitecture().target().toString();
         }
 
         auto [problemConfig, mode, loadPathA, loadPathB, storeLDSD] = std::get<1>(GetParam());
@@ -126,10 +129,10 @@ namespace GEMMTests
 
     TEST_P(StreamKWGMTestGPU, GPU_BasicGEMMStreamKWorkgroupMapping)
     {
-        if(m_context->targetArchitecture().target().isCDNA1GPU())
+        if(m_context->targetArchitecture().HasCapability(GPUCapability::HasWMMA))
         {
-            GTEST_SKIP()
-                << "Skipping GPU_BasicGEMMStreamKWorkgroupMapping test: CDNA1 not supported";
+            GTEST_SKIP() << "Skipping StreamKWGMTestGPU on architecture "
+                         << m_context->targetArchitecture().target().toString();
         }
 
         GEMMProblem gemm;
@@ -158,9 +161,10 @@ namespace GEMMTests
 
     TEST_P(StreamKTestGPU, GPU_BasicGEMM)
     {
-        if(m_context->targetArchitecture().target().isCDNA1GPU())
+        if(m_context->targetArchitecture().HasCapability(GPUCapability::HasWMMA))
         {
-            GTEST_SKIP() << "Skipping GPU_BasicGEMM test: CDNA1 not supported";
+            GTEST_SKIP() << "Skipping StreamKTestGPU on architecture "
+                         << m_context->targetArchitecture().target().toString();
         }
 
         auto [typeAB, unrollK, loadPathA, loadPathB, storeLDSD, mode, betaZero, prefetchConfig]
@@ -244,6 +248,7 @@ namespace GEMMTests
                 ::testing::Values(
                     // ProblemConfig: (dataTypeAB, macM, macN, macK, m, n, k, numWGs)
                     ProblemConfig{rocRoller::DataType::Half, 128, 128, 16, 128, 256, 15936, 128},
+                    ProblemConfig{rocRoller::DataType::Float, 128, 128, 64, 128, 128, 4096, 128},
                     ProblemConfig{rocRoller::DataType::Float,
                                   64,
                                   64,
