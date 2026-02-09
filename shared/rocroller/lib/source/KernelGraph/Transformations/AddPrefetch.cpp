@@ -992,52 +992,6 @@ namespace rocRoller
             {
                 orderMemoryNodes(graph, m_deferredToOrder[forLoop][u], false);
             }
-
-            //
-            // Make exchange scale loads happen first!
-            //
-            {
-                auto isExchangePredicate = graph.control.isElemType<Exchange>();
-
-                auto bodies = graph.control.getOutputNodeIndices<Body>(forLoop).to<std::vector>();
-                auto exchanges
-                    = graph.control.findNodes(bodies, isExchangePredicate).to<std::vector>();
-
-                std::map<int, int> scaleLoadU;
-
-                for(auto const exchangeTag : exchanges)
-                {
-                    auto prefetchGlobalU
-                        = (m_exchangeSegment[exchangeTag] + numInFlight) % numUnroll;
-
-                    auto loadTag = getLoadForExchange(exchangeTag, graph);
-
-                    // When loading pre-swizzled scales from LDS, no
-                    // LoadTiled node exists.
-                    if(!loadTag)
-                    {
-                        Log::debug("No matching load operation found for Exchange({}); assuming it "
-                                   "is pre-swizzled from LDS.",
-                                   exchangeTag);
-                        continue;
-                    }
-
-                    auto const search = scaleLoadU.find(loadTag.value());
-                    if(search == scaleLoadU.end() || search->second > prefetchGlobalU)
-                        scaleLoadU[loadTag.value()] = prefetchGlobalU;
-                }
-
-                for(auto const [loadTag, u] : scaleLoadU)
-                {
-                    std::unordered_set<int> orderBeforeTags;
-                    for(auto const info : loadsByUnroll[u])
-                        orderBeforeTags.insert(info.globalChain);
-
-                    auto topOp = getTopSetCoordinate(graph, loadTag);
-                    for(auto const orderBeforeTag : orderBeforeTags)
-                        graph.control.addElement(Sequence(), {topOp}, {orderBeforeTag});
-                }
-            }
         }
 
         void updateExchangeColouring(std::map<int, int>&    operationUnroll,
