@@ -1786,7 +1786,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         size_t outputBytes = 1.0 * out_n * out_c * out_d * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
 
-                             if(json_mode)
+        if(json_mode)
         {
             std::cout << "{\"performance\":{"
                       << "\"direction\":\"forward\","

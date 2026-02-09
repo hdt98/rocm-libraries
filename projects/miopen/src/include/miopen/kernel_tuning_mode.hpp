@@ -4,13 +4,15 @@
 #ifndef GUARD_MIOPEN_KERNEL_TUNING_MODE_HPP
 #define GUARD_MIOPEN_KERNEL_TUNING_MODE_HPP
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <iomanip>
 #include <iostream>
+#include <map>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <map>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
 
 namespace miopen {
 
@@ -95,8 +97,13 @@ struct KernelExecutionData
 struct GroupedKernelData
 {
     std::string kernel_name;
-    std::vector<float> time_ms_array;
+    std::vector<float> time_executions_ms;  // Renamed from time_ms_array
+    float time_ms;                          // Average time (excluding first)
+    float time_std_ms;                      // Standard deviation (excluding first)
+    float time_min_ms;                      // Minimum time (excluding first)
+    float time_max_ms;                      // Maximum time (excluding first)
     int number_of_transformations;
+    std::vector<std::string> transformation_kernels;  // Names of transformation kernels
     size_t exec_number;  // First/lowest exec_id
     bool is_transformation;
 };
@@ -179,6 +186,46 @@ inline ExecIdAccumulator& GetCurrentExecIdAccumulator()
     return accumulator;
 }
 
+/// Calculate statistics for grouped kernel data (excluding first execution)
+inline void CalculateStatistics(GroupedKernelData& data)
+{
+    const auto& times = data.time_executions_ms;
+    if(times.size() <= 1)
+    {
+        // If only one execution, use that value for all stats
+        data.time_ms = times.empty() ? 0.0f : times[0];
+        data.time_std_ms = 0.0f;
+        data.time_min_ms = data.time_ms;
+        data.time_max_ms = data.time_ms;
+        return;
+    }
+    
+    // Calculate stats excluding first execution
+    float sum = 0.0f;
+    float min_val = times[1];
+    float max_val = times[1];
+    
+    for(size_t i = 1; i < times.size(); ++i)
+    {
+        sum += times[i];
+        min_val = std::min(min_val, times[i]);
+        max_val = std::max(max_val, times[i]);
+    }
+    
+    data.time_ms = sum / (times.size() - 1);
+    data.time_min_ms = min_val;
+    data.time_max_ms = max_val;
+    
+    // Calculate standard deviation
+    float sq_sum = 0.0f;
+    for(size_t i = 1; i < times.size(); ++i)
+    {
+        float diff = times[i] - data.time_ms;
+        sq_sum += diff * diff;
+    }
+    data.time_std_ms = std::sqrt(sq_sum / (times.size() - 1));
+}
+
 /// Finalize the current exec_id accumulator and add it to the solution kernels
 inline void FinalizeCurrentExecId()
 {
@@ -210,15 +257,16 @@ inline void FlushJsonAccumulator()
     if(data.kernels.empty())
         return;
     
-    // Group kernels by kernel_name
+    // Group kernels by kernel_name and track transformation kernels
     std::map<std::string, GroupedKernelData> grouped_kernels;
+    std::map<std::string, std::vector<std::string>> transformation_kernels_map;
     
     for(const auto& k : data.kernels)
     {
         auto& grouped = grouped_kernels[k.kernel_name];
         
         // Initialize on first occurrence
-        if(grouped.time_ms_array.empty())
+        if(grouped.time_executions_ms.empty())
         {
             grouped.kernel_name = k.kernel_name;
             grouped.number_of_transformations = k.transformation_count;
@@ -227,7 +275,51 @@ inline void FlushJsonAccumulator()
         }
         
         // Append timing data
-        grouped.time_ms_array.push_back(k.time_ms);
+        grouped.time_executions_ms.push_back(k.time_ms);
+    }
+    
+    // Also track transformation kernels separately by iterating through all kernel executions
+    // We need to associate transformation kernels with their main kernel
+    for(const auto& k : data.kernels)
+    {
+        if(k.is_transformation)
+        {
+            // Find the main kernel for this exec_id
+            for(const auto& main_k : data.kernels)
+            {
+                if(main_k.exec_id == k.exec_id && !main_k.is_transformation)
+                {
+                    transformation_kernels_map[main_k.kernel_name].push_back(k.kernel_name);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Populate transformation_kernels and remove duplicates
+    for(auto& entry : grouped_kernels)
+    {
+        auto& grouped = entry.second;
+        if(transformation_kernels_map.count(grouped.kernel_name) > 0)
+        {
+            auto& trans_kernels = transformation_kernels_map[grouped.kernel_name];
+            // Remove duplicates while preserving order
+            std::vector<std::string> unique_trans;
+            for(const auto& tk : trans_kernels)
+            {
+                if(std::find(unique_trans.begin(), unique_trans.end(), tk) == unique_trans.end())
+                {
+                    unique_trans.push_back(tk);
+                }
+            }
+            grouped.transformation_kernels = unique_trans;
+        }
+    }
+    
+    // Calculate statistics for each grouped kernel
+    for(auto& entry : grouped_kernels)
+    {
+        CalculateStatistics(entry.second);
     }
     
     // Output JSON
@@ -243,17 +335,31 @@ inline void FlushJsonAccumulator()
         first = false;
         
         std::cerr << "{\"kernel_name\":\"" << JsonEscape(g.kernel_name) << "\","
-                  << "\"time_ms\":[";
+                  << "\"time_executions_ms\":[";
         
-        for(size_t i = 0; i < g.time_ms_array.size(); ++i)
+        for(size_t i = 0; i < g.time_executions_ms.size(); ++i)
         {
             if(i > 0) std::cerr << ",";
-            std::cerr << g.time_ms_array[i];
+            std::cerr << g.time_executions_ms[i];
         }
         
         std::cerr << "],"
-                  << "\"number_of_transformations\":" << g.number_of_transformations << ","
-                  << "\"exec_number\":" << g.exec_number << ","
+                  << "\"time_ms\":" << g.time_ms << ","
+                  << "\"time_std_ms\":" << g.time_std_ms << ","
+                  << "\"time_min_ms\":" << g.time_min_ms << ","
+                  << "\"time_max_ms\":" << g.time_max_ms << ","
+                  << "\"number_of_transformations\":" << g.number_of_transformations << ",";
+        
+        // Output transformation_kernels array
+        std::cerr << "\"transformation_kernels\":[";
+        for(size_t i = 0; i < g.transformation_kernels.size(); ++i)
+        {
+            if(i > 0) std::cerr << ",";
+            std::cerr << "\"" << JsonEscape(g.transformation_kernels[i]) << "\"";
+        }
+        std::cerr << "],";
+        
+        std::cerr << "\"exec_number\":" << g.exec_number << ","
                   << "\"is_transformation\":" << (g.is_transformation ? "true" : "false") << "}";
     }
     
