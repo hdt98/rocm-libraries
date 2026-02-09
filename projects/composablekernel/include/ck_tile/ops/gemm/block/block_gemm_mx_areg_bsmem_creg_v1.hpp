@@ -90,7 +90,7 @@ struct BlockGemmMxARegBSmemCRegV1
         // elements of matrix C. See MakeBScaleBlockTileDistribution and MakeCBlockTile that shuffle
         // B scale and C in the same way.
         auto b_warp_window_tmp = [&] {
-            using Impl = WarpGemm::WarpGemmAttribute::Impl;
+            using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
 
             constexpr index_t N3 = Impl::kCM1PerLane;
             constexpr index_t N2 = TargetCMPerLane / N3;
@@ -246,7 +246,7 @@ struct BlockGemmMxARegBSmemCRegV1
 
     CK_TILE_DEVICE static constexpr auto MakeAScaleWarpDstrEncoding()
     {
-        using Impl = WarpGemm::WarpGemmAttribute::Impl;
+        using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
 
         constexpr index_t AScaleMLane     = Impl::kAMLane;
         constexpr index_t ABScaleKLane    = Impl::kABKLane;
@@ -264,7 +264,7 @@ struct BlockGemmMxARegBSmemCRegV1
 
     CK_TILE_DEVICE static constexpr auto MakeBScaleWarpDstrEncoding()
     {
-        using Impl = WarpGemm::WarpGemmAttribute::Impl;
+        using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
 
         constexpr index_t BScaleNLane     = Impl::kBNLane;
         constexpr index_t ABScaleKLane    = Impl::kABKLane;
@@ -306,7 +306,7 @@ struct BlockGemmMxARegBSmemCRegV1
         constexpr index_t NIterPerWarp_ = NPerBlock_ / (NWarp * WarpGemm::kN);
         constexpr index_t KIterPerWarp_ = KPerBlock_ / WarpGemm::kK;
 
-        using Impl = WarpGemm::WarpGemmAttribute::Impl;
+        using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
 
         constexpr index_t ABScaleKLane    = Impl::kABKLane;
         constexpr index_t ABScaleKPerLane = Impl::kABKPerLane / Impl::kScaleGranularity;
@@ -330,7 +330,7 @@ struct BlockGemmMxARegBSmemCRegV1
 
     CK_TILE_DEVICE static constexpr auto MakeCBlockTile()
     {
-        using Impl = WarpGemm::WarpGemmAttribute::Impl;
+        using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
 
         constexpr auto c_block_dstr_encode = ck_tile::tile_distribution_encoding<
             ck_tile::sequence<>,
