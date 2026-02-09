@@ -2,18 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "run_gemm_quant_example.inc"
-
-#if defined(CK_TILE_EIGHTWARP_SUP)
-template <typename T>
-using GemmConfig = GemmConfigEightWarps<T>;
-template <typename T>
-using GemmConfigPrefill = GemmConfigPreshuffleBEightWarps<T>;
-#else
-template <typename T>
-using GemmConfig = GemmConfigABQuantPrefill<T>;
-template <typename T>
-using GemmConfigPrefill = GemmConfigPreshuffleB_ABQuant_Prefill<T>;
-#endif
+#include "gemm_abquant_quantgrouped.h"
 
 static auto _ = []() {
     auto& lut                               = get_kernel_lut();
@@ -26,7 +15,7 @@ static auto _ = []() {
         using BQuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, 128>>;
         using TypeConfig =
             decltype(GemmQuantTypeConfig<ck_tile::fp8_t, ck_tile::fp8_t, ck_tile::half_t, float>{});
-        return run_gemm_example_prec_type<GemmConfigABQuantPrefill<ck_tile::fp8_t>,
+        return run_gemm_example_prec_type<GemmConfigABQuantPrefill<ck_tile::fp8_t, false>,
                                           TypeConfig,
                                           AQuantGroupSize,
                                           BQuantGroupSize,

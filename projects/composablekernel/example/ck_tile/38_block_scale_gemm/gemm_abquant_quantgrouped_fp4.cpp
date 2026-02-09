@@ -2,21 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 #include "run_gemm_quant_example.inc"
-
-#if defined(CK_TILE_EIGHTWARP_SUP)
-template <typename T>
-using GemmConfig = GemmConfigEightWarps<T>;
-template <typename T>
-using GemmConfigPrefill = GemmConfigPreshuffleBEightWarps<T>;
-#else
-template <typename T>
-using GemmConfig = GemmConfigABQuantPrefill<T>;
-template <typename T>
-using GemmConfigPrefill = GemmConfigPreshuffleB_ABQuant_Prefill<T>;
-#endif
+#include "gemm_abquant_quantgrouped.h"
 
 static auto _ = []() {
-    auto& lut                               = get_kernel_lut();
+    auto& lut = get_kernel_lut();
     lut[hash_multiple_strings(
         {"fp4", "abquant", "non-preshuffleb", "non-preshufflequant", "1x128x128"})] =
         [](const ck_tile::ArgParser& arg_parser) {
