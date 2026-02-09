@@ -2554,6 +2554,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     snops = []
+    numCodePaths = 1
     if isNN(kernel) and not useLDSTr and TLDS==1:
         syncs = SyncSchedule()
         syncs.add(-1, dscnt=4, comment="Wait for prior local read local write")
@@ -2575,7 +2576,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         lra1 = [24,24, 25,25, 26,26, 27,27, 28, 29,29, 30,30, 31,31, 32,32, 33,34,35,36,37,38,39]
         grB  = [24,24,26,26,28,28,30,30,32,32,36,36,38,38,40,40]
         lrb1 = [39,40,41,42,43,44,45,46]
-        
+
         # Packs should be ordered AFTER GrIncs.
         packA1 = [
             -1,-1,-1,-1,-1,-1,
@@ -2591,7 +2592,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         # GRIncs should be ordered AFTER LRs.
         grIncA = [0,1,2,3,4,5,6,7,8]
         grIncB = [9,10,11,12,13,14,15,16,17]
-        
+
         lwsa = [46]
         lwsb = [46]
         lrsa = [22]
@@ -2618,12 +2619,12 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
         nllshift = nglshift = num_gr
     else:
         return False, None
-    
+
     if snops:
         optSchedule['SNOP'] = [[s[0] for s in snops]]
         snopCode = [s[1] for s in snops]
 
-    opt = ScheduleInfo(2, 48, optSchedule=optSchedule, syncCode=syncs.get_code(), nglshift=nglshift, nllshift=nllshift, snopCode=snopCode)
+    opt = ScheduleInfo(numCodePaths, 48, optSchedule=optSchedule, syncCode=syncs.get_code(), nglshift=nglshift, nllshift=nllshift, snopCode=snopCode)
     return True, opt
 
 @RegisterSchedule(
