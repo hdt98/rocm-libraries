@@ -35,7 +35,6 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
                                     const I n,
                                     T* A,
                                     const I lda,
-                                    const I* ipiv,
                                     const S* anorm,
                                     S* rcond, //rcond is a host allocation
                                     const I max_iter = 5)
@@ -46,7 +45,7 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
         return rocblas_status_invalid_handle;
 
     // argument checking
-    rocblas_status st = rocsolver_gecon_argCheck(handle, norm_type, n, lda, A, ipiv, anorm, rcond);
+    rocblas_status st = rocsolver_gecon_argCheck(handle, norm_type, n, lda, A, anorm, rcond);
     if(st != rocblas_status_continue)
         return st;
 
@@ -55,32 +54,31 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
 
     // normal (non-batched non-strided) execution
     rocblas_stride strideA = 0;
-    rocblas_stride strideP = 0;
     I batch_count = 1;
 
     // memory workspace sizes:
     size_t size_work_v, size_work_x, size_work_isgn;
     size_t size_scalar_est, size_scalar_max_idx, size_scalar_kase, size_scalar_jump;
-    size_t size_work_getrs_1, size_work_getrs_2, size_work_getrs_3, size_work_getrs_4;
+    size_t size_work_trsm_1, size_work_trsm_2, size_work_trsm_3, size_work_trsm_4;
+    bool optim_mem;
     rocsolver_gecon_getMemorySize<T, I, S>(
         n, lda, batch_count, &size_work_v, &size_work_x, &size_work_isgn, &size_scalar_est,
-        &size_scalar_max_idx, &size_scalar_kase, &size_scalar_jump, &size_work_getrs_1,
-        &size_work_getrs_2, &size_work_getrs_3, &size_work_getrs_4);
+        &size_scalar_max_idx, &size_scalar_kase, &size_scalar_jump, &size_work_trsm_1,
+        &size_work_trsm_2, &size_work_trsm_3, &size_work_trsm_4, &optim_mem);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(
             handle, size_work_v, size_work_x, size_work_isgn, size_scalar_est, size_scalar_max_idx,
-            size_scalar_kase, size_scalar_jump, size_work_getrs_1, size_work_getrs_2,
-            size_work_getrs_3, size_work_getrs_4);
+            size_scalar_kase, size_scalar_jump, size_work_trsm_1, size_work_trsm_2,
+            size_work_trsm_3, size_work_trsm_4);
 
     // memory workspace allocation
     void *work_v, *work_x, *work_isgn, *scalar_est, *scalar_max_idx;
     void *scalar_kase, *scalar_jump;
-    void *work_getrs_1, *work_getrs_2, *work_getrs_3, *work_getrs_4;
+    void *work_trsm_1, *work_trsm_2, *work_trsm_3, *work_trsm_4;
     rocblas_device_malloc mem(handle, size_work_v, size_work_x, size_work_isgn, size_scalar_est,
                               size_scalar_max_idx, size_scalar_kase, size_scalar_jump,
-                              size_work_getrs_1, size_work_getrs_2, size_work_getrs_3,
-                              size_work_getrs_4);
+                              size_work_trsm_1, size_work_trsm_2, size_work_trsm_3, size_work_trsm_4);
 
     if(!mem)
         return rocblas_status_memory_error;
@@ -92,17 +90,17 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
     scalar_max_idx = mem[4];
     scalar_kase = mem[5];
     scalar_jump = mem[6];
-    work_getrs_1 = mem[7];
-    work_getrs_2 = mem[8];
-    work_getrs_3 = mem[9];
-    work_getrs_4 = mem[10];
+    work_trsm_1 = mem[7];
+    work_trsm_2 = mem[8];
+    work_trsm_3 = mem[9];
+    work_trsm_4 = mem[10];
 
     // execution
     return rocsolver_gecon_template<false, false, T>(
-        handle, norm_type, n, A, shiftA, (I)1, lda, strideA, ipiv, strideP, anorm, rcond,
-        batch_count, (T*)work_v, (T*)work_x, (I*)work_isgn, (S*)scalar_est, (I*)scalar_max_idx,
-        (rocblas_int*)scalar_kase, (rocblas_int*)scalar_jump, work_getrs_1, work_getrs_2,
-        work_getrs_3, work_getrs_4, max_iter);
+        handle, norm_type, n, A, shiftA, (I)1, lda, strideA, anorm, rcond, batch_count, (T*)work_v,
+        (T*)work_x, (I*)work_isgn, (S*)scalar_est, (I*)scalar_max_idx, (rocblas_int*)scalar_kase,
+        (rocblas_int*)scalar_jump, optim_mem, work_trsm_1, work_trsm_2, work_trsm_3, work_trsm_4,
+        max_iter);
 }
 
 ROCSOLVER_END_NAMESPACE
@@ -120,12 +118,11 @@ rocblas_status rocsolver_sgecon(rocblas_handle handle,
                                 const rocblas_int n,
                                 float* A,
                                 const rocblas_int lda,
-                                const rocblas_int* ipiv,
                                 const float* anorm,
                                 float* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<float, rocblas_int, float>(handle, norm_type, n, A, lda,
-                                                                      ipiv, anorm, rcond);
+                                                                      anorm, rcond);
 }
 
 rocblas_status rocsolver_dgecon(rocblas_handle handle,
@@ -133,12 +130,11 @@ rocblas_status rocsolver_dgecon(rocblas_handle handle,
                                 const rocblas_int n,
                                 double* A,
                                 const rocblas_int lda,
-                                const rocblas_int* ipiv,
                                 const double* anorm,
                                 double* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<double, rocblas_int, double>(handle, norm_type, n, A,
-                                                                        lda, ipiv, anorm, rcond);
+                                                                        lda, anorm, rcond);
 }
 
 rocblas_status rocsolver_cgecon(rocblas_handle handle,
@@ -146,12 +142,11 @@ rocblas_status rocsolver_cgecon(rocblas_handle handle,
                                 const rocblas_int n,
                                 rocblas_float_complex* A,
                                 const rocblas_int lda,
-                                const rocblas_int* ipiv,
                                 const float* anorm,
                                 float* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<rocblas_float_complex, rocblas_int, float>(
-        handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+        handle, norm_type, n, A, lda, anorm, rcond);
 }
 
 rocblas_status rocsolver_zgecon(rocblas_handle handle,
@@ -159,12 +154,11 @@ rocblas_status rocsolver_zgecon(rocblas_handle handle,
                                 const rocblas_int n,
                                 rocblas_double_complex* A,
                                 const rocblas_int lda,
-                                const rocblas_int* ipiv,
                                 const double* anorm,
                                 double* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<rocblas_double_complex, rocblas_int, double>(
-        handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+        handle, norm_type, n, A, lda, anorm, rcond);
 }
 
 rocblas_status rocsolver_sgecon_64(rocblas_handle handle,
@@ -172,13 +166,12 @@ rocblas_status rocsolver_sgecon_64(rocblas_handle handle,
                                    const int64_t n,
                                    float* A,
                                    const int64_t lda,
-                                   const int64_t* ipiv,
                                    const float* anorm,
                                    float* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
     return rocsolver::rocsolver_gecon_impl<float, int64_t, float>(handle, norm_type, n, A, lda,
-                                                                  ipiv, anorm, rcond);
+                                                                  anorm, rcond);
 #else
     return rocblas_status_not_implemented;
 #endif
@@ -189,13 +182,12 @@ rocblas_status rocsolver_dgecon_64(rocblas_handle handle,
                                    const int64_t n,
                                    double* A,
                                    const int64_t lda,
-                                   const int64_t* ipiv,
                                    const double* anorm,
                                    double* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
     return rocsolver::rocsolver_gecon_impl<double, int64_t, double>(handle, norm_type, n, A, lda,
-                                                                    ipiv, anorm, rcond);
+                                                                    anorm, rcond);
 #else
     return rocblas_status_not_implemented;
 #endif
@@ -206,13 +198,12 @@ rocblas_status rocsolver_cgecon_64(rocblas_handle handle,
                                    const int64_t n,
                                    rocblas_float_complex* A,
                                    const int64_t lda,
-                                   const int64_t* ipiv,
                                    const float* anorm,
                                    float* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
     return rocsolver::rocsolver_gecon_impl<rocblas_float_complex, int64_t, float>(
-        handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+        handle, norm_type, n, A, lda, anorm, rcond);
 #else
     return rocblas_status_not_implemented;
 #endif
@@ -223,13 +214,12 @@ rocblas_status rocsolver_zgecon_64(rocblas_handle handle,
                                    const int64_t n,
                                    rocblas_double_complex* A,
                                    const int64_t lda,
-                                   const int64_t* ipiv,
                                    const double* anorm,
                                    double* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
     return rocsolver::rocsolver_gecon_impl<rocblas_double_complex, int64_t, double>(
-        handle, norm_type, n, A, lda, ipiv, anorm, rcond);
+        handle, norm_type, n, A, lda, anorm, rcond);
 #else
     return rocblas_status_not_implemented;
 #endif

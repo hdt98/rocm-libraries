@@ -33,7 +33,6 @@
 #pragma once
 
 #include "ideal_sizes.hpp"
-#include "lapack/roclapack_getrs.hpp"
 #include "lapack_device_functions.hpp"
 #include "lib_device_helpers.hpp"
 #include "rocblas.hpp"
@@ -77,10 +76,11 @@ void rocsolver_gecon_getMemorySize(const I n,
                                    size_t* size_scalar_max_idx,
                                    size_t* size_scalar_kase,
                                    size_t* size_scalar_jump,
-                                   size_t* size_work_getrs_1,
-                                   size_t* size_work_getrs_2,
-                                   size_t* size_work_getrs_3,
-                                   size_t* size_work_getrs_4)
+                                   size_t* size_work_trsm_1,
+                                   size_t* size_work_trsm_2,
+                                   size_t* size_work_trsm_3,
+                                   size_t* size_work_trsm_4,
+                                   bool* optim_mem)
 {
     // if quick return no workspace needed
     if(n == 0 || batch_count == 0)
@@ -92,10 +92,11 @@ void rocsolver_gecon_getMemorySize(const I n,
         *size_scalar_max_idx = 0;
         *size_scalar_kase = 0;
         *size_scalar_jump = 0;
-        *size_work_getrs_1 = 0;
-        *size_work_getrs_2 = 0;
-        *size_work_getrs_3 = 0;
-        *size_work_getrs_4 = 0;
+        *size_work_trsm_1 = 0;
+        *size_work_trsm_2 = 0;
+        *size_work_trsm_3 = 0;
+        *size_work_trsm_4 = 0;
+        *optim_mem = true;
         return;
     }
 
@@ -121,13 +122,10 @@ void rocsolver_gecon_getMemorySize(const I n,
     // need one rocblas_int scalar for jump state
     *size_scalar_jump = sizeof(rocblas_int);
 
-    // workspace for getrs
-    // optim_mem is an output parameter indicating if optimized memory layout is used
-    // by getrs internally; we don't need to act on it here, just provide it to the query
-    bool optim_mem;
-    rocsolver_getrs_getMemorySize<false, false, T, I>(
-        rocblas_operation_none, n, 1, batch_count, size_work_getrs_1, size_work_getrs_2,
-        size_work_getrs_3, size_work_getrs_4, &optim_mem, lda, n);
+    // workspace for trsm (solving triangular systems directly)
+    rocsolver_trsm_mem<false, false, T, I>(
+        rocblas_side_left, rocblas_operation_none, n, (I)1, batch_count, size_work_trsm_1,
+        size_work_trsm_2, size_work_trsm_3, size_work_trsm_4, optim_mem, false, lda, n, (I)1, (I)1);
 }
 
 template <typename T, typename I, typename S>
@@ -136,7 +134,6 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
                                         const I n,
                                         const I lda,
                                         T A,
-                                        const I* ipiv,
                                         const S* anorm,
                                         S* rcond)
 {
@@ -155,7 +152,7 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
         return rocblas_status_continue;
 
     // 3. invalid pointers
-    if((n && !A) || (n && !ipiv) || (n && !anorm) || (n && !rcond))
+    if((n && !A) || (n && !anorm) || (n && !rcond))
         return rocblas_status_invalid_pointer;
 
     return rocblas_status_continue;
@@ -171,8 +168,6 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                                         const I inca,
                                         const I lda,
                                         const rocblas_stride strideA,
-                                        const I* ipiv,
-                                        const rocblas_stride strideP,
                                         const S* anorm, // S = real_t<T>
                                         S* rcond,
                                         const I batch_count,
@@ -183,10 +178,11 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                                         I* scalar_max_idx,
                                         rocblas_int* scalar_kase,
                                         rocblas_int* scalar_jump,
-                                        void* work_getrs_1,
-                                        void* work_getrs_2,
-                                        void* work_getrs_3,
-                                        void* work_getrs_4,
+                                        const bool optim_mem,
+                                        void* work_trsm_1,
+                                        void* work_trsm_2,
+                                        void* work_trsm_3,
+                                        void* work_trsm_4,
                                         const I max_iter)
 {
     ROCSOLVER_ENTER("gecon", "norm_type:", norm_type, "n:", n, "shiftA:", shiftA, "lda:", lda,
@@ -241,7 +237,7 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
         rocblas_int h_jump = 0;
         I h_iters = 1;
 
-        // main LACN2 and GETRS iteration loop
+        // main LACN2 and TRSM iteration loop
         do
         {
             // Call LACN2 to get next operation (simplified parameter list)
@@ -262,10 +258,35 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
                 opr = (h_kase == 1) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
             }
 
-            rocsolver_getrs_template<false, false, T>(
-                handle, opr, n, (I)1, A, shiftA + batch * strideA, inca, lda, strideA,
-                ipiv + batch * strideP, strideP, (U)x, 0, (I)1, (I)n, 0, (I)1, work_getrs_1,
-                work_getrs_2, work_getrs_3, work_getrs_4, true, true);
+            // Solve triangular systems directly using TRSM (bypassing LASWP from GETRS)
+            // For LU factorization PA = LU, we need to solve (LU)^{-1} * x or (LU)^{-H} * x
+            // Row permutations P don't affect the norm, so we skip LASWP entirely.
+            if(opr == rocblas_operation_none)
+            {
+                // Solve L*y = x (unit lower triangular), then U*x = y (non-unit upper triangular)
+                rocsolver_trsm_lower<false, false, T, I>(
+                    handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_unit, n,
+                    (I)1, A, shiftA + batch * strideA, inca, lda, strideA, (U)x, 0, (I)1, n,
+                    strideA, (I)1, optim_mem, work_trsm_1, work_trsm_2, work_trsm_3, work_trsm_4);
+
+                rocsolver_trsm_upper<false, false, T, I>(
+                    handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit, n,
+                    (I)1, A, shiftA + batch * strideA, inca, lda, strideA, (U)x, 0, (I)1, n,
+                    strideA, (I)1, optim_mem, work_trsm_1, work_trsm_2, work_trsm_3, work_trsm_4);
+            }
+            else
+            {
+                // Solve U^H*y = x, then L^H*x = y (conjugate transpose for complex, transpose for real)
+                rocsolver_trsm_upper<false, false, T, I>(
+                    handle, rocblas_side_left, opr, rocblas_diagonal_non_unit, n, (I)1, A,
+                    shiftA + batch * strideA, inca, lda, strideA, (U)x, 0, (I)1, n, strideA, (I)1,
+                    optim_mem, work_trsm_1, work_trsm_2, work_trsm_3, work_trsm_4);
+
+                rocsolver_trsm_lower<false, false, T, I>(
+                    handle, rocblas_side_left, opr, rocblas_diagonal_unit, n, (I)1, A,
+                    shiftA + batch * strideA, inca, lda, strideA, (U)x, 0, (I)1, n, strideA, (I)1,
+                    optim_mem, work_trsm_1, work_trsm_2, work_trsm_3, work_trsm_4);
+            }
         } while(h_kase != 0);
 
         // Compute rcond from estimate on device

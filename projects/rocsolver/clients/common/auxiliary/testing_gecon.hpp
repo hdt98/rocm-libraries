@@ -42,34 +42,30 @@ void gecon_checkBadArgs(const rocblas_handle handle,
                         const I n,
                         T dA,
                         const I lda,
-                        I* dipiv,
                         const S* danorm,
                         S* drcond)
 {
     // handle
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(nullptr, norm_type, n, dA, lda, dipiv, danorm, drcond),
+    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(nullptr, norm_type, n, dA, lda, danorm, drcond),
                           rocblas_status_invalid_handle);
 
     // values
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, static_cast<rocsolver_norm_type>(0), n, dA, lda,
-                                          dipiv, danorm, drcond),
-                          rocblas_status_invalid_value);
+    EXPECT_ROCBLAS_STATUS(
+        rocsolver_gecon(handle, static_cast<rocsolver_norm_type>(0), n, dA, lda, danorm, drcond),
+        rocblas_status_invalid_value);
 
     // pointers
-    EXPECT_ROCBLAS_STATUS(
-        rocsolver_gecon(handle, norm_type, n, (T) nullptr, lda, dipiv, danorm, drcond),
-        rocblas_status_invalid_pointer);
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA, lda, (I*)nullptr, danorm, drcond),
+    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, (T) nullptr, lda, danorm, drcond),
                           rocblas_status_invalid_pointer);
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA, lda, dipiv, (S*)nullptr, drcond),
+    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA, lda, (S*)nullptr, drcond),
                           rocblas_status_invalid_pointer);
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA, lda, dipiv, danorm, (S*)nullptr),
+    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA, lda, danorm, (S*)nullptr),
                           rocblas_status_invalid_pointer);
 
     // quick return with invalid pointers
-    EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, (I)0, (T) nullptr, lda, (I*)nullptr,
-                                          (S*)nullptr, (S*)nullptr),
-                          rocblas_status_success);
+    EXPECT_ROCBLAS_STATUS(
+        rocsolver_gecon(handle, norm_type, (I)0, (T) nullptr, lda, (S*)nullptr, (S*)nullptr),
+        rocblas_status_success);
 }
 
 template <typename T, typename I>
@@ -85,36 +81,22 @@ void testing_gecon_bad_arg()
 
     // memory allocation
     device_strided_batch_vector<T> dA(1, 1, 1, 1);
-    device_strided_batch_vector<I> dipiv(1, 1, 1, 1);
     device_strided_batch_vector<S> danorm(1, 1, 1, 1);
     device_strided_batch_vector<S> drcond(1, 1, 1, 1);
     CHECK_HIP_ERROR(dA.memcheck());
-    CHECK_HIP_ERROR(dipiv.memcheck());
     CHECK_HIP_ERROR(danorm.memcheck());
     CHECK_HIP_ERROR(drcond.memcheck());
 
     // check bad arguments
-    gecon_checkBadArgs(handle, norm_type, n, dA.data(), lda, dipiv.data(), danorm.data(),
-                       drcond.data());
+    gecon_checkBadArgs(handle, norm_type, n, dA.data(), lda, danorm.data(), drcond.data());
 }
 
-template <bool CPU,
-          bool GPU,
-          typename T,
-          typename I,
-          typename S,
-          typename Td,
-          typename Id,
-          typename Sd,
-          typename Th,
-          typename Ih,
-          typename Sh>
+template <bool CPU, bool GPU, typename T, typename I, typename S, typename Td, typename Sd, typename Th, typename Ih, typename Sh>
 void gecon_initData(const rocblas_handle handle,
                     const rocsolver_norm_type norm_type,
                     const I n,
                     Td& dA,
                     const I lda,
-                    Id& dipiv,
                     Sd& danorm,
                     Sd& drcond,
                     Th& hA,
@@ -141,23 +123,15 @@ void gecon_initData(const rocblas_handle handle,
         // copy factored data from CPU to device
         CHECK_HIP_ERROR(dA.transfer_from(hA));
         CHECK_HIP_ERROR(danorm.transfer_from(hanorm));
-
-        // convert and transfer pivot indices
-        std::vector<I> hipiv_converted(n);
-        for(I i = 0; i < n; i++)
-            hipiv_converted[i] = static_cast<I>(hipiv[0][i]);
-        CHECK_HIP_ERROR(
-            hipMemcpy(dipiv.data(), hipiv_converted.data(), sizeof(I) * n, hipMemcpyHostToDevice));
     }
 }
 
-template <typename T, typename I, typename S, typename Td, typename Id, typename Sd, typename Th, typename Ih, typename Sh>
+template <typename T, typename I, typename S, typename Td, typename Sd, typename Th, typename Ih, typename Sh>
 void gecon_getError(const rocblas_handle handle,
                     const rocsolver_norm_type norm_type,
                     const I n,
                     Td& dA,
                     const I lda,
-                    Id& dipiv,
                     Sd& danorm,
                     Sd& drcond,
                     Th& hA,
@@ -170,11 +144,11 @@ void gecon_getError(const rocblas_handle handle,
     std::vector<rocblas_int> hinfo;
 
     // initialize data
-    gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                        hipiv, hanorm, hrcond, hinfo);
+    gecon_initData<true, true, T, I, S>(handle, norm_type, n, dA, lda, danorm, drcond, hA, hipiv,
+                                        hanorm, hrcond, hinfo);
 
-    CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
-                                        danorm.data(), drcond.data()));
+    CHECK_ROCBLAS_ERROR(
+        rocsolver_gecon(handle, norm_type, n, dA.data(), lda, danorm.data(), drcond.data()));
     CHECK_HIP_ERROR(hrcond_res.transfer_from(drcond));
 
     char norm = rocsolver2char_norm_type(norm_type);
@@ -187,13 +161,12 @@ void gecon_getError(const rocblas_handle handle,
     *max_err = std::abs(hrcond[0][0] - hrcond_res[0][0]) / std::abs(hrcond[0][0]);
 }
 
-template <typename T, typename I, typename S, typename Td, typename Id, typename Sd, typename Th, typename Ih, typename Sh>
+template <typename T, typename I, typename S, typename Td, typename Sd, typename Th, typename Ih, typename Sh>
 void gecon_getPerfData(const rocblas_handle handle,
                        const rocsolver_norm_type norm_type,
                        const I n,
                        Td& dA,
                        const I lda,
-                       Id& dipiv,
                        Sd& danorm,
                        Sd& drcond,
                        Th& hA,
@@ -209,8 +182,8 @@ void gecon_getPerfData(const rocblas_handle handle,
 {
     std::vector<rocblas_int> hinfo;
 
-    gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA,
-                                         hipiv, hanorm, hrcond, hinfo);
+    gecon_initData<true, false, T, I, S>(handle, norm_type, n, dA, lda, danorm, drcond, hA, hipiv,
+                                         hanorm, hrcond, hinfo);
 
     if(!perf)
     {
@@ -228,11 +201,11 @@ void gecon_getPerfData(const rocblas_handle handle,
     // cold calls
     for(int iter = 0; iter < 2; iter++)
     {
-        gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hipiv, hanorm, hrcond, hinfo);
+        gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, danorm, drcond, hA,
+                                             hipiv, hanorm, hrcond, hinfo);
 
-        CHECK_ROCBLAS_ERROR(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
-                                            danorm.data(), drcond.data()));
+        CHECK_ROCBLAS_ERROR(
+            rocsolver_gecon(handle, norm_type, n, dA.data(), lda, danorm.data(), drcond.data()));
     }
 
     // gpu-lapack performance
@@ -252,12 +225,11 @@ void gecon_getPerfData(const rocblas_handle handle,
 
     for(int iter = 0; iter < hot_calls; iter++)
     {
-        gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond,
-                                             hA, hipiv, hanorm, hrcond, hinfo);
+        gecon_initData<false, true, T, I, S>(handle, norm_type, n, dA, lda, danorm, drcond, hA,
+                                             hipiv, hanorm, hrcond, hinfo);
 
         timer.start(stream);
-        rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(), danorm.data(),
-                        drcond.data());
+        rocsolver_gecon(handle, norm_type, n, dA.data(), lda, danorm.data(), drcond.data());
         timer.end(stream);
     }
     *gpu_time_used = timer.get_combined();
@@ -280,9 +252,9 @@ void testing_gecon(Arguments& argus)
     // check non-supported values
     if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity)
     {
-        EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (I*)nullptr,
-                                              (S*)nullptr, (S*)nullptr),
-                              rocblas_status_invalid_value);
+        EXPECT_ROCBLAS_STATUS(
+            rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (S*)nullptr, (S*)nullptr),
+            rocblas_status_invalid_value);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_args);
@@ -292,7 +264,7 @@ void testing_gecon(Arguments& argus)
 
     // determine sizes
     size_t size_A = size_t(lda) * n;
-    size_t size_ipiv = n;
+    size_t size_ipiv = n; // still needed for CPU reference factorization
     size_t size_anorm = 1;
     size_t size_rcond = 1;
     double max_error = 0, gpu_time_used = 0, cpu_time_used = 0;
@@ -303,9 +275,9 @@ void testing_gecon(Arguments& argus)
     bool invalid_size = (n < 0 || lda < n);
     if(invalid_size)
     {
-        EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (I*)nullptr,
-                                              (S*)nullptr, (S*)nullptr),
-                              rocblas_status_invalid_size);
+        EXPECT_ROCBLAS_STATUS(
+            rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (S*)nullptr, (S*)nullptr),
+            rocblas_status_invalid_size);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_size);
@@ -317,8 +289,8 @@ void testing_gecon(Arguments& argus)
     if(argus.mem_query)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
-        CHECK_ALLOC_QUERY(rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (I*)nullptr,
-                                          (S*)nullptr, (S*)nullptr));
+        CHECK_ALLOC_QUERY(
+            rocsolver_gecon(handle, norm_type, n, (T*)nullptr, lda, (S*)nullptr, (S*)nullptr));
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
@@ -329,27 +301,24 @@ void testing_gecon(Arguments& argus)
 
     // memory allocations
     host_strided_batch_vector<T> hA(size_A, 1, size_A, 1);
-    host_strided_batch_vector<rocblas_int> hipiv(size_ipiv, 1, size_ipiv, 1);
+    host_strided_batch_vector<rocblas_int> hipiv(size_ipiv, 1, size_ipiv, 1); // for CPU reference
     host_strided_batch_vector<S> hanorm(size_anorm, 1, size_anorm, 1);
     host_strided_batch_vector<S> hrcond(size_rcond, 1, size_rcond, 1);
     host_strided_batch_vector<S> hrcond_res(size_rcond_res, 1, size_rcond_res, 1);
     device_strided_batch_vector<T> dA(size_A, 1, size_A, 1);
-    device_strided_batch_vector<I> dipiv(size_ipiv, 1, size_ipiv, 1);
     device_strided_batch_vector<S> danorm(size_anorm, 1, size_anorm, 1);
     device_strided_batch_vector<S> drcond(size_rcond, 1, size_rcond, 1);
     if(size_A)
         CHECK_HIP_ERROR(dA.memcheck());
-    if(size_ipiv)
-        CHECK_HIP_ERROR(dipiv.memcheck());
     CHECK_HIP_ERROR(danorm.memcheck());
     CHECK_HIP_ERROR(drcond.memcheck());
 
     // check quick return
     if(n == 0)
     {
-        EXPECT_ROCBLAS_STATUS(rocsolver_gecon(handle, norm_type, n, dA.data(), lda, dipiv.data(),
-                                              danorm.data(), drcond.data()),
-                              rocblas_status_success);
+        EXPECT_ROCBLAS_STATUS(
+            rocsolver_gecon(handle, norm_type, n, dA.data(), lda, danorm.data(), drcond.data()),
+            rocblas_status_success);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_quick_return);
@@ -359,14 +328,14 @@ void testing_gecon(Arguments& argus)
 
     // check computations
     if(argus.unit_check || argus.norm_check)
-        gecon_getError<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA, hipiv,
-                                hanorm, hrcond, hrcond_res, &max_error);
+        gecon_getError<T, I, S>(handle, norm_type, n, dA, lda, danorm, drcond, hA, hipiv, hanorm,
+                                hrcond, hrcond_res, &max_error);
 
     // collect performance data
     if(argus.timing)
-        gecon_getPerfData<T, I, S>(handle, norm_type, n, dA, lda, dipiv, danorm, drcond, hA, hipiv,
-                                   hanorm, hrcond, &gpu_time_used, &cpu_time_used, hot_calls,
-                                   argus.profile, argus.profile_kernels, argus.perf);
+        gecon_getPerfData<T, I, S>(handle, norm_type, n, dA, lda, danorm, drcond, hA, hipiv, hanorm,
+                                   hrcond, &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
+                                   argus.profile_kernels, argus.perf);
 
     // validate results for rocsolver-test
     // using n * machine_precision as tolerance
