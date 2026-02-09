@@ -69,7 +69,7 @@ rocRoller uses CMake for configuration and building. If all dependencies are ins
   - `CMAKE_CXX_COMPILER`: `/opt/rocm/bin/amdclang++`
   - `CMAKE_BUILD_TYPE`: `Release`
   - `ROCROLLER_ENABLE_FETCH`: `ON`
-  - `ROCROLLER_TESTS_SKIP_SLOW`: `OFF`
+  - `ROCROLLER_ENABLE_SLOW_TESTS`: `ON`
   - `CMAKE_PREFIX_PATH`: `/opt/rocm;/opt/rocm/llvm`
 - **asan**, **amd-mrisa**, **coverage**, **docs**: See `CMakePresets.json` for details.
 
@@ -112,7 +112,7 @@ CXX=<g++ or clang++ path> CC=<gcc or clang path> cmake .. [cmake options]
 
 #### Common CMake Options
 
-| Option                                   | Default | Description                                               |
+| Option                                    | Default | Description                                               |
 |-------------------------------------------|---------|-----------------------------------------------------------|
 | ROCROLLER_ENABLE_CLIENT                   | ON      | Build the rocRoller client                                |
 | ROCROLLER_ENABLE_YAML_CPP                 | ON      | Enable yaml-cpp backend                                   |
@@ -122,13 +122,13 @@ CXX=<g++ or clang++ path> CC=<gcc or clang path> cmake .. [cmake options]
 | ROCROLLER_ENABLE_ARCH_GEN_TEST            | ON      | Build architecture generator test                         |
 | ROCROLLER_ENABLE_TEST_DISCOVERY           | ON      | Use gtest/catch2 test discovery                           |
 | ROCROLLER_ENABLE_COVERAGE                 | OFF     | Build code coverage                                       |
-| ROCROLLER_TESTS_SKIP_SLOW                 | OFF     | Disable slow tests                                        |
+| ROCROLLER_ENABLE_SLOW_TESTS               | ON      | Enable slow tests                                         |
 | ROCROLLER_EMBED_ARCH_DEF                  | ON      | Embed msgpack architecture data in library                |
 | ROCROLLER_BUILD_SHARED_LIBS               | ON      | Build as shared library                                   |
 | ROCROLLER_ENABLE_FETCH                    | OFF     | Fetch dependencies if not found                           |
 | ROCROLLER_ENABLE_TIMERS                   | OFF     | Enable timer code                                         |
 | ROCROLLER_ENABLE_CPPCHECK                 | OFF     | Enable cppcheck                                           |
-| ROCROLLER_MRISAS_DIR                      | `<build>/GPUArchitectureGenerator/amd-mrisa` | MRISA XML directory |
+| ROCROLLER_MRISAS_DIR                      | `<build>/GPUArchitectureGenerator/amd-mrisa` | MRISA XML directory  |
 | ROCROLLER_ENABLE_PREGENERATED_ARCH_DEF    | ON      | Use pregenerated GPU architecture YAML files              |
 
 ## Running the Tests (from a build directory)
