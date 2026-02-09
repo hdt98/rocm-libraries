@@ -4,30 +4,31 @@
 #pragma once
 
 #include <functional>
-#include <hipdnn_sdk/data_objects/data_types_generated.h>
-#include <hipdnn_sdk/data_objects/graph_generated.h>
-#include <hipdnn_sdk/plugin/PluginFlatbufferTypeHelpers.hpp>
+#include <hipdnn_data_sdk/data_objects/data_types_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/BatchnormTrainPlan.hpp>
+#include <ostream>
 
 namespace hipdnn_test_sdk::utilities
 {
 
 struct BatchnormTrainSignatureKey
 {
-    const hipdnn_sdk::data_objects::NodeAttributes nodeType
-        = hipdnn_sdk::data_objects::NodeAttributes::BatchnormAttributes;
-    hipdnn_sdk::data_objects::DataType xDataType;
-    hipdnn_sdk::data_objects::DataType scaleBiasDataType;
-    hipdnn_sdk::data_objects::DataType meanVarianceDataType;
-    hipdnn_sdk::data_objects::DataType outputDataType;
-    hipdnn_sdk::data_objects::DataType computeDataType;
+    const hipdnn_data_sdk::data_objects::NodeAttributes nodeType
+        = hipdnn_data_sdk::data_objects::NodeAttributes::BatchnormAttributes;
+    hipdnn_data_sdk::data_objects::DataType xDataType;
+    hipdnn_data_sdk::data_objects::DataType scaleBiasDataType;
+    hipdnn_data_sdk::data_objects::DataType meanVarianceDataType;
+    hipdnn_data_sdk::data_objects::DataType outputDataType;
+    hipdnn_data_sdk::data_objects::DataType computeDataType;
 
     BatchnormTrainSignatureKey() = default;
-    constexpr BatchnormTrainSignatureKey(hipdnn_sdk::data_objects::DataType input,
-                                         hipdnn_sdk::data_objects::DataType scaleBias,
-                                         hipdnn_sdk::data_objects::DataType meanVariance,
-                                         hipdnn_sdk::data_objects::DataType output,
-                                         hipdnn_sdk::data_objects::DataType compute)
+    constexpr BatchnormTrainSignatureKey(hipdnn_data_sdk::data_objects::DataType input,
+                                         hipdnn_data_sdk::data_objects::DataType scaleBias,
+                                         hipdnn_data_sdk::data_objects::DataType meanVariance,
+                                         hipdnn_data_sdk::data_objects::DataType output,
+                                         hipdnn_data_sdk::data_objects::DataType compute)
         : xDataType(input)
         , scaleBiasDataType(scaleBias)
         , meanVarianceDataType(meanVariance)
@@ -37,8 +38,8 @@ struct BatchnormTrainSignatureKey
     }
 
     BatchnormTrainSignatureKey(
-        const hipdnn_sdk::data_objects::Node& node,
-        const std::unordered_map<int64_t, const hipdnn_sdk::data_objects::TensorAttributes*>&
+        const hipdnn_data_sdk::data_objects::Node& node,
+        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
             tensorMap)
     {
         const auto* nodeAttributes = node.attributes_as_BatchnormAttributes();
@@ -100,50 +101,50 @@ struct BatchnormTrainSignatureKey
                            BatchnormTrainSignatureKey>
             map;
 
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
 
         return map;
     }
 
-    template <hipdnn_sdk::data_objects::DataType XDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType ScaleBiasDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType MeanVarianceDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType OutputDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType ComputeDataTypeEnum>
+    template <hipdnn_data_sdk::data_objects::DataType XDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType ScaleBiasDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType MeanVarianceDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType OutputDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType ComputeDataTypeEnum>
     static void addPlanBuilder(std::unordered_map<BatchnormTrainSignatureKey,
                                                   std::unique_ptr<IGraphNodePlanBuilder>,
                                                   BatchnormTrainSignatureKey>& map)
@@ -160,25 +161,12 @@ struct BatchnormTrainSignatureKey
                                                          ComputeDataTypeEnum>>();
     }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const BatchnormTrainSignatureKey& key)
+{
+    os << "BatchnormTrain(x=" << key.xDataType << ", scale=" << key.scaleBiasDataType
+       << ", y=" << key.outputDataType << ", compute=" << key.computeDataType << ")";
+    return os;
 }
 
-template <>
-struct fmt::formatter<hipdnn_test_sdk::utilities::BatchnormTrainSignatureKey>
-{
-    static constexpr auto parse(format_parse_context& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename FormatContext>
-    auto format(const hipdnn_test_sdk::utilities::BatchnormTrainSignatureKey& key,
-                FormatContext& ctx) const
-    {
-        return fmt::format_to(ctx.out(),
-                              "BatchnormTrain(x={}, scale={}, y={}, compute={})",
-                              key.xDataType,
-                              key.scaleBiasDataType,
-                              key.outputDataType,
-                              key.computeDataType);
-    }
-};
+}

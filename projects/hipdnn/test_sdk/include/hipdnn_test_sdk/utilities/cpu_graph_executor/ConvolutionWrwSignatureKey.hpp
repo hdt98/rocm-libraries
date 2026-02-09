@@ -4,29 +4,30 @@
 #pragma once
 
 #include <functional>
-#include <hipdnn_sdk/data_objects/data_types_generated.h>
-#include <hipdnn_sdk/data_objects/graph_generated.h>
-#include <hipdnn_sdk/plugin/PluginFlatbufferTypeHelpers.hpp>
+#include <hipdnn_data_sdk/data_objects/data_types_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/ConvolutionWrwPlan.hpp>
+#include <ostream>
 
 namespace hipdnn_test_sdk::utilities
 {
 
 struct ConvolutionWrwSignatureKey
 {
-    const hipdnn_sdk::data_objects::NodeAttributes nodeType{
-        hipdnn_sdk::data_objects::NodeAttributes::ConvolutionWrwAttributes};
-    hipdnn_sdk::data_objects::DataType xDataType;
-    hipdnn_sdk::data_objects::DataType dyDataType;
-    hipdnn_sdk::data_objects::DataType outputDataType;
-    hipdnn_sdk::data_objects::DataType computeDataType;
+    const hipdnn_data_sdk::data_objects::NodeAttributes nodeType{
+        hipdnn_data_sdk::data_objects::NodeAttributes::ConvolutionWrwAttributes};
+    hipdnn_data_sdk::data_objects::DataType xDataType;
+    hipdnn_data_sdk::data_objects::DataType dyDataType;
+    hipdnn_data_sdk::data_objects::DataType outputDataType;
+    hipdnn_data_sdk::data_objects::DataType computeDataType;
 
     ConvolutionWrwSignatureKey() = default;
 
-    constexpr ConvolutionWrwSignatureKey(hipdnn_sdk::data_objects::DataType x,
-                                         hipdnn_sdk::data_objects::DataType dy,
-                                         hipdnn_sdk::data_objects::DataType output,
-                                         hipdnn_sdk::data_objects::DataType compute)
+    constexpr ConvolutionWrwSignatureKey(hipdnn_data_sdk::data_objects::DataType x,
+                                         hipdnn_data_sdk::data_objects::DataType dy,
+                                         hipdnn_data_sdk::data_objects::DataType output,
+                                         hipdnn_data_sdk::data_objects::DataType compute)
         : xDataType(x)
         , dyDataType(dy)
         , outputDataType(output)
@@ -35,10 +36,10 @@ struct ConvolutionWrwSignatureKey
     }
 
     ConvolutionWrwSignatureKey(
-        const hipdnn_sdk::data_objects::Node& node,
-        const std::unordered_map<int64_t, const hipdnn_sdk::data_objects::TensorAttributes*>&
+        const hipdnn_data_sdk::data_objects::Node& node,
+        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
             tensorMap,
-        const hipdnn_sdk::data_objects::DataType computeType)
+        const hipdnn_data_sdk::data_objects::DataType computeType)
     {
         const auto* nodeAttributes = node.attributes_as_ConvolutionWrwAttributes();
         if(nodeAttributes == nullptr)
@@ -94,34 +95,34 @@ struct ConvolutionWrwSignatureKey
                            ConvolutionWrwSignatureKey>
             map;
 
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF,
-                       hipdnn_sdk::data_objects::DataType::HALF>(map);
-        addPlanBuilder<hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_sdk::data_objects::DataType::BFLOAT16>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF,
+                       hipdnn_data_sdk::data_objects::DataType::HALF>(map);
+        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16>(map);
 
         return map;
     }
 
-    template <hipdnn_sdk::data_objects::DataType XDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType DyDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType OutputDataTypeEnum,
-              hipdnn_sdk::data_objects::DataType ComputeDataTypeEnum>
+    template <hipdnn_data_sdk::data_objects::DataType XDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType DyDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType OutputDataTypeEnum,
+              hipdnn_data_sdk::data_objects::DataType ComputeDataTypeEnum>
     static void addPlanBuilder(std::unordered_map<ConvolutionWrwSignatureKey,
                                                   std::unique_ptr<IGraphNodePlanBuilder>,
                                                   ConvolutionWrwSignatureKey>& map)
@@ -135,25 +136,11 @@ struct ConvolutionWrwSignatureKey
     }
 };
 
+inline std::ostream& operator<<(std::ostream& os, const ConvolutionWrwSignatureKey& key)
+{
+    os << "ConvolutionWrw(x=" << key.xDataType << ", dy=" << key.dyDataType
+       << ", dw=" << key.outputDataType << ", compute=" << key.computeDataType << ")";
+    return os;
 }
 
-template <>
-struct fmt::formatter<hipdnn_test_sdk::utilities::ConvolutionWrwSignatureKey>
-{
-    static constexpr auto parse(format_parse_context& ctx)
-    {
-        return ctx.begin();
-    }
-
-    template <typename FormatContext>
-    auto format(const hipdnn_test_sdk::utilities::ConvolutionWrwSignatureKey& key,
-                FormatContext& ctx) const
-    {
-        return fmt::format_to(ctx.out(),
-                              "ConvolutionWrw(x={}, dy={}, dw={}, compute={})",
-                              key.xDataType,
-                              key.dyDataType,
-                              key.outputDataType,
-                              key.computeDataType);
-    }
-};
+}
