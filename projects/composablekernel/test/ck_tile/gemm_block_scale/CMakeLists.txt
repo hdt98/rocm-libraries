@@ -129,15 +129,26 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx12")
     target_compile_options(test_tile_gemm_quant_bquant_transpose PRIVATE ${TEST_GEMM_COMPILE_OPTIONS})
 
     # BQuant split-K tests (no preshuffle)
-    add_gtest_executable(test_tile_gemm_quant_bquant_splitk_decode 
+    add_gtest_executable(test_tile_gemm_quant_bquant_splitk_decode
         test_gemm_quant_bquant_splitk_decode.cpp
     )
     target_compile_options(test_tile_gemm_quant_bquant_splitk_decode PRIVATE ${TEST_GEMM_COMPILE_OPTIONS})
 
-    add_gtest_executable(test_tile_gemm_quant_bquant_splitk_prefill 
+    add_gtest_executable(test_tile_gemm_quant_bquant_splitk_prefill
         test_gemm_quant_bquant_splitk_prefill.cpp
     )
     target_compile_options(test_tile_gemm_quant_bquant_splitk_prefill PRIVATE ${TEST_GEMM_COMPILE_OPTIONS})
+
+    # ABQuant split-K tests (no preshuffle, 2D BQ groups only)
+    add_gtest_executable(test_tile_gemm_quant_abquant_splitk_decode
+        test_gemm_quant_abquant_splitk_decode.cpp
+    )
+    target_compile_options(test_tile_gemm_quant_abquant_splitk_decode PRIVATE ${TEST_GEMM_COMPILE_OPTIONS})
+
+    add_gtest_executable(test_tile_gemm_quant_abquant_splitk_prefill
+        test_gemm_quant_abquant_splitk_prefill.cpp
+    )
+    target_compile_options(test_tile_gemm_quant_abquant_splitk_prefill PRIVATE ${TEST_GEMM_COMPILE_OPTIONS})
 
     # BQuant tests (with PreshuffleB) - split into 5 files
     add_gtest_executable(test_tile_gemm_quant_bquant_preshuffle_decode_1d 

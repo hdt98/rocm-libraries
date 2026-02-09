@@ -948,7 +948,10 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
     void SetUpQuantTypeSpecific() {}
     void TearDownQuantTypeSpecific() {}
 
-    void run_test_with_validation(ck_tile::index_t M, ck_tile::index_t N, ck_tile::index_t K)
+    void run_test_with_validation(ck_tile::index_t M,
+                                  ck_tile::index_t N,
+                                  ck_tile::index_t K,
+                                  ck_tile::index_t k_batch = 1)
     {
         const ck_tile::index_t stride_A =
             ck_tile::get_default_stride(M, K, 0, this->is_row_major(ALayout{}));
@@ -1059,6 +1062,8 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
             bq_bqk_bqn_dev_buf.ToDevice(bq_bqk_bqn.data());
         }
 
+        c_m_n_dev_buf.SetZero();
+
         // Create args for kernel execution
         ck_tile::QuantGemmHostArgs args{
             a_m_k_dev_buf.GetDeviceBuffer(),      // a_ptr
@@ -1066,7 +1071,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
             c_m_n_dev_buf.GetDeviceBuffer(),      // c_ptr
             aq_m_aqk_dev_buf.GetDeviceBuffer(),   // aq_ptr (scales)
             bq_bqk_bqn_dev_buf.GetDeviceBuffer(), // bq_ptr (scales)
-            1,                                    // k_batch
+            k_batch,                              // k_batch (split-K)
             M,
             N,
             K,   // M, N, K
