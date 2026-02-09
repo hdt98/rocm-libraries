@@ -269,7 +269,7 @@
     UnrollMajorLDSB: false
     UnrollMajorLDSMetadata: true
     Use64bShadowLimit: 1
-    UseCustomMainLoopSchedule: false
+    UseCustomMainLoopSchedule: 0
     UseDot2F32XEmulation: true
     UseDotInstruction: false
     UseF32XEmulation: true
@@ -311,6 +311,8 @@
     tailLoopOptB: false
 - [2, 3, 0, 1]
 - - - [41, 128, 17711, 6]
+    - [0, 0.0]
+  - - [33554432, 10, 1, 32]
     - [0, 0.0]
 - null
 - null

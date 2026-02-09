@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -19,6 +19,9 @@ template <int MinBlockPerCu, typename Kernel, typename... Args>
 #if CK_TILE_USE_LAUNCH_BOUNDS
 __launch_bounds__(Kernel::kBlockSize, MinBlockPerCu)
 #endif
+#if defined(__HIP_DEVICE_COMPILE__) && defined(CK_TILE_EIGHTWARP_SUP)
+    __attribute__((target("no-packed-fp32-ops")))
+#endif
     __global__ void kentry(Args... args)
 {
 #if defined(__HIP_DEVICE_COMPILE__)
@@ -31,6 +34,9 @@ __launch_bounds__(Kernel::kBlockSize, MinBlockPerCu)
 template <typename Arch, int MinBlockPerCu, typename Kernel, typename... Args>
 #if CK_TILE_USE_LAUNCH_BOUNDS
 __launch_bounds__(Kernel::kBlockSize, MinBlockPerCu)
+#endif
+#if defined(__HIP_DEVICE_COMPILE__) && defined(CK_TILE_EIGHTWARP_SUP)
+    __attribute__((target("no-packed-fp32-ops")))
 #endif
     __global__ void kentry(Args... args)
 {

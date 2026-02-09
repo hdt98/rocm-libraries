@@ -415,8 +415,21 @@ class TaskPredicate(Properties.Predicate):
         return None
 
     @classmethod
+    def ExtraPredicates(cls, state):
+        rv = []
+
+        # LaunchLimits predicate checks that launch grid will not overflow hip API limits
+        # TODO This predicate could also verify limits on some kernel arguments
+        # Stream-k kernels currently do not need limit check since launch grid should be limited by the grid model
+        if ('StreamK' not in state) or (state['StreamK'] == 0):
+            rv += [cls('LaunchLimits')]
+
+        return rv
+
+    @classmethod
     def FromOriginalState(cls, d, problemType, morePreds=[]):
-        predicates = [p for p in map(cls.FromOriginalKeyPair, d.items()) if p is not None]
+        extraPredicates = cls.ExtraPredicates(d)
+        predicates = [p for p in map(cls.FromOriginalKeyPair, d.items()) if p is not None] + extraPredicates
         return cls.And(predicates)
 
 class ProblemPredicate(Properties.Predicate):
@@ -595,6 +608,21 @@ class SizeMapping:
                  'synchronizerSizePerWG',
                  'nonTemporalA',
                  'nonTemporalB',
+                 'customMainLoopScheduling',
+                 'NonTemporalD',
+                 'WaveSeparateGlobalReadA',
+                 'WaveSeparateGlobalReadB',
+                 'UnrollLoopSwapGlobalReadOrder',
+                 'DirectToVgprA',
+                 'DirectToVgprB',
+                 'NumLoadsCoalescedA',
+                 'NumLoadsCoalescedB',
+                 'WaveGroup',
+                 'VectorWidthA',
+                 'VectorWidthB',
+                 'LocalSplitU',
+                 'DirectToLdsA',
+                 'DirectToLdsB'
                  ]
 
     @classmethod
@@ -627,6 +655,10 @@ class SizeMapping:
             # WGM kernel param is interpreted as int so, 32bit output to 32b int
             return ctypes.c_int(output & 0xFFFFFFFF).value
 
+        dtva = bool(d['DirectToVgprA'])
+        dtvb = bool(d['DirectToVgprB'])
+        dtlA = bool(d['DirectToLdsA'])
+        dtlB = bool(d['DirectToLdsB'])
 
         return cls(waveNum                  = d['NumThreads'] // d['WavefrontSize'],
                    workGroup                = d['WorkGroup'],
@@ -664,6 +696,21 @@ class SizeMapping:
                    synchronizerSizePerWG    = synchronizerSizePerWG,
                    nonTemporalA             = d['NonTemporalA'],
                    nonTemporalB             = d['NonTemporalB'],
+                   customMainLoopScheduling = d['UseCustomMainLoopSchedule'],
+                   NonTemporalD             = d['NonTemporalD'],
+                   WaveSeparateGlobalReadA  = d['WaveSeparateGlobalReadA'],
+                   WaveSeparateGlobalReadB  = d['WaveSeparateGlobalReadB'],
+                   UnrollLoopSwapGlobalReadOrder = d['UnrollLoopSwapGlobalReadOrder'],
+                   DirectToVgprA            = dtva,
+                   DirectToVgprB            = dtvb,
+                   NumLoadsCoalescedA       = d['NumLoadsCoalescedA'],
+                   NumLoadsCoalescedB       = d['NumLoadsCoalescedB'],
+                   WaveGroup                = d["MIWaveGroup"],
+                   VectorWidthA             = d["VectorWidthA"],
+                   VectorWidthB             = d["VectorWidthB"],
+                   LocalSplitU              = d["LocalSplitU"],
+                   DirectToLdsA             = dtlA,
+                   DirectToLdsB             = dtlB,
                    )
     @classmethod
     def ReadOriginalMacroTile(cls, d):
@@ -687,12 +734,15 @@ class InternalArgsSupport:
 
     @classmethod
     def FromOriginalState(cls, d):
+        # Set useSFC to True if SpaceFillingAlgo is non-empty, regardless of
+        # the explicit InternalSupportParams setting
+        useSFC = d['InternalSupportParams']['UseSFC'] or len(d.get('SpaceFillingAlgo', [])) > 0
         return cls(version = d['InternalSupportParams']['KernArgsVersion'],
                    gsu = d['InternalSupportParams']['SupportUserGSU'],
                    wgm = d['InternalSupportParams']['SupportCustomWGM'],
                    staggerU = d['InternalSupportParams']['SupportCustomStaggerU'],
                    useUniversalArgs = d['InternalSupportParams']['UseUniversalArgs'],
-                   useSFC = d['InternalSupportParams']['UseSFC'])
+                   useSFC = useSFC)
 
     def __init__(self, **kwargs):
         for (key, value) in list(kwargs.items()):
