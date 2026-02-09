@@ -3267,7 +3267,7 @@ void local_gemm(rocblas_handle handle,
  * ------------------
  * LACN2 uses a stateful iteration pattern where the caller:
  * 1. Calls LACN2 to get the next operation to perform (via kase parameter)
- * 2. Performs the requested matrix solve (A*x or A'*x)
+ * 2. Performs the requested matrix solve (A*x or A^H*x)
  * 3. Calls LACN2 again with the result
  * 4. Repeats until kase = 0 (convergence)
  *
@@ -3275,7 +3275,7 @@ void local_gemm(rocblas_handle handle,
  * -------------
  * kase = 0: Converged (d_est contains the final estimate of ||A?1||1)
  * kase = 1: Caller should solve A*x = x and call LACN2 again
- * kase = 2: Caller should solve A'*x = x and call LACN2 again
+ * kase = 2: Caller should solve A^H*x = x and call LACN2 again
  *
  * jump values (internal state transitions):
  * - jump = 1: Initial iteration, compute first estimate
