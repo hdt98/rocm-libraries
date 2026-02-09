@@ -198,11 +198,13 @@ inline hipError_t segmented_radix_sort_impl(
     const size_t segment_count_output_bytes
         = segment_count_output_size * sizeof(segment_index_type);
 
+    // Large and small segments are in the same buffer, expanding from both ends.
+    //   I.e.: [large... ...small]
+    // We therefore have to reverse the small segment iterator.
     segment_index_type* large_segment_indices_output{};
-    // The total number of large and small segmeby default knts is not above the number of segments
-    // The same buffer is filled with the large and small indices from both directions
     auto small_segment_indices_output
         = make_reverse_iterator(large_segment_indices_output + segments);
+
     key_type*           keys_tmp_storage;
     value_type*         values_tmp_storage;
     segment_index_type* medium_segment_indices_output{};
