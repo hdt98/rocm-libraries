@@ -7,7 +7,7 @@
 
 namespace ck {
 
-// Naive pipeline with lowest resource request per WGP
+    // Naive pipeline with lowest resource request per WGP
 
 template <BlockGemmPipelineScheduler BlkGemmPipelineVer,
           index_t BlockSize,
@@ -267,30 +267,28 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                             vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                             vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
 
-                            static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                    a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / A_K1>{},
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   Number<kk % A_K1>{}))>{}];
-                            });
-                            static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                    b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / B_K1>{},
-                                                   n0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   Number<kk % B_K1>{}))>{}];
-                            });
+                            auto loadA =
+                                    load_thread_vec<k_inner,
+                                                    A_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(a_thread_vec),
+                                                    decltype(a_thread_buf),
+                                                    a_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeA>{a_thread_vec, a_thread_buf};
+                                auto loadB =
+                                    load_thread_vec<k_inner,
+                                                    B_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(b_thread_vec),
+                                                    decltype(b_thread_buf),
+                                                    b_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeB,
+                                                    n0>{b_thread_vec, b_thread_buf};
+
+                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
                             using wmma_input_type_a =
                                 typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
@@ -473,35 +471,33 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                             vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
 
                             static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                    constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                    constexpr index_t k_index =
-                                        kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                    a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                        a_thread_buf[Number<Base::a_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<kk / A_K1>{},
-                                                       m0,
-                                                       k_index,
-                                                       I0,
-                                                       I0,
-                                                       I0,
-                                                       Number<kk % A_K1>{}))>{}];
-                                });
-                                static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                    constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                    constexpr index_t k_index =
-                                        kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                    b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                        b_thread_buf[Number<Base::b_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<kk / B_K1>{},
-                                                       n0,
-                                                       k_index,
-                                                       I0,
-                                                       I0,
-                                                       I0,
-                                                       Number<kk % B_K1>{}))>{}];
-                                });
+                                constexpr index_t k_index =
+                                    kscale0 * (KRepeat / NumScaleKBlock) + k0;
+                                auto loadA =
+                                    load_thread_vec<k_inner,
+                                                    A_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(a_thread_vec),
+                                                    decltype(a_thread_buf),
+                                                    Base::a_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeA,
+                                                    m0,
+                                                    k_index>{a_thread_vec, a_thread_buf};
+                                auto loadB =
+                                    load_thread_vec<k_inner,
+                                                    B_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(b_thread_vec),
+                                                    decltype(b_thread_buf),
+                                                    Base::b_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeB,
+                                                    n0,
+                                                    k_index>{b_thread_vec, b_thread_buf};
 
+                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
                                 using wmma_input_type_a =
                                     typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
                                 using wmma_input_type_b =
@@ -857,30 +853,36 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Interwave,
                                 vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                                 vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
 
-                                static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                    constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                    a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                        a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<kk / A_K1>{},
-                                                       m0,
-                                                       k0_inner,
-                                                       I0,
-                                                       I0,
-                                                       I0,
-                                                       Number<kk % A_K1>{}))>{}];
-                                });
-                                static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                    constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                    b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                        b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<kk / B_K1>{},
-                                                       n0,
-                                                       k0_inner,
-                                                       I0,
-                                                       I0,
-                                                       I0,
-                                                       Number<kk % B_K1>{}))>{}];
-                                });
+                                 auto loadA = load_thread_vec<k_inner,
+                                                         A_K1,
+                                                         KPerWaveBlock,
+                                                         decltype(a_thread_vec),
+                                                         decltype(a_thread_buf),
+                                                         a_thread_desc_,
+                                                         Base,
+                                                         ComputeTypeA,
+                                                         m0,
+                                                         k0_inner>{
+                                    a_thread_vec,
+                                    a_thread_buf
+                                };
+
+                            auto loadB = load_thread_vec<k_inner,
+                                                         B_K1,
+                                                         KPerWaveBlock,
+                                                         decltype(b_thread_vec),
+                                                         decltype(b_thread_buf),
+                                                         b_thread_desc_,
+                                                         Base,
+                                                         ComputeTypeB,
+                                                         n0,
+                                                         k0_inner>{
+                                    b_thread_vec,
+                                    b_thread_buf
+                                };
+
+                            static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                            static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
                                 using wmma_input_type_a =
                                     typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
@@ -1293,31 +1295,37 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                                 vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                                 vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
                                 static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                    static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                        constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                        a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                            a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                                make_tuple(Number<kk / A_K1>{},
-                                                           m0,
-                                                           k0,
-                                                           I0,
-                                                           I0,
-                                                           I0,
-                                                           Number<kk % A_K1>{}))>{}];
-                                    });
-                                    static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                        constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                        b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                            b_thread_bufs[wmma_reg_buf]
-                                                         [Number<b_thread_desc_.CalculateOffset(
-                                                             make_tuple(Number<kk / B_K1>{},
-                                                                        I0,
-                                                                        I0,
-                                                                        n0,
-                                                                        I0,
-                                                                        k0,
-                                                                        Number<kk % B_K1>{}))>{}];
-                                    });
+                                    auto loadA = load_thread_vec<k_inner,
+                                                                 A_K1,
+                                                                 KPerWaveBlock,
+                                                                 decltype(a_thread_vec),
+                                                                 decltype(a_thread_buf),
+                                                                 a_thread_desc_,
+                                                                 Base,
+                                                                 ComputeTypeA,
+                                                                 m0,
+                                                                 k0>{
+                                        a_thread_vec, a_thread_buf, a_thread_desc_};
+                                    
+                                    auto loadB =
+                                        load_thread_vec<k_inner,
+                                                        B_K1,
+                                                        KPerWaveBlock,
+                                                        decltype(b_thread_vec),
+                                                        decltype(b_thread_bufs[wmma_reg_buf]),
+                                                        b_thread_desc_,
+                                                        Base,
+                                                        ComputeTypeB,
+                                                        I0,
+                                                        I0,
+                                                        n0,
+                                                        I0,
+                                                        k0>{b_thread_vec,
+                                                                      b_thread_bufs[wmma_reg_buf],
+                                                                      b_thread_desc_};
+
+                                    static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                                    static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
                                     using wmma_input_type_a =
                                         typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
                                     using wmma_input_type_b =
@@ -1379,43 +1387,50 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                         vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
                         static_for<0, KInner, 1>{}([&](auto k_inner) {
-                            static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                    a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / A_K1>{},
-                                                   m0,
-                                                   k0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   Number<kk % A_K1>{}))>{}];
-                            });
-                            static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                    b_thread_bufs[I0][Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / B_K1>{},
-                                                   I0,
-                                                   I0,
-                                                   n0,
-                                                   I0,
-                                                   k0,
-                                                   Number<kk % B_K1>{}))>{}];
-                            });
+                                auto loadA =
+                                    load_thread_vec<k_inner,
+                                                    A_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(a_thread_vec),
+                                                    decltype(a_thread_buf),
+                                                    a_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeA,
+                                                    m0,
+                                                    k0,
+                                                    I0,
+                                                    I0,
+                                                    I0>{a_thread_vec, a_thread_buf};
+                                auto loadB =
+                                    load_thread_vec<k_inner,
+                                                    B_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(b_thread_vec),
+                                                    decltype(b_thread_bufs[I0]),
+                                                    b_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeB,
+                                                    I0,
+                                                    I0,
+                                                    n0,
+                                                    I0,
+                                                    k0>{b_thread_vec, b_thread_bufs[I0]};
 
-                            using wmma_input_type_a =
-                                typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                            using wmma_input_type_b =
-                                typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
-                            constexpr index_t c_offset =
-                                c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+                                using wmma_input_type_a =
+                                    typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                                using wmma_input_type_b =
+                                    typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+
+                                constexpr index_t c_offset =
+                                    c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
 
                             wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
-                                          b_thread_vec.template AsType<wmma_input_type_b>(),
-                                          c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
-                        });
+                                    b_thread_vec.template AsType<wmma_input_type_b>(),
+                                    c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                            });
                     });
                 });
             });
@@ -1424,15 +1439,15 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
 
             // tail Local Prefetch A1
             static_for<0, MRepeat, 1>{}([&](auto m0) {
-                static_for<0, KRepeat, 1>{}([&](auto k0) {
-                    a_thread_copy_.Run(a_block_desc_k0_m0_m1_m2_k1,
-                                       make_tuple(I0, m0, k0, I0, I0, I0, I0),
-                                       a_block_buf,
-                                       a_thread_desc_,
-                                       make_tuple(I0, m0, k0, I0, I0, I0, I0),
-                                       a_thread_buf);
+                    static_for<0, KRepeat, 1>{}([&](auto k0) {
+                        a_thread_copy_.Run(a_block_desc_k0_m0_m1_m2_k1,
+                                           make_tuple(I0, m0, k0, I0, I0, I0, I0),
+                                           a_block_buf,
+                                           a_thread_desc_,
+                                           make_tuple(I0, m0, k0, I0, I0, I0, I0),
+                                           a_thread_buf);
+                    });
                 });
-            });
 
             __builtin_amdgcn_sched_barrier(0);
 
@@ -1442,42 +1457,50 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                         vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
                         static_for<0, KInner, 1>{}([&](auto k_inner) {
-                            static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                    a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / A_K1>{},
-                                                   m0,
-                                                   k0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   Number<kk % A_K1>{}))>{}];
-                            });
-                            static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                    b_thread_bufs[I1][Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / B_K1>{},
-                                                   I0,
-                                                   I0,
-                                                   n0,
-                                                   I0,
-                                                   k0,
-                                                   Number<kk % B_K1>{}))>{}];
-                            });
-                            using wmma_input_type_a =
-                                typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                            using wmma_input_type_b =
-                                typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                                auto loadA =
+                                    load_thread_vec<k_inner,
+                                                    A_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(a_thread_vec),
+                                                    decltype(a_thread_buf),
+                                                    a_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeA,
+                                                    m0,
+                                                    k0,
+                                                    I0,
+                                                    I0,
+                                                    I0>{a_thread_vec, a_thread_buf};
+                                auto loadB =
+                                    load_thread_vec<k_inner,
+                                                    B_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(b_thread_vec),
+                                                    decltype(b_thread_bufs[I1]),
+                                                    b_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeB,
+                                                    I0,
+                                                    I0,
+                                                    n0,
+                                                    I0,
+                                                    k0>{b_thread_vec, b_thread_bufs[I1]};
 
-                            constexpr index_t c_offset =
-                                c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+                                using wmma_input_type_a =
+                                    typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                                using wmma_input_type_b =
+                                    typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
 
-                            wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
-                                          b_thread_vec.template AsType<wmma_input_type_b>(),
-                                          c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
-                        });
+                                constexpr index_t c_offset =
+                                    c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+
+                                wmma_gemm.Run(
+                                    a_thread_vec.template AsType<wmma_input_type_a>(),
+                                    b_thread_vec.template AsType<wmma_input_type_b>(),
+                                    c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                            });
                     });
                 });
             });
@@ -1493,30 +1516,37 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                         vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
                         static_for<0, KInner, 1>{}([&](auto k_inner) {
-                            static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                    a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / A_K1>{},
-                                                   m0,
-                                                   k0,
-                                                   I0,
-                                                   I0,
-                                                   I0,
-                                                   Number<kk % A_K1>{}))>{}];
-                            });
-                            static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                    b_thread_bufs[I0][Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(Number<kk / B_K1>{},
-                                                   I0,
-                                                   I0,
-                                                   n0,
-                                                   I0,
-                                                   k0,
-                                                   Number<kk % B_K1>{}))>{}];
-                            });
+                            auto loadA =
+                                load_thread_vec<k_inner,
+                                                A_K1,
+                                                KPerWaveBlock,
+                                                decltype(a_thread_vec),
+                                                decltype(a_thread_buf),
+                                                a_thread_desc_,
+                                                Base,
+                                                ComputeTypeA,
+                                                m0,
+                                                k0,
+                                                I0,
+                                                I0,
+                                                I0>{a_thread_vec, a_thread_buf};
+                            auto loadB =
+                                load_thread_vec<k_inner,
+                                                B_K1,
+                                                KPerWaveBlock,
+                                                decltype(b_thread_vec),
+                                                decltype(b_thread_bufs[I0]),
+                                                b_thread_desc_,
+                                                Base,
+                                                ComputeTypeB,
+                                                I0,
+                                                I0,
+                                                n0,
+                                                I0,
+                                                k0>{b_thread_vec, b_thread_bufs[I0]};
+
+                            static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                            static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
                             using wmma_input_type_a =
                                 typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
                             using wmma_input_type_b =
@@ -1598,35 +1628,39 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                             vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
                             vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
                             static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                static_for<0, KPack / A_KRow / KInner, 1>{}([&](auto ik) {
-                                    constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                    constexpr index_t k_index =
+                                constexpr index_t k_index =
                                         kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                    a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                        a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<kk / A_K1>{},
-                                                       m0,
-                                                       k_index,
-                                                       I0,
-                                                       I0,
-                                                       I0,
-                                                       Number<kk % A_K1>{}))>{}];
-                                });
-                                static_for<0, KPack / B_KRow / KInner, 1>{}([&](auto ik) {
-                                    constexpr index_t kk = ik + k_inner * KPerWaveBlock;
-                                    constexpr index_t k_index =
-                                        kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                    b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                        b_thread_bufs[reg_buf]
-                                                     [Number<b_thread_desc_.CalculateOffset(
-                                                         make_tuple(Number<kk / B_K1>{},
-                                                                    I0,
-                                                                    I0,
-                                                                    n0,
-                                                                    I0,
-                                                                    k_index,
-                                                                    Number<kk % B_K1>{}))>{}];
-                                });
+                                auto loadA =
+                                    load_thread_vec<k_inner,
+                                                    A_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(a_thread_vec),
+                                                    decltype(a_thread_buf),
+                                                    a_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeA,
+                                                    m0,
+                                                    k_index,
+                                                    I0,
+                                                    I0,
+                                                    I0>{a_thread_vec, a_thread_buf};
+                                auto loadB =
+                                    load_thread_vec<k_inner,
+                                                    B_K1,
+                                                    KPerWaveBlock,
+                                                    decltype(b_thread_vec),
+                                                    decltype(b_thread_bufs[reg_buf]),
+                                                    b_thread_desc_,
+                                                    Base,
+                                                    ComputeTypeB,
+                                                    I0,
+                                                    I0,
+                                                    n0,
+                                                    I0,
+                                                    k_index>{b_thread_vec, b_thread_bufs[reg_buf]};
+
+                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
                                 using wmma_input_type_a =
                                     typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
                                 using wmma_input_type_b =

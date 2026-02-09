@@ -14,6 +14,45 @@
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 namespace ck {
 
+template <index_t k_inner,
+          index_t K1,
+          index_t KPerWaveBlock,
+          typename ThreadVec,
+          typename ThreadBuf,
+          auto ThreadDesc,
+          typename Base,
+          typename ComputeType,
+          index_t i0 = Base::I0,
+          index_t i1 = Base::I0,
+          index_t i2 = Base::I0,
+          index_t i3 = Base::I0,
+          index_t i4 = Base::I0>
+struct load_thread_vec
+{
+    ThreadVec& thread_vec;
+    ThreadBuf& thread_buf;
+
+    __host__ __device__ load_thread_vec(ThreadVec& thread_vec_, ThreadBuf& thread_buf_)
+        : thread_vec(thread_vec_), thread_buf(thread_buf_)
+    {
+    }
+
+    template <index_t ik>
+    __host__ __device__ void operator()(Number<ik>) const
+    {
+        constexpr index_t kk = ik + k_inner * KPerWaveBlock;
+
+        thread_vec.template AsType<ComputeType>()(Number<ik>{}) =
+            thread_buf[Number<ThreadDesc.CalculateOffset(make_tuple(Number<kk / K1>{},
+                                                                     Number<i0>{},
+                                                                     Number<i1>{},
+                                                                     i2,
+                                                                     i3,
+                                                                     i4,
+                                                                     Number<kk % K1>{}))>{}];
+    }
+};
+
 template <index_t BlockSize,
           typename ADataType,
           typename BDataType,
