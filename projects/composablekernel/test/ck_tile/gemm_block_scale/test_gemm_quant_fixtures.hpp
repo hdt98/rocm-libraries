@@ -1114,7 +1114,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
             *std::max_element(c_m_n_host_ref.mData.begin(), c_m_n_host_ref.mData.end());
         const auto rtol_atol =
             this->template calculate_rtol_atol<ADataType, BDataType, AccDataType, CDataType>(
-                K, 1, max_accumulated_value);
+                K, k_batch, max_accumulated_value);
 
         // Validate results
         bool pass = ck_tile::check_err(c_m_n_dev_result,
@@ -1124,7 +1124,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                        rtol_atol.at(ck_tile::number<1>{}));
 
         EXPECT_TRUE(pass) << "ABQuantGrouped validation failed with M=" << M << ", N=" << N
-                          << ", K=" << K;
+                          << ", K=" << K << ", k_batch=" << k_batch;
 
         if(!pass)
         {
