@@ -147,6 +147,10 @@ struct GemmConfigPreshuffleBPrefill : public GemmConfigPrefill
     static constexpr bool PreshuffleB      = true;
     static constexpr bool DoubleSmemBuffer = true;
 };
+struct GemmConfigPreshuffleBPrefillTransposeC : public GemmConfigPreshuffleBPrefill
+{
+    static constexpr bool TransposeC = true;
+};
 
 struct GemmConfigPreshuffleQuantPrefill : public GemmConfigPrefill
 {
