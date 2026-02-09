@@ -158,6 +158,7 @@ class LraTileAssignmentTransposedMFMA(LraTileAssignment):
         dummy   = writer.vgprPool.checkOut(1, "dummy")
         sReg    = writer.vgprPool.checkOut(1, "sReg") # remainder
         mReg    = writer.vgprPool.checkOut(1, "mReg") # remainder
+        qReg    = writer.vgprPool.checkOut(1, "qReg") # quotient
 
         # get constant parameter
         tc               = tP["tensorChar"]
@@ -238,7 +239,7 @@ class LraTileAssignmentTransposedMFMA(LraTileAssignment):
             if num1DWaves > 1:
                 module.add(vectorStaticDivide(dummy, dividendReg, dividedForWaveId, tmpVgprRes, \
                     "7. wave offset in N dimen: wtid = tid / dividedForWaveId(%u)" % dividedForWaveId))
-                module.add(vectorStaticRemainder(dummy, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
+                module.add(vectorStaticRemainder(qReg, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
                     "7. wave offset in M dimen: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideWave, vgpr(tReg), tmpSgprInfo, \
                                              "7. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u); 7. final local read offset: flrOffset = lrOffset + WOffset" % strideWave))
@@ -246,6 +247,7 @@ class LraTileAssignmentTransposedMFMA(LraTileAssignment):
         tP["gpr"]["lro"] = tReg
         # release register
         writer.vgprPool.checkIn(dummy)
+        writer.vgprPool.checkIn(qReg)
         writer.vgprPool.checkIn(sReg)
         writer.vgprPool.checkIn(mReg)
         writer.vgprPool.checkIn(kReg)
@@ -304,6 +306,7 @@ class LraTileAssignmentTransposedMFMAB8(LraTileAssignmentTransposedMFMA):
         dummy   = writer.vgprPool.checkOut(1, "dummy")
         sReg    = writer.vgprPool.checkOut(1, "sReg") # remainder
         mReg    = writer.vgprPool.checkOut(1, "mReg") # remainder
+        qReg    = writer.vgprPool.checkOut(1, "qReg") # quotient
 
         # get constant parameter
         tc               = tP["tensorChar"]
@@ -403,7 +406,7 @@ class LraTileAssignmentTransposedMFMAB8(LraTileAssignmentTransposedMFMA):
             if num1DWaves > 1:
                 module.add(vectorStaticDivide(dummy, dividendReg, dividedForWaveId, tmpVgprRes, \
                     "7. wave offset in N dimen: wtid = tid / dividedForWaveId(%u)" % dividedForWaveId))
-                module.add(vectorStaticRemainder(dummy, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
+                module.add(vectorStaticRemainder(qReg, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
                     "7. wave offset in M dimen: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideWave, vgpr(tReg), tmpSgprInfo, \
                                              "7. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u); 7. final local read offset: flrOffset = lrOffset + WOffset" % strideWave))
@@ -411,6 +414,7 @@ class LraTileAssignmentTransposedMFMAB8(LraTileAssignmentTransposedMFMA):
         tP["gpr"]["lro"] = tReg
         # release register
         writer.vgprPool.checkIn(dummy)
+        writer.vgprPool.checkIn(qReg)
         writer.vgprPool.checkIn(sReg)
         writer.vgprPool.checkIn(mReg)
         writer.vgprPool.checkIn(kReg)
@@ -531,6 +535,7 @@ class LraTileAssignmentTransposedMFMAF4(LraTileAssignmentTransposedMFMA):
         dummy   = writer.vgprPool.checkOut(1, "dummy")
         sReg    = writer.vgprPool.checkOut(1, "sReg") # remainder
         mReg    = writer.vgprPool.checkOut(1, "mReg") # remainder
+        qReg    = writer.vgprPool.checkOut(1, "qReg") # quotient
 
         # get constant parameter
         tc               = tP["tensorChar"]
@@ -592,7 +597,7 @@ class LraTileAssignmentTransposedMFMAF4(LraTileAssignmentTransposedMFMA):
             if num1DWaves > 1:
                 module.add(vectorStaticDivide(dummy, dividendReg, dividedForWaveId, tmpVgprRes, \
                     "7. wave offset in N dimen: wtid = tid / dividedForWaveId(%u)" % dividedForWaveId))
-                module.add(vectorStaticRemainder(dummy, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
+                module.add(vectorStaticRemainder(qReg, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
                     "7. wave offset in M dimen: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideWave, vgpr(tReg), tmpSgprInfo, \
                                              "7. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u); 7. final local read offset: flrOffset = lrOffset + WOffset" % strideWave))
@@ -600,6 +605,7 @@ class LraTileAssignmentTransposedMFMAF4(LraTileAssignmentTransposedMFMA):
         tP["gpr"]["lro"] = tReg
         # release register
         writer.vgprPool.checkIn(dummy)
+        writer.vgprPool.checkIn(qReg)
         writer.vgprPool.checkIn(sReg)
         writer.vgprPool.checkIn(mReg)
         writer.vgprPool.checkIn(kReg)
@@ -641,6 +647,7 @@ class LraTileAssignmentTransposedMFMAF6(LraTileAssignmentTransposedMFMA):
         dummy   = writer.vgprPool.checkOut(1, "dummy")
         sReg    = writer.vgprPool.checkOut(1, "sReg") # remainder
         mReg    = writer.vgprPool.checkOut(1, "mReg") # remainder
+        qReg    = writer.vgprPool.checkOut(1, "qReg") # quotient
 
         # get constant parameter
         tc               = tP["tensorChar"]
@@ -699,7 +706,7 @@ class LraTileAssignmentTransposedMFMAF6(LraTileAssignmentTransposedMFMA):
             if num1DWaves > 1:
                 module.add(vectorStaticDivide(dummy, dividendReg, dividedForWaveId, tmpVgprRes, \
                     "7. wave offset in N dimen: wtid = tid / dividedForWaveId(%u)" % dividedForWaveId))
-                module.add(vectorStaticRemainder(dummy, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
+                module.add(vectorStaticRemainder(qReg, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
                     "7. wave offset in M dimen: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideWave, vgpr(tReg), tmpSgprInfo, \
                                              "7. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u); 7. final local read offset: flrOffset = lrOffset + WOffset" % strideWave))
@@ -707,6 +714,7 @@ class LraTileAssignmentTransposedMFMAF6(LraTileAssignmentTransposedMFMA):
         tP["gpr"]["lro"] = tReg
         # release register
         writer.vgprPool.checkIn(dummy)
+        writer.vgprPool.checkIn(qReg)
         writer.vgprPool.checkIn(sReg)
         writer.vgprPool.checkIn(mReg)
         writer.vgprPool.checkIn(kReg)
@@ -760,6 +768,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
         enableLDSTr = tP["enableLDSTr"]
         dummy = writer.vgprPool.checkOut(1,"dummy")
         mReg  = writer.vgprPool.checkOut(1,"mReg") # remainder
+        qReg  = writer.vgprPool.checkOut(1,"qReg") # quotient
         if enableLDSTr:
            sReg = writer.vgprPool.checkOut(1,"sReg") # remainder
 
@@ -934,7 +943,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
             if num1DBlocks > 1:
                 module.add(vectorStaticDivide(dummy, kReg, dividedForBlkId, tmpVgprRes, \
                     "2. block offset: bnIdx = wtid / dividedForBlkId(%u)" % dividedForBlkId))
-                module.add(vectorStaticRemainder(dummy, dummy, dummy, num1DBlocks, tmpVgprRes, tmpSgprInfo, \
+                module.add(vectorStaticRemainder(qReg, dummy, dummy, num1DBlocks, tmpVgprRes, tmpSgprInfo, \
                     "2. block offset: bnIdx = bnIdx %% num1DBlocks(%u)" % num1DBlocks))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideBlock, vgpr(tReg), tmpSgprInfo, \
                     "2. block offset: bnOffset = bnIdx * strideBlock(%u); 3. add N and block offset: bnOffset = block and N offset" % strideBlock))
@@ -998,7 +1007,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
             if num1DWaves > 1:
                 module.add(vectorStaticDivide(dummy, dividendReg, dividedForWaveId, tmpVgprRes, \
                     "7. wave offset in N dimen: wtid = tid / dividedForWaveId(%u)" % dividedForWaveId))
-                module.add(vectorStaticRemainder(dummy, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
+                module.add(vectorStaticRemainder(qReg, dummy, dummy, num1DWaves, tmpVgprRes, tmpSgprInfo, \
                     "7. wave offset in M dimen: wtid0 = wtid / num1DWaves(%u)" % num1DWaves))
                 module.add(vectorStaticMultiplyAdd(vgpr(tReg), vgpr(dummy), strideWave, vgpr(tReg), tmpSgprInfo, \
                                              "7. wave offset in M dimen: wOffset = wtid0 * W0Stride(%u); 7. final local read offset: flrOffset = lrOffset + WOffset" % strideWave))
@@ -1008,6 +1017,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
         # release register
         writer.vgprPool.checkIn(dummy)
         writer.vgprPool.checkIn(mReg)
+        writer.vgprPool.checkIn(qReg)
         if enableLDSTr:
            writer.vgprPool.checkIn(sReg)
 
