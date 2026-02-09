@@ -350,7 +350,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
     @param[in]
     norm_type   rocsolver_norm_type.
                 Specifies the norm to be used. The 1-norm and the infinity-norm
-                are supported, specified by values of '1' and 'I'.
+                are supported, specified by values of rocsolver_norm_type_one and rocsolver_norm_type_infinity.
     @param[in]
     n           rocblas_int. n >= 0.
                 The number of rows and columns of the matrix A.
