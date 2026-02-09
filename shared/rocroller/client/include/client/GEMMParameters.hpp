@@ -97,9 +97,7 @@ namespace rocRoller
                 int scaleBlockSize = -1;
 
                 bool scaleSkipPermlane = false;
-
-                std::vector<size_t> scalePretileA;
-                std::vector<size_t> scalePretileB;
+                bool pretileScale = false;
 
                 // Order: M/N, K tile, K subtile
                 std::vector<size_t> scaleShuffleTileA;

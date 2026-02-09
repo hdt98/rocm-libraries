@@ -79,16 +79,16 @@ namespace rocRoller
                     rv << "_PreSW";
                 }
 
-                if(!scalePretileA.empty())
+                if(pretileScale)
                 {
                     rv << "_PTA";
-                    rocRoller::streamJoin(rv, scalePretileA, "x");
+                    rocRoller::streamJoin(rv, std::vector<size_t>{scaleShuffleTileA[0], scaleShuffleTileA[1]}, "x");
                 }
 
-                if(!scalePretileB.empty())
+                if(pretileScale)
                 {
                     rv << "_PTB";
-                    rocRoller::streamJoin(rv, scalePretileB, "x");
+                    rocRoller::streamJoin(rv, std::vector<size_t>{scaleShuffleTileB[1], scaleShuffleTileB[0]}, "x");
                 }
 
                 return rv.str();
@@ -239,8 +239,17 @@ namespace rocRoller
                    or x.scaleB == rocRoller::Operations::ScaleMode::Separate)
                 {
                     s << " BlockSize: " << x.scaleBlockSize;
-                    s << " Pretile A: " << x.scalePretileA;
-                    s << " Pretile B: " << x.scalePretileB;
+                    if(x.scaleSkipPermlane)
+                    {
+                        if(x.scaleShuffleTileA.size() >= 3)
+                            s << " ShuffleTile A: [" << x.scaleShuffleTileA[0] << ", " << x.scaleShuffleTileA[1] << ", " << x.scaleShuffleTileA[2] << "]";
+                        if(x.scaleShuffleTileB.size() >= 3)
+                            s << " ShuffleTile B: [" << x.scaleShuffleTileB[0] << ", " << x.scaleShuffleTileB[1] << ", " << x.scaleShuffleTileB[2] << "]";
+                    }
+                    if(x.pretileScale && x.scaleShuffleTileA.size() >= 2)
+                        s << " Pretile A: [" << x.scaleShuffleTileA[0] << ", " << x.scaleShuffleTileA[1] << "]";
+                    if(x.pretileScale && x.scaleShuffleTileB.size() >= 2)
+                        s << " Pretile B: [" << x.scaleShuffleTileB[1] << ", " << x.scaleShuffleTileB[0] << "]";
                 }
                 s << std::endl;
                 return s;

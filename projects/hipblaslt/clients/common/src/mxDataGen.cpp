@@ -243,7 +243,7 @@ std::vector<float> generateData(T                           dgen,
         size_t scaleRows = sizes[0] / elementsPerMXBlock; // K / blockSize
         size_t scaleCols = sizes[1]; // M or N
 
-        scaleBytes = DGen::preSwizzle(scaleBytes, {scaleRows, scaleCols}, preSwizzleTile, preTile);
+        scaleBytes = DGen::preSwizzle(scaleBytes, {scaleRows, scaleCols}, preSwizzleTile, !preTile.empty());
     }
 #endif
 

@@ -248,7 +248,7 @@ namespace rocRoller::Client::GEMMClient
         if(problemParams.types.scaleA == Operations::ScaleMode::Separate)
         {
             if((problemParams.types.scaleSkipPermlane)
-               || (not problemParams.types.scalePretileA.empty()))
+               || (problemParams.types.pretileScale))
             {
                 auto descScaleA = descA.withNormalizedDimensions();
                 {
@@ -264,23 +264,10 @@ namespace rocRoller::Client::GEMMClient
                     preSwizzleSize = problemParams.types.scaleShuffleTileA;
                 }
 
-                std::vector<size_t> preTileSize;
-                if(not problemParams.types.scalePretileA.empty())
-                {
-                    AssertFatal(problemParams.types.transA == TransposeType::T,
-                                "Can only pre-tile A if it is TransposeType::T");
-
-                    // Note, scalePretileA is M x K (usually something like 256 x 8)
-                    //
-                    // Because we used "withNormalizedDimensions"
-                    // above and A is T, the K dimension becomes the
-                    // leftmost dimension
-                    preTileSize = {problemParams.types.scalePretileA[1],
-                                   problemParams.types.scalePretileA[0]};
-                }
-
-                auto tmpScaleA
-                    = DGen::preSwizzle(hostScaleA, descScaleA.sizes(), preSwizzleSize, preTileSize);
+                auto tmpScaleA = DGen::preSwizzle(hostScaleA,
+                                                   descScaleA.sizes(),
+                                                   preSwizzleSize,
+                                                   problemParams.types.pretileScale);
                 deviceScaleA = make_shared_device(tmpScaleA);
             }
             else
@@ -291,7 +278,7 @@ namespace rocRoller::Client::GEMMClient
         if(problemParams.types.scaleB == Operations::ScaleMode::Separate)
         {
             if((problemParams.types.scaleSkipPermlane)
-               || (not problemParams.types.scalePretileB.empty()))
+               || (problemParams.types.pretileScale))
             {
                 auto descScaleB = descB.withNormalizedDimensions();
                 {
@@ -307,23 +294,10 @@ namespace rocRoller::Client::GEMMClient
                     preSwizzleSize = problemParams.types.scaleShuffleTileB;
                 }
 
-                std::vector<size_t> preTileSize;
-                if(not problemParams.types.scalePretileB.empty())
-                {
-                    // Note scalePretileB is K x N (usually something like 8 x 256)
-                    //
-                    // Because we used "withNormalizedDimensions"
-                    // above, and B is N, the K dimension stays as the
-                    // leftmost dimension.
-                    AssertFatal(problemParams.types.transB == TransposeType::N,
-                                "Can only pre-tile B if it is TransposeType::N");
-
-                    preTileSize = {problemParams.types.scalePretileB[0],
-                                   problemParams.types.scalePretileB[1]};
-                };
-
-                auto tmpScaleB
-                    = DGen::preSwizzle(hostScaleB, descScaleB.sizes(), preSwizzleSize, preTileSize);
+                auto tmpScaleB = DGen::preSwizzle(hostScaleB,
+                                                   descScaleB.sizes(),
+                                                   preSwizzleSize,
+                                                   problemParams.types.pretileScale);
                 deviceScaleB = make_shared_device(tmpScaleB);
             }
             else
@@ -345,7 +319,7 @@ namespace rocRoller::Client::GEMMClient
         if(problemParams.types.scaleA == Operations::ScaleMode::Separate)
         {
             TensorDescriptor descAScale;
-            if(not problemParams.types.scalePretileA.empty())
+            if(problemParams.types.pretileScale)
             {
                 //
                 // AScale is M x (K / scaleBlockSize); just write as M
@@ -362,8 +336,8 @@ namespace rocRoller::Client::GEMMClient
 
                 auto const M     = problemParams.m;
                 auto const K     = problemParams.k / problemParams.types.scaleBlockSize;
-                auto const tileM = problemParams.types.scalePretileA[0];
-                auto const tileK = problemParams.types.scalePretileA[1];
+                auto const tileM = problemParams.types.scaleShuffleTileA[0];
+                auto const tileK = problemParams.types.scaleShuffleTileA[1];
 
                 descAScale = TensorDescriptor(problemParams.types.scaleTypeA,
                                               {static_cast<size_t>(M / tileM),
@@ -399,7 +373,7 @@ namespace rocRoller::Client::GEMMClient
         if(problemParams.types.scaleB == Operations::ScaleMode::Separate)
         {
             TensorDescriptor descBScale;
-            if(not problemParams.types.scalePretileB.empty())
+            if(problemParams.types.pretileScale)
             {
                 //
                 // BScale is (K / scaleBlockSize) x N; just write as K
@@ -416,8 +390,8 @@ namespace rocRoller::Client::GEMMClient
 
                 auto const K     = problemParams.k / problemParams.types.scaleBlockSize;
                 auto const N     = problemParams.n;
-                auto const tileK = problemParams.types.scalePretileB[0];
-                auto const tileN = problemParams.types.scalePretileB[1];
+                auto const tileK = problemParams.types.scaleShuffleTileB[1];
+                auto const tileN = problemParams.types.scaleShuffleTileB[0];
 
                 descBScale = TensorDescriptor(problemParams.types.scaleTypeB,
                                               {static_cast<size_t>(K / tileK),
@@ -1702,8 +1676,7 @@ int main(int argc, const char* argv[])
                    types.scaleSkipPermlane,
                    "Experimental: Skip Permlane instructions for scale data for performance.");
 
-    bool pretileScale = false;
-    app.add_flag("--pretileScale", pretileScale, "Experimental: pretile scale data.");
+    app.add_flag("--pretileScale", types.pretileScale, "Experimental: pretile scale data.");
 
     //
     // Solution parameters
@@ -2200,13 +2173,11 @@ int main(int argc, const char* argv[])
                                    kSubtile};
     }
 
-    if(pretileScale)
+    if(types.pretileScale)
     {
         AssertFatal(types.scaleShuffleTileA.size() >= 2 && types.scaleShuffleTileB.size() >= 2,
                     "scaleShuffleTileA and scaleShuffleTileB must have at least 2 elements when "
                     "pretileScale is enabled");
-        types.scalePretileA = {types.scaleShuffleTileA[0], types.scaleShuffleTileA[1]};
-        types.scalePretileB = {types.scaleShuffleTileB[1], types.scaleShuffleTileB[0]};
     }
 
     problem.types  = types;

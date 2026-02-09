@@ -150,15 +150,15 @@ namespace DGen
      * @param input The input data vector
      * @param sizes The dimension sizes {size0, size1}
      * @param preSwizzleSize The swizzle configuration {tileMN, tileK, subTileK}, or empty
-     * @param preTileSize The pre-tile configuration {tileSize0, tileSize1}, or empty
+     * @param preTile If true and preSwizzleSize is provided, derive preTileSize from preSwizzleSize
      * @return The pre-swizzled/pre-tiled data
      */
     template <typename T>
     inline std::vector<T> preSwizzle(std::vector<T> const&      input,
                                      std::vector<size_t> const& sizes,
                                      std::vector<size_t> const& preSwizzleSize,
-                                     std::vector<size_t> const& preTileSize)
-    {
+                                     bool                       preTile)
+    {        
         if(!preSwizzleSize.empty())
         {
             if(preSwizzleSize.size() != 3)
@@ -188,7 +188,7 @@ namespace DGen
 
         std::vector<size_t> srcSizes, dimOrder;
 
-        if((!preSwizzleSize.empty()) && (preTileSize.empty()))
+        if((!preSwizzleSize.empty()) && (!preTile))
         {
             auto tileMN   = preSwizzleSize[0];
             auto tileK    = preSwizzleSize[1];
@@ -257,12 +257,15 @@ namespace DGen
                 dimOrder = {1, 2, 0, 3, 4, 5, 6, 7};
             }
         }
-        else if((preSwizzleSize.empty()) && (!preTileSize.empty()))
+        else if((preSwizzleSize.empty()) && (preTile))
         {
-            srcSizes = {preTileSize[0],
-                        sizes[0] / preTileSize[0],
-                        preTileSize[1],
-                        sizes[1] / preTileSize[1]};
+            auto tileMN   = preSwizzleSize[0];
+            auto tileK    = preSwizzleSize[1];
+            
+            srcSizes = {tileK,
+                        sizes[0] / tileK,
+                        tileMN,
+                        sizes[1] / tileMN};
 
             // Pre-tiling: 1 and 3 are pushed to the back (they become the slowest)
             dimOrder = {0, 2, 1, 3};
@@ -287,8 +290,8 @@ namespace DGen
                 throw std::runtime_error(msg.str());
             }
 
-            size_t ptTileSizeK     = preTileSize[0];
-            size_t ptTileSizeMN    = preTileSize[1];
+            size_t ptTileSizeK     = tileK;
+            size_t ptTileSizeMN    = tileMN;
             size_t nLanesPerSIMD   = 16;
             size_t nSIMDsPerWave   = 4;
             size_t nSIMDIndex      = tileMN / nLanesPerSIMD;
@@ -331,32 +334,30 @@ namespace DGen
             srcSizes = {nVGPRIndex,
                         nVGPRBlock,
                         nSIMDBlock,
-                        ptTileSizeK / tileK,
                         sizes[0] / ptTileSizeK,
                         nLanesPerSIMD,
                         nSIMDIndexIndex,
                         nSIMDIndexBlock,
-                        ptTileSizeMN / tileMN,
                         sizes[1] / ptTileSizeMN};
 
             if(tileMN == 64)
             {
-                // Pre swizzle: swap nSIMDIndexBlock (7) and nVGPRIndex (0)
-                // Pre tile: push workgroup tiles (4 and 9) to the end
-                dimOrder = {7, 1, 2, 3, 5, 6, 0, 8, 4, 9};
+                // Pre swizzle: swap nSIMDIndexBlock (6) and nVGPRIndex (0)
+                // Pre tile: push workgroup tiles (3 and 7) to the end
+                dimOrder = {6, 1, 2, 4, 5, 0, 3, 7};
             }
             else if(tileMN == 32 && subTileK == 4)
             {
-                // Pre swizzle: swap nSIMDIndexBlock (7) and nVGPRIndex (0)
+                // Pre swizzle: swap nSIMDIndexBlock (6) and nVGPRIndex (0)
                 //              swap nSIMDBlock (2) and nVGPRBlock (1)
-                // Pre tile: push workgroup tiles (4 and 9) to the end
-                dimOrder = {7, 2, 1, 3, 5, 6, 0, 8, 4, 9};
+                // Pre tile: push workgroup tiles (3 and 7) to the end
+                dimOrder = {6, 2, 1, 4, 5, 0, 3, 7};
             }
             else if(tileMN == 32 && subTileK == 2)
             {
                 // Pre swizzle: rotate nVGPRIndex (0), nVGPRBlock (1), nSIMDBlock (2)
-                // Pre tile: push workgroup tiles (4 and 9) to the end
-                dimOrder = {1, 2, 0, 3, 5, 6, 7, 8, 4, 9};
+                // Pre tile: push workgroup tiles (3 and 7) to the end
+                dimOrder = {1, 2, 0, 4, 5, 6, 3, 7};
             }
         }
 

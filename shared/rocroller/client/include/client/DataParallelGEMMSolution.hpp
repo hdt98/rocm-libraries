@@ -126,17 +126,17 @@ namespace rocRoller
 
                     if(solutionParams.types.scaleA == Operations::ScaleMode::Separate)
                     {
-                        if(not solutionParams.types.scalePretileA.empty())
+                        if(solutionParams.types.pretileScale)
                         {
-                            size_t stride = solutionParams.types.scalePretileA[1];
+                            size_t stride = solutionParams.types.scaleShuffleTileA[1];
                             AssertFatal(solutionParams.types.transA == TransposeType::T);
                             m_tagTensorScaleA = command->addOperation(rocRoller::Operations::Tensor(
                                 4,
                                 solutionParams.types.scaleTypeA,
                                 std::vector<size_t>{0ull,
                                                     0ull,
-                                                    solutionParams.types.scalePretileA[0],
-                                                    solutionParams.types.scalePretileA[1]},
+                                                    solutionParams.types.scaleShuffleTileA[0],
+                                                    solutionParams.types.scaleShuffleTileA[1]},
                                 std::vector<size_t>{0ull, 0ull, stride, 1ull}));
                         }
                         else
@@ -182,17 +182,17 @@ namespace rocRoller
 
                     if(solutionParams.types.scaleB == Operations::ScaleMode::Separate)
                     {
-                        if(not solutionParams.types.scalePretileB.empty())
+                        if(solutionParams.types.pretileScale)
                         {
-                            size_t stride = solutionParams.types.scalePretileB[0];
+                            size_t stride = solutionParams.types.scaleShuffleTileB[1];
                             AssertFatal(solutionParams.types.transB == TransposeType::N);
                             m_tagTensorScaleB = command->addOperation(rocRoller::Operations::Tensor(
                                 4,
                                 solutionParams.types.scaleTypeB,
                                 std::vector<size_t>{0ull,
                                                     0ull,
-                                                    solutionParams.types.scalePretileB[0],
-                                                    solutionParams.types.scalePretileB[1]},
+                                                    solutionParams.types.scaleShuffleTileB[1],
+                                                    solutionParams.types.scaleShuffleTileB[0]},
 
                                 std::vector<size_t>{0ull, 0ull, 1ull, stride}));
                         }
