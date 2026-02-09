@@ -671,8 +671,8 @@ def cmake_build(Map conf=[:]){
             }
         }
 
-        //run tests except when NO_CK_BUILD or BUILD_LEGACY_OS are set
-        if(!setup_args.contains("NO_CK_BUILD") && !params.BUILD_LEGACY_OS  && !setup_args.contains("gfx1250")){
+        //run tests except when NO_CK_BUILD is set
+        if(!setup_args.contains("NO_CK_BUILD")  && !setup_args.contains("gfx1250")){
             sh "python3 ../script/ninja_json_converter.py .ninja_log --legacy-format --output ck_build_trace_${arch_name}.json"
             archiveArtifacts "ck_build_trace_${arch_name}.json"
             sh "python3 ../script/parse_ninja_trace.py ck_build_trace_${arch_name}.json"
@@ -814,7 +814,7 @@ def Build_CK(Map conf=[:]){
                     //check whether to run performance tests on this node
                     def arch = check_arch_name()
                     cmake_build(conf)
-                    if ( params.RUN_INDUCTOR_TESTS && !params.BUILD_LEGACY_OS && arch == "gfx90a" ){
+                    if ( params.RUN_INDUCTOR_TESTS && arch == "gfx90a" ){
                             echo "Run inductor codegen tests"
                             sh """
                                   python3 -m venv ${env.WORKSPACE}
@@ -1776,7 +1776,7 @@ pipeline {
                 {
                     when {
                         beforeAgent true
-                        expression { params.BUILD_GFX1250.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() && !params.BUILD_LEGACY_OS.toBoolean() }
+                        expression { params.BUILD_GFX1250.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx90a") }
                     environment{
