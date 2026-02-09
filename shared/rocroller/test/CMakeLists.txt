@@ -14,6 +14,11 @@ if(NOT GTest_FOUND)
     endif()
 endif()
 
+if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS OR ROCROLLER_ENABLE_TEST_DISCOVERY)
+    set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
+    find_package(Pytest REQUIRED) # requires `pip install -r ../requirements.txt`
+endif()
+
 if(NOT ROCM_LIBS_SUPERBUILD)
     if(ROCROLLER_ENABLE_THEROCK)
         find_package(mxDataGenerator REQUIRED)
@@ -73,7 +78,6 @@ if(ROCROLLER_ENABLE_ASAN)
 endif()
 
 if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
-    find_package(Pytest REQUIRED) # requires pip install -r requirements.txt
     pytest_discover_tests(
         GEMMClientTests
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/client"
