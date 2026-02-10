@@ -3297,7 +3297,8 @@ void local_gemm(rocblas_handle handle,
  * - This is an INTERNAL template utility, not a public API
  * - LACN2 only computes the estimate; the caller computes rcond = 1/(||A|| * ||A?1||)
  * - Typically converges in 3-5 iterations
- * - Thread-safe and suitable for batched operations (process one batch at a time)
+ * - LACN2 can only process one matrix at a time, batched routines should compute
+ *   the condition number for one batch at a time in a loop
  *
  * REFERENCE:
  * ---------
