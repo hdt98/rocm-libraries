@@ -475,26 +475,7 @@ struct ProblemTensorTransposeDescriptor
         const auto& desc_from = (src.*cdescriptor)();
         auto& desc_to         = (dest.*descriptor)();
 
-        // Log before transpose
-        const auto& from_strides = desc_from.GetStrides();
-        MIOPEN_LOG_I("ProblemTensorTransposeDescriptor::Transpose: target='"
-                     << to << "', is_input=" << is_input << ", from_strides="
-                     << (from_strides.size() >= 4 ? std::to_string(from_strides[0]) + "," +
-                                                        std::to_string(from_strides[1]) + "," +
-                                                        std::to_string(from_strides[2]) + "," +
-                                                        std::to_string(from_strides[3])
-                                                  : "?"));
-
         desc_to = Transpose(desc_from);
-
-        // Log after transpose
-        const auto& to_strides = desc_to.GetStrides();
-        MIOPEN_LOG_I("ProblemTensorTransposeDescriptor::Transpose: to_strides="
-                     << (to_strides.size() >= 4
-                             ? std::to_string(to_strides[0]) + "," + std::to_string(to_strides[1]) +
-                                   "," + std::to_string(to_strides[2]) + "," +
-                                   std::to_string(to_strides[3])
-                             : "?"));
     }
 
     inline void Transpose(const InvokeParams& src, InvokeParams& dest) const
@@ -605,7 +586,6 @@ public:
                                                     transposed_params);
             });
 
-        MIOPEN_LOG_I2("Executing the input transpose");
         for(const auto& transpose : inputs)
             transpose(*handle);
     }
@@ -617,7 +597,6 @@ public:
 
     ~ProblemTensorTransposeGroup()
     {
-        MIOPEN_LOG_I2("Executing the output transpose");
         for(const auto& transpose : outputs)
             transpose(*handle);
     }
@@ -734,19 +713,15 @@ struct TransposingSolver : Base
         // Use Derived::Transpose to allow derived classes to override (CRTP pattern)
         const auto transposed_problem = Derived::Transpose(problem);
         auto ws_size                  = Inner{}.GetWorkspaceSize(ctx, transposed_problem);
-        MIOPEN_LOG_I2("TransposingSolver::GetWorkspaceSize: inner ws_size = " << ws_size);
 
         for(const auto& transpose : Derived::GetTransposes())
         {
             const auto& descriptor = (transposed_problem.*(transpose.cdescriptor))();
             const auto e_size      = get_data_size(descriptor.GetType());
             const auto tensor_size = descriptor.GetElementSpace() * e_size;
-            MIOPEN_LOG_I2(
-                "TransposingSolver::GetWorkspaceSize: adding tensor_size = " << tensor_size);
             ws_size += tensor_size;
         }
 
-        MIOPEN_LOG_I("TransposingSolver::GetWorkspaceSize: total ws_size = " << ws_size);
         return ws_size;
     }
 
