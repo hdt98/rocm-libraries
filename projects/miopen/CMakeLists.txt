@@ -25,7 +25,13 @@
 ################################################################################
 cmake_minimum_required( VERSION 3.15 )
 
-set(MIOPEN_TEST_SINGLE_GTEST 1)
+set(MIOPEN_TEST_DIFF_ONLY 1)
+
+#message(STATUS "------------------------------------ CMAKE_CURRENT_LIST_DIR: ${CMAKE_CURRENT_LIST_DIR}")
+#message(STATUS "------------------------------------ CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+#message(STATUS "------------------------------------ CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
+
+set(USER_BUILD_DIR ${CMAKE_BINARY_DIR})
 
 if (POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -705,9 +711,16 @@ endif()
 
 # End KDB package creation
 
-if(NOT MIOPEN_TEST_DISCRETE)
+# At least one of MIOPEN_TEST_DISCRETE and MIOPEN_TEST_SINGLE_GTEST must be defined.
+# Single gtest is the default.
+# Define both or set MIOPEN_TEST_DIFF_ONLY to enable diff testing. 
+if(MIOPEN_TEST_DIFF_ONLY)
+    set(MIOPEN_TEST_DISCRETE 1)
+    set(MIOPEN_TEST_SINGLE_GTEST 1)
+elseif(NOT MIOPEN_TEST_DISCRETE)
     set(MIOPEN_TEST_SINGLE_GTEST 1)
 endif()
+
 if(MIOPEN_TEST_SINGLE_GTEST)
     list(APPEND CPACK_COMPONENTS_ALL clients)
 endif()
