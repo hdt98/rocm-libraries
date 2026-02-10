@@ -47,7 +47,7 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_FIND_CONV_INSUFFICIENT_WORKSPACE_ALLOW_FINDDB
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_SEARCH_CUTOFF, false)
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_SKIP_PCT, 130)
-// temporary workaround, essentially revertin #2393
+// temporary workaround, essentially reverting #2393.
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_CONV_GEMM_MAX_SIZE, 7287183769)
 
 namespace miopen {
@@ -439,6 +439,7 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
 
 namespace conv {
 namespace detail {
+#if MIOPEN_USE_GEMM
 /// Determine if GEMM workspace size exceeds threshold.
 ///
 /// This function estimates the workspace size required by GEMM solvers and compares it
@@ -453,7 +454,7 @@ namespace detail {
 /// @return true if estimated workspace exceeds limit and GEMM should be disabled, false otherwise.
 bool IsGEMMProblemTooLarge(const ProblemDescription& problem)
 {
-    const unsigned long long max_size = env::value(MIOPEN_CONV_GEMM_MAX_SIZE);
+    const std::size_t max_size = env::value(MIOPEN_CONV_GEMM_MAX_SIZE);
     // 0 means no limit
     if(max_size == 0)
         return false;
@@ -485,9 +486,7 @@ bool IsGEMMProblemTooLarge(const ProblemDescription& problem)
 
     // Workspace is within limit
     if(ws_sz <= max_size)
-    {
-        MIOPEN_LOG_I2("GEMMSolverFinder enabled for workspace size "
-                      << ws_sz << " bytes < " << max_size << " bytes (MIOPEN_CONV_GEMM_MAX_SIZE)");
+    {        
         return false;
     }
 
@@ -495,6 +494,7 @@ bool IsGEMMProblemTooLarge(const ProblemDescription& problem)
                   << ws_sz << " bytes > " << max_size << " bytes (MIOPEN_CONV_GEMM_MAX_SIZE)");
     return true;
 }
+#endif
 } // namespace detail
 
 // Overload without problem parameter - checks only environment variable (global disable)
@@ -523,22 +523,19 @@ bool IsAlgorithmDisabled(miopenConvAlgorithm_t algo)
 // constraints
 bool IsAlgorithmDisabled(miopenConvAlgorithm_t algo, const ProblemDescription& problem)
 {
+    // First check if algorithm is globally disabled
+    if(IsAlgorithmDisabled(algo))
+        return true;
+
+    // Then check problem-specific constraints
     switch(algo)
     { // clang-format off
 #if MIOPEN_USE_GEMM
     case miopenConvolutionAlgoGEMM:
-        return env::disabled(MIOPEN_DEBUG_CONV_GEMM) || detail::IsGEMMProblemTooLarge(problem);
+        return detail::IsGEMMProblemTooLarge(problem);
 #endif
-    case miopenConvolutionAlgoDirect:
-        return env::disabled(MIOPEN_DEBUG_CONV_DIRECT);
-    case miopenConvolutionAlgoFFT:
-        return env::disabled(MIOPEN_DEBUG_CONV_FFT);
-    case miopenConvolutionAlgoWinograd:
-        return env::disabled(MIOPEN_DEBUG_CONV_WINOGRAD);
-    case miopenConvolutionAlgoImplicitGEMM:
-        return env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM);
-    default: // Disable future algos by default to enforce explicit handling:
-        return true;
+    default: // if not globally disabled and no problem-specific constraints: do not disable
+        return false;
     } // clang-format on
 }
 
