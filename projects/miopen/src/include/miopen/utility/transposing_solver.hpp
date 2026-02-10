@@ -474,23 +474,27 @@ struct ProblemTensorTransposeDescriptor
     {
         const auto& desc_from = (src.*cdescriptor)();
         auto& desc_to         = (dest.*descriptor)();
-        
+
         // Log before transpose
         const auto& from_strides = desc_from.GetStrides();
-        MIOPEN_LOG_I("ProblemTensorTransposeDescriptor::Transpose: target='" << to 
-                     << "', is_input=" << is_input
-                     << ", from_strides=" << (from_strides.size() >= 4 
-                         ? std::to_string(from_strides[0]) + "," + std::to_string(from_strides[1]) + "," 
-                           + std::to_string(from_strides[2]) + "," + std::to_string(from_strides[3]) : "?"));
-        
+        MIOPEN_LOG_I("ProblemTensorTransposeDescriptor::Transpose: target='"
+                     << to << "', is_input=" << is_input << ", from_strides="
+                     << (from_strides.size() >= 4 ? std::to_string(from_strides[0]) + "," +
+                                                        std::to_string(from_strides[1]) + "," +
+                                                        std::to_string(from_strides[2]) + "," +
+                                                        std::to_string(from_strides[3])
+                                                  : "?"));
+
         desc_to = Transpose(desc_from);
-        
+
         // Log after transpose
         const auto& to_strides = desc_to.GetStrides();
-        MIOPEN_LOG_I("ProblemTensorTransposeDescriptor::Transpose: to_strides=" 
-                     << (to_strides.size() >= 4 
-                         ? std::to_string(to_strides[0]) + "," + std::to_string(to_strides[1]) + "," 
-                           + std::to_string(to_strides[2]) + "," + std::to_string(to_strides[3]) : "?"));
+        MIOPEN_LOG_I("ProblemTensorTransposeDescriptor::Transpose: to_strides="
+                     << (to_strides.size() >= 4
+                             ? std::to_string(to_strides[0]) + "," + std::to_string(to_strides[1]) +
+                                   "," + std::to_string(to_strides[2]) + "," +
+                                   std::to_string(to_strides[3])
+                             : "?"));
     }
 
     inline void Transpose(const InvokeParams& src, InvokeParams& dest) const
@@ -737,7 +741,8 @@ struct TransposingSolver : Base
             const auto& descriptor = (transposed_problem.*(transpose.cdescriptor))();
             const auto e_size      = get_data_size(descriptor.GetType());
             const auto tensor_size = descriptor.GetElementSpace() * e_size;
-            MIOPEN_LOG_I2("TransposingSolver::GetWorkspaceSize: adding tensor_size = " << tensor_size);
+            MIOPEN_LOG_I2(
+                "TransposingSolver::GetWorkspaceSize: adding tensor_size = " << tensor_size);
             ws_size += tensor_size;
         }
 
