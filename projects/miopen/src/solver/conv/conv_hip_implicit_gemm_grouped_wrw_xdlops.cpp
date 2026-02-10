@@ -312,7 +312,7 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::ModelApplyToken(
 {
     if(idx == 13 && arch == "gfx90a")
         idx += 1; // skip
-    if(arch == "gfx942" || arch == "gfx950" || arch == "gfx1100")
+    if(arch == "gfx942" || arch == "gfx950")
     {
         if(idx == 0)
         {
@@ -479,7 +479,7 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::IsModelApplicable(
     const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
     if(ctx.GetStream().GetDeviceName() != "gfx90a" && ctx.GetStream().GetDeviceName() != "gfx942" &&
-       ctx.GetStream().GetDeviceName() != "gfx950" && ctx.GetStream().GetDeviceName() != "gfx1100")
+       ctx.GetStream().GetDeviceName() != "gfx950")
         return false;
     if(problem.GetInDataType() != miopenFloat && problem.GetInDataType() != miopenHalf &&
        problem.GetInDataType() != miopenBFloat16)

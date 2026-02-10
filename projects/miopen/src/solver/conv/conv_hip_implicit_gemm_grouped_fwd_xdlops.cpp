@@ -291,14 +291,14 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::ModelApplyToken(int idx,
             idx += 2; // skip MPerXDL and NPerXDL as they are constant
         }
     }
-    if(idx == 0 && (arch == "gfx942" || arch == "gfx950" || arch == "gfx1100"))
+    if(idx == 0 && (arch == "gfx942" || arch == "gfx950"))
     {
         InitHeuristicKernelIDs(value);
         if(!heuristic_indexes.empty())
             return true;
         return false;
     }
-    if(idx >= 1 && (arch == "gfx942" || arch == "gfx950" || arch == "gfx1100"))
+    if(idx >= 1 && (arch == "gfx942" || arch == "gfx950"))
         idx--;
     auto eraseBegin = std::remove_if(
         heuristic_indexes.begin(), heuristic_indexes.end(), [&](int heuristic_index) {
@@ -416,7 +416,7 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::IsModelApplicable(
     const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
     if(ctx.GetStream().GetDeviceName() != "gfx90a" && ctx.GetStream().GetDeviceName() != "gfx942" &&
-       ctx.GetStream().GetDeviceName() != "gfx950" && ctx.GetStream().GetDeviceName() != "gfx1100")
+       ctx.GetStream().GetDeviceName() != "gfx950")
         return false;
     if(problem.GetInDataType() != miopenFloat && problem.GetInDataType() != miopenHalf &&
        problem.GetInDataType() != miopenBFloat16)
