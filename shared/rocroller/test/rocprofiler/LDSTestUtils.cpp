@@ -259,10 +259,9 @@ namespace rocRoller
 
         const auto workgroupSize
             = config.useMultipleWorkgroupSizes ? GENERATE(64u, 128u, 256u) : 64u;
-
-        int  instrDwords      = GENERATE(1, 2, 4);
-        int  strideMultiplier = GENERATE(1, 2, 4, 8, 16);
-        bool write            = GENERATE(true, false);
+        const int  instrDwords      = GENERATE(1, 2, 4);
+        const int  strideMultiplier = GENERATE(1, 2, 4, 8, 16);
+        const bool write            = GENERATE(true, false);
 
         const auto baseAddresses
             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);

@@ -62,8 +62,9 @@ namespace rocRoller
     {
         AssertFatal(!values.empty(), "vector must not be empty");
         AssertFatal(values.size() % 2 == 1, "vector size must be odd");
-        std::sort(values.begin(), values.end());
-        return values[values.size() / 2];
+        const auto n = values.size() / 2;
+        std::nth_element(values.begin(), values.begin() + n, values.end());
+        return values[n];
     }
 
     /**

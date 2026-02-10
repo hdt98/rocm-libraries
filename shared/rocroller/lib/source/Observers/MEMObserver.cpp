@@ -41,27 +41,6 @@ namespace rocRoller
 {
     namespace Scheduling
     {
-        bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
-        {
-            AssertFatal(context != nullptr);
-
-            const DSObserverType observerType = context->kernelOptions()->dsObserver;
-
-            if(observerType == DSObserverType::WeightlessDSMemObserver)
-            {
-                const auto addrs = inst.getModelledAddresses();
-                AssertFatal(addrs.has_value(), ShowValue(inst.toString(LogLevel::Terse)));
-                AssertFatal(addrs->size() % 64 == 0, ShowValue(addrs->size()));
-                AssertFatal(LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode()).has_value(),
-                            ShowValue(inst.toString(LogLevel::Terse)));
-                AssertFatal(context->targetArchitecture().target().isGFX9GPU(),
-                            ShowValue(context->targetArchitecture().target().toString()));
-                return true;
-            }
-
-            return false;
-        }
-
         VMEMObserver::VMEMObserver(ContextPtr ctx)
             : MEMObserver(ctx,
                           "VMEM",
@@ -88,6 +67,11 @@ namespace rocRoller
         {
         }
 
+        bool DSMEMObserver::runtimeRequired(ContextPtr const& ctx)
+        {
+            return ctx->kernelOptions()->dsObserver == DSObserverType::DSMEMObserver;
+        }
+
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
         {
             auto context = m_context.lock();
@@ -106,6 +90,11 @@ namespace rocRoller
         {
         }
 
+        bool WeightlessDSMemObserver::runtimeRequired(ContextPtr const& ctx)
+        {
+            return ctx->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver;
+        }
+
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
             if(!m_scheduler.has_value())
@@ -120,8 +109,7 @@ namespace rocRoller
 
             InstructionStatus status;
 
-            if(GPUInstructionInfo::isLDS(inst.getOpCode())
-               && useWeightlessObserver(inst, m_context.lock()))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
             {
                 const auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
                 if(ldsInfo.has_value())
@@ -131,6 +119,7 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
+                    AssertFatal(inst.getModelledAddresses().has_value());
                     std::vector<size_t> addresses = inst.getModelledAddresses().value();
                     auto [stallCycles, additionalCycles]
                         = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
@@ -145,11 +134,8 @@ namespace rocRoller
             {
                 auto ctx = m_context.lock();
                 AssertFatal(ctx != nullptr);
-                if(ctx->kernelOptions()->dsObserver == DSObserverType::WeightlessDSMemObserver)
-                {
-                    auto stallCycles   = m_scheduler.value().predictWaitcntStallCycles(waitcnt);
-                    status.stallCycles = stallCycles / 4;
-                }
+                auto stallCycles   = m_scheduler.value().predictWaitcntStallCycles(waitcnt);
+                status.stallCycles = stallCycles / 4;
             }
 
             return status;
@@ -157,8 +143,7 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::modify(Instruction& inst) const
         {
-            if(GPUInstructionInfo::isLDS(inst.getOpCode())
-               && useWeightlessObserver(inst, m_context.lock()))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
             {
                 const auto status = peek(inst);
                 inst.addComment(fmt::format("WeightlessDSMemObserver {}: stall {}, additional {}",
@@ -173,8 +158,7 @@ namespace rocRoller
             m_scheduler.value().incrementProgramCycleBy(inst.totalCycles() * 4);
             m_scheduler.value().updateQueues();
 
-            if(GPUInstructionInfo::isLDS(inst.getOpCode())
-               && useWeightlessObserver(inst, m_context.lock()))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
             {
                 auto ldsInfo = LDSModel::getLdsInfoFromOpcodeIfSupported(inst.getOpCode());
                 if(ldsInfo.has_value())

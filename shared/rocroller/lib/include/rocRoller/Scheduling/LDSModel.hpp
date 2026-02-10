@@ -284,8 +284,12 @@ namespace rocRoller::Scheduling::LDSModel
         void updateQueues();
 
     private:
+        // gfx942 to gfx950
+        // actually 40 deep 16 entries wide -> simplify to 10 deep 64 entries wide
         static constexpr int dataQueueSize    = 10;
         static constexpr int commandQueueSize = 8;
+
+        // Before gfx942, data queue should be 64 deep 16 entries wide, command queue remains same
 
         GPUArchitectureGFX m_gfx;
         int                m_programCycle;
