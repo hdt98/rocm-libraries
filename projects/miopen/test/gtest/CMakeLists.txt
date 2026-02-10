@@ -273,59 +273,49 @@ set(FIXTURES_JSON "${USER_BUILD_DIR}/fixtures.json")
 set(PY_MAIN "/dep/main")
 set(PY_FIXTURES "/dep/src/all_gtest_fixtures")
 set(PY_RUN_GTEST "/dep/src/run_gtest")
+set(BN_BASE_SHA c5946cf2382a46b280c402f4ff397e382df1516e)
+set(BN_TEST_SHA 21db4f318f39999b618b3f163941ea4ae378afe6)
+set(GLU_BASE_SHA b567476bbd4946c66d6d48d5910899d820796ec4)
+set(GLU_TEST_SHA 59d8b9dbd727a8030f1038b14f89e3baabf152ca)
 
-# --- 2. Custom Commands for JSON Generation ---
 # Generate fixtures
   add_custom_command(
       OUTPUT ${FIXTURES_JSON}
+      COMMENT "Generating ${FIXTURES_JSON}"
       COMMAND cp "${PY_FIXTURES}.py" "${PY_FIXTURES}" &&
               python3 ${PY_FIXTURES} ${USER_BUILD_DIR}/bin
       WORKING_DIRECTORY ${USER_BUILD_DIR}
-      COMMENT "Generating ${FIXTURES_JSON}"
       VERBATIM
   )
 
 # Generate mapping
   add_custom_command(
       OUTPUT ${MAPPING_JSON}
+      COMMENT "Generating ${MAPPING_JSON}"
       COMMAND cp "${PY_MAIN}.py" "${PY_MAIN}" &&
               python3 ${PY_MAIN} parse ${BUILD_NINJA}
       WORKING_DIRECTORY ${USER_BUILD_DIR}
-      COMMENT "Generating ${MAPPING_JSON}"
       VERBATIM
   )
 
-set(BN_BASE_SHA c5946cf2382a46b280c402f4ff397e382df1516e)
-set(BN_TEST_SHA 21db4f318f39999b618b3f163941ea4ae378afe6)
-set(GLU_BASE_SHA b567476bbd4946c66d6d48d5910899d820796ec4)
-set(GLU_TEST_SHA 59d8b9dbd727a8030f1038b14f89e3baabf152ca)
-
-# Generate JSON file
+# Generate TESTS_TO_RUN_JSON file
   add_custom_command(
       OUTPUT "${TESTS_TO_RUN_JSON}"
+      COMMENT "Generating ${TESTS_TO_RUN_JSON}"
       COMMAND cp "${PY_MAIN}.py" "${PY_MAIN}" &&
               python3 "${PY_MAIN}" select ${MAPPING_JSON} ${GLU_BASE_SHA} ${GLU_TEST_SHA}  --fixturemap=${FIXTURES_JSON}
       WORKING_DIRECTORY ${USER_BUILD_DIR}
       DEPENDS ${MAPPING_JSON} ${FIXTURES_JSON}
-      COMMENT "Generating ${TESTS_TO_RUN_JSON}"
       VERBATIM
   )
 
-#  add_custom_command(
-#      OUTPUT "${GTEST_FILTER_FILE}"
-#      COMMAND python3 -c "import json; print(json.load(open('\''tests_to_run.json'\''))['\''gtest_filter'\''])" > ${GTEST_FILTER_FILE}
-#      WORKING_DIRECTORY ${USER_BUILD_DIR}
-#      DEPENDS ${TESTS_TO_RUN_JSON}
-#      VERBATIM
-#  )
-
   add_custom_target(
       diff_check
-      DEPENDS miopen_gtest tests "${TESTS_TO_RUN_JSON}"
       COMMENT "Running filtered gtests..."
       COMMAND cp "${PY_RUN_GTEST}.py" "${PY_RUN_GTEST}" &&
       python3 "${PY_RUN_GTEST}" "${USER_BUILD_DIR}/bin/miopen_gtest" "${TESTS_TO_RUN_JSON}"
       WORKING_DIRECTORY ${USER_BUILD_DIR}
+      DEPENDS miopen_gtest tests "${TESTS_TO_RUN_JSON}"
       VERBATIM
   )
 
