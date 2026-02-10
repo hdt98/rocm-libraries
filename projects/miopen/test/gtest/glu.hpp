@@ -72,6 +72,7 @@ inline std::vector<GLUTestCase> GenFullTestCases()
         GLUTestCase({2, 320, 4, 4, 4}, 0),
         GLUTestCase({32, 64, 3, 3, 3}, 0),
         GLUTestCase({64, 3, 11, 11}, 0),
+        GLUTestCase({64, 3, 17, 17}, 0),
         GLUTestCase({256, 256, 1, 1}, 0),
         GLUTestCase({64, 64, 7, 7}, 0),
         GLUTestCase({64, 32, 7, 7}, 0),
