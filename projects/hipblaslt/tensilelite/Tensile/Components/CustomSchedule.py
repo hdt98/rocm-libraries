@@ -1745,17 +1745,15 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
         syncs.add(                 12, dscnt=5, barrier=True, comment="wait for all LRA0 to complete before GRA start")
         gra    = [                   13,15,17,19] # one index for two instructions
         
-        syncs.add(                            20, dscnt=0, vlcnt=4+6, barrier=True, comment="wait for all LRB0 to complete before GRB start + wait for previous GRs to complete before LR1")
-        grb    = [                              22,25,29,     32,34,36] # one index for two instructions
-        num_gr = len(gra) + len(grb)
+        syncs.add(                             20, dscnt=0, vlcnt=4+6, barrier=True, comment="wait for all LRB0 to complete before GRB start + wait for previous GRs to complete before LR1")
+        grb    = [                              21,24,    27,31,34,36] # one index for two instructions
+        lra1   = [                                22,25,26,29]
+        syncs.add(                                                35, vlcnt=4+5, barrier=True, comment="wait for all LRB0 to complete before GRB start + wait for previous GRs to complete before LR1")
+        lrb1   = [                                                35,38,40,42,44,46]
 
+        num_gr = len(gra) + len(grb)
         lrsa   = [18]
         lrsb   = [18]
-        # syncs.add(71, vlcnt=10, barrier=True, comment="wait for previous set of global reads")
-
-        lra1   = [                              23,25,27,29]
-        syncs.add(                                           31, vlcnt=4+3, barrier=True, comment="wait for all LRB0 to complete before GRB start + wait for previous GRs to complete before LR1")
-        lrb1   = [                                           31,34,37,40,43,46]
         lwsa   = [30]
         lwsb   = [30]
 
