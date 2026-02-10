@@ -67,7 +67,7 @@ def runBuildAndSingleGtestJob(def flags, def build_timeout_minutes=420)
             def single_gtest_flags = " -DMIOPEN_TEST_DISCRETE=OFF -DGTEST_PARALLEL_LEVEL=4 "
             utils.buildHipClangJob(
                 setup_flags: single_gtest_flags + flags, 
-                build_cmd: "LLVM_PATH=/opt/rocm/llvm CTEST_PARALLEL_LEVEL=4 make -j\$(nproc) install miopen_gtest check",
+                build_cmd: "LLVM_PATH=/opt/rocm/llvm CTEST_PARALLEL_LEVEL=4 make -j\$(nproc) install diff_check",
                 build_install:true,
                 build_timeout:build_timeout_minutes)
         }
@@ -579,7 +579,7 @@ pipeline {
                     agent{ label rocmnode("gfx90a") }
                     environment{
                         // Can be removed altogether with when WORKAROUND_SWDEV_290754.
-                        NOMLIR_build_cmd = "CTEST_PARALLEL_LEVEL=4 MIOPEN_LOG_LEVEL=5 make -j\$(nproc) check"
+                        NOMLIR_build_cmd = "CTEST_PARALLEL_LEVEL=4 MIOPEN_LOG_LEVEL=5 make -j\$(nproc) diff_check"
                     }
                     steps{
                         script {
