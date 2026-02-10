@@ -49,24 +49,23 @@ import hashlib
 import itertools
 import math
 import multiprocessing
+import numpy as np
 import os
-import pathlib
 import random
 import subprocess
-from dataclasses import asdict, dataclass, field, fields
-from typing import List, Tuple
-
-import numpy as np
-import rrperf
-
-# import tempfile
 import yaml
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
+
+import rrperf.problems
+import rrperf.utils
 
 gpus = {}
 mp_pool = None
 
 
-def instantiate_gpus(idxs: List[int]):
+def instantiate_gpus(idxs: Iterable[int]):
     global gpus, mp_pool  # noqa: disable=F824
     for idx in idxs:
         gpus[idx] = multiprocessing.Lock()
@@ -75,7 +74,7 @@ def instantiate_gpus(idxs: List[int]):
         mp_pool = None
 
 
-def acquire_lock() -> Tuple[int, multiprocessing.Lock]:
+def acquire_lock() -> tuple[int, multiprocessing.Lock]:
     global gpus  # noqa: disable=unused-variable
     for i in range(100):
         for id, lock in gpus.items():
@@ -282,7 +281,9 @@ def bench_star(arg):
 
 
 def bench(
-    thedir: pathlib.Path, problem: rrperf.problems.GEMMRun, weights: Weights
+    thedir: Path,
+    problem: rrperf.problems.GEMMRun,
+    weights: Weights,
 ) -> Result:
     device, lock = acquire_lock()
 
@@ -340,7 +341,7 @@ def bench(
         lock.release()
 
 
-def sanity_check(results: List[Result]):
+def sanity_check(results: Iterable[Result]):
     rnorms = {r.rnorm for r in results if r.passed}
     print(f"RNorms: {rnorms}")
     if len(rnorms) != 1:
@@ -351,11 +352,13 @@ def sanity_check(results: List[Result]):
 prev_results = {}
 
 
-def split_old_new_results(weights) -> Tuple[List[Weights], List[Weights]]:
+def split_old_new_results(
+    weights: Iterable[Weights],
+) -> tuple[list[Weights], list[Weights]]:
     global prev_results  # noqa: disable=F824
 
-    already_ran = []
-    to_run = []
+    already_ran: list[Weights] = []
+    to_run: list[Weights] = []
     for w in weights:
         if w in prev_results:
             already_ran.append(w)
@@ -366,8 +369,10 @@ def split_old_new_results(weights) -> Tuple[List[Weights], List[Weights]]:
 
 
 def generation(
-    output_dir: pathlib.Path, problem: rrperf.problems.GEMMRun, weights: List[Weights]
-) -> List[Result]:
+    output_dir: Path,
+    problem: rrperf.problems.GEMMRun,
+    weights: Iterable[Weights],
+) -> list[Result]:
     global prev_results  # noqa: disable=F824
 
     already_ran, to_run = split_old_new_results(weights)
@@ -392,8 +397,7 @@ def generation(
     return sorted(old_results + new_results)
 
 
-def read_gen_results(resfile: str):
-    resfile = pathlib.Path(resfile)
+def read_gen_results(resfile: Path):
     with resfile.open() as f:
         data = yaml.safe_load(f)
 
@@ -403,8 +407,12 @@ def read_gen_results(resfile: str):
         return list(map(res, data))
 
 
-def write_generation(thedir: pathlib.Path, name, results: List[Result]):
-    data = list([val.dict for val in results])
+def write_generation(
+    thedir: Path,
+    name: str,
+    results: Iterable[Result],
+):
+    data = [val.dict for val in results]
     datafile = thedir / f"results_{name}.yaml"
     with datafile.open("w") as f:
         yaml.dump(data, f)
@@ -412,7 +420,11 @@ def write_generation(thedir: pathlib.Path, name, results: List[Result]):
 
 
 def new_inputs(
-    all_results: List[Result], population, num_parents, num_random, mutation
+    all_results: list[Result],
+    population,
+    num_parents,
+    num_random,
+    mutation,
 ):
     if len(all_results) == 0:
         rv = set()
@@ -477,7 +489,7 @@ def genetic(args):
             results = generation(gen_dir, args.problem, inputs)
             sanity_check(results)
 
-            write_generation(args.output_dir, i, results)
+            write_generation(args.output_dir, f"{i}", results)
 
             args.all_results = sorted(set(args.all_results + results))
             write_generation(args.output_dir, f"{i}_all", args.all_results)
@@ -496,7 +508,7 @@ def genetic(args):
         close_pool()
 
 
-def find_most_different_outputs(results: List[Result], n: int = 5):
+def find_most_different_outputs(results: list[Result], n: int = 5):
     n = min(n, len(results))
     if n <= 0:
         return
@@ -570,7 +582,7 @@ def get_args(parser: argparse.ArgumentParser):
         "--output",
         "-o",
         dest="output_dir",
-        type=pathlib.Path,
+        type=Path,
         required=True,
         help="Directory to store results.",
     )

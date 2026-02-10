@@ -35,24 +35,22 @@ scripts/check_included_tests.py -t test/
 
 import argparse
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import List
 
 
 def check_included_tests(
-    tests_dir: str,
-    exclude_paths: List[str],
+    tests_dir: Path,
+    exclude_paths: Iterable[Path],
 ) -> int:
-    tests_dir = Path(tests_dir)
     assert tests_dir.is_dir()
 
-    def should_exclude(test_path: Path, exclude_paths: List[str]):
-        for exclude_path in exclude_paths:
-            if test_path.is_relative_to(Path(exclude_path)):
-                return True
-        return False
+    def should_exclude(test_path: Path, exclude_paths: Iterable[Path]):
+        return any(
+            test_path.is_relative_to(exclude_path) for exclude_path in exclude_paths
+        )
 
-    def missing_tests(cmakelist_path):
+    def missing_tests(cmakelist_path: Path):
         assert cmakelist_path.is_file()
         missingTestCount = 0
         for subpath in tests_in_dir:
@@ -66,7 +64,7 @@ def check_included_tests(
         return missingTestCount
 
     test_dirs = [
-        Path(d)
+        d
         for d in tests_dir.iterdir()
         if d.is_dir() and not should_exclude(d, exclude_paths)
     ]
@@ -90,6 +88,7 @@ if __name__ == "__main__":
         "--test-dir",
         default="../test/",
         help="Directory to tests",
+        type=Path,
     )
     parser.add_argument(
         "-x",
@@ -97,6 +96,7 @@ if __name__ == "__main__":
         action="append",
         default=["../test/common"],
         help="Paths to exclude",
+        type=Path,
     )
 
     args = parser.parse_args()

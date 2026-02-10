@@ -29,16 +29,21 @@ import argparse
 import datetime
 import importlib.util
 import os
+import pandas as pd
 import subprocess
+import yaml
 from dataclasses import fields
+from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import Dict, Tuple
 
-import pandas as pd
-import rrperf
+import rrperf.args
 import rrperf.dump_csv
-import yaml
+import rrperf.git
+import rrperf.problems
+import rrperf.rocm_control
+import rrperf.specs
+import rrperf.utils
 
 
 def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
@@ -50,7 +55,7 @@ def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
     """
     results = []
     for jpath in wrkdir.glob(f"{suite}-*.yaml"):
-        results.extend(yaml.load(jpath.read_text()))
+        results.extend(yaml.safe_load(jpath.read_text()))
     df = pd.DataFrame(results)
     df.to_csv(f"{str(ptsdir)}/{suite}-benchmark.csv", index=False)
     # TODO: add call to SOMEWHERE to submit
@@ -64,8 +69,8 @@ def run_problems(
     generator,
     build_dir: Path,
     work_dir: Path,
-    env: Dict[str, str],
-    id_filter: list[str],
+    env: dict[str, str],
+    id_filter: Iterable[str],
     l2: bool,
 ) -> bool:
 
@@ -76,9 +81,7 @@ def run_problems(
     failed = []
 
     for i, problem in enumerate(generator):
-        if id_filter is not None and not any(
-            problem.id.startswith(filt) for filt in id_filter
-        ):
+        if not any(problem.id.startswith(filt) for filt in id_filter):
             continue
 
         if problem in already_run:
@@ -168,10 +171,12 @@ def generate_missing_attr_value(run, attr):
             )
 
 
-def backcast(generator, build_dir):
+def backcast(generator, build_dir: Path):
     """Reconstruct run objects from `generator` into run objects from previous rrperf version."""
     pdef = build_dir.parent / "scripts" / "lib" / "rrperf" / "problems.py"
-    spec = importlib.util.spec_from_file_location("problems", str(pdef))
+    spec = importlib.util.spec_from_file_location("problems", pdef)
+    if spec is None or spec.loader is None:
+        raise RuntimeError('Module spec "problems" not found at {pdef}')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     for run in generator:
@@ -236,22 +241,24 @@ def run(args):
 
 
 def run_cli(  # noqa: C901
-    token: str = None,
-    suite: str = None,
+    token: str | None = None,
+    suite: str | None = None,
     submit: bool = False,
-    id_filter: list[str] = None,
-    rundir: str = None,
-    build_dir: str = None,
-    rocm_smi: str = "rocm-smi",
+    id_filter: list[str] | None = None,
+    rundir: Path | None = None,
+    build_dir: Path | None = None,
+    rocm_smi: Path = Path("rocm-smi"),
     pin_clocks: bool = False,
     recast: bool = False,
     l2: bool = False,
     **kwargs,
-) -> Tuple[bool, Path]:
+) -> tuple[bool, Path]:
     """Run benchmarks!
 
     Implements the CLI 'run' subcommand.
     """
+    if not id_filter:
+        id_filter = []
 
     if pin_clocks:
         rrperf.rocm_control.pin_clocks(rocm_smi)
@@ -262,6 +269,9 @@ def run_cli(  # noqa: C901
         else:
             suite = "all"
 
+    if build_dir is None:
+        build_dir = rrperf.utils.get_build_dir()
+
     generator = rrperf.utils.empty()
     if suite is not None:
         generator = chain(generator, rrperf.utils.load_suite(suite))
@@ -269,11 +279,6 @@ def run_cli(  # noqa: C901
         generator = chain(generator, from_token(token))
     if recast:
         generator = backcast(generator, build_dir)
-
-    if build_dir is None:
-        build_dir = rrperf.utils.get_build_dir()
-    else:
-        build_dir = Path(build_dir)
 
     env = dict(os.environ)
     env["ROCROLLER_ENFORCE_GRAPH_CONSTRAINTS"] = "1"
@@ -298,13 +303,15 @@ def run_cli(  # noqa: C901
 
     result = run_problems(generator, build_dir, rundir, env, id_filter, l2)
 
+    suite_name = suite or "unknown_suite"
+
     if submit:
         ptsdir = rundir / "rocRoller"
         ptsdir.mkdir(parents=True)
         # XXX if running single token, suite might be None
-        submit_directory(suite, rundir, ptsdir)
+        submit_directory(suite_name, rundir, ptsdir)
 
     if kwargs.get("dump_csv", False):
-        rrperf.dump_csv.dump_csv(suite, rundir)
+        rrperf.dump_csv.dump_csv(suite_name, rundir)
 
     return result, rundir

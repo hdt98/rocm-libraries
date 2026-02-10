@@ -24,17 +24,25 @@
 ################################################################################
 
 import pytest
-import rrperf
+
+from pathlib import Path
+
+import rrperf.run
 import rrperf.utils as utils
 
 
 @pytest.mark.slow
 def test_run_suite_unit():
+    result = False
     if utils.rocm_gfx().startswith("gfx120"):
-        result, rundir = rrperf.run.run_cli(
-            suite="unit_gfx120X", rundir="performance_unit"
+        result, _ = rrperf.run.run_cli(
+            suite="unit_gfx120X",
+            rundir=Path("performance_unit"),
         )
     else:
-        result, rundir = rrperf.run.run_cli(suite="unit", rundir="performance_unit")
+        result, _ = rrperf.run.run_cli(
+            suite="unit",
+            rundir=Path("performance_unit"),
+        )
 
     assert result

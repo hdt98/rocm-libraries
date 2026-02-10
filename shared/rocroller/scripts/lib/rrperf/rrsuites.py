@@ -24,8 +24,8 @@
 ################################################################################
 
 import pathlib
+from collections.abc import Iterable
 from itertools import product
-from typing import List
 
 from rrperf.problems import (
     CodeGenRun,
@@ -512,25 +512,21 @@ def hgemm_no_store_LDS():
 
 def tensile_guidepost():
     yield TensileRun(
-        config=str(
-            repo_dir
-            / "test"
-            / "unit"
-            / "GemmGuidePost"
-            / "HGemmGuidePost_Optimized.yaml"
-        ),
+        config=repo_dir
+        / "test"
+        / "unit"
+        / "GemmGuidePost"
+        / "HGemmGuidePost_Optimized.yaml"
     )
 
 
 def tensile_sgemm_guidepost():
     yield TensileRun(
-        config=str(
-            repo_dir
-            / "test"
-            / "unit"
-            / "GemmGuidePost"
-            / "GemmGuidePost_Optimized.yaml"
-        ),
+        config=repo_dir
+        / "test"
+        / "unit"
+        / "GemmGuidePost"
+        / "GemmGuidePost_Optimized.yaml"
     )
 
 
@@ -1140,7 +1136,7 @@ def add_wgm(mapping, suite):
         yield run
 
 
-def addSkipPermlane(suite: List[GEMMRun], value=True):
+def addSkipPermlane(suite: Iterable[GEMMRun], value=True):
     for run in suite:
         run.types.scaleSkipPermlane = value
         yield run

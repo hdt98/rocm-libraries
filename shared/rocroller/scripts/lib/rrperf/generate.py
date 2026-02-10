@@ -28,28 +28,29 @@
 import argparse
 import os
 import subprocess
+from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import Dict
 
-import rrperf
-from rrperf.utils import sjoin
+import rrperf.args
+import rrperf.git
+import rrperf.utils
 
 
 def generate_kernels(
     generator,
-    architecture: str,
+    architecture: str | None,
     build_dir: Path,
     work_dir: Path,
-    env: Dict[str, str],
-    id_filter: list[str],
+    env: dict[str, str],
+    id_filter: Iterable[str],
 ) -> bool:
 
     already_run = set()
     failed = []
 
     for i, problem in enumerate(generator):
-        if id_filter is not None and not any(
+        if not any(
             problem.id.startswith(filt) for filt in id_filter
         ):
             continue
@@ -61,15 +62,15 @@ def generate_kernels(
         cmd = problem.command(architecture=architecture, generate_only=True)
         log = (work_dir / f"{problem.group}-{i:06d}.log").resolve()
         rr_env = {k: str(v) for k, v in env.items() if k.startswith("ROC")}
-        rr_env_str = sjoin([f"{k}={v}" for k, v in rr_env.items()])
+        rr_env_str = rrperf.utils.sjoin([f"{k}={v}" for k, v in rr_env.items()])
 
         with log.open("w") as f:
             print(f"# env: {rr_env_str}", file=f, flush=True)
-            print(f"# command: {sjoin(cmd)}", file=f, flush=True)
+            print(f"# command: {rrperf.utils.sjoin(cmd)}", file=f, flush=True)
             print(f"# token: {repr(problem)}", file=f, flush=True)
             print("running:")
             print(f"  id: {id}")
-            print(f"  command: {sjoin(cmd)}")
+            print(f"  command: {rrperf.utils.sjoin(cmd)}")
             print(f"  wrkdir:  {work_dir.resolve()}")
             print(f"  log:     {log.resolve()}")
             p = subprocess.run(cmd, stdout=f, cwd=build_dir, env=env, check=False)
@@ -98,14 +99,17 @@ def generate_kernels(
 
 
 def generate(
-    architecture: str = None,
-    suite: str = None,
-    rundir: str = None,
-    build_dir: str = None,
-    id_filter: list[str] = None,
+    architecture: str | None = None,
+    suite: str | None = None,
+    rundir: Path | None = None,
+    build_dir: Path | None = None,
+    id_filter: list[str] | None = None,
     **kwargs,
 ):
     """Generate kernels!"""
+
+    if not id_filter:
+        id_filter = []
 
     generator = rrperf.utils.empty()
     if suite is not None:
@@ -116,8 +120,6 @@ def generate(
 
     if build_dir is None:
         build_dir = rrperf.utils.get_build_dir()
-    else:
-        build_dir = Path(build_dir)
 
     env = dict(os.environ)
     env["ROCROLLER_ENFORCE_GRAPH_CONSTRAINTS"] = "1"
@@ -133,7 +135,12 @@ def generate(
         git_commit.write_text("NO_COMMIT\n")
 
     success = generate_kernels(
-        generator, architecture, build_dir, run_dir, env, id_filter
+        generator,
+        architecture,
+        build_dir,
+        run_dir,
+        env,
+        id_filter,
     )
 
     if not success:

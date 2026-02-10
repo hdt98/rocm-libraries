@@ -28,19 +28,20 @@
 import argparse
 import datetime
 import io
+import numpy as np
+import pandas as pd
 import os
 import pathlib
 import re
+import scipy.stats
 import statistics
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
-from typing import Any, List
 
-import numpy as np
-import pandas as pd
-import rrperf
 import rrperf.args as args
-import scipy.stats
+import rrperf.problems
+import rrperf.specs
+import rrperf.utils
 from rrperf.problems import GEMMResult, RRPerfResult
 from rrperf.specs import MachineSpecs
 
@@ -52,24 +53,24 @@ def priority_problems():
 
 @dataclass
 class ComparisonResult:
-    mean: List[float]
-    median: List[float]
+    mean: list[float]
+    median: list[float]
     moods_pval: float
 
-    results: List[Any] = field(repr=False)
+    results: list = field(repr=False)
 
     problem: str
 
 
 @dataclass
 class PlotData:
-    timestamp: List[float] = field(default_factory=list)
-    commit: List[str] = field(default_factory=list)
-    median: List[float] = field(default_factory=list)
-    min: List[float] = field(default_factory=list)
-    name: List[str] = field(default_factory=list)
-    kernel: List[float] = field(default_factory=list)
-    machine: List[int] = field(default_factory=list)
+    timestamp: list[float] = field(default_factory=list)
+    commit: list[str] = field(default_factory=list)
+    median: list[float] = field(default_factory=list)
+    min: list[float] = field(default_factory=list)
+    name: list[str] = field(default_factory=list)
+    kernel: list[float] = field(default_factory=list)
+    machine: list[int] = field(default_factory=list)
     box_data: pd.DataFrame = field(
         default_factory=lambda: pd.DataFrame(columns=["timestamp", "commit", "runs"])
     )
@@ -200,8 +201,9 @@ def summary_statistics(perf_runs):
             kb_median = statistics.median(kb) if kb.size > 0 else 0
             kb_mean = statistics.mean(kb) if kb.size > 0 else 0
 
+            p: float
             try:
-                _, p, _, _ = scipy.stats.median_test(ka, kb)
+                _, p, _, _ = scipy.stats.median_test(ka, kb) # type: ignore[reportGeneralTypeIssues] 
             except Exception:
                 p = 1.0
             stats[run][token] = A.run_invariant_token, ComparisonResult(

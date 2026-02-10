@@ -23,12 +23,13 @@
 #
 ################################################################################
 
+from pathlib import Path
 import shutil
 import subprocess
 from time import sleep
 
 
-def pin_clocks(ROCmSMIPath):
+def pin_clocks(ROCmSMIPath: Path):
     print("Attempting to pin clocks...")
     rocm_smi_found = shutil.which(ROCmSMIPath) is not None
     if rocm_smi_found:
@@ -66,7 +67,7 @@ def pin_clocks(ROCmSMIPath):
         print("{} not found, unable to pin clocks.".format(ROCmSMIPath))
 
 
-def setupRestoreClocks(ROCmSMIPath):
+def setupRestoreClocks(ROCmSMIPath: Path):
     import atexit
 
     def restoreClocks():

@@ -35,8 +35,8 @@ import datetime
 import os
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import List
 
 import rrperf.args as args
 from rrperf import compare, git
@@ -100,9 +100,9 @@ def build_rocroller(
     return build_dir
 
 
-def ancestral_targets(targets: List[str]):
+def ancestral_targets(input_targets: list[str]) -> list[str]:
     orig_project_dir = git.top()
-    targets = git.rev_list(orig_project_dir, targets[0], targets[-1])
+    targets = git.rev_list(orig_project_dir, input_targets[0], input_targets[-1])
     targets.reverse()
     targets = [git.short_hash(orig_project_dir, x) for x in targets]
     if len(targets) == 0:
@@ -131,7 +131,7 @@ def get_args(parser: argparse.ArgumentParser):
 
     parser.add_argument(
         "--clonedir",
-        type=str,
+        type=Path,
         help="Base directory for repo clone destinations.",
         default=".",
     )
@@ -166,14 +166,14 @@ def run(args):
 
 
 def autoperf(
-    commits: List[str],
-    clonedir: str,
-    rundir: str,
-    no_fail: List[str] = None,
+    commits: Iterable[str],
+    clonedir: Path,
+    rundir: Path,
+    no_fail: list[str] | None = None,
     current: bool = False,
     ancestral: bool = False,
-    suite: str = None,
-    id_filter=None,
+    suite: str | None = None,
+    id_filter: list[str] | None = None,
     normalize=False,
     y_zero=False,
     plot_median=False,
@@ -182,7 +182,7 @@ def autoperf(
     x_value: str = "timestamp",
     **kwargs,
 ):
-    if no_fail is None:
+    if not no_fail:
         no_fail = []
 
     monorepo_dir = git.top()
@@ -201,11 +201,11 @@ def autoperf(
     if current:
         targets.append("current")
 
-    top = Path(clonedir).resolve()
+    top = clonedir.resolve()
     top.mkdir(parents=True, exist_ok=True)
     os.chdir(str(top))
 
-    results = []
+    results: list[Path] = []
     success = True
     success_no_fail = True
 

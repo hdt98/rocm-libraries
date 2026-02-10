@@ -30,60 +30,30 @@ import re
 import shutil
 import socket
 import subprocess
-from dataclasses import dataclass
-from pathlib import Path as path
-from textwrap import dedent
-
 import yaml
+
+from dataclasses import dataclass
+from pathlib import Path
+from textwrap import dedent
 
 
 @dataclass
 class MachineSpecs(yaml.YAMLObject):
     yaml_tag = "!rrperfMachineSpecs"
 
-    hostname: str
-    cpu: str
-    kernel: str
-    ram: str
-    distro: str
-    rocmversion: str
-    vbios: str
-    gpuid: str
-    deviceinfo: str
-    vram: str
-    perflevel: str
-    mclk: str
-    sclk: str
-
-    def __init__(
-        self,
-        hostname="",
-        cpu="",
-        kernel="",
-        ram="",
-        distro="",
-        rocmversion="",
-        vbios="",
-        gpuid="",
-        deviceinfo="",
-        vram="",
-        perflevel="",
-        mclk="",
-        sclk="",
-    ):
-        self.hostname = hostname
-        self.cpu = cpu
-        self.kernel = kernel
-        self.ram = ram
-        self.distro = distro
-        self.rocmversion = rocmversion
-        self.vbios = vbios
-        self.gpuid = gpuid
-        self.deviceinfo = deviceinfo
-        self.vram = vram
-        self.perflevel = perflevel
-        self.mclk = mclk
-        self.sclk = sclk
+    hostname: str = ""
+    cpu: str = ""
+    kernel: str = ""
+    ram: str = ""
+    distro: str = ""
+    rocmversion: str = ""
+    vbios: str = ""
+    gpuid: str = ""
+    deviceinfo: str = ""
+    vram: str = ""
+    perflevel: str = ""
+    mclk: str = ""
+    sclk: str = ""
 
     def __str__(self):
         return yaml.dump(self)
@@ -139,14 +109,14 @@ def run(cmd):
     return p.stdout.decode("ascii")
 
 
-def search(pattern, string):
+def search(pattern: str, string: str) -> str:
     m = re.search(pattern, string, re.MULTILINE)
     if m is not None:
         return m.group(1)
-    return None
+    return ""
 
 
-def load_machine_specs(path):
+def load_machine_specs(path: Path) -> MachineSpecs:
     if path.exists():
         contents = path.read_text()
         if contents.startswith(MachineSpecs.yaml_tag):
@@ -154,15 +124,21 @@ def load_machine_specs(path):
     return MachineSpecs()
 
 
-def get_machine_specs(devicenum, rocm_smi_path="rocm-smi"):
-    cpuinfo = path("/proc/cpuinfo").read_text()
-    meminfo = path("/proc/meminfo").read_text()
-    version = path("/proc/version").read_text()
-    os_release = path("/etc/os-release").read_text()
-    if os.path.isfile("/opt/rocm/.info/version-utils"):
-        rocm_info = path("/opt/rocm/.info/version-utils").read_text()
-    elif os.path.isfile("/opt/rocm/.info/version"):
-        rocm_info = path("/opt/rocm/.info/version").read_text()
+def get_machine_specs(
+    devicenum: int,
+    rocm_smi_path: Path = Path("rocm-smi"),
+) -> MachineSpecs:
+    cpuinfo = Path("/proc/cpuinfo").read_text()
+    meminfo = Path("/proc/meminfo").read_text()
+    version = Path("/proc/version").read_text()
+    os_release = Path("/etc/os-release").read_text()
+
+    version_utils_file = Path("/opt/rocm/.info/version-utils")
+    version_file = Path("/opt/rocm/.info/version")
+    if os.path.isfile(version_utils_file):
+        rocm_info = version_utils_file.read_text()
+    elif os.path.isfile(version_file):
+        rocm_info = version_file.read_text()
     else:
         rocm_info = "rocm info not available"
 
@@ -219,8 +195,8 @@ def get_machine_specs(devicenum, rocm_smi_path="rocm-smi"):
         if rocm_smi_found
         else "no rocm-smi"
     )
-    mclk = search(device + r"mclk.*\((.*?)\)$", rocm_smi) if rocm_smi_found else 0
-    sclk = search(device + r"sclk.*\((.*?)\)$", rocm_smi) if rocm_smi_found else 0
+    mclk = search(device + r"mclk.*\((.*?)\)$", rocm_smi) if rocm_smi_found else "0"
+    sclk = search(device + r"sclk.*\((.*?)\)$", rocm_smi) if rocm_smi_found else "0"
 
     if ram is not None:
         ram = "{:.2f} GiB".format(float(ram) / 1024**2)

@@ -32,14 +32,15 @@ from dataclasses import asdict, fields
 from hashlib import sha1
 from pathlib import Path
 
-import rrperf
+import rrperf.git
+import rrperf.rrsuites
 
 
 def empty():
     yield from ()
 
 
-def sjoin(xs):
+def sjoin(xs) -> str:
     return " ".join([str(x) for x in xs])
 
 
@@ -54,7 +55,7 @@ def first_problem_from_suite(suite: str):
     raise RuntimeError(f"Suite {suite} has no problems.")
 
 
-def try_getting_commit(repo):
+def try_getting_commit(repo: Path | None) -> str | None:
     if repo is not None:
         try:
             return rrperf.git.short_hash(repo)
@@ -63,12 +64,15 @@ def try_getting_commit(repo):
     return None
 
 
-def get_commit(rundir: str = None, build_dir: Path = None) -> str:
+def get_commit(
+    rundir: Path | None = None,
+    build_dir: Path | None = None,
+) -> str:
     commit = try_getting_commit(build_dir)
     if commit is None:
         commit = try_getting_commit(rundir)
     if commit is None:
-        commit = try_getting_commit(".")
+        commit = try_getting_commit(Path("."))
     if commit is None:
         commit = try_getting_commit(Path(__file__).resolve().parent)
     if commit is None:
@@ -76,7 +80,10 @@ def get_commit(rundir: str = None, build_dir: Path = None) -> str:
     return commit
 
 
-def get_work_dir(rundir: str = None, build_dir: Path = None) -> Path:
+def get_work_dir(
+    rundir: Path | None = None,
+    build_dir: Path | None = None,
+) -> Path:
     """Return a new work directory path."""
 
     date = datetime.date.today().strftime("%Y-%m-%d")
@@ -111,15 +118,15 @@ def get_dataclass_id(obj):
 
 
 @functools.cache
-def rocm_gfx():
+def rocm_gfx() -> str:
     """Return GPU architecture (gfxXXXX) for local GPU device."""
-    output = None
+    output = ""
     try:
         output = subprocess.run(
             ["rocminfo"], capture_output=True, text=True, check=True
         ).stdout
     except subprocess.CalledProcessError:
-        return None
+        return ""
 
     for line in output.splitlines():
         if line.startswith("  Name:"):
@@ -127,4 +134,4 @@ def rocm_gfx():
             if arch.startswith("gfx"):
                 return arch
 
-    return None
+    return ""

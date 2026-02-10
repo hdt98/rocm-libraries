@@ -27,10 +27,9 @@
 
 import subprocess
 from pathlib import Path
-from typing import List, Union
 
 
-def top(loc: str = None) -> Path:
+def top(loc: str | None = None) -> Path:
     path_arg = ["-C", loc] if loc is not None else []
     command = ["git"] + path_arg + ["rev-parse", "--show-toplevel"]
     p = subprocess.run(
@@ -42,7 +41,7 @@ def top(loc: str = None) -> Path:
     return Path(p.stdout.strip()).resolve()
 
 
-def clone(remote: Union[str, Path], repo: Path) -> None:
+def clone(remote: str | Path, repo: Path) -> None:
     subprocess.run(
         [
             "git",
@@ -107,7 +106,7 @@ def full_hash(repo: Path) -> str:
     return p.stdout.strip()
 
 
-def rev_list(repo: Path, old_commit: str, new_commit: str) -> List[str]:
+def rev_list(repo: Path, old_commit: str, new_commit: str) -> list[str]:
     """
     Gets a list of commits, starting with the newest commit and ending
     with the oldest commit, with every commit in between.
@@ -128,7 +127,7 @@ def rev_list(repo: Path, old_commit: str, new_commit: str) -> List[str]:
     return p.stdout.strip().split("\n")
 
 
-def ls_tree(repo: Path = None):
+def ls_tree(repo: Path | None = None) -> list[str]:
     """
     Returns a list of all files committed into Git in this repo.
     """

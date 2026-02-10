@@ -24,10 +24,9 @@
 ################################################################################
 
 import pathlib
-from dataclasses import asdict, dataclass, field, fields
-from typing import Any, List, Optional
-
 import yaml
+from dataclasses import asdict, dataclass, field, fields
+
 from rrperf.utils import get_dataclass_id
 
 repo_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
@@ -37,7 +36,7 @@ def field_dict(cls, obj):
     return {f.name: getattr(obj, f.name) for f in fields(cls)}
 
 
-def to_bool(val):
+def to_bool(val: str):
     if val in ["True", "true", "T", "t", "1"]:
         return True
     elif val in ["False", "false", "F", "f", "0"]:
@@ -92,7 +91,7 @@ class RRPerfResult:
 
     kernelGenerate: int = field(repr=False, hash=False)
     kernelAssemble: int = field(repr=False, hash=False)
-    kernelExecute: List[int] = field(repr=False, hash=False)
+    kernelExecute: list[int] = field(repr=False, hash=False)
 
     device: int = field(repr=False, hash=False, compare=False, default=0)
 
@@ -129,14 +128,10 @@ class TypeParameters:
     scaleBlockSize: int = -1
     scaleSkipPermlane: bool = False
 
-    def __init__(self, typeParams: Optional[Any] = None, **kwargs):
-        if isinstance(typeParams, TypeParameters):
+    def __init__(self, typeParams: "TypeParameters | None" = None, **kwargs):
+        if typeParams is not None:
             for f in fields(self):
                 setattr(self, f.name, getattr(typeParams, f.name))
-        elif typeParams is not None:
-            raise TypeError(
-                f"Expected TypeParameters or None, got {type(typeParams).__name__}"
-            )
 
         for key, value in kwargs.items():
             if hasattr(self, key):
@@ -144,8 +139,8 @@ class TypeParameters:
             else:
                 raise AttributeError(f"Unknown field: {key}")
 
-    def asArgs(self) -> List[str]:
-        rv: List[str] = []
+    def asArgs(self) -> list[str]:
+        rv: list[str] = []
         for f in fields(self):
             rv.append(f"--{f.name}={self.__getattribute__(f.name)}")
         return rv
@@ -159,7 +154,7 @@ class GPUArchitectureTarget:
     Xnack: bool = False
     Sramecc: bool = False
 
-    def asArgs(self) -> List[str]:
+    def asArgs(self) -> list[str]:
         if len(self.ArchString) == 0:
             return []
         arch = self.ArchString
@@ -327,7 +322,12 @@ class GEMM(GEMMProblem, GEMMSolution):
 class GEMMRun(GEMM):
     """GEMM run interface."""
 
-    output: pathlib.Path = field(repr=False, default=None, hash=False, compare=False)
+    output: pathlib.Path | None = field(
+        repr=False,
+        default=None,
+        hash=False,
+        compare=False,
+    )
 
     @property
     def group(self):
@@ -337,8 +337,11 @@ class GEMMRun(GEMM):
         self.output = path
 
     def command(
-        self, generate_only=False, architecture=None, **extra_args
-    ) -> List[str]:
+        self,
+        generate_only=False,
+        architecture=None,
+        **extra_args,
+    ) -> list[str]:
 
         specialNames = {
             "output": "yaml",
@@ -390,7 +393,7 @@ class GEMMRun(GEMM):
 class GEMMResult(GEMM, RRPerfResult):
     """GEMM result interface."""
 
-    rnorm: float = field(repr=False, default=None, hash=False)
+    rnorm: float | None = field(repr=False, default=None, hash=False)
 
     def compact(self):
         def TF(x):
@@ -494,7 +497,12 @@ class CodeGen:
 class CodeGenRun(CodeGen):
     """CodeGen run interface."""
 
-    output: pathlib.Path = field(repr=False, default=None, hash=False, compare=False)
+    output: pathlib.Path | None = field(
+        repr=False,
+        default=None,
+        hash=False,
+        compare=False,
+    )
 
     @property
     def group(self):
@@ -503,7 +511,7 @@ class CodeGenRun(CodeGen):
     def set_output(self, path: pathlib.Path):
         self.output = path
 
-    def command(self) -> List[str]:
+    def command(self) -> list[str]:
         retval = [
             "client/rocroller-codegen-stress",
             "--inst_count=" + str(self.instCount),
@@ -527,8 +535,18 @@ class CodeGenResult(CodeGen, RRPerfResult):
 class TensileRun(GEMM):
     """Tensile run interface."""
 
-    config: pathlib.Path = field(repr=False, default=None, hash=False, compare=False)
-    output: pathlib.Path = field(repr=False, default=None, hash=False, compare=False)
+    config: pathlib.Path | None = field(
+        repr=False,
+        default=None,
+        hash=False,
+        compare=False,
+    )
+    output: pathlib.Path | None = field(
+        repr=False,
+        default=None,
+        hash=False,
+        compare=False,
+    )
     tensile_commit: str = "rocm-6.0.0"
 
     @property
@@ -538,7 +556,7 @@ class TensileRun(GEMM):
     def set_output(self, path: pathlib.Path):
         self.output = path
 
-    def command(self, **extra_args) -> List[str]:
+    def command(self, **extra_args) -> list[str]:
         command = str(repo_dir / "scripts" / "benchmark_tensile")
 
         arg_dict = asdict(self)

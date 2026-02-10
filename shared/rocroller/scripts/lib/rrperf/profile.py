@@ -35,23 +35,23 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Dict, List
 
-import rrperf
+import rrperf.args
+import rrperf.utils
 from rrperf.problems import GEMMRun
 
 
 def has_omniperf() -> bool:
-    return shutil.which("omniperf")
+    return shutil.which("omniperf") is not None
 
 
 def run_omniperf(
     working_dir: Path,
-    executable: List[str],
+    executable: list[str],
     output: Path,
-    omniperf_workload_dir: Path = "profiling",
-    cwd: Path = ".",
-    env: Dict[str, str] = None,
+    omniperf_workload_dir: Path = Path("profiling"),
+    cwd: Path = Path("."),
+    env: dict[str, str] | None = None,
 ):
     cmd = [
         "omniperf",
@@ -97,17 +97,22 @@ def profile_tensile(config: Path, output_dir: Path, tensile_repo: Path):
             [str(tensile_path), str(config), working_dir_name],
             check=True,
         )
-        run_scripts = list(Path(working_dir_name).rglob("*/00_Final/build/run.sh"))
+        working_dir = Path(working_dir_name)
+        run_scripts = list(working_dir.rglob("*/00_Final/build/run.sh"))
         if len(run_scripts) != 1:
             print(f"Bad config: found {len(run_scripts)} run.sh files", run_scripts)
             return
 
         output: Path = output_dir / "results_tensile.txt"
-        run_omniperf(working_dir_name, [str(run_scripts[0])], output, omniperf_workload)
+        run_omniperf(working_dir, [str(run_scripts[0])], output, omniperf_workload)
 
 
 def profile_rr(
-    problem: GEMMRun, name: str, output_dir: Path, build_dir: Path, env: Dict[str, str]
+    problem: GEMMRun,
+    name: str,
+    output_dir: Path,
+    build_dir: Path,
+    env: dict[str, str] | None = None,
 ):
     i = 0
     output = output_dir / f"results_{name}.txt"
@@ -123,7 +128,7 @@ def profile_rr(
         working_dir,
         problem.command(),
         output,
-        "profile_" + name,
+        Path("profile_" + name),
         build_dir,
         env,
     )
@@ -155,17 +160,14 @@ def run(args):
 
 
 def profile(
-    output_dir: str,
-    tensile_repo: str,
-    build_dir: str = None,
-    suite: str = None,
-    config: Path = None,
+    output_dir: Path,
+    tensile_repo: Path,
+    build_dir: Path | None = None,
+    suite: str | None = None,
+    config: Path | None = None,
     **kwargs,
 ):
-    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    tensile_repo = Path(tensile_repo)
 
     if not has_omniperf():
         raise FileNotFoundError("Could not find omniperf")
@@ -176,8 +178,6 @@ def profile(
     if suite is not None:
         if build_dir is None:
             build_dir = rrperf.utils.get_build_dir()
-        else:
-            build_dir = Path(build_dir)
 
         for i, problem in enumerate(rrperf.utils.load_suite(suite)):
             profile_rr(
@@ -185,4 +185,5 @@ def profile(
                 f"{i:02}",
                 output_dir,
                 build_dir,
+                env=None,
             )

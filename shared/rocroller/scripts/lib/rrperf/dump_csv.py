@@ -132,7 +132,7 @@ def merge_types(data):
     return rec
 
 
-def dump_csv(suite: str, rundir: Path, outdir: Path = None):
+def dump_csv(suite: str, rundir: Path, outdir: Path | None = None):
     """
     Consolidate performance data and dump a hipblaslt-bench compatible CSV.
     Only the specified columns (INCLUDED_HEADERS) are included,
