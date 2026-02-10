@@ -140,7 +140,7 @@ namespace TensileLite
     struct CustomKernel
     {
         std::string name;
-        std::vector<int> args;
+        std::vector<KernelArgumentType> args;
     };
 
     struct SizeMapping
