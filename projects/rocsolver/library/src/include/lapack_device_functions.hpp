@@ -622,7 +622,13 @@ __device__ void lasrt_increasing(const rocblas_int n, T* D, rocblas_int* stack)
 
 /** IAMAX finds the maximum element of a given vector.
     MAX_THDS should be 128, 256, 512, or 1024, and sval should
-    be a shared array of size MAX_THDS. **/
+    be a shared array of size MAX_THDS.
+
+    NOTE: iamax finds element of maximum |Re(.)| + |Im(.)| (this is like the inf-norm)
+   imax1 finds element of maximum absolute value (this is like the 2-norm).
+
+   The absolute value is sqrt( Re(.)^2 + Im(.)^2 ).
+   IAMAX and IMAX1 behave the same for real numbers. **/
 template <int MAX_THDS, typename T, typename I, typename S>
 __device__ void iamax(const I tid, const I n, T* A, const I incA, S* sval)
 {
