@@ -26,7 +26,8 @@
 using ::ck::DeviceMem;
 using ::ck::HostTensorDescriptor;
 using ::ck::Tensor;
-
+static ck::index_t param_mask     = 0xffff;
+static ck::index_t instance_index = -1;
 template <typename Tuple>
 class TestGroupedConvndBwdData : public ::testing::Test
 {
@@ -173,6 +174,12 @@ class TestGroupedConvndBwdData : public ::testing::Test
 
         for(std::size_t i = 0; i < op_ptrs.size(); ++i)
         {
+            if((instance_index != -1) && (instance_index != static_cast<int>(i)))
+            {
+                // skip test if instance_index is specified
+                continue;
+            }
+
             auto& op_ptr      = op_ptrs[i];
             auto argument_ptr = op_ptr->MakeArgumentPointer(out_device_buf.GetDeviceBuffer(),
                                                             wei_device_buf.GetDeviceBuffer(),
@@ -277,9 +284,14 @@ class TestGroupedConvndBwdData : public ::testing::Test
 
         for(auto split_k : split_ks)
         {
-            for(auto& param : conv_params)
+            for(size_t i = 0; i < conv_params.size(); i++)
             {
-                pass = pass && PerformConvDataScale(param, split_k);
+                if((param_mask & (1 << i)) == 0)
+                {
+                    continue;
+                }
+                auto& param = conv_params[i];
+                pass        = pass && PerformConvDataScale(param, split_k);
             }
         }
         EXPECT_TRUE(pass);
@@ -321,4 +333,21 @@ TYPED_TEST(TestGroupedConvndBwdData3d, Test3D)
         {3, 1, 64, 16, 32, {3, 3, 3}, {28, 28, 28}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
 
     this->Run();
+}
+
+int main(int argc, char** argv)
+{
+    testing::InitGoogleTest(&argc, argv);
+    if(argc == 1) {}
+    else if(argc == 3)
+    {
+        param_mask     = strtol(argv[1], nullptr, 0);
+        instance_index = atoi(argv[2]);
+    }
+    else
+    {
+        std::cout << "Usage of " << argv[0] << std::endl;
+        std::cout << "Arg1,2: param_mask instance_index(-1 means all)" << std::endl;
+    }
+    return RUN_ALL_TESTS();
 }

@@ -25,11 +25,12 @@
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
 
-using I8   = int8_t;
-using F16  = ck::half_t;
-using BF16 = ck::bhalf_t;
-using F32  = float;
-
+using I8                          = int8_t;
+using F16                         = ck::half_t;
+using BF16                        = ck::bhalf_t;
+using F32                         = float;
+static ck::index_t param_mask     = 0xffff;
+static ck::index_t instance_index = -1;
 // This is pretty much a fully functional profiler function, but I only implemented it here to add a
 // proper gtest test for the scaleadd_ab flavor. At some point we may want to move this and add it
 // to the ckProfiler.
@@ -277,8 +278,15 @@ bool profile_grouped_conv_fwd_scaleadd_ab_impl(int do_verification,
                                       wei_bias_device_buf.GetDeviceBuffer()};
     std::array<const void*, 0> ds{};
 
-    for(auto& op_ptr : op_ptrs)
+    for(size_t i = 0; i < op_ptrs.size(); i++)
     {
+        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
+        {
+            // skip test if instance_index is specified
+            continue;
+        }
+        auto& op_ptr = op_ptrs[i];
+
         auto argument_ptr = op_ptr->MakeArgumentPointer(as,
                                                         bs,
                                                         ds,
@@ -329,15 +337,20 @@ class TestGroupedConvndFwdScaleaddAB : public ::testing::Test
     {
         EXPECT_FALSE(conv_params.empty());
         bool pass = true;
-        for(auto& param : conv_params)
+        for(size_t i = 0; i < conv_params.size(); i++)
         {
-            pass = pass && profile_grouped_conv_fwd_scaleadd_ab_impl<NDimSpatial,
-                                                                     InLayout,
-                                                                     WeiLayout,
-                                                                     OutLayout,
-                                                                     InDataType,
-                                                                     WeiDataType,
-                                                                     OutDataType>(
+            if((param_mask & (1 << i)) == 0)
+            {
+                continue;
+            }
+            auto& param = conv_params[i];
+            pass        = pass && profile_grouped_conv_fwd_scaleadd_ab_impl<NDimSpatial,
+                                                                            InLayout,
+                                                                            WeiLayout,
+                                                                            OutLayout,
+                                                                            InDataType,
+                                                                            WeiDataType,
+                                                                            OutDataType>(
                                true,  // do_verification
                                1,     // init_method: integer value
                                false, // do_log
@@ -404,4 +417,21 @@ TYPED_TEST(TestGroupedConvndFwdScaleaddAB3d, Test3D)
     this->conv_params.push_back(
         {3, 96, 1, 1, 1, {3, 3, 3}, {120, 40, 20}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
     this->template Run<3>();
+}
+
+int main(int argc, char** argv)
+{
+    testing::InitGoogleTest(&argc, argv);
+    if(argc == 1) {}
+    else if(argc == 3)
+    {
+        param_mask     = strtol(argv[1], nullptr, 0);
+        instance_index = atoi(argv[2]);
+    }
+    else
+    {
+        std::cout << "Usage of " << argv[0] << std::endl;
+        std::cout << "Arg1,2: param_mask instance_index(-1 means all)" << std::endl;
+    }
+    return RUN_ALL_TESTS();
 }

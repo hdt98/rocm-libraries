@@ -184,7 +184,8 @@ bool profile_gemm_mx_impl(int do_verification,
                           int KBatch,
                           int n_warmup,
                           int n_iter,
-                          uint64_t rotating = 0)
+                          uint64_t rotating  = 0,
+                          int instance_index = -1)
 {
     using tensor_operation::device::instance::Col;
     using tensor_operation::device::instance::E8M0;
@@ -455,8 +456,14 @@ bool profile_gemm_mx_impl(int do_verification,
     bool pass             = true;
 
     // profile device GEMM instances
-    for(auto& op_ptr : op_ptrs)
+    for(size_t j = 0; j < op_ptrs.size(); j++)
     {
+        if((instance_index != -1) && (instance_index != static_cast<int>(j)))
+        {
+            // skip test if instance_index is specified
+            continue;
+        }
+        auto& op_ptr                 = op_ptrs[j];
         std::vector<int> kbatch_list = {1, 2, 4, 8, 16, 19, 32, 38}; // use these when KBatch <= 0
 
         if(KBatch > 0)
