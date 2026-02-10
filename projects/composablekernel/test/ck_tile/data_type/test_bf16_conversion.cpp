@@ -412,30 +412,29 @@ TEST_F(Bf16ConversionTest, DenormalHandling)
 // Test overflow handling
 TEST_F(Bf16ConversionTest, OverflowHandling)
 {
-    // Note: BF16 has the same 8-bit exponent as float32, so they have the same range.
-    // Float max does NOT overflow to bf16 infinity - it rounds to bf16 max.
-    // Only values larger than bf16 max (which would require more than 8 exponent bits) overflow.
+    // Note: BF16 has the same 8-bit exponent as float32, but only 7 mantissa bits vs 23.
+    // This means bf16::max (0x7F7F) ≈ 3.39e38 is LESS than float::max ≈ 3.40e38.
+    // With IEEE RTN (round-to-nearest-even) rounding, float::max correctly rounds UP
+    // to infinity since it's closer to inf than to bf16::max.
+    // This is the correct IEEE-754 behavior for hardware bf16 conversion.
 
-    // Test float max -> bf16 max (not infinity, since same exponent range)
+    // Test float max -> infinity (IEEE RTN rounding behavior)
     {
         float f      = std::numeric_limits<float>::max();
         bf16_t b     = float_to_bf16(f);
         float result = bf16_to_float(b);
-        // Should be bf16 max (0x7F7F), not infinity
-        // bf16 max is approximately 3.39e38
-        EXPECT_FALSE(std::isinf(result))
-            << "Float max should NOT overflow to bf16 infinity (same exponent range)";
-        EXPECT_GT(result, 3.0e38f) << "Float max should convert to a very large bf16 value";
+        // With RTN rounding, float::max rounds up to infinity because:
+        // float::max (0x7F7FFFFF) > bf16::max (0x7F7F), and RTN rounds to nearest
+        EXPECT_TRUE(std::isinf(result) && result > 0)
+            << "Float max should overflow to bf16 +infinity with RTN rounding";
     }
 
     {
         float f      = -std::numeric_limits<float>::max();
         bf16_t b     = float_to_bf16(f);
         float result = bf16_to_float(b);
-        EXPECT_FALSE(std::isinf(result))
-            << "Negative float max should NOT overflow to bf16 -infinity";
-        EXPECT_LT(result, -3.0e38f)
-            << "Negative float max should convert to a very large negative bf16 value";
+        EXPECT_TRUE(std::isinf(result) && result < 0)
+            << "Negative float max should overflow to bf16 -infinity with RTN rounding";
     }
 
     // Test infinity passthrough

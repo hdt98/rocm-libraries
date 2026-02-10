@@ -325,7 +325,7 @@ TEST_F(Bf16VectorTest, VectorEdgeCases)
         EXPECT_EQ(static_cast<float>(vec.w), 0.0f);
     }
 
-    // Vector conversion with float max (same exponent range as bf16)
+    // Vector conversion with float max (IEEE RTN rounding to infinity)
     {
         fp32x2_t f32_vec;
         f32_vec.x = std::numeric_limits<float>::max();
@@ -333,15 +333,15 @@ TEST_F(Bf16VectorTest, VectorEdgeCases)
 
         bf16x2_t bf16_vec = fp32x2_to_bf16x2(f32_vec);
 
-        // BF16 has same 8-bit exponent as float32, so float max does NOT overflow
-        // It rounds to bf16 max instead
+        // BF16 has same 8-bit exponent but only 7 mantissa bits (vs 23 for float32).
+        // So bf16::max < float::max. With IEEE RTN rounding, float::max correctly
+        // rounds up to infinity since it's the nearest representable value.
         float result_x = bf16_to_float(bf16_vec.x);
         float result_y = bf16_to_float(bf16_vec.y);
-        EXPECT_FALSE(std::isinf(result_x)) << "Float max should NOT overflow to bf16 infinity";
-        EXPECT_FALSE(std::isinf(result_y))
-            << "Negative float max should NOT overflow to bf16 -infinity";
-        EXPECT_GT(result_x, 3.0e38f) << "Should be a very large positive value";
-        EXPECT_LT(result_y, -3.0e38f) << "Should be a very large negative value";
+        EXPECT_TRUE(std::isinf(result_x) && result_x > 0)
+            << "Float max should overflow to bf16 +infinity with RTN rounding";
+        EXPECT_TRUE(std::isinf(result_y) && result_y < 0)
+            << "Negative float max should overflow to bf16 -infinity with RTN rounding";
     }
 
     // Vector conversion with denormals

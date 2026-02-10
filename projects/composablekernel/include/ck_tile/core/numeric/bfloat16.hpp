@@ -283,10 +283,10 @@ template <bf16_rounding_mode rounding =
               static_cast<bf16_rounding_mode>(CK_TILE_FLOAT_TO_BFLOAT16_DEFAULT)>
 CK_TILE_HOST_DEVICE constexpr bfloat16_t float_to_bf16(float f, constant<rounding> = {})
 {
-// Use builtin bfloat16 conversion only on gfx950 as its predecessors do not support bf16 cvt
-// instructions, resulting in suboptimal performance; Add host side marcro check for consistency
-// during accuracy tests.
-#if CK_TILE_USE_LLVM_BUILTIN_BF16 && (defined(__gfx950__) || defined(CK_GFX950_SUPPORT))
+// Use builtin bfloat16 conversion on gfx950 and gfx12 as they support native bf16 cvt
+// instructions; Add host side macro check for consistency during accuracy tests.
+#if CK_TILE_USE_LLVM_BUILTIN_BF16 && \
+    (defined(__gfx950__) || defined(__gfx12__) || defined(CK_GFX950_SUPPORT))
     return static_cast<bfloat16_t>(f);
 #else
     return bit_cast<bfloat16_t>(float_to_bf16_raw(f, constant<rounding>{}));
