@@ -175,7 +175,8 @@ namespace TensileLite
         int VectorWidthB = 1;
         int LocalSplitU = 1;
 
-        std::array<int, 2> waveGroup;
+        // Must be initialized because legacy schemas may not provide WaveGroup.
+        std::array<int, 2> waveGroup = {1, 1};
     };
 
     struct StreamKSettings

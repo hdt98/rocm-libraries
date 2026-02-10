@@ -191,46 +191,77 @@ class PredictionLibrary:
 
     @classmethod
     def FromOriginalState(cls, d, solutions):
-        libType = d["type"]
-        distance = d["distance"]
-        origTable = d["table"]
+        # Backward compatibility:
+        # - legacy schema may not contain "type"/"distance"
+        # - legacy Prediction libraries only contain "table"
+        libType   = d.get("type", "Prediction")
+        distance  = d.get("distance", None)
+        origTable = d.get("table", [])
+        origTableFc = d.get("table_fc", None)
 
         table_fc = []
         table = []
 
+        def _append_index(index, output):
+            try:
+                value = IndexSolutionLibrary(solutions[index])
+                output.append(value)
+            except (KeyError, IndexError, TypeError):
+                pass
+
+        def _append_range_indices(index_table, output):
+            # Common schema: [start_index, count]
+            if (
+                isinstance(index_table, list)
+                and len(index_table) == 2
+                and isinstance(index_table[0], int)
+                and isinstance(index_table[1], int)
+            ):
+                indexStart = index_table[0]
+                indexCount = index_table[1]
+                for index in range(indexStart, indexStart + indexCount):
+                    _append_index(index, output)
+                return
+
+            # Compatibility fallback: explicit index list
+            if isinstance(index_table, list):
+                for index in index_table:
+                    if isinstance(index, int):
+                        _append_index(index, output)
+
+        def _append_grid_indices(index_table, output):
+            for row in index_table:
+                try:
+                    index = row[1][0]
+                    _append_index(index, output)
+                except (KeyError, IndexError, TypeError):
+                    pass
+
+        def _append_explicit_indices(index_list, output):
+            for index in index_list:
+                _append_index(index, output)
+
         # libType = Prediction = Origami pool, save to table
         if libType == "Prediction":
-            try:
-                indexStart  = origTable[0]
-                indexOffset = origTable[1]
-                for index in range(indexStart, indexStart + indexOffset):
-                    value = IndexSolutionLibrary(solutions[index])
-                    table.append(value)
-                    # TODO- TOGGLE THIS LINE TO DECIDED IF Prediction Logic is also part of FormoCast Pool
-                    # table_fc.append(value)
-            except KeyError:
-                pass
+            _append_range_indices(origTable, table)
         # libType == FreeSize or Matching(distance = GridBased), save to table_fc (formocast)
         else:
             # Different way to append GridBased logic yaml to FormoCast
             if distance == "GridBased":
-                for row in origTable:
-                    try:
-                        index = row[1][0]
-                        value = IndexSolutionLibrary(solutions[index])
-                        table_fc.append(value)
-                    except KeyError:
-                        pass
+                _append_grid_indices(origTable, table_fc)
             # FreeSizes: insert all table directly
             else:
-                try:
-                    indexStart  = origTable[0]
-                    indexOffset = origTable[1]
-                    for index in range(indexStart, indexStart + indexOffset):
-                        value = IndexSolutionLibrary(solutions[index])
-                        table_fc.append(value)
-                except KeyError:
-                    pass
+                _append_range_indices(origTable, table_fc)
+
+        # Newer schema may provide explicit FormoCast pool.
+        if origTableFc:
+            _append_explicit_indices(origTableFc, table_fc)
+
+        # Keep both pools available if only one exists in legacy data.
+        if not table and table_fc:
+            table = list(table_fc)
+        if not table_fc and table:
+            table_fc = list(table)
 
         return cls(table, table_fc)
 

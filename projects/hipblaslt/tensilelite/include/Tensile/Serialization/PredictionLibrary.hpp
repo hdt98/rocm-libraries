@@ -57,7 +57,7 @@ namespace TensileLite
 
                 // Serialize table for Origami
                 bool table_empty = false, table_fc_empty = false;
-                bool is_out = iot::outputting(io);
+                bool is_out      = iot::outputting(io);
                 std::vector<int> mappingIndices;
                 if(is_out)
                 {
@@ -71,8 +71,7 @@ namespace TensileLite
                 else
                 {
                     iot::mapRequired(io, "table", mappingIndices);
-                    if(mappingIndices.empty())
-                        table_empty = true;
+                    table_empty = mappingIndices.empty();
                 }
                 // Serialize table_fc for FormoCast
                 std::vector<int> mappingIndices_fc;
@@ -87,9 +86,8 @@ namespace TensileLite
                 }
                 else
                 {
-                    iot::mapRequired(io, "table_fc", mappingIndices_fc);
-                    if(mappingIndices_fc.empty())
-                        table_fc_empty = true;
+                    iot::mapOptional(io, "table_fc", mappingIndices_fc);
+                    table_fc_empty = mappingIndices_fc.empty();
                 }
                 if(table_empty && table_fc_empty)
                 {
