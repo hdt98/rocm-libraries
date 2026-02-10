@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -378,6 +378,106 @@ try
                                                        B,
                                                        ldb,
                                                        info));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+/******************** LARFT ********************/
+hipsolverStatus_t hipsolverDnXlarft_bufferSize(hipsolverDnHandle_t   handle,
+                                               hipsolverDnParams_t   params,
+                                               hipsolverDirectMode_t direct,
+                                               hipsolverStorevMode_t storev,
+                                               int64_t               n,
+                                               int64_t               k,
+                                               hipDataType           dataTypeV,
+                                               const void*           V,
+                                               int64_t               ldv,
+                                               hipDataType           dataTypeTau,
+                                               const void*           tau,
+                                               hipDataType           dataTypeT,
+                                               void*                 T,
+                                               int64_t               ldt,
+                                               hipDataType           computeType,
+                                               size_t*               lworkOnDevice,
+                                               size_t*               lworkOnHost)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!params)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    return hipsolver::cuda2hip_status(
+        cusolverDnXlarft_bufferSize((cusolverDnHandle_t)handle,
+                                    (cusolverDnParams_t)params,
+                                    hipsolver::hip2cuda_direct(direct),
+                                    hipsolver::hip2cuda_storev(storev),
+                                    n,
+                                    k,
+                                    dataTypeV,
+                                    V,
+                                    ldv,
+                                    dataTypeTau,
+                                    tau,
+                                    dataTypeT,
+                                    T,
+                                    ldt,
+                                    computeType,
+                                    lworkOnDevice,
+                                    lworkOnHost));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDnXlarft(hipsolverDnHandle_t   handle,
+                                    hipsolverDnParams_t   params,
+                                    hipsolverDirectMode_t direct,
+                                    hipsolverStorevMode_t storev,
+                                    int64_t               n,
+                                    int64_t               k,
+                                    hipDataType           dataTypeV,
+                                    void*                 V,
+                                    int64_t               ldv,
+                                    hipDataType           dataTypeTau,
+                                    void*                 tau,
+                                    hipDataType           dataTypeT,
+                                    void*                 T,
+                                    int64_t               ldt,
+                                    hipDataType           computeType,
+                                    void*                 workOnDevice,
+                                    size_t                lworkOnDevice,
+                                    void*                 workOnHost,
+                                    size_t                lworkOnHost)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!params)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    return hipsolver::cuda2hip_status(cusolverDnXlarft((cusolverDnHandle_t)handle,
+                                                       (cusolverDnParams_t)params,
+                                                       hipsolver::hip2cuda_direct(direct),
+                                                       hipsolver::hip2cuda_storev(storev),
+                                                       n,
+                                                       k,
+                                                       dataTypeV,
+                                                       V,
+                                                       ldv,
+                                                       dataTypeTau,
+                                                       tau,
+                                                       dataTypeT,
+                                                       T,
+                                                       ldt,
+                                                       computeType,
+                                                       workOnDevice,
+                                                       lworkOnDevice,
+                                                       workOnHost,
+                                                       lworkOnHost));
 }
 catch(...)
 {
