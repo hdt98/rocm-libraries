@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import stat
+import resource
 import subprocess
 import json
 import sys
@@ -14,8 +15,16 @@ def is_executable(file_path: Path) -> bool:
         and not file_path.name.startswith('.')  # skip hidden files
     )
 
+def disable_core_dump():
+    """Disable core dump generation."""
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
 def list_gtest_fixtures(executable: Path):
     """Run the executable with --gtest_list_tests and return fixture names."""
+    if "miopen_gtest" in str(executable):
+        print(f"Info: Skipping single-binary {executable}.", file=sys.stderr)
+        return []
+
     try:
         # Run the command and capture output
         result = subprocess.run(
@@ -23,10 +32,11 @@ def list_gtest_fixtures(executable: Path):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=10  # prevent hanging
+            timeout=10,  # prevent hanging
+            preexec_fn=disable_core_dump
         )
         if result.returncode != 0:
-            print(f"Warning: {executable} returned non-zero exit code. Assuming it is not a gtest.", file=sys.stderr)
+            print(f"Warning: Skipping '{executable}' due to non-zero exit code. Not a gtest..?", file=sys.stderr)
             return []
 
         fixtures = []
@@ -54,8 +64,7 @@ def main(directory: str, output_file: str):
         if is_executable(file):
             fixtures = list_gtest_fixtures(file)
             if fixtures:
-#                src_file = file.name[5:] + ".cpp" # For MIOpen gtests, src_file.cpp <-> test_src_file
-                src_file = f"bin/{file.name}" # however, we're currently using the exe's name
+                src_file = f"bin/{file.name}"
                 results[src_file] = fixtures
                 fixture_count += len(fixtures)
 
@@ -68,9 +77,21 @@ def main(directory: str, output_file: str):
         print(f"Error writing JSON file: {e}", file=sys.stderr)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <directory> <output.json>", file=sys.stderr)
-        sys.exit(1)
+    if len(sys.argv) < 2:
+        bin_path = Path(".") / "build" / "bin"
+        if not bin_path.is_dir():
+            print(f"Usage: {sys.argv[0]} <directory> <output.json>", file=sys.stderr)
+            sys.exit(1)
+        bin_dir = str(bin_path)
+    else:
+        if not os.path.isdir(sys.argv[1]):
+            print(f"Error: {sys.argv[1]} is not a valid directory", file=sys.stderr)
+            sys.exit(1)
+        bin_dir = sys.argv[1]
 
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) < 3:
+        output_file = "fixtures.json"
+    else:
+        output_file = sys.argv[2]
 
+    main(bin_dir, output_file)

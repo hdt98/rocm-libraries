@@ -103,8 +103,8 @@ def get_gtest_filter(tests, fixturemap):
             for f in fixturemap[t]:
                 gtest_filter += f + "*:"
                 fixture_count += 1
-        else:
-            print(f"Warning: Diff references test {t}. However, it is not in the fixturemap")
+        elif not "miopen_gtest" in t:
+            print(f"Warning: Diff references test {t}. However, it is not in the fixturemap.")
     if gtest_filter:
         gtest_filter = gtest_filter[:-1]
         print(f"Added {fixture_count} fixtures to gtest_filter")
@@ -173,6 +173,9 @@ def main():
         idx = sys.argv.index("--fixturemap")
         if idx + 1 < len(sys.argv):
             fixture_file = sys.argv[idx + 1]
+            if not os.path.exists(fixture_file):
+                print(f"Error: Fixture map file '{fixture_file}'not found. Please check the path or run 'all_gtest_fixtures.py' to generate it. Exiting.", file=sys.stderr)
+                sys.exit(1)
     if not os.path.exists(depmap_json):
         print(f"Dependency map JSON not found: {depmap_json}")
         sys.exit(1)
@@ -185,9 +188,13 @@ def main():
     else:
         tests = select_tests(file_to_executables, changed_files, filter_mode)
         gtest_filter = ""
-        if tests and fixture_file and os.path.exists(fixture_file):
-            tests_to_fixtures = load_fixturemap(fixture_file)
-            gtest_filter = get_gtest_filter(tests, tests_to_fixtures)
+        if tests and fixture_file:
+            if os.path.exists(fixture_file):
+                tests_to_fixtures = load_fixturemap(fixture_file)
+                gtest_filter = get_gtest_filter(tests, tests_to_fixtures)
+            else:
+                print(f"Warning: Fixture map file not found: {fixture_file}. Skipping gtest_filter.", file=sys.stderr)
+                gtest_filter = ""
 
     with open(output_json, "w") as f:
         if gtest_filter:
