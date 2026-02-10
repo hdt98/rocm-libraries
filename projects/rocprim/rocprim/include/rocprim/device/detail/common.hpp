@@ -23,6 +23,9 @@
 
 #include <hip/hip_runtime.h>
 
+#include "../../config.hpp"
+#include "../../detail/various.hpp"
+
 BEGIN_ROCPRIM_NAMESPACE
 
 namespace detail
@@ -34,7 +37,8 @@ namespace detail
 /// When \p number_of_blocks * \p block_size exceeds this limit, then 2-dimensional grid is used.
 /// The kernel must use flat_block_id() or a similar code to calculate the 2d block id and compare
 /// it with \p number_of_blocks to prevent out-of-bounds accesses.
-inline dim3 calculate_grid_dim(unsigned int number_of_blocks, unsigned int block_size)
+ROCPRIM_INLINE
+dim3 calculate_grid_dim(unsigned int number_of_blocks, unsigned int block_size)
 {
     const unsigned int max_blocks = std::numeric_limits<uint32_t>::max() / block_size;
     const unsigned int blocks_y   = ceiling_div(number_of_blocks, max_blocks);

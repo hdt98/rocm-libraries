@@ -680,6 +680,18 @@ public:
     }
 };
 
+ROCPRIM_INLINE
+hipError_t is_graph_capture(hipStream_t stream, bool& is_capturing)
+{
+    hipStreamCaptureStatus status;
+    unsigned long long     id;
+    ROCPRIM_RETURN_ON_ERROR(hipStreamGetCaptureInfo(stream, &status, &id));
+
+    is_capturing = status == hipStreamCaptureStatus::hipStreamCaptureStatusActive;
+
+    return hipSuccess;
+}
+
 } // end namespace detail
 END_ROCPRIM_NAMESPACE
 
