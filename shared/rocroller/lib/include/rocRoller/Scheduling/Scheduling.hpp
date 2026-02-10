@@ -143,7 +143,7 @@ namespace rocRoller
             //> This observer requires ctx to determine if it's required at runtime.
             {
                 a.runtimeRequired(ctx)
-            } -> std::convertible_to<bool>;
+                } -> std::convertible_to<bool>;
         };
 
         struct IObserver
