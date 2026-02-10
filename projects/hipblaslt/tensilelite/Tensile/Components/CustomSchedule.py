@@ -1666,7 +1666,7 @@ def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
         syncTable = [
             # Loop start: must guarantee prior-iteration LR1 completion for the next iteration's early MFMA use.
             -1, SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 before starting main loop"),
-            5,  SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 for the remaining main loop"),
+            5,  SWaitCnt(dscnt=5, vlcnt=-1, vscnt=-1, comment="Wait for prior LRA1/LRB1 for the remaining main loop"),
 
             14,  SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete to start GRA"),
             14,  SBarrier(comment=""),
@@ -1687,19 +1687,12 @@ def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
             'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
             'GRIncB' : [[9,9,10,10,11,11,12,13,13]],
 
-            # Current iteration local reads
             'LRA0'   : [[0,1,2,3,4,5]],
-            'LRB0'   : [[6,9,12,15],
-                        #[7,8,9,10]
-                        ],
+            'LRB0'   : [[6,9,12,15]],
 
-            # Global reads (two instructions per GR -> explicit duplicates)
-            # NOTE: Avoid placing GRA between GRIncB (22-24) due to SCC usage.
             'GRA'    : [[14,14, 16,16, 18,18, 20,20, 22,22, 24,24],
                         [15,15, 17,17, 19,19, 21,21, 23,23, 25,25]],
-            'GRB'    : [[26,26, 30,30, 37,37, 43,43],
-                       # [30,30, 33,33, 36,36, 39,39]
-                        ],
+            'GRB'    : [[26,26, 30,30, 37,37, 43,43]],
 
             # Prefetch next iteration
             'LRA1'   : [[28,30,32,34,36,38],
