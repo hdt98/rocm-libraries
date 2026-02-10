@@ -413,29 +413,11 @@ struct MIOPEN_INTERNALS_EXPORT ConvBinWinogradRxSf2x3g1Fused final : FusionSolve
     ConvSolution GetSolution(const FusionContext& context,
                              const FusionDescription& problem) const override;
     float GetWti(const FusionContext&, const FusionDescription&) const override;
-};
-
-template <uint32_t Winodata, uint32_t Winofilter>
-struct ConvWinoFuryRxSFused final : FusionSolverBase
-{
-    const std::string& SolverDbId() const override
-    {
-        return GetSolverDbId<ConvWinoFuryRxSFused<Winodata, Winofilter>>();
-    }
-
-    bool IsApplicable(const FusionContext&, const FusionDescription&) const override;
-    bool IsDynamic() const override { return true; }
-    float GetWti(const FusionContext&, const FusionDescription&) const override;
     size_t GetWorkspaceSize(const FusionContext&, const FusionDescription&) const override;
     bool MayNeedWorkspace() const override { return true; }
 
     ConvSolution GetSolution(const FusionContext&, const FusionDescription&) const override;
 };
-
-#ifndef CONV_WINO_FURY_RXS_CPP
-extern template struct ConvWinoFuryRxSFused<2, 3>;
-// extern template struct ConvWinoFuryRxSFused<3, 2>;
-#endif
 
 struct MIOPEN_INTERNALS_EXPORT BnFwdInferActivationFused final : FusionSolverBase
 {
