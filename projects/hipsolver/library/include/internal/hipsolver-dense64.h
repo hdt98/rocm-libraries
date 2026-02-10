@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2024-2026 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 #ifndef HIPSOLVER_DENSE64_H
@@ -144,6 +144,45 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXpotrs(hipsolverDnHandle_t handle,
                                                      void*               B,
                                                      int64_t             ldb,
                                                      int*                info);
+
+// larft
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXlarft_bufferSize(hipsolverDnHandle_t   handle,
+                                                                hipsolverDnParams_t   params,
+                                                                hipsolverDirectMode_t direct,
+                                                                hipsolverStorevMode_t storev,
+                                                                int64_t               n,
+                                                                int64_t               k,
+                                                                hipDataType           dataTypeV,
+                                                                const void*           V,
+                                                                int64_t               ldv,
+                                                                hipDataType           dataTypeTau,
+                                                                const void*           tau,
+                                                                hipDataType           dataTypeT,
+                                                                void*                 T,
+                                                                int64_t               ldt,
+                                                                hipDataType           computeType,
+                                                                size_t*               lworkOnDevice,
+                                                                size_t*               lworkOnHost);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXlarft(hipsolverDnHandle_t   handle,
+                                                     hipsolverDnParams_t   params,
+                                                     hipsolverDirectMode_t direct,
+                                                     hipsolverStorevMode_t storev,
+                                                     int64_t               n,
+                                                     int64_t               k,
+                                                     hipDataType           dataTypeV,
+                                                     void*                 V,
+                                                     int64_t               ldv,
+                                                     hipDataType           dataTypeTau,
+                                                     void*                 tau,
+                                                     hipDataType           dataTypeT,
+                                                     void*                 T,
+                                                     int64_t               ldt,
+                                                     hipDataType           computeType,
+                                                     void*                 workOnDevice,
+                                                     size_t                lworkOnDevice,
+                                                     void*                 workOnHost,
+                                                     size_t                lworkOnHost);
 
 #ifdef __cplusplus
 }
