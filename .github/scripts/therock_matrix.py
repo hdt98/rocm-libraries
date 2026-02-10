@@ -11,6 +11,7 @@ subtree_to_project_map = {
     "projects/hipblaslt": "blas",
     "projects/hipcub": "prim",
     "projects/hipdnn": "hipdnn",
+    "projects/composablekernel": "composablekernel",
     "projects/hipfft": "fft",
     "projects/hiprand": "rand",
     "projects/hipsolver": "solver",
@@ -53,6 +54,10 @@ project_map = {
             "-DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
         ],
         "projects_to_test": ["miopen", "miopen_plugin"],
+    },
+    "composablekernel": {
+        "cmake_options": ["-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON"],
+        "projects_to_test": ["composablekernel"],
     },
     "fft": {
         "cmake_options": ["-DTHEROCK_ENABLE_FFT=ON", "-DTHEROCK_ENABLE_RAND=ON"],
