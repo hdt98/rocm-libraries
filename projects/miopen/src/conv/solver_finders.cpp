@@ -486,7 +486,7 @@ bool IsGEMMProblemTooLarge(const ProblemDescription& problem)
 
     // Workspace is within limit
     if(ws_sz <= max_size)
-    {        
+    {
         return false;
     }
 
