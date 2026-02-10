@@ -294,14 +294,16 @@ set(PY_RUN_GTEST "/dep/src/run_gtest")
       VERBATIM
   )
 
-set(BASE_SHA c5946cf2382a46b280c402f4ff397e382df1516e)
-set(TEST_SHA 21db4f318f39999b618b3f163941ea4ae378afe6)
+set(BN_BASE_SHA c5946cf2382a46b280c402f4ff397e382df1516e)
+set(BN_TEST_SHA 21db4f318f39999b618b3f163941ea4ae378afe6)
+set(GLU_BASE_SHA b567476bbd4946c66d6d48d5910899d820796ec4)
+set(GLU_TEST_SHA 59d8b9dbd727a8030f1038b14f89e3baabf152ca)
 
 # Generate JSON file
   add_custom_command(
       OUTPUT "${TESTS_TO_RUN_JSON}"
       COMMAND cp "${PY_MAIN}.py" "${PY_MAIN}" &&
-              python3 "${PY_MAIN}" select ${MAPPING_JSON} ${BASE_SHA} ${TEST_SHA}  --fixturemap=${FIXTURES_JSON}
+              python3 "${PY_MAIN}" select ${MAPPING_JSON} ${GLU_BASE_SHA} ${GLU_TEST_SHA}  --fixturemap=${FIXTURES_JSON}
       WORKING_DIRECTORY ${USER_BUILD_DIR}
       DEPENDS ${MAPPING_JSON} ${FIXTURES_JSON}
       COMMENT "Generating ${TESTS_TO_RUN_JSON}"
