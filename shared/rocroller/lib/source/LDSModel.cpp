@@ -553,7 +553,6 @@ namespace rocRoller::Scheduling::LDSModel
         The way to reproduce this behavior is to write a microkernel that uses ds_read_b64 with two cases:
             1) each thread accesses unique banks, e.g. thread 0 accesses bank 0 and 1, thread 1 accesses bank 2 and 3, etc.
             2) each thread accesses every other bank pairs, e.g. thread 0 accesses bank 0 and 1, thread 1 accesses bank 4, 5, etc.
-
             Compare the change in latency numbers from workgroup size of 64 to 128 for both cases.
             Notice only in case 2) do the latency numbers increase (gradually reach double).
         */

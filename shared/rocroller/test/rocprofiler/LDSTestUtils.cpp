@@ -259,7 +259,6 @@ namespace rocRoller
 
         const auto workgroupSize
             = config.useMultipleWorkgroupSizes ? GENERATE(64u, 128u, 256u) : 64u;
-
         const int  instrDwords      = GENERATE(1, 2, 4);
         const int  strideMultiplier = GENERATE(1, 2, 4, 8, 16);
         const bool write            = GENERATE(true, false);
