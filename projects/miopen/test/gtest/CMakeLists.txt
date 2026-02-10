@@ -280,6 +280,7 @@ set(PY_RUN_GTEST "/dep/src/run_gtest")
       OUTPUT ${FIXTURES_JSON}
       COMMAND cp "${PY_FIXTURES}.py" "${PY_FIXTURES}" &&
               python3 ${PY_FIXTURES} ${USER_BUILD_DIR}/bin
+      WORKING_DIRECTORY ${USER_BUILD_DIR}
       COMMENT "Generating ${FIXTURES_JSON}"
       VERBATIM
   )
@@ -319,12 +320,13 @@ set(GLU_TEST_SHA 59d8b9dbd727a8030f1038b14f89e3baabf152ca)
 #  )
 
   add_custom_target(
-    diff_check
-    DEPENDS miopen_gtest tests "${TESTS_TO_RUN_JSON}"
-    COMMENT "Needs '${CMAKE_SOURCE_DIR}/tests_to_run.json'"
-    COMMAND cp "${PY_RUN_GTEST}.py" "${PY_RUN_GTEST}" &&
-              python3 "${PY_RUN_GTEST}" "${USER_BUILD_DIR}/bin/miopen_gtest" "${TESTS_TO_RUN_JSON}"
-    VERBATIM
+      diff_check
+      DEPENDS miopen_gtest tests "${TESTS_TO_RUN_JSON}"
+      COMMENT "Running filtered gtests..."
+      COMMAND cp "${PY_RUN_GTEST}.py" "${PY_RUN_GTEST}" &&
+      python3 "${PY_RUN_GTEST}" "${USER_BUILD_DIR}/bin/miopen_gtest" "${TESTS_TO_RUN_JSON}"
+      WORKING_DIRECTORY ${USER_BUILD_DIR}
+      VERBATIM
   )
 
   if( NOT ENABLE_ASAN_PACKAGING )
