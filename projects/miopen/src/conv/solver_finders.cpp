@@ -34,6 +34,7 @@
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/solution.hpp>
 #include <miopen/utility/modified_z.hpp>
+#include <boost/range/adaptors.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_GEMM)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT)
