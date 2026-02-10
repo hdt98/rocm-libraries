@@ -125,8 +125,8 @@ inline void cblas_gemm(hipblasOperation_t       transA,
                                             tiB,
                                             to,
                                             tc,
-                                            tciA,
-                                            tciB,
+                                            tiA,
+                                            tiB,
                                             alt,
                                             isScaleAMXFormat,
                                             isScaleBMXFormat);
@@ -157,8 +157,8 @@ inline void cblas_gemm(hipblasOperation_t       transA,
                                              tiB,
                                              to,
                                              tc,
-                                             tciA,
-                                             tciB,
+                                             tiA,
+                                             tiB,
                                              alt);
             return;
         }
