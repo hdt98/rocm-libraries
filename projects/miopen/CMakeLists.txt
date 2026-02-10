@@ -25,6 +25,8 @@
 ################################################################################
 cmake_minimum_required( VERSION 3.15 )
 
+set(MIOPEN_TEST_SINGLE_GTEST 1)
+
 if (POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
@@ -704,7 +706,10 @@ endif()
 # End KDB package creation
 
 if(NOT MIOPEN_TEST_DISCRETE)
-list(APPEND CPACK_COMPONENTS_ALL clients)
+    set(MIOPEN_TEST_SINGLE_GTEST 1)
+endif()
+if(MIOPEN_TEST_SINGLE_GTEST)
+    list(APPEND CPACK_COMPONENTS_ALL clients)
 endif()
 
 rocm_create_package(
