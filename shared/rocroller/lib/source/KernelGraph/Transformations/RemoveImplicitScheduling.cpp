@@ -56,7 +56,12 @@ namespace rocRoller::KernelGraph
 
             using Colour = std::set<std::pair<int, int>>;
 
-            std::map<Colour, std::vector<int>> reverse;
+	    // key: Colour (ordered set of (coord_id, coord_val) pairs).
+	    // value: vector of control_ids.
+	    // Q: Which control nodes will have the same key (Colour)?
+	    // A: The Multiply nodes that compute the same D wavetile
+	    // because small k is not coloured yet. 
+            std::map<Colour, std::vector<int>> colourToNodesMap;
 
             for(auto node : nodes)
             {
@@ -64,22 +69,25 @@ namespace rocRoller::KernelGraph
 
                 Colour key(opColour.begin(), opColour.end());
 
-                reverse[key].push_back(node);
+                colourToNodesMap[key].push_back(node);
             }
 
-            for(auto& [key, keyOps] : reverse)
+            for(auto& [key, keyOps] : colourToNodesMap)
             {
                 std::ranges::sort(keyOps, TopologicalCompare(graph));
             }
 
             std::set<int> edgesToKeep;
-
-            for(auto& [key, keyOps] : reverse)
+ 
+	    // edgesToKeep: edges b/w the control nodes that have the same key.
+            for(auto& [key, keyOps] : colourToNodesMap)
             {
                 for(int idx = 0; idx + 1 < keyOps.size(); idx++)
                 {
                     auto thisEdge = graph.control.findEdge(keyOps[idx], keyOps[idx + 1]);
 
+		    // If no edge connects the two control nodes at idx and idx+1,
+		    // confirm that keyOps[idx] happens first, and add an edge b/w them.
                     if(!thisEdge)
                     {
                         AssertFatal(graph.control.compareNodes(
@@ -157,6 +165,7 @@ namespace rocRoller::KernelGraph
     {
         auto rv = original;
 
+	// grouped by immediate body-parent
         auto groupedMultiplyNodes = NodeScheduling::getGroupedNodes<ControlGraph::Multiply>(rv);
 
         for(auto& [parent, nodes] : groupedMultiplyNodes)

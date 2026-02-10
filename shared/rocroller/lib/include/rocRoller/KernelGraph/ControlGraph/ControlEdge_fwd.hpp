@@ -32,6 +32,7 @@ namespace rocRoller
 {
     namespace KernelGraph::ControlGraph
     {
+        struct Dependency;
         struct Sequence;
         struct Body; // Of kernel, for loop, if, etc.
         struct Else; // Alternative body for false conditional
@@ -39,7 +40,7 @@ namespace rocRoller
         struct Initialize;
         struct ForLoopIncrement;
 
-        using ControlEdge = std::variant<Sequence, Initialize, ForLoopIncrement, Body, Else>;
+        using ControlEdge = std::variant<Dependency, Sequence, Initialize, ForLoopIncrement, Body, Else>;
 
         template <typename T>
         concept CControlEdge = std::constructible_from<ControlEdge, T>;

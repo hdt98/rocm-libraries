@@ -42,6 +42,11 @@ namespace rocRoller
          */
 
         /**
+         * Dependency edges indicate data dependencies.
+         */
+        RR_EMPTY_STRUCT_WITH_NAME(Dependency);
+
+        /**
          * Sequence edges indicate sequential dependencies.  A node is considered schedulable
          * if all of its incoming Sequence edges have been scheduled.
          */

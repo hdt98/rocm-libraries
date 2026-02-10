@@ -62,6 +62,7 @@
 #include <rocRoller/KernelGraph/Transforms/RemapOutputTiles.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveDuplicates.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveImplicitScheduling.hpp>
+#include <rocRoller/KernelGraph/Transforms/RemoveScheduling.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveSetCoordinate.hpp>
 #include <rocRoller/KernelGraph/Transforms/ScheduleMultiplyAndLDS.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
