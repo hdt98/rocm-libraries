@@ -242,11 +242,12 @@ void latrd_getError(const rocblas_handle handle,
     // input data initialization
     latrd_initData<true, true, T>(handle, n, dA, lda, hA);
 
-    // Create thin wrapper of input matrix
+    // Create a copy of input matrix into iA
     rocblas_int b = 0;
     auto iAWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n);
     auto iA = (*iAWrap).block(BDesc().nrows(n).ncols(n));
-    std::cout << "max|A - A^*| = " << (iA - adjoint(iA)).max_coeff_norm() << std::endl;
+    // Prints for debugging (1. check if input A is self-adjoint; 2. print input A)
+    /* std::cout << "max|A - A^*| = " << (iA - adjoint(iA)).max_coeff_norm() << std::endl; */
     /* iA.print(); */
 
     // execute computations
@@ -260,19 +261,20 @@ void latrd_getError(const rocblas_handle handle,
     // CPU lapack
     cpu_latrd(uplo, n, k, hA[0], lda, hE[0], hTau[0], hW[0], ldw);
 
-    // Create thin wrappers of matrices A and W
+    // create copies of matrices A and W after calls to rocsolver and lapack
     auto AWrap = HMat::Wrap(hA[0] + b * lda * n, lda, n);
     auto WWrap = HMat::Wrap(hW[0] + b * ldw * n, ldw, n);
     auto AResWrap = HMat::Wrap(hARes[0] + b * lda * n, lda, n);
     auto WResWrap = HMat::Wrap(hWRes[0] + b * ldw * n, ldw, n);
 
-    // We want the sub-blocks starting from row 0, col 0 and with size n x n of A and B
     auto A = (*AWrap).block(BDesc().nrows(n).ncols(n));
     /* std::cout << "Matrix A.diag() (lapack):" << std::endl; */
     /* A.diag().print(); */
     auto E = *HMat::Convert(hE[0], 1, n - 1);
     /* std::cout << "Matrix E (lapack):" << std::endl; */
     /* E.print(); */
+    // Create tridiagonal Tl (lapack) with diagonal and off-diagonal entries computed with lapack's LATRD
+    // Tl is a (k + 1) x (k + 1) matrix
     auto Tl = HMat::Zeros(n, n);
     Tl.diag(A.diag());
     Tl.sub_diag(E);
@@ -287,15 +289,19 @@ void latrd_getError(const rocblas_handle handle,
     auto ERes = *HMat::Convert(hERes[0], 1, n - 1);
     /* std::cout << "Matrix E (rocsolver):" << std::endl; */
     /* E.print(); */
+    // Create tridiagonal Tr (rocsolver) with diagonal and off-diagonal entries computed with rocsolver's LATRD
+    // Tr is a (k + 1) x (k + 1) matrix
     auto Tr = HMat::Zeros(n, n);
     Tr.diag(ARes.diag());
     Tr.sub_diag(ERes);
     Tr.sup_diag(ERes);
-
     /* auto WRes = (*WResWrap).block(BDesc().nrows(n).ncols(k)); */
     /* std::cout << "Matrix Wres (rocsolver):" << std::endl; */
     /* WRes.print(); */
 
+    //
+    // Old error bounds, comparing rocsolver's outputs with lapack's outputs
+    //
     // error is max(||hA - hARes|| / ||hA||, ||hW - hWRes|| / ||hW||)
     // (THIS DOES NOT ACCOUNT FOR NUMERICAL REPRODUCIBILITY
     // ISSUES. IT MIGHT BE REVISITED IN THE FUTURE) using frobenius norm
@@ -307,8 +313,24 @@ void latrd_getError(const rocblas_handle handle,
     /* err = norm_error('F', n - k, k, ldw, hW[0] + offset, hWRes[0] + offset); */
     /* *max_err = err > *max_err ? err : *max_err; */
 
+    //
+    // New error bounds, compare (k + 1) eigenvalues of Tl and Tr
+    //
+    // A proper bound would be (following Weyl)
+    //    max| l_lapack - l_rocsolver | < C * ulp * (k + 1) * max|l_lapack|
+    //
+    // where `l_lapack` (`l_rocsolver`) stand for eigenvalues computed from
+    // lapack (rocsolver) results (diagonal and off-diagonal entries) of LATRD,
+    // and `C` is a "small" constant.
+    //
+    // (Strictly speaking, the current input matrices should satisfy a bound
+    // that grows with `sqrt(k + 1)` instead of `k + 1`).
+    //
     if(uplo == rocblas_fill_lower)
     {
+        // When `uplo == rocblas_fill_lower` LATRD will update the first `k` columns of A.
+        //
+        // Extract first `k + 1` columns of Tl and Tr.
         auto Tl_k = Tl.block(BDesc().nrows(k + 1).ncols(k + 1));
         auto Tr_k = Tr.block(BDesc().nrows(k + 1).ncols(k + 1));
 
@@ -329,6 +351,9 @@ void latrd_getError(const rocblas_handle handle,
     }
     else // if(uplo == rocblas_fill_upper)
     {
+        // When `uplo == rocblas_fill_upper` LATRD will update the last `k` columns of A.
+        //
+        // Extract last `k + 1` columns of Tl and Tr.
         auto Tl_k
             = Tl.block(BDesc().from_row(n - k - 2).nrows(k + 1).from_col(n - k - 2).ncols(k + 1));
         auto Tr_k
@@ -531,6 +556,9 @@ void testing_latrd(Arguments& argus)
                              &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
                              argus.profile_kernels, argus.perf);
 
+    //
+    // This error bound is very lax!
+    //
     // validate results for rocsolver-test
     // using k*n * machine_precision as tolerance
     if(argus.unit_check)
