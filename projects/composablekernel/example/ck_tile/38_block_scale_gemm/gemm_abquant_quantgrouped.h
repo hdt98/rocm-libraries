@@ -5,7 +5,7 @@
 
 #include "gemm_utils.hpp"
 
-#if defined(CK_TILE_EIGHTWARP_SUP)
+#if defined(CK_USE_GFX950)
 template <typename T, bool TransposeC = true>
 using GemmConfig = GemmConfigEightWarps<T, TransposeC>;
 template <typename T, bool TransposeC = true>
