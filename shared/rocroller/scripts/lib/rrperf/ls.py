@@ -30,6 +30,7 @@ import functools
 import shutil
 
 import rrperf.args as args
+import rrperf.rrsuites
 import rrperf.utils as utils
 
 
@@ -53,8 +54,7 @@ def run(args):
         else:
             suite = "all"
 
-    generator = utils.load_suite(suite)
-    for x in generator:
+    for x in rrperf.rrsuites.load_suite(suite):
         print(hline())
         print("-- rocRoller benchmark run")
         print("--")

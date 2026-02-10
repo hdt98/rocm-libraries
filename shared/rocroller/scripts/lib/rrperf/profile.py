@@ -37,6 +37,7 @@ import tempfile
 from pathlib import Path
 
 import rrperf.args
+import rrperf.rrsuites
 import rrperf.utils
 from rrperf.problems import GEMMRun
 
@@ -179,7 +180,7 @@ def profile(
         if build_dir is None:
             build_dir = rrperf.utils.get_build_dir()
 
-        for i, problem in enumerate(rrperf.utils.load_suite(suite)):
+        for i, problem in enumerate(rrperf.rrsuites.load_suite(suite)):
             profile_rr(
                 problem,
                 f"{i:02}",

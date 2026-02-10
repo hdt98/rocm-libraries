@@ -33,7 +33,6 @@ from hashlib import sha1
 from pathlib import Path
 
 import rrperf.git
-import rrperf.rrsuites
 
 
 def empty():
@@ -42,17 +41,6 @@ def empty():
 
 def sjoin(xs) -> str:
     return " ".join([str(x) for x in xs])
-
-
-def load_suite(suite: str):
-    """Load performance suite from rrsuites.py."""
-    return getattr(rrperf.rrsuites, suite)()
-
-
-def first_problem_from_suite(suite: str):
-    for problem in load_suite(suite):
-        return problem
-    raise RuntimeError(f"Suite {suite} has no problems.")
 
 
 def try_getting_commit(repo: Path | None) -> str | None:

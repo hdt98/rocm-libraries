@@ -34,6 +34,7 @@ from pathlib import Path
 
 import rrperf.args
 import rrperf.git
+import rrperf.rrsuites
 import rrperf.utils
 
 
@@ -113,7 +114,7 @@ def generate(
 
     generator = rrperf.utils.empty()
     if suite is not None:
-        generator = chain(generator, rrperf.utils.load_suite(suite))
+        generator = chain(generator, rrperf.rrsuites.load_suite(suite))
     else:
         print("No suite specified.")
         return

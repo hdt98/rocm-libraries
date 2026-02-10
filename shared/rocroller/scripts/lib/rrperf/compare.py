@@ -40,15 +40,15 @@ from dataclasses import dataclass, field
 
 import rrperf.args as args
 import rrperf.problems
+import rrperf.rrsuites
 import rrperf.specs
-import rrperf.utils
 from rrperf.problems import GEMMResult, RRPerfResult
 from rrperf.specs import MachineSpecs
 
 
 def priority_problems():
     """Load priority problem args from rrsuites.py."""
-    return rrperf.utils.load_suite("priority_problems")
+    return rrperf.rrsuites.load_suite("priority_problems")
 
 
 @dataclass

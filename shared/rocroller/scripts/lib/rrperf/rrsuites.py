@@ -2195,3 +2195,14 @@ def priority_problems():
         "2. Halfs": {"type_A": "half"},
         "3. Floats": {"type_A": "float"},
     }
+
+
+def load_suite(suite: str):
+    """Load performance suite from rrsuites.py."""
+    return globals()[suite]()
+
+
+def first_problem_from_suite(suite: str):
+    for problem in load_suite(suite):
+        return problem
+    raise RuntimeError(f"Suite {suite} has no problems.")

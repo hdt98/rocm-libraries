@@ -59,6 +59,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import rrperf.problems
+import rrperf.rrsuites
 import rrperf.utils
 
 gpus = {}
@@ -641,7 +642,7 @@ def get_args(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--suite",
         dest="problem",
-        type=rrperf.utils.first_problem_from_suite,
+        type=rrperf.rrsuites.first_problem_from_suite,
         help="Benchmark suite to run. NOTE: Only the first problem from the "
         "suite will be used.",
     )

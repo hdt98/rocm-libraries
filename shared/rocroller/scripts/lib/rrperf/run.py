@@ -42,6 +42,7 @@ import rrperf.dump_csv
 import rrperf.git
 import rrperf.problems
 import rrperf.rocm_control
+import rrperf.rrsuites
 import rrperf.specs
 import rrperf.utils
 
@@ -274,7 +275,7 @@ def run_cli(  # noqa: C901
 
     generator = rrperf.utils.empty()
     if suite is not None:
-        generator = chain(generator, rrperf.utils.load_suite(suite))
+        generator = chain(generator, rrperf.rrsuites.load_suite(suite))
     if token is not None:
         generator = chain(generator, from_token(token))
     if recast:
