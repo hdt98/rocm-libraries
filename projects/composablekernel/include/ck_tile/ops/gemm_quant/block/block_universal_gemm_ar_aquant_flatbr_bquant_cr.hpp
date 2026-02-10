@@ -133,7 +133,7 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
     using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
     using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
     using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>; // TileFlatmmShape
-    using QuantGroupSize   = remove_cvref_t<typename Problem::BQuantGroupSize>;
+    using BQuantGroupSize  = remove_cvref_t<typename Problem::BQuantGroupSize>;
 
     static_assert(BQuantGroupSize::kM == 1, "only N/K blocks for BQuant preshuffle kernel!");
 
@@ -256,7 +256,7 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                         constexpr auto AmIter = (mIter + m_preload) % MIterPerWarp;
                         constexpr auto AkIter = (kIter + (mIter + m_preload) / MIterPerWarp);
 
-                        load_int4_tile<ADataType, ComputeDataType, UnaryOpSize>(
+                        load_int4_tile<ADataType, AComputeDataType, UnaryOpSize>(
                             a_warp_tensor(number<AwarpIter>{}),
                             a_warp_windows(number<AmIter>{})(number<AkIter>{}));
                     }

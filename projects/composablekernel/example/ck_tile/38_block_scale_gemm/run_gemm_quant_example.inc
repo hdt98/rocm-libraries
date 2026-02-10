@@ -36,10 +36,9 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
     static_assert(std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor>);
     constexpr bool transpose_c =
         GemmConfig::TransposeC; // QuantMode == ck_tile::QuantType::ABQuantGrouped;
-    using AComputeDataType = std::conditional_t<QuantMode == ck_tile::QuantType::AQuantGrouped ||
-                                                    QuantMode == ck_tile::QuantType::RowColQuant,
-                                                typename TypeConfig::BDataType,
-                                                typename TypeConfig::ADataType>;
+
+    // Use automatically determined compute type from
+    using AComputeDataType = void;
     using BComputeDataType = AComputeDataType; // TODO : need to double check
 
     using GemmShape = ck_tile::TileGemmShape<
@@ -190,8 +189,8 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
         }
 
         using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<typename PipelineProblem::ComputeDataType,
-                                             typename PipelineProblem::ComputeDataType,
+            ck_tile::CShuffleEpilogueProblem<typename PipelineProblem::AComputeDataType,
+                                             typename PipelineProblem::BComputeDataType,
                                              ck_tile::tuple<>,
                                              typename TypeConfig::AccDataType,
                                              typename TypeConfig::CDataType,
@@ -997,6 +996,7 @@ int run_gemm_example_prec_type(const ck_tile::ArgParser& arg_parser)
         if constexpr(QuantMode == ck_tile::QuantType::AQuantGrouped &&
                      !GemmConfig::APreshuffleQuant)
         {
+
             if(a_layout == "C" && b_layout == "C")
             {
                 return run_gemm_example_with_layouts<GemmConfig,

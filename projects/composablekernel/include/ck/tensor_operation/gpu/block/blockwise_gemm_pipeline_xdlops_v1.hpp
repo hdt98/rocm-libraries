@@ -789,7 +789,7 @@ template <index_t BlockSize,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          // ,bool TransposeC //disable transposec right now...
+          bool TransposeC,
           bool LdsScalarLoadToVgpr>
 struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                                                  BlockSize,
@@ -811,7 +811,7 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Int
                                                  MRepeat,
                                                  NRepeat,
                                                  KPack,
-                                                 // TransposeC,
+                                                 TransposeC,
                                                  LdsScalarLoadToVgpr>
     : BlockwiseGemmXdlops_pipeline_base<BlockSize,
                                         ADataType,
@@ -832,7 +832,7 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Int
                                         MRepeat,
                                         NRepeat,
                                         KPack,
-                                        false /*TransposeC*/,
+                                        TransposeC,
                                         LdsScalarLoadToVgpr>
 
 {
@@ -855,7 +855,7 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Int
                                                    MRepeat,
                                                    NRepeat,
                                                    KPack,
-                                                   false /*TransposeC*/,
+                                                   TransposeC,
                                                    LdsScalarLoadToVgpr>;
     using Base::I0;
     using Base::KRepeat;

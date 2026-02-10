@@ -37,7 +37,7 @@ struct BQuantBlockUniversalGemmAsBsCr
         using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
         using CDataType        = remove_cvref_t<typename Problem::CDataType>;
         using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
-        using QuantGroupSize   = remove_cvref_t<typename Problem::BQuantGroupSize>;
+        using BQuantGroupSize  = remove_cvref_t<typename Problem::BQuantGroupSize>;
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;

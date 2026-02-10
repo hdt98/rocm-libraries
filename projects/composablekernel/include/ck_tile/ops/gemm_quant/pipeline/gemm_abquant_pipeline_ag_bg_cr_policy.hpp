@@ -19,6 +19,12 @@ struct GemmABQuantPipelineAgBgCrDefaultPolicy
     using Base::I2;
 
     template <typename Problem>
+    using LdsADataType = typename Problem::AComputeDataType;
+
+    template <typename Problem>
+    using LdsBDataType = typename Problem::BComputeDataType;
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetVectorSizeAQ()
     {
         return GemmAQuantPipelineAgBgCrDefaultPolicy::GetVectorSizeAQ<Problem>();

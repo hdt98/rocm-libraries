@@ -606,6 +606,12 @@ struct GridwiseGemm_wmma_cshuffle_v3
 
     __device__ static bool constexpr IsValidCompilationParameter()
     {
+#if defined(__gfx12__)
+        if constexpr(KPerBlock % (Base::KPerWmmaBlk * 2) != 0)
+        {
+            return false;
+        }
+#endif
         constexpr bool IsGfx11            = is_same_v<decltype(get_device_arch()), gfx11_t>;
         constexpr auto EstimateVgprCount  = GetEstimateVgprCount<IsGfx11>();
         constexpr auto AvailableVgprCount = get_max_vgpr_count(get_device_arch());

@@ -1255,12 +1255,12 @@ CK_TILE_DEVICE_EXTERN void llvm_amdgcn_raw_buffer_store_i32x2(
     index_t soffset,
     index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v2i32.v4i32");
 
-CK_TILE_DEVICE_EXTERN void
-llvm_amdgcn_raw_buffer_store_i32x3_(int32x3_t vdata,
-                                    int32x4_t rsrc,
-                                    index_t voffset,
-                                    index_t soffset,
-                                    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v3i32");
+CK_TILE_DEVICE_EXTERN void llvm_amdgcn_raw_buffer_store_i32x3_(
+    int32x3_t vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v3i32.v4i32");
 
 CK_TILE_DEVICE_EXTERN void llvm_amdgcn_raw_buffer_store_i32x3(dwordx3_union vdata,
                                                               int32x4_t rsrc,

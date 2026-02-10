@@ -140,8 +140,8 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
     using CDataType        = remove_cvref_t<typename Traits::CDataType>;
 
     // A/B DataType get converted from PkInt4/PkFp4 during loading
-    using OverrideADataType = ComputeDataType;
-    using OverrideBDataType = ComputeDataType;
+    using OverrideADataType = AComputeDataType;
+    using OverrideBDataType = BComputeDataType;
 
     using Base     = BlockGemmQuantBase;
     using WarpGemm = remove_cvref_t<typename Traits::WarpGemm>;
@@ -269,7 +269,7 @@ struct ABQuantBlockUniversalGemmAsBsCr : public BlockGemmQuantBase
                                           bool_constant<ALoadTranspose> = {},
                                           bool_constant<BLoadTranspose> = {})
         {
-            load_int4_tile<ADataType, AComputeDataType, UnaryOpSize_, ALoadTranspose>(
+            load_int4_tile<OverrideADataType, AComputeDataType, UnaryOpSize_, ALoadTranspose>(
                 a_warp_tile_, a_block_window);
             // If B datatype were pkint4 it would be converted prior to storing in LDS
             load_int4_tile<OverrideBDataType, BComputeDataType, UnaryOpSize_, BLoadTranspose>(

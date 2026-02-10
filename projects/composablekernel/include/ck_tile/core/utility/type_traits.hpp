@@ -302,6 +302,9 @@ static constexpr bool is_packed_type_v = is_packed_type<T>::value;
 // Helper definition to take the largest sizes type
 template <typename ADataType, typename BDataType>
 using largest_type_t =
-    std::conditional_t<sizeof(ADataType) >= sizeof(BDataType), ADataType, BDataType>;
+    std::conditional_t<sizeof(ADataType) * 8 / numeric_traits<ADataType>::PackedSize >=
+                           sizeof(BDataType) * 8 / numeric_traits<BDataType>::PackedSize,
+                       ADataType,
+                       BDataType>;
 
 } // namespace ck_tile

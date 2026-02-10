@@ -10,7 +10,6 @@
 #include "ck_tile/core/numeric/bfloat16.hpp"
 #include "ck_tile/core/numeric/pk_int4.hpp"
 #include "ck_tile/core/numeric/pk_fp4.hpp"
-#include "ck_tile/core/numeric/pk_fp6.hpp"
 #include "ck_tile/core/numeric/e8m0.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
 
@@ -170,22 +169,6 @@ struct impl::ext_vector<int8_t, 12>
     static constexpr index_t N = 12;
     using value_type           = int32x3_tt;
     using type                 = int32x3_tt;
-};
-
-template <>
-struct impl::ext_vector<pk_fp6x16_t, 1>
-{
-    static constexpr index_t N = 1;
-    using value_type           = int32x3_tt;
-    using type                 = int32x3_tt;
-};
-
-template <>
-struct impl::ext_vector<pk_fp6x16_t, 2>
-{
-    static constexpr index_t N = 2;
-    using value_type           = int32x6_tt;
-    using type                 = int32x6_tt;
 };
 
 // u32

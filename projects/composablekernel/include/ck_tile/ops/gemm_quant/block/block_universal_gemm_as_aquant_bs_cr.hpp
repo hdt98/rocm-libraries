@@ -35,7 +35,7 @@ struct AQuantBlockUniversalGemmAsBsCr
         using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
         using CDataType        = remove_cvref_t<typename Problem::CDataType>;
         using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>;
-        using QuantGroupSize   = remove_cvref_t<typename Problem::AQuantGroupSize>;
+        using AQuantGroupSize  = remove_cvref_t<typename Problem::AQuantGroupSize>;
 
         static constexpr index_t kBlockSize = Problem::kBlockSize;
         static constexpr auto Scheduler     = Problem::Scheduler;
@@ -342,8 +342,8 @@ struct AQuantBlockUniversalGemmAsBsCr
         static constexpr auto BLdsTileDistr =
             make_static_tile_distribution(MakeBBlockDistributionEncode());
 
-        using ALdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(ALdsTileDistr));
-        using BLdsTile = decltype(make_static_distributed_tensor<ComputeDataType>(BLdsTileDistr));
+        using ALdsTile = decltype(make_static_distributed_tensor<AComputeDataType>(ALdsTileDistr));
+        using BLdsTile = decltype(make_static_distributed_tensor<BComputeDataType>(BLdsTileDistr));
 
         ALdsTile a_warp_tile_;
         BLdsTile b_warp_tile_;
@@ -397,9 +397,9 @@ struct AQuantBlockUniversalGemmAsBsCr
             auto b_lds_gemm_window = make_tile_window(
                 b_block_window.get_bottom_tensor_view(), b_lds_shape, b_offset, b_lds_load_distr);
 
-            load_int4_tile<BDataType, ComputeDataType, UnaryOpSize_, ALoadTranspose>(
+            load_int4_tile<BDataType, AComputeDataType, UnaryOpSize_, ALoadTranspose>(
                 a_warp_tile_, a_lds_gemm_window);
-            load_int4_tile<BDataType, ComputeDataType, UnaryOpSize_, BLoadTranspose>(
+            load_int4_tile<BDataType, BComputeDataType, UnaryOpSize_, BLoadTranspose>(
                 b_warp_tile_, b_lds_gemm_window);
         }
 

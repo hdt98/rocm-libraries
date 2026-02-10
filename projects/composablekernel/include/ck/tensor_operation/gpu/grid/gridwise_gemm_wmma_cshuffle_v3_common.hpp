@@ -400,24 +400,8 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
     // Limitations of the current implementation:
     //  - no multiAB
     //  - GemmSpecialization Default with transpose
+
 #if defined(__gfx120__)
-    static constexpr bool IsAWaveTransferApplicable =
-        !ForceThreadTileTransfer && NumATensor == 1 && APackedSize == 1 &&
-        ((GemmSpec == tensor_operation::device::GemmSpecialization::Default &&
-          !is_same_v<ALayout, tensor_layout::gemm::RowMajor>) ||
-         is_same_v<ALayout, tensor_layout::gemm::RowMajor>) &&
-        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 && !IsBPreShuffled &&
-        ATransferWaveTiles::KRepeat_ > 0 && ATransferWaveTiles::MNRepeat_ > 0;
-
-    static constexpr bool IsBWaveTransferApplicable =
-        !ForceThreadTileTransfer && NumBTensor == 1 && BPackedSize == 1 &&
-        ((GemmSpec == tensor_operation::device::GemmSpecialization::Default &&
-          !is_same_v<BLayout, tensor_layout::gemm::ColumnMajor>) ||
-         is_same_v<BLayout, tensor_layout::gemm::ColumnMajor>) &&
-        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8 &&
-        BTransferWaveTiles::KRepeat_ > 0 && BTransferWaveTiles::MNRepeat_ > 0;
-
-#elif defined(__gfx12__)
     static constexpr bool IsAWaveTransferApplicable = AWaveTransferApplicable();
 
     static constexpr bool IsBWaveTransferApplicable = BWaveTransferApplicable();

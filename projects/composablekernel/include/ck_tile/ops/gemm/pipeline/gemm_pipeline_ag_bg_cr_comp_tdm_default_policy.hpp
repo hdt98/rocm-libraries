@@ -153,7 +153,7 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
             constexpr auto DataTypeSize  = sizeof(ADataType);
             constexpr index_t AVectorLen = VecByteSize / DataTypeSize * PackedSize;
             constexpr index_t MLdsLayerRequired =
-                get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize * PackedSize;
+                get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize * PackedSize;
             constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
             // calculate how many elements to pad to avoid bank conflict
             constexpr index_t BytesPerDword = sizeof(int32_t);
@@ -214,7 +214,7 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
 
             constexpr index_t BVectorLen = VecByteSize / DataTypeSize * PackedSize;
             constexpr index_t NLdsLayerRequired =
-                get_n_lds_banks() * get_n_words_per_128b() / KPerBlock / DataTypeSize * PackedSize;
+                get_n_lds_banks() * get_n_dwords_per_128b() / KPerBlock / DataTypeSize * PackedSize;
             constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
             // calculate how many elements to pad to avoid bank conflict
             constexpr index_t BytesPerDword = sizeof(int32_t);

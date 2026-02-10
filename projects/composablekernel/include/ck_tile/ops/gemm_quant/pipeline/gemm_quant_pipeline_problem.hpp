@@ -25,21 +25,24 @@ template <typename ADataType_,
           GemmPipelineScheduler Scheduler_ = GemmPipelineScheduler::Intrawave,
           bool HasHotLoop_                 = true,
           TailNumber TailNum_              = TailNumber::Full>
-struct GemmQuantPipelineProblemBase : public GemmPipelineProblemBase<ADataType_,
-                                                                     BDataType_,
-                                                                     CDataType_,
-                                                                     BlockGemmShape_,
-                                                                     Traits_,
-                                                                     ComputeDataType_,
-                                                                     ComputeDataType_>
+struct GemmQuantPipelineProblemBase
+    : public GemmPipelineProblemBase<
+          ADataType_,
+          BDataType_,
+          CDataType_,
+          BlockGemmShape_,
+          Traits_,
+          mixed_prec_compute_type_t<ComputeDataType_, ADataType_, BDataType_>,
+          mixed_prec_compute_type_t<ComputeDataType_, ADataType_, BDataType_>>
 {
-    using Base = GemmPipelineProblemBase<ADataType_,
-                                         BDataType_,
-                                         CDataType_,
-                                         BlockGemmShape_,
-                                         Traits_,
-                                         ComputeDataType_,
-                                         ComputeDataType_>;
+    using Base = GemmPipelineProblemBase<
+        ADataType_,
+        BDataType_,
+        CDataType_,
+        BlockGemmShape_,
+        Traits_,
+        mixed_prec_compute_type_t<ComputeDataType_, ADataType_, BDataType_>,
+        mixed_prec_compute_type_t<ComputeDataType_, ADataType_, BDataType_>>;
 
     using Traits = typename Base::Traits;
 
