@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <miopen/kernel_build_params.hpp>
 #include <miopen/conv/invokers/gcn_asm_wino.hpp>
 #include <miopen/conv/kernel_interface/winograd_kernel_interface.hpp>
 #include <miopen/conv/solvers.hpp>
