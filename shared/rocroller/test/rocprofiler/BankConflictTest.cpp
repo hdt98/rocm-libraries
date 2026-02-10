@@ -197,7 +197,7 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu][lds-model]")
 
                     if(not context->targetArchitecture().target().isCDNA35GPU())
                     {
-                        SKIP("LDS Bank Model only implemented for CDNA 3.5 GPUs");
+                        SKIP("Currently only testing on gfx950");
                     }
 
                     LDSBankConflictTestKernel kernel(
