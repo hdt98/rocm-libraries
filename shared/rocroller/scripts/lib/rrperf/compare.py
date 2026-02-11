@@ -203,7 +203,7 @@ def summary_statistics(perf_runs):
 
             p: float
             try:
-                _, p, _, _ = scipy.stats.median_test(ka, kb) # type: ignore[reportGeneralTypeIssues] 
+                _, p, _, _ = scipy.stats.median_test(ka, kb)  # type: ignore[reportGeneralTypeIssues]
             except Exception:
                 p = 1.0
             stats[run][token] = A.run_invariant_token, ComparisonResult(

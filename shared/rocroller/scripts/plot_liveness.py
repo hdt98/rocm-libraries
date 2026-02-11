@@ -105,7 +105,7 @@ class RegisterCollection:
     def append(self, entry: RegisterState) -> None:
         self._data.append(entry)
 
-    def get_liveness_sum(self, instruction: str) -> List:
+    def get_liveness_sum(self, instruction: str) -> list:
         return [
             sum([int(x.is_live()) for x in self._data]),
             sum([int(x.is_allocated()) for x in self._data]),
