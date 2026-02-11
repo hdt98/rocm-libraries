@@ -33,7 +33,7 @@ using ::testing::Values;
 using ::testing::ValuesIn;
 using namespace std;
 
-static bool latrd_old_test_sizes = std::getenv("LATRD_NEW_TESTS_SIZES") != nullptr ? false : true;
+static bool latrd_old_test_sizes = std::getenv("LATRD_OLD_TESTS_SIZES") != nullptr ? true : false;
 
 typedef std::tuple<vector<int>, vector<int>> latrd_tuple;
 
