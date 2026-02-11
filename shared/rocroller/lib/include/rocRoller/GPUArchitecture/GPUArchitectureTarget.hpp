@@ -215,7 +215,7 @@ namespace rocRoller
            GPUArchitectureTarget{GPUArchitectureGFX::GFX950},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX950, {.sramecc = true}},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX950, {.xnack = true}},
-           GPUArchitectureTarget{GPUArchitectureGFX::GFX950, {.sramecc = true, .xnack = true}}
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX950, {.sramecc = true, .xnack = true}},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1012},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1012, {.xnack = true}},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1030},
