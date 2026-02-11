@@ -73,14 +73,20 @@ struct UniversalInvoker
 
         constexpr auto scheduler = GemmConfig::Scheduler;
 
-        using AComputeDataType = std::conditional_t<
-            std::is_same_v<ComputeDataType, void>,
-            std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>,
-            ComputeDataType>;
-        using BComputeDataType = std::conditional_t<
-            std::is_same_v<ComputeDataType, void>,
-            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>,
-            ComputeDataType>;
+        using AComputeDataType =
+            std::conditional_t<std::is_same_v<ComputeDataType, void>,
+                               std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t> ||
+                                                      std::is_same_v<ADataType, ck_tile::pk_fp4_t>,
+                                                  BDataType,
+                                                  ADataType>,
+                               ComputeDataType>;
+        using BComputeDataType =
+            std::conditional_t<std::is_same_v<ComputeDataType, void>,
+                               std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
+                                                      std::is_same_v<BDataType, ck_tile::pk_fp4_t>,
+                                                  ADataType,
+                                                  BDataType>,
+                               ComputeDataType>;
 
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataType,
@@ -254,14 +260,20 @@ struct UniversalInvoker
                                              GemmConfig::Preshuffle>;
 
         constexpr auto scheduler = GemmConfig::Scheduler;
-        using AComputeDataType   = std::conditional_t<
-              std::is_same_v<ComputeDataType, void>,
-              std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t>, BDataType, ADataType>,
-              ComputeDataType>;
-        using BComputeDataType = std::conditional_t<
-            std::is_same_v<ComputeDataType, void>,
-            std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t>, ADataType, BDataType>,
-            ComputeDataType>;
+        using AComputeDataType =
+            std::conditional_t<std::is_same_v<ComputeDataType, void>,
+                               std::conditional_t<std::is_same_v<ADataType, ck_tile::pk_int4_t> ||
+                                                      std::is_same_v<ADataType, ck_tile::pk_fp4_t>,
+                                                  BDataType,
+                                                  ADataType>,
+                               ComputeDataType>;
+        using BComputeDataType =
+            std::conditional_t<std::is_same_v<ComputeDataType, void>,
+                               std::conditional_t<std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
+                                                      std::is_same_v<BDataType, ck_tile::pk_fp4_t>,
+                                                  ADataType,
+                                                  BDataType>,
+                               ComputeDataType>;
 
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataType,

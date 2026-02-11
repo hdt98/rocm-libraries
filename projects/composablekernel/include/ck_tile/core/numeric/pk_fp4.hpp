@@ -87,6 +87,8 @@ struct pk_float4_e2m1_t
     CK_TILE_HOST_DEVICE constexpr bf16x2_t to_bf16x2(float scale = 1.f) const;
     CK_TILE_HOST_DEVICE constexpr fp8_t to_fp8(float scale = 1.f) const;
     CK_TILE_HOST_DEVICE constexpr fp8x2_t to_fp8x2(float scale = 1.f) const;
+    CK_TILE_HOST_DEVICE constexpr bf8_t to_bf8(float scale = 1.f) const;
+    CK_TILE_HOST_DEVICE constexpr bf8x2_t to_bf8x2(float scale = 1.f) const;
 
     CK_TILE_HOST_DEVICE constexpr operator float() const { return to_float(); }
     CK_TILE_HOST_DEVICE constexpr operator fp32x2_t() const { return to_fp32x2(); }
@@ -96,7 +98,8 @@ struct pk_float4_e2m1_t
     CK_TILE_HOST_DEVICE constexpr operator bf16x2_t() const { return to_bf16x2(); }
     CK_TILE_HOST_DEVICE constexpr operator fp8_t() const { return to_fp8(); }
     CK_TILE_HOST_DEVICE constexpr operator fp8x2_t() const { return to_fp8x2(); }
-
+    CK_TILE_HOST_DEVICE constexpr operator bf8_t() const { return to_bf8(); }
+    CK_TILE_HOST_DEVICE constexpr operator bf8x2_t() const { return to_bf8x2(); }
     template <index_t I>
     CK_TILE_HOST_DEVICE constexpr pk_float4_e2m1_t unpack(number<I>) const
     {
@@ -707,6 +710,29 @@ CK_TILE_HOST_DEVICE constexpr fp8x2_t pk_fp4_t::to_fp8x2(float scale) const
         type_convert<fp8_t>(type_convert<float>(e2m1_to_fp8_table[_unpack(number<1>{})]) * scale)};
 }
 #endif
+
+CK_TILE_HOST_DEVICE constexpr bf8_t pk_fp4_t::to_bf8(float scale) const
+{
+    // NOTE: No specialized fp4 to fp8 instructions are available. Unsure whether fp4 to fp16 to fp8
+    // would be better than the naive implementation below
+    // #if CK_TILE_FP4_CVT_DEVICE
+    //    return impl::_from_f4<fp8_t>(data, scale);
+    // #else
+    return bf8_t{type_convert<bf8_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
+    // #endif
+}
+
+CK_TILE_HOST_DEVICE constexpr bf8x2_t pk_fp4_t::to_bf8x2(float scale) const
+{
+    // NOTE: No specialized fp4 to fp8 instructions are available. Unsure whether fp4 to fp16 to fp8
+    // would be better than the naive implementation below
+    // #if CK_TILE_FP4_CVT_DEVICE
+    //    return impl::_from_f4<fp8x2_t>(data, scale);
+    // #else
+    return bf8x2_t{type_convert<bf8_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
+                   type_convert<bf8_t>(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
+    // #endif
+}
 
 } // namespace ck_tile
 #pragma clang diagnostic pop
