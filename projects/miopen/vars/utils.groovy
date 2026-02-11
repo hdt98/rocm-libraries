@@ -141,6 +141,8 @@ def cmake_build(Map conf=[:]){
         setup_args = " -DMIOPEN_INSTALL_CXX_HEADERS=On " + setup_args
     }
 
+    setup_args = " -G Ninja " + setup_args
+
     def pre_setup_cmd = """
             echo \$HSA_ENABLE_SDMA
             ulimit -c unlimited
