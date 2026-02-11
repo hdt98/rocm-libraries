@@ -1733,7 +1733,6 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
     gr_inc_step = 0
 
     if isTN(kernel) and not useLDSTr and TLDS==1:
-        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         grinca = [0,1,2, 3,4,5, 6,7,7]
         grincb = [7,8,9, 9,9,10, 10,10,11]
 
@@ -1742,13 +1741,13 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
         syncs.add(      3, dscnt=3, comment="wait for the rest of LRB1 to complete")
         lrb0   = [       4,5,6,8,11,  14]
 
-        syncs.add(                 12, dscnt=5, barrier=True, comment="wait for all LRA0 to complete before GRA start")
+        syncs.add(                 12, dscnt=5, barrier=True, comment="wait for LRA0 before GRA start")
         gra    = [                   13,15,17,19] # one index for two instructions
         
-        syncs.add(                             20, dscnt=0, vlcnt=4+6, barrier=True, comment="wait for all LRB0 to complete before GRB start + wait for previous GRs to complete before LR1")
-        grb    = [                              21,24,    27,31,34,36] # one index for two instructions
+        syncs.add(                             21, dscnt=0, vlcnt=4+6, barrier=True, comment="wait for LRB0 before GRB start + wait for previous GRAs before LRA1")
+        grb    = [                              21,24,    27,31,34,37] # one index for two instructions
         lra1   = [                                22,25,26,29]
-        syncs.add(                                                35, vlcnt=4+5, barrier=True, comment="wait for all LRB0 to complete before GRB start + wait for previous GRs to complete before LR1")
+        syncs.add(                                                35, vlcnt=4+5, barrier=True, comment="wait for previous GRBs to complete before LRB1")
         lrb1   = [                                                35,38,40,42,44,46]
 
         num_gr = len(gra) + len(grb)
@@ -1756,8 +1755,6 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
         lrsb   = [18]
         lwsa   = [30]
         lwsb   = [30]
-
-        # gr_inc_step = 1
 
     else:
         return False, None
