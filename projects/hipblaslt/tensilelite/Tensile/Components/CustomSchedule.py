@@ -4831,3 +4831,65 @@ def _get_schedule_128x256x64_16bit(kernel, useLDSTr, TLDS):
     kernel["MfmaInitCVgprs"] = True
     return True, opt1
 
+
+@RegisterSchedule(
+    tile_config=TileConfig(256, 320, 64, 2, 1, True, 0, 0),
+    dtype_predicate=is16bit,
+    vector_widths=[8, 8, 8],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_256x320x64_16bit(kernel, useLDSTr, TLDS):
+    kernel["MfmaInitCVgprs"] = True
+    optSchedule = dict()
+    numMfma = 160
+    nllshift = nglshift = 0
+    if isTN(kernel) and not useLDSTr and TLDS == 1:
+        syncs = SyncSchedule()
+        syncs.add(-1, dscnt=9, vlcnt=-1, vscnt=-1, comment="Wait for prior local read local write")
+        syncs.add(7,  dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for prior local read local write")
+        syncs.add(28, dscnt=0, vlcnt=-1, vscnt=-1, barrier=True, comment="Wait for LRA0 to finish before issuing GRA")
+        syncs.add(79, dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for prior local read local write")
+        syncs.add(136, dscnt=-1, vlcnt=18, vscnt=-1, barrier=True, comment="Wait for GRs from previous iteration")
+
+        lra0 = [0,2,3,4,5,6,7,8]
+        lra1 = [137,139,140,141,142,143,144,145]
+        
+        lrb0 = [1,9,10,11,12,13,14,15,16,17]
+        lrb1 = [138,146,147,148,149,150,151,152,153,154]
+
+        grA = [28,28,34,34,40,40,46,46,53,53,59,59,65,65,71,71]
+        grB = [78,78,84,84,90,90,96,96,103,103,109,109,115,115,121,121,128,128,134,134]
+        
+        lrsa = [78]
+        lrsb = [78]
+
+        lwsa = [134]
+        lwsb = [134]
+        
+        grIncA = [0,0,0, 1,1,1, 2,2,2]
+        grIncB = [3,3,3, 4,4,4, 5,5,5]
+        num_gr = (len(grA) + len(grB)) // 2
+
+        optSchedule = {
+            'SYNC': [syncs.get_indicies()],
+            'GRA': [grA],
+            'GRB': [grB],
+            'GRIncA': [grIncA],
+            'GRIncB': [grIncB],
+            'LRA0': [lra0],
+            'LRA1': [lra1],
+            'LRB0': [lrb0],
+            'LRB1': [lrb1],
+            'LRSA': [lrsa],
+            'LRSB': [lrsb],
+            'LWSA': [lwsa],
+            'LWSB': [lwsb],
+            'LCC': [[159,159]],
+        }
+    else:
+        return False, None
+    
+    nllshift = nglshift = num_gr
+    opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode=syncs.get_code(), nllshift=nllshift, nglshift=nglshift)
+    return True, opt1
