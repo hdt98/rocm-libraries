@@ -632,6 +632,12 @@ namespace
         case rocisa::DataType::Int32:
             return "i32_r";
             break;
+        case rocisa::DataType::ComplexFloat:
+            return "f32_r";
+            break;
+        case rocisa::DataType::ComplexDouble:
+            return "f64_r";
+            break;       
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -674,6 +680,12 @@ namespace
         case rocisa::DataType::Int32:
             return "c_i32_r";
             break;
+        case rocisa::DataType::ComplexFloat:
+            return "c_f32_r";
+            break;
+        case rocisa::DataType::ComplexDouble:
+            return "c_f64_r";
+            break;    
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -723,6 +735,43 @@ namespace
         }
     }
 
+    inline std::string getAlphaRealAsString(const TensileLite::ContractionInputs& inputs, bool isComplex)
+    {
+        return isComplex 
+            ?  (std::holds_alternative<std::complex<float>>(inputs.alpha)
+                ?  std::to_string(std::get<std::complex<float>>(inputs.alpha).real())
+                : std::to_string(std::get<std::complex<double>>(inputs.alpha).real()))
+            : ToString(inputs.alpha);
+    }
+
+    inline std::string getAlphaImagAsString(const TensileLite::ContractionInputs& inputs, bool isComplex)
+    {
+        return isComplex
+            ?  (std::holds_alternative<std::complex<float>>(inputs.alpha)
+                ?  std::to_string(std::get<std::complex<float>>(inputs.alpha).imag())
+                : std::to_string(std::get<std::complex<double>>(inputs.alpha).imag()))
+            : std::to_string(0.0);
+    }
+
+    inline std::string getBetaRealAsString(const TensileLite::ContractionInputs& inputs, bool isComplex)
+    {
+        return isComplex
+            ?  (std::holds_alternative<std::complex<float>>(inputs.beta)
+                ?  std::to_string(std::get<std::complex<float>>(inputs.beta).real())
+                : std::to_string(std::get<std::complex<double>>(inputs.beta).real()))
+            : ToString(inputs.beta);
+    }
+
+    inline std::string getBetaImagAsString(const TensileLite::ContractionInputs& inputs, bool isComplex)
+    {
+        return isComplex
+            ?  (std::holds_alternative<std::complex<float>>(inputs.beta)
+                ?  std::to_string(std::get<std::complex<float>>(inputs.beta).imag())
+                : std::to_string(std::get<std::complex<double>>(inputs.beta).imag()))
+            : std::to_string(0.0f);
+    }
+
+
     inline void logBenchFromTensileDataGemm(const TensileLite::ContractionProblemGemm& problem,
                                             const TensileLite::ContractionInputs&      inputs,
                                             const int&     solutionIndex,
@@ -732,6 +781,8 @@ namespace
                                             const int32_t& hotIterations,
                                             bool           isCpp)
     {
+        bool isComplexInput = (problem.a().dataType() == rocisa::DataType::ComplexFloat
+                               || problem.a().dataType() == rocisa::DataType::ComplexDouble);
         auto s = log_str(
             __func__,
             "--api_method",
@@ -773,9 +824,13 @@ namespace
                       problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides()[2])
                 : "",
             "--alpha",
-            ToString(inputs.alpha),
+            getAlphaRealAsString(inputs, isComplexInput),
+            "--alphai",
+            getAlphaImagAsString(inputs, isComplexInput),
             "--beta",
-            ToString(inputs.beta),
+            getBetaRealAsString(inputs, isComplexInput),
+            "--betai",
+            getBetaImagAsString(inputs, isComplexInput),
             "--transA",
             problem.transA() ? "T" : "N",
             "--transB",
@@ -859,6 +914,9 @@ namespace
                                               const int32_t& hotIterations,
                                               bool           isCpp)
     {
+        bool isComplexInput = (problem.a().dataType() == rocisa::DataType::ComplexFloat
+                               || problem.a().dataType() == rocisa::DataType::ComplexDouble);
+
         log_profile("matmul",
                     "M",
                     problem.c().sizes()[0],
@@ -883,9 +941,13 @@ namespace
                     "stride_d",
                     problem.d().strides()[2],
                     "alpha",
-                    ToString(inputs.alpha),
+                    getAlphaRealAsString(inputs, isComplexInput),
+                    "alphai",
+                    getAlphaImagAsString(inputs, isComplexInput),
                     "beta",
-                    ToString(inputs.beta),
+                    getBetaRealAsString(inputs, isComplexInput),
+                    "betai",
+                    getBetaImagAsString(inputs, isComplexInput),
                     "transA",
                     problem.transA() ? "T" : "N",
                     "transB",
@@ -964,6 +1026,9 @@ namespace
                                               const int32_t&     hotIterations,
                                               bool               isCpp)
     {
+        bool isComplexInput = (problem.a().dataType() == rocisa::DataType::ComplexFloat
+                               || problem.a().dataType() == rocisa::DataType::ComplexDouble);
+                               
         log_profile("matmul",
                     "M",
                     problem.c().sizes()[0],
@@ -988,9 +1053,13 @@ namespace
                     "stride_d",
                     problem.d().strides()[2],
                     "alpha",
-                    ToString(inputs.alpha),
+                    getAlphaRealAsString(inputs, isComplexInput),
+                    "alphai",
+                    getAlphaImagAsString(inputs, isComplexInput),
                     "beta",
-                    ToString(inputs.beta),
+                    getBetaRealAsString(inputs, isComplexInput),
+                    "betai",
+                    getBetaImagAsString(inputs, isComplexInput),
                     "transA",
                     problem.transA() ? "T" : "N",
                     "transB",
