@@ -37,6 +37,8 @@
 #include "common/misc/rocsolver_test.hpp"
 #include "common/misc/rocsolver_timer.hpp"
 
+static bool latrd_use_hipgraph = std::getenv("LATRD_USE_HIPGRAPH") != nullptr ? true : false;
+
 template <typename T, typename S>
 void latrd_checkBadArgs(const rocblas_handle handle,
                         const rocblas_fill uplo,
@@ -409,41 +411,106 @@ void latrd_getPerfData(const rocblas_handle handle,
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
-    latrd_initData<true, false, T>(handle, n, dA, lda, hA);
-
-    // cold calls
-    for(int iter = 0; iter < 2; iter++)
+    if(latrd_use_hipgraph)
     {
-        latrd_initData<false, true, T>(handle, n, dA, lda, hA);
+        std::cout << "Using hipGraph" << std::endl;
 
-        CHECK_ROCBLAS_ERROR(rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(),
+        // cold calls
+        rocblas_handle handle2;
+        rocblas_create_handle(&handle2);
+
+        hipStream_t stream;
+        CHECK_HIP_ERROR(hipStreamCreate(&stream));
+        CHECK_ROCBLAS_ERROR(rocblas_set_stream(handle2, stream));
+        for(int iter = 0; iter < 2; iter++)
+        {
+            latrd_initData<false, true, T>(handle2, n, dA, lda, hA);
+
+            CHECK_ROCBLAS_ERROR(rocsolver_latrd(handle2, uplo, n, k, dA.data(), lda, dE.data(),
+                                                dTau.data(), dW.data(), ldw));
+        }
+
+        // graph capture
+        hipGraph_t graph;
+        latrd_initData<false, true, T>(handle2, n, dA, lda, hA);
+        CHECK_HIP_ERROR(hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal));
+        CHECK_ROCBLAS_ERROR(rocsolver_latrd(handle2, uplo, n, k, dA.data(), lda, dE.data(),
                                             dTau.data(), dW.data(), ldw));
+
+        // graphExec
+        CHECK_HIP_ERROR(hipStreamEndCapture(stream, &graph));
+        hipGraphExec_t graphExec;
+        CHECK_HIP_ERROR(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
+        CHECK_HIP_ERROR(hipGraphDestroy(graph));
+
+        // gpu-lapack performance
+        /* hipStream_t stream; */
+        CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
+        rocsolver_timer timer;
+
+        if(profile > 0)
+        {
+            if(profile_kernels)
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
+                                             | rocblas_layer_mode_ex_log_kernel);
+            else
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
+            rocsolver_log_set_max_levels(profile);
+        }
+
+        for(rocblas_int iter = 0; iter < hot_calls; iter++)
+        {
+            /* latrd_initData<false, true, T>(handle, n, dA, lda, hA); */
+            latrd_initData<false, true, T>(handle2, n, dA, lda, hA);
+
+            timer.start(stream);
+            /* rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(), dTau.data(), dW.data(), ldw); */
+            CHECK_HIP_ERROR(hipGraphLaunch(graphExec, stream));
+
+            timer.end(stream);
+        }
+        *gpu_time_used = timer.get_combined();
     }
-
-    // gpu-lapack performance
-    hipStream_t stream;
-    CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
-
-    if(profile > 0)
+    else
     {
-        if(profile_kernels)
-            rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
-                                         | rocblas_layer_mode_ex_log_kernel);
-        else
-            rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
-        rocsolver_log_set_max_levels(profile);
-    }
+        latrd_initData<true, false, T>(handle, n, dA, lda, hA);
 
-    for(rocblas_int iter = 0; iter < hot_calls; iter++)
-    {
-        latrd_initData<false, true, T>(handle, n, dA, lda, hA);
+        // cold calls
+        for(int iter = 0; iter < 2; iter++)
+        {
+            latrd_initData<false, true, T>(handle, n, dA, lda, hA);
 
-        timer.start(stream);
-        rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(), dTau.data(), dW.data(), ldw);
-        timer.end(stream);
+            CHECK_ROCBLAS_ERROR(rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(),
+                                                dTau.data(), dW.data(), ldw));
+        }
+
+        // gpu-lapack performance
+        hipStream_t stream;
+        CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
+        rocsolver_timer timer;
+
+        if(profile > 0)
+        {
+            if(profile_kernels)
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
+                                             | rocblas_layer_mode_ex_log_kernel);
+            else
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
+            rocsolver_log_set_max_levels(profile);
+        }
+
+        for(rocblas_int iter = 0; iter < hot_calls; iter++)
+        {
+            latrd_initData<false, true, T>(handle, n, dA, lda, hA);
+
+            timer.start(stream);
+            rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(), dTau.data(), dW.data(),
+                            ldw);
+            timer.end(stream);
+        }
+        *gpu_time_used = timer.get_combined();
     }
-    *gpu_time_used = timer.get_combined();
+    /* *gpu_time_used = timer.get_combined(); */
 }
 
 template <typename T>
