@@ -18,16 +18,19 @@ namespace origami {
 
 void heuristic_params_t::merge_with(const heuristic_params_t& other) {
   // Latency component weights
-  weight_mem_l2        = other.weight_mem_l2;
-  weight_mem_mall      = other.weight_mem_mall;
-  weight_mem_dram      = other.weight_mem_dram;
-  weight_compute       = other.weight_compute;
-  weight_memory        = other.weight_memory;
-  weight_wg_setup      = other.weight_wg_setup;
-  weight_prologue      = other.weight_prologue;
-  weight_epilogue      = other.weight_epilogue;
-  weight_loop_overhead = other.weight_loop_overhead;
-  weight_tile_total    = other.weight_tile_total;
+  weight_mem_l2                     = other.weight_mem_l2;
+  weight_mem_mall                   = other.weight_mem_mall;
+  weight_mem_dram                   = other.weight_mem_dram;
+  weight_compute                    = other.weight_compute;
+  weight_memory                     = other.weight_memory;
+  weight_wg_setup                   = other.weight_wg_setup;
+  weight_prologue                   = other.weight_prologue;
+  weight_epilogue                   = other.weight_epilogue;
+  weight_loop_overhead              = other.weight_loop_overhead;
+  weight_tile_total                 = other.weight_tile_total;
+  weight_epilogue_initial           = other.weight_epilogue_initial;
+  weight_epilogue_compute           = other.weight_epilogue_compute;
+  weight_epilogue_k_split_reduction = other.weight_epilogue_k_split_reduction;
 
   // Empirical constants
   l2_min_hit_rate_default    = other.l2_min_hit_rate_default;
