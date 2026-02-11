@@ -159,11 +159,14 @@ namespace rocRoller
             start               = end + 1;
             end                 = archStr.find(":", start);
             std::string feature = archStr.substr(start, end - start);
-            if(feature == "xnack+")
+            // Handle both colon-separated (e.g., "sramecc+:xnack+") and
+            // concatenated (e.g., "sramecc+xnack+") feature formats.
+            // The concatenated format is returned by HIP runtime on some systems.
+            if(feature.find("xnack+") != std::string::npos)
             {
                 rv.features.xnack = true;
             }
-            else if(feature == "sramecc+")
+            if(feature.find("sramecc+") != std::string::npos)
             {
                 rv.features.sramecc = true;
             }
