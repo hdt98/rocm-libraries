@@ -384,6 +384,19 @@ struct tile_distribution_encoding_pattern_bq : public tile_distribution_encoding
 
                 if constexpr(std::is_same_v<BQLayout, tensor_layout::gemm::ColumnMajor>)
                 {
+                    if(get_block_id() == 0 && get_thread_id() == 0)
+                    {
+                        // Debug print to verify values
+                        printf("PreshuffleQuant Medium-grained: MWarps: %d, NR=%d, NPerQ=%d, "
+                               "N0: %d, N1=%d, N2=%d, KPerTile: %d\n",
+                               MWarps,
+                               NR,
+                               NPerQ,
+                               N0,
+                               N1,
+                               N2,
+                               KPerTile);
+                    }
                     // ColumnMajor: [(N0, N1, N2), K] - N on Y-axis, partition Y
                     return make_static_tile_distribution(
                         tile_distribution_encoding<sequence<MWarps, NR, NPerQ>,
