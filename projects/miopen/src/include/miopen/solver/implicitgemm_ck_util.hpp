@@ -811,7 +811,7 @@ inline bool CKWrwRequireWorkspace(
     size_t K_per_group = K / G;
 
     return (alpha_beta_case == BILINEAR || alpha_beta_case == SCALE) ||
-           ((data_type == miopenHalf || data_type == miopenBFloat16 || data_type == miopenBFloat) &&
+           ((data_type == miopenHalf || data_type == miopenBFloat16 || data_type == miopenFloat) &&
             (is_odd(C_per_group) || is_odd(K_per_group)));
 }
 
