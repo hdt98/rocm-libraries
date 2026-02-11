@@ -55,6 +55,8 @@
 #include <omp.h>
 #include <set>
 
+#include "monitor.hpp"
+
 extern "C" __global__ void flush_icache()
 {
     asm __volatile__("s_icache_inv \n\t"
@@ -3681,6 +3683,10 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
             if(!do_grouped_gemm)
             {
+                int dev_id = 0;
+                CHECK_HIP_ERROR(hipGetDevice(&dev_id));
+                SMI_Monitor monitor;
+
                 EfficiencyMonitor& perf_monitor = getEfficiencyMonitor();
                 if(arg.use_ext)
                 {
@@ -3722,6 +3728,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                     }
                     perf_monitor.start();
+                    monitor.Start(dev_id);
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
                     for(int i = 0; i < number_hot_calls; i++)
@@ -3791,6 +3798,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                     }
                     perf_monitor.start();
+                    monitor.Start(dev_id);
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
                     for(int i = 0; i < number_hot_calls; i++)
@@ -3832,6 +3840,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                               event_gpu_time_end,
                               gpu_time_used,
                               stream);
+
+                monitor.Stop();
                 perf_monitor.stop();
             }
             else
