@@ -908,7 +908,6 @@ struct tile_window_with_static_distribution
     // Prefetch DRAM memory that would be accessed by TDM load
     // Similar to tdm_load_to_lds but issues cache prefetch hints instead of loading to LDS
     // We try to fill entire wave with multiple rows and columns per single call to prefetch
-    // We expect global_strides[0] to be 1!
     // For OOB we set is_valid to false
     // For now TDMConfig_ is unused, but we keep it for future use when maybe TDM will have prefetch
     // config
@@ -920,7 +919,7 @@ struct tile_window_with_static_distribution
         constexpr index_t L1_cacheline_size = 32;
         constexpr index_t L2_cacheline_size = 256;
 
-        constexpr bool prefetch_L1       = false;
+        constexpr bool prefetch_L1       = true;
         constexpr index_t cacheline_size = prefetch_L1 ? L1_cacheline_size : L2_cacheline_size;
         constexpr auto preferred_coherence =
             prefetch_L1 ? amd_buffer_coherence_enum::CU_RT : amd_buffer_coherence_enum::SE_RT;
@@ -976,40 +975,49 @@ struct tile_window_with_static_distribution
             // Get base offset for this thread's starting position
             const auto base_offset = bottom_tensor_thread_coord.get_offset();
 
-            // Hoist y dimension check outside the loop (wave-uniform for better codegen)
-            constexpr bool check_y_bounds = (Base::NDimBottomTensor > 1);
-
+            constexpr index_t num_x_iterations = (x_len + lanes_per_row * col_prefetch_stride - 1) /
+                                                 (lanes_per_row * col_prefetch_stride);
             constexpr index_t num_y_iterations =
                 (y_len + num_rows_parallel - 1) / num_rows_parallel;
-            static_for<0, num_y_iterations, 1>{}([&](auto j) {
-                constexpr index_t y_base = j * num_rows_parallel;
-                index_t y_pos            = y_base + y_lane_offset;
-                // Check y bounds once per y-iteration (not per x)
-                const bool y_in_bounds = check_y_bounds ? (y_pos < tensor_dims[1]) : true;
+            constexpr auto box_dim = [&]() {
+                if constexpr(raw_box_dim.size() > 1)
+                {
+                    return raw_box_dim.modify(number<0>{}, number<num_x_iterations>{})
+                        .modify(number<1>{}, number<num_y_iterations>{});
+                }
+                else
+                {
+                    return raw_box_dim.modify(number<0>{}, number<num_x_iterations>{});
+                }
+            }();
 
-                // Fully unroll inner loop at compile time
-                constexpr index_t num_x_iterations =
-                    (x_len + lanes_per_row * col_prefetch_stride - 1) /
-                    (lanes_per_row * col_prefetch_stride);
-                static_for<0, num_x_iterations, 1>{}([&](auto i) {
-                    const index_t x_pos = x_lane_offset + i * lanes_per_row * col_prefetch_stride;
+            // Create reverse iteration order: dimension 0 moves fastest
+            constexpr auto reverse_order =
+                typename arithmetic_sequence_gen<box_dim.size() - 1, -1, -1>::type{};
+            static_ford<decltype(box_dim), decltype(reverse_order)>{}([&](auto box_dim_idx) {
+                const index_t x =
+                    x_lane_offset + box_dim_idx[I0] * lanes_per_row * col_prefetch_stride;
+                index_t prefetch_offset = base_offset + x * Traits::PackedSize;
+                bool is_valid           = x < tensor_dims[0];
 
-                    const index_t prefetch_offset = base_offset + y_pos * global_strides[1] +
-                                                    x_pos * Traits::PackedSize * global_strides[0];
+                if constexpr(box_dim.size() > 1)
+                {
+                    const index_t y = y_lane_offset + box_dim_idx[I1] * num_rows_parallel;
+                    prefetch_offset += y * global_strides[0];
+                    is_valid = is_valid && y < tensor_dims[1];
+                }
 
-                    // Only check x bounds (y already checked above)
-                    const bool is_valid = y_in_bounds && (x_pos < tensor_dims[0]);
-
-                    // Use buffer_view's prefetch method
-                    using DataType = typename Base::DataType;
-                    this->get_bottom_tensor_view()
-                        .get_buffer_view()
-                        .template prefetch<DataType, preferred_coherence>(
-                            0, prefetch_offset, is_valid);
+                static_for<2, box_dim.size(), 1>{}([&](auto i) {
+                    prefetch_offset += box_dim_idx[i] * global_strides[i - 1];
+                    is_valid = is_valid && box_dim_idx[i] < tensor_dims[i];
                 });
+
+                using DataType = typename Base::DataType;
+                this->get_bottom_tensor_view()
+                    .get_buffer_view()
+                    .template prefetch<DataType, preferred_coherence>(0, prefetch_offset, is_valid);
             });
         });
-#else
 #endif
     }
 
@@ -1046,7 +1054,8 @@ struct tile_window_with_static_distribution
                 lds_window_origin + window_adaptor_thread_coord.get_bottom_index();
 
             // Calculate remaining tensor dimensions, clamping negative values to 0
-            // This prevents out-of-bounds access when window_origin + bottom_index > tensor_length
+            // This prevents out-of-bounds access when window_origin + bottom_index >
+            // tensor_length
             auto&& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
                 transform_tuples([](auto x) { return max(index_t{0}, x); },
                                  glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
