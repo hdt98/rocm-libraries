@@ -66,6 +66,23 @@ namespace detail
         while(0)
 #endif // ROCPRIM_DETAIL_HIP_SYNC
 
+#ifndef ROCPRIM_DETAIL_DEBUG_SYNC_START
+    #define ROCPRIM_DETAIL_DEBUG_SYNC_START(start)        \
+        do                                                \
+        {                                                 \
+            if(debug_synchronous)                         \
+            {                                             \
+                start = std::chrono::steady_clock::now(); \
+            }                                             \
+        }                                                 \
+        while(0)
+#endif
+
+#ifndef ROCPRIM_DETAIL_DEBUG_SYNC_END
+    #define ROCPRIM_DETAIL_DEBUG_SYNC_END(name, size, start) \
+        ROCPRIM_DETAIL_HIP_SYNC(name, size, start)
+#endif
+
 #ifndef ROCPRIM_RETURN_ON_ERROR
     #define ROCPRIM_RETURN_ON_ERROR(...)                                        \
         do                                                                      \
