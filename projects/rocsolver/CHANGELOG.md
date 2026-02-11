@@ -6,6 +6,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 ## (Unreleased) rocSOLVER
 
 ### Added
+
+* Added LARFT 64 bit API.
+
 ### Changed
 ### Removed
 ### Optimized
