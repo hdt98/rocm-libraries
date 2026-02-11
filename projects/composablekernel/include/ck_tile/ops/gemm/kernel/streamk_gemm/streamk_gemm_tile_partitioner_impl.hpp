@@ -285,26 +285,26 @@ StreamKTilePartitionerBase<BlockGemmShapeType, ReductionStrategyType>::estimate_
  *
  * @param block_1d_id       grid 1D id
  * @param total_num_tiles   size of the 1D grid
- * @param NUM_XCDS          number of XCDs
+ * @param num_xcds          number of XCDs
  * @return index_t  The id after XCD remap
  */
 template <typename BlockGemmShapeType, StreamKReductionStrategy ReductionStrategyType>
 CK_TILE_HOST_DEVICE index_t
-StreamKTilePartitionerBase<BlockGemmShapeType, ReductionStrategyType>::RemapXCD(
-    index_t block_1d_id, index_t total_num_tiles, index_t NUM_XCDS) const noexcept
+StreamKTilePartitionerBase<BlockGemmShapeType, ReductionStrategyType>::remap_xcd(
+    index_t block_1d_id, index_t total_num_tiles, index_t num_xcds) const noexcept
 {
     // Number of ids per XCD in the new arrangement
-    index_t ids_per_xcd = (total_num_tiles + NUM_XCDS - 1) / NUM_XCDS;
+    index_t ids_per_xcd = (total_num_tiles + num_xcds - 1) / num_xcds;
 
-    // When total_num_tiles cannot divide NUM_XCDS, some xcds will have
+    // When total_num_tiles cannot divide num_xcds, some xcds will have
     // ids_per_xcd ids, the other will have ids_per_xcd - 1 ids.
     // We calculate the number of xcds that have ids_per_xcd ids as tall_xcds
-    index_t tall_xcds = total_num_tiles % NUM_XCDS;
-    tall_xcds         = (tall_xcds == 0) ? NUM_XCDS : tall_xcds;
+    index_t tall_xcds = total_num_tiles % num_xcds;
+    tall_xcds         = (tall_xcds == 0) ? num_xcds : tall_xcds;
 
     // Compute current XCD and local id within the XCD
-    index_t xcd      = block_1d_id % NUM_XCDS;
-    index_t local_id = block_1d_id / NUM_XCDS;
+    index_t xcd      = block_1d_id % num_xcds;
+    index_t local_id = block_1d_id / num_xcds;
 
     // Calculate new id based on the new grouping
     if(xcd < tall_xcds)

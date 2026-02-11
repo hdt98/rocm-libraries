@@ -425,14 +425,15 @@ template <typename GemmShape>
 void test_remap_xcd(
     const std::vector<ck_tile::index_t>& initial_values,
     const std::vector<ck_tile::index_t>& expected_values,
-    ck_tile::StreamKTilePartitioner_v2<GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>&
-        tile_partitioner)
+    ck_tile::StreamKTilePartitioner<GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>&
+        tile_partitioner,
+    const int num_xcds = 8)
 {
-    // ck_tile::index_t grid_size   = tile_partitioner.grid_size().x;
     std::vector<ck_tile::index_t> remapped_values(initial_values.size());
     for(std::size_t i = 0; i < initial_values.size(); ++i)
     {
-        remapped_values[i] = tile_partitioner.RemapXCD(initial_values[i], initial_values.size());
+        remapped_values[i] =
+            tile_partitioner.remap_xcd(initial_values[i], initial_values.size(), num_xcds);
     }
 
     EXPECT_EQ(remapped_values, expected_values);

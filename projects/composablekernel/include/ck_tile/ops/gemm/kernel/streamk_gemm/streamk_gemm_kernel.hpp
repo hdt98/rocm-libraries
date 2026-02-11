@@ -7,6 +7,7 @@
 #include "ck_tile/ops/common.hpp"
 #include "ck_tile/host/concat.hpp"
 #include "streamk_gemm_coherency.hpp"
+#include "streamk_gemm_xcd.hpp"
 
 namespace ck_tile {
 
@@ -678,7 +679,12 @@ struct StreamKKernel
         index_t dp_ctas     = kargs.tile_partitioner.get_dp_ctas();
         bool is_dp_ctas     = block_idx < kargs.tile_partitioner.get_dp_ctas();
 
-        block_idx = kargs.tile_partitioner.RemapXCD(block_idx, grid_size);
+        using CompilerTargetT = decltype(core::arch::get_compiler_target());
+        if constexpr(CompilerTargetT::TARGET_ID == core::arch::amdgcn_target_id::GFX942)
+        {
+            constexpr int num_xcds = ck_tile::NumXCD<CompilerTargetT>::num_xcds;
+            block_idx = kargs.tile_partitioner.remap_xcd(block_idx, grid_size, num_xcds);
+        }
         // Check if at the data parallel section
         if(is_dp_ctas)
         {
@@ -711,11 +717,15 @@ struct StreamKKernel
         index_t grid_size   = kargs.tile_partitioner.grid_size().x;
         index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
 
-        block_idx =
-            kargs.tile_partitioner.RemapXCD(block_idx, grid_size)
-            // Data-parallel section
-            for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
-                tile_idx += kargs.tile_partitioner.get_grid())
+        using CompilerTargetT = decltype(core::arch::get_compiler_target());
+        if constexpr(CompilerTargetT::TARGET_ID == core::arch::amdgcn_target_id::GFX942)
+        {
+            constexpr int num_xcds = ck_tile::NumXCD<CompilerTargetT>::num_xcds;
+            block_idx = kargs.tile_partitioner.remap_xcd(block_idx, grid_size, num_xcds);
+        }
+        // Data-parallel section
+        for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
+            tile_idx += kargs.tile_partitioner.get_grid())
         {
             BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
             block_sync_lds();
