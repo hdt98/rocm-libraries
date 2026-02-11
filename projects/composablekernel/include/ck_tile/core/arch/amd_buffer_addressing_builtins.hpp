@@ -1128,7 +1128,7 @@ CK_TILE_DEVICE_EXTERN int32x3_t
 llvm_amdgcn_raw_buffer_load_i32x3(int32x4_t srsrc,
                                   index_t voffset,
                                   index_t soffset,
-                                  index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.v3i32");
+                                  index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.v3i32.v4i32");
 
 CK_TILE_DEVICE_EXTERN int32x4_t
 llvm_amdgcn_raw_buffer_load_i32x4(int32x4_t srsrc,

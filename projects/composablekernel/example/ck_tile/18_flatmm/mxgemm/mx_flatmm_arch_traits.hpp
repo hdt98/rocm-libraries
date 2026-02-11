@@ -52,6 +52,38 @@ struct MXFlatmmConfigBase16
     static constexpr bool TiledMMAPermuteN = false;
 };
 
+struct MXFp6FlatmmConfigBase16
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 256;
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 128;
+
+    static constexpr bool kPadM = false;
+    static constexpr bool kPadN = false;
+    static constexpr bool kPadK = false;
+
+    static constexpr bool TransposeC            = false;
+    static constexpr bool UseStructuredSparsity = false;
+
+    static constexpr int kBlockPerCu                = 1;
+    static constexpr int TileParitionerGroupNum     = 8;
+    static constexpr int TileParitionerM01          = 4;
+    static constexpr auto Scheduler                 = ck_tile::GemmPipelineScheduler::Default;
+    static constexpr ck_tile::index_t NumWaveGroups = 1;
+    static constexpr bool DoubleSmemBuffer          = false;
+
+    static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
+    static constexpr bool TiledMMAPermuteN = false;
+};
+
 // Base FlatmmConfig with 32x32 warp tile (for GFX1250 TDM)
 struct MXFlatmmConfigBase32TDM
 {
@@ -96,6 +128,7 @@ struct MXFlatmmArchTraits
     using Fp8Fp8Config = MXFlatmmConfigBase16;
     using F8F4Config   = MXFlatmmConfigBase16;
     using F4F8Config   = MXFlatmmConfigBase16;
+    using Fp6Fp6Config = MXFp6FlatmmConfigBase16;
 
     template <typename MXPipelineProblem>
     using MXFlatmmPipeline = ck_tile::MXFlatmmPipelineAGmemBGmemCRegV1<MXPipelineProblem>;
@@ -172,6 +205,7 @@ struct MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250>
     using Fp8Fp8Config = MXFlatmmConfigBase32TDM;
     using F8F4Config   = MXFlatmmConfigBase32TDM;
     using F4F8Config   = MXFlatmmConfigBase32TDM;
+    using Fp6Fp6Config = MXFlatmmConfigBase32TDM;
 
     template <typename MXPipelineProblem>
     using MXFlatmmPipeline = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegTDM<MXPipelineProblem>;
@@ -236,6 +270,7 @@ constexpr ck_tile::core::arch::TargetId GetCurrentTargetId()
 using CurrentArchTraits = MXFlatmmArchTraits<GetCurrentTargetId()>;
 
 // Type aliases for backward compatibility
+using MXfp6_FlatmmConfig16  = CurrentArchTraits::Fp6Fp6Config;
 using MXfp4_FlatmmConfig16  = CurrentArchTraits::Fp4Fp4Config;
 using MXfp8_FlatmmConfig16  = CurrentArchTraits::Fp8Fp8Config;
 using MXf8f4_FlatmmConfig16 = CurrentArchTraits::F8F4Config;
