@@ -407,15 +407,92 @@ private:
         return total_time;
     }
 
-    void PrintForwardTime(float kernel_total_time, float kernel_first_time, bool json_mode) const;
+    void PrintForwardTime(float kernel_total_time, float kernel_first_time, const miopenConvSolution_t& solution) const;
     int RunForwardGpuImmed(bool is_transform);
     int RunForwardGpuFind(bool is_transform);
-    void PrintBackwardDataTime(float kernel_total_time, float kernel_first_time);
+    void PrintBackwardDataTime(float kernel_total_time, float kernel_first_time, const miopenConvSolution_t& solution);
     int RunBackwardDataGpuImmed();
     int RunBackwardDataGpuFind();
-    void PrintBackwardWrwTime(float kernel_total_time, float kernel_first_time);
+    void PrintBackwardWrwTime(float kernel_total_time, float kernel_first_time, const miopenConvSolution_t& solution);
     int RunBackwardWrwGpuImmed();
     int RunBackwardWrwGpuFind();
+
+    // Helper function to print 2D JSON performance logs
+    void Print2DConvJsonLog(const std::string& operation_name,
+                            const std::string& direction,
+                            float kernel_average_time,
+                            const miopenConvSolution_t& solution,
+                            int in_n, int in_c, int in_h, int in_w,
+                            int wei_h, int wei_w,
+                            int out_c, int out_h, int out_w,
+                            size_t flopCnt,
+                            size_t readBytes,
+                            size_t outputBytes) const
+    {
+        std::cout << "{\"performance\":{"
+                  << "\"name\":\"" << operation_name << wei_h << "x" << wei_w << "u" << miopen::deref(convDesc).GetConvStrides()[0] << "\","
+                  << "\"algorithm\":" << solution.algorithm << ","
+                  << "\"solution\":\"" << solution.solution_id << '/'
+                  << ((solution.solution_id != 0) ? miopen::solver::Id(solution.solution_id).ToString()
+                                                  : std::string("UNKNOWN")) << "\","
+                  << "\"direction\":\"" << direction << "\","
+                  << "\"operation\":\"conv\","
+                  << "\"dimensions\":2,"
+                  << "\"n\":" << in_n << ","
+                  << "\"c\":" << in_c << ","
+                  << "\"ho\":" << out_h << ","
+                  << "\"wo\":" << out_w << ","
+                  << "\"y\":" << wei_h << ","
+                  << "\"x\":" << wei_w << ","
+                  << "\"k\":" << out_c << ","
+                  << "\"results\":{"
+                  << "\"average_time_ms\":" << kernel_average_time << ","
+                  << "\"flop_count\":" << flopCnt << ","
+                  << "\"bytes_read\":" << readBytes << ","
+                  << "\"bytes_written\":" << outputBytes << ","
+                  << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
+                  << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
+                  << "}}}" << std::endl;
+    }
+    // Helper function to print 2D JSON performance logs
+    void Print3DConvJsonLog(const std::string& operation_name,
+                            const std::string& direction,
+                            float kernel_average_time,
+                            const miopenConvSolution_t& solution,
+                            int in_n, int in_c, int in_h, int in_w,
+                            int wei_h, int wei_w,int wei_d,
+                            int out_c, int out_h, int out_w, int out_d,
+                            size_t flopCnt,
+                            size_t readBytes,
+                            size_t outputBytes) const
+    {
+        std::cout << "{\"performance\":{"
+                    << "\"name\":\"" << operation_name << wei_d << "x" << wei_h << "x" << wei_w << "u" <<  miopen::deref(convDesc).GetConvStrides()[0] << "\","
+                    << "\"algorithm\":" << solution.algorithm << ","
+                    << "\"solution\":\"" << solution.solution_id << '/'
+                    << ((solution.solution_id != 0) ? miopen::solver::Id(solution.solution_id).ToString()
+                                                    : std::string("UNKNOWN")) << "\","
+                    << "\"direction\":\"" << direction << "\","
+                    << "\"operation\":\"conv\","
+                    << "\"dimensions\":3,"
+                    << "\"n\":" << in_n << ","
+                    << "\"c\":" << in_c << ","
+                    << "\"do\":" << out_d << ","
+                    << "\"ho\":" << out_h << ","
+                    << "\"wo\":" << out_w << ","
+                    << "\"z\":" << wei_d << ","
+                    << "\"y\":" << wei_h << ","
+                    << "\"x\":" << wei_w << ","
+                    << "\"k\":" << out_c << ","
+                    << "\"results\":{"
+                    << "\"average_time_ms\":" << kernel_average_time << ","
+                    << "\"flop_count\":" << flopCnt << ","
+                    << "\"bytes_read\":" << readBytes << ","
+                    << "\"bytes_written\":" << outputBytes << ","
+                    << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
+                    << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
+                    << "}}}" << std::endl;
+    }
 
     double GetDefaultTolerance() const
     {
@@ -612,7 +689,8 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
         }
     }
 
-    if(time_enabled)
+    const auto performance_performance_log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+    if(time_enabled || miopen::IsPerformanceLoggingEnabled(performance_performance_log_level))
     {
         miopenEnableProfiling(GetHandle(), true);
     }
@@ -1681,15 +1759,23 @@ int ConvDriver<Tgpu, Tref>::FindForward(int& ret_algo_count,
 template <typename Tgpu, typename Tref>
 void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                                               const float kernel_first_time,
-                                              const bool json_mode) const
+                                              const miopenConvSolution_t& solution) const
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
+    
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    
+    if(!performance_logging_enabled)
+    {
+        printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    }
+    
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        if(!json_mode)
+        if(!performance_logging_enabled)
         {
-            printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
             printf("stats: <not implemented> for conv%ud\n", num_dim);
         }
         return;
@@ -1719,24 +1805,9 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         size_t outputBytes = 1.0 * out_n * out_c * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
 
-        if(json_mode)
+        if(performance_logging_enabled)
         {
-            std::cout << "{\"performance\":{"
-                      << "\"name\":\"fwd-conv" << wei_h << wei_w << "x" <<  miopen::deref(convDesc).GetConvStrides()[0] << "\","
-                      << "\"n\":" << in_n << ","
-                      << "\"c\":" << in_c << ","
-                      << "\"ho\":" << out_h << ","
-                      << "\"wo\":" << out_w << ","
-                      << "\"y\":" << wei_h << ","
-                      << "\"x\":" << wei_w << ","
-                      << "\"k\":" << out_c << ","
-                      << "\"flop_count\":" << flopCnt << ","
-                      << "\"bytes_read\":" << readBytes << ","
-                      << "\"bytes_written\":" << outputBytes << ","
-                      << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
-                      << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6) << ","
-                      << "\"average_time_ms\":" << kernel_average_time 
-                      << "}}" << std::endl;
+            Print2DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes);
         }
         else
         {
@@ -1786,20 +1857,9 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         size_t outputBytes = 1.0 * out_n * out_c * out_d * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
 
-        if(json_mode)
+        if(performance_logging_enabled)
         {
-            std::cout << "{\"performance\":{"
-                      << "\"direction\":\"forward\","
-                      << "\"operation\":\"conv\","
-                      << "\"dimensions\":3,"
-                      << "\"results\":{"
-                      << "\"average_time_ms\":" << kernel_average_time << ","
-                      << "\"flop_count\":" << flopCnt << ","
-                      << "\"bytes_read\":" << readBytes << ","
-                      << "\"bytes_written\":" << outputBytes << ","
-                      << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
-                      << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
-                      << "}}}" << std::endl;
+            Print3DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes);
         }
         else
         {
@@ -1866,7 +1926,7 @@ int ConvDriver<Tgpu, Tref>::RunWarmupFindForwardGPU()
     if(find_count == 0)
         return 20;
 
-    miopenConvSolution_t solution;
+    miopenConvSolution_t warmup_solution;
     if(immediate_solution)
     {
         std::size_t immed_count;
@@ -1891,13 +1951,13 @@ int ConvDriver<Tgpu, Tref>::RunWarmupFindForwardGPU()
                                                  warmupOutputTensor,
                                                  1,
                                                  &immed_count,
-                                                 &solution);
+                                                 &warmup_solution);
         warmup_wall_total.pause(wall_enabled);
         if(rc != miopenStatusSuccess)
             return 50;
         if(immed_count < 1)
             return 60;
-        if(solution.workspace_size != 0)
+        if(warmup_solution.workspace_size != 0)
             return 70;
 
         warmup_wall_total.resume(wall_enabled);
@@ -1917,7 +1977,7 @@ int ConvDriver<Tgpu, Tref>::RunWarmupFindForwardGPU()
                                                warmup_out.GetDevicePtr(),
                                                nullptr,
                                                0,
-                                               solution.solution_id);
+                                               warmup_solution.solution_id);
         warmup_wall_total.pause(wall_enabled);
         if(rc != miopenStatusSuccess)
             return 80;
@@ -1930,8 +1990,8 @@ int ConvDriver<Tgpu, Tref>::RunWarmupFindForwardGPU()
         ss << "Wall-clock Total Time: " << warmup_wall_total.gettime_ms() << " ms, ";
     ss << "Find Algorithm: " << find_result.fwd_algo;
     if(immediate_solution)
-        ss << ", Immediate Algorithm: " << miopen::ConvolutionAlgoToString(solution.algorithm)
-           << '[' << solution.solution_id << ']';
+        ss << ", Immediate Algorithm: " << miopen::ConvolutionAlgoToString(warmup_solution.algorithm)
+           << '[' << warmup_solution.solution_id << ']';
     ss << std::endl;
     std::cout << ss.str();
     return rc;
@@ -2105,7 +2165,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
     auto in_buff  = (is_transform ? in_vect4_dev->GetMem() : in.GetDevicePtr());
     auto wei_tens = (is_transform ? weightTensor_vect4 : weightTensor);
     auto wei_buff = (is_transform ? wei_vect4_dev->GetMem() : wei.GetDevicePtr());
-
+    
     if(ws_size > ws_sizeof_find_fwd)
     {
         MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Error,
@@ -2115,6 +2175,21 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         return miopenStatusInternalError;
     }
     ResizeWorkspaceDev(ctx, ws_size);
+    
+    // Get the actual solution details to log the correct solver name
+    miopenConvSolution_t found_solution;
+    GetSolutionAfterFind(
+        perf_results[0], Direction::Fwd, in_tens, wei_tens, outputTensor, found_solution);
+    
+    // Get performance_log_level once at the start to avoid shadow variable warnings
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    // Log the selected solver for execution phase kernel tracking
+    std::string solution_name = std::to_string(found_solution.solution_id) + "/" +
+                                ((found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
+                                                             : std::string("UNKNOWN"));
+    miopen::LogSolutionName(solution_name, performance_log_level);
+    
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -2123,7 +2198,10 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         {
             out.FillGpuBufferWithNans(handle, outputTensor);
         }
-
+        if(performance_logging_enabled)
+        {
+            miopen::IncrementKernelExecutionCounter();
+        }
         rc = miopenConvolutionForward(GetHandle(),
                                       &alpha,
                                       in_tens,
@@ -2163,20 +2241,13 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
                   << ", Auxiliary API calls: " << fwd_auxiliary.gettime_ms() << " ms"
                   << " (GWSS: " << fwd_auxiliary_gwss.gettime_ms() << ')' << std::endl;
     }
-    if(time_enabled)
+    if(time_enabled || performance_logging_enabled)
     {
-        miopenConvSolution_t solution;
-        GetSolutionAfterFind(
-            perf_results[0], Direction::Fwd, in_tens, wei_tens, outputTensor, solution);
-
-         
-        const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
-        if(!json_mode)
+        if(!performance_logging_enabled)
         {
-            std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(solution) << std::endl;
+            std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(found_solution) << std::endl;
         }
-        PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
+        PrintForwardTime(kernel_total_time, kernel_first_time, found_solution);
     }
 
     return rc;
@@ -2278,10 +2349,17 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
     fwd_auxiliary.pause(wall_enabled);
     if(rc != miopenStatusSuccess)
         return rc;
-
     float kernel_total_time = 0.f;
     float kernel_first_time = 0.f;
     float wall_first_time   = 0.f;
+
+    // Log the selected solver for execution phase kernel tracking
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    std::string solution_name = std::to_string(selected->solution_id) + "/" +
+                                ((selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
+                                                             : std::string("UNKNOWN"));
+    miopen::LogSolutionName(solution_name, performance_log_level);
 
     wall.start(wall_enabled);
 
@@ -2291,7 +2369,10 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
         {
             out.FillGpuBufferWithNans(handle, outputTensor);
         }
-
+        if(performance_logging_enabled)
+        {
+            miopen::IncrementKernelExecutionCounter();
+        }
         rc = miopenConvolutionForwardImmediate(
             handle,
             (is_transform ? weightTensor_vect4 : weightTensor),
@@ -2332,13 +2413,11 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
     }
     if(time_enabled)
     {
-        const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
-        if(!json_mode)
+        if(!performance_logging_enabled)
         {
             std::cout << "MIOpen Forward Conv. " << AlgorithmSolutionToString(*selected) << std::endl;
         }
-        PrintForwardTime(kernel_total_time, kernel_first_time, json_mode);
+        PrintForwardTime(kernel_total_time, kernel_first_time, *selected);
     }
 
     is_fwd_igemm = (selected->algorithm == miopenConvolutionAlgoImplicitGEMM);
@@ -2613,6 +2692,24 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
         return miopenStatusInternalError;
     }
     ResizeWorkspaceDev(ctx, ws_size);
+    
+    // Get the actual solution details to log the correct solver name
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    miopenConvSolution_t found_solution;
+    GetSolutionAfterFind(perf_results_data[0],
+                         Direction::Bwd,
+                         inputTensor,
+                         weightTensor,
+                         outputTensor,
+                         found_solution);
+    
+    // Log the selected solver for execution phase kernel tracking
+    std::string solution_name = std::to_string(found_solution.solution_id) + "/" +
+                                ((found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
+                                                             : std::string("UNKNOWN"));
+    miopen::LogSolutionName(solution_name, performance_log_level);
+    
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -2620,6 +2717,10 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
         if(init_output_nan)
         {
             din.FillGpuBufferWithNans(handle, inputTensor);
+        }
+        if(performance_logging_enabled)
+        {
+            miopen::IncrementKernelExecutionCounter();
         }
         rc = miopenConvolutionBackwardData(GetHandle(),
                                            &alpha,
@@ -2663,16 +2764,12 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
     }
     if(time_enabled)
     {
-        miopenConvSolution_t solution;
-        GetSolutionAfterFind(perf_results_data[0],
-                             Direction::Bwd,
-                             inputTensor,
-                             weightTensor,
-                             outputTensor,
-                             solution);
-        std::cout << "MIOpen Backward Data Conv. " << AlgorithmSolutionToString(solution)
-                  << std::endl;
-        PrintBackwardDataTime(kernel_total_time, kernel_first_time);
+        if(!performance_logging_enabled)
+        {
+            std::cout << "MIOpen Backward Data Conv. " << AlgorithmSolutionToString(found_solution)
+                      << std::endl;
+        }
+        PrintBackwardDataTime(kernel_total_time, kernel_first_time, found_solution);
     }
 
     din.CopyFromDeviceToHost(GetStream());
@@ -2680,15 +2777,25 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
 }
 
 template <typename Tgpu, typename Tref>
-void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, float kernel_first_time)
+void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, float kernel_first_time, const miopenConvSolution_t& solution)
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
-    printf("GPU Kernel Time Backward Data Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    
+    if(!performance_logging_enabled)
+    {
+        printf("GPU Kernel Time Backward Data Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    }
 
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        printf("stats: <not implemented> for conv%ud\n", num_dim);
+        if(!performance_logging_enabled)
+        {
+            printf("stats: <not implemented> for conv%ud\n", num_dim);
+        }
         return;
     }
 
@@ -2709,33 +2816,40 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
                          out_w / group_count;
         size_t weightBytes = wei_n * wei_c * wei_h * wei_w *
                              miopen::GetTypeSize(miopen::deref(weightTensor).GetType());
-        size_t inputBytes =
-            in_n * in_c * out_c * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
-        size_t readBytes = inputBytes + weightBytes;
-
-        size_t outputBytes = 1.0 * out_n * out_c * out_h * out_w *
+        size_t outputBytes = out_n * out_c * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
+        size_t readBytes = weightBytes + outputBytes;
+        size_t inputBytes = in_n * in_c * in_h * in_w *
+                            miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
 
-        printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-               "GB/s, timeMs\n");
-        printf("stats: %s%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, %.0f, %f\n",
-               "bwdd-conv",
-               wei_h,
-               wei_w,
-               miopen::deref(convDesc).GetConvStrides()[0],
-               in_n,
-               in_c,
-               out_h,
-               out_w,
-               wei_h,
-               wei_w,
-               out_c,
-               flopCnt,
-               readBytes,
-               outputBytes,
-               flopCnt / kernel_average_time / 1e6,
-               (readBytes + outputBytes) / kernel_average_time / 1e6,
-               kernel_average_time);
+        if(performance_logging_enabled)
+        {
+            
+            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes);
+        }
+        else
+        {
+            printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+                   "GB/s, timeMs\n");
+            printf("stats: %s%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, %.0f, %f\n",
+                   "bwdd-conv",
+                   wei_h,
+                   wei_w,
+                   miopen::deref(convDesc).GetConvStrides()[0],
+                   in_n,
+                   in_c,
+                   out_h,
+                   out_w,
+                   wei_h,
+                   wei_w,
+                   out_c,
+                   flopCnt,
+                   readBytes,
+                   inputBytes,
+                   flopCnt / kernel_average_time / 1e6,
+                   (readBytes + inputBytes) / kernel_average_time / 1e6,
+                   kernel_average_time);
+        }
     }
     else
     { // 3d
@@ -2753,38 +2867,44 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
                          out_d * out_h * out_w / group_count;
         size_t weightBytes = wei_n * wei_c * wei_d * wei_h * wei_w *
                              miopen::GetTypeSize(miopen::deref(weightTensor).GetType());
-        size_t inputBytes =
-            in_n * in_c * out_c * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
-        size_t readBytes = inputBytes + weightBytes;
-
-        size_t outputBytes = 1.0 * out_n * out_c * out_d * out_h * out_w *
+        size_t outputBytes = out_n * out_c * out_d * out_h * out_w *
                              miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
+        size_t readBytes = weightBytes + outputBytes;
+        size_t inputBytes = in_n * in_c * in_d * in_h * in_w *
+                            miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
 
-        printf(
-            "stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-            "GB/s, timeMs\n");
-        printf("stats: %s%dx%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, "
-               "%.0f, %f\n",
-               "bwdd-conv",
-               wei_d,
-               wei_h,
-               wei_w,
-               miopen::deref(convDesc).GetConvStrides()[0],
-               in_n,
-               in_c,
-               out_d,
-               out_h,
-               out_w,
-               wei_d,
-               wei_h,
-               wei_w,
-               out_c,
-               flopCnt,
-               readBytes,
-               outputBytes,
-               flopCnt / kernel_average_time / 1e6,
-               (readBytes + outputBytes) / kernel_average_time / 1e6,
-               kernel_average_time);
+        if(performance_logging_enabled)
+        {
+            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes);
+        }
+        else
+        {
+            printf(
+                "stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+                "GB/s, timeMs\n");
+            printf("stats: %s%dx%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, "
+                   "%.0f, %f\n",
+                   "bwdd-conv",
+                   wei_d,
+                   wei_h,
+                   wei_w,
+                   miopen::deref(convDesc).GetConvStrides()[0],
+                   in_n,
+                   in_c,
+                   out_d,
+                   out_h,
+                   out_w,
+                   wei_d,
+                   wei_h,
+                   wei_w,
+                   out_c,
+                   flopCnt,
+                   readBytes,
+                   inputBytes,
+                   flopCnt / kernel_average_time / 1e6,
+                   (readBytes + inputBytes) / kernel_average_time / 1e6,
+                   kernel_average_time);
+        }
     }
 }
 
@@ -2800,6 +2920,9 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
 
     float alpha = static_cast<float>(1), beta = static_cast<float>(0);
     std::vector<miopenConvAlgoPerf_t> perf_results_weights(request_algo_count);
+
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
 
     DEFINE_CONTEXT(ctx);
 #if MIOPEN_BACKEND_OPENCL
@@ -2827,6 +2950,22 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
         return miopenStatusInternalError;
     }
     ResizeWorkspaceDev(ctx, ws_size);
+    
+    // Get the actual solution details to log the correct solver name
+    miopenConvSolution_t found_solution;
+    GetSolutionAfterFind(perf_results_weights[0],
+                         Direction::WrW,
+                         inputTensor,
+                         weightTensor,
+                         outputTensor,
+                         found_solution);
+    
+    // Log the selected solver for execution phase kernel tracking
+    std::string solution_name = std::to_string(found_solution.solution_id) + "/" +
+                                ((found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
+                                                             : std::string("UNKNOWN"));
+    miopen::LogSolutionName(solution_name, performance_log_level);
+    
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -2835,7 +2974,10 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
         {
             dwei.FillGpuBufferWithNans(handle, weightTensor);
         }
-
+        if(performance_logging_enabled)
+        {
+            miopen::IncrementKernelExecutionCounter();
+        }
         rc = miopenConvolutionBackwardWeights(GetHandle(),
                                               &alpha,
                                               outputTensor,
@@ -2878,16 +3020,12 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
     }
     if(time_enabled)
     {
-        miopenConvSolution_t solution;
-        GetSolutionAfterFind(perf_results_weights[0],
-                             Direction::WrW,
-                             inputTensor,
-                             weightTensor,
-                             outputTensor,
-                             solution);
-        std::cout << "MIOpen Backward Weights Conv. " << AlgorithmSolutionToString(solution)
-                  << std::endl;
-        PrintBackwardWrwTime(kernel_total_time, kernel_first_time);
+        if(!performance_logging_enabled)
+        {
+            std::cout << "MIOpen Backward Weights Conv. " << AlgorithmSolutionToString(found_solution)
+                      << std::endl;
+        }
+        PrintBackwardWrwTime(kernel_total_time, kernel_first_time, found_solution);
     }
 
     dwei.CopyFromDeviceToHost(GetStream());
@@ -2895,16 +3033,26 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
 }
 
 template <typename Tgpu, typename Tref>
-void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float kernel_first_time)
+void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float kernel_first_time, const miopenConvSolution_t& solution)
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
-    printf("GPU Kernel Time Backward Weights Conv. Elapsed: %f ms (average)\n",
-           kernel_average_time);
+    
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    
+    if(!performance_logging_enabled)
+    {
+        printf("GPU Kernel Time Backward Weights Conv. Elapsed: %f ms (average)\n",
+               kernel_average_time);
+    }
 
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        printf("stats: <not implemented> for conv%ud\n", num_dim);
+        if(!performance_logging_enabled)
+        {
+            printf("stats: <not implemented> for conv%ud\n", num_dim);
+        }
         return;
     }
 
@@ -2923,29 +3071,42 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_h * wei_w * out_c * out_h *
                          out_w / group_count;
-        size_t readBytes   = 0;
-        size_t outputBytes = 0;
+        size_t inputBytes =
+            in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
+        size_t outputBytes = out_n * out_c * out_h * out_w *
+                             miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
+        size_t readBytes = inputBytes + outputBytes;
+        size_t weightBytes = wei_n * wei_c * wei_h * wei_w *
+                             miopen::GetTypeSize(miopen::deref(weightTensor).GetType());
 
-        printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-               "GB/s, timeMs\n");
-        printf("stats: %s%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, %.0f, %f\n",
-               "bwdw-conv",
-               wei_h,
-               wei_w,
-               miopen::deref(convDesc).GetConvStrides()[0],
-               in_n,
-               in_c,
-               out_h,
-               out_w,
-               wei_h,
-               wei_w,
-               out_c,
-               flopCnt,
-               readBytes,
-               outputBytes,
-               flopCnt / kernel_average_time / 1e6,
-               (readBytes + outputBytes) / kernel_average_time / 1e6,
-               kernel_average_time);
+        if(performance_logging_enabled)
+        {
+            
+            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes);
+        }
+        else
+        {
+            printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+                   "GB/s, timeMs\n");
+            printf("stats: %s%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, %.0f, %f\n",
+                   "bwdw-conv",
+                   wei_h,
+                   wei_w,
+                   miopen::deref(convDesc).GetConvStrides()[0],
+                   in_n,
+                   in_c,
+                   out_h,
+                   out_w,
+                   wei_h,
+                   wei_w,
+                   out_c,
+                   flopCnt,
+                   readBytes,
+                   weightBytes,
+                   flopCnt / kernel_average_time / 1e6,
+                   (readBytes + weightBytes) / kernel_average_time / 1e6,
+                   kernel_average_time);
+        }
     }
     else
     { // 3d
@@ -2961,34 +3122,46 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_d * wei_h * wei_w * out_c *
                          out_d * out_h * out_w / group_count;
-        size_t readBytes   = 0;
-        size_t outputBytes = 0;
+        size_t inputBytes = in_n * in_c * in_d * in_h * in_w *
+                            miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
+        size_t outputBytes = out_n * out_c * out_d * out_h * out_w *
+                             miopen::GetTypeSize(miopen::deref(outputTensor).GetType());
+        size_t readBytes = inputBytes + outputBytes;
+        size_t weightBytes = wei_n * wei_c * wei_d * wei_h * wei_w *
+                             miopen::GetTypeSize(miopen::deref(weightTensor).GetType());
 
-        printf(
-            "stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-            "GB/s, timeMs\n");
-        printf("stats: %s%dx%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, "
-               "%.0f, %f\n",
-               "bwdw-conv",
-               wei_d,
-               wei_h,
-               wei_w,
-               miopen::deref(convDesc).GetConvStrides()[0],
-               in_n,
-               in_c,
-               out_d,
-               out_h,
-               out_w,
-               wei_d,
-               wei_h,
-               wei_w,
-               out_c,
-               flopCnt,
-               readBytes,
-               outputBytes,
-               flopCnt / kernel_average_time / 1e6,
-               (readBytes + outputBytes) / kernel_average_time / 1e6,
-               kernel_average_time);
+        if(performance_logging_enabled)
+        {
+            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes);
+        }
+        else
+        {
+            printf(
+                "stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+                "GB/s, timeMs\n");
+            printf("stats: %s%dx%dx%du%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %zu, %zu, %zu, %.0f, "
+                   "%.0f, %f\n",
+                   "bwdw-conv",
+                   wei_d,
+                   wei_h,
+                   wei_w,
+                   miopen::deref(convDesc).GetConvStrides()[0],
+                   in_n,
+                   in_c,
+                   out_d,
+                   out_h,
+                   out_w,
+                   wei_d,
+                   wei_h,
+                   wei_w,
+                   out_c,
+                   flopCnt,
+                   readBytes,
+                   weightBytes,
+                   flopCnt / kernel_average_time / 1e6,
+                   (readBytes + weightBytes) / kernel_average_time / 1e6,
+                   kernel_average_time);
+        }
     }
 }
 
@@ -3070,6 +3243,14 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
     float kernel_first_time = 0.f;
     float wall_first_time   = 0.f;
 
+    // Log the selected solver for execution phase kernel tracking
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    std::string solution_name = std::to_string(selected->solution_id) + "/" +
+                                ((selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
+                                                             : std::string("UNKNOWN"));
+    miopen::LogSolutionName(solution_name, performance_log_level);
+
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -3078,7 +3259,10 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
         {
             din.FillGpuBufferWithNans(handle, inputTensor);
         }
-
+        if(performance_logging_enabled)
+        {
+            miopen::IncrementKernelExecutionCounter();
+        }
         rc = miopenConvolutionBackwardDataImmediate(handle,
                                                     outputTensor,
                                                     dout.GetDevicePtr(),
@@ -3118,9 +3302,12 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
     }
     if(time_enabled)
     {
-        std::cout << "MIOpen Backward Data Conv. " << AlgorithmSolutionToString(*selected)
-                  << std::endl;
-        PrintBackwardDataTime(kernel_total_time, kernel_first_time);
+        if(!performance_logging_enabled)
+        {
+            std::cout << "MIOpen Backward Data Conv. " << AlgorithmSolutionToString(*selected)
+                      << std::endl;
+        }
+        PrintBackwardDataTime(kernel_total_time, kernel_first_time, *selected);
     }
 
     is_bwd_igemm = (selected->algorithm == miopenConvolutionAlgoImplicitGEMM);
@@ -3205,6 +3392,14 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
     float kernel_first_time = 0.f;
     float wall_first_time   = 0.f;
 
+    // Log the selected solver for execution phase kernel tracking
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    std::string solution_name = std::to_string(selected->solution_id) + "/" +
+                                ((selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
+                                                             : std::string("UNKNOWN"));
+    miopen::LogSolutionName(solution_name, performance_log_level);
+
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -3213,7 +3408,10 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
         {
             dwei.FillGpuBufferWithNans(handle, weightTensor);
         }
-
+        if(performance_logging_enabled)
+        {
+            miopen::IncrementKernelExecutionCounter();
+        }
         rc = miopenConvolutionBackwardWeightsImmediate(handle,
                                                        outputTensor,
                                                        dout.GetDevicePtr(),
@@ -3253,9 +3451,12 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
     }
     if(time_enabled)
     {
-        std::cout << "MIOpen Backward Weights Conv. " << AlgorithmSolutionToString(*selected)
-                  << std::endl;
-        PrintBackwardWrwTime(kernel_total_time, kernel_first_time);
+        if(!performance_logging_enabled)
+        {
+            std::cout << "MIOpen Backward Weights Conv. " << AlgorithmSolutionToString(*selected)
+                      << std::endl;
+        }
+        PrintBackwardWrwTime(kernel_total_time, kernel_first_time, *selected);
     }
 
     is_wrw_winograd = (selected->algorithm == miopenConvolutionAlgoWinograd);
@@ -3611,12 +3812,12 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     if(is_fwd_igemm)
         tolerance = tolerance * 10;
 
-    const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
     
     if(!std::isfinite(error) || error > tolerance)
     {
-        if(json_mode)
+        if(performance_logging_enabled)
         {
             std::cout << "{\"verification\":{\"direction\":\"forward\",\"status\":\"FAILED\","
                       << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3629,7 +3830,7 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
         return EC_VerifyFwd;
     }
 
-    if(json_mode)
+    if(performance_logging_enabled)
     {
         std::cout << "{\"verification\":{\"direction\":\"forward\",\"status\":\"OK\","
                   << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3658,8 +3859,8 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
 
     MIOPEN_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
 
-    const auto log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool json_mode = miopen::IsPerformanceLoggingEnabled(log_level);
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
 
     int cumulative_rc = 0;
     if(is_bwd)
@@ -3684,7 +3885,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
 
         if(!std::isfinite(error_data) || error_data > tolerance)
         {
-            if(json_mode)
+            if(performance_logging_enabled)
             {
                 std::cout << "{\"verification\":{\"direction\":\"backward_data\",\"status\":\"FAILED\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3699,7 +3900,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         }
         else
         {
-            if(json_mode)
+            if(performance_logging_enabled)
             {
                 std::cout << "{\"verification\":{\"direction\":\"backward_data\",\"status\":\"OK\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3759,7 +3960,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
 
         if(!std::isfinite(error_weights) || error_weights > tolerance)
         {
-            if(json_mode)
+            if(performance_logging_enabled)
             {
                 std::cout << "{\"verification\":{\"direction\":\"backward_weights\",\"status\":\"FAILED\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3774,7 +3975,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         }
         else
         {
-            if(json_mode)
+            if(performance_logging_enabled)
             {
                 std::cout << "{\"verification\":{\"direction\":\"backward_weights\",\"status\":\"OK\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3800,7 +4001,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         const auto tolerance = GetDefaultTolerance();
         if(!std::isfinite(error_bias) || error_bias > tolerance)
         {
-            if(json_mode)
+            if(performance_logging_enabled)
             {
                 std::cout << "{\"verification\":{\"direction\":\"backward_bias\",\"status\":\"FAILED\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","
@@ -3815,7 +4016,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         }
         else
         {
-            if(json_mode)
+            if(performance_logging_enabled)
             {
                 std::cout << "{\"verification\":{\"direction\":\"backward_bias\",\"status\":\"OK\","
                         << "\"reference\":\"" << (UseGPUReference() ? "GPU" : "CPU") << "\","

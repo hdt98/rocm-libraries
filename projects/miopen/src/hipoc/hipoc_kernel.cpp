@@ -65,27 +65,6 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
                   << GetName() << ", global_work_dim = " << DimToFormattedString(gdims.data(), 3)
                   << ", local_work_dim = " << DimToFormattedString(ldims.data(), 3));
 
-    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool is_tuning_mode = GetKernelTuningMode();
-    
-    // Enhanced logging levels:
-    // Level 0: No logging
-    // Level 1: Only main conv kernel per executed solution (not find/search)
-    // Level 2: All kernels for executed solution (not find/search)
-    // Level 3: Only main conv kernels for all solutions (including find/search)
-    // Level 4: All kernels for all solutions (including find/search)
-    // Add 256 to enable JSON mode
-    
-    HipEventPtr log_start = nullptr;
-    HipEventPtr log_stop  = nullptr;
-
-    if(IsLoggingKernel(base_level, is_tuning_mode))
-    {
-        log_start = make_hip_event();
-        log_stop  = make_hip_event();
-        hipEventRecord(log_start.get(), stream);
-    }
-
     HipEventPtr start = nullptr;
     HipEventPtr stop  = nullptr;
     void* config[]    = {// HIP_LAUNCH_PARAM_* are macros that do horrible things
@@ -127,18 +106,6 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
     if(status != hipSuccess)
         MIOPEN_THROW_HIP_STATUS(status, "Failed to launch kernel");
 
-    if(IsLoggingKernel(base_level, is_tuning_mode))
-    {
-        hipEventRecord(log_stop.get(), stream);
-        hipEventSynchronize(log_stop.get());
-        float elapsed_time = 0.0f;
-        hipEventElapsedTime(&elapsed_time, log_start.get(), log_stop.get());
-        
-        const bool is_transpose = IsTransposeOrTransformKernel(GetName());
-        const auto exec_id = GetKernelExecutionCounter();
-        AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
-    }
-
     if(callback)
     {
 #if 0
@@ -155,6 +122,17 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
 #else
         hipEventSynchronize(stop.get());
 #endif
+        const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+        const bool is_tuning_mode = GetKernelTuningMode();
+        if(IsLoggingKernel(base_level, is_tuning_mode))
+        {
+            float elapsed_time = 0.0f;
+            hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
+            
+            const bool is_transpose = IsTransposeOrTransformKernel(GetName());
+            const auto exec_id = GetKernelExecutionCounter();
+            AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
+        }
         callback(start.get(), stop.get());
     }
 }
@@ -166,19 +144,6 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
     MIOPEN_LOG_I2("kernel_name = "
                   << GetName() << ", global_work_dim = " << DimToFormattedString(gdims.data(), 3)
                   << ", local_work_dim = " << DimToFormattedString(ldims.data(), 3));
-
-    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool is_tuning_mode = GetKernelTuningMode();
-    
-    HipEventPtr log_start = nullptr;
-    HipEventPtr log_stop  = nullptr;
-
-    if(IsLoggingKernel(base_level, is_tuning_mode))
-    {
-        log_start = make_hip_event();
-        log_stop  = make_hip_event();
-        hipEventRecord(log_start.get(), stream);
-    }
 
     const auto& arch = env::value(MIOPEN_DEVICE_ARCH);
     if(!arch.empty())
@@ -228,18 +193,6 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
     if(status != hipSuccess)
         MIOPEN_THROW_HIP_STATUS(status, "Failed to launch kernel");
 
-    if(IsLoggingKernel(base_level, is_tuning_mode))
-    {
-        hipEventRecord(log_stop.get(), stream);
-        hipEventSynchronize(log_stop.get());
-        float elapsed_time = 0.0f;
-        hipEventElapsedTime(&elapsed_time, log_start.get(), log_stop.get());
-        
-        const bool is_transpose = IsTransposeOrTransformKernel(GetName());
-        const auto exec_id = GetKernelExecutionCounter();
-        AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
-    }
-
     if(callback)
     {
         status = hipEventRecord(stop.get(), stream);
@@ -253,6 +206,17 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
     if(callback)
     {
         hipEventSynchronize(stop.get());
+        const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+        const bool is_tuning_mode = GetKernelTuningMode();
+        if(IsLoggingKernel(base_level, is_tuning_mode))
+        {
+            float elapsed_time = 0.0f;
+            hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
+            
+            const bool is_transpose = IsTransposeOrTransformKernel(GetName());
+            const auto exec_id = GetKernelExecutionCounter();
+            AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
+        }
         callback(start.get(), stop.get());
     }
 }

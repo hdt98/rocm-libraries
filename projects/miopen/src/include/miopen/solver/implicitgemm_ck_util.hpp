@@ -393,41 +393,24 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                 auto argument_ptr    = ck_args.MakeArgPtr(sh_conv_ptr, data_ctx);
                 auto invoker_ptr     = sh_conv_ptr->MakeInvokerPointer();
                 
-                // Kernel logging for CK kernels
-                const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-                const uint64_t base_level = log_level & 0xFF;
-                const bool is_tuning_mode = GetKernelTuningMode();
-                
-                HipEventPtr log_start = nullptr;
-                HipEventPtr log_stop  = nullptr;
-                
-                // Log to JSON accumulator
-                if(IsLoggingKernel(base_level, is_tuning_mode))
-                {
-                    log_start = make_hip_event();
-                    log_stop  = make_hip_event();
-                    hipEventRecord(log_start.get(), handle.GetStream());
-                }
-                
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
                 
-                if(IsLoggingKernel(base_level, is_tuning_mode))
-                {
-                    hipEventRecord(log_stop.get(), handle.GetStream());
-                    hipEventSynchronize(log_stop.get());
-                    float kernel_time = 0.0f;
-                    hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                    
-                    const auto exec_id = IncrementKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
-                }
                 
                 if(handle.IsProfilingEnabled())
                 {
                     float elapsed_time = handle.GetKernelTime();
+                    
+                    // Kernel logging for CK kernels
+                    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                    const bool is_tuning_mode = GetKernelTuningMode();
+                    if(IsLoggingKernel(base_level, is_tuning_mode))
+                    {                   
+                        const auto exec_id = GetKernelExecutionCounter();
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed_time, false, base_level);
+                    }
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed_time);
                 }
@@ -1280,40 +1263,24 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
 
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
             
-            // Kernel logging for CK kernels
-            const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-            const bool is_tuning_mode = GetKernelTuningMode();
-            
-            HipEventPtr log_start = nullptr;
-            HipEventPtr log_stop  = nullptr;
-            
-            if(IsLoggingKernel(base_level, is_tuning_mode))
-            {
-                log_start = make_hip_event();
-                log_stop  = make_hip_event();
-                hipEventRecord(log_start.get(), handle.GetStream());
-            }
-            
             {
                 WorkAroundHipEventProfiler prf(handle);
                 MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                 invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
             }
-            
-            if(IsLoggingKernel(base_level, is_tuning_mode))
-            {
-                hipEventRecord(log_stop.get(), handle.GetStream());
-                hipEventSynchronize(log_stop.get());
-                float kernel_time = 0.0f;
-                hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                
-                const auto exec_id = GetKernelExecutionCounter();
-                AddKernelToJsonAccumulator(exec_id, kernel_id, kernel_time, false, base_level);
-            }
 
             if(handle.IsProfilingEnabled())
             {
                 elapsed += handle.GetKernelTime();
+                    
+                // Kernel logging for CK kernels
+                const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                const bool is_tuning_mode = GetKernelTuningMode();
+                if(IsLoggingKernel(base_level, is_tuning_mode))
+                {
+                    const auto exec_id = GetKernelExecutionCounter();
+                    AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false, base_level);
+                }
                 handle.ResetKernelTime();
                 handle.AccumKernelTime(elapsed);
             }
@@ -1416,40 +1383,25 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
 
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
                 
-                // Kernel logging for CK kernels
-                const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-                const bool is_tuning_mode = GetKernelTuningMode();
-
-                HipEventPtr log_start = nullptr;
-                HipEventPtr log_stop  = nullptr;
-                
-                if(IsLoggingKernel(base_level, is_tuning_mode))
-                {
-                    log_start = make_hip_event();
-                    log_stop  = make_hip_event();
-                    hipEventRecord(log_start.get(), handle.GetStream());
-                }
                 
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
-                
-                if(IsLoggingKernel(base_level, is_tuning_mode))
-                {
-                    hipEventRecord(log_stop.get(), handle.GetStream());
-                    hipEventSynchronize(log_stop.get());
-                    float kernel_time = 0.0f;
-                    hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-
-                    const auto log_exec_id = IncrementKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(log_exec_id, kernel_id, kernel_time, false, base_level);
-                }
 
                 if(handle.IsProfilingEnabled())
                 {
                     elapsed += handle.GetKernelTime();
+                    
+                    // Kernel logging for CK kernels
+                    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                    const bool is_tuning_mode = GetKernelTuningMode();
+                    if(IsLoggingKernel(base_level, is_tuning_mode))
+                    {
+                        const auto exec_id = GetKernelExecutionCounter();
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false, base_level);
+                    }
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed);
                 }
@@ -1496,40 +1448,25 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     }
                 }
 
-                // Kernel logging for CK kernels
-                const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-                const bool is_tuning_mode = GetKernelTuningMode();
-                
-                HipEventPtr log_start = nullptr;
-                HipEventPtr log_stop  = nullptr;
-                
-                if(IsLoggingKernel(base_level, is_tuning_mode))
-                {
-                    log_start = make_hip_event();
-                    log_stop  = make_hip_event();
-                    hipEventRecord(log_start.get(), handle.GetStream());
-                }
-
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
-                
-                if(IsLoggingKernel(base_level, is_tuning_mode))
-                {
-                    hipEventRecord(log_stop.get(), handle.GetStream());
-                    hipEventSynchronize(log_stop.get());
-                    float kernel_time = 0.0f;
-                    hipEventElapsedTime(&kernel_time, log_start.get(), log_stop.get());
-                    
-                    const auto log_exec_id = IncrementKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(log_exec_id, kernel_id, kernel_time, false, base_level);
-                }
 
                 if(handle.IsProfilingEnabled())
                 {
                     elapsed += handle.GetKernelTime();
+                    
+                    // Kernel logging for CK kernels
+                    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+                    const bool is_tuning_mode = GetKernelTuningMode();
+                    if(IsLoggingKernel(base_level, is_tuning_mode))
+                    {
+                        const auto exec_id = GetKernelExecutionCounter();
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false, base_level);
+                    }
+
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed);
                 }

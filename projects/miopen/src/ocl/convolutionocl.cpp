@@ -281,6 +281,16 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
     {
         const auto id      = solver::Id{conv_sol->solver_id};
         const auto& solver = id.GetSolver();
+        
+        // Log the solver being benchmarked during tuning/Find phase
+        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+        if(IsPerformanceLoggingEnabled(log_level))
+        {
+            std::string solution_name = std::to_string(id.Value()) + "/" + id.ToString();
+            LogSolutionName(solution_name, log_level);
+            IncrementKernelExecutionCounter();
+        }
+        
         CompileSolution(id, ctx, problem);
 
         std::vector<solver::ConvSolution> conv_sols;
@@ -819,11 +829,6 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
                                                             this->attribute.gfx90aFp16alt.GetFwd(),
                                                             alpha_val,
                                                             beta_val};
-            const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-            const auto& solver = handle.GetInvoker(network_config, {}, algorithm_name);
-            if(solver)
-                LogSolutionName(algorithm_name.ToString(), log_level);
-            IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_ctx);
             return;
         }
@@ -1095,8 +1100,15 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetFwd()};
         const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-        LogSolutionName(solver_id.ToString(), log_level);
-        IncrementKernelExecutionCounter();
+        if(IsPerformanceLoggingEnabled(log_level))
+        {
+            // Log the selected solver for execution phase kernel tracking
+            std::string solution_name = std::to_string(solver_id.Value()) + "/" +
+                                    ((solver_id.Value() != 0) ? solver_id.ToString()
+                                                                : std::string("UNKNOWN"));
+            LogSolutionName(solution_name, log_level);
+            IncrementKernelExecutionCounter();
+        }
         invoker(handle, invoke_ctx);
     });
 }
@@ -1243,9 +1255,6 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
                                                         this->attribute.gfx90aFp16alt.GetBwd(),
                                                         alpha_val,
                                                         beta_val};
-        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-        LogSolutionName(algorithm_name.ToString(), log_level);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     });
 }
@@ -1313,8 +1322,15 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetBwd()};
         const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-        LogSolutionName(solver_id.ToString(), log_level);
-        IncrementKernelExecutionCounter();
+        if(IsPerformanceLoggingEnabled(log_level))
+        {            
+            // Log the selected solver for execution phase kernel tracking
+            std::string solution_name = std::to_string(solver_id.Value()) + "/" +
+                                    ((solver_id.Value() != 0) ? solver_id.ToString()
+                                                                : std::string("UNKNOWN"));
+            LogSolutionName(solution_name, log_level);
+            IncrementKernelExecutionCounter();
+        }
         invoker(handle, invoke_ctx);
     });
 }
@@ -1458,9 +1474,6 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
                                                       this->attribute.gfx90aFp16alt.GetWrW(),
                                                       alpha_val,
                                                       beta_val};
-        const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-        LogSolutionName(algorithm_name.ToString(), log_level);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     });
 }
@@ -1526,8 +1539,11 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
         const auto invoke_ctx = conv::WrWInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetWrW()};
         const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-        LogSolutionName(solver_id.ToString(), log_level);
-        IncrementKernelExecutionCounter();
+        if(IsPerformanceLoggingEnabled(log_level))
+        {
+            LogSolutionName(solver_id.ToString(), log_level);
+            IncrementKernelExecutionCounter();
+        }
         invoker(handle, invoke_ctx);
     });
 }

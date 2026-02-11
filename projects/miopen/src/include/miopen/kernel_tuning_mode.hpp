@@ -90,6 +90,7 @@ struct KernelExecutionData
     std::string kernel_name;
     float time_ms;
     int transformation_count;
+    std::vector<std::string> transformation_kernel_names;  // Collected transformation kernel names
     bool is_transformation;
 };
 
@@ -115,6 +116,7 @@ struct ExecIdAccumulator
     std::string main_kernel_name;
     float total_time_ms = 0.0f;
     int transformation_count = 0;
+    std::vector<std::string> transformation_kernel_names;  // Track transformation kernel names
     bool has_data = false;
     
     void Reset()
@@ -123,6 +125,7 @@ struct ExecIdAccumulator
         main_kernel_name.clear();
         total_time_ms = 0.0f;
         transformation_count = 0;
+        transformation_kernel_names.clear();
         has_data = false;
     }
 };
@@ -240,6 +243,7 @@ inline void FinalizeCurrentExecId()
         exec_accum.main_kernel_name,
         exec_accum.total_time_ms,
         exec_accum.transformation_count,
+        exec_accum.transformation_kernel_names,  // Pass transformation kernel names
         false  // is_transformation - this is the accumulated main kernel
     });
     
@@ -257,9 +261,8 @@ inline void FlushJsonAccumulator()
     if(data.kernels.empty())
         return;
     
-    // Group kernels by kernel_name and track transformation kernels
+    // Group kernels by kernel_name and accumulate transformation kernels
     std::map<std::string, GroupedKernelData> grouped_kernels;
-    std::map<std::string, std::vector<std::string>> transformation_kernels_map;
     
     for(const auto& k : data.kernels)
     {
@@ -272,48 +275,17 @@ inline void FlushJsonAccumulator()
             grouped.number_of_transformations = k.transformation_count;
             grouped.exec_number = k.exec_id;  // First/lowest exec_id
             grouped.is_transformation = k.is_transformation;
+            
+            // Use the transformation_kernels from the first exec_id amalgamation
+            // This avoids duplicates when grouping by kernel_name
+            grouped.transformation_kernels = k.transformation_kernel_names;
         }
         
         // Append timing data
         grouped.time_executions_ms.push_back(k.time_ms);
-    }
-    
-    // Also track transformation kernels separately by iterating through all kernel executions
-    // We need to associate transformation kernels with their main kernel
-    for(const auto& k : data.kernels)
-    {
-        if(k.is_transformation)
-        {
-            // Find the main kernel for this exec_id
-            for(const auto& main_k : data.kernels)
-            {
-                if(main_k.exec_id == k.exec_id && !main_k.is_transformation)
-                {
-                    transformation_kernels_map[main_k.kernel_name].push_back(k.kernel_name);
-                    break;
-                }
-            }
-        }
-    }
-    
-    // Populate transformation_kernels and remove duplicates
-    for(auto& entry : grouped_kernels)
-    {
-        auto& grouped = entry.second;
-        if(transformation_kernels_map.count(grouped.kernel_name) > 0)
-        {
-            auto& trans_kernels = transformation_kernels_map[grouped.kernel_name];
-            // Remove duplicates while preserving order
-            std::vector<std::string> unique_trans;
-            for(const auto& tk : trans_kernels)
-            {
-                if(std::find(unique_trans.begin(), unique_trans.end(), tk) == unique_trans.end())
-                {
-                    unique_trans.push_back(tk);
-                }
-            }
-            grouped.transformation_kernels = unique_trans;
-        }
+        
+        // No need to accumulate transformation kernels from subsequent executions
+        // as they were already collected in the first amalgamation (by exec_id)
     }
     
     // Calculate statistics for each grouped kernel
@@ -399,6 +371,7 @@ inline void AddKernelToJsonAccumulator(size_t exec_id,
             kernel_name,
             time_ms,
             0,  // transformation_count is 0 for individual kernels
+            {},  // transformation_kernel_names - empty for individual kernels
             is_transform
         });
     }
@@ -428,12 +401,14 @@ inline void AddKernelToJsonAccumulator(size_t exec_id,
         if(is_transform)
         {
             exec_accum.transformation_count++;
+            exec_accum.transformation_kernel_names.push_back(kernel_name);
         }
         else
         {
             // This is a main kernel - use it as the representative kernel name
             // If there are multiple non-transform kernels, the last one wins
             exec_accum.main_kernel_name = kernel_name;
+            exec_accum.transformation_kernel_names.push_back(kernel_name);
         }
     }
 }
@@ -446,9 +421,21 @@ inline bool IsPerformanceLoggingEnabled(uint64_t log_level)
 }
 
 /// Check if this kernel should be logged
+/// - When log_level <= 2: Only log execution phase kernels (not tuning)
+/// - When log_level > 2: Log both tuning and execution phase kernels
 inline bool IsLoggingKernel(uint64_t log_level, bool is_tuning)
 {
-    return IsPerformanceLoggingEnabled(log_level) && (!is_tuning || (is_tuning && log_level > 2));
+    if (log_level > 2)
+    {
+        // Log all kernels (both tuning and execution) when log_level > 2
+        return true;
+    }
+    else if (log_level > 0)
+    {
+        // Only log execution phase kernels when 0 < log_level <= 2
+        return !is_tuning;
+    }
+    return false;
 }
 
 /// Log solution name if appropriate for the current log level

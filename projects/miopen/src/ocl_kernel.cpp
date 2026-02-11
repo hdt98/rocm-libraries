@@ -35,9 +35,6 @@ void OCLKernelInvoke::run() const
                   << ", global_work_dim = " << DimToFormattedString(gdims.data(), work_dim)
                   << ", local_work_dim = " << DimToFormattedString(ldims.data(), work_dim));
 
-    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool is_tuning_mode = GetKernelTuningMode();
-
     MIOPEN_HANDLE_LOCK
 
     const auto& arch = env::value(MIOPEN_DEVICE_ARCH);
@@ -58,38 +55,33 @@ void OCLKernelInvoke::run() const
                                            ((ldims[0] == 0) ? nullptr : ldims.data()),
                                            0,
                                            nullptr,
-                                           (callback || IsLoggingKernel(base_level, is_tuning_mode)) ? &ev : nullptr);
+                                           callback ? &ev : nullptr);
 
     if(status != CL_SUCCESS)
     {
         MIOPEN_THROW_CL_STATUS(status, "Running kernel failed: ");
     }
-    // Log to JSON accumulator
-    if(IsLoggingKernel(base_level, is_tuning_mode))
+    // If profiling is enable, then callback exists.
+    if(callback)
     {
         clWaitForEvents(1, &ev);
-
-        cl_ulong start_time = 0;
-        cl_ulong end_time = 0;
-        
-        clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start_time, nullptr);
-        clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end_time, nullptr);
-        
-        float elapsed_time = (end_time - start_time) / 1000000.0f; // Convert nanoseconds to milliseconds
-
-        const bool is_transpose = IsTransposeOrTransformKernel(GetName());
-        const auto exec_id = GetKernelExecutionCounter();
-        AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
-            
-        if(callback)
+        // Profiling is enable when Performance Logs are see `Run` in handleocl.cpp so this is nested in callback
+        // Log to JSON accumulator
+        const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+        const bool is_tuning_mode = GetKernelTuningMode();
+        if(IsLoggingKernel(base_level, is_tuning_mode))
         {
-            callback(ev);
+            // Match handleocl.cpp `SetProfilingResult`
+            size_t st, end;
+            clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(size_t), &st, nullptr);
+            clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(size_t), &end, nullptr);
+            float elapsed_time = static_cast<float>(end - st) * 1.0e-6; // NOLINT
+
+            auto kernel_name = GetName();
+            const bool is_transpose = IsTransposeOrTransformKernel(kernel_name);
+            const auto exec_id = GetKernelExecutionCounter();
+            AddKernelToJsonAccumulator(exec_id, kernel_name, elapsed_time, is_transpose, base_level);
         }
-        clReleaseEvent(ev);
-    }
-    else if(callback)
-    {
-        clWaitForEvents(1, &ev);
         callback(ev);
     }
 }
