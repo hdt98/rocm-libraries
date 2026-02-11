@@ -481,6 +481,22 @@ class TileConfig:
     wave_separate_global_read_a: int
     wave_separate_global_read_b: int
 
+class RegisterSceduleCallback:
+
+    def __init__(self, register_schedule, func: Callable):
+        self.func = func
+        self.register_schedule = register_schedule
+
+    def __call__(self, *args, **kwargs) -> Callable:
+        return self.func(*args, **kwargs)
+    
+    def __str__(self) -> str:
+        return f"{self.register_schedule}"
+
+    def __repr__(self) -> str:
+        return f"{self.register_schedule}"
+
+
 class RegisterSchedule:
     """
     Decorator that registers a schedule function with its matching criteria.
@@ -498,6 +514,10 @@ class RegisterSchedule:
             ...
     """
     
+
+    def __str__(self) -> str:
+        return f"TileConfig(macro_tile_size_0={self.tile_config.macro_tile_size_0}, macro_tile_size_1={self.tile_config.macro_tile_size_1}, depth_u={self.tile_config.depth_u}, prefetch_global_read={self.tile_config.prefetch_global_read}, prefetch_local_read={self.tile_config.prefetch_local_read}, direct_to_lds={self.tile_config.direct_to_lds}, wave_separate_global_read_a={self.tile_config.wave_separate_global_read_a}, wave_separate_global_read_b={self.tile_config.wave_separate_global_read_b})"
+        
     def __init__(self, tile_config: TileConfig, dtype_predicate: Callable, vector_widths: list[int], matrix_inst: list[int], mfma_wave_group: list[int]):
         """
         Initialize the registration decorator with matching criteria.
@@ -518,11 +538,15 @@ class RegisterSchedule:
     def __call__(self, func: Callable) -> Callable:
         """Wrap the function with matching logic and register it."""
         def wrapped_func(kernel: dict, useLDSTr: bool, TLDS: int) -> tuple[ScheduleMatchStatus, Optional[ScheduleInfo]]:
-            # TODO: Currently ULSGRO not checked for in CMS, disabled for now
-            if kernel["UnrollLoopSwapGlobalReadOrder"]:
+            # import pdb
+            # pdb.set_trace()
+            print(f"Checking {func.__name__} and {self}")            # TODO: Currently ULSGRO not checked for in CMS, disabled for now
+            if kernel["UnrollLoopSwapGlobalReadOrder"]: 
+                print(f"Unroll loop swap global read order mismatch in {func.__name__} and {self}")
                 return ScheduleMatchStatus.NO_MATCH, None
 
             if not self.dtype_predicate(kernel):
+                print(f"Dtype predicate mismatch: {self.dtype_predicate} in {func.__name__} and {self}")
                 return ScheduleMatchStatus.NO_MATCH, None
 
             MT0, MT1, DU = kernel["MacroTile0"], kernel["MacroTile1"], kernel["DepthU"]
@@ -530,18 +554,22 @@ class RegisterSchedule:
             WSGRA, WSGRB = kernel["WaveSeparateGlobalReadA"], kernel["WaveSeparateGlobalReadB"]
             kernel_tile_config = TileConfig(MT0, MT1, DU, PGR, PLR, DTL, WSGRA, WSGRB)
             if self.tile_config != kernel_tile_config:
+                print(f"Tile config mismatch: {self.tile_config} != {kernel_tile_config} in {func.__name__} and {self}")
                 return ScheduleMatchStatus.NO_MATCH, None
 
             GRVWA, GRVWB = kernel["GlobalReadVectorWidthA"], kernel["GlobalReadVectorWidthB"]
             LRVW = kernel["LocalReadVectorWidth"]
             kernel_vector_widths = [GRVWA, GRVWB, LRVW]            
             if self.vector_widths != kernel_vector_widths:
+                print(f"Vector widths mismatch: {self.vector_widths} != {kernel_vector_widths} in {func.__name__} and {self}")
                 return ScheduleMatchStatus.NO_MATCH, None
             
             if self.matrix_inst != kernel["MatrixInstruction"]:
+                print(f"Matrix instruction mismatch: {self.matrix_inst} != {kernel['MatrixInstruction']} in {func.__name__} and {self}")
                 return ScheduleMatchStatus.NO_MATCH, None
             
             if self.mfma_wave_group != kernel["MIWaveGroup"]:
+                print(f"MFMA wave group mismatch: {self.mfma_wave_group} != {kernel['MIWaveGroup']} in {func.__name__} and {self}")
                 return ScheduleMatchStatus.NO_MATCH, None
             
             # All wrapper criteria matched - call inner function
@@ -550,12 +578,18 @@ class RegisterSchedule:
             if match:
                 return ScheduleMatchStatus.FOUND, schedule
             # Inner function returned False - variant unsupported, stop searching
+            print(f"Unsupported variant: {func.__name__} and {self}")
             return ScheduleMatchStatus.UNSUPPORTED_VARIANT, None
                
-        _SCHEDULE_REGISTRY.append(wrapped_func)
+        _SCHEDULE_REGISTRY.append(RegisterSceduleCallback(self, wrapped_func))
         
         # Return original function unchanged (so it can still be called directly)
         return func
+    def __str__(self) -> str:
+        return f"(tile_config={self.tile_config}, dtype_predicate={self.dtype_predicate}, vector_widths={self.vector_widths}, matrix_inst={self.matrix_inst}, mfma_wave_group={self.mfma_wave_group})"
+    
+    def __repr__(self) -> str:
+        return f"(tile_config={self.tile_config}, dtype_predicate={self.dtype_predicate}, vector_widths={self.vector_widths}, matrix_inst={self.matrix_inst}, mfma_wave_group={self.mfma_wave_group})"
 
 
 @RegisterSchedule(

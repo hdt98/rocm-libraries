@@ -112,7 +112,9 @@ def _generateForkedSolutions(problemType, constantParams, forkPermutations, asse
         itertools.repeat(debugConfig),
         itertools.repeat(isaInfoMap)
     )
-    raw_solutions = ParallelMap2(_generate_single_solution, forkIters, "fork solutions", return_as="list")
+
+    raw_solutions = [_generate_single_solution(*args) for args in forkIters]
+    # raw_solutions = ParallelMap2(_generate_single_solution, forkIters, "fork solutions", return_as="list")
 
     # Filter out None and duplicates
     solutionSet = set()
