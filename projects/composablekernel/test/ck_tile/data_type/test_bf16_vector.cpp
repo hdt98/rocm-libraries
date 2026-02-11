@@ -334,14 +334,26 @@ TEST_F(Bf16VectorTest, VectorEdgeCases)
         bf16x2_t bf16_vec = fp32x2_to_bf16x2(f32_vec);
 
         // BF16 has same 8-bit exponent but only 7 mantissa bits (vs 23 for float32).
-        // So bf16::max < float::max. With IEEE RTN rounding, float::max correctly
-        // rounds up to infinity since it's the nearest representable value.
+        // So bf16::max < float::max.
+        // Hardware behavior differs by architecture:
+        // - gfx950: RTN rounding -> float::max rounds to infinity (IEEE-754 compliant)
+        // - gfx12/gfx1250: Saturates -> float::max clamps to bf16::max (faster, non-IEEE)
         float result_x = bf16_to_float(bf16_vec.x);
         float result_y = bf16_to_float(bf16_vec.y);
+
+#ifdef CK_TILE_BF16_OVERFLOW_SATURATES
+        // gfx12/gfx1250: Hardware saturates to bf16::max
+        EXPECT_FALSE(std::isinf(result_x))
+            << "gfx12/gfx1250: float::max should saturate to bf16::max";
+        EXPECT_FALSE(std::isinf(result_y))
+            << "gfx12/gfx1250: -float::max should saturate to -bf16::max";
+#else
+        // gfx950 and software: RTN rounding to infinity (IEEE-754 behavior)
         EXPECT_TRUE(std::isinf(result_x) && result_x > 0)
             << "Float max should overflow to bf16 +infinity with RTN rounding";
         EXPECT_TRUE(std::isinf(result_y) && result_y < 0)
             << "Negative float max should overflow to bf16 -infinity with RTN rounding";
+#endif
     }
 
     // Vector conversion with denormals

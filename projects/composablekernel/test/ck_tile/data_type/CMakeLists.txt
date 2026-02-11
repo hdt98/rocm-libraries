@@ -105,12 +105,18 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
         if(DEFINED CK_TILE_USE_LLVM_BUILTIN_BF16)
             target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_LLVM_BUILTIN_BF16=${CK_TILE_USE_LLVM_BUILTIN_BF16})
         endif()
-        
+
+        # Define macro to indicate gfx12/gfx1250 hardware saturation behavior for bf16 overflow
+        # (gfx12/gfx1250 saturates to bf16::max instead of rounding to infinity like gfx950/software)
+        if(GPU_TARGETS MATCHES "gfx12")
+            target_compile_definitions(${test_target} PRIVATE -DCK_TILE_BF16_OVERFLOW_SATURATES=1)
+        endif()
+
         # Apply custom data type flag if enabled (except for arithmetic which already has it)
         if(CK_TILE_USE_CUSTOM_DATA_TYPE AND NOT "${test_target}" STREQUAL "test_ck_tile_bf16_arithmetic")
             target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_CUSTOM_DATA_TYPE=1)
         endif()
-        
+
         # Ensure GTEST_HAS_RTTI is consistent
         target_compile_definitions(${test_target} PUBLIC GTEST_HAS_RTTI=0)
     endforeach()

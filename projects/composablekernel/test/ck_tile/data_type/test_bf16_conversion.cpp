@@ -414,27 +414,57 @@ TEST_F(Bf16ConversionTest, OverflowHandling)
 {
     // Note: BF16 has the same 8-bit exponent as float32, but only 7 mantissa bits vs 23.
     // This means bf16::max (0x7F7F) ≈ 3.39e38 is LESS than float::max ≈ 3.40e38.
-    // With IEEE RTN (round-to-nearest-even) rounding, float::max correctly rounds UP
-    // to infinity since it's closer to inf than to bf16::max.
-    // This is the correct IEEE-754 behavior for hardware bf16 conversion.
+    //
+    // Hardware behavior differs by architecture:
+    // - gfx950: RTN rounding -> float::max rounds to infinity (IEEE-754 compliant)
+    // - gfx12/gfx1250: Saturates -> float::max clamps to bf16::max (faster, non-IEEE)
 
-    // Test float max -> infinity (IEEE RTN rounding behavior)
+    // Test float max overflow behavior (architecture-dependent)
     {
-        float f      = std::numeric_limits<float>::max();
-        bf16_t b     = float_to_bf16(f);
-        float result = bf16_to_float(b);
-        // With RTN rounding, float::max rounds up to infinity because:
-        // float::max (0x7F7FFFFF) > bf16::max (0x7F7F), and RTN rounds to nearest
+        float f            = std::numeric_limits<float>::max();
+        bf16_t b           = float_to_bf16(f);
+        float result       = bf16_to_float(b);
+        uint16_t bf16_bits = bf16_to_bits(b);
+
+#ifdef CK_TILE_BF16_OVERFLOW_SATURATES
+        // gfx12/gfx1250: Hardware saturates to bf16::max
+        EXPECT_FALSE(std::isinf(result))
+            << "gfx12/gfx1250: float::max should saturate to bf16::max (0x7f7f). Got bf16=0x"
+            << std::hex << bf16_bits << std::dec << " result=" << result;
+        EXPECT_EQ(bf16_bits, 0x7f7f)
+            << "gfx12/gfx1250: Expected saturation to bf16::max (0x7f7f), got 0x" << std::hex
+            << bf16_bits << std::dec;
+#else
+        // gfx950 and software: RTN rounding to infinity (IEEE-754 behavior)
         EXPECT_TRUE(std::isinf(result) && result > 0)
-            << "Float max should overflow to bf16 +infinity with RTN rounding";
+            << "gfx950/software: float::max should overflow to +infinity with RTN rounding. Got "
+               "bf16=0x"
+            << std::hex << bf16_bits << std::dec << " result=" << result;
+        EXPECT_EQ(bf16_bits, 0x7f80)
+            << "Expected +infinity (0x7f80), got 0x" << std::hex << bf16_bits << std::dec;
+#endif
     }
 
     {
-        float f      = -std::numeric_limits<float>::max();
-        bf16_t b     = float_to_bf16(f);
-        float result = bf16_to_float(b);
+        float f            = -std::numeric_limits<float>::max();
+        bf16_t b           = float_to_bf16(f);
+        float result       = bf16_to_float(b);
+        uint16_t bf16_bits = bf16_to_bits(b);
+
+#ifdef CK_TILE_BF16_OVERFLOW_SATURATES
+        // gfx12/gfx1250: Hardware saturates to -bf16::max
+        EXPECT_FALSE(std::isinf(result))
+            << "gfx12/gfx1250: -float::max should saturate to -bf16::max (0xff7f)";
+        EXPECT_EQ(bf16_bits, 0xff7f)
+            << "gfx12/gfx1250: Expected saturation to -bf16::max (0xff7f), got 0x" << std::hex
+            << bf16_bits << std::dec;
+#else
+        // gfx950 and software: RTN rounding to -infinity (IEEE-754 behavior)
         EXPECT_TRUE(std::isinf(result) && result < 0)
-            << "Negative float max should overflow to bf16 -infinity with RTN rounding";
+            << "gfx950/software: -float::max should overflow to -infinity with RTN rounding";
+        EXPECT_EQ(bf16_bits, 0xff80)
+            << "Expected -infinity (0xff80), got 0x" << std::hex << bf16_bits << std::dec;
+#endif
     }
 
     // Test infinity passthrough
