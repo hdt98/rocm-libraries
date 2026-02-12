@@ -109,7 +109,9 @@ namespace TensileLite
                     continue;
 
                 // Set library context for debug output
-                row.first.setLibrary(row.second);
+		// this setLibrary() could introduce data race in multi-threading
+		if(Debug::Instance().printDeviceSelection() || Debug::Instance().printPredicateEvaluation())
+                    row.first.setLibrary(row.second);
 
                 if(row.first(problem, hardware))
                 {
@@ -155,7 +157,9 @@ namespace TensileLite
                     continue;
 
                 // Set library context for debug output
-                row.first.setLibrary(row.second);
+		// this setLibrary() could introduce data race in multi-threading
+		if(Debug::Instance().printDeviceSelection() || Debug::Instance().printPredicateEvaluation())
+                    row.first.setLibrary(row.second);
 
                 if(row.first.value->type() == "AMDGPU" && !row.first(problem, hardware))
                     continue;
@@ -242,7 +246,9 @@ namespace TensileLite
                     continue;
 
                 // Set library context for debug output
-                row.first.setLibrary(row.second);
+		// this setLibrary() could introduce data race in multi-threading
+		if(Debug::Instance().printDeviceSelection() || Debug::Instance().printPredicateEvaluation())
+                    row.first.setLibrary(row.second);
 
                 if(row.first(problem, hardware))
                 {
