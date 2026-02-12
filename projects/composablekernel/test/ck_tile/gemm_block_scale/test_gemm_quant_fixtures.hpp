@@ -163,14 +163,18 @@ struct GemmConfigPreshuffleBPrefillTiledPermuteN : public GemmConfigPreshuffleBP
     static constexpr bool TiledMMAPermuteN = N_Repeat % 2 == 0;
 };
 
+template <bool TransposeC_ = false>
 struct GemmConfigPreshuffleBPreshuffleQuantPrefill : public GemmConfigPreshuffleBPrefill
 {
     static constexpr bool BPreshuffleQuant = true;
+    static constexpr bool TransposeC       = TransposeC_;
 };
 
+template <bool TransposeC_ = false>
 struct GemmConfigPreshuffleBPreshuffleQuantDecode : public GemmConfigPreshuffleBDecode
 {
     static constexpr bool BPreshuffleQuant = true;
+    static constexpr bool TransposeC       = TransposeC_;
 };
 
 template <typename Tuple>
