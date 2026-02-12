@@ -55,27 +55,27 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DRIVER_USE_GPU_REFERENCE)
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DRIVER_SUBNORM_PERCENTAGE)
 
 // Environment variables for performance logging and find configuration
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_MODE)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_ENFORCE)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_DISABLE_FIND_DB)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_FFT)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_DIRECT)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_GEMM)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_WINOGRAD)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_IMMED_FALLBACK)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK)
-MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEBUG_FIND_ONLY_SOLVER)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_TUNING_PATIENCE)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_TUNING_TIME_MS_MAX)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_CUTOFF)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_CUTOFF_MUL)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_SKIP_PCT)
-MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH)
-MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_CU)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_LEVEL)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_MODE, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_ENFORCE, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_DISABLE_FIND_DB, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_FFT, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_DIRECT, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_GEMM, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_WINOGRAD, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_IMMED_FALLBACK, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK, 0)
+MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEBUG_FIND_ONLY_SOLVER, "")
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_TUNING_PATIENCE, std::numeric_limits<std::size_t>::max())
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_TUNING_TIME_MS_MAX, 7200000)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_CUTOFF, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_CUTOFF_MUL, 10)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_SKIP_PCT, 0)
+MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH, "")
+MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_CU, "")
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS, 0)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_LEVEL, 0)
 
 // 0 - Allocate WS size as reported by the library (default)
 // 1 - Do not allocate workspace.
@@ -477,7 +477,7 @@ private:
                   << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
                   << "}}}" << std::endl;
     }
-    // Helper function to print 2D JSON performance logs
+    // Helper function to print 3D JSON performance logs
     void Print3DConvJsonLog(const std::string& operation_name,
                             const std::string& direction,
                             float kernel_average_time,
@@ -515,6 +515,36 @@ private:
                     << "\"gflops\":" << (flopCnt / kernel_average_time / 1e6) << ","
                     << "\"gb_per_s\":" << ((readBytes + outputBytes) / kernel_average_time / 1e6)
                     << "}}}" << std::endl;
+    }
+    // Helper function to print tuning/lead time
+    void PrintTuningJsonLog(const std::string& direction,
+                            float tuning_time) const
+    {
+        std::cout << "{\"find_time\":" << tuning_time << ","
+                << "\"direction\":" << direction << ","
+                << "\"environment_variables\":{"
+                    << "\"MIOPEN_FIND_MODE\":" << (MIOPEN_FIND_MODE ? miopen::env::value(MIOPEN_FIND_MODE) : static_cast<int>(miopenConvolutionFindModeDefault)) << ","
+                    << "\"MIOPEN_FIND_ENFORCE\":" << (MIOPEN_FIND_ENFORCE ? miopen::env::value(MIOPEN_FIND_ENFORCE) : static_cast<int>(miopenTuningPolicyNone)) << ","
+                    << "\"MIOPEN_DEBUG_DISABLE_FIND_DB\":" << miopen::env::value(MIOPEN_DEBUG_DISABLE_FIND_DB) << ","
+                    << "\"MIOPEN_DEBUG_CONV_FFT\":" << miopen::env::value(MIOPEN_DEBUG_CONV_FFT) << ","
+                    << "\"MIOPEN_DEBUG_CONV_DIRECT\":" << miopen::env::value(MIOPEN_DEBUG_CONV_DIRECT) << ","
+                    << "\"MIOPEN_DEBUG_CONV_GEMM\":" << miopen::env::value(MIOPEN_DEBUG_CONV_GEMM) << ","
+                    << "\"MIOPEN_DEBUG_CONV_WINOGRAD\":" << miopen::env::value(MIOPEN_DEBUG_CONV_WINOGRAD) << ","
+                    << "\"MIOPEN_DEBUG_CONV_IMPLICIT_GEMM\":" << miopen::env::value(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM) << ","
+                    << "\"MIOPEN_DEBUG_CONV_IMMED_FALLBACK\":" << miopen::env::value(MIOPEN_DEBUG_CONV_IMMED_FALLBACK) << ","
+                    << "\"MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK\":" << miopen::env::value(MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK) << ","
+                    << "\"MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK\":" << miopen::env::value(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK) << ","
+                    << "\"MIOPEN_DEBUG_FIND_ONLY_SOLVER\":\"" << miopen::env::value(MIOPEN_DEBUG_FIND_ONLY_SOLVER) << "\","
+                    << "\"MIOPEN_TUNING_PATIENCE\":" << miopen::env::value(MIOPEN_TUNING_PATIENCE) << ","
+                    << "\"MIOPEN_TUNING_TIME_MS_MAX\":" << miopen::env::value(MIOPEN_TUNING_TIME_MS_MAX) << ","
+                    << "\"MIOPEN_SEARCH_CUTOFF\":" << miopen::env::value(MIOPEN_SEARCH_CUTOFF) << ","
+                    << "\"MIOPEN_SEARCH_CUTOFF_MUL\":" << miopen::env::value(MIOPEN_SEARCH_CUTOFF_MUL) << ","
+                    << "\"MIOPEN_SEARCH_SKIP_PCT\":" << miopen::env::value(MIOPEN_SEARCH_SKIP_PCT) << ","
+                    << "\"MIOPEN_DEVICE_ARCH\":\"" << miopen::env::value(MIOPEN_DEVICE_ARCH) << "\","
+                    << "\"MIOPEN_DEVICE_CU\":\"" << miopen::env::value(MIOPEN_DEVICE_CU) << "\","
+                    << "\"MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS\":" << miopen::env::value(MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS) << ","
+                    << "\"MIOPEN_LOG_LEVEL\":" << miopen::env::value(MIOPEN_LOG_LEVEL)
+                << "}}" << std::endl;
     }
 
     double GetDefaultTolerance() const
@@ -1783,31 +1813,7 @@ int ConvDriver<Tgpu, Tref>::FindForward(int& ret_algo_count,
     fwd_auxiliary.pause(wall_enabled);
     if(performance_logging_enabled)
     {
-        std::cout << "{\"find_time\":" << find_time.gettime_ms() << ","
-                << "\"direction\": \"forward\"" << ","
-                << "\"environment_variables\":{"
-                    << "\"MIOPEN_FIND_MODE\":" << miopen::env::value(MIOPEN_FIND_MODE) << ","
-                    << "\"MIOPEN_FIND_ENFORCE\":" << miopen::env::value(MIOPEN_FIND_ENFORCE) << ","
-                    << "\"MIOPEN_DEBUG_DISABLE_FIND_DB\":" << miopen::env::value(MIOPEN_DEBUG_DISABLE_FIND_DB) << ","
-                    << "\"MIOPEN_DEBUG_CONV_FFT\":" << miopen::env::value(MIOPEN_DEBUG_CONV_FFT) << ","
-                    << "\"MIOPEN_DEBUG_CONV_DIRECT\":" << miopen::env::value(MIOPEN_DEBUG_CONV_DIRECT) << ","
-                    << "\"MIOPEN_DEBUG_CONV_GEMM\":" << miopen::env::value(MIOPEN_DEBUG_CONV_GEMM) << ","
-                    << "\"MIOPEN_DEBUG_CONV_WINOGRAD\":" << miopen::env::value(MIOPEN_DEBUG_CONV_WINOGRAD) << ","
-                    << "\"MIOPEN_DEBUG_CONV_IMPLICIT_GEMM\":" << miopen::env::value(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM) << ","
-                    << "\"MIOPEN_DEBUG_CONV_IMMED_FALLBACK\":" << miopen::env::value(MIOPEN_DEBUG_CONV_IMMED_FALLBACK) << ","
-                    << "\"MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK\":" << miopen::env::value(MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK) << ","
-                    << "\"MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK\":" << miopen::env::value(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK) << ","
-                    << "\"MIOPEN_DEBUG_FIND_ONLY_SOLVER\":" << miopen::env::value(MIOPEN_DEBUG_FIND_ONLY_SOLVER) << ","
-                    << "\"MIOPEN_TUNING_PATIENCE\":" << miopen::env::value(MIOPEN_TUNING_PATIENCE) << ","
-                    << "\"MIOPEN_TUNING_PATIENCE\":" << miopen::env::value(MIOPEN_TUNING_TIME_MS_MAX) << ","
-                    << "\"MIOPEN_SEARCH_CUTOFF\":" << miopen::env::value(MIOPEN_SEARCH_CUTOFF) << ","
-                    << "\"MIOPEN_SEARCH_CUTOFF_MUL\":" << miopen::env::value(MIOPEN_SEARCH_CUTOFF_MUL) << ","
-                    << "\"MIOPEN_SEARCH_SKIP_PCT\":" << miopen::env::value(MIOPEN_SEARCH_SKIP_PCT) << ","
-                    << "\"MIOPEN_DEVICE_ARCH\":\"" << miopen::env::value(MIOPEN_DEVICE_ARCH) << "\","
-                    << "\"MIOPEN_DEVICE_CU\":\"" << miopen::env::value(MIOPEN_DEVICE_CU) << "\","
-                    << "\"MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS\":" << miopen::env::value(MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS) << ","
-                    << "\"MIOPEN_LOG_LEVEL\":" << miopen::env::value(MIOPEN_LOG_LEVEL)
-                << "}}" << std::endl;
+        PrintTuningJsonLog("forward", find_time.gettime_ms());
     }
     return rc;
 }
@@ -2599,6 +2605,8 @@ int ConvDriver<Tgpu, Tref>::FindBackwardData(int& ret_algo_count,
 {
     bwd_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_bwd);
+    Timer find_time;
+    find_time.start();
     const auto rc = miopenFindConvolutionBackwardDataAlgorithm(
         GetHandle(),
         outputTensor,
@@ -2614,7 +2622,12 @@ int ConvDriver<Tgpu, Tref>::FindBackwardData(int& ret_algo_count,
         workspace_dev != nullptr ? workspace_dev->GetMem() : nullptr,
         ws_sizeof_find_bwd,
         (inflags.GetValueInt("search") == 1) ? true : false);
+    find_time.stop();
     bwd_auxiliary.pause(wall_enabled);
+    if(performance_logging_enabled)
+    {
+        PrintTuningJsonLog("backward-data", find_time.gettime_ms());
+    }
     return rc;
 }
 
@@ -2626,6 +2639,8 @@ int ConvDriver<Tgpu, Tref>::FindBackwardWeights(int& ret_algo_count,
 {
     wrw_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_wrw);
+    Timer find_time;
+    find_time.start();
     const auto rc = miopenFindConvolutionBackwardWeightsAlgorithm(
         GetHandle(),
         outputTensor,
@@ -2641,7 +2656,12 @@ int ConvDriver<Tgpu, Tref>::FindBackwardWeights(int& ret_algo_count,
         workspace_dev != nullptr ? workspace_dev->GetMem() : nullptr,
         ws_sizeof_find_wrw,
         (inflags.GetValueInt("search") == 1) ? true : false);
+    find_time.stop();
     wrw_auxiliary.pause(wall_enabled);
+    if(performance_logging_enabled)
+    {
+        PrintTuningJsonLog("backward-weights", find_time.gettime_ms());
+    }
     return rc;
 }
 
