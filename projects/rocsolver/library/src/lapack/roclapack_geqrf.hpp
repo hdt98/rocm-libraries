@@ -152,7 +152,7 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
         {
             // compute block reflector
             rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                        (I)(m - j), (I)jb, A, (I)(shiftA + idx2D(j, j, lda)), (I)lda,
+                                        (I)(m - j), (I)jb, A, shiftA + idx2D(j, j, lda), (I)lda,
                                         strideA, (ipiv + j), strideP, Abyx_norms_trfact, (I)ldw,
                                         strideW, (I)batch_count, scalars, (T*)work_workArr, workArr);
 
@@ -304,8 +304,8 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
             // compute block reflector
             rocsolver_larft_inverse_template<T>(
                 handle, rocblas_forward_direction, rocblas_column_wise, (I)(m - j), (I)jb, A,
-                (I)(shiftA + idx2D(j, j, lda)), (I)lda, strideA, (ipiv + j), strideP,
-                Abyx_norms_trfact, (I)ldw, strideW, (I)batch_count, (T*)work_workArr_work1, workArr);
+                shiftA + idx2D(j, j, lda), (I)lda, strideA, (ipiv + j), strideP, Abyx_norms_trfact,
+                (I)ldw, strideW, (I)batch_count, (T*)work_workArr_work1, workArr);
 
             rocsolver_larfb_inverse_template<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_conjugate_transpose,

@@ -53,7 +53,7 @@ rocblas_status rocsolver_larft_impl(rocblas_handle handle,
         return st;
 
     // working with unshifted arrays
-    I shiftV = 0;
+    rocblas_stride shiftV = 0;
 
     // normal (non-batched non-strided) execution
     rocblas_stride stridev = 0;

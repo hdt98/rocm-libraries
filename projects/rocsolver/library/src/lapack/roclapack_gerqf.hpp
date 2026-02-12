@@ -155,7 +155,7 @@ rocblas_status rocsolver_gerqf_template(rocblas_handle handle,
             using I = rocblas_int;
             rocsolver_larft_template<T>(handle, rocblas_backward_direction, rocblas_row_wise,
                                         (I)(n - k + j + jb), (I)jb, A,
-                                        (I)(shiftA + idx2D(m - k + j, 0, lda)), (I)lda, strideA,
+                                        shiftA + idx2D(m - k + j, 0, lda), (I)lda, strideA,
                                         (ipiv + j), strideP, Abyx_norms_trfact, (I)ldw, strideW,
                                         (I)batch_count, scalars, (T*)work_workArr, workArr);
 

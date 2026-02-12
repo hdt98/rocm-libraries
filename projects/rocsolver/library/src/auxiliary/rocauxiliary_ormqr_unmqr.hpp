@@ -249,7 +249,7 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
         // generate triangular factor of current block reflector
         using I = rocblas_int;
         rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                    (I)(nq - i), (I)ib, A, (I)(shiftA + idx2D(i, i, lda)), (I)lda,
+                                    (I)(nq - i), (I)ib, A, shiftA + idx2D(i, i, lda), (I)lda,
                                     strideA, ipiv + i, strideP, trfact, (I)ldw, strideW,
                                     (I)batch_count, scalars, AbyxORwork, workArr);
 
@@ -368,7 +368,7 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
         // generate triangular factor of current block reflector
         using I = rocblas_int;
         rocsolver_larft_inverse_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                            (I)(nq - i), (I)ib, A, (I)(shiftA + idx2D(i, i, lda)),
+                                            (I)(nq - i), (I)ib, A, shiftA + idx2D(i, i, lda),
                                             (I)lda, strideA, ipiv + i, strideP, trfact, (I)ldw,
                                             strideW, (I)batch_count, AbyxORwork, workArr);
 

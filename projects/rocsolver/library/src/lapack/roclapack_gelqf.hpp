@@ -151,7 +151,7 @@ rocblas_status rocsolver_gelqf_template(rocblas_handle handle,
             // compute block reflector
             using I = rocblas_int;
             rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_row_wise,
-                                        (I)(n - j), (I)jb, A, (I)(shiftA + idx2D(j, j, lda)), (I)lda,
+                                        (I)(n - j), (I)jb, A, shiftA + idx2D(j, j, lda), (I)lda,
                                         strideA, (ipiv + j), strideP, Abyx_norms_trfact, (I)ldw,
                                         strideW, (I)batch_count, scalars, (T*)work_workArr, workArr);
 
