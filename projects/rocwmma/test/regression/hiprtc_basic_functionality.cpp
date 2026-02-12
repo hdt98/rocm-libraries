@@ -384,10 +384,22 @@ TEST_F(HipRTC_BasicFunctionality, MultipleKernelCompilations)
     hiprtcProgram prog1;
     ASSERT_HIPRTC_SUCCESS(hiprtcCreateProgram(&prog1, vectorAddSource, nullptr, 0, nullptr, nullptr));
 
-    auto options     = buildCompileOptions();
-    int  numOptions  = options.size();
+    // Build compile options
+    auto options    = buildCompileOptions();
+    int  numOptions = options.size();
 
-    ASSERT_HIPRTC_SUCCESS(hiprtcCompileProgram(prog1, numOptions, options.data()));
+    // Compile the program
+    hiprtcResult compileResult1 = hiprtcCompileProgram(prog1, numOptions, options.data());
+
+    // Handle compilation errors
+    if(compileResult1 != HIPRTC_SUCCESS)
+    {
+        std::size_t log_size;
+        hiprtcGetProgramLogSize(prog1, &log_size);
+        std::string log(log_size, '\0');
+        hiprtcGetProgramLog(prog1, &log[0]);
+        FAIL() << "Compilation failed:\n" << log;
+    }
 
     std::size_t code_size1;
     ASSERT_HIPRTC_SUCCESS(hiprtcGetCodeSize(prog1, &code_size1));
@@ -459,7 +471,19 @@ TEST_F(HipRTC_BasicFunctionality, MultipleKernelCompilations)
     // Compile and execute second kernel
     hiprtcProgram prog2;
     ASSERT_HIPRTC_SUCCESS(hiprtcCreateProgram(&prog2, vectorMultiplySource, nullptr, 0, nullptr, nullptr));
-    ASSERT_HIPRTC_SUCCESS(hiprtcCompileProgram(prog2, numOptions, options.data()));
+    // Compile the program
+    hiprtcResult compileResult2 = hiprtcCompileProgram(prog2, numOptions, options.data());
+
+    // Handle compilation errors
+    if(compileResult2 != HIPRTC_SUCCESS)
+    {
+        std::size_t log_size;
+        hiprtcGetProgramLogSize(prog2, &log_size);
+        std::string log(log_size, '\0');
+        hiprtcGetProgramLog(prog2, &log[0]);
+        FAIL() << "Compilation failed:\n" << log;
+    }
+
 
     std::size_t code_size2;
     ASSERT_HIPRTC_SUCCESS(hiprtcGetCodeSize(prog2, &code_size2));
@@ -546,9 +570,22 @@ TEST_F(HipRTC_BasicFunctionality, FloatTypeTest)
     hiprtcProgram prog;
     ASSERT_HIPRTC_SUCCESS(hiprtcCreateProgram(&prog, vectorMultiplySource, nullptr, 0, nullptr, nullptr));
 
+    // Build compile options
     auto options    = buildCompileOptions();
     int  numOptions = options.size();
-    ASSERT_HIPRTC_SUCCESS(hiprtcCompileProgram(prog, numOptions, options.data()));
+
+    // Compile the program
+    hiprtcResult compileResult = hiprtcCompileProgram(prog, numOptions, options.data());
+
+    // Handle compilation errors
+    if(compileResult != HIPRTC_SUCCESS)
+    {
+        std::size_t log_size;
+        hiprtcGetProgramLogSize(prog, &log_size);
+        std::string log(log_size, '\0');
+        hiprtcGetProgramLog(prog, &log[0]);
+        FAIL() << "Compilation failed:\n" << log;
+    }
 
     // Extract code
     std::size_t code_size;
