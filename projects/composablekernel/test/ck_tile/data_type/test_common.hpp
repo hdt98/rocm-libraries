@@ -15,23 +15,24 @@ namespace ck_tile_test {
 // It measures the distance between two floating-point numbers as the number of representable values
 // between them.
 template <typename T>
-inline int32_t ulp_distance(T a, T b)
+inline uint64_t ulp_distance(T a, T b)
 {
     static_assert(std::is_floating_point<T>::value, "ULP distance only for floating point types");
 
     if(std::isnan(a) || std::isnan(b))
-        return std::numeric_limits<int32_t>::max();
+        return std::numeric_limits<uint64_t>::max();
     if(std::isinf(a) || std::isinf(b))
     {
         if(a == b)
             return 0;
-        return std::numeric_limits<int32_t>::max();
+        return std::numeric_limits<uint64_t>::max();
     }
 
     // Use int32_t for float and int64_t for double
-    using IntType = std::conditional_t<sizeof(T) == 4, int32_t, int64_t>;
-    IntType ia    = ck_tile::bit_cast<IntType>(a);
-    IntType ib    = ck_tile::bit_cast<IntType>(b);
+    using IntType  = std::conditional_t<sizeof(T) == 4, int32_t, int64_t>;
+    using UIntType = std::conditional_t<sizeof(T) == 4, uint32_t, uint64_t>;
+    IntType ia     = ck_tile::bit_cast<IntType>(a);
+    IntType ib     = ck_tile::bit_cast<IntType>(b);
 
     // Make ia and ib lexicographically ordered as a twos-complement int
     // For float (32-bit): use 0x80000000, for double (64-bit): use 0x8000000000000000
@@ -42,7 +43,10 @@ inline int32_t ulp_distance(T a, T b)
     if(ib < 0)
         ib = sign_bit_mask - ib;
 
-    return static_cast<int32_t>(std::abs(ia - ib));
+    // Compute difference in unsigned type to avoid signed overflow (UB)
+    UIntType ua = static_cast<UIntType>(ia);
+    UIntType ub = static_cast<UIntType>(ib);
+    return (ua > ub) ? (ua - ub) : (ub - ua);
 }
 
 } // namespace ck_tile_test
