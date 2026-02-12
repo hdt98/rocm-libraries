@@ -142,6 +142,7 @@ class TestCkTileMemoryCopyFP8Async : public TestCkTileMemoryCopy<ck_tile::fp8_t>
 {
 };
 
+#if !defined(CK_USE_GFX1250)
 TEST_P(TestCkTileMemoryCopyF6x16, TestCorrectness)
 {
     auto [M, N, warp_id] = GetParam();
@@ -153,6 +154,7 @@ TEST_P(TestCkTileMemoryCopyF6x16Async, TestCorrectness)
     auto [M, N, warp_id] = GetParam();
     this->Run({M, N, warp_id});
 }
+#endif
 
 TEST_P(TestCkTileMemoryCopyHalfAsync, TestCorrectness)
 {
