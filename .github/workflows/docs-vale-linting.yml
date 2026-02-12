@@ -1,0 +1,20 @@
+name: docs_vale_linting
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - users/dsclear/documentation_vale_linting
+    paths:
+      - '**/*.md'
+      - '**/*.rst'
+      - '.vale.ini'
+
+jobs:
+  docs-vale-linting:
+    name: 'docs-vale-linting'
+    uses: ROCm/rocm-docs-core/.github/workflows/linting.yml@vale_check
