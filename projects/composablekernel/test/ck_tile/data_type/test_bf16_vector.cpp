@@ -337,16 +337,17 @@ TEST_F(Bf16VectorTest, VectorEdgeCases)
         // So bf16::max < float::max.
         // Hardware behavior differs by architecture:
         // - gfx950: RTN rounding -> float::max rounds to infinity (IEEE-754 compliant)
+        // - gfx9 (gfx90a, gfx908, gfx942): Saturates -> float::max clamps to bf16::max
         // - gfx12/gfx1250: Saturates -> float::max clamps to bf16::max (faster, non-IEEE)
         float result_x = bf16_to_float(bf16_vec.x);
         float result_y = bf16_to_float(bf16_vec.y);
 
 #ifdef CK_TILE_BF16_OVERFLOW_SATURATES
-        // gfx12/gfx1250: Hardware saturates to bf16::max
+        // gfx9/gfx11/gfx12: Hardware saturates to bf16::max
         EXPECT_FALSE(std::isinf(result_x))
-            << "gfx12/gfx1250: float::max should saturate to bf16::max";
+            << "gfx9/gfx11/gfx12: float::max should saturate to bf16::max";
         EXPECT_FALSE(std::isinf(result_y))
-            << "gfx12/gfx1250: -float::max should saturate to -bf16::max";
+            << "gfx9/gfx11/gfx12: -float::max should saturate to -bf16::max";
 #else
         // gfx950 and software: RTN rounding to infinity (IEEE-754 behavior)
         EXPECT_TRUE(std::isinf(result_x) && result_x > 0)

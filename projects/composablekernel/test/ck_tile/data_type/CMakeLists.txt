@@ -107,10 +107,11 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
         endif()
 
         # Define macro to indicate hardware/software saturation behavior for bf16 overflow
+        # - gfx9 (gfx90a, gfx908, gfx942): Hardware saturates to bf16::max
         # - gfx11: Software truncate mode saturates to bf16::max
         # - gfx12: Hardware builtin saturates to bf16::max
         # - gfx950: Hardware builtin rounds to infinity (IEEE-754 RTN)
-        if(GPU_TARGETS MATCHES "gfx1[12]")
+        if(GPU_TARGETS MATCHES "gfx90a|gfx908|gfx94[02]|gfx1[12]")
             target_compile_definitions(${test_target} PRIVATE -DCK_TILE_BF16_OVERFLOW_SATURATES=1)
         endif()
 
