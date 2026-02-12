@@ -118,7 +118,7 @@ std::string getRocmPath()
 // Build standard compilation options for HIP RTC
 std::vector<const char*> buildCompileOptions()
 {
-    static std::string rocmIncludePath = getRocmPath() + "/include";
+    static std::string rocmIncludePath = "-I" + getRocmPath() + "/include";
 
     std::vector<const char*> options;
     options.push_back("-D__HIP_PLATFORM_AMD__");
