@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "../../../shared/array_predicate.h"
+#include "data_layout.h"
 #include "function_pool.h"
 #include "load_store_ops.h"
 #include "rocfft_mpi.h"
@@ -65,73 +66,33 @@ static inline bool IsPow(size_t u)
 
 struct rocfft_brick_t
 {
-    // all vectors here are column-major, with same length as FFT
-    // dimension + 1 (for batch dimension)
-    rocfft_brick_t(const size_t*            field_lower,
-                   const size_t*            field_upper,
-                   const size_t*            brick_stride,
-                   size_t                   dim,
-                   const rocfft_location_t& location)
-        : lower(field_lower, field_lower + dim)
-        , upper(field_upper, field_upper + dim)
-        , stride(brick_stride, brick_stride + dim)
+    // no default constructor
+    rocfft_brick_t() = delete;
+    // default move and copy constructors
+    rocfft_brick_t(const rocfft_brick_t&) = default;
+    rocfft_brick_t& operator=(const rocfft_brick_t&) = default;
+    rocfft_brick_t(rocfft_brick_t&&)                 = default;
+    rocfft_brick_t& operator=(rocfft_brick_t&&) = default;
+
+    // all vectors here are column-major, with same size as FFT
+    // rank + 1 (batch axis last)
+    rocfft_brick_t(const std::vector<size_t>& field_lower,
+                   const std::vector<size_t>& field_upper,
+                   const std::vector<size_t>& brick_stride,
+                   const rocfft_location_t&   location)
+        : layout(field_lower, field_upper, brick_stride)
         , location(location)
     {
     }
-    rocfft_brick_t()                      = default;
-    rocfft_brick_t(const rocfft_brick_t&) = default;
-    rocfft_brick_t& operator=(const rocfft_brick_t&) = default;
 
-    // inclusive lower bound of brick
-    std::vector<size_t> lower;
-    // exclusive upper bound of brick
-    std::vector<size_t> upper;
-    // stride of brick in memory
-    std::vector<size_t> stride;
-
+    // Data layout of the brick
+    data_layout_t layout;
     // Location of the brick
     rocfft_location_t location;
 
-    // Compute the length of this brick
-    std::vector<size_t> length() const
-    {
-        std::vector<size_t> ret;
-        for(size_t i = 0; i < lower.size(); ++i)
-            ret.push_back(upper[i] > lower[i] ? upper[i] - lower[i] : 0);
-        return ret;
-    }
-
-    // Functions and operators
-
-    // check if brick is empty
-    bool empty() const;
-    // return intersection of *this and another brick.  note that
-    // strides and device are not set on the returned brick, as this
-    // method can't know if the caller wants to look at the result in
-    // *this or in other.
-    rocfft_brick_t intersect(const rocfft_brick_t& other) const;
-
-    // test whether this brick covers same coordinates as another
-    // brick.  strides are not considered.
-    bool equal_coords(const rocfft_brick_t& other) const;
-
-    // compute the number of elements in this brick
-    size_t count_elems() const;
-    bool   is_contiguous() const;
-    // Return strides for this brick, if it were transposed to be
-    // contiguous.
-    std::vector<size_t> contiguous_strides() const;
-
-    // return true if this brick is contiguous in the specified field
-    bool is_contiguous_in_field(const std::vector<size_t>& field_length) const;
-
-    // compute offset of this brick, given the field's stride
-    size_t offset_in_field(const std::vector<size_t>& fieldStride) const;
-
     bool operator==(const rocfft_brick_t& other) const
     {
-        return lower == other.lower && upper == other.upper && stride == other.stride
-               && location == other.location;
+        return layout == other.layout && location == other.location;
     }
 
     std::string str() const;
@@ -140,6 +101,67 @@ struct rocfft_brick_t
 struct rocfft_field_t
 {
     std::vector<rocfft_brick_t> bricks;
+
+    /**
+     * @brief Finalize all the bricks for a given full-range data set
+     * that `full_range_layout` captures:
+     * 
+     * - sort field's bricks by increasing rank (stable sort);
+     * 
+     * - set the `is_partial` flags for all axes of all the bricks' layouts,
+     * in light of the given full-range layout.
+     * 
+     * @param[in] full_range_layout A full (i.e. non-partial) data layout
+     * capturing the range of logical indices that this field's bricks are
+     * expected to cover.
+     * 
+     * @note The in-buffer strides of `full_range_layout` are irrelevant for
+     * this function; only the range of logical indices along all axes matters.
+     * 
+     * @throw An `std::invalid_argument` is thrown if `full_range_layout` is
+     * partial (i.e., not full) or if some bricks are not dimensionally
+     * consistent with it (different number of length or batch axes).
+     */
+    void finalize_bricks_for(const data_layout_t& full_range_layout);
+
+    /**
+     * @brief Verify that the field is valid and finalized for a given
+     * full-range data set that `full_range_layout` captures. An
+     * `std::runtime_error` is thrown if
+     * 
+     * - the bricks are not sorted by increasing rank;
+     * 
+     * - two different bricks' layouts are found to have overlapping ranges of
+     * logical indices;
+     * 
+     * - some brick layout is not logically contained in the given full-data layout;
+     * 
+     * - some `is_partial` flag is incorrectly set in brick layout's axes;
+     * 
+     * - the union of logical index ranges covered by all the bricks' layouts
+     * does not match the logical index range of the given full-data layout.
+     * 
+     * @param[in] full_range_layout A full (i.e. non-partial) data layout
+     * capturing the range of logical indices that this field's bricks are
+     * supposed to cover.
+     * 
+     * @note The in-buffer strides of `full_range_layout` are irrelevant for
+     * this function; only the range of logical indices along all axes matters. 
+     *
+     * @throw An `std::invalid_argument` is thrown if `full_range_layout` is
+     * partial (i.e., not full) or if some bricks are not dimensionally
+     * consistent with it (different number of length or batch axes). 
+     */
+    void throw_if_invalid_for(const data_layout_t& full_range_layout) const;
+
+    inline decltype(bricks)::const_iterator first_brick_on_rank(int rank) const
+    {
+        return std::find_if(bricks.begin(), bricks.end(), [&rank](const auto& brick) {
+            return brick.location.comm_rank == rank;
+        });
+    }
+
+    bool has_dimensionally_consistent_bricks_for(const data_layout_t& full_range_layout) const;
 };
 
 struct rocfft_plan_description_t
@@ -147,11 +169,8 @@ struct rocfft_plan_description_t
     rocfft_array_type inArrayType  = rocfft_array_type_unset;
     rocfft_array_type outArrayType = rocfft_array_type_unset;
 
-    std::vector<size_t> inStrides;
-    std::vector<size_t> outStrides;
-
-    size_t inDist  = 0;
-    size_t outDist = 0;
+    data_layout_t input_layout;
+    data_layout_t output_layout;
 
     std::array<size_t, 2> inOffset  = {0, 0};
     std::array<size_t, 2> outOffset = {0, 0};
@@ -162,9 +181,7 @@ struct rocfft_plan_description_t
     // Multi-process communicator info:
     rocfft_comm_type comm_type = rocfft_comm_none;
 #ifdef ROCFFT_MPI_ENABLE
-    // this is the communicator that was directly provided by the user
-    // - we don't own it so it doesn't need to be wrapped or freed
-    MPI_Comm user_mpi_comm = MPI_COMM_NULL;
+    MPI_Comm_wrapper_t mpi_comm;
 #endif
 
     LoadOps  loadOps;
@@ -173,14 +190,111 @@ struct rocfft_plan_description_t
     rocfft_plan_description_t()  = default;
     ~rocfft_plan_description_t() = default;
 
-    // A plan description is created in a vacuum and does not know what
-    // type of transform it will be for.  Once that's known, we can
-    // initialize default values for in/out type, stride, dist if they're
-    // unspecified.
-    void init_defaults(rocfft_transform_type      transformType,
-                       rocfft_result_placement    placement,
-                       const std::vector<size_t>& lengths,
-                       const std::vector<size_t>& outputLengths);
+    /**
+     * @return The number of length dimensions.
+     */
+    size_t rank() const;
+    /**
+     * @return The batch size.
+     */
+    size_t batch() const;
+
+    // Get the local communication rank
+    int get_local_comm_rank() const;
+    // Get number of ranks in the local communicator
+    int get_local_comm_size() const;
+    // returns the current rocfft_location_t (process rank + current device ID)
+    // seen by this object
+    rocfft_location_t get_current_location() const;
+
+    /**
+     * @brief Finalize the description by
+     * 
+     * - assigning default values for the description members that haven't been
+     * explicitly set yet;
+     * 
+     * - finalizing bricks for all member fields (see `rocfft_field_t::finalize_bricks_for`);
+     * 
+     * - removing trivial unit-span axes from all layouts (including bricks' if any)
+     * and sorting length axes by increasing strides if that can be done consistently
+     * across all of them;
+     * 
+     * @param[in] dft_type user-provided type of transform for the owning plan.
+     * @param[in] placement user-provided placement of transform results for the owning plan.
+     * @param[in] user_lengths user-provided lengths of the transform for the owning plan.
+     * @param[in] len_rank user-provided number of length dimensions for the owning plan.
+     * @param[in] number_of_transforms user-provided batch size for the owning plan.
+     */
+    void finalize_for(rocfft_transform_type   dft_type,
+                      rocfft_result_placement placement,
+                      const size_t*           user_lengths,
+                      const size_t            len_rank,
+                      const size_t            number_of_transforms);
+
+    /**
+     * @brief Throw an `std::runtime_error` or a `rocfft_status` value (i.e., to be
+     * escalated back to the end user as is), if the description is found invalid
+     * or inconsistent for the intended plan operations. Series of verifications:
+     * 
+     * - No planar data type if not consistent with single-device operations on the
+     *   current location;
+     * 
+     * - Validation of input and output array types (rocfft_status_invalid_array_type thrown);
+     * 
+     * - No planar hermitian type for in-place real transforms (rocfft_status_invalid_array_type thrown);
+     * 
+     * - Consistency for input and output data layouts;
+     * 
+     * - Input and output fields must be set for multi-process usage;
+     * 
+     * - Validity of input and output fields, if any (see `rocfft_field_t::throw_if_invalid_for`);
+     * 
+     * - Matching locations for all buffers expected to be used as input and output
+     *   (if intended in-place);
+     * 
+     * - Actual in-place data layout requirements if consistent with single-device
+     *   operations on the current location (if intended in-place);
+     * 
+     * @param[in] dft_type intended type of transform for the owning plan.
+     * @param[in] placement intended placement for the owning plan.
+     */
+    void throw_if_inconsistent_or_invalid_for(rocfft_transform_type   dft_type,
+                                              rocfft_result_placement placement) const;
+
+    /**
+     * @brief Verify if the description has undistributed input/output data (for all
+     * possible fields) and, if so, if all said data shares the same location.
+     * 
+     * @tparam io input (resp. output) data sets are considered for specialization
+     * value `io_data_label::INPUT` (resp. `io_data_label::OUTPUT`)
+     * @return An `std::optional<rocfft_location_t>` object which has a value
+     * set iff all ipnut (resp. output) data sets are undistributed and shares
+     * the (returned) location. 
+     */
+    template <io_data_label io>
+    std::optional<rocfft_location_t> expected_undistributed_location_for() const;
+
+    /**
+     * @return `true` if the description is consistent with single-device
+     * operations on the current location.
+     */
+    bool has_undistributed_io_on_current_location() const;
+
+    /**
+     * @brief Read accessor implementation helper for the input (resp. output)
+     * data layout that must take precedence. If a lone input (resp. output)
+     * field with a lone brick is used, this returns a (const) reference to that
+     * brick's layout (regardless of the brick's location). Otherwise, a (const)
+     * reference to `input_layout` (resp. `output_lauyout`) is returned.
+     * 
+     * @tparam io input (resp. output) data sets are considered for specialization
+     * value `io_data_label::INPUT` (resp. `io_data_label::OUTPUT`)
+     * 
+     * @throw An `std::logic_error` is thrown if this description involves more
+     * than one brick.
+     */
+    template <io_data_label io>
+    const data_layout_t& undistributed_layout() const;
 
     // Count the number of pointers required for either input or output
     // - planar data requires two pointers, real + complex require one.
@@ -206,21 +320,14 @@ struct rocfft_plan_description_t
     // returns true if a field has bricks such that any rank has
     // bricks on more than one device
     static bool multiple_devices_in_rank(const rocfft_field_t& field);
+
+private:
+    template <io_data_label io>
+    bool bricks_are_dimensionally_consistent() const;
 };
 
 struct rocfft_plan_t
 {
-#ifdef ROCFFT_MPI_ENABLE
-    MPI_Comm_wrapper_t mpi_comm;
-#endif
-    size_t rank = 0;
-    // input lengths
-    std::vector<size_t> lengths;
-    // output lengths, which differ from input lengths for real-complex
-    // transforms
-    std::vector<size_t> outputLengths;
-    size_t              batch = 1;
-
     rocfft_result_placement placement     = rocfft_placement_inplace;
     rocfft_transform_type   transformType = rocfft_transform_type_complex_forward;
     rocfft_precision        precision     = rocfft_precision_single;
@@ -228,20 +335,6 @@ struct rocfft_plan_t
     rocfft_plan_description_t desc;
 
     rocfft_plan_t() = default;
-
-    // Users can provide lengths+strides in any order, but we'll
-    // construct the most sensible plans if they're in row-major order.
-    // Sort the FFT dimensions.
-    //
-    // This should be done when the plan parameters are known, but
-    // before we start creating any child nodes from the root plan.
-    void sort();
-
-    static bool is_contiguous(const std::vector<size_t>& length,
-                              const std::vector<size_t>& stride,
-                              size_t                     dist);
-    bool        is_contiguous_input();
-    bool        is_contiguous_output();
 
     // Add a multi-plan item for execution.  Returns the index of the
     // new item in the overall multi-GPU plan.  Also provide a
@@ -278,15 +371,6 @@ struct rocfft_plan_t
 
     // log field layout at plan level
     static void LogFields(const char* description, const std::vector<rocfft_field_t>& fields);
-
-    // throw exception if input/output fields are not valid (e.g. they
-    // don't cover the whole index space, or bricks overlap)
-    void ValidateFields() const;
-
-    // Get the local communication rank
-    int get_local_comm_rank() const;
-    // Get number of ranks in the local communicator
-    int get_local_comm_size() const;
 
     // During plan creation, InternalTempBuffer remembers how much
     // space will be needed but doesn't allocate.  Allocate the buffers
@@ -326,27 +410,42 @@ private:
     // plan items can have void*'s that point to these buffers.
     std::multimap<rocfft_location_t, std::shared_ptr<InternalTempBuffer>> tempBuffers;
 
-    // gather a set of bricks to a field on the current device
-    std::vector<size_t> GatherBricksToField(rocfft_location_t                  destLocation,
-                                            const std::vector<rocfft_brick_t>& bricks,
-                                            rocfft_precision                   precision,
-                                            rocfft_array_type                  arrayType,
-                                            const std::vector<size_t>&         field_length,
-                                            const std::vector<size_t>&         field_stride,
-                                            BufferPtr                          output,
-                                            const std::vector<size_t>&         antecedents,
-                                            size_t                             elem_size);
+    /**
+     * @brief Create the plan items required to gather the input data buffer(s) of a
+     * multi-device transform into the input buffer of the (single-device) execution
+     * plan (abiding by that execution plan's input data layout).
+     * 
+     * @param[in] execution_plan Single-device execution plan.
+     * @param[in] input_bricks bricks describing the data (layout and location) in
+     * all execution-time input buffers of the multi-device transform.
+     * @param[in] antecedents indices of the plan items that must complete before
+     * the gather steps may be initiated.
+     * @return An `std::vector<size_t>` of indices of the created plan items.
+     * When these items complete, the execution plan's input buffer is set for
+     * computating the desired transform.
+     */
+    std::vector<size_t> CreateInputGatheringItems(const ExecPlan&                    execution_plan,
+                                                  const std::vector<rocfft_brick_t>& input_bricks,
+                                                  const std::vector<size_t>& antecedents = {});
 
-    // scatter a field on the current device to a set of bricks
-    std::vector<size_t> ScatterFieldToBricks(rocfft_location_t                  srcLocation,
-                                             BufferPtr                          input,
-                                             rocfft_precision                   precision,
-                                             rocfft_array_type                  arrayType,
-                                             const std::vector<size_t>&         field_length,
-                                             const std::vector<size_t>&         field_stride,
-                                             const std::vector<rocfft_brick_t>& bricks,
-                                             const std::vector<size_t>&         antecedents,
-                                             size_t                             elem_size);
+    /**
+     * @brief Create the plan items required to scatter the output buffer of the
+     * (single-device) execution plan (observing that plan's output data layout)
+     * into the output data buffer(s) of a multi-device transform.
+     * 
+     * @param[in] execution_plan single-device execution plan.
+     * @param[in] output_bricks bricks describing the data (layout and location) in
+     * all execution-time output buffers of the multi-device transform.
+     * @param[in] antecedents indices of the plan items that must complete before
+     * the scatter steps may be initiated. 
+     * @return An `std::vector<size_t>` of indices of the created plan items.
+     * When these items complete, the user's output buffers are set with the
+     * corresponding portions of the transform's results.
+     */
+    std::vector<size_t>
+        CreateOutputScatteringItems(const ExecPlan&                    execution_plan,
+                                    const std::vector<rocfft_brick_t>& output_bricks,
+                                    const std::vector<size_t>&         antecedents);
 
     // Transpose the input field to the output field by adding work items
     // to the plan.  Antecedents are provided as a vector of item

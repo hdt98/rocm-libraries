@@ -27,6 +27,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "../../../shared/device_properties.h"
@@ -37,6 +38,7 @@
 #include "../device/kernels/common.h"
 #include "callback_map.h"
 #include "compute_scheme.h"
+#include "data_layout.h"
 #include "enum_printer.h"
 #include "function_map_key.h"
 #include "function_pool.h"
@@ -315,6 +317,40 @@ public:
 
     // Distance between consecutive batch members:
     size_t iDist = 0, oDist = 0;
+
+    // TODO: `batch`, `dimension`, `length`, `outputLength` `inStride`,
+    // `outStride`, `iDist`, and `oDist` could (and should) be replaced
+    // by two data_layout_t member objects instead.
+    template <io_data_label io>
+    inline data_layout_t io_layout() const
+    {
+        static_assert(io == io_data_label::INPUT || io == io_data_label::OUTPUT);
+        if constexpr(io == io_data_label::INPUT)
+            return data_layout_t(length, inStride, batch, iDist);
+        else
+            return data_layout_t(outputLength, outStride, batch, oDist);
+    };
+
+    template <io_data_label io>
+    inline size_t expected_buffer_size() const
+    {
+        static_assert(io == io_data_label::INPUT || io == io_data_label::OUTPUT);
+        const auto layout = io_layout<io>();
+        auto       ret
+            = layout.buffer_element_count()
+              * element_size(precision, io == io_data_label::INPUT ? inArrayType : outArrayType);
+        if(placement == rocfft_placement_inplace)
+        {
+            const auto other_layout = io_layout<other<io>()>();
+
+            ret = std::max(ret,
+                           other_layout.buffer_element_count()
+                               * element_size(precision,
+                                              other<io>() == io_data_label::INPUT ? inArrayType
+                                                                                  : outArrayType));
+        }
+        return ret;
+    }
 
     // Distance between consecutive batch members in fused Bluestein nodes
     size_t iDistBlue = 0, oDistBlue = 0;
@@ -818,15 +854,6 @@ struct rocfft_location_t
     {
     }
 
-    // return a location for the current device on comm rank 0
-    static rocfft_location_t rank0_current_device()
-    {
-        rocfft_location_t id;
-        if(hipGetDevice(&id.device) != hipSuccess)
-            throw std::runtime_error("hipGetDevice failed");
-        return id;
-    }
-
     // allow locations to be sorted
     bool operator<(const rocfft_location_t& other) const
     {
@@ -838,6 +865,15 @@ struct rocfft_location_t
     bool operator==(const rocfft_location_t& other) const
     {
         return comm_rank == other.comm_rank && device == other.device;
+    }
+
+    std::string str() const
+    {
+        std::string ret = "comm rank ";
+        ret += std::to_string(comm_rank);
+        ret += " device ";
+        ret += std::to_string(device);
+        return ret;
     }
 
     int comm_rank = 0;

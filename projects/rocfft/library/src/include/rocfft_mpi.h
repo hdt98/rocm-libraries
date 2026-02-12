@@ -38,18 +38,23 @@ public:
     static MPI_Comm_wrapper_t from_raw(MPI_Comm raw_comm)
     {
         MPI_Comm_wrapper_t wrap;
-        wrap.mpi_comm = raw_comm;
+        if(raw_comm != MPI_COMM_NULL)
+        {
+            auto tmp      = std::make_unique<MPI_Comm>(raw_comm);
+            wrap.mpi_comm = std::shared_ptr<MPI_Comm>(tmp.release(), shared_ptr_deleter);
+        }
         return wrap;
     }
 
     // conversion to unwrapped communicator for passing to MPI APIs
     operator MPI_Comm() const
     {
-        return mpi_comm;
+        auto ret = !mpi_comm ? MPI_COMM_NULL : *mpi_comm;
+        return ret;
     }
 
-    MPI_Comm_wrapper_t(const MPI_Comm_wrapper_t&) = delete;
-    MPI_Comm_wrapper_t& operator=(const MPI_Comm_wrapper_t&) = delete;
+    MPI_Comm_wrapper_t(const MPI_Comm_wrapper_t&) = default;
+    MPI_Comm_wrapper_t& operator=(const MPI_Comm_wrapper_t&) = default;
 
     // move communicator
     MPI_Comm_wrapper_t(MPI_Comm_wrapper_t&& other)
@@ -69,32 +74,40 @@ public:
 
     void free()
     {
-        if(mpi_comm != MPI_COMM_NULL)
-            MPI_Comm_free(&mpi_comm);
-        mpi_comm = MPI_COMM_NULL;
+        mpi_comm.reset();
     }
 
     void duplicate(MPI_Comm in_comm)
     {
         free();
-        if(in_comm != MPI_COMM_NULL && MPI_Comm_dup(in_comm, &mpi_comm) != MPI_SUCCESS)
+        if(in_comm != MPI_COMM_NULL)
         {
-            throw std::runtime_error("failed to duplicate MPI communicator");
+            auto tmp = std::make_unique<MPI_Comm>();
+            if(MPI_Comm_dup(in_comm, tmp.get()) != MPI_SUCCESS)
+                throw std::runtime_error("failed to duplicate MPI communicator");
+            mpi_comm = std::shared_ptr<MPI_Comm>(tmp.release(), shared_ptr_deleter);
         }
     }
 
     // check if communicator has been initialized
     operator bool() const
     {
-        return mpi_comm != MPI_COMM_NULL;
+        return mpi_comm && *mpi_comm != MPI_COMM_NULL;
     }
     bool operator!() const
     {
-        return mpi_comm == MPI_COMM_NULL;
+        return !mpi_comm || *mpi_comm == MPI_COMM_NULL;
     }
 
 private:
-    MPI_Comm mpi_comm = MPI_COMM_NULL;
+    // shared_ptr makes the structure safely copyable
+    std::shared_ptr<MPI_Comm> mpi_comm;
+
+    static void shared_ptr_deleter(MPI_Comm* comm)
+    {
+        if(*comm != MPI_COMM_NULL)
+            MPI_Comm_free(comm);
+    }
 };
 
 // RAII wrapper around MPI_Datatypes
@@ -284,9 +297,6 @@ inline MPI_Comm_wrapper_t make_subcommunicator(MPI_Comm parent_comm, const std::
     MPI_Group_free(&sub_group);
     if(rcmpi != MPI_SUCCESS)
         throw std::runtime_error("MPI_Comm_create failed with code: " + std::to_string(rcmpi));
-
-    if(new_comm == MPI_COMM_NULL)
-        return MPI_Comm_wrapper_t{};
 
     return MPI_Comm_wrapper_t::from_raw(new_comm);
 }

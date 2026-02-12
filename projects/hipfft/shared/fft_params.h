@@ -40,7 +40,7 @@
 #include "../shared/array_validator.h"
 #include "../shared/data_gen_device.h"
 #include "../shared/data_gen_host.h"
-#include "../shared/data_layout.h"
+#include "../shared/data_layout_helpers.h"
 #include "../shared/device_properties.h"
 #include "../shared/fft_enums.h"
 #include "../shared/gpubuf.h"
