@@ -49,6 +49,24 @@ bool IsAnyBufferFp16(const TensorDescriptor& xDesc,
 
 double SlowdownFactor(int n_oper, double oper_factor, double multiple_oper_factor);
 
+// Workaround for ALMIOPEN-1044: Temporary workspace size limit for GEMM solvers
+// This can be removed once the underlying issue is resolved
+#if MIOPEN_USE_GEMM
+/// Determine if GEMM workspace size exceeds threshold.
+///
+/// This function estimates the workspace size required by GEMM solvers and compares it
+/// against the configured limit. The calculation matches the workspace computation used
+/// in GemmFwdRest solver, which represents the general (non-1x1) case.
+///
+/// The workspace size is calculated as:
+///   C × filter_spatial × output_spatial × type_size × groups
+/// For Int8, the size is doubled.
+///
+/// @param problem The convolution problem description.
+/// @return true if estimated workspace exceeds limit and GEMM should be disabled, false otherwise.
+bool IsGEMMProblemTooLarge(const miopen::conv::ProblemDescription& problem);
+#endif
+
 } // namespace gemm
 } // namespace conv
 } // namespace solver

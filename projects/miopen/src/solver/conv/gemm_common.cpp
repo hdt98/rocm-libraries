@@ -25,7 +25,25 @@
  *******************************************************************************/
 
 #include <miopen/env.hpp>
+#include <miopen/logger.hpp>
 #include <miopen/solver/gemm_common.hpp>
+#include <boost/range/adaptors.hpp>
+#include <numeric>
+
+// Workaround for ALMIOPEN-1044: Temporary workspace size limit for GEMM solvers
+// This can be removed once the underlying issue is resolved
+#define MIOPEN_WORKAROUND_ALMIOPEN_1044 1
+
+#if MIOPEN_WORKAROUND_ALMIOPEN_1044
+// temporary workaround, essentially reverting #2393.
+// PR 2393 removed this limit with this comment attached:
+// "Workaround for MLOpen issue 1430. Vega20 fails to access GPU memory
+//  larger than the return value of GetMaxMemoryAllocSize() of Vega10.
+//  Due to historical reasons, this W/A is applied to all targets.
+//  We are going to keep it as is until the new GEMM backend
+//  is used instead of rocBLAS. See also issue #2809."
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_CONV_GEMM_MAX_WORKSPACE_SIZE, 7287183769)
+#endif
 
 namespace miopen {
 namespace solver {
@@ -62,6 +80,58 @@ double SlowdownFactor(const int n_oper, const double oper_factor, const double m
     else
         return 1.0;
 }
+
+#if MIOPEN_USE_GEMM
+bool IsGEMMProblemTooLarge(const miopen::conv::ProblemDescription& problem)
+{
+#if MIOPEN_WORKAROUND_ALMIOPEN_1044
+    const std::size_t max_size = env::value(MIOPEN_DEBUG_CONV_GEMM_MAX_WORKSPACE_SIZE);
+    // 0 means no limit
+    if(max_size == 0)
+        return false;
+
+    const auto& conv  = problem.GetConv();
+    const auto& wDesc = problem.GetWeights();
+    const auto& yDesc = problem.GetOut();
+
+    const auto spatial_dim = conv.GetSpatialDimension();
+    const auto wei_spatial = boost::adaptors::slice(wDesc.GetLengths(), 2, 2 + spatial_dim);
+    const auto out_spatial = boost::adaptors::slice(yDesc.GetLengths(), 2, 2 + spatial_dim);
+    const auto wei_c       = wDesc.GetLengths()[1];
+
+    // Calculate workspace size using the same formula as GemmFwdRest::GetWorkspaceSize()
+    // workspace = C × filter_spatial × output_spatial × type_size × groups
+    const auto workspace_size = wei_c *
+                                std::accumulate(wei_spatial.begin(),
+                                                wei_spatial.end(),
+                                                std::size_t(1),
+                                                std::multiplies<std::size_t>()) *
+                                std::accumulate(out_spatial.begin(),
+                                                out_spatial.end(),
+                                                std::size_t(1),
+                                                std::multiplies<std::size_t>()) *
+                                GetTypeSize(wDesc.GetType()) * conv.group_count;
+
+    // For Int8, workspace is doubled (for transpose operations)
+    const auto ws_sz = (wDesc.GetType() == miopenInt8 ? 2 * workspace_size : workspace_size);
+
+    // Workspace is within limit
+    if(ws_sz <= max_size)
+    {
+        return false;
+    }
+
+    MIOPEN_LOG_I2("GEMMSolverFinder disabled for workspace size "
+                  << ws_sz << " bytes > " << max_size
+                  << " bytes (MIOPEN_DEBUG_CONV_GEMM_MAX_WORKSPACE_SIZE)");
+    return true;
+#else
+    // Workaround disabled - no size limit
+    (void)problem; // Suppress unused parameter warning
+    return false;
+#endif
+}
+#endif
 
 } // namespace gemm
 } // namespace conv

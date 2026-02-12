@@ -33,6 +33,7 @@
 #include <miopen/perf_field.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/solution.hpp>
+#include <miopen/solver/gemm_common.hpp>
 #include <miopen/utility/modified_z.hpp>
 #include <boost/range/adaptors.hpp>
 
@@ -48,8 +49,6 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_FIND_CONV_INSUFFICIENT_WORKSPACE_ALLOW_FINDDB
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_SEARCH_CUTOFF, false)
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_SKIP_PCT, 130)
-// temporary workaround, essentially reverting #2393.
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_CONV_GEMM_MAX_SIZE, 7287183769)
 
 namespace miopen {
 
@@ -439,64 +438,6 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
 }
 
 namespace conv {
-namespace detail {
-#if MIOPEN_USE_GEMM
-/// Determine if GEMM workspace size exceeds threshold.
-///
-/// This function estimates the workspace size required by GEMM solvers and compares it
-/// against the configured limit. The calculation matches the workspace computation used
-/// in GemmFwdRest solver, which represents the general (non-1x1) case.
-///
-/// The workspace size is calculated as:
-///   C × filter_spatial × output_spatial × type_size × groups
-/// For Int8, the size is doubled.
-///
-/// @param problem The convolution problem description.
-/// @return true if estimated workspace exceeds limit and GEMM should be disabled, false otherwise.
-bool IsGEMMProblemTooLarge(const ProblemDescription& problem)
-{
-    const std::size_t max_size = env::value(MIOPEN_CONV_GEMM_MAX_SIZE);
-    // 0 means no limit
-    if(max_size == 0)
-        return false;
-
-    const auto& conv  = problem.GetConv();
-    const auto& wDesc = problem.GetWeights();
-    const auto& yDesc = problem.GetOut();
-
-    const auto spatial_dim = conv.GetSpatialDimension();
-    const auto wei_spatial = boost::adaptors::slice(wDesc.GetLengths(), 2, 2 + spatial_dim);
-    const auto out_spatial = boost::adaptors::slice(yDesc.GetLengths(), 2, 2 + spatial_dim);
-    const auto wei_c       = wDesc.GetLengths()[1];
-
-    // Calculate workspace size using the same formula as GemmFwdRest::GetWorkspaceSize()
-    // workspace = C × filter_spatial × output_spatial × type_size × groups
-    const auto workspace_size = wei_c *
-                                std::accumulate(wei_spatial.begin(),
-                                                wei_spatial.end(),
-                                                std::size_t(1),
-                                                std::multiplies<std::size_t>()) *
-                                std::accumulate(out_spatial.begin(),
-                                                out_spatial.end(),
-                                                std::size_t(1),
-                                                std::multiplies<std::size_t>()) *
-                                GetTypeSize(wDesc.GetType()) * conv.group_count;
-
-    // For Int8, workspace is doubled (for transpose operations)
-    const auto ws_sz = (wDesc.GetType() == miopenInt8 ? 2 * workspace_size : workspace_size);
-
-    // Workspace is within limit
-    if(ws_sz <= max_size)
-    {
-        return false;
-    }
-
-    MIOPEN_LOG_I2("GEMMSolverFinder disabled for workspace size "
-                  << ws_sz << " bytes > " << max_size << " bytes (MIOPEN_CONV_GEMM_MAX_SIZE)");
-    return true;
-}
-#endif
-} // namespace detail
 
 // Overload without problem parameter - checks only environment variable (global disable)
 bool IsAlgorithmDisabled(miopenConvAlgorithm_t algo)
@@ -533,7 +474,7 @@ bool IsAlgorithmDisabled(miopenConvAlgorithm_t algo, const ProblemDescription& p
     { // clang-format off
 #if MIOPEN_USE_GEMM
     case miopenConvolutionAlgoGEMM:
-        return detail::IsGEMMProblemTooLarge(problem);
+        return solver::conv::gemm::IsGEMMProblemTooLarge(problem);
 #endif
     default: // if not globally disabled and no problem-specific constraints: do not disable
         return false;
