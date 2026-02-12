@@ -201,7 +201,6 @@ bool profile_conv_bwd_data_impl(int do_verification,
     float best_tflops     = 0;
     float best_gb_per_sec = 0;
     int num_kernel        = 0;
-    bool pass             = true;
     // profile device Conv instances
     for(size_t i = 0; i < op_ptrs.size(); i++)
     {
