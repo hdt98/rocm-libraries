@@ -28,6 +28,16 @@ target_link_libraries(hipblaslt-clients-common
         hip::device
 )
 
+if(NOT ROCM_LIBS_SUPERBUILD)
+    if(HIPBLASLT_ENABLE_THEROCK)
+        find_package(mxDataGenerator REQUIRED)
+    else()
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/mxdatagenerator" "${CMAKE_CURRENT_BINARY_DIR}/mxdatagenerator")
+    endif()
+endif()
+target_link_libraries(hipblaslt-clients-common PRIVATE roc::mxDataGenerator)
+target_compile_features(hipblaslt-clients-common PRIVATE cxx_std_20)
+
 if(HIPBLASLT_ENABLE_ROCROLLER)
     if(NOT ROCM_LIBS_SUPERBUILD)
         if(HIPBLASLT_ENABLE_THEROCK)

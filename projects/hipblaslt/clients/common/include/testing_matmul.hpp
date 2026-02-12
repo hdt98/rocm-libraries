@@ -1307,6 +1307,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                               hipDataType      Tbias,
                               hipDataType      Taux)
 {
+    hipblaslt_cout << "testing matmul!!\n";
     double gpu_time_used, cpu_time_used, gpu_mem_gbytes;
     gpu_time_used = cpu_time_used = gpu_mem_gbytes = 0.0;
     bool                   HMM                     = arg.HMM;
@@ -1869,7 +1870,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         hipblaslt_seedrand();
 
-#ifdef HIPBLASLT_USE_ROCROLLER
+//#ifdef HIPBLASLT_USE_ROCROLLER
         if(isBlockScaling(arg.scaleA))
         {
             if(arg.initialization != hipblaslt_initialization::hpl
@@ -1886,6 +1887,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
+	    hipblaslt_cout << "Hello!!\n";
             // For MX format, use mxDataGenerator to generate input data
             // (consists of data part and scale part)
             // TODO: mxDataGenerator can only generate data on CPU. Using
@@ -1914,7 +1916,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
         else
         {
-#endif
+//#endif
             hipblaslt_init_device(ABC_dims::A,
                                   arg.initialization,
                                   alpha_isnan_type(arg, Talpha),
@@ -1926,7 +1928,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   (do_swizzle_a && stride_a[i] != 0) ? A_row[i] * A_col[i]
                                                                      : stride_a[i],
                                   num_batches[i]);
-#ifdef HIPBLASLT_USE_ROCROLLER
+//#ifdef HIPBLASLT_USE_ROCROLLER
         }
         if(isBlockScaling(arg.scaleB))
         {
@@ -1970,7 +1972,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
         else
         {
-#endif
+//#endif
             hipblaslt_init_device(ABC_dims::B,
                                   arg.initialization,
                                   alpha_isnan_type(arg, Talpha),
@@ -1982,9 +1984,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   (do_swizzle_b && stride_b[i] != 0) ? B_row[i] * B_col[i]
                                                                      : stride_b[i],
                                   num_batches[i]);
-#ifdef HIPBLASLT_USE_ROCROLLER
+//#ifdef HIPBLASLT_USE_ROCROLLER
         }
-#endif
+//#endif
         hipblaslt_init_device(ABC_dims::C,
                               arg.initialization,
                               beta_isnan_type(arg, Talpha),
