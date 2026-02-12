@@ -97,17 +97,17 @@ void rocsolver_geqlf_getMemorySize(const rocblas_int m,
     }
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename U>
+template <bool BATCHED, bool STRIDED, typename T, typename U, typename I = rocblas_int>
 rocblas_status rocsolver_geqlf_template(rocblas_handle handle,
-                                        const rocblas_int m,
-                                        const rocblas_int n,
+                                        const I m,
+                                        const I n,
                                         U A,
                                         const rocblas_int shiftA,
-                                        const rocblas_int lda,
+                                        const I lda,
                                         const rocblas_stride strideA,
                                         T* ipiv,
                                         const rocblas_stride strideP,
-                                        const rocblas_int batch_count,
+                                        const I batch_count,
                                         T* scalars,
                                         void* work_workArr,
                                         T* Abyx_norms_trfact,
@@ -152,7 +152,6 @@ rocblas_status rocsolver_geqlf_template(rocblas_handle handle,
         if(n - k + j > 0)
         {
             // compute block reflector
-            using I = rocblas_int;
             rocsolver_larft_template<T>(handle, rocblas_backward_direction, rocblas_column_wise,
                                         (I)(m - k + j + jb), (I)jb, A,
                                         shiftA + idx2D(0, n - k + j, lda), (I)lda, strideA,

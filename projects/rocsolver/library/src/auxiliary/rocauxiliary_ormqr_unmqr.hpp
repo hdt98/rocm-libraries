@@ -148,24 +148,24 @@ void rocsolver_ormqr_unmqr_getMemorySize(const rocblas_side side,
         *size_trfact = 0;
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename U>
+template <bool BATCHED, bool STRIDED, typename T, typename U, typename I = rocblas_int>
 rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
                                               const rocblas_side side,
                                               const rocblas_operation trans,
-                                              const rocblas_int m,
-                                              const rocblas_int n,
-                                              const rocblas_int k,
+                                              const I m,
+                                              const I n,
+                                              const I k,
                                               U A,
                                               const rocblas_int shiftA,
-                                              const rocblas_int lda,
+                                              const I lda,
                                               const rocblas_stride strideA,
                                               T* ipiv,
                                               const rocblas_stride strideP,
                                               U C,
                                               const rocblas_int shiftC,
-                                              const rocblas_int ldc,
+                                              const I ldc,
                                               const rocblas_stride strideC,
-                                              const rocblas_int batch_count,
+                                              const I batch_count,
                                               T* scalars,
                                               T* AbyxORwork,
                                               T* diagORtmptr,
@@ -247,7 +247,6 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
         }
 
         // generate triangular factor of current block reflector
-        using I = rocblas_int;
         rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
                                     (I)(nq - i), (I)ib, A, shiftA + idx2D(i, i, lda), (I)lda,
                                     strideA, ipiv + i, strideP, trfact, (I)ldw, strideW,
@@ -263,24 +262,24 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename U>
+template <bool BATCHED, bool STRIDED, typename T, typename U, typename I = rocblas_int>
 rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
                                               const rocblas_side side,
                                               const rocblas_operation trans,
-                                              const rocblas_int m,
-                                              const rocblas_int n,
-                                              const rocblas_int k,
+                                              const I m,
+                                              const I n,
+                                              const I k,
                                               U A,
                                               const rocblas_int shiftA,
-                                              const rocblas_int lda,
+                                              const I lda,
                                               const rocblas_stride strideA,
                                               T* ipiv,
                                               const rocblas_stride strideP,
                                               U C,
                                               const rocblas_int shiftC,
-                                              const rocblas_int ldc,
+                                              const I ldc,
                                               const rocblas_stride strideC,
-                                              const rocblas_int batch_count,
+                                              const I batch_count,
                                               T* scalars,
                                               T* AbyxORwork,
                                               void* work2,
@@ -366,7 +365,6 @@ rocblas_status rocsolver_ormqr_unmqr_template(rocblas_handle handle,
         }
 
         // generate triangular factor of current block reflector
-        using I = rocblas_int;
         rocsolver_larft_inverse_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
                                             (I)(nq - i), (I)ib, A, shiftA + idx2D(i, i, lda),
                                             (I)lda, strideA, ipiv + i, strideP, trfact, (I)ldw,

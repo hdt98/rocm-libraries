@@ -91,18 +91,18 @@ void rocsolver_orgql_ungql_getMemorySize(const rocblas_int m,
     }
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename U>
+template <bool BATCHED, bool STRIDED, typename T, typename U, typename I = rocblas_int>
 rocblas_status rocsolver_orgql_ungql_template(rocblas_handle handle,
-                                              const rocblas_int m,
-                                              const rocblas_int n,
-                                              const rocblas_int k,
+                                              const I m,
+                                              const I n,
+                                              const I k,
                                               U A,
                                               const rocblas_int shiftA,
-                                              const rocblas_int lda,
+                                              const I lda,
                                               const rocblas_stride strideA,
                                               T* ipiv,
                                               const rocblas_stride strideP,
-                                              const rocblas_int batch_count,
+                                              const I batch_count,
                                               T* scalars,
                                               T* work,
                                               T* Abyx_tmptr,
@@ -156,7 +156,6 @@ rocblas_status rocsolver_orgql_ungql_template(rocblas_handle handle,
         // applying the current block reflector using larft + larfb
         if(n - k + j > 0)
         {
-            using I = rocblas_int;
             rocsolver_larft_template<T>(
                 handle, rocblas_backward_direction, rocblas_column_wise, (I)(m - k + j + jb), (I)jb,
                 A, shiftA + idx2D(0, n - k + j, lda), (I)lda, strideA, (ipiv + j), strideP, trfact,
