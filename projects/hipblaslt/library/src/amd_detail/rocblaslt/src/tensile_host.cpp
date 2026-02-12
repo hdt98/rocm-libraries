@@ -1920,9 +1920,9 @@ namespace
         tensileProblem.setSwizzleTensorA(prob.swizzleA);
         tensileProblem.setSwizzleTensorB(prob.swizzleB);
 
-        if(prob.scaleAType = RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0)
+        if(prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0)
 	    tensileProblem.setMXScaleA(32);
-        if(prob.scaleBType = RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0)
+        if(prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0)
 	    tensileProblem.setMXScaleB(32);
     }
 
