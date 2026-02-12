@@ -3698,6 +3698,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                   tuningVec[heuristicTuningIndex[sol]],
                                                   *dWorkspace));
                     }
+
+                    perf_monitor.start();
+                    monitor.Start(dev_id);
+                    
                     if(arg.skip_slow_solution_ratio)
                         pre_gpu_time(
                             arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
@@ -3727,8 +3731,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                             continue;
                         }
                     }
-                    perf_monitor.start();
-                    monitor.Start(dev_id);
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
                     for(int i = 0; i < number_hot_calls; i++)
@@ -3740,6 +3742,13 @@ void testing_matmul_with_bias(const Arguments& arg,
                 }
                 else
                 {
+                    perf_monitor.start();
+                    monitor.Start(dev_id);
+
+                    const auto now0 =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    std::cout << "main thread time 0: " << now0 << std::endl;
+
                     if(arg.skip_slow_solution_ratio)
                         pre_gpu_time(
                             arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
@@ -3797,8 +3806,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                             continue;
                         }
                     }
-                    perf_monitor.start();
-                    monitor.Start(dev_id);
+                    const auto now1 =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                    std::cout << "main thread time 1: " << now1 << std::endl;
+
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
                     for(int i = 0; i < number_hot_calls; i++)
@@ -3840,6 +3851,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                               event_gpu_time_end,
                               gpu_time_used,
                               stream);
+
+                const auto now2 =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                std::cout << "main thread time 2: " << now2 << std::endl;
 
                 monitor.Stop();
                 perf_monitor.stop();
