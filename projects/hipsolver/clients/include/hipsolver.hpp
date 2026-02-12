@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -5875,6 +5875,196 @@ inline hipsolverStatus_t hipsolver_getrs(testAPI_t               API,
     default:
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
+}
+
+/******************** GETRS_BATCHED ********************/
+// batched
+inline hipsolverStatus_t hipsolver_getrsBatched_bufferSize(hipsolverHandle_t    handle,
+                                                           hipsolverOperation_t trans,
+                                                           int                  n,
+                                                           int                  nrhs,
+                                                           float**              A,
+                                                           int                  lda,
+                                                           int*                 devIpiv,
+                                                           int                  strideP,
+                                                           float**              B,
+                                                           int                  ldb,
+                                                           int*                 lwork,
+                                                           int                  bc)
+{
+    return hipsolverSgetrsBatched_bufferSize(
+        handle, trans, n, nrhs, A, lda, devIpiv, strideP, B, ldb, lwork, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched_bufferSize(hipsolverHandle_t    handle,
+                                                           hipsolverOperation_t trans,
+                                                           int                  n,
+                                                           int                  nrhs,
+                                                           double**             A,
+                                                           int                  lda,
+                                                           int*                 devIpiv,
+                                                           int                  strideP,
+                                                           double**             B,
+                                                           int                  ldb,
+                                                           int*                 lwork,
+                                                           int                  bc)
+{
+    return hipsolverDgetrsBatched_bufferSize(
+        handle, trans, n, nrhs, A, lda, devIpiv, strideP, B, ldb, lwork, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched_bufferSize(hipsolverHandle_t    handle,
+                                                           hipsolverOperation_t trans,
+                                                           int                  n,
+                                                           int                  nrhs,
+                                                           hipsolverComplex**   A,
+                                                           int                  lda,
+                                                           int*                 devIpiv,
+                                                           int                  strideP,
+                                                           hipsolverComplex**   B,
+                                                           int                  ldb,
+                                                           int*                 lwork,
+                                                           int                  bc)
+{
+    return hipsolverCgetrsBatched_bufferSize(handle,
+                                             trans,
+                                             n,
+                                             nrhs,
+                                             (hipFloatComplex**)A,
+                                             lda,
+                                             devIpiv,
+                                             strideP,
+                                             (hipFloatComplex**)B,
+                                             ldb,
+                                             lwork,
+                                             bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched_bufferSize(hipsolverHandle_t        handle,
+                                                           hipsolverOperation_t     trans,
+                                                           int                      n,
+                                                           int                      nrhs,
+                                                           hipsolverDoubleComplex** A,
+                                                           int                      lda,
+                                                           int*                     devIpiv,
+                                                           int                      strideP,
+                                                           hipsolverDoubleComplex** B,
+                                                           int                      ldb,
+                                                           int*                     lwork,
+                                                           int                      bc)
+{
+    return hipsolverZgetrsBatched_bufferSize(handle,
+                                             trans,
+                                             n,
+                                             nrhs,
+                                             (hipDoubleComplex**)A,
+                                             lda,
+                                             devIpiv,
+                                             strideP,
+                                             (hipDoubleComplex**)B,
+                                             ldb,
+                                             lwork,
+                                             bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched(hipsolverHandle_t    handle,
+                                                hipsolverOperation_t trans,
+                                                int                  n,
+                                                int                  nrhs,
+                                                float**              A,
+                                                int                  lda,
+                                                int*                 devIpiv,
+                                                int                  strideP,
+                                                float**              B,
+                                                int                  ldb,
+                                                float*               work,
+                                                int                  lwork,
+                                                int*                 devInfo,
+                                                int                  bc)
+{
+    return hipsolverSgetrsBatched(
+        handle, trans, n, nrhs, A, lda, devIpiv, strideP, B, ldb, work, lwork, devInfo, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched(hipsolverHandle_t    handle,
+                                                hipsolverOperation_t trans,
+                                                int                  n,
+                                                int                  nrhs,
+                                                double**             A,
+                                                int                  lda,
+                                                int*                 devIpiv,
+                                                int                  strideP,
+                                                double**             B,
+                                                int                  ldb,
+                                                double*              work,
+                                                int                  lwork,
+                                                int*                 devInfo,
+                                                int                  bc)
+{
+    return hipsolverDgetrsBatched(
+        handle, trans, n, nrhs, A, lda, devIpiv, strideP, B, ldb, work, lwork, devInfo, bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched(hipsolverHandle_t    handle,
+                                                hipsolverOperation_t trans,
+                                                int                  n,
+                                                int                  nrhs,
+                                                hipsolverComplex**   A,
+                                                int                  lda,
+                                                int*                 devIpiv,
+                                                int                  strideP,
+                                                hipsolverComplex**   B,
+                                                int                  ldb,
+                                                hipsolverComplex*    work,
+                                                int                  lwork,
+                                                int*                 devInfo,
+                                                int                  bc)
+{
+    return hipsolverCgetrsBatched(handle,
+                                  trans,
+                                  n,
+                                  nrhs,
+                                  (hipFloatComplex**)A,
+                                  lda,
+                                  devIpiv,
+                                  strideP,
+                                  (hipFloatComplex**)B,
+                                  ldb,
+                                  (hipFloatComplex*)work,
+                                  lwork,
+                                  devInfo,
+                                  bc);
+}
+
+inline hipsolverStatus_t hipsolver_getrsBatched(hipsolverHandle_t        handle,
+                                                hipsolverOperation_t     trans,
+                                                int                      n,
+                                                int                      nrhs,
+                                                hipsolverDoubleComplex** A,
+                                                int                      lda,
+                                                int*                     devIpiv,
+                                                int                      strideP,
+                                                hipsolverDoubleComplex** B,
+                                                int                      ldb,
+                                                hipsolverDoubleComplex*  work,
+                                                int                      lwork,
+                                                int*                     devInfo,
+                                                int                      bc)
+{
+    return hipsolverZgetrsBatched(handle,
+                                  trans,
+                                  n,
+                                  nrhs,
+                                  (hipDoubleComplex**)A,
+                                  lda,
+                                  devIpiv,
+                                  strideP,
+                                  (hipDoubleComplex**)B,
+                                  ldb,
+                                  (hipDoubleComplex*)work,
+                                  lwork,
+                                  devInfo,
+                                  bc);
 }
 /********************************************************/
 
