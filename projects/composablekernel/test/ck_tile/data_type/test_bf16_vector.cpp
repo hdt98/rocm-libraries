@@ -366,7 +366,11 @@ TEST_F(Bf16VectorTest, VectorEdgeCases)
         bf16x2_t bf16_vec = fp32x2_to_bf16x2(f32_vec);
 
         // bf16 doesn't support denormals, should flush to zero
-        EXPECT_EQ(static_cast<float>(bf16_vec.x), 0.0f);
-        EXPECT_EQ(static_cast<float>(bf16_vec.y), -0.0f);
+        float result_x = static_cast<float>(bf16_vec.x);
+        float result_y = static_cast<float>(bf16_vec.y);
+        EXPECT_EQ(result_x, 0.0f);
+        EXPECT_FALSE(std::signbit(result_x)); // Positive zero
+        EXPECT_EQ(result_y, 0.0f);
+        EXPECT_TRUE(std::signbit(result_y)); // Negative zero
     }
 }
