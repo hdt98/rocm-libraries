@@ -94,12 +94,12 @@ class TestCkTileGemmQuantBase : public ::testing::Test
     static constexpr ck_tile::index_t N_Warp_Tile = GemmConfig::N_Warp_Tile;
 
     // K_Warp_Tile is variant with respect to the compute data type and M warp tile size.
-    static constexpr bool is_8bit = std::is_same_v<ComputeDataType, ck_tile::fp8_t> ||
-                                    std::is_same_v<ComputeDataType, ck_tile::bf8_t> ||
-                                    std::is_same_v<ComputeDataType, ck_tile::int8_t>;
+    static constexpr bool is_8bit = !(std::is_same_v<ComputeDataType, ck_tile::fp16_t> ||
+                                      std::is_same_v<ComputeDataType, ck_tile::bf16_t>);
     static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<is_8bit, M_Warp_Tile>();
 
-    static constexpr bool PreshuffleQuant  = GemmConfig::PreshuffleQuant;
+    static constexpr bool APreshuffleQuant = GemmConfig::APreshuffleQuant;
+    static constexpr bool BPreshuffleQuant = GemmConfig::BPreshuffleQuant;
     static constexpr bool PreshuffleB      = GemmConfig::PreshuffleB;
     static constexpr bool TiledMMAPermuteN = GemmConfig::TiledMMAPermuteN;
     static constexpr bool DoubleSmemBuffer = GemmConfig::DoubleSmemBuffer;

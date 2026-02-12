@@ -93,13 +93,17 @@ struct UniversalGemmBasePolicy
     // - For 2-byte types (fp16/bf16): K warp tile <= 32
     template <typename Problem>
     static constexpr bool is_a_load_tr = []() {
-        using ADataType              = ALdsDataType_<Problem>;
-        using BDataType              = BLdsDataType_<Problem>;
+        using BDataType              = remove_cvref_t<typename Problem::BDataType>;
+        using ALdsDataType           = ALdsDataType_<Problem>;
+        using BLdsDataType           = BLdsDataType_<Problem>;
         using WarpTile               = typename Problem::BlockGemmShape::WarpTile;
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
-        constexpr index_t kMaxKWarpTile = (sizeof(ADataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<BDataType, pk_int4_t> || std::is_same_v<BDataType, pk_fp4_t>)
+        constexpr index_t kMaxKWarpTile = (sizeof(ALdsDataType) == 1) ? 64 : 32;
+        // Todo: check BLdsDataType only
+        if constexpr(std::is_same_v<BDataType, pk_int4_t> ||
+                     std::is_same_v<BLdsDataType, pk_fp4_t> ||
+                     std::is_same_v<BLdsDataType, pk_int4_t>)
             return false;
         else if constexpr(kKWarpTile > kMaxKWarpTile)
             return false;
@@ -110,12 +114,16 @@ struct UniversalGemmBasePolicy
 
     template <typename Problem>
     static constexpr bool is_b_load_tr = []() {
-        using BDataType              = BLdsDataType_<Problem>;
+        using BDataType              = remove_cvref_t<typename Problem::BDataType>;
+        using BLdsDataType           = BLdsDataType_<Problem>;
         using WarpTile               = typename Problem::BlockGemmShape::WarpTile;
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
-        constexpr index_t kMaxKWarpTile = (sizeof(BDataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<BDataType, pk_int4_t> || std::is_same_v<BDataType, pk_fp4_t>)
+        constexpr index_t kMaxKWarpTile = (sizeof(BLdsDataType) == 1) ? 64 : 32;
+        // Todo: check BLdsDataType only
+        if constexpr(std::is_same_v<BDataType, pk_int4_t> ||
+                     std::is_same_v<BLdsDataType, pk_fp4_t> ||
+                     std::is_same_v<BLdsDataType, pk_int4_t>)
             return false;
         else if constexpr(kKWarpTile > kMaxKWarpTile)
             return false;

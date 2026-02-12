@@ -435,7 +435,8 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                                    NXdlPerWave,
                                    KPack,
                                    DirectLoad,
-                                   false,
+                                   false, // TransposeC
+                                   false, // UseDataCachePrefetch
                                    LdsScalarLoadToVgpr>())>;
 
     template <typename DeviceArch>
