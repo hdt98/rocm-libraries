@@ -2072,8 +2072,8 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                                  T* norms,
                                                  T** workArr)
 {
-    ROCSOLVER_ENTER("latrd", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA, "lda:", lda,
-                    "shiftW:", shiftW, "ldw:", ldw, "bc:", batch_count);
+    ROCSOLVER_ENTER("latrd_forsytrd", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA,
+                    "lda:", lda, "shiftW:", shiftW, "ldw:", ldw, "bc:", batch_count);
     roctxRangePush("rocsolver_latrd_forsytrd");
 
     // quick return
