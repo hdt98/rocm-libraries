@@ -120,6 +120,7 @@ inline void hipblaslt_expect_status(hipblasStatus_t status, hipblasStatus_t expe
 {
     if(status != expect)
     {
+        throw std::runtime_error("Here fails");
         hipblaslt_cerr << "hipBLASLt status error: Expected " << hipblas_status_to_string(expect)
                        << ", received " << hipblas_status_to_string(status) << std::endl;
         if(expect == HIPBLAS_STATUS_SUCCESS)

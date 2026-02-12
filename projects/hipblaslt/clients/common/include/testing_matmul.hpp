@@ -1307,7 +1307,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                               hipDataType      Tbias,
                               hipDataType      Taux)
 {
-    hipblaslt_cout << "testing matmul!!\n";
     double gpu_time_used, cpu_time_used, gpu_mem_gbytes;
     gpu_time_used = cpu_time_used = gpu_mem_gbytes = 0.0;
     bool                   HMM                     = arg.HMM;
@@ -1887,7 +1886,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-	    hipblaslt_cout << "Hello!!\n";
+
             // For MX format, use mxDataGenerator to generate input data
             // (consists of data part and scale part)
             // TODO: mxDataGenerator can only generate data on CPU. Using

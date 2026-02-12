@@ -269,7 +269,6 @@ bool tuning_path_compare_git_version(const char* tuningEnv)
 int main(int argc, char* argv[])
 try
 {
-    hipblaslt_cout << "BEGIN !!!!!!!!!!!\n";
     fix_batch(argc, argv);
     Arguments   arg;
     std::string function;
@@ -621,7 +620,6 @@ try
 
         ("version", "Prints the version number");
     // clang-format on
-    hipblaslt_cout << "11111111111\n";
     // parse command line into arg structure and stack variables using desc
     variables_map vm;
     store(parse_command_line(argc, argv, desc), vm);
@@ -785,26 +783,20 @@ try
             arg.stride_e[i]
                 = stride_e.size() >= length ? stride_e[i] : stride_e[stride_e.size() - 1];
     }
-    hipblaslt_cout << "222222222222\n";
     // Device Query
     hipDeviceProp_t props;
     int64_t         device_count = query_device_property(device_id, props);
-    hipblaslt_cout << "777777777777777\n";
-    hipblaslt_cout << std::endl;
-    hipblaslt_cout << device_count << "\n";
+
     if(device_count <= device_id)
     {
-	hipblaslt_cout << "devicie count = " << device_count << "\n"; exit(0);
         throw std::invalid_argument("Invalid Device ID");
     }
     //set_device(device_id);
-    hipblaslt_cout << "4444444444\n";
     EfficiencyMonitor& perf_monitor = getEfficiencyMonitor();
     perf_monitor.set_device_id(device_id);
 
     if(datafile)
         return hipblaslt_bench_datafile(filter, any_stride, props);
-    hipblaslt_cout << "5555555555555\n";
     // single bench run
 
     // validate arguments
@@ -816,7 +808,6 @@ try
     {
         arg.requested_solution_num = 1;
     }
-    hipblaslt_cout << "333333333333\n";
     std::transform(precision.begin(), precision.end(), precision.begin(), ::tolower);
     auto prec = string_to_hip_datatype(precision);
     if(prec == HIPBLASLT_DATATYPE_INVALID)
@@ -910,7 +901,6 @@ try
         hipblaslt_cerr << "For swizzle-B, problem type must be FP16 or BF16 or FP8 TN" << std::endl;
         return 1;
     }
-    hipblaslt_cout << "Hi !!!!!!!!!!!\n";
 
     auto scaleInt2Enum = [](int s) {
         if(s == 0)
