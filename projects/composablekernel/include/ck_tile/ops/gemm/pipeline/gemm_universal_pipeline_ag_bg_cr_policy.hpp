@@ -93,8 +93,8 @@ struct UniversalGemmBasePolicy
     // - For 2-byte types (fp16/bf16): K warp tile <= 32
     template <typename Problem>
     static constexpr bool is_a_load_tr = []() {
-        using ADataType              = remove_cvref_t<typename Problem::ADataType>;
-        using BDataType              = remove_cvref_t<typename Problem::BDataType>;
+        using ADataType              = ALdsDataType_<Problem>;
+        using BDataType              = BLdsDataType_<Problem>;
         using WarpTile               = typename Problem::BlockGemmShape::WarpTile;
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
@@ -110,7 +110,7 @@ struct UniversalGemmBasePolicy
 
     template <typename Problem>
     static constexpr bool is_b_load_tr = []() {
-        using BDataType              = remove_cvref_t<typename Problem::BDataType>;
+        using BDataType              = BLdsDataType_<Problem>;
         using WarpTile               = typename Problem::BlockGemmShape::WarpTile;
         constexpr index_t kKWarpTile = WarpTile::at(number<2>{});
         // Max K warp tile for transpose load based on data type size
@@ -448,6 +448,7 @@ struct UniversalGemmBasePolicy
 
         if constexpr(is_b_load_tr<Problem>)
         {
+
             // TODO: better lds descriptor for performance
             constexpr auto b_lds_block_desc_0 =
                 make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),

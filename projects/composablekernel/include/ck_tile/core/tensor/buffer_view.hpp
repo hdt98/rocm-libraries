@@ -944,7 +944,8 @@ struct buffer_view<address_space_enum::lds,
             constexpr index_t load_elts = scalar_per_t_vector * scalar_per_x_vector;
             if constexpr(load_elts == 12 && sizeof(typename X::value_type) == 1)
             {
-                auto rtn = reinterpret_cast<const int32_t*>(p_data_) + (i + linear_offset) / 4;
+                auto rtn = reinterpret_cast<const int32_t*>(p_data_) +
+                           (i + linear_offset + static_offset) / 4;
                 struct
                 {
                     int32_t x, y, z;
@@ -955,7 +956,8 @@ struct buffer_view<address_space_enum::lds,
             {
                 using buf_t = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
                                            scalar_per_t_vector * scalar_per_x_vector>;
-                auto rtn    = *c_style_pointer_cast<const buf_t*>(&p_data_[i + linear_offset]);
+                auto rtn    = *c_style_pointer_cast<const buf_t*>(
+                    &p_data_[i + linear_offset + static_offset]);
                 return bit_cast<X>(rtn);
             }
 #endif
