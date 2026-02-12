@@ -66,7 +66,8 @@ namespace rocRoller::KernelGraph
                                                       ContextPtr   context,
                                                       int          macTileTag,
                                                       int          waveTileTag,
-                                                      NaryArgument arg);
+                                                      NaryArgument arg,
+                                                      int          multiplyTag);
 
         /**
          * @brief Add swizzle load coordinate transform.
@@ -74,7 +75,7 @@ namespace rocRoller::KernelGraph
         std::tuple<std::vector<DeferredConnection>,
                    std::vector<DeferredConnection>,
                    std::map<int, int>>
-            addSwizzleLoadCT(KernelGraph& graph, ContextPtr context, int tag, NaryArgument arg);
+            addSwizzleLoadCT(KernelGraph& graph, ContextPtr context, int tag, NaryArgument arg, int multiplyTag);
 
         /**
          * @brief Get outer merge factors from macro tile.

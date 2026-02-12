@@ -152,13 +152,17 @@ namespace DGen
      * @param sizes The dimension sizes {size0, size1}
      * @param preSwizzleSize The swizzle configuration {tileMN, tileK, subTileK}, or empty
      * @param preTileSize The pre-tile configuration {tileSize0, tileSize1}, or empty
+     * @param useAlternativeLayout When true and tileMN==32 and subTileK==4, use alternative 
+     *                             layout with nVGPRBlock=1, nSIMDIndexBlock=nSIMDIndex, 
+     *                             nSIMDIndexIndex=1
      * @return The pre-swizzled/pre-tiled data
      */
     template <typename T>
     inline std::vector<T> preSwizzle(std::vector<T> const&      input,
                                      std::vector<size_t> const& sizes,
                                      std::vector<size_t> const& preSwizzleSize,
-                                     std::vector<size_t> const& preTileSize)
+                                     std::vector<size_t> const& preTileSize,
+                                     bool                       useAlternativeLayout = false)
     {
         if(!preSwizzleSize.empty())
         {
@@ -294,10 +298,31 @@ namespace DGen
             size_t nSIMDsPerWave   = 4;
             size_t nSIMDIndex      = tileMN / nLanesPerSIMD;
             size_t nSIMDBlock      = nSIMDsPerWave / nSIMDIndex;
-            size_t nVGPRIndex      = std::min(nSIMDIndex, subTileK);
-            size_t nVGPRBlock      = tileK / nSIMDBlock / nVGPRIndex;
-            size_t nSIMDIndexBlock = nVGPRIndex;
-            size_t nSIMDIndexIndex = nSIMDIndex / nSIMDIndexBlock;
+            size_t nVGPRIndex;
+            size_t nVGPRBlock;
+            size_t nSIMDIndexBlock;
+            size_t nSIMDIndexIndex;
+
+            // Apply alternative layout when specified conditions are met
+            if(useAlternativeLayout)
+            {
+                if (tileMN != 32 || tileK != 8 && subTileK != 4) {
+                    std::ostringstream msg;
+                    msg << "Alternative layout is only supported when tileMN==32, tileK==8 and subTileK==4";
+                    throw std::runtime_error(msg.str());
+                }
+                nVGPRIndex      = tileK / nSIMDBlock;
+                nVGPRBlock      = 1;
+                nSIMDIndexBlock = nSIMDIndex;
+                nSIMDIndexIndex = 1;
+            }
+            else
+            {
+                nVGPRIndex      = std::min(nSIMDIndex, subTileK);
+                nVGPRBlock      = tileK / nSIMDBlock / nVGPRIndex;
+                nSIMDIndexBlock = nVGPRIndex;
+                nSIMDIndexIndex = nSIMDIndex / nSIMDIndexBlock;
+            }
 
             if(ptTileSizeK / tileK == 0)
             {
@@ -339,7 +364,11 @@ namespace DGen
                         nSIMDIndexBlock,
                         ptTileSizeMN / tileMN,
                         sizes[1] / ptTileSizeMN};
-
+            std::cout << "print srcSizes: " << std::endl;
+                for (auto size : srcSizes) {
+                    std::cout << size << " ";
+                }
+                std::cout << std::endl;
             if(tileMN == 64)
             {
                 // Pre swizzle: swap nSIMDIndexBlock (7) and nVGPRIndex (0)
@@ -377,6 +406,22 @@ namespace DGen
 
         auto srcStrides = computeStrides(srcSizes);
         auto dstStrides = computeShuffledStrides(srcSizes, dimOrder);
+
+        std::cout << "srcSizes: " << srcSizes << std::endl;
+        for (auto size : srcSizes) {
+            std::cout << size << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "dstStrides: " << dstStrides << std::endl;
+        for (auto stride : dstStrides) {
+            std::cout << stride << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "srcStrides: " << srcStrides << std::endl;
+        for (auto stride : srcStrides) {
+            std::cout << stride << " ";
+        }
+        std::cout << std::endl;
 
         return shuffleDims(input, srcSizes, dstStrides, srcStrides);
     }
@@ -455,6 +500,22 @@ namespace DGen
         // in the order that makes the output contiguous: {1, 4, 2, 5, 3, 0}
         std::vector<size_t> dimOrder = {1, 4, 2, 5, 3, 0};
         auto                dstStrides = computeShuffledStrides(srcSizes, dimOrder);
+
+        std::cout << "srcSizes: " << srcSizes << std::endl;
+        for (auto size : srcSizes) {
+            std::cout << size << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "dstStrides: " << dstStrides << std::endl;
+        for (auto stride : dstStrides) {
+            std::cout << stride << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "srcStrides: " << srcStrides << std::endl;
+        for (auto stride : srcStrides) {
+            std::cout << stride << " ";
+        }
+        std::cout << std::endl;
 
         return shuffleDims(input, srcSizes, dstStrides, srcStrides);
     }

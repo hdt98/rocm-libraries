@@ -674,7 +674,7 @@ namespace rocRoller
                 auto connectBlockScale = [&](Operations::BlockScale const& op,
                                              Operations::OperationTag      inputTag,
                                              NaryArgument                  valueArg,
-                                             NaryArgument scaleArg) -> std::vector<size_t> {
+                                             NaryArgument scaleArg) -> std::tuple<std::vector<size_t>, bool> {
                     auto mode = op.scaleMode();
                     AssertFatal(mode != Operations::ScaleMode::Inline, ShowValue(mode));
 
@@ -682,20 +682,20 @@ namespace rocRoller
                     auto scaleInputOp = m_command->findTag(scaleInput);
                     AssertFatal(scaleInputOp != nullptr);
 
-                    using TensorAndTranspose
-                        = std::tuple<Operations::OperationTag, std::vector<size_t>>;
+                    using TensorTransposeAndLayout
+                        = std::tuple<Operations::OperationTag, std::vector<size_t>, bool>;
                     auto getTensorAndTranspose = rocRoller::overloaded{
-                        [](Operations::SubTileTranspose const& op) -> TensorAndTranspose {
-                            return {op.input(), op.tileDimensions()};
+                        [](Operations::SubTileTranspose const& op) -> TensorTransposeAndLayout {
+                            return {op.input(), op.tileDimensions(), op.useAlternativeLayout()};
                         },
-                        [](Operations::Nop const& op) -> TensorAndTranspose {
-                            return {Operations::OperationTag(), {}};
+                        [](Operations::Nop const& op) -> TensorTransposeAndLayout {
+                            return {Operations::OperationTag(), {}, false};
                         },
-                        [](auto const& op) -> TensorAndTranspose {
-                            return {op.getTag(), {}};
+                        [](auto const& op) -> TensorTransposeAndLayout {
+                            return {op.getTag(), {}, false};
                         }};
 
-                    auto [scaleTensor, scaleTranspose]
+                    auto [scaleTensor, scaleTranspose, useAltLayout]
                         = std::visit(getTensorAndTranspose, *scaleInputOp);
 
                     if(!scaleTranspose.empty())
@@ -728,19 +728,19 @@ namespace rocRoller
 
                     sourceDims.insert(sourceDims.end(), {X, XScale});
 
-                    return scaleTranspose;
+                    return std::make_tuple(scaleTranspose, useAltLayout);
                 };
 
                 auto handleInput = rocRoller::overloaded{
-                    [&](auto const& op, auto, auto, auto) -> std::vector<size_t> {
+                    [&](auto const& op, auto, auto, auto) -> std::tuple<std::vector<size_t>, bool> {
                         Throw<FatalError>("Can't go here!");
-                        return {};
+                        return {{}, false};
                     },
 
                     [&](Operations::T_Load_Tiled const& op,
                         Operations::OperationTag        inputTag,
                         NaryArgument                    valueArg,
-                        auto) -> std::vector<size_t> {
+                        auto) -> std::tuple<std::vector<size_t>, bool> {
                         auto AB     = m_dim.at(inputTag);
                         auto loadAB = m_op.at(inputTag);
 
@@ -750,19 +750,19 @@ namespace rocRoller
 
                         m_graph.mapper.connect(TC, AB, valueArg);
 
-                        return {};
+                        return {{}, false};
                     },
                     connectBlockScale};
 
                 // Handle A, either T_Load_Tiled or BlockScale
-                contraction.scalePreShuffledTileA
+                std::tie(contraction.scalePreShuffledTileA, contraction.scaleUseAlternativeLayoutA)
                     = std::visit(handleInput,
                                  *aSource,
                                  singleVariant(mul.a),
                                  singleVariant(NaryArgument::LHS),
                                  singleVariant(NaryArgument::LHS_SCALE));
 
-                contraction.scalePreShuffledTileB
+                std::tie(contraction.scalePreShuffledTileB, contraction.scaleUseAlternativeLayoutB)
                     = std::visit(handleInput,
                                  *bSource,
                                  singleVariant(mul.b),

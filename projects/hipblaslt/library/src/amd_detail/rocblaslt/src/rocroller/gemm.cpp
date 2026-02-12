@@ -277,8 +277,15 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
                         ShowValue(gemm->swizzleTileSize.m),
                         ShowValue(gemm->swizzleTileSize.k));
 
+            // Use alternative layout when tileMN==32 and subTileK==4
+            bool useAltLayoutA = (gemm->kernelType.scaleTypeA.preSwizzleTile[0] == 32
+                                  && gemm->kernelType.scaleTypeA.preSwizzleTile[2] == 4);
+            if (useAltLayoutA) {
+                std::cout << "Using alternative layout for scale A" << std::endl;
+            }
+
             scaleInputA = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                *tagLoadScaleA, gemm->kernelType.scaleTypeA.preSwizzleTile));
+                *tagLoadScaleA, gemm->kernelType.scaleTypeA.preSwizzleTile, useAltLayoutA));
         }
 
         tagBlockScaleA = mulInputA = command->addOperation(rocRoller::Operations::BlockScale(
@@ -335,8 +342,17 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
                         "Pre-swizzled scale tile is not compatible with swizzle tile B",
                         ShowValue(gemm->swizzleTileSize.n),
                         ShowValue(gemm->swizzleTileSize.l));
+
+            // Use alternative layout when tileMN==32 and subTileK==4
+            bool useAltLayoutB = (gemm->kernelType.scaleTypeB.preSwizzleTile[0] == 32
+                                  && gemm->kernelType.scaleTypeB.preSwizzleTile[2] == 4);
+
+            if (useAltLayoutB) {
+                std::cout << "Using alternative layout for scale B" << std::endl;
+            }
+
             scaleInputB = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                *tagLoadScaleB, gemm->kernelType.scaleTypeB.preSwizzleTile));
+                *tagLoadScaleB, gemm->kernelType.scaleTypeB.preSwizzleTile, useAltLayoutB));
         }
 
         tagBlockScaleB = mulInputB = command->addOperation(rocRoller::Operations::BlockScale(

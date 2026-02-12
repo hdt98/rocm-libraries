@@ -426,6 +426,8 @@ namespace rocRoller
             std::vector<size_t>   scaleStridesB;
             std::vector<size_t>   scalePreShuffledTileA;
             std::vector<size_t>   scalePreShuffledTileB;
+            bool                  scaleUseAlternativeLayoutA = false;
+            bool                  scaleUseAlternativeLayoutB = false;
             VariableType          accType = DataType::Float;
 
             std::string name() const;

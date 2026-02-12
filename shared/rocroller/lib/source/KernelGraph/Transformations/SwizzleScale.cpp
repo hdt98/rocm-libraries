@@ -131,7 +131,8 @@ namespace rocRoller
                                                                           ContextPtr   context,
                                                                           int          macTileTag,
                                                                           int          waveTileTag,
-                                                                          NaryArgument arg)
+                                                                          NaryArgument arg,
+                                                                          int          multiplyTag)
         {
             auto macTile = graph.coordinates.getNode<MacroTile>(macTileTag);
             AssertFatal(macTile.memoryType == MemoryType::WAVE_SWIZZLE,
@@ -163,8 +164,34 @@ namespace rocRoller
                 = std::min(nSIMDIndex, static_cast<uint>(macTile.miTileSizes.at(2)));
             // Minimal swizzle tile size 64x4 or 32x8 = 256
             uint const numElementsPerMinimalSwizzleTile = 256;
-            uint const nVgprBlock = numElementsPerMinimalSwizzleTile / macTile.subTileSizes.at(0)
-                                    / nSIMDBlock / nVgprIndex;
+
+            // Check if we should use alternative layout
+            auto contractionTag = findContainingOperation<TensorContraction>(multiplyTag, graph);
+            bool useAltLayout = false;
+            if(contractionTag.has_value())
+            {
+                auto contraction = graph.control.get<TensorContraction>(contractionTag.value()).value();
+                if(arg == NaryArgument::LHS_SCALE)
+                    useAltLayout = contraction.scaleUseAlternativeLayoutA;
+                else if(arg == NaryArgument::RHS_SCALE)
+                    useAltLayout = contraction.scaleUseAlternativeLayoutB;
+            }
+
+            uint nVgprBlock, nSIMDIndexBlock, nSIMDIndexIndex;
+            if(useAltLayout && macTile.subTileSizes.at(0) == 32 && macTile.miTileSizes.at(2) == 4)
+            {
+                nVgprBlock = 1;
+                nSIMDIndexBlock = nSIMDIndex;
+                nSIMDIndexIndex = 1;
+            }
+            else
+            {
+                nVgprBlock = numElementsPerMinimalSwizzleTile / macTile.subTileSizes.at(0)
+                             / nSIMDBlock / nVgprIndex;
+                nSIMDIndexBlock = nVgprIndex;
+                nSIMDIndexIndex = nSIMDIndex / nSIMDIndexBlock;
+            }
+
             uint const nBlocks = numVgpr / nVgprBlock / nVgprIndex;
             auto       vgprBlock
                 = graph.coordinates.addElement(VGPRBlockNumber(literal(nVgprBlock), literal(1u)));
@@ -176,9 +203,7 @@ namespace rocRoller
 
             graph.coordinates.addElement(Tile(), {vgpr}, {block, vgprBlock, vgprIndex});
 
-            uint const nSIMDIndexBlock = nVgprIndex;
-            uint const nSIMDIndexIndex = nSIMDIndex / nSIMDIndexBlock;
-            auto       SIMDIndexBlock  = graph.coordinates.addElement(
+            auto SIMDIndexBlock  = graph.coordinates.addElement(
                 Adhoc("SIMDIndexBlock", literal(nSIMDIndexBlock), nullptr));
             auto SIMDIndexIndex = graph.coordinates.addElement(
                 Adhoc("SIMDIndexIndex", literal(nSIMDIndexIndex), nullptr));
@@ -255,7 +280,8 @@ namespace rocRoller
             SwizzleScaleDetail::addSwizzleLoadCT(KernelGraph& graph,
                                                  ContextPtr   context,
                                                  int          tag,
-                                                 NaryArgument arg)
+                                                 NaryArgument arg,
+                                                 int          multiplyTag)
         {
             AssertFatal(arg == NaryArgument::LHS_SCALE || arg == NaryArgument::RHS_SCALE);
 
@@ -488,7 +514,7 @@ namespace rocRoller
                 }
             }
 
-            auto exchangeConnections = addExchangeCT(graph, context, macTileTag, waveTileTag, arg);
+            auto exchangeConnections = addExchangeCT(graph, context, macTileTag, waveTileTag, arg, multiplyTag);
 
             return {connections, exchangeConnections, unrolls};
         }
@@ -740,9 +766,10 @@ namespace rocRoller
                 return;
 
             auto sampleLoad = mergeables.begin()->first;
+            auto sampleMultiplyTag = scaleLoads.at(sampleLoad).first;
 
             auto [loadConnections, exchangeConnections, unrollReindexMap]
-                = SwizzleScaleDetail::addSwizzleLoadCT(graph, context, sampleLoad, arg);
+                = SwizzleScaleDetail::addSwizzleLoadCT(graph, context, sampleLoad, arg, sampleMultiplyTag);
 
             std::map<int, int> tileExchangeMap;
 

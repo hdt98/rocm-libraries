@@ -386,7 +386,9 @@ namespace rocRoller
             using iot = IOTraits<IO>;
             static void mapping(IO& io, KernelGraph::ControlGraph::TensorContraction& op, Context&)
             {
-                static_assert(sizeof(op) == 160);
+                // Size increased from 160 to 168 due to two additional bool fields
+                // (2 bools add 8 bytes due to struct alignment/padding)
+                static_assert(sizeof(op) == 168);
 
                 iot::mapRequired(io, "aDims", op.aDims);
                 iot::mapRequired(io, "bDims", op.bDims);
@@ -396,6 +398,8 @@ namespace rocRoller
                 iot::mapRequired(io, "scaleStridesB", op.scaleStridesB);
                 iot::mapRequired(io, "scalePreShuffledTileA", op.scalePreShuffledTileA);
                 iot::mapRequired(io, "scalePreShuffledTileB", op.scalePreShuffledTileB);
+                iot::mapRequired(io, "scaleUseAlternativeLayoutA", op.scaleUseAlternativeLayoutA);
+                iot::mapRequired(io, "scaleUseAlternativeLayoutB", op.scaleUseAlternativeLayoutB);
                 iot::mapRequired(io, "accType", op.accType);
             }
 

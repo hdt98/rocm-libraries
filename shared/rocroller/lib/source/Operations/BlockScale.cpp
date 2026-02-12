@@ -131,9 +131,10 @@ namespace rocRoller
             return stream << toString(mode);
         }
 
-        SubTileTranspose::SubTileTranspose(OperationTag input, std::vector<size_t> tileDimensions)
+        SubTileTranspose::SubTileTranspose(OperationTag input, std::vector<size_t> tileDimensions, bool useAlternativeLayout)
             : m_input(input)
             , m_tileDimensions(std::move(tileDimensions))
+            , m_useAlternativeLayout(useAlternativeLayout)
         {
             if(!m_tileDimensions.empty())
             {
@@ -166,6 +167,11 @@ namespace rocRoller
         OperationTag SubTileTranspose::input() const
         {
             return m_input;
+        }
+
+        bool SubTileTranspose::useAlternativeLayout() const
+        {
+            return m_useAlternativeLayout;
         }
     }
 }

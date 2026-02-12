@@ -158,9 +158,13 @@ namespace rocRoller
                             AssertFatal(solutionParams.types.scaleShuffleTileA.size() == 3,
                                         ShowValue(solutionParams.types.scaleShuffleTileA));
 
+                            // Use alternative layout when tileMN==32 and subTileK==4
+                            bool useAltLayoutA = (solutionParams.types.scaleShuffleTileA[0] == 32
+                                                  && solutionParams.types.scaleShuffleTileA[2] == 4);
+
                             scaleInputA
                                 = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                                    *m_tagLoadScaleA, solutionParams.types.scaleShuffleTileA));
+                                    *m_tagLoadScaleA, solutionParams.types.scaleShuffleTileA, useAltLayoutA));
                         }
 
                         m_tagBlockScaleA = mulInputA
@@ -214,9 +218,13 @@ namespace rocRoller
                         {
                             AssertFatal(solutionParams.types.scaleShuffleTileB.size() == 3);
 
+                            // Use alternative layout when tileMN==32 and subTileK==4
+                            bool useAltLayoutB = (solutionParams.types.scaleShuffleTileB[0] == 32
+                                                  && solutionParams.types.scaleShuffleTileB[2] == 4);
+
                             scaleInputB
                                 = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                                    *m_tagLoadScaleB, solutionParams.types.scaleShuffleTileB));
+                                    *m_tagLoadScaleB, solutionParams.types.scaleShuffleTileB, useAltLayoutB));
                         }
 
                         m_tagBlockScaleB = mulInputB
