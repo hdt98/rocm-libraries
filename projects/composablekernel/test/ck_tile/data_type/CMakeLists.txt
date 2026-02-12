@@ -73,7 +73,7 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
     if(CK_TILE_USE_CUSTOM_DATA_TYPE)
         add_gtest_executable(test_ck_tile_bf16_arithmetic test_bf16_arithmetic.cpp)
         target_compile_options(test_ck_tile_bf16_arithmetic PRIVATE -Wno-float-equal)
-        target_compile_definitions(test_ck_tile_bf16_arithmetic PRIVATE -DCK_TILE_USE_CUSTOM_DATA_TYPE=1)
+        target_compile_definitions(test_ck_tile_bf16_arithmetic PRIVATE CK_TILE_USE_CUSTOM_DATA_TYPE=1)
     endif()
     
     # Vector operations
@@ -101,9 +101,15 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
 
         # Apply LLVM builtin BF16 flag if explicitly set as a CMake variable.
         # If not set here, config.hpp will automatically define CK_TILE_USE_LLVM_BUILTIN_BF16 based on HIP version (ROCm 6.5.50421+ or ROCm 7.0+)
-        # This allows the user to explicitly set the flag at CMake configure time (e.g., via -DCK_TILE_USE_LLVM_BUILTIN_BF16=ON/OFF), allowing them to override the header's default.
+        # This allows the user to explicitly set the flag at CMake configure time (e.g., via -DCK_TILE_USE_LLVM_BUILTIN_BF16=ON/OFF as a CMake variable),
+        # which is then converted to 0/1 for the C++ preprocessor, allowing them to override the header's default.
         if(DEFINED CK_TILE_USE_LLVM_BUILTIN_BF16)
-            target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_LLVM_BUILTIN_BF16=${CK_TILE_USE_LLVM_BUILTIN_BF16})
+            # Convert ON/OFF to 0/1 for C++ preprocessor
+            if(CK_TILE_USE_LLVM_BUILTIN_BF16)
+                target_compile_definitions(${test_target} PRIVATE CK_TILE_USE_LLVM_BUILTIN_BF16=1)
+            else()
+                target_compile_definitions(${test_target} PRIVATE CK_TILE_USE_LLVM_BUILTIN_BF16=0)
+            endif()
         endif()
 
         # Define macro to indicate hardware/software saturation behavior for bf16 overflow
@@ -112,12 +118,12 @@ if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
         # - gfx12: Hardware builtin saturates to bf16::max
         # - gfx950: Hardware builtin rounds to infinity (IEEE-754 RTN)
         if(GPU_TARGETS MATCHES "gfx90a|gfx908|gfx94[02]|gfx1[12]")
-            target_compile_definitions(${test_target} PRIVATE -DCK_TILE_BF16_OVERFLOW_SATURATES=1)
+            target_compile_definitions(${test_target} PRIVATE CK_TILE_BF16_OVERFLOW_SATURATES=1)
         endif()
 
         # Apply custom data type flag if enabled (except for arithmetic which already has it)
         if(CK_TILE_USE_CUSTOM_DATA_TYPE AND NOT "${test_target}" STREQUAL "test_ck_tile_bf16_arithmetic")
-            target_compile_definitions(${test_target} PRIVATE -DCK_TILE_USE_CUSTOM_DATA_TYPE=1)
+            target_compile_definitions(${test_target} PRIVATE CK_TILE_USE_CUSTOM_DATA_TYPE=1)
         endif()
 
         # Ensure GTEST_HAS_RTTI is consistent

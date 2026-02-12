@@ -140,7 +140,7 @@ inline bool bf16_near_equal(ck_tile::bf16_t a, ck_tile::bf16_t b, int ulp_tolera
     // Use bf16_to_float for proper conversion regardless of bf16_t implementation
     float fa = ck_tile::bf16_to_float(a);
     float fb = ck_tile::bf16_to_float(b);
-    return ulp_distance(fa, fb) <= ulp_tolerance;
+    return ulp_distance(fa, fb) <= static_cast<uint64_t>(ulp_tolerance);
 }
 
 // Helper to print bf16 value with bit pattern for debugging
