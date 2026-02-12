@@ -81,7 +81,12 @@ struct SMI_Monitor
     static void _monitor_loop(std::atomic<bool>& running,
                               uint32_t smi_index,
                               std::chrono::milliseconds period)
-    {
+    {        
+        const double MhzToMHz = 1;
+        uint16_t xcd_count;
+        if(rsmi_dev_metrics_xcd_counter_get(smi_index, &xcd_count) != RSMI_STATUS_SUCCESS)
+            xcd_count = 1;
+
         while(running.load(std::memory_order_acquire))
         {
             const auto now = std::chrono::system_clock::now();
@@ -89,33 +94,37 @@ struct SMI_Monitor
                 std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch())
                     .count();
 
-            uint64_t        power_uW   = 0;
-            RSMI_POWER_TYPE power_type = RSMI_INVALID_POWER;
-            rsmi_frequencies_t gfx_clk{};
-            rsmi_frequencies_t mem_clk{};
-            uint32_t gfx_busy = 0;
+            rsmi_gpu_metrics_t metrics{};
+            const bool metrics_ok =
+                rsmi_dev_gpu_metrics_info_get(smi_index, &metrics) == RSMI_STATUS_SUCCESS;
 
-            const bool power_ok =
-                rsmi_dev_power_get(smi_index, &power_uW, &power_type) == RSMI_STATUS_SUCCESS;
-            const bool gfx_ok =
-                rsmi_dev_gpu_clk_freq_get(smi_index, RSMI_CLK_TYPE_SYS, &gfx_clk) ==
-                RSMI_STATUS_SUCCESS;
-            const bool mem_ok =
-                rsmi_dev_gpu_clk_freq_get(smi_index, RSMI_CLK_TYPE_MEM, &mem_clk) ==
-                RSMI_STATUS_SUCCESS;
+            double power_w = -1.0;
+            double mem_mhz = -1.0;
+            double avg_clk = 0.0;
+
+            if(metrics_ok)
+            {
+                if(metrics.current_socket_power)
+                    power_w = static_cast<double>(metrics.current_socket_power);
+                if(metrics.current_uclk)
+                    mem_mhz = static_cast<double>(metrics.current_uclk);
+            }
+
+            uint32_t gfx_busy = 0;
             const bool usage_ok =
                 rsmi_dev_busy_percent_get(smi_index, &gfx_busy) == RSMI_STATUS_SUCCESS;
 
-            const double power_w = power_ok ? static_cast<double>(power_uW) / 1.0e6 : -1.0;
-            const double gfx_mhz = gfx_ok ? static_cast<double>(gfx_clk.frequency[gfx_clk.current]) /
-                                                1.0e6
-                                          : 0.0;
-            const double mem_mhz = mem_ok ? static_cast<double>(mem_clk.frequency[mem_clk.current]) /
-                                                1.0e6
-                                          : 0.0;
-
             std::cout << "[monitor " << ms_since_epoch << " ms] power=" << power_w
-                      << " W, gfx_clk=" << gfx_mhz << " MHz, mem_clk=" << mem_mhz << " MHz";
+                      << " W, gfx_clk=";
+
+            for(size_t i = 0; i < xcd_count; ++i){
+                double xcd_clk = metrics.current_gfxclks[i] * MhzToMHz;
+                avg_clk += xcd_clk;
+                std::cout << "|" << metrics.current_gfxclks[i] * MhzToMHz;
+            }
+            std::cout << "|->" << uint32_t(avg_clk / xcd_count);
+
+            std::cout << " MHz, mem_clk=" << mem_mhz << " MHz";
 
             if(usage_ok)
                 std::cout << ", gfx%=" << gfx_busy;
