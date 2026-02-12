@@ -42,8 +42,23 @@ def main():
         help="Maximum dimension size (default: 16384).",
     )
     parser.add_argument(
-        "--alignment", type=int, default=64,
-        help="Align dimensions to this multiple (default: 64).",
+        "--alignment", type=int, default=None,
+        help="Align ALL dimensions to this multiple. "
+             "Overridden by --alignment-m/n/k if those are also set. "
+             "Default: use --alignment-m/n/k values.",
+    )
+    parser.add_argument(
+        "--alignment-m", type=int, default=256,
+        help="Align M dimension to this multiple (default: 256, matching "
+             "common tile_m size for compiled kernels without padding).",
+    )
+    parser.add_argument(
+        "--alignment-n", type=int, default=256,
+        help="Align N dimension to this multiple (default: 256).",
+    )
+    parser.add_argument(
+        "--alignment-k", type=int, default=32,
+        help="Align K dimension to this multiple (default: 32).",
     )
     parser.add_argument(
         "--output", "-o", default="benchmark_problem_sizes.json",
@@ -56,8 +71,15 @@ def main():
 
     args = parser.parse_args()
 
+    # Determine per-dimension alignment
+    if args.alignment is not None:
+        align_m = align_n = align_k = args.alignment
+    else:
+        align_m = args.alignment_m
+        align_n = args.alignment_n
+        align_k = args.alignment_k
+
     rng = np.random.RandomState(args.seed)
-    alignment = args.alignment
 
     sizes = []
     for _ in range(args.num_samples):
@@ -65,15 +87,15 @@ def main():
         n = int(rng.randint(args.dim_min, args.dim_max + 1))
         k = int(rng.randint(args.dim_min, args.dim_max + 1))
 
-        # Align
-        m = max(alignment, ((m + alignment - 1) // alignment) * alignment)
-        n = max(alignment, ((n + alignment - 1) // alignment) * alignment)
-        k = max(alignment, ((k + alignment - 1) // alignment) * alignment)
+        # Align (round up)
+        m = max(align_m, ((m + align_m - 1) // align_m) * align_m)
+        n = max(align_n, ((n + align_n - 1) // align_n) * align_n)
+        k = max(align_k, ((k + align_k - 1) // align_k) * align_k)
 
-        # Clamp
-        m = min(m, args.dim_max)
-        n = min(n, args.dim_max)
-        k = min(k, args.dim_max)
+        # Clamp (round down to alignment)
+        m = min(m, (args.dim_max // align_m) * align_m)
+        n = min(n, (args.dim_max // align_n) * align_n)
+        k = min(k, (args.dim_max // align_k) * align_k)
 
         sizes.append({"m": m, "n": n, "k": k, "split_k": 1})
 
@@ -83,7 +105,7 @@ def main():
                 "description": (
                     f"Randomly generated {args.num_samples} problem sizes "
                     f"(seed={args.seed}, range=[{args.dim_min}..{args.dim_max}], "
-                    f"aligned to {alignment})"
+                    f"alignment M%{align_m} N%{align_n} K%{align_k})"
                 )
             },
             "test_params": {
@@ -99,7 +121,7 @@ def main():
     print(f"Generated {len(sizes)} problem sizes -> {args.output}")
     print(f"  Seed: {args.seed}")
     print(f"  Range: [{args.dim_min}, {args.dim_max}]")
-    print(f"  Alignment: {alignment}")
+    print(f"  Alignment: M%{align_m}, N%{align_n}, K%{align_k}")
 
     # Show sample
     print(f"\n  Sample (first 5):")

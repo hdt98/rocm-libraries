@@ -29,6 +29,7 @@ import csv
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -39,6 +40,63 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 # ---------------------------------------------------------------------------
+# Tile-alignment helpers
+# ---------------------------------------------------------------------------
+
+def _lcm(a: int, b: int) -> int:
+    return abs(a * b) // math.gcd(a, b)
+
+
+def extract_tile_alignment_from_kernels(
+    kernel_paths: List[Path],
+) -> Tuple[int, int, int]:
+    """
+    Parse kernel executable names to discover tile dimensions and return the
+    LCM of all tile_m, tile_n, tile_k values found.
+
+    Kernel names follow the pattern:
+      benchmark_gemm_streamk_..._<TileM>x<TileN>x<TileK>_<WarpM>x<WarpN>x<WarpK>_...
+
+    Returns (align_m, align_n, align_k).  Falls back to (256, 256, 32) if
+    nothing can be parsed.
+    """
+    tile_ms, tile_ns, tile_ks = set(), set(), set()
+
+    # Match groups of 3 integers joined by 'x' (e.g. 256x256x32)
+    dim_pattern = re.compile(r"(\d+)x(\d+)x(\d+)")
+
+    for kp in kernel_paths:
+        groups = dim_pattern.findall(kp.name)
+        if groups:
+            # First NxNxN group in the name is the tile dimensions
+            # (the largest-magnitude group)
+            parsed = [(int(a), int(b), int(c)) for a, b, c in groups]
+            # Sort by product descending — tile dims are always the biggest
+            parsed.sort(key=lambda t: t[0] * t[1] * t[2], reverse=True)
+            tm, tn, tk = parsed[0]
+            tile_ms.add(tm)
+            tile_ns.add(tn)
+            tile_ks.add(tk)
+
+    if not tile_ms:
+        return (256, 256, 32)  # safe default
+
+    align_m = 1
+    for v in tile_ms:
+        align_m = _lcm(align_m, v)
+
+    align_n = 1
+    for v in tile_ns:
+        align_n = _lcm(align_n, v)
+
+    align_k = 1
+    for v in tile_ks:
+        align_k = _lcm(align_k, v)
+
+    return (align_m, align_n, align_k)
+
+
+# ---------------------------------------------------------------------------
 # Problem-size generation
 # ---------------------------------------------------------------------------
 
@@ -47,17 +105,22 @@ def generate_problem_sizes(
     seed: int,
     dim_min: int = 1,
     dim_max: int = 16384,
+    align_m: int = 256,
+    align_n: int = 256,
+    align_k: int = 32,
 ) -> List[Tuple[int, int, int]]:
     """
     Generate *num_samples* random (M, N, K) triples with a fixed *seed*.
 
     Each dimension is sampled uniformly from [dim_min, dim_max] and then
-    rounded up to the nearest multiple of 64 (a common tile-alignment
-    requirement for AMD GPU GEMM kernels).  We additionally filter out any
-    sizes where M*K or K*N would exceed ~32 GiB in fp16 to avoid OOM.
+    rounded up to the nearest multiple of the corresponding tile alignment
+    (align_m for M, align_n for N, align_k for K).  This ensures generated
+    sizes are compatible with compiled kernels that have padding disabled.
+
+    We additionally filter out any sizes whose total tensor footprint would
+    exceed ~32 GiB in fp16 to avoid OOM.
     """
     rng = np.random.RandomState(seed)
-    alignment = 64
     # ~32 GiB in fp16 elements ≈ 16 G elements
     max_elements = 16 * (1024 ** 3)
 
@@ -71,15 +134,19 @@ def generate_problem_sizes(
         n = int(rng.randint(dim_min, dim_max + 1))
         k = int(rng.randint(dim_min, dim_max + 1))
 
-        # Align to 64
-        m = max(alignment, ((m + alignment - 1) // alignment) * alignment)
-        n = max(alignment, ((n + alignment - 1) // alignment) * alignment)
-        k = max(alignment, ((k + alignment - 1) // alignment) * alignment)
+        # Align to tile dimensions (round up)
+        m = max(align_m, ((m + align_m - 1) // align_m) * align_m)
+        n = max(align_n, ((n + align_n - 1) // align_n) * align_n)
+        k = max(align_k, ((k + align_k - 1) // align_k) * align_k)
 
-        # Clamp to dim_max
-        m = min(m, dim_max)
-        n = min(n, dim_max)
-        k = min(k, dim_max)
+        # Clamp to dim_max (round down to alignment)
+        m = min(m, (dim_max // align_m) * align_m)
+        n = min(n, (dim_max // align_n) * align_n)
+        k = min(k, (dim_max // align_k) * align_k)
+
+        # Ensure we didn't clamp below minimum
+        if m < align_m or n < align_n or k < align_k:
+            continue
 
         # OOM guard (conservative for fp16 = 2 bytes)
         total_elems = m * k + k * n + m * n
@@ -95,6 +162,33 @@ def generate_problem_sizes(
         )
 
     return sizes
+
+
+def align_problem_sizes(
+    sizes: List[Tuple[int, int, int]],
+    align_m: int,
+    align_n: int,
+    align_k: int,
+) -> List[Tuple[int, int, int]]:
+    """
+    Re-align externally loaded problem sizes to the required tile alignment.
+
+    Sizes that are already aligned are kept as-is.  Unaligned sizes are
+    rounded up.  Sizes that would become 0 are dropped.
+    """
+    aligned = []
+    skipped = 0
+    for m, n, k in sizes:
+        am = ((m + align_m - 1) // align_m) * align_m
+        an = ((n + align_n - 1) // align_n) * align_n
+        ak = ((k + align_k - 1) // align_k) * align_k
+        if am <= 0 or an <= 0 or ak <= 0:
+            skipped += 1
+            continue
+        aligned.append((am, an, ak))
+    if skipped:
+        print(f"[WARN] Dropped {skipped} problem sizes that could not be aligned.")
+    return aligned
 
 
 # ---------------------------------------------------------------------------
@@ -183,11 +277,16 @@ def run_kernel(
             if verbose:
                 print(f"  [ERR] {kernel_path.name} returned {result.returncode}")
                 if result.stderr:
-                    print(f"        stderr: {result.stderr[:200]}")
+                    print(f"        stderr: {result.stderr.strip()[:300]}")
             return None
 
         output = result.stdout.strip()
         if not output:
+            # Kernel produced no stdout — likely IsSupportedArgument() failed
+            # and the exception was caught internally.  Show stderr hint.
+            if verbose:
+                stderr_msg = result.stderr.strip()[:300] if result.stderr else "(none)"
+                print(f"  [NO OUTPUT] {kernel_path.name}  stderr: {stderr_msg}")
             return None
 
         # The executable with -json_output=true prints a JSON blob
@@ -201,6 +300,7 @@ def run_kernel(
     except json.JSONDecodeError as exc:
         if verbose:
             print(f"  [JSON ERR] {kernel_path.name}: {exc}")
+            print(f"        raw stdout: {result.stdout.strip()[:300]}")
         return None
     except Exception as exc:
         if verbose:
@@ -220,6 +320,7 @@ def benchmark_sweep(
     timeout: int = 120,
     verbose: bool = False,
     dtype_bytes: int = 2,
+    kernel_pattern: str = "benchmark_gemm_streamk_*",
 ) -> List[Dict]:
     """
     Run every discovered kernel on every problem size.
@@ -232,7 +333,7 @@ def benchmark_sweep(
       - latency_ms
       - bandwidth_gb_s
     """
-    kernels = discover_kernels(build_dir)
+    kernels = discover_kernels(build_dir, pattern=kernel_pattern)
     if not kernels:
         print("[ERROR] No kernel executables found. Did you build with "
               "`cmake --build . --target benchmark_gemm_streamk_all`?")
@@ -242,18 +343,28 @@ def benchmark_sweep(
     for k in kernels:
         print(f"  - {k.name}")
 
+    # Show detected tile alignment so the user knows what constraints apply
+    align_m, align_n, align_k = extract_tile_alignment_from_kernels(kernels)
+    print(f"\nDetected tile alignment from kernel names: "
+          f"M%{align_m}==0, N%{align_n}==0, K%{align_k}==0")
+    print(f"  (Kernels compiled without padding require problem sizes "
+          f"to be multiples of these tile dimensions.)\n")
+
     total_runs = len(kernels) * len(problem_sizes)
-    print(f"\nTotal benchmark runs: {total_runs} "
+    print(f"Total benchmark runs: {total_runs} "
           f"({len(kernels)} kernels x {len(problem_sizes)} problems)")
     print(f"Warmup={warmup}, Repeat={repeat}\n")
 
     all_results: List[Dict] = []
     completed = 0
+    failed_per_problem = 0
+    total_failures = 0
     start_wall = time.time()
 
     for prob_idx, (m, n, k) in enumerate(problem_sizes):
         ai = compute_arithmetic_intensity(m, n, k, dtype_bytes)
 
+        problem_successes = 0
         for kern_idx, kernel_path in enumerate(kernels):
             completed += 1
             if completed % 100 == 0 or completed <= 5:
@@ -272,7 +383,10 @@ def benchmark_sweep(
             )
 
             if raw is None:
+                total_failures += 1
                 continue
+
+            problem_successes += 1
 
             # Extract perf fields from the JSON blob
             perf = raw.get("perf_result", {})
@@ -301,9 +415,46 @@ def benchmark_sweep(
 
             all_results.append(record)
 
+        if problem_successes == 0:
+            failed_per_problem += 1
+            # Show a diagnostic for the first few fully-failed problems
+            if failed_per_problem <= 3:
+                print(
+                    f"  [WARN] ALL {len(kernels)} kernels failed for "
+                    f"M={m} N={n} K={k}  "
+                    f"(M%{align_m}={m % align_m}, "
+                    f"N%{align_n}={n % align_n}, "
+                    f"K%{align_k}={k % align_k})"
+                )
+                if m % align_m != 0 or n % align_n != 0 or k % align_k != 0:
+                    print(
+                        f"         ^ Dimensions are NOT multiples of tile sizes! "
+                        f"Re-run with --auto-align or aligned problem sizes."
+                    )
+            elif failed_per_problem == 4:
+                print(f"  [WARN] (suppressing further per-problem warnings ...)")
+
     wall_time = time.time() - start_wall
-    print(f"\nBenchmark sweep completed: {len(all_results)} successful runs "
-          f"in {wall_time:.1f}s")
+    print(f"\nBenchmark sweep completed: {len(all_results)} successful runs, "
+          f"{total_failures} failures in {wall_time:.1f}s")
+
+    if failed_per_problem > 0:
+        print(f"[WARN] {failed_per_problem}/{len(problem_sizes)} problem sizes "
+              f"had ALL kernels fail.")
+        if failed_per_problem == len(problem_sizes):
+            print(
+                "\n[HINT] Every single problem size failed for every kernel.\n"
+                "       This almost certainly means the problem dimensions are not\n"
+                f"       aligned to the tile sizes (M%{align_m}, N%{align_n}, K%{align_k}).\n"
+                "       The compiled kernels have padding disabled (pad_m/n/k=False)\n"
+                "       so they reject misaligned sizes via IsSupportedArgument().\n"
+                "\n"
+                "       Fix: re-run with --auto-align to automatically align sizes,\n"
+                "            or regenerate sizes with the correct alignment:\n"
+                f"              python generate_problem_sizes.py "
+                f"--alignment-m {align_m} --alignment-n {align_n} "
+                f"--alignment-k {align_k} ...\n"
+            )
 
     return all_results
 
@@ -580,6 +731,16 @@ def main():
              "(list of {\"m\": ..., \"n\": ..., \"k\": ...} dicts). "
              "If provided, --num-samples and --seed are ignored.",
     )
+    parser.add_argument(
+        "--auto-align", action="store_true", default=True,
+        help="Automatically align problem sizes to the tile dimensions "
+             "detected from compiled kernels (default: enabled). "
+             "Use --no-auto-align to disable.",
+    )
+    parser.add_argument(
+        "--no-auto-align", dest="auto_align", action="store_false",
+        help="Disable automatic alignment of problem sizes to tile dimensions.",
+    )
 
     args = parser.parse_args()
 
@@ -587,6 +748,17 @@ def main():
     if not build_dir.exists():
         print(f"[ERROR] Build directory does not exist: {build_dir}")
         return 1
+
+    # ---- Discover kernels early to detect tile alignment ----
+    kernels = discover_kernels(build_dir, pattern=args.kernel_pattern)
+    if kernels:
+        align_m, align_n, align_k = extract_tile_alignment_from_kernels(kernels)
+        print(f"Auto-detected tile alignment: M%{align_m}==0, "
+              f"N%{align_n}==0, K%{align_k}==0")
+    else:
+        align_m, align_n, align_k = 256, 256, 32
+        print(f"[WARN] No kernels found yet — using default alignment: "
+              f"M%{align_m}, N%{align_n}, K%{align_k}")
 
     # ---- Problem sizes ----
     if args.problem_sizes_file:
@@ -598,13 +770,27 @@ def main():
             raw_sizes = raw_sizes["test_params"].get("problem_sizes", [])
         problem_sizes = [(s["m"], s["n"], s["k"]) for s in raw_sizes]
         print(f"Loaded {len(problem_sizes)} problem sizes from file.")
+
+        # Check and optionally fix alignment
+        if args.auto_align:
+            misaligned = sum(
+                1 for m, n, k in problem_sizes
+                if m % align_m != 0 or n % align_n != 0 or k % align_k != 0
+            )
+            if misaligned:
+                print(f"[INFO] {misaligned}/{len(problem_sizes)} sizes are not "
+                      f"aligned to tile dims — re-aligning (round up).")
+                problem_sizes = align_problem_sizes(
+                    problem_sizes, align_m, align_n, align_k
+                )
     else:
         print(f"Generating {args.num_samples} random problem sizes "
               f"(seed={args.seed}, range=[{args.dim_min}..{args.dim_max}], "
-              f"aligned to 64) ...")
+              f"aligned to M%{align_m}, N%{align_n}, K%{align_k}) ...")
         problem_sizes = generate_problem_sizes(
             args.num_samples, args.seed,
             dim_min=args.dim_min, dim_max=args.dim_max,
+            align_m=align_m, align_n=align_n, align_k=align_k,
         )
         print(f"Generated {len(problem_sizes)} problem sizes.")
 
@@ -627,6 +813,7 @@ def main():
         timeout=args.timeout,
         verbose=args.verbose,
         dtype_bytes=args.dtype_bytes,
+        kernel_pattern=args.kernel_pattern,
     )
 
     if not results:
