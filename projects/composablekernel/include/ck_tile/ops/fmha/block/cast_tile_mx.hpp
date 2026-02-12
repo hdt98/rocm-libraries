@@ -46,8 +46,10 @@ CK_TILE_DEVICE void cast_tile_mx(DstTensor& dst_tensor,
             });
 
             static_assert(std::is_same_v<DstScaleDataType, e8m0_t>);
-            // For e8m0 round up to the next power of 2
-            float scale = exp2(ceil(log2(max_value)));
+            // For e8m0 round up to the next power of 2, equivalent of exp2(ceil(log2(max_value)))
+            float scale =
+                bit_cast<float>((bit_cast<uint32_t>(max_value) + numeric_traits<float>::mant_mask) &
+                                numeric_traits<float>::head_mask);
 
             scale = scale_func(scale);
 
@@ -111,8 +113,10 @@ CK_TILE_DEVICE void cast_tile_mx(DstTensor& dst_tensor,
             max_value = max(max_value, warp_shuffle(max_value, lane ^ MLane));
 
             static_assert(std::is_same_v<DstScaleDataType, e8m0_t>);
-            // For e8m0 round up to the next power of 2
-            float scale = exp2(ceil(log2(max_value)));
+            // For e8m0 round up to the next power of 2, equivalent of exp2(ceil(log2(max_value)))
+            float scale =
+                bit_cast<float>((bit_cast<uint32_t>(max_value) + numeric_traits<float>::mant_mask) &
+                                numeric_traits<float>::head_mask);
 
             scale = scale_func(scale);
 
