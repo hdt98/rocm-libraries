@@ -299,7 +299,7 @@ pipeline {
                     agent{ label rocmnode("nogpu") }
                     environment{
                         HipNoGPU_flags = "-DMIOPEN_BACKEND=HIPNOGPU -DMIOPEN_INSTALL_CXX_HEADERS=On"
-                        build_cmd = "make -j\$(nproc)"
+                        build_cmd = "ninja"
                     }
                     steps{
                         script {
