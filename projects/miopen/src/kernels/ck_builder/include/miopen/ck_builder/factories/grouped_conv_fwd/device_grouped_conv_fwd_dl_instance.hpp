@@ -4,6 +4,7 @@
 #pragma once
 
 #include <miopen/ck_builder/instance_data/dl.hpp>
+#include <miopen/ck_builder/factories/grouped_conv_fwd/common_aliases.hpp>
 #include <array>
 
 namespace miopen {
@@ -13,16 +14,6 @@ namespace factories {
 namespace grouped_conv_fwd {
 
 using namespace instance;
-
-// Data type aliases
-constexpr auto DL_F16 = ckb::DataType::FP16;
-constexpr auto DL_F32 = ckb::DataType::FP32;
-
-// Operation aliases
-constexpr auto DL_PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
-
-// Specialization aliases
-constexpr auto DL_GemmMNKPadding = ckb::GemmSpecialization::MNKPadding;
 
 // DL factory functions: 7 template parameters become function parameters
 // Original CK template: device_grouped_conv2d_fwd_dl_f16_instances<InLayout, WeiLayout, DsLayout,
@@ -40,9 +31,9 @@ constexpr auto device_grouped_conv2d_fwd_dl_f16_instances(
 {
     return std::array{
         // clang-format off
-        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,DL_F16,DL_F16,ds_types,DL_F16,DL_F32,input_layout,weight_layout,ds_layouts,output_layout,DL_PassThrough,DL_PassThrough,cde_element_op,conv_spec,DL_GemmMNKPadding,8,16,4,2,1,1,2,1,{4,2},{1,1},{2,1,2,1},{1,1,8,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{1,1,1,1},{2,1,4,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
-        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,DL_F16,DL_F16,ds_types,DL_F16,DL_F32,input_layout,weight_layout,ds_layouts,output_layout,DL_PassThrough,DL_PassThrough,cde_element_op,conv_spec,DL_GemmMNKPadding,256,128,128,16,1,4,4,1,{8,2},{8,2},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
-        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,DL_F16,DL_F16,ds_types,DL_F16,DL_F32,input_layout,weight_layout,ds_layouts,output_layout,DL_PassThrough,DL_PassThrough,cde_element_op,conv_spec,DL_GemmMNKPadding,256,128,128,16,2,4,4,1,{8,2},{8,2},{8,1,1,2},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,2},{1,2,0,3},{1,1,1,2},{8,1,1,2},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,2},{1,2,0,3},{1,1,1,2},{0,1,2,3,4,5},5,4)
+        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,F16,F16,ds_types,F16,F32,input_layout,weight_layout,ds_layouts,output_layout,PassThrough,PassThrough,cde_element_op,conv_spec,GemmMNKPadding,8,16,4,2,1,1,2,1,{4,2},{1,1},{2,1,2,1},{1,1,8,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{1,1,1,1},{2,1,4,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
+        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,F16,F16,ds_types,F16,F32,input_layout,weight_layout,ds_layouts,output_layout,PassThrough,PassThrough,cde_element_op,conv_spec,GemmMNKPadding,256,128,128,16,1,4,4,1,{8,2},{8,2},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
+        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,F16,F16,ds_types,F16,F32,input_layout,weight_layout,ds_layouts,output_layout,PassThrough,PassThrough,cde_element_op,conv_spec,GemmMNKPadding,256,128,128,16,2,4,4,1,{8,2},{8,2},{8,1,1,2},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,2},{1,2,0,3},{1,1,1,2},{8,1,1,2},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,2},{1,2,0,3},{1,1,1,2},{0,1,2,3,4,5},5,4)
         // clang-format on
     };
 }
@@ -59,9 +50,9 @@ constexpr auto device_grouped_conv2d_fwd_dl_f32_instances(
 {
     return std::array{
         // clang-format off
-        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,DL_F32,DL_F32,ds_types,DL_F32,DL_F32,input_layout,weight_layout,ds_layouts,output_layout,DL_PassThrough,DL_PassThrough,cde_element_op,conv_spec,DL_GemmMNKPadding,8,16,4,2,1,1,2,1,{4,2},{1,1},{2,1,2,1},{1,1,8,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{1,1,1,1},{2,1,4,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
-        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,DL_F32,DL_F32,ds_types,DL_F32,DL_F32,input_layout,weight_layout,ds_layouts,output_layout,DL_PassThrough,DL_PassThrough,cde_element_op,conv_spec,DL_GemmMNKPadding,256,128,128,16,1,4,4,1,{8,2},{8,2},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
-        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,DL_F32,DL_F32,ds_types,DL_F32,DL_F32,input_layout,weight_layout,ds_layouts,output_layout,DL_PassThrough,DL_PassThrough,cde_element_op,conv_spec,DL_GemmMNKPadding,256,128,128,16,1,4,4,1,{8,2},{8,2},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,1},{1,2,0,3},{1,1,1,1},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,4)
+        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,F32,F32,ds_types,F32,F32,input_layout,weight_layout,ds_layouts,output_layout,PassThrough,PassThrough,cde_element_op,conv_spec,GemmMNKPadding,8,16,4,2,1,1,2,1,{4,2},{1,1},{2,1,2,1},{1,1,8,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{1,1,1,1},{2,1,4,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
+        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,F32,F32,ds_types,F32,F32,input_layout,weight_layout,ds_layouts,output_layout,PassThrough,PassThrough,cde_element_op,conv_spec,GemmMNKPadding,256,128,128,16,1,4,4,1,{8,2},{8,2},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{1,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,1),
+        DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK<NumDTensor>(2,F32,F32,ds_types,F32,F32,input_layout,weight_layout,ds_layouts,output_layout,PassThrough,PassThrough,cde_element_op,conv_spec,GemmMNKPadding,256,128,128,16,1,4,4,1,{8,2},{8,2},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,1},{1,2,0,3},{1,1,1,1},{8,1,1,1},{2,1,128,1},{1,2,0,3},{1,2,0,3},{4,1,1,1},{1,2,0,3},{1,1,1,1},{0,1,2,3,4,5},5,4)
         // clang-format on
     };
 }

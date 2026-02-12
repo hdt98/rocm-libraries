@@ -5,6 +5,7 @@
 
 #include <miopen/ck_builder/instance_data/xdl.hpp>
 #include <miopen/ck_builder/instance_data/xdl_v3.hpp>
+#include <miopen/ck_builder/factories/grouped_conv_fwd/common_aliases.hpp>
 #include <array>
 
 namespace miopen {
@@ -14,23 +15,6 @@ namespace factories {
 namespace grouped_conv_fwd {
 
 using namespace instance;
-
-// Data type aliases
-constexpr auto BF16 = ckb::DataType::BF16;
-constexpr auto F16  = ckb::DataType::FP16;
-constexpr auto F32  = ckb::DataType::FP32;
-constexpr auto I8   = ckb::DataType::I8;
-constexpr auto I32  = ckb::DataType::I32;
-
-// Operation aliases
-constexpr auto PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
-
-// Specialization aliases
-constexpr auto GemmMNKPadding = ckb::GemmSpecialization::MNKPadding;
-
-// Pipeline aliases
-constexpr auto Interwave = ckb::PipelineScheduler::INTERWAVE;
-constexpr auto PipeV1    = ckb::PipelineVersion::V1;
 
 // ========================================================================================
 // BF16 merged groups instances (non-V3, 3 instances with NumGroupsToMerge = 8/16/32)

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <miopen/ck_builder/instance_data/xdl_v3.hpp>
+#include <miopen/ck_builder/factories/grouped_conv_fwd/common_aliases.hpp>
 #include <array>
 
 namespace miopen {
@@ -13,27 +14,6 @@ namespace factories {
 namespace grouped_conv_fwd {
 
 using namespace instance;
-
-// Data type aliases
-constexpr auto BF16 = ckb::DataType::BF16;
-constexpr auto F16  = ckb::DataType::FP16;
-constexpr auto F32  = ckb::DataType::FP32;
-constexpr auto I8   = ckb::DataType::I8;
-constexpr auto I32  = ckb::DataType::I32;
-
-// Operation aliases
-constexpr auto PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
-
-// Specialization aliases
-constexpr auto GemmMNKPadding = ckb::GemmSpecialization::MNKPadding;
-
-// Pipeline scheduling aliases
-constexpr auto Intrawave = ckb::PipelineScheduler::INTRAWAVE;
-constexpr auto Interwave = ckb::PipelineScheduler::INTERWAVE;
-constexpr auto PipeV1    = ckb::PipelineVersion::V1;
-constexpr auto PipeV3    = ckb::PipelineVersion::V3;
-constexpr auto PipeV4    = ckb::PipelineVersion::V4;
-constexpr auto PipeV5    = ckb::PipelineVersion::V5;
 
 // double rate mfma instances on gfx950
 template <std::size_t NumDTensor = 0>

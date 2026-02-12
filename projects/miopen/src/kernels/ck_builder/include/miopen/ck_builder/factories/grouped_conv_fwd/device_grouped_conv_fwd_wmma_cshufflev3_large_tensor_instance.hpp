@@ -4,6 +4,7 @@
 #pragma once
 
 #include <miopen/ck_builder/instance_data/wmma_v3_large_tensor.hpp>
+#include <miopen/ck_builder/factories/grouped_conv_fwd/common_aliases.hpp>
 #include <array>
 
 namespace miopen {
@@ -13,17 +14,6 @@ namespace factories {
 namespace grouped_conv_fwd {
 
 using namespace instance;
-
-// Data type aliases
-constexpr auto WMMA_LT_F16  = ckb::DataType::FP16;
-constexpr auto WMMA_LT_BF16 = ckb::DataType::BF16;
-constexpr auto WMMA_LT_F32  = ckb::DataType::FP32;
-
-// Operation aliases
-constexpr auto WMMA_LT_PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
-
-// Specialization aliases
-constexpr auto WMMA_LT_GemmMNKPadding = ckb::GemmSpecialization::MNKPadding;
 
 // DeviceGroupedConvFwdMultipleD_Wmma_CShuffle_V3_Large_Tensor is UNSUPPORTED.
 // All factory functions return empty arrays.

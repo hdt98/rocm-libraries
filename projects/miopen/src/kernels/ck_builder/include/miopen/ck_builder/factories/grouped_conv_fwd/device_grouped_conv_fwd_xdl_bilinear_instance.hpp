@@ -4,6 +4,7 @@
 #pragma once
 
 #include <miopen/ck_builder/instance_data/xdl.hpp>
+#include <miopen/ck_builder/factories/grouped_conv_fwd/common_aliases.hpp>
 #include <array>
 
 namespace miopen {
@@ -13,20 +14,6 @@ namespace factories {
 namespace grouped_conv_fwd {
 
 using namespace instance;
-
-// Data type aliases
-constexpr auto BF16 = ckb::DataType::BF16;
-constexpr auto F16  = ckb::DataType::FP16;
-constexpr auto F32  = ckb::DataType::FP32;
-constexpr auto I8   = ckb::DataType::I8;
-constexpr auto I32  = ckb::DataType::I32;
-
-// Operation aliases
-constexpr auto PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
-constexpr auto Bilinear    = ckb::ElementwiseOperation::BILINEAR;
-
-// Specialization aliases
-constexpr auto GemmMNKPadding = ckb::GemmSpecialization::MNKPadding;
 
 template <std::size_t NumDTensor = 1>
 constexpr auto device_grouped_conv_fwd_xdl_bilinear_bf16_instances(

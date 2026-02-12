@@ -208,6 +208,9 @@ target_include_directories(ck_builder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
 target_link_libraries(ck_builder composable_kernel::device_conv_operations)
 
+# CK template instantiations can produce fold expressions exceeding the default bracket-depth limit of 256
+target_compile_options(ck_builder PRIVATE $<$<CXX_COMPILER_ID:Clang>:-fbracket-depth=2048>)
+
 # This static library contains a large amount of GPU code that will benefit from offload-compress if it's available
 check_cxx_compiler_flag("--offload-compress -x hip" CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
 if(CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)

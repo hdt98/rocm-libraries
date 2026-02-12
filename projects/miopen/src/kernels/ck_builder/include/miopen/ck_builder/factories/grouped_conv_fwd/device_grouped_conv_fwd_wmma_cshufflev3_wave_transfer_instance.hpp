@@ -4,6 +4,7 @@
 #pragma once
 
 #include <miopen/ck_builder/instance_data/wmma_v3.hpp>
+#include <miopen/ck_builder/factories/grouped_conv_fwd/common_aliases.hpp>
 #include <array>
 
 namespace miopen {
@@ -13,21 +14,6 @@ namespace factories {
 namespace grouped_conv_fwd {
 
 using namespace instance;
-
-// Data type aliases
-constexpr auto WMMAV3_F16 = ckb::DataType::FP16;
-constexpr auto WMMAV3_F32 = ckb::DataType::FP32;
-
-// Operation aliases
-constexpr auto WMMAV3_PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
-
-// Specialization aliases
-constexpr auto WMMAV3_GemmDefault    = ckb::GemmSpecialization::Default;
-constexpr auto WMMAV3_GemmMNKPadding = ckb::GemmSpecialization::MNKPadding;
-
-// Pipeline scheduling aliases
-constexpr auto WMMAV3_Intrawave = ckb::PipelineScheduler::INTRAWAVE;
-constexpr auto WMMAV3_PipeV1    = ckb::PipelineVersion::V1;
 
 // DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3 is not supported by CK Builder.
 // This factory preserves the function signature but returns an empty array.
@@ -59,14 +45,14 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_wave_transfer_instances(
     // BlockGemmPipelineVersion::v1, false): return std::array{
     //     // clang-format off
     //     // generic instance
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,256,128,128,64,8,8,16,16,2,4,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,64,1,4},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,128,64,256,32,8,8,16,16,4,4,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,16,1,8},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,128,64,192,64,8,8,16,16,2,6,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,4},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,128,128,64,64,8,8,16,16,2,4,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,64,1,2},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,256,128,256,64,8,8,16,16,4,4,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,256,128,192,64,8,8,16,16,2,6,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,64,1,4},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,128,64,128,64,8,8,16,16,4,2,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,16,1,8},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false),
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,WMMAV3_F32,abc_data_type,ds_types,abc_data_type,WMMAV3_PassThrough,WMMAV3_PassThrough,output_op,conv_spec,gemm_spec,128,64,192,32,8,8,16,16,2,6,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,4},8,WMMAV3_Intrawave,WMMAV3_PipeV1,false)
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,256,128,128,64,8,8,16,16,2,4,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,64,1,4},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,128,64,256,32,8,8,16,16,4,4,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,16,1,8},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,128,64,192,64,8,8,16,16,2,6,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,4},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,128,128,64,64,8,8,16,16,2,4,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,64,1,2},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,256,128,256,64,8,8,16,16,4,4,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,256,128,192,64,8,8,16,16,2,6,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,64,1,4},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,128,64,128,64,8,8,16,16,4,2,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,{8,16,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,16,1,8},8,Intrawave,PipeV1,false),
+    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,abc_data_type,abc_data_type,F32,abc_data_type,ds_types,abc_data_type,PassThrough,PassThrough,output_op,conv_spec,gemm_spec,128,64,192,32,8,8,16,16,2,6,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,{4,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,4},8,Intrawave,PipeV1,false)
     //     // clang-format on
     // };
     return std::array<int, 0>{};
