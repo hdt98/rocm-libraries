@@ -24,6 +24,7 @@
  *
  *******************************************************************************/
 
+#include <rocRoller/CodeGen/LoadStoreTileGenerator.hpp>
 #include <rocRoller/Graph/Hypergraph.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/ModelAddresses.hpp>
@@ -100,10 +101,12 @@ namespace rocRoller::KernelGraph
         auto [ldsTag, lds]   = graph.getDimension<LDS>(tag);
         auto [tileTag, tile] = graph.getDimension<MacroTile>(tag);
 
-        auto maybeParentLDS
-            = only(graph.coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<Duplicate>));
-        if(maybeParentLDS)
-            ldsTag = *maybeParentLDS;
+        // auto maybeParentLDS
+        //     = only(graph.coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<Duplicate>));
+        // if(maybeParentLDS)
+        //     ldsTag = *maybeParentLDS;
+
+        Log::info("{}: tag {}, memoryType {}", tag, ldsTag, toString(tile.memoryType));
 
         if(tile.memoryType == MemoryType::WAVE)
         {
@@ -178,24 +181,60 @@ namespace rocRoller::KernelGraph
         for(const auto node : allNodes)
         {
             auto visitor = rocRoller::overloaded{
-                // TODO: can probably use same code path for StoreLDSTile
+                // [&](CIsAnyOf<LoadLDSTile> auto op) {
+                //     const auto addresses
+                //         = getLDSAddresses(graph, node, op.varType).template to<std::vector>();
+
+                //     AssertFatal(!addresses.empty());
+
+                //     std::vector<size_t> normalizedAddresses;
+                //     auto minAddress = *std::min_element(addresses.begin(), addresses.end());
+                //     for(auto addr : addresses)
+                //     {
+                //         normalizedAddresses.push_back(addr - minAddress);
+                //     }
+
+                //     graph.modelledAddresses[node] = std::move(normalizedAddresses);
+                // },
                 [&](CIsAnyOf<LoadLDSTile> auto op) {
-                    {
-                        const auto addresses
-                            = getLDSAddresses(graph, node, op.varType).template to<std::vector>();
+                    namespace CT = rocRoller::KernelGraph::CoordinateGraph;
 
-                        AssertFatal(!addresses.empty());
+                    const auto addresses
+                        = getLDSAddresses(graph, node, op.varType).template to<std::vector>();
 
-                        std::vector<size_t> normalizedAddresses;
-                        auto minAddress = *std::min_element(addresses.begin(), addresses.end());
-                        for(auto addr : addresses)
-                        {
-                            normalizedAddresses.push_back(addr - minAddress);
-                        }
+                    // LoadStoreTileGenerator generator(
+                    //     std::make_shared<KernelGraph>(graph),
+                    //     m_context,
+                    //     m_context->kernel()->max_flat_workgroup_size());
 
-                        graph.modelledAddresses[node] = std::move(normalizedAddresses);
-                    }
+                    // auto info
+                    //     = generator.loadMacroTileWAVELDS(node, op, graph.buildTransformer(node));
+
+                    // Log::info("{} {} {}", node, toString(op), toString(info));
                 },
+                // [&](CIsAnyOf<StoreLDSTile, LoadLDSTile> auto op) {
+                //     namespace CT         = rocRoller::KernelGraph::CoordinateGraph;
+                //     namespace Expression = rocRoller::Expression;
+                //     using namespace ControlGraph;
+                //     using namespace CoordinateGraph;
+                //     using namespace Expression;
+
+                //     auto [ldsTag, lds]   = graph.getDimension<LDS>(node);
+                //     auto [tileTag, tile] = graph.getDimension<MacroTile>(node);
+
+                //     Log::info("{}: tag {}, memoryType {}",
+                //               toString(op),
+                //               tileTag,
+                //               toString(tile.memoryType));
+
+                //     for(const auto& connection : graph.mapper.getConnections(node))
+                //     {
+                //         Log::info("Connected coordinate: {} {}",
+                //                   connection.coordinate,
+                //                   Graph::variantToString(
+                //                       graph.coordinates.getElement(connection.coordinate)));
+                //     }
+                // },
                 [&](auto op) {}};
 
             std::visit(visitor, graph.control.getNode(node));

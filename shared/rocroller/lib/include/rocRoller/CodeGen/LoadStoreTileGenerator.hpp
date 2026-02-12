@@ -144,6 +144,13 @@ namespace rocRoller
                 bool                           isPadded         = false;
             };
 
+            LoadStoreTileInfo loadMacroTileLDS(int                              tag,
+                                               ControlGraph::LoadLDSTile const& load,
+                                               CoordinateGraph::Transformer     coords);
+            LoadStoreTileInfo loadMacroTileWAVELDS(int                              tag,
+                                                   ControlGraph::LoadLDSTile const& load,
+                                                   CoordinateGraph::Transformer     coords);
+
         private:
             ContextPtr                       m_context;
             KernelGraphPtr                   m_graph;
@@ -220,12 +227,6 @@ namespace rocRoller
             Generator<Instruction> loadMacroTileVGPR(int                            tag,
                                                      ControlGraph::LoadTiled const& load,
                                                      CoordinateGraph::Transformer   coords);
-            Generator<Instruction> loadMacroTileLDS(int                              tag,
-                                                    ControlGraph::LoadLDSTile const& load,
-                                                    CoordinateGraph::Transformer     coords);
-            Generator<Instruction> loadMacroTileWAVELDS(int                              tag,
-                                                        ControlGraph::LoadLDSTile const& load,
-                                                        CoordinateGraph::Transformer     coords);
             Generator<Instruction> loadMacroTileWAVE(int                            tag,
                                                      ControlGraph::LoadTiled const& load,
                                                      CoordinateGraph::Transformer   coords);

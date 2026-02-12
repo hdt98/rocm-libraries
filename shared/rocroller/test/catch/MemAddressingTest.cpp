@@ -107,7 +107,9 @@ namespace MemAddressingTest
 
         SECTION(variants.name)
         {
-            auto context = TestContext::ForTestDevice({}, variants.name);
+            // TODO: switch to weightless which as asserts that all LDS instructions are annotated with addresses
+            auto context = TestContext::ForTestDevice(
+                {{.dsObserver = DSObserverType::DSMEMObserver}}, variants.name);
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
 
             example.setUseLDS(true, true, false);
