@@ -3,16 +3,17 @@
 
 #include "gemm_tdm_data_cache_prefetch_common.hpp"
 
-// TDM V1 GEMM Configuration with Data Cache Prefetch control
+// TDM V2 GEMM Configuration with Data Cache Prefetch control
 template <typename PrecType, bool UseDataCachePrefetch_, bool DataCachePrefetchToL1_ = false>
-struct GemmConfigTDMV1Prefetch : public GemmConfigBase
+struct GemmConfigTDMV2Prefetch : public GemmConfigBase
 {
     static constexpr ck_tile::index_t M_Tile = 128;
     static constexpr ck_tile::index_t N_Tile = 128;
     static constexpr ck_tile::index_t K_Tile = 64;
 
+    //  TDM V2 (requires 4 waves):  M_Warp * N_Warp * K_Warp == 4
     static constexpr ck_tile::index_t M_Warp = 2;
-    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 2;
     static constexpr ck_tile::index_t K_Warp = 1;
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
@@ -25,14 +26,14 @@ struct GemmConfigTDMV1Prefetch : public GemmConfigBase
     static constexpr bool kPadK = true;
 
     static constexpr bool DoubleSmemBuffer          = true;
-    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_TDM_V1;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_TDM_V2;
     static constexpr bool UseDataCachePrefetch      = UseDataCachePrefetch_;
     static constexpr bool DataCachePrefetchToL1     = DataCachePrefetchToL1_;
 };
 
 int run_gemm_example(ck_tile::ArgParser& arg_parser)
 {
-    return run_gemm_example_with_prefetch<GemmConfigTDMV1Prefetch>(arg_parser);
+    return run_gemm_example_with_prefetch<GemmConfigTDMV2Prefetch>(arg_parser);
 }
 
 int main(int argc, char* argv[])

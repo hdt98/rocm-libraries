@@ -905,24 +905,72 @@ struct tile_window_with_static_distribution
         static_for<0, NumCoord, 1>{}(process_coord);
     }
 
+#if defined(__gfx125__)
+    template <bool isL1Cache = true>
+    static constexpr index_t getCachelineSize()
+    {
+        if constexpr(isL1Cache)
+            return 32; // L1 cacheline size in bytes for gfx125
+        else
+            return 256; // L2 cacheline size in bytes for gfx125
+    }
+#endif
+
+    // NOTE:
+    // We assume that the prefetch_for_tdm call starts with coordinates aligned to cacheline size
+    // i.e for 32 bit cacheline they're aligned to 32. We also assume the step coordinate that is
+    // moving in contiguous dimension is at the last dimension of the tile distribution (i.e x
+    // dimension in row-major layout), and we only consider the step in that dimension for prefetch
+    // coverage calculation.
+    template <bool PrefetchL1 = false, typename DramTileWindowStep>
+    CK_TILE_DEVICE constexpr index_t
+    prefetch_for_tdm_covers_more_calls([[maybe_unused]] const DramTileWindowStep& step)
+    {
+#if defined(__gfx125__)
+        // TODO: move it somewhere and call when we need these values
+        constexpr index_t cacheline_size = getCachelineSize<PrefetchL1>();
+
+        using Traits             = typename Base::Traits;
+        constexpr auto tile_dstr = typename Base::TileDstr{};
+
+        // Get tile dimensions
+        constexpr auto raw_box_dim =
+            to_sequence(tile_dstr.get_ys_to_d_descriptor().get_lengths()).reverse();
+
+        const index_t x_step = step.at(number<DramTileWindowStep{}.size() - 1>{});
+        if(x_step == 0)
+            return 0; // if step is 0, it means we are not moving in that dimension, so prefetch
+                      // won't cover more calls
+
+        const index_t bytes_per_x_step =
+            x_step * Traits::PackedSize * sizeof(typename Base::DataType);
+
+        constexpr index_t cacheline_part_covered_by_prefetch_for_tdm =
+            raw_box_dim.at(number<0>{}) * sizeof(typename Base::DataType);
+
+        const index_t additional_prefetches_covered =
+            max(0,
+                (cacheline_size - cacheline_part_covered_by_prefetch_for_tdm) /
+                    bytes_per_x_step); // we don't want negatives
+        return additional_prefetches_covered;
+#else
+        return 0;
+#endif
+    }
     // Prefetch DRAM memory that would be accessed by TDM load
     // Similar to tdm_load_to_lds but issues cache prefetch hints instead of loading to LDS
     // We try to fill entire wave with multiple rows and columns per single call to prefetch
     // For OOB we set is_valid to false
     // For now TDMConfig_ is unused, but we keep it for future use when maybe TDM will have prefetch
     // config
-    template <typename TDMConfig_>
+    template <bool PrefetchL1 = false, typename TDMConfig_>
     CK_TILE_DEVICE void prefetch_for_tdm([[maybe_unused]] const TDMConfig_& tdm_config) const
     {
 #if defined(__gfx125__)
         // TODO: move it somewhere and call when we need these values
-        constexpr index_t L1_cacheline_size = 32;
-        constexpr index_t L2_cacheline_size = 256;
-
-        constexpr bool prefetch_L1       = true;
-        constexpr index_t cacheline_size = prefetch_L1 ? L1_cacheline_size : L2_cacheline_size;
+        constexpr index_t cacheline_size = getCachelineSize<PrefetchL1>();
         constexpr auto preferred_coherence =
-            prefetch_L1 ? amd_buffer_coherence_enum::CU_RT : amd_buffer_coherence_enum::SE_RT;
+            PrefetchL1 ? amd_buffer_coherence_enum::CU_RT : amd_buffer_coherence_enum::SE_RT;
 
         using Traits             = typename Base::Traits;
         constexpr auto tile_dstr = typename Base::TileDstr{};
@@ -969,17 +1017,16 @@ struct tile_window_with_static_distribution
                 num_lanes / lanes_per_row; // how many rows we can process in parallel
 
             // Determine which row and column offset this lane handles
-            const index_t y_lane_offset = get_lane_id() / lanes_per_row;
+            const index_t y_lane_offset = (get_lane_id() / lanes_per_row) % y_len;
             const index_t x_lane_offset = (get_lane_id() % lanes_per_row) * col_prefetch_stride;
 
             // Get base offset for this thread's starting position
             const auto base_offset = bottom_tensor_thread_coord.get_offset();
 
-            constexpr index_t num_x_iterations = (x_len + lanes_per_row * col_prefetch_stride - 1) /
-                                                 (lanes_per_row * col_prefetch_stride);
-            constexpr index_t num_y_iterations =
-                (y_len + num_rows_parallel - 1) / num_rows_parallel;
-            constexpr auto box_dim = [&]() {
+            constexpr index_t num_x_iterations =
+                integer_divide_ceil(x_len, lanes_per_row * col_prefetch_stride);
+            constexpr index_t num_y_iterations = integer_divide_ceil(y_len, num_rows_parallel);
+            constexpr auto box_dim             = [&]() {
                 if constexpr(raw_box_dim.size() > 1)
                 {
                     return raw_box_dim.modify(number<0>{}, number<num_x_iterations>{})

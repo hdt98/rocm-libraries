@@ -306,6 +306,28 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                               !(is_tile_window_linear_v<decltype(b_lds_gemm_windows[I0{}])>) &&
                               !(is_tile_window_linear_v<decltype(b_lds_gemm_windows[I1{}])>),
                           "LDS windows must not be linear");
+
+            // Data cache prefetch for upcoming TDM loads
+            auto a_prefetch_window = a_copy_dram_window;
+            auto b_prefetch_window = b_copy_dram_window;
+            if constexpr(Policy::UseDataCachePrefetch && HasHotLoop)
+            {
+                __builtin_amdgcn_sched_barrier(0);
+                if constexpr(warp_id == 0)
+                {
+                    move_tile_window(a_prefetch_window, a_dram_tile_window_step_stride);
+                    a_prefetch_window.template prefetch_for_tdm<Policy::DataCachePrefetchToL1>(
+                        tdm_config_a[0]);
+                }
+                if constexpr(warp_id == 1)
+                {
+                    move_tile_window(b_prefetch_window, b_dram_tile_window_step_stride);
+                    b_prefetch_window.template prefetch_for_tdm<Policy::DataCachePrefetchToL1>(
+                        tdm_config_b[0]);
+                }
+                __builtin_amdgcn_sched_barrier(0);
+            }
+
 #if BARRIER_ATOMIC_IN_TDM
             uint32_t phase[2]             = {7, 7};
             constexpr uint32_t PHASE_MASK = 0x7;
@@ -339,6 +361,39 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                 {
                     // ping
                     {
+                        if constexpr(Policy::UseDataCachePrefetch)
+                        {
+                            // NOTE: found out that this place for prefetch give best performance
+                            // when swizzled with block_gemm
+                            if constexpr(warp_id == 2)
+                            {
+                                if(i_global_read + 2 < num_loop)
+                                    move_tile_window(a_prefetch_window,
+                                                     a_dram_tile_window_step_stride);
+                                // check if prefetch is needed or was covered by warp_id 0
+                                if constexpr(!a_prefetch_window
+                                                  .template prefetch_for_tdm_covers_more_calls<
+                                                      Policy::DataCachePrefetchToL1>(
+                                                      a_dram_tile_window_step))
+                                    a_prefetch_window
+                                        .template prefetch_for_tdm<Policy::DataCachePrefetchToL1>(
+                                            tdm_config_a[1]);
+                            }
+                            if constexpr(warp_id == 3)
+                            {
+                                if(i_global_read + 2 < num_loop)
+                                    move_tile_window(b_prefetch_window,
+                                                     b_dram_tile_window_step_stride);
+                                // check if prefetch is needed or was covered by warp_id 1
+                                if constexpr(!b_prefetch_window
+                                                  .template prefetch_for_tdm_covers_more_calls<
+                                                      Policy::DataCachePrefetchToL1>(
+                                                      b_dram_tile_window_step))
+                                    b_prefetch_window
+                                        .template prefetch_for_tdm<Policy::DataCachePrefetchToL1>(
+                                            tdm_config_b[1]);
+                            }
+                        }
                         static_for<0, sub_tile_num - 1, 1>{}([&](auto i) {
                             // current compute tile index
                             constexpr index_t compute_idx = i.value % 2;
@@ -387,6 +442,29 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                         __builtin_amdgcn_s_barrier_wait(-1);
 #endif
                         __builtin_amdgcn_sched_barrier(0);
+                        if constexpr(Policy::UseDataCachePrefetch)
+                        {
+                            // NOTE: found out that this place for prefetch give best performance
+                            // when swizzled with block_gemm
+                            if constexpr(warp_id == 0)
+                            {
+                                if(i_global_read + 2 < num_loop)
+                                    move_tile_window(a_prefetch_window,
+                                                     a_dram_tile_window_step_stride);
+                                a_prefetch_window
+                                    .template prefetch_for_tdm<Policy::DataCachePrefetchToL1>(
+                                        tdm_config_a[0]);
+                            }
+                            if constexpr(warp_id == 1)
+                            {
+                                if(i_global_read + 2 < num_loop)
+                                    move_tile_window(b_prefetch_window,
+                                                     b_dram_tile_window_step_stride);
+                                b_prefetch_window
+                                    .template prefetch_for_tdm<Policy::DataCachePrefetchToL1>(
+                                        tdm_config_b[0]);
+                            }
+                        }
                         constexpr index_t final_prefetch_idx = sub_tile_num % 2;
                         constexpr index_t final_compute_idx  = (sub_tile_num - 1) % 2;
                         block_gemm.template LocalPrefetch<
@@ -442,6 +520,7 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                                                     b_copy_lds_windows[number<1>{}],
                                                     b_copy_dram_window);
                         }
+
 #if BARRIER_ATOMIC_IN_TDM
                         phase[0] = (phase[0] - 1) & PHASE_MASK;
                         barriers[0]->wait(phase[0]);

@@ -37,6 +37,7 @@ struct GemmConfigBase
     static constexpr ck_tile::index_t kClusterSizeN       = 1;
     static constexpr ck_tile::index_t BlockedXDLN_PerWarp = 1;
     static constexpr bool UseDataCachePrefetch            = false;
+    static constexpr bool DataCachePrefetchToL1           = false;
 };
 
 template <typename PrecType>
@@ -493,14 +494,20 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V1>
         ck_tile::GemmPipelineAgBgCrCompTDMV1<PipelineProblem,
                                              ck_tile::GemmPipelineAgBgCrCompTDMDefaultPolicy<
                                                  false,
-                                                 PipelineProblem::Traits::UseDataCachePrefetch>>;
+                                                 PipelineProblem::Traits::UseDataCachePrefetch,
+                                                 PipelineProblem::Traits::DataCachePrefetchToL1>>;
 };
 
 template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_TDM_V2>
 {
     template <typename PipelineProblem>
-    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompTDMV2<PipelineProblem>;
+    using GemmPipeline =
+        ck_tile::GemmPipelineAgBgCrCompTDMV2<PipelineProblem,
+                                             ck_tile::GemmPipelineAgBgCrCompTDMDefaultPolicy<
+                                                 true,
+                                                 PipelineProblem::Traits::UseDataCachePrefetch,
+                                                 PipelineProblem::Traits::DataCachePrefetchToL1>>;
 };
 
 template <>
