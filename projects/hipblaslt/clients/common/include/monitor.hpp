@@ -14,6 +14,8 @@
 #include <rocm_smi/rocm_smi.h>
 #include <hip/hip_runtime.h>
 
+#define MONITOR_ON 1
+
 inline void CHECK_ERR(hipError_t status)
 {
     if(status != hipSuccess)
@@ -123,11 +125,12 @@ struct SMI_Monitor
                 std::cout << "|" << metrics.current_gfxclks[i] * MhzToMHz;
             }
             std::cout << "|->" << uint32_t(avg_clk / xcd_count);
-
             std::cout << " MHz, mem_clk=" << mem_mhz << " MHz";
 
             if(usage_ok)
                 std::cout << ", gfx%=" << gfx_busy;
+            // std::cout << ", ppt_acc=" << metrics.ppt_residency_acc;
+            // std::cout << ", thr_sta=" << metrics.indep_throttle_status;
 
             std::cout << std::endl;
             std::this_thread::sleep_for(period);
@@ -136,6 +139,7 @@ struct SMI_Monitor
 
     void Start(int hip_dev_id)
     {
+#if MONITOR_ON
         auto smi_index = _get_smi_index(hip_dev_id);
         if(smi_index == UINT32_MAX)
         {
@@ -143,12 +147,17 @@ struct SMI_Monitor
             return;
         }
         monitor_thread = std::thread(_monitor_loop, std::ref(running), smi_index, period);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif 
     }
 
     void Stop()
     {
+#if MONITOR_ON
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         running.store(false, std::memory_order_release);
         if(monitor_thread.joinable())
             monitor_thread.join();
+#endif
     }
 };
