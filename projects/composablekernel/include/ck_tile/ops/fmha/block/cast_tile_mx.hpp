@@ -9,14 +9,16 @@ namespace ck_tile {
 
 template <index_t ScaleGranularity,
           index_t MLane,
+          typename DstTensor,
+          typename DstScaleTensor,
           typename SrcTensor,
           typename SrcElementFunc,
-          typename DstTensor,
-          typename DstScaleTensor>
-CK_TILE_DEVICE void cast_tile_mx(const SrcTensor& src_tensor,
-                                 const SrcElementFunc& src_element_func,
-                                 DstTensor& dst_tensor,
-                                 DstScaleTensor& dst_scale_tensor)
+          typename ScaleFunc>
+CK_TILE_DEVICE void cast_tile_mx(DstTensor& dst_tensor,
+                                 DstScaleTensor& dst_scale_tensor,
+                                 const SrcTensor& src_tensor,
+                                 const SrcElementFunc& src_element_func = identity{},
+                                 const ScaleFunc& scale_func            = identity{})
 {
     using DstDataType      = remove_cv_t<typename DstTensor::DataType>;
     using DstScaleDataType = remove_cv_t<typename DstScaleTensor::DataType>;
@@ -39,14 +41,15 @@ CK_TILE_DEVICE void cast_tile_mx(const SrcTensor& src_tensor,
             // (1 lane, 32 per lane for fp4)
             float max_value = 0;
             static_for<0, 32, 1>{}([&](auto j) {
-                max_value =
-                    max(max_value, type_convert<float>(src_tensor.get_thread_buffer()[i * 32 + j]));
+                const float v = type_convert<float>(src_tensor.get_thread_buffer()[i * 32 + j]);
+                max_value     = max(max_value, abs(v));
             });
-            max_value = min(1.0f, max_value);
 
             static_assert(std::is_same_v<DstScaleDataType, e8m0_t>);
             // For e8m0 round up to the next power of 2
             float scale = exp2(ceil(log2(max_value)));
+
+            scale = scale_func(scale);
 
             // Convert using scales
 
@@ -101,16 +104,17 @@ CK_TILE_DEVICE void cast_tile_mx(const SrcTensor& src_tensor,
             // (2 lanes, 16 per lane for fp8/bf8)
             float max_value = 0;
             static_for<0, 16, 1>{}([&](auto j) {
-                max_value =
-                    max(max_value, type_convert<float>(src_tensor.get_thread_buffer()[i * 16 + j]));
+                const float v = type_convert<float>(src_tensor.get_thread_buffer()[i * 16 + j]);
+                max_value     = max(max_value, abs(v));
             });
             // 2 lanes, 16 values per lane share one scale
             max_value = max(max_value, warp_shuffle(max_value, lane ^ MLane));
-            max_value = min(1.0f, max_value);
 
             static_assert(std::is_same_v<DstScaleDataType, e8m0_t>);
             // For e8m0 round up to the next power of 2
             float scale = exp2(ceil(log2(max_value)));
+
+            scale = scale_func(scale);
 
             // Convert using scales
 
