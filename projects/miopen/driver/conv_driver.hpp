@@ -520,8 +520,8 @@ private:
     void PrintTuningJsonLog(const std::string& direction,
                             float tuning_time) const
     {
-        std::cout << "{\"find_time\":" << tuning_time << ","
-                << "\"direction\":" << direction << ","
+        std::cout << "{\"find_time_conv_ms\":" << tuning_time << ","
+                << "\"direction\":\"" << direction << "\","
                 << "\"environment_variables\":{"
                     << "\"MIOPEN_FIND_MODE\":" << (MIOPEN_FIND_MODE ? miopen::env::value(MIOPEN_FIND_MODE) : static_cast<int>(miopenConvolutionFindModeDefault)) << ","
                     << "\"MIOPEN_FIND_ENFORCE\":" << (MIOPEN_FIND_ENFORCE ? miopen::env::value(MIOPEN_FIND_ENFORCE) : static_cast<int>(miopenTuningPolicyNone)) << ","
@@ -1790,10 +1790,10 @@ int ConvDriver<Tgpu, Tref>::FindForward(int& ret_algo_count,
     bool is_transform = IsInputTensorTransform();
     fwd_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_fwd);
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
     Timer find_time;
     find_time.start();
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
     const auto rc = miopenFindConvolutionForwardAlgorithm(
         GetHandle(),
         (is_transform ? inputTensor_vect4 : inputTensor),
@@ -2605,6 +2605,8 @@ int ConvDriver<Tgpu, Tref>::FindBackwardData(int& ret_algo_count,
 {
     bwd_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_bwd);
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
     Timer find_time;
     find_time.start();
     const auto rc = miopenFindConvolutionBackwardDataAlgorithm(
@@ -2639,6 +2641,8 @@ int ConvDriver<Tgpu, Tref>::FindBackwardWeights(int& ret_algo_count,
 {
     wrw_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_wrw);
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
     Timer find_time;
     find_time.start();
     const auto rc = miopenFindConvolutionBackwardWeightsAlgorithm(
