@@ -102,6 +102,17 @@ struct XdlV3Algorithm
     static_assert(ckb::BlockGemmPipelineDescriptor<BlockGemmPipelineDescriptor>);
 
     bool direct_load;
+
+    // Elementwise operations applied during convolution
+    // - input_op: Applied to input tensor (A) before GEMM
+    // - weight_op: Applied to weight tensor (B) before GEMM
+    // - output_op: Applied to output tensor (CDE) after GEMM (epilogue)
+    struct ElementwiseOps
+    {
+        ckb::ElementwiseOperation input_op;
+        ckb::ElementwiseOperation weight_op;
+        ckb::ElementwiseOperation output_op;
+    } elementwise_ops;
 };
 
 static_assert(ckb::factory::FwdXdlV3Algorithm<XdlV3Algorithm>);
@@ -116,20 +127,26 @@ struct XdlV3Instance
 // Constexpr function to create XdlV3Instance from old
 // DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 template parameters. Parameters are in the same
 // order as the template parameters, with V3-specific additions.
-constexpr XdlV3Instance make_xdl_v3_instance_from_old_params(
+template <std::size_t NumDTensor>
+constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
+    const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     // 6-11. Data types
     ckb::DataType input_data_type,
     ckb::DataType weight_data_type,
     ckb::DataType acc_data_type,
     ckb::DataType cshuffle_data_type,
+    const std::array<ckb::DataType, NumDTensor>& ds_data_types,
     ckb::DataType output_data_type,
-    // 12-14. Elementwise operations (not stored in XdlSignature/XdlAlgorithm currently)
+    // 12-14. Elementwise operations
+    ckb::ElementwiseOperation input_elementwise_op,
+    ckb::ElementwiseOperation weight_elementwise_op,
+    ckb::ElementwiseOperation output_elementwise_op,
     // 15-16. Specializations
     ckb::ConvSpecialization conv_fwd_specialization,
     ckb::GemmSpecialization gemm_specialization,
@@ -292,7 +309,12 @@ constexpr XdlV3Instance make_xdl_v3_instance_from_old_params(
                 .scheduler        = loop_scheduler,
                 .pipeline_version = pipeline_version
             },
-            .direct_load = direct_load
+            .direct_load = direct_load,
+            .elementwise_ops = {
+                .input_op  = input_elementwise_op,
+                .weight_op = weight_elementwise_op,
+                .output_op = output_elementwise_op
+            }
         }
     };
     // clang-format on
