@@ -40,7 +40,56 @@ namespace rocRoller::KernelGraph
     using namespace ControlGraph;
     using namespace CoordinateGraph;
 
-    Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, VariableType varType)
+    ModelAddresses::ModelAddresses(ContextPtr context)
+        : m_context(context)
+    {
+        setup();
+    }
+
+    void ModelAddresses::setup()
+    {
+        namespace CT         = rocRoller::KernelGraph::CoordinateGraph;
+        namespace Expression = rocRoller::Expression;
+        using namespace ControlGraph;
+        using namespace CoordinateGraph;
+        using namespace Expression;
+
+        for(int i = 0; i < 3; ++i)
+        {
+            workgroupOffset[i] = arguments.size();
+            auto wg_name       = concatenate("WG", i);
+            auto wg_carg       = CommandArgument(
+                nullptr, DataType::UInt32, workgroupOffset[i], DataDirection::ReadOnly, wg_name);
+            auto wg = std::make_shared<CommandArgument>(wg_carg);
+            arguments.appendUnbound<uint>(wg_name);
+
+            workitemOffset[i] = arguments.size();
+            auto wi_name      = concatenate("WI", i);
+            auto wi_carg      = CommandArgument(
+                nullptr, DataType::UInt32, workitemOffset[i], DataDirection::ReadOnly, wi_name);
+            auto wi = std::make_shared<CommandArgument>(wi_carg);
+            arguments.appendUnbound<uint>(wi_name);
+
+            kernelWorkgroupIndexes[i] = std::make_shared<Expression::Expression>(wg);
+            kernelWorkitemIndexes[i]  = std::make_shared<Expression::Expression>(wi);
+        }
+
+        rawArguments     = arguments.dataVector();
+        runtimeArguments = RuntimeArguments(rawArguments.data(), rawArguments.size());
+    }
+
+    void ModelAddresses::setWorkgroup(uint offset, uint value)
+    {
+        *((uint*)(rawArguments.data() + workgroupOffset[offset])) = value;
+    }
+
+    void ModelAddresses::setWorkitem(uint offset, uint value)
+    {
+        *((uint*)(rawArguments.data() + workitemOffset[offset])) = value;
+    }
+
+    Generator<size_t>
+        ModelAddresses::getLDSAddresses(KernelGraph& graph, int tag, VariableType varType)
     {
         namespace CT         = rocRoller::KernelGraph::CoordinateGraph;
         namespace Expression = rocRoller::Expression;
@@ -64,42 +113,6 @@ namespace rocRoller::KernelGraph
             auto numBits      = static_cast<uint>(dataTypeInfo.elementBits / dataTypeInfo.packing);
             auto numElements  = getUnsignedInt(evaluate(vgpr.size));
             auto numBytes     = (numBits * numElements) / 8u;
-
-            // TODO: most of this can be cached for a const graph
-            KernelArguments              arguments;
-            std::array<uint, 3>          workgroupOffset, workitemOffset;
-            std::array<ExpressionPtr, 3> kernelWorkgroupIndexes, kernelWorkitemIndexes;
-
-            for(int i = 0; i < 3; ++i)
-            {
-                workgroupOffset[i] = arguments.size();
-                auto wg_name       = concatenate("WG", i);
-                auto wg_carg       = CommandArgument(nullptr,
-                                               DataType::UInt32,
-                                               workgroupOffset[i],
-                                               DataDirection::ReadOnly,
-                                               wg_name);
-                auto wg            = std::make_shared<CommandArgument>(wg_carg);
-                arguments.appendUnbound<uint>(wg_name);
-
-                workitemOffset[i] = arguments.size();
-                auto wi_name      = concatenate("WI", i);
-                auto wi_carg      = CommandArgument(
-                    nullptr, DataType::UInt32, workitemOffset[i], DataDirection::ReadOnly, wi_name);
-                auto wi = std::make_shared<CommandArgument>(wi_carg);
-                arguments.appendUnbound<uint>(wi_name);
-
-                kernelWorkgroupIndexes[i] = std::make_shared<Expression::Expression>(wg);
-                kernelWorkitemIndexes[i]  = std::make_shared<Expression::Expression>(wi);
-            }
-
-            auto rawArguments     = arguments.dataVector();
-            auto runtimeArguments = RuntimeArguments(rawArguments.data(), rawArguments.size());
-
-            auto setWorkgroup
-                = [&](uint i, uint v) { *((uint*)(rawArguments.data() + workgroupOffset[i])) = v; };
-            auto setWorkitem
-                = [&](uint i, uint v) { *((uint*)(rawArguments.data() + workitemOffset[i])) = v; };
 
             auto coords = graph.buildTransformer(tag);
             coords.setCoordinate(vgprTag, Expression::literal(0));

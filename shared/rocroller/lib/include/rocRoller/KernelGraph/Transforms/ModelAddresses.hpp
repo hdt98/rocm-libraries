@@ -38,16 +38,23 @@ namespace rocRoller
         class ModelAddresses : public GraphTransform
         {
         public:
-            ModelAddresses(ContextPtr context)
-                : m_context(context)
-            {
-            }
+            ModelAddresses(ContextPtr context);
 
             KernelGraph apply(KernelGraph const& original) override;
             std::string name() const override;
 
         private:
-            ContextPtr m_context;
+            Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, VariableType varType);
+            void              setup();
+            void              setWorkgroup(uint offset, uint value);
+            void              setWorkitem(uint offset, uint value);
+
+            ContextPtr                               m_context;
+            KernelArguments                          arguments;
+            std::array<uint, 3>                      workgroupOffset, workitemOffset;
+            std::array<Expression::ExpressionPtr, 3> kernelWorkgroupIndexes, kernelWorkitemIndexes;
+            std::vector<uint8_t>                     rawArguments;
+            RuntimeArguments                         runtimeArguments;
         };
     }
 }
