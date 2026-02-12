@@ -39,6 +39,7 @@
 #include <miopen/solver/implicitgemm_util.hpp>
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS)
+MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CK_DEFAULT_KERNELS)
 
 namespace miopen {
 namespace solver {
@@ -172,6 +173,41 @@ bool ConvHipImplicitGemmBwdXdlops::CheckCKApplicability(const ProblemDescription
 }
 #endif
 
+static std::vector<std::string> ranked_1st_applicable = {
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4> Filter1x1Stride1Pad0",
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 4, 1, 2, 4, 4, 4, 4> Filter1x1Stride1Pad0",
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<64, 32, 64, 4, 4, 1, 2, 4, 4, 4, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<128, 128, 32, 4, 4, 2, 1, 4, 4, 1, 4> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 4, 2, 1, 4, 4, 2, 4> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 4, 2, 1, 4, 4, 2, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 8, 1, 2, 8, 8, 2, 8> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 64, 4, 8, 2, 1, 8, 8, 1, 8> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<128, 128, 32, 4, 8, 2, 1, 8, 8, 1, 8> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 8, 2, 1, 8, 8, 2, 8> Filter1x1Stride1Pad0",
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 128, 128, 4, 8, 2, 2, 8, 8, 2, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 8, 1, 2, 8, 8, 2, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 64, 4, 8, 2, 1, 8, 8, 1, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<128, 128, 32, 4, 8, 2, 1, 8, 8, 1, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 8, 2, 1, 8, 8, 2, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 8, 1, 2, 8, 8, 2, 8> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 8, 1, 2, 8, 8, 2, 8>"
+};
+
+void PerformanceConfigHipImplicitGemmBwdXdlops::DefaultKernelFromList()
+{
+    for(auto kernel_str : ranked_1st_applicable)
+    {
+        auto it = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
+        if(it != valid_kernels.end())
+        {
+            index = it - valid_kernels.begin();
+            kernel_id = valid_kernels[index];
+            return;
+        }
+    }
+}
+
 void PerformanceConfigHipImplicitGemmBwdXdlops::HeuristicInit(
     [[maybe_unused]] const ProblemDescription& problem)
 {
@@ -191,6 +227,9 @@ void PerformanceConfigHipImplicitGemmBwdXdlops::HeuristicInit(
     case miopenInt64:
     case miopenDouble: break;
     }
+
+    if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
+        DefaultKernelFromList();
 #endif
 }
 
