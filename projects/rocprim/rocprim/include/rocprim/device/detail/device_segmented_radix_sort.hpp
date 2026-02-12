@@ -874,7 +874,7 @@ template<class TargetConfig,
          class SegmentIndexIterator,
          class OffsetIterator>
 ROCPRIM_DEVICE ROCPRIM_INLINE
-void segmented_sort_large(
+void sort_block_sized_segments(
     const unsigned int*                                             segment_counts,
     KeysInputIterator                                               keys_input,
     typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
@@ -992,7 +992,47 @@ void segmented_sort_large(
     }
 }
 
+template<class TargetConfig>
+struct small_segment_config_extractor
+{
+    static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
+
+    static constexpr auto partitioning_allowed = params.warp_sort_config.partitioning_allowed;
+    static constexpr auto block_size           = params.warp_sort_config.block_size_small;
+    static constexpr auto logical_warp_size    = params.warp_sort_config.logical_warp_size_small;
+    static constexpr auto items_per_thread     = params.warp_sort_config.items_per_thread_small;
+    static constexpr auto warps_per_block      = block_size / logical_warp_size;
+
+    ROCPRIM_DEVICE
+    static auto           get_num_segment_count(const unsigned int  total_segments,
+                                                const unsigned int* segment_counts)
+    {
+        return total_segments - segment_counts[1] - segment_counts[0];
+    }
+};
+
+template<class TargetConfig>
+struct medium_segment_config_extractor
+{
+    static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
+
+    static constexpr auto partitioning_allowed = params.warp_sort_config.partitioning_allowed;
+    static constexpr auto block_size           = params.warp_sort_config.block_size_medium;
+    static constexpr auto logical_warp_size    = params.warp_sort_config.logical_warp_size_medium;
+    static constexpr auto items_per_thread     = params.warp_sort_config.items_per_thread_medium;
+    static constexpr auto warps_per_block      = block_size / logical_warp_size;
+
+    ROCPRIM_DEVICE
+    static auto           get_num_segment_count(const unsigned int  total_segments,
+                                                const unsigned int* segment_counts)
+    {
+        (void)total_segments;
+        return segment_counts[1];
+    }
+};
+
 template<class TargetConfig,
+         template<class> class ConfigExtractor,
          bool Descending,
          bool IsUnknownGridSize,
          class KeysInputIterator,
@@ -1002,8 +1042,8 @@ template<class TargetConfig,
          class SegmentIndexIterator,
          class OffsetIterator>
 ROCPRIM_DEVICE ROCPRIM_INLINE
-void segmented_sort_small(
-    const unsigned int*                                             segments_counts,
+void sort_warp_sized_segments(
+    const unsigned int*                                             segment_counts,
     KeysInputIterator                                               keys_input,
     typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
     KeysOutputIterator                                              keys_output,
@@ -1015,41 +1055,44 @@ void segmented_sort_small(
     OffsetIterator                                                  begin_offsets,
     OffsetIterator                                                  end_offsets,
     unsigned int                                                    begin_bit,
-    unsigned int                                                    end_bit)
+    unsigned int                                                    end_bit,
+    unsigned int                                                    total_segments,
+    unsigned int                                                    num_segments)
 {
-    static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
-
-    static constexpr unsigned int block_size = params.warp_sort_config.block_size_small;
-    static constexpr unsigned int logical_warp_size
-        = params.warp_sort_config.logical_warp_size_small;
-    static_assert(block_size % logical_warp_size == 0,
+    // Config extractor is either small_segment_config_extractor or medium_segment_config_extractor.
+    // It extracts the right block size, warp size, and items per thread from the config.
+    using config = ConfigExtractor<TargetConfig>;
+    static_assert(config::block_size % config::logical_warp_size == 0,
                   "logical_warp_size must be a divisor of block_size");
-    static constexpr unsigned int warps_per_block = block_size / logical_warp_size;
 
     using key_type   = typename std::iterator_traits<KeysInputIterator>::value_type;
     using value_type = typename std::iterator_traits<ValuesInputIterator>::value_type;
 
-    using warp_sort_helper_type = segmented_warp_sort_helper<
-        select_warp_sort_helper_config_t<params.warp_sort_config.partitioning_allowed,
-                                         params.warp_sort_config.logical_warp_size_small,
-                                         params.warp_sort_config.items_per_thread_small,
-                                         params.warp_sort_config.block_size_small>,
-        key_type,
-        value_type,
-        block_size,
-        Descending>;
+    using warp_sort_helper_type
+        = segmented_warp_sort_helper<select_warp_sort_helper_config_t<config::partitioning_allowed,
+                                                                      config::logical_warp_size,
+                                                                      config::items_per_thread,
+                                                                      config::block_size>,
+                                     key_type,
+                                     value_type,
+                                     config::block_size,
+                                     Descending>;
 
     ROCPRIM_SHARED_MEMORY
     typename warp_sort_helper_type::storage_type storage;
 
-    const auto num_segments = segments_counts[2] /* total */ - segments_counts[1] /* medium */
-                              - segments_counts[0] /* large */;
-    const auto start_block_id  = ::rocprim::detail::block_id<0>();
-    const auto logical_warp_id = ::rocprim::detail::logical_warp_id<logical_warp_size>();
-
-    auto sort_segments = [&](auto block_id)
+    // If we have an unknown grid size, we also do not know the number of segments
+    // we need to process. We have to load this from global memory.
+    if constexpr(IsUnknownGridSize)
     {
-        const auto segment_index = (block_id * warps_per_block) + logical_warp_id;
+        num_segments = config::get_num_segment_count(total_segments, segment_counts);
+    }
+
+    const auto start_block_id  = ::rocprim::detail::block_id<0>();
+    const auto logical_warp_id = ::rocprim::detail::logical_warp_id<config::logical_warp_size>();
+    const auto sort_segments   = [&](auto block_id)
+    {
+        const auto segment_index = (block_id * config::warps_per_block) + logical_warp_id;
         if(segment_index >= num_segments)
         {
             // Break out of outer loop.
@@ -1084,112 +1127,8 @@ void segmented_sort_small(
     if constexpr(IsUnknownGridSize)
     {
         const auto grid_size = ::rocprim::detail::grid_size<0>();
-        for(auto block_id = start_block_id; block_id < num_segments; block_id += grid_size)
-        {
-            if(sort_segments(block_id))
-            {
-                return;
-            }
-        }
-    }
-    else
-    {
-        sort_segments(start_block_id);
-    }
-}
-
-template<class TargetConfig,
-         bool Descending,
-         bool IsUnknownGridSize,
-         class KeysInputIterator,
-         class KeysOutputIterator,
-         class ValuesInputIterator,
-         class ValuesOutputIterator,
-         class SegmentIndexIterator,
-         class OffsetIterator>
-ROCPRIM_DEVICE ROCPRIM_INLINE
-void segmented_sort_medium(
-    const unsigned int*                                             segments_counts,
-    KeysInputIterator                                               keys_input,
-    typename std::iterator_traits<KeysInputIterator>::value_type*   keys_tmp,
-    KeysOutputIterator                                              keys_output,
-    ValuesInputIterator                                             values_input,
-    typename std::iterator_traits<ValuesInputIterator>::value_type* values_tmp,
-    ValuesOutputIterator                                            values_output,
-    bool                                                            to_output,
-    SegmentIndexIterator                                            segment_indices,
-    OffsetIterator                                                  begin_offsets,
-    OffsetIterator                                                  end_offsets,
-    unsigned int                                                    begin_bit,
-    unsigned int                                                    end_bit)
-{
-    static constexpr segmented_radix_sort_config_params params = TargetConfig::params;
-
-    static constexpr unsigned int block_size = params.warp_sort_config.block_size_medium;
-    static constexpr unsigned int logical_warp_size
-        = params.warp_sort_config.logical_warp_size_medium;
-    static_assert(block_size % logical_warp_size == 0,
-                  "logical_warp_size must be a divisor of block_size");
-    static constexpr unsigned int warps_per_block = block_size / logical_warp_size;
-
-    using key_type   = typename std::iterator_traits<KeysInputIterator>::value_type;
-    using value_type = typename std::iterator_traits<ValuesInputIterator>::value_type;
-
-    using warp_sort_helper_type = segmented_warp_sort_helper<
-        select_warp_sort_helper_config_t<params.warp_sort_config.partitioning_allowed,
-                                         params.warp_sort_config.logical_warp_size_medium,
-                                         params.warp_sort_config.items_per_thread_medium,
-                                         params.warp_sort_config.block_size_medium>,
-        key_type,
-        value_type,
-        block_size,
-        Descending>;
-
-    ROCPRIM_SHARED_MEMORY
-    typename warp_sort_helper_type::storage_type storage;
-
-    const auto num_segments    = segments_counts[1] /* medium */;
-    const auto start_block_id  = ::rocprim::detail::block_id<0>();
-    const auto logical_warp_id = ::rocprim::detail::logical_warp_id<logical_warp_size>();
-
-    auto sort_segments = [&](auto block_id)
-    {
-        const auto segment_index = (block_id * warps_per_block) + logical_warp_id;
-        if(segment_index >= num_segments)
-        {
-            // Break out of outer loop.
-            return true;
-        }
-
-        const unsigned int segment_id   = segment_indices[segment_index];
-        const unsigned int begin_offset = begin_offsets[segment_id];
-        const unsigned int end_offset   = end_offsets[segment_id];
-
-        if(end_offset <= begin_offset)
-        {
-            // Do not break out of outer loop.
-            return false;
-        }
-
-        warp_sort_helper_type().sort(keys_input,
-                                     keys_tmp,
-                                     keys_output,
-                                     values_input,
-                                     values_tmp,
-                                     values_output,
-                                     to_output,
-                                     begin_offset,
-                                     end_offset,
-                                     begin_bit,
-                                     end_bit,
-                                     storage);
-        return false;
-    };
-
-    if constexpr(IsUnknownGridSize)
-    {
-        const auto grid_size = ::rocprim::detail::grid_size<0>();
-        for(auto block_id = start_block_id; block_id < num_segments; block_id += grid_size)
+        for(auto block_id = start_block_id; block_id * config::warps_per_block < num_segments;
+            block_id += grid_size)
         {
             if(sort_segments(block_id))
             {
