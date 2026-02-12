@@ -12,7 +12,8 @@
 #include "../common/csv_test_loader.hpp"              // Shared CSV test case loader
 
 using namespace ck::tensor_layout::convolution; // Import tensor layout names (NHWGC, GKYXC, etc.)
-
+static ck::index_t param_mask     = 0xffff;
+static ck::index_t instance_index = -1;
 // Load CSV data for 2D tests
 static std::vector<ck::utils::conv::ConvParam> Get2DTestCases()
 {
@@ -77,11 +78,14 @@ bool RunConvTest(const ck::utils::conv::ConvParam& param)
                                                        DataType,
                                                        DataType,
                                                        DataType,
-                                                       IndexType>(2,     // do_verification
-                                                                  1,     // init_method
-                                                                  false, // do_log
-                                                                  false, // time_kernel
-                                                                  param);
+                                                       IndexType>(
+        2,     // do_verification
+        1,     // init_method
+        false, // do_log
+        false, // time_kernel
+        param,
+        ck::tensor_operation::element_wise::PassThrough{},
+        instance_index);
 }
 
 // 2D Tests - Float
@@ -167,3 +171,20 @@ TEST_P(TestGroupedConvndFwd3dBFloat16, ConvTest)
 INSTANTIATE_TEST_SUITE_P(Dataset,
                          TestGroupedConvndFwd3dBFloat16,
                          ::testing::ValuesIn(Get3DTestCases()));
+
+int main(int argc, char** argv)
+{
+    testing::InitGoogleTest(&argc, argv);
+    if(argc == 1) {}
+    else if(argc == 3)
+    {
+        param_mask     = strtol(argv[1], nullptr, 0);
+        instance_index = atoi(argv[2]);
+    }
+    else
+    {
+        std::cout << "Usage of " << argv[0] << std::endl;
+        std::cout << "Arg1,2: param_mask instance_index(-1 means all)" << std::endl;
+    }
+    return RUN_ALL_TESTS();
+}

@@ -73,12 +73,6 @@ int run_gemm_test(int argc, char* argv[])
             }
         }
 
-        if(instance_index != -1)
-        {
-            std::cout << "TestGemm_instance (" << instance_index << "/" << num_instance
-                      << "): " << (pass ? "Passed" : "Failed") << std::endl;
-        }
-
         return pass;
     };
 

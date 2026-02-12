@@ -7,20 +7,6 @@
 #include "ck_tile/host/permute_pk_int4.hpp"
 #include "ck_tile/host/tensor_shuffle_utils.hpp"
 
-template <bool is_8bit>
-constexpr ck_tile::index_t get_k_warp_tile()
-{
-#if CK_TILE_USE_WMMA
-#if defined(CK_USE_GFX1250)
-    return is_8bit ? 64 : 32;
-#else
-    return 16;
-#endif
-#else
-    return is_8bit ? 64 : 32;
-#endif
-}
-
 struct GemmConfigBase
 {
     static constexpr bool kPadM = false;
@@ -55,23 +41,20 @@ struct GemmConfigBase
 
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<false>();
 };
 
 struct GemmConfigDecode : public GemmConfigBase
 {
-    static constexpr ck_tile::index_t M_Tile      = 16;
-    static constexpr ck_tile::index_t N_Tile      = 64;
-    static constexpr ck_tile::index_t K_Tile      = 256;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<true>();
+    static constexpr ck_tile::index_t M_Tile = 16;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 256;
 };
 
 struct GemmConfigPrefill : public GemmConfigBase
 {
-    static constexpr ck_tile::index_t M_Tile      = 128;
-    static constexpr ck_tile::index_t N_Tile      = 128;
-    static constexpr ck_tile::index_t K_Tile      = 128;
-    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<true>();
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128;
 };
 
 struct GemmConfigPrefillIntrawave : public GemmConfigBase
@@ -139,6 +122,8 @@ struct GemmConfigPreshuffleBDecode : public GemmConfigDecode
 {
     static constexpr bool PreshuffleB      = true;
     static constexpr bool DoubleSmemBuffer = true;
+
+    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<true>();
 };
 
 struct GemmConfigPreshuffleQuantDecode : public GemmConfigDecode
@@ -150,6 +135,8 @@ struct GemmConfigPreshuffleBPrefill : public GemmConfigPrefill
 {
     static constexpr bool PreshuffleB      = true;
     static constexpr bool DoubleSmemBuffer = true;
+
+    static constexpr ck_tile::index_t K_Warp_Tile = get_k_warp_tile<true>();
 };
 
 struct GemmConfigPreshuffleQuantPrefill : public GemmConfigPrefill

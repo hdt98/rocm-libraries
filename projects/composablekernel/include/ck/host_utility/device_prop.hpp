@@ -187,6 +187,30 @@ inline bool is_xdl_wmma_k_supported()
     return true;
 }
 
+template <typename ADataType, index_t K1 = 0>
+inline index_t __host__ get_wmma_k()
+{
+    if(is_gfx125_supported())
+    {
+        return 64 / sizeof(ADataType);
+    }
+    else
+    {
+        return K1 == 16 ? 32 : 16;
+    }
+}
+
+template <typename ADataType, index_t K1 = 0>
+inline index_t __device__ get_wmma_k()
+{
+#if defined(__gfx125__)
+    return 64 / sizeof(ADataType);
+#else
+
+    return K1 == 16 ? 32 : 16;
+#endif
+}
+
 inline bool is_lds_direct_load_supported()
 {
     // Check if direct loads from global memory to LDS are supported.

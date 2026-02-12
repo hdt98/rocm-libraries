@@ -270,11 +270,7 @@ class TestGroupedConvndBwdData : public ::testing::Test
                 std::cerr << op_name << " does not support this problem" << std::endl;
             }
         }
-        if(instance_index != -1)
-        {
-            std::cout << "grouped_conv_bwd_data_instance (" << instance_index << "/" << num_kernel
-                      << "): Passed" << std::endl;
-        }
+
         printf("\033[36mvalids: %d\033[0m\n", num_kernel);
         return passed;
     }

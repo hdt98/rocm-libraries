@@ -160,7 +160,7 @@ auto shuffle_b_permuteN(const ck_tile::HostTensor<T>& t, const GemmConfig& gemmC
                                        divisor,
                                        kABK1PerLane});
         std::copy(t.begin(), t.end(), t_view.begin());
-        return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 6, 5, 2, 7});
+        return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 6, 2, 5, 7});
     }
     else
     {
