@@ -40,6 +40,103 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 # ---------------------------------------------------------------------------
+# GPU architecture detection & binary compatibility
+# ---------------------------------------------------------------------------
+
+def detect_gpu_arch() -> str:
+    """Detect GPU architecture (e.g. 'gfx942') using rocminfo."""
+    try:
+        output = subprocess.check_output(
+            ["rocminfo"], text=True, stderr=subprocess.PIPE, timeout=10
+        )
+        for line in output.splitlines():
+            if "Name:" in line and "gfx" in line:
+                match = re.search(r"(gfx\w+)", line)
+                if match:
+                    return match.group(1)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return ""
+
+
+def check_binary_gpu_targets(binary_path: Path) -> List[str]:
+    """
+    Check what GPU architectures a HIP binary was compiled for.
+
+    Uses roc-obj-ls (preferred) or llvm-objdump to list embedded code objects.
+    Returns a list of architecture strings like ['gfx90a', 'gfx942'].
+    """
+    archs = set()
+
+    # Try roc-obj-ls first (ROCm 6.x+)
+    for tool in ["roc-obj-ls", "roc-obj-extract"]:
+        try:
+            out = subprocess.check_output(
+                [tool, str(binary_path)],
+                text=True, stderr=subprocess.PIPE, timeout=10,
+            )
+            for line in out.splitlines():
+                match = re.search(r"(gfx\w+)", line)
+                if match:
+                    archs.add(match.group(1))
+            if archs:
+                return sorted(archs)
+        except (subprocess.CalledProcessError, FileNotFoundError,
+                subprocess.TimeoutExpired):
+            continue
+
+    # Fallback: use strings to find gfx arch markers in the binary
+    try:
+        out = subprocess.check_output(
+            ["strings", str(binary_path)],
+            text=True, stderr=subprocess.PIPE, timeout=10,
+        )
+        for match in re.finditer(r"amdhsa--.+?(gfx\w+)", out):
+            archs.add(match.group(1))
+        if archs:
+            return sorted(archs)
+    except (subprocess.CalledProcessError, FileNotFoundError,
+            subprocess.TimeoutExpired):
+        pass
+
+    return []
+
+
+def print_gpu_arch_diagnostic(
+    gpu_arch: str, binary_targets: List[str], kernels: List[Path]
+) -> bool:
+    """
+    Print a diagnostic comparing the running GPU architecture with the binary
+    targets. Returns True if everything looks OK, False if there's a mismatch.
+    """
+    print(f"\n--- GPU Architecture Diagnostic ---")
+    print(f"  Running GPU:     {gpu_arch or '(unknown - rocminfo failed)'}")
+    if binary_targets:
+        print(f"  Binary targets:  {', '.join(binary_targets)}")
+    else:
+        print(f"  Binary targets:  (could not detect)")
+
+    if not gpu_arch:
+        print(f"  [WARN] Could not detect GPU architecture. "
+              f"Run 'rocminfo' to verify.")
+        return True  # can't tell, proceed anyway
+
+    if binary_targets and gpu_arch not in binary_targets:
+        print(f"\n  *** ARCHITECTURE MISMATCH ***")
+        print(f"  The kernel binaries were compiled for: {', '.join(binary_targets)}")
+        print(f"  But the running GPU is: {gpu_arch}")
+        print(f"  This causes 'Cannot find Symbol' errors for ALL kernels.")
+        print(f"  FIX: Rebuild with the correct GPU target:")
+        print(f"    cd <build_dir>")
+        print(f"    cmake .. -DGPU_TARGETS={gpu_arch}")
+        print(f"    cmake --build . --target benchmark_gemm_streamk_all -j$(nproc)")
+        return False
+    elif binary_targets:
+        print(f"  [OK] Binary targets include {gpu_arch}")
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Tile-alignment helpers
 # ---------------------------------------------------------------------------
 
@@ -244,11 +341,12 @@ def run_kernel(
     repeat: int = 20,
     timeout: int = 120,
     verbose: bool = False,
-) -> Optional[Dict]:
+) -> Tuple[Optional[Dict], str]:
     """
     Run a single kernel executable with the given problem size.
 
-    Returns parsed JSON result dict or None on failure.
+    Returns (parsed_result_dict_or_None, failure_reason_string).
+    On success the failure_reason is "".
     """
     cmd = [
         str(kernel_path),
@@ -273,39 +371,216 @@ def run_kernel(
             cmd, capture_output=True, text=True, timeout=timeout
         )
 
+        stderr_text = result.stderr.strip() if result.stderr else ""
+
         if result.returncode != 0:
+            reason = f"exit code {result.returncode}"
+            if stderr_text:
+                reason += f": {stderr_text[:200]}"
             if verbose:
-                print(f"  [ERR] {kernel_path.name} returned {result.returncode}")
-                if result.stderr:
-                    print(f"        stderr: {result.stderr.strip()[:300]}")
-            return None
+                print(f"  [ERR] {kernel_path.name}: {reason}")
+            return None, reason
 
         output = result.stdout.strip()
         if not output:
-            # Kernel produced no stdout — likely IsSupportedArgument() failed
-            # and the exception was caught internally.  Show stderr hint.
+            # Kernel produced no stdout — IsSupportedArgument() failed or
+            # another internal exception was caught.
+            reason = stderr_text[:200] if stderr_text else "no stdout (kernel likely rejected args)"
             if verbose:
-                stderr_msg = result.stderr.strip()[:300] if result.stderr else "(none)"
-                print(f"  [NO OUTPUT] {kernel_path.name}  stderr: {stderr_msg}")
-            return None
+                print(f"  [NO OUTPUT] {kernel_path.name}  reason: {reason}")
+            return None, reason
 
-        # The executable with -json_output=true prints a JSON blob
-        data = json.loads(output)
-        return data
+        # The executable with -json_output=true prints a JSON blob.
+        # Sometimes HIP runtime or the kernel may print extra lines before
+        # the JSON.  Try to find the outermost { ... } to handle that.
+        json_str = output
+        first_brace = output.find("{")
+        last_brace = output.rfind("}")
+        if first_brace >= 0 and last_brace > first_brace:
+            json_str = output[first_brace : last_brace + 1]
+
+        data = json.loads(json_str)
+        return data, ""
 
     except subprocess.TimeoutExpired:
+        reason = f"timeout ({timeout}s)"
         if verbose:
             print(f"  [TIMEOUT] {kernel_path.name}")
-        return None
+        return None, reason
     except json.JSONDecodeError as exc:
+        reason = f"JSON parse error: {exc}"
         if verbose:
             print(f"  [JSON ERR] {kernel_path.name}: {exc}")
-            print(f"        raw stdout: {result.stdout.strip()[:300]}")
-        return None
+            print(f"        raw stdout: {output[:300]}")
+        return None, reason
     except Exception as exc:
+        reason = str(exc)[:200]
         if verbose:
             print(f"  [ERR] {kernel_path.name}: {exc}")
-        return None
+        return None, reason
+
+
+# ---------------------------------------------------------------------------
+# Kernel probe / diagnostic
+# ---------------------------------------------------------------------------
+
+def _probe_single_kernel(
+    kernel_path: Path,
+    m: int, n: int, k: int,
+    timeout: int = 30,
+) -> Tuple[bool, str]:
+    """
+    Run a kernel once with minimal iterations to check if it works.
+
+    Returns (success, stderr_output).
+    """
+    cmd = [
+        str(kernel_path),
+        f"-m={m}", f"-n={n}", f"-k={k}",
+        "-warmup=0", "-repeat=1",
+        "-verify=0", "-timer=true",
+        "-flush_cache=false",
+        "-rotating_count=0",
+        "-json_output=true", "-metric=1",
+    ]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+        )
+        stderr_text = result.stderr.strip() if result.stderr else ""
+        stdout_text = result.stdout.strip() if result.stdout else ""
+
+        if result.returncode != 0:
+            return False, (
+                f"exit code {result.returncode}\n"
+                f"  stderr: {stderr_text[:500]}\n"
+                f"  stdout: {stdout_text[:200]}"
+            )
+
+        if not stdout_text:
+            return False, (
+                f"no JSON output (exit 0)\n"
+                f"  stderr: {stderr_text[:500]}"
+            )
+
+        # Try to parse JSON
+        first_brace = stdout_text.find("{")
+        last_brace = stdout_text.rfind("}")
+        if first_brace >= 0 and last_brace > first_brace:
+            json.loads(stdout_text[first_brace : last_brace + 1])
+            return True, ""
+
+        return False, f"stdout not valid JSON: {stdout_text[:200]}"
+
+    except subprocess.TimeoutExpired:
+        return False, f"timeout ({timeout}s)"
+    except json.JSONDecodeError as exc:
+        return False, f"JSON parse error: {exc}"
+    except Exception as exc:
+        return False, str(exc)[:300]
+
+
+def probe_kernels(
+    kernels: List[Path],
+    align_m: int = 256,
+    align_n: int = 256,
+    align_k: int = 32,
+    timeout: int = 30,
+) -> Tuple[List[Path], Dict[str, str]]:
+    """
+    Run each kernel once with a small problem to see which ones are functional.
+
+    Uses a problem size of 4x tile dimensions (e.g. 1024x1024x128 for
+    256x256x32 tiles) so stream-K has enough tiles to distribute work.
+
+    Returns:
+      - working_kernels: list of paths that produced valid output
+      - failure_map: {kernel_name: reason_string} for failed kernels
+    """
+    # Use several tiles per dimension so stream-K has a realistic workload.
+    probe_m = align_m * 4
+    probe_n = align_n * 4
+    probe_k = align_k * 4
+
+    print(f"\n--- Probing {len(kernels)} kernel executables "
+          f"with M={probe_m}, N={probe_n}, K={probe_k} ---")
+    print(f"    (Each executable is a different tile/warp configuration")
+    print(f"     compiled from default_config.json — not related to --num-samples)")
+
+    working: List[Path] = []
+    failure_map: Dict[str, str] = {}
+
+    for idx, kp in enumerate(kernels):
+        ok, detail = _probe_single_kernel(kp, probe_m, probe_n, probe_k,
+                                          timeout=timeout)
+        if ok:
+            working.append(kp)
+        else:
+            failure_map[kp.name] = detail
+
+        # Progress for large sets
+        if (idx + 1) % 20 == 0:
+            print(f"    probed {idx + 1}/{len(kernels)} ...")
+
+    # ---- Summary ----
+    print(f"\nProbe results: {len(working)}/{len(kernels)} kernel executables operational")
+
+    if failure_map:
+        # Group by the first line of the failure detail
+        reason_groups: Dict[str, List[str]] = {}
+        for name, detail in failure_map.items():
+            first_line = detail.split("\n")[0]
+            reason_groups.setdefault(first_line, []).append(name)
+
+        print(f"\nFailed kernel executables ({len(failure_map)}):")
+        for reason, names in sorted(reason_groups.items(),
+                                     key=lambda x: -len(x[1])):
+            print(f"\n  [{len(names)} kernel(s)] {reason}")
+
+            # Classify
+            if "exit code -6" in reason or "exit code -11" in reason:
+                signal_name = "SIGABRT" if "-6" in reason else "SIGSEGV"
+                # Check if it's a "Cannot find Symbol" error (arch mismatch)
+                any_detail = next(iter(names))
+                detail_text = failure_map.get(any_detail, "")
+                if "Cannot find Symbol" in detail_text:
+                    print(f"    Cause: HIP runtime cannot find kernel symbol in the binary.")
+                    print(f"           This means the binary was NOT compiled for the running GPU.")
+                    print(f"           Check GPU arch vs binary targets (see diagnostic above).")
+                    print(f"           FIX: rebuild with correct -DGPU_TARGETS=<your_gpu_arch>")
+                else:
+                    print(f"    Cause: kernel crashed ({signal_name}). "
+                          f"This usually means the warp tile config")
+                    print(f"           generates MFMA instructions not supported "
+                          f"on this GPU architecture.")
+            elif "no JSON output" in reason:
+                print(f"    Cause: IsSupportedArgument() rejected the "
+                      f"configuration for this problem size.")
+
+            for nm in names[:5]:
+                print(f"    - {nm}")
+            if len(names) > 5:
+                print(f"    ... and {len(names) - 5} more")
+
+        # Show full stderr from the first failure for diagnostics
+        first_failed = next(iter(failure_map))
+        full_detail = failure_map[first_failed]
+        print(f"\n  Full diagnostic from first failed kernel ({first_failed}):")
+        for line in full_detail.split("\n"):
+            print(f"    {line}")
+
+    if working:
+        print(f"\nWorking kernel executables ({len(working)}):")
+        for kp in working:
+            print(f"  + {kp.name}")
+    else:
+        print(f"\n[WARN] No kernels work. Try running one manually to see the full error:")
+        if kernels:
+            print(f"  {kernels[0]} -m={probe_m} -n={probe_n} -k={probe_k} "
+                  f"-warmup=0 -repeat=1 -verify=0")
+
+    print()
+    return working, failure_map
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +596,7 @@ def benchmark_sweep(
     verbose: bool = False,
     dtype_bytes: int = 2,
     kernel_pattern: str = "benchmark_gemm_streamk_*",
+    skip_probe: bool = False,
 ) -> List[Dict]:
     """
     Run every discovered kernel on every problem size.
@@ -333,22 +609,62 @@ def benchmark_sweep(
       - latency_ms
       - bandwidth_gb_s
     """
-    kernels = discover_kernels(build_dir, pattern=kernel_pattern)
-    if not kernels:
+    all_kernels = discover_kernels(build_dir, pattern=kernel_pattern)
+    if not all_kernels:
         print("[ERROR] No kernel executables found. Did you build with "
               "`cmake --build . --target benchmark_gemm_streamk_all`?")
         return []
 
-    print(f"Discovered {len(kernels)} kernel(s):")
-    for k in kernels:
+    # Count fp16 vs fp8 etc. for a useful summary
+    dtype_counts: Dict[str, int] = {}
+    for k in all_kernels:
+        for dt in ("fp16", "fp8", "bf16", "fp32"):
+            if f"_{dt}_" in k.name:
+                dtype_counts[dt] = dtype_counts.get(dt, 0) + 1
+                break
+    dtype_summary = ", ".join(f"{v} {k}" for k, v in sorted(dtype_counts.items()))
+
+    print(f"\nDiscovered {len(all_kernels)} kernel executable(s) ({dtype_summary}):")
+    print(f"  (These are compiled binaries from default_config.json — each is a")
+    print(f"   different tile/warp configuration. NOT related to --num-samples.)")
+    for k in all_kernels:
         print(f"  - {k.name}")
 
     # Show detected tile alignment so the user knows what constraints apply
-    align_m, align_n, align_k = extract_tile_alignment_from_kernels(kernels)
+    align_m, align_n, align_k = extract_tile_alignment_from_kernels(all_kernels)
     print(f"\nDetected tile alignment from kernel names: "
           f"M%{align_m}==0, N%{align_n}==0, K%{align_k}==0")
     print(f"  (Kernels compiled without padding require problem sizes "
-          f"to be multiples of these tile dimensions.)\n")
+          f"to be multiples of these tile dimensions.)")
+
+    # --- GPU architecture compatibility check ---
+    gpu_arch = detect_gpu_arch()
+    binary_targets = check_binary_gpu_targets(all_kernels[0])
+    arch_ok = print_gpu_arch_diagnostic(gpu_arch, binary_targets, all_kernels)
+
+    if not arch_ok:
+        print("\n[ERROR] GPU architecture mismatch detected. Most kernels will fail.")
+        print("        Proceeding with probe to show which (if any) work...\n")
+
+    # --- Probe phase: identify working vs broken kernels ---
+    if skip_probe:
+        kernels = all_kernels
+    else:
+        kernels, failure_map = probe_kernels(
+            all_kernels,
+            align_m=align_m,
+            align_n=align_n,
+            align_k=align_k,
+            timeout=min(timeout, 30),
+        )
+
+        if not kernels:
+            print("[ERROR] No kernels passed the probe. Nothing to benchmark.")
+            if not arch_ok:
+                print("\n  This is likely caused by the GPU architecture mismatch above.")
+                print("  Rebuild with: cmake .. -DGPU_TARGETS=<your_gpu> && "
+                      "cmake --build . --target benchmark_gemm_streamk_all -j$(nproc)")
+            return []
 
     total_runs = len(kernels) * len(problem_sizes)
     print(f"Total benchmark runs: {total_runs} "
@@ -357,8 +673,8 @@ def benchmark_sweep(
 
     all_results: List[Dict] = []
     completed = 0
-    failed_per_problem = 0
     total_failures = 0
+    failed_per_problem = 0
     start_wall = time.time()
 
     for prob_idx, (m, n, k) in enumerate(problem_sizes):
@@ -376,7 +692,7 @@ def benchmark_sweep(
                     f"(elapsed {elapsed:.0f}s, ETA {eta:.0f}s)"
                 )
 
-            raw = run_kernel(
+            raw, reason = run_kernel(
                 kernel_path, m, n, k,
                 warmup=warmup, repeat=repeat,
                 timeout=timeout, verbose=verbose,
@@ -417,22 +733,11 @@ def benchmark_sweep(
 
         if problem_successes == 0:
             failed_per_problem += 1
-            # Show a diagnostic for the first few fully-failed problems
             if failed_per_problem <= 3:
                 print(
                     f"  [WARN] ALL {len(kernels)} kernels failed for "
-                    f"M={m} N={n} K={k}  "
-                    f"(M%{align_m}={m % align_m}, "
-                    f"N%{align_n}={n % align_n}, "
-                    f"K%{align_k}={k % align_k})"
+                    f"M={m} N={n} K={k}"
                 )
-                if m % align_m != 0 or n % align_n != 0 or k % align_k != 0:
-                    print(
-                        f"         ^ Dimensions are NOT multiples of tile sizes! "
-                        f"Re-run with --auto-align or aligned problem sizes."
-                    )
-            elif failed_per_problem == 4:
-                print(f"  [WARN] (suppressing further per-problem warnings ...)")
 
     wall_time = time.time() - start_wall
     print(f"\nBenchmark sweep completed: {len(all_results)} successful runs, "
@@ -441,20 +746,6 @@ def benchmark_sweep(
     if failed_per_problem > 0:
         print(f"[WARN] {failed_per_problem}/{len(problem_sizes)} problem sizes "
               f"had ALL kernels fail.")
-        if failed_per_problem == len(problem_sizes):
-            print(
-                "\n[HINT] Every single problem size failed for every kernel.\n"
-                "       This almost certainly means the problem dimensions are not\n"
-                f"       aligned to the tile sizes (M%{align_m}, N%{align_n}, K%{align_k}).\n"
-                "       The compiled kernels have padding disabled (pad_m/n/k=False)\n"
-                "       so they reject misaligned sizes via IsSupportedArgument().\n"
-                "\n"
-                "       Fix: re-run with --auto-align to automatically align sizes,\n"
-                "            or regenerate sizes with the correct alignment:\n"
-                f"              python generate_problem_sizes.py "
-                f"--alignment-m {align_m} --alignment-n {align_n} "
-                f"--alignment-k {align_k} ...\n"
-            )
 
     return all_results
 
@@ -741,6 +1032,11 @@ def main():
         "--no-auto-align", dest="auto_align", action="store_false",
         help="Disable automatic alignment of problem sizes to tile dimensions.",
     )
+    parser.add_argument(
+        "--skip-probe", action="store_true",
+        help="Skip the initial kernel probe phase that checks which kernels "
+             "are functional. Use if you know all kernels work.",
+    )
 
     args = parser.parse_args()
 
@@ -814,6 +1110,7 @@ def main():
         verbose=args.verbose,
         dtype_bytes=args.dtype_bytes,
         kernel_pattern=args.kernel_pattern,
+        skip_probe=args.skip_probe,
     )
 
     if not results:

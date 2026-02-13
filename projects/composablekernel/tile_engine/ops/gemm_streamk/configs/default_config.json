@@ -1,21 +1,21 @@
 {
+    "_comment": [
+        "Warp tile combinations correspond to valid MFMA instructions on gfx942 (CDNA3/MI300).",
+        "For FP8, only [32,32,16] and [16,16,32] are valid - others are filtered by validation.",
+        "Padding (pad_m/n/k) is set to true to match the CK example and test configurations.",
+        "IMPORTANT: Rebuild after modifying: cmake --build . --target benchmark_gemm_streamk_all -j$(nproc)"
+    ],
     "problem": {
     },
     "tile_config": {
         "tile_m": {
-            "max": 256,
-            "min": 64,
-            "step": 64
+            "values": [256]
         },
         "tile_n": {
-            "max": 256,
-            "min": 64,
-            "step": 64
+            "values": [256]
         },
         "tile_k": {
-            "max": 256,
-            "min": 64,
-            "step": 64
+            "values": [32]
         },
         "warp_m": {
             "values": [
@@ -36,29 +36,14 @@
                 1
             ]
         },
-        "warp_tile_m": {
-            "values": [
-                4,
-                16,
-                32
-            ]
-        },
-        "warp_tile_n": {
-            "values": [
-                16,
-                32,
-                64
-            ]
-        },
-        "warp_tile_k": {
-            "values": [
-                8,
-                16,
-                32,
-                64,
-                128
-            ]
-        }
+        "warp_tile_combinations": [
+            [32, 32, 8],
+            [16, 16, 16],
+            [32, 32, 16],
+            [16, 16, 32],
+            [4, 64, 16],
+            [64, 4, 16]
+        ]
     },
     "trait_config": {
         "pipeline": {
@@ -78,17 +63,17 @@
         },
         "pad_m": {
             "values": [
-                false
+                true
             ]
         },
         "pad_n": {
             "values": [
-                false
+                true
             ]
         },
         "pad_k": {
             "values": [
-                false
+                true
             ]
         },
         "persistent": {

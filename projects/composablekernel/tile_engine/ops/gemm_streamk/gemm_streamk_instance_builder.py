@@ -133,9 +133,35 @@ class GemmKernelBuilder:
             warp_m_values = tile_config.get("warp_m", {}).get("values", [2])
             warp_n_values = tile_config.get("warp_n", {}).get("values", [2])
             warp_k_values = tile_config.get("warp_k", {}).get("values", [1])
-            warp_tile_m_values = tile_config.get("warp_tile_m", {}).get("values", [32])
-            warp_tile_n_values = tile_config.get("warp_tile_n", {}).get("values", [32])
-            warp_tile_k_values = tile_config.get("warp_tile_k", {}).get("values", [32])
+
+            # Check for explicit warp_tile_combinations (preferred over cartesian product).
+            # Each entry is [warp_tile_m, warp_tile_n, warp_tile_k] - these must correspond
+            # to valid MFMA instructions for the target GPU architecture.
+            warp_tile_combos = tile_config.get("warp_tile_combinations")
+
+            if warp_tile_combos is None:
+                # Fall back to cartesian product of individual warp_tile lists
+                warp_tile_m_values = tile_config.get("warp_tile_m", {}).get(
+                    "values", [32]
+                )
+                warp_tile_n_values = tile_config.get("warp_tile_n", {}).get(
+                    "values", [32]
+                )
+                warp_tile_k_values = tile_config.get("warp_tile_k", {}).get(
+                    "values", [32]
+                )
+                warp_tile_combos = list(
+                    itertools.product(
+                        warp_tile_m_values, warp_tile_n_values, warp_tile_k_values
+                    )
+                )
+            else:
+                # Convert JSON arrays to tuples for consistency
+                warp_tile_combos = [tuple(c) for c in warp_tile_combos]
+                logging.info(
+                    f"Using {len(warp_tile_combos)} explicit warp_tile_combinations "
+                    f"(bypassing cartesian product)"
+                )
 
             # Generate all combinations
             configs = []
@@ -145,35 +171,33 @@ class GemmKernelBuilder:
                         for warp_m in warp_m_values:
                             for warp_n in warp_n_values:
                                 for warp_k in warp_k_values:
-                                    for warp_tile_m in warp_tile_m_values:
-                                        for warp_tile_n in warp_tile_n_values:
-                                            for warp_tile_k in warp_tile_k_values:
-                                                # Validate configuration
-                                                if self._validate_tile_config(
-                                                    tile_m,
-                                                    tile_n,
-                                                    tile_k,
-                                                    warp_m,
-                                                    warp_n,
-                                                    warp_k,
-                                                    warp_tile_m,
-                                                    warp_tile_n,
-                                                    warp_tile_k,
-                                                    fast_mode=fast_mode,
-                                                ):
-                                                    configs.append(
-                                                        {
-                                                            "tile_m": tile_m,
-                                                            "tile_n": tile_n,
-                                                            "tile_k": tile_k,
-                                                            "warp_m": warp_m,
-                                                            "warp_n": warp_n,
-                                                            "warp_k": warp_k,
-                                                            "warp_tile_m": warp_tile_m,
-                                                            "warp_tile_n": warp_tile_n,
-                                                            "warp_tile_k": warp_tile_k,
-                                                        }
-                                                    )
+                                    for warp_tile_m, warp_tile_n, warp_tile_k in warp_tile_combos:
+                                        # Validate configuration
+                                        if self._validate_tile_config(
+                                            tile_m,
+                                            tile_n,
+                                            tile_k,
+                                            warp_m,
+                                            warp_n,
+                                            warp_k,
+                                            warp_tile_m,
+                                            warp_tile_n,
+                                            warp_tile_k,
+                                            fast_mode=fast_mode,
+                                        ):
+                                            configs.append(
+                                                {
+                                                    "tile_m": tile_m,
+                                                    "tile_n": tile_n,
+                                                    "tile_k": tile_k,
+                                                    "warp_m": warp_m,
+                                                    "warp_n": warp_n,
+                                                    "warp_k": warp_k,
+                                                    "warp_tile_m": warp_tile_m,
+                                                    "warp_tile_n": warp_tile_n,
+                                                    "warp_tile_k": warp_tile_k,
+                                                }
+                                            )
             return configs
         else:
             # Fallback to default
@@ -435,9 +459,9 @@ struct SelectedKernel {{
     static constexpr ck_tile::index_t WarpTileK = {tile_config["warp_tile_k"]};
 
     // Traits
-    static constexpr bool kPadM = {"true" if pad_m == "true" else "false"};
-    static constexpr bool kPadN = {"true" if pad_n == "true" else "false"};
-    static constexpr bool kPadK = {"true" if pad_k == "true" else "false"};
+    static constexpr bool kPadM = {"true" if pad_m else "false"};
+    static constexpr bool kPadN = {"true" if pad_n else "false"};
+    static constexpr bool kPadK = {"true" if pad_k else "false"};
     static constexpr bool Preshuffle = false;
 
     static constexpr bool DoubleSmemBuffer = {"true" if pipeline == "compv4" else "false"};
@@ -696,15 +720,15 @@ struct SelectedKernel {{
                     pipeline,
                     epilogue,
                     scheduler,
+                    reduction_strategy,
                     pad_m,
                     pad_n,
                     pad_k,
                     persistent,
-                    reduction_strategy,
                 ) = trait_combo
 
                 # Create kernel name with proper boolean capitalization
-                kernel_name = f"gemm_{self.datatype}_{self.layout}_{pipeline}_{epilogue}_{scheduler}_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}_{str(pad_k).capitalize()}_{str(persistent).capitalize()}_{reduction_strategy}"
+                kernel_name = f"gemm_{self.datatype}_{self.layout}_{pipeline}_{epilogue}_{scheduler}_{reduction_strategy}_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}_{str(pad_k).capitalize()}_{str(persistent).capitalize()}"
 
                 # Create tile configuration string
                 tile_str = f"{tile_config['tile_m']}x{tile_config['tile_n']}x{tile_config['tile_k']}_"
@@ -862,9 +886,9 @@ def main():
             trait_parts[1],  # epilogue
             trait_parts[2],  # scheduler
             trait_parts[3],  # reduction_strategy
-            trait_parts[4] == "false",  # pad_m
-            trait_parts[5] == "false",  # pad_n
-            trait_parts[6] == "false",  # pad_k
+            trait_parts[4].lower() == "true",  # pad_m
+            trait_parts[5].lower() == "true",  # pad_n
+            trait_parts[6].lower() == "true",  # pad_k
             trait_parts[7],  # persistent
         )
 

@@ -224,6 +224,11 @@ def validate_lds_capacity(
     return True, ""
 
 
+# Default GPU architecture used when rocminfo is unavailable (e.g. cross-compilation).
+# gfx942 (CDNA3/MI300) is the safe default - its MFMA set is a subset of gfx950.
+DEFAULT_FALLBACK_GPU = "gfx942"
+
+
 def validate_warp_tile_combination(
     warp_tile_m: int,
     warp_tile_n: int,
@@ -233,7 +238,12 @@ def validate_warp_tile_combination(
     c_datatype: str,
     gpu_name: str = None,
 ) -> Tuple[bool, str]:
-    """Validate warp tile combination against GPU-specific supported combinations."""
+    """Validate warp tile combination against GPU-specific supported combinations.
+
+    When the GPU cannot be detected (e.g. build machine has no GPU), the validation
+    falls back to DEFAULT_FALLBACK_GPU (gfx942) to avoid generating kernels with
+    invalid MFMA instructions that would crash at runtime.
+    """
     if gpu_name is None:
         gpu_name = get_gpu_name_by_id(0)
 
@@ -244,9 +254,23 @@ def validate_warp_tile_combination(
     # Check if we have GPU-specific combinations
     gpu_warp_tile_combinations = WARP_TILE_SUPPORTED_COMBINATIONS.get(gpu_name, {})
     if not gpu_warp_tile_combinations:
-        # If GPU not recognized, try to be permissive but log warning
-        logging.warning(f"No warp tile combinations found for GPU: {gpu_name}")
-        return True, ""
+        # GPU not recognized - fall back to default instead of being permissive.
+        # This prevents generating kernels with invalid MFMA instructions when
+        # building on machines without GPU access (CI, cross-compilation, etc.).
+        logging.warning(
+            f"No warp tile combinations found for GPU: '{gpu_name}'. "
+            f"Falling back to {DEFAULT_FALLBACK_GPU} for validation."
+        )
+        gpu_name = DEFAULT_FALLBACK_GPU
+        gpu_warp_tile_combinations = WARP_TILE_SUPPORTED_COMBINATIONS.get(
+            gpu_name, {}
+        )
+        if not gpu_warp_tile_combinations:
+            # Should not happen unless DEFAULT_FALLBACK_GPU is removed from the map
+            logging.error(
+                f"Fallback GPU {DEFAULT_FALLBACK_GPU} not in WARP_TILE_SUPPORTED_COMBINATIONS!"
+            )
+            return False, f"No validation data for fallback GPU {DEFAULT_FALLBACK_GPU}"
 
     # Check if we have combinations for this data type combination
     allowed_combinations = gpu_warp_tile_combinations.get(warp_tile_key, [])
