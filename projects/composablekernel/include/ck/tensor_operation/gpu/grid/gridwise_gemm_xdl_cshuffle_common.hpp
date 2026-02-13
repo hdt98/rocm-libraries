@@ -311,7 +311,21 @@ struct GridwiseGemm_xdl_cshuffle_base
         constexpr index_t MLdsLayer = (EnableLdsLayer == false) || (LdsSize < 1) ? 1 : LdsSize;
         constexpr index_t MPerThread =
             MPerBlock / ABlockTransferThreadClusterLengths_AK0_M_AK1{}[1];
-        constexpr index_t MPerThreadLayer = DirectLoad ? 1 : (MPerThread >= 16) ? 4 : MPerThread;
+        constexpr index_t MPerThreadLayer = [&]() {
+            if constexpr(DirectLoad || MPerThread == 1)
+            {
+                return 1;
+            }
+            // Disable MPerThreadLayer if it is non-power two.
+            else if constexpr(math::next_power_of_two<MPerThread>() != MPerThread)
+            {
+                return 1;
+            }
+            else
+            {
+                return (MPerThread >= 16) ? 4 : MPerThread;
+            }
+        }();
 
         static_assert(MLdsLayer == 1 || MPerBlock % (MLdsLayer * MPerThreadLayer) == 0);
         // A matrix in LDS memory, dst of blockwise copy
@@ -662,7 +676,23 @@ struct GridwiseGemm_xdl_cshuffle_base
         constexpr index_t NLdsLayer = (EnableLdsLayer == false) || (LdsSize < 1) ? 1 : LdsSize;
         constexpr index_t NPerThread =
             EnableLdsLayer ? NPerBlock / BBlockTransferThreadClusterLengths_BK0_N_BK1{}[1] : 1;
-        constexpr index_t NPerThreadLayer = DirectLoad ? 1 : (NPerThread >= 16) ? 4 : NPerThread;
+
+        constexpr index_t NPerThreadLayer = [&]() {
+            if constexpr(DirectLoad || NPerThread == 1)
+            {
+                return 1;
+            }
+            // Disable MPerThreadLayer if it is non-power two.
+            else if constexpr(math::next_power_of_two<NPerThread>() != NPerThread)
+            {
+                return 1;
+            }
+            else
+            {
+                return (NPerThread >= 16) ? 4 : NPerThread;
+            }
+        }();
+
         static_assert(NLdsLayer == 1 || NPerBlock % (NLdsLayer * NPerThreadLayer) == 0);
         // B matrix in LDS memory, dst of blockwise copy
         if constexpr(BBlockLdsExtraN || ForceNaiveLdsLayout || DirectLoad)
