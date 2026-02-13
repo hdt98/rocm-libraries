@@ -67,15 +67,15 @@ macro(get_gpu_targets)
   # Handle 'all'-keyword in architectures.
   if(GPU_TARGETS STREQUAL "all")
     if(BUILD_ADDRESS_SANITIZER)
-      # ASAN builds require xnack
-      check_target_ids(VERIFIED_GPU_TARGETS
-        TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+"
-      )
+      set(GPU_TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+")
     else()
-      check_target_ids(VERIFIED_GPU_TARGETS
-        TARGETS "gfx906:xnack-;gfx908:xnack-;gfx90a:xnack-;gfx90a:xnack+;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1152;gfx1153;gfx1200;gfx1201"
-      )
+      set(GPU_TARGETS "gfx906:xnack-;gfx908:xnack-;gfx90a:xnack-;gfx90a:xnack+;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1152;gfx1153;gfx1200;gfx1201")
     endif()
+  endif()
+
+  # 'check_target_ids' does not work on Windows.
+  if(WIN32)
+    set(VERIFIED_GPU_TARGETS "${GPU_TARGETS}")
   else()
     check_target_ids(VERIFIED_GPU_TARGETS TARGETS "${GPU_TARGETS}")
   endif()
