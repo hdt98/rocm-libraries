@@ -32,6 +32,16 @@ else()
   set(ROCM_PATH "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 endif()
 
+# 'enable_language(HIP)' calls CMake's into CMakeHIPRuntime.cmake
+# which may have trouble finding 'FindHIP.cmake'. We can give a 
+# few extra hints by modifying CMAKE_MODULE_PATH.
+list(APPEND CMAKE_MODULE_PATH
+  ${ROCM_PATH}/lib/cmake/hip-lang # hip-lang-config.cmake (Windows)
+  ${ROCM_PATH}/lib/cmake/hip # FindHIP.cmake (Linux)
+  ${HIP_PATH}/lib/cmake/hip # FindHIP.cmake (Linux, alternative)
+  ${HIP_PATH}/cmake # FindHIP.cmake (Windows)
+)
+
 # Configure default CMake install behavior.
 set(CMAKE_INSTALL_PREFIX ${ROCM_PATH} CACHE PATH "Install path prefix, prepended onto install directories")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker search and installed rpath")
