@@ -20,7 +20,7 @@ using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 template <typename T, typename U>
 inline constexpr bool is_same_v = std::is_same_v<remove_cvref_t<T>, U>;
 
-// aliasing, for commonly used data type
+// aliasing, for commonly used data types
 using F64  = double;
 using F32  = float;
 using TF32 = ck::tf32_t;
