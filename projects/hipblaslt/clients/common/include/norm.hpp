@@ -124,6 +124,8 @@ double norm_check_general(char norm_type, int64_t M, int64_t N, int64_t lda, T* 
     host_vector<double> hCPU_double(size);
     host_vector<double> hGPU_double(size);
 
+    hipblaslt_cout << "HERE 1111111111 !!!!!!!!!\n";
+    int count = 0;
     for(int64_t i = 0; i < N; i++)
     {
         for(int64_t j = 0; j < M; j++)
@@ -131,8 +133,17 @@ double norm_check_general(char norm_type, int64_t M, int64_t N, int64_t lda, T* 
             size_t idx       = j + i * (size_t)lda;
             hCPU_double[idx] = double(hCPU[idx]);
             hGPU_double[idx] = double(hGPU[idx]);
+
+	    if(std::isnan(hCPU_double[idx]) or std::isinf(hCPU_double[idx]))
+		hipblaslt_cout << "CPU " << i * N + j << " : " << hCPU_double[idx] << std::endl;
+	    if(std::isnan(hGPU_double[idx]) or std::isinf(hGPU_double[idx]))
+	    {
+		//hipblaslt_cout << "GPU " << i * N + j << " : " << hGPU_double[idx] << std::endl;
+		count ++;
+	    }
         }
     }
+    hipblaslt_cerr << "GPU count = " << count << "\n";
 
     double work[1];
     int    incx  = 1;

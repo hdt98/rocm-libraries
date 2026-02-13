@@ -1730,6 +1730,11 @@ namespace
         tensileProblem.setSwizzleTensorA(prob.swizzleA);
         tensileProblem.setSwizzleTensorB(prob.swizzleB);
 
+        if(prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0)
+	    tensileProblem.setMXScaleA(32);
+        if(prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0)
+	    tensileProblem.setMXScaleB(32);
+
         return tensileProblem;
     }
 
@@ -2656,7 +2661,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
             algo = &heuristicResult.algo;
         }
         updateTensileProblem(prob, data->problem);
-	std::cout << "run COntraction Tensile !!!!!!!!!!!!\n";
+	std::cout << "run Contraction Tensile !!!!!!!!!!!!\n";
 
         // Get the values of static member variables flush and rotating size from UserClientArguments
         UserClientArguments ClientArguments;
