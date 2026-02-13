@@ -24,145 +24,78 @@
  *
  *******************************************************************************/
 
+#include <filesystem>
+#include <string>
+
 #include <catch2/catch_test_macros.hpp>
 
-#include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
-#include <rocRoller/Utilities/Logging.hpp>
+#include <rocRoller/Expression.hpp> // Needed or else doesn't compile
+#include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 
-#include <string>
-#include <thread>
-#include <vector>
+#include <rocRoller/CommandSolution.hpp>
 
-TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[utils][API]")
+std::shared_ptr<rocRoller::Command> MakeSAXPYCommand()
 {
-    auto* a = rocRoller::GPUArchitectureLibrary::getInstance();
-    auto* b = rocRoller::GPUArchitectureLibrary::getInstance();
-    REQUIRE(a != nullptr);
-    REQUIRE(b != nullptr);
-    REQUIRE(a == b);
+    auto command = std::make_shared<rocRoller::Command>();
+
+    auto dataType = rocRoller::DataType::Float;
+
+    auto xTensorTag = command->addOperation(rocRoller::Operations::Tensor(1, dataType));
+    auto xLoadTag   = command->addOperation(rocRoller::Operations::T_Load_Linear(xTensorTag));
+
+    auto yTensorTag = command->addOperation(rocRoller::Operations::Tensor(1, dataType));
+    auto yLoadTag   = command->addOperation(rocRoller::Operations::T_Load_Linear(yTensorTag));
+
+    auto alphaScalarTag = command->addOperation(
+        rocRoller::Operations::Scalar({dataType, rocRoller::PointerType::PointerGlobal}));
+    auto alphaLoadTag = command->addOperation(rocRoller::Operations::T_Load_Scalar(alphaScalarTag));
+
+    auto execute   = rocRoller::Operations::T_Execute(command->getNextTag());
+    auto alphaXTag = execute.addXOp(rocRoller::Operations::E_Mul(xLoadTag, alphaLoadTag));
+    auto sumTag    = execute.addXOp(rocRoller::Operations::E_Add(alphaXTag, yLoadTag));
+    command->addOperation(std::move(execute));
+
+    auto sumTensorTag = command->addOperation(rocRoller::Operations::Tensor(1, dataType));
+    command->addOperation(rocRoller::Operations::T_Store_Linear(sumTag, sumTensorTag));
+
+    return command;
 }
 
-TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[utils][API]")
+TEST_CASE("Settings change has observable effect", "[api]")
 {
-    const bool original = rocRoller::Settings::Get(rocRoller::Settings::LogConsole);
+    auto command    = MakeSAXPYCommand();
+    auto kernelName = "testKernel";
 
-    auto* settings = rocRoller::Settings::getInstance();
-    REQUIRE(settings != nullptr);
-
-    const bool flipped = !original;
-    settings->set(rocRoller::Settings::LogConsole, flipped);
-
-    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == flipped);
-
-    settings->set(rocRoller::Settings::LogConsole, original);
-    CHECK(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == original);
-}
-
-TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[utils][API]")
-{
-    auto* settings = rocRoller::Settings::getInstance();
-    REQUIRE(settings != nullptr);
-
-    std::string customPath = "/tmp/rocm_custom";
-    settings->set(rocRoller::Settings::ROCMPath, customPath);
-
-    CHECK(settings->get(rocRoller::Settings::ROCMPath) == customPath);
-    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::ROCMPath) == customPath);
-}
-
-TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "[utils][API]")
-{
-    auto* settings = rocRoller::Settings::getInstance();
-    REQUIRE(settings != nullptr);
-
-    settings->set(rocRoller::Settings::LogConsole, false);
-    settings->set(rocRoller::Settings::ROCMPath, "/tmp/test_path");
-
-    REQUIRE(settings->get(rocRoller::Settings::LogConsole) == false);
-    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == std::string("/tmp/test_path"));
-
-    settings->set(rocRoller::Settings::LogConsole, true);
-}
-
-TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only)", "[utils][API]")
-{
-    constexpr int writers = 2;
-    constexpr int readers = 8;
-
-    auto* settings = rocRoller::Settings::getInstance();
-    REQUIRE(settings != nullptr);
-
-    settings->set(rocRoller::Settings::LogConsole, true);
-
-    std::vector<std::thread> ts;
-
-    for(int i = 0; i < readers; ++i)
+    SECTION("Generate kernel with default settings")
     {
-        ts.emplace_back([] { (void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole); });
+        auto context = rocRoller::Context::ForTarget(
+            rocRoller::GPUArchitectureTarget::fromString("gfx90a"), kernelName);
+
+        auto kernel = rocRoller::CommandKernel(command, kernelName);
+        kernel.setContext(context);
+        kernel.generateKernel();
     }
 
-    for(int i = 0; i < writers; ++i)
+    SECTION("Generate kernel with non-default settings that make observable difference")
     {
-        ts.emplace_back([settings, i] {
-            settings->set(rocRoller::Settings::LogConsole, (i % 2) == 0 ? false : true);
-        });
+        std::string tempAsmPath = std::tmpnam(nullptr);
+        CHECK(not std::filesystem::exists(tempAsmPath));
+
+        rocRoller::Settings::getInstance()->set(rocRoller::Settings::SaveAssembly, true);
+        rocRoller::Settings::getInstance()->set(rocRoller::Settings::AssemblyFile, tempAsmPath);
+
+        auto context = rocRoller::Context::ForTarget(
+            rocRoller::GPUArchitectureTarget::fromString("gfx90a"), kernelName);
+
+        auto kernel = rocRoller::CommandKernel(command, kernelName);
+        kernel.setContext(context);
+        kernel.generateKernel();
+
+        CHECK(std::filesystem::exists(tempAsmPath));
+        CHECK(std::filesystem::file_size(tempAsmPath) > 0);
+        std::filesystem::remove(tempAsmPath);
     }
-
-    for(auto& t : ts)
-        t.join();
-
-    REQUIRE_NOTHROW((void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole));
 }
 
-TEST_CASE("LazySingletonAPI: Logging behavior reflects Settings toggles", "[utils][API]")
-{
-    const bool prevConsole            = rocRoller::Settings::Get(rocRoller::Settings::LogConsole);
-    const rocRoller::LogLevel prevLvl = rocRoller::Settings::Get(rocRoller::Settings::LogLvl);
-    const rocRoller::LogLevel prevCLvl
-        = rocRoller::Settings::Get(rocRoller::Settings::LogConsoleLvl);
-
-    auto* settings = rocRoller::Settings::getInstance();
-    auto  logger   = rocRoller::Log::getLogger();
-
-    REQUIRE(settings != nullptr);
-    REQUIRE(logger != nullptr);
-
-    settings->set(rocRoller::Settings::LogConsole, true);
-    settings->set(rocRoller::Settings::LogLvl, rocRoller::LogLevel::Info);
-    settings->set(rocRoller::Settings::LogConsoleLvl, rocRoller::LogLevel::Info);
-
-    REQUIRE(logger->should_log(rocRoller::LogLevel::Warning));
-    REQUIRE(logger->should_log(rocRoller::LogLevel::Error));
-    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Debug));
-    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Trace));
-
-    REQUIRE(settings->get(rocRoller::Settings::LogLvl) == rocRoller::LogLevel::Info);
-
-    settings->set(rocRoller::Settings::LogLvl, rocRoller::LogLevel::Warning);
-    settings->set(rocRoller::Settings::LogConsoleLvl, rocRoller::LogLevel::Warning);
-
-    REQUIRE(logger->should_log(rocRoller::LogLevel::Warning));
-    REQUIRE(logger->should_log(rocRoller::LogLevel::Error));
-    REQUIRE(logger->should_log(rocRoller::LogLevel::Critical));
-    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Debug));
-    REQUIRE_FALSE(logger->should_log(rocRoller::LogLevel::Trace));
-
-    settings->set(rocRoller::Settings::LogConsole, prevConsole);
-    settings->set(rocRoller::Settings::LogLvl, prevLvl);
-    settings->set(rocRoller::Settings::LogConsoleLvl, prevCLvl);
-}
-
-TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary::resetState restores loaded library",
-          "[utils][API]")
-{
-    auto* lib = rocRoller::GPUArchitectureLibrary::getInstance();
-    REQUIRE(lib != nullptr);
-
-    auto before = lib->getAllSupportedISAs();
-
-    REQUIRE_NOTHROW(lib->resetState());
-
-    auto after = lib->getAllSupportedISAs();
-    REQUIRE(after == before);
-}
+// Until we have a defined API, please do not add more tests here.

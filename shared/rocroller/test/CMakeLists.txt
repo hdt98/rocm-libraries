@@ -26,7 +26,6 @@ add_executable(rocroller-tests)
 
 if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
     add_executable(rocroller-tests-catch)
-    add_executable(rocroller-tests-api)
     if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
         add_executable(rocroller-tests-rocprofiler)
     endif()
@@ -44,11 +43,6 @@ if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
     if(ROCROLLER_ENABLE_ASAN)
         rocroller_target_configure_sanitizers(rocroller-tests-catch PRIVATE)
         set_target_properties(rocroller-tests-catch
-            PROPERTIES
-                CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
-        )
-        rocroller_target_configure_sanitizers(rocroller-tests-api PRIVATE)
-        set_target_properties(rocroller-tests-api
             PROPERTIES
                 CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
         )
@@ -196,17 +190,6 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
                        "ENVIRONMENT" "${asan_opts}"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
-        catch_discover_tests(
-            rocroller-tests-api
-            REPORTER JUnit
-            OUTPUT_DIR ${TEST_REPORT_DIR}
-            OUTPUT_SUFFIX ".xml"
-            DISCOVERY_MODE PRE_TEST
-            EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
-            PROPERTIES "LABELS" "CATCH;API"
-                       "ENVIRONMENT" "${asan_opts}"
-            SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
-        )
         if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
             catch_discover_tests(
                 rocroller-tests-rocprofiler
@@ -272,9 +255,6 @@ if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
 
     target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
-
-    target_compile_options(rocroller-tests-api PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(rocroller-tests-api PRIVATE -fprofile-instr-generate)
 
     if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
         target_compile_options(rocroller-tests-rocprofiler PRIVATE -fprofile-instr-generate -fcoverage-mapping)

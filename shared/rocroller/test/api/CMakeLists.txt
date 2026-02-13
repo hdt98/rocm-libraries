@@ -1,9 +1,6 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-# API tests are built into the rocroller-tests-api target (created by the parent test CMake).
-# This file wires up dependencies and registers sources under test/api/.
-
 find_package(Catch2 QUIET)
 if(NOT Catch2_FOUND)
     if(ROCROLLER_ENABLE_FETCH)
@@ -17,21 +14,36 @@ if(NOT Catch2_FOUND)
         message(FATAL_ERROR "Failed to find Catch2")
     endif()
 endif()
+if(DEFINED Catch2_SOURCE_DIR)
+    list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
+else()
+    list(APPEND CMAKE_MODULE_PATH "${Catch2_DIR}")
+endif()
+include(Catch)
 
-target_link_libraries(rocroller-tests-api
-    PRIVATE
-        rocroller::common-test-utilities
-        Catch2::Catch2WithMain
-        ${BLAS_LIBRARIES}
-        ${msgpack_libs}
-)
+add_executable(rocroller-tests-api)
 
 target_sources(rocroller-tests-api
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/LazySingletonAPITest.cpp"
 )
 
-target_include_directories(rocroller-tests-api
+target_compile_features(rocroller-tests-api PRIVATE cxx_std_20)
+
+target_link_libraries(rocroller-tests-api
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../client/include
+        roc::rocroller-interface
+        Catch2::Catch2WithMain
 )
+
+catch_discover_tests(
+    rocroller-tests-api
+    REPORTER JUnit
+    OUTPUT_DIR ${TEST_REPORT_DIR}
+    OUTPUT_SUFFIX ".xml"
+    DISCOVERY_MODE PRE_TEST
+    EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
+    PROPERTIES "LABELS" "CATCH;API"
+               "ENVIRONMENT" "${asan_opts}"
+    SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
+)    
