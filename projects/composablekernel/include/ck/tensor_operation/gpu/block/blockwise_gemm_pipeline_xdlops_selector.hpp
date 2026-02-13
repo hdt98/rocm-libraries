@@ -34,9 +34,15 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t KPack,
           bool DirectLoad           = false,
           bool TransposeC           = false,
-          bool UseDataCachePrefetch = false>
+          bool UseDataCachePrefetch = false,
+          bool LdsScalarLoadToVgpr  = false>
 constexpr auto BlockGemmPipeline_Selector()
 {
+    // Supported for Direct Load and V1
+    if constexpr(LdsScalarLoadToVgpr)
+    {
+        static_assert(DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v1);
+    }
     if constexpr(DirectLoad)
     {
         if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
@@ -61,7 +67,8 @@ constexpr auto BlockGemmPipeline_Selector()
                                                              MRepeat,
                                                              NRepeat,
                                                              KPack,
-                                                             TransposeC>{};
+                                                             TransposeC,
+                                                             LdsScalarLoadToVgpr>{};
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
         {

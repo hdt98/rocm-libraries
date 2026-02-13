@@ -14,12 +14,14 @@
 
 // FlatmmConfig types are now defined via CurrentArchTraits:
 //   - MXfp4_FlatmmConfig16  = CurrentArchTraits::Fp4Fp4Config
+//   - MXfp6_FlatmmConfig16  = CurrentArchTraits::Fp6Fp6Config
 //   - MXfp8_FlatmmConfig16  = CurrentArchTraits::Fp8Fp8Config
 //   - MXf8f4_FlatmmConfig16 = CurrentArchTraits::F8F4Config
 //   - MXf4f8_FlatmmConfig16 = CurrentArchTraits::F4F8Config
 //
 // For GFX1250 TDM: these map to MXFlatmmConfigBase32TDM (32x32 warp tile)
 // For others:  these map to MXFlatmmConfigBase16 (16x16 warp tile)
+// GEMM config with 16x16 warp tile
 
 template <typename FlatmmConfig,
           typename ADataType,

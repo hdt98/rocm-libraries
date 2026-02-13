@@ -70,7 +70,8 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
         static constexpr index_t NIterPerWarp = NPerBlock / (NWarp * WarpGemm::kN);
         static constexpr index_t KIterPerWarp = KPerBlock / WarpGemm::kK;
 
-        static constexpr bool PreshuffleQuant = Problem::Traits::PreshuffleQuant;
+        static constexpr bool APreshuffleQuant = Problem::Traits::APreshuffleQuant;
+        static constexpr bool BPreshuffleQuant = Problem::Traits::BPreshuffleQuant;
 
         static constexpr index_t QScalesPerBlockRow =
             integer_divide_ceil(KPerBlock, BQuantGroupSize::kK);
@@ -101,9 +102,11 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
         // 4. i4,  bf8, (fp8/fp32) -> f32
         static_assert(
             (std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, bf8_t> ||
-             std::is_same_v<ADataType, ck_tile::pk_int4_t>) &&
+             std::is_same_v<ADataType, ck_tile::pk_int4_t> ||
+             std::is_same_v<ADataType, ck_tile::pk_fp4_t>) &&
             (std::is_same_v<BDataType, fp8_t> || std::is_same_v<BDataType, bf8_t> ||
-             std::is_same_v<BDataType, ck_tile::pk_int4_t>) &&
+             std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
+             std::is_same_v<BDataType, ck_tile::pk_fp4_t>) &&
             (std::is_same_v<AQDataType, float> || std::is_same_v<AQDataType, ck_tile::fp8_t> ||
              std::is_same_v<AQDataType, ck_tile::bf8_t>) &&
             (std::is_same_v<BQDataType, float> || std::is_same_v<BQDataType, ck_tile::fp8_t> ||
@@ -130,9 +133,9 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
     using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
     using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
     using BlockGemmShape   = remove_cvref_t<typename Problem::BlockGemmShape>; // TileFlatmmShape
-    using QuantGroupSize   = remove_cvref_t<typename Problem::BQuantGroupSize>;
+    using BQuantGroupSize  = remove_cvref_t<typename Problem::BQuantGroupSize>;
 
-    static_assert(QuantGroupSize::kM == 1, "only N/K blocks for BQuant preshuffle kernel!");
+    static_assert(BQuantGroupSize::kM == 1, "only N/K blocks for BQuant preshuffle kernel!");
 
     static constexpr auto I0   = number<0>();
     static constexpr auto I1   = number<1>();
@@ -165,12 +168,12 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
     static constexpr auto MIter_2nd_last =
         (MIterPerWarp >= 2) ? MIterPerWarp - 2 : MIterPerWarp - 1;
 
-    static constexpr index_t KPerBlockBQ = KPerBlock / QuantGroupSize::kK;
+    static constexpr index_t KPerBlockBQ = KPerBlock / BQuantGroupSize::kK;
 
     static constexpr index_t QScalesPerBlockRow =
-        integer_divide_ceil(KPerBlock, QuantGroupSize::kK); // 128 / 128 = 1
+        integer_divide_ceil(KPerBlock, BQuantGroupSize::kK); // 128 / 128 = 1
     static constexpr index_t QScalesPerWarpGemmRow =
-        integer_divide_ceil(WG::kK, QuantGroupSize::kK);
+        integer_divide_ceil(WG::kK, BQuantGroupSize::kK);
 
     static constexpr index_t KIterPerQScale = KIterPerWarp / QScalesPerBlockRow; // 8 / 1 = 8
     static constexpr index_t DsReadPreload  = 2; // default 2, preload 2 ds read
@@ -191,7 +194,8 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
               typename BFlatBlockTensor,
               typename AQBlockTensor,
               typename BQBlockTensor,
-              typename ABlockWindow>
+              typename ABlockWindow,
+              index_t UnaryOpSize = 8>
     CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
                                    ABlockTensor& a_warp_tensor,
                                    BFlatBlockTensor& b_warp_tensor,
@@ -251,8 +255,10 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                     {
                         constexpr auto AmIter = (mIter + m_preload) % MIterPerWarp;
                         constexpr auto AkIter = (kIter + (mIter + m_preload) / MIterPerWarp);
-                        a_warp_tensor(number<AwarpIter>{}) =
-                            load_tile(a_warp_windows(number<AmIter>{})(number<AkIter>{}));
+
+                        load_int4_tile<ADataType, AComputeDataType, UnaryOpSize>(
+                            a_warp_tensor(number<AwarpIter>{}),
+                            a_warp_windows(number<AmIter>{})(number<AkIter>{}));
                     }
                     // barrier
                     // Could be deleted
@@ -292,9 +298,9 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                                CBlockTensor::PackedSize>{};
 
                     index_t reg_offset = [&]() {
-                        if constexpr(QuantGroupSize::kN >= (NWarp * WG::kN))
+                        if constexpr(BQuantGroupSize::kN >= (NWarp * WG::kN))
                         {
-                            return (nIter * NWarp * WG::kN) / QuantGroupSize::kN * KPerBlockBQ +
+                            return (nIter * NWarp * WG::kN) / BQuantGroupSize::kN * KPerBlockBQ +
                                    kQScale;
                         }
                         else

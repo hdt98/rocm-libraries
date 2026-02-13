@@ -10,12 +10,19 @@
 
 namespace ck_tile {
 
-struct GemmABQuantPipelineAgBgCrDefaultPolicy : public UniversalGemmPipelineAgBgCrPolicy
+struct GemmABQuantPipelineAgBgCrDefaultPolicy
+    : public UniversalGemmBasePolicy<GemmABQuantPipelineAgBgCrDefaultPolicy>
 {
-    using Base = UniversalGemmPipelineAgBgCrPolicy;
+    using Base = UniversalGemmBasePolicy<GemmABQuantPipelineAgBgCrDefaultPolicy>;
     using Base::I0;
     using Base::I1;
     using Base::I2;
+
+    template <typename Problem>
+    using LdsADataType = typename Problem::AComputeDataType;
+
+    template <typename Problem>
+    using LdsBDataType = typename Problem::BComputeDataType;
 
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetVectorSizeAQ()

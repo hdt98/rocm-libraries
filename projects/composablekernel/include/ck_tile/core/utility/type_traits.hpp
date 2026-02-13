@@ -4,6 +4,8 @@
 #pragma once
 
 #include "ck_tile/core/config.hpp"
+#include "ck_tile/core/numeric/numeric.hpp"
+
 #include <tuple>
 #include <type_traits>
 #include <stdint.h>
@@ -286,5 +288,23 @@ inline constexpr bool problem_is_flatmm_v = []() {
     else
         return false;
 }();
+
+// Helper struct to determine if a type is packed (more than 1 element per byte)
+template <typename T>
+struct is_packed_type
+{
+    static constexpr bool value = numeric_traits<T>::PackedSize > 1;
+};
+
+template <typename T>
+static constexpr bool is_packed_type_v = is_packed_type<T>::value;
+
+// Helper definition to take the largest sizes type
+template <typename ADataType, typename BDataType>
+using largest_type_t =
+    std::conditional_t<sizeof(ADataType) * 8 / numeric_traits<ADataType>::PackedSize >=
+                           sizeof(BDataType) * 8 / numeric_traits<BDataType>::PackedSize,
+                       ADataType,
+                       BDataType>;
 
 } // namespace ck_tile
