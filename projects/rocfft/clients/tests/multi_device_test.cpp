@@ -231,6 +231,9 @@ std::vector<fft_params> param_generator_multi_gpu(const SplitType type, const in
                     |= p.length[dim] < input_grid[dim + 1] || p.length[dim] < output_grid[dim + 1];
             if(too_short_lengths)
                 continue;
+            if(mp_lib == fft_params::fft_mp_lib_mpi && p.length.back() == 1 && p.is_real()
+               && p.is_callback())
+                continue; // <-- FIXME
 
             p_dist.mp_lib = mp_lib;
             p_dist.distribute_field<fft_io::fft_io_in>(
