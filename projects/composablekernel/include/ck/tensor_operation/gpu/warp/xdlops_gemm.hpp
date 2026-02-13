@@ -134,6 +134,16 @@ enum struct MfmaInstr
     wmma_f32_16x16_f8bf8_gfx13,
     wmma_f32_16x16_bf8f8_gfx13,
     wmma_f32_16x16_bf8bf8_gfx13,
+    wmma_i32_16x16x32_iu8_gfx13,
+    wmma_f32_16x16x32_iu8_gfx13,
+    wmma_f16_16x16x32_f8f8_gfx13,
+    wmma_f16_16x16x32_f8bf8_gfx13,
+    wmma_f16_16x16x32_bf8f8_gfx13,
+    wmma_f16_16x16x32_bf8bf8_gfx13,
+    wmma_f32_16x16x32_f8f8_gfx13,
+    wmma_f32_16x16x32_f8bf8_gfx13,
+    wmma_f32_16x16x32_bf8f8_gfx13,
+    wmma_f32_16x16x32_bf8bf8_gfx13,
     wmma_f32_16x16x64_f8f6f4_gfx13,
     wmma_unsupport_16x16_gfx13,
 };
@@ -1272,8 +1282,9 @@ struct mfma_type<MfmaInstr::wmma_unsupport_16x16_gfx12> : public mfma_type_gfx12
 // gfx13
 struct mfma_type_gfx13_base
 {
-    static constexpr index_t group_size          = 2;  // Changed from 8 to 2 for correct row mapping
-    static constexpr index_t num_groups_per_blk  = 4;  // Changed from 1 to 4 to keep num_regs_per_blk=8
+    static constexpr index_t group_size = 4; // Changed from 8 to 2 for correct row mapping
+    static constexpr index_t num_groups_per_blk =
+        2; // Changed from 1 to 4 to keep num_regs_per_blk=8
     static constexpr index_t num_regs_per_blk    = 8;
     static constexpr index_t num_threads_per_blk = 16;
     static constexpr index_t wave_size           = 32;
@@ -1285,8 +1296,20 @@ struct mfma_type_gfx13_base
     static constexpr bool is_k_reduction         = true;
 };
 
+struct mfma_type_gfx13_16x16x32_base : public mfma_type_gfx13_base
+{
+    static constexpr index_t k_per_blk = 16;
+};
+
+struct mfma_type_gfx13_16bit_base : public mfma_type_gfx13_base
+{
+    static constexpr index_t group_size = 2; // Changed from 8 to 2 for correct row mapping
+    static constexpr index_t num_groups_per_blk =
+        4; // Changed from 1 to 4 to keep num_regs_per_blk=8
+};
+
 template <>
-struct mfma_type<MfmaInstr::wmma_f32_16x16_f16_gfx13> : public mfma_type_gfx13_base
+struct mfma_type<MfmaInstr::wmma_f32_16x16_f16_gfx13> : public mfma_type_gfx13_16bit_base
 {
     template <index_t MPerWmma,
               index_t NPerWmma,
@@ -1301,7 +1324,7 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16_f16_gfx13> : public mfma_type_gfx13_b
 };
 
 template <>
-struct mfma_type<MfmaInstr::wmma_f32_16x16_bf16_gfx13> : public mfma_type_gfx13_base
+struct mfma_type<MfmaInstr::wmma_f32_16x16_bf16_gfx13> : public mfma_type_gfx13_16bit_base
 {
     template <index_t MPerWmma,
               index_t NPerWmma,
@@ -1316,7 +1339,7 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16_bf16_gfx13> : public mfma_type_gfx13_
 };
 
 template <>
-struct mfma_type<MfmaInstr::wmma_f16_16x16_f16_gfx13> : public mfma_type_gfx13_base
+struct mfma_type<MfmaInstr::wmma_f16_16x16_f16_gfx13> : public mfma_type_gfx13_16bit_base
 {
     template <index_t MPerWmma,
               index_t NPerWmma,
@@ -1331,7 +1354,7 @@ struct mfma_type<MfmaInstr::wmma_f16_16x16_f16_gfx13> : public mfma_type_gfx13_b
 };
 
 template <>
-struct mfma_type<MfmaInstr::wmma_bf16_16x16_bf16_gfx13> : public mfma_type_gfx13_base
+struct mfma_type<MfmaInstr::wmma_bf16_16x16_bf16_gfx13> : public mfma_type_gfx13_16bit_base
 {
     template <index_t MPerWmma,
               index_t NPerWmma,
@@ -1498,6 +1521,162 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16_bf8bf8_gfx13> : public mfma_type_gfx1
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
         intrin_wmma_f32_16x16_bf8bf8_w32<MPerWmma, NPerWmma, clamp, 1>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_i32_16x16x32_iu8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool neg_a = true,
+              bool neg_b = true,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_i32_16x16_iu8iu8_w32<MPerWmma, NPerWmma, neg_a, neg_b, clamp, 2>::Run(
+            a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f32_16x16x32_iu8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool neg_a = true,
+              bool neg_b = true,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f32_16x16_iu8iu8_w32<MPerWmma, NPerWmma, neg_a, neg_b, clamp, 2>::Run(
+            a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f16_16x16x32_f8f8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f16_16x16_f8f8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f16_16x16x32_f8bf8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f16_16x16_f8bf8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f16_16x16x32_bf8f8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f16_16x16_bf8f8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f16_16x16x32_bf8bf8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f16_16x16_bf8bf8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f32_16x16x32_f8f8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f32_16x16_f8f8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f32_16x16x32_f8bf8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f32_16x16_f8bf8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f32_16x16x32_bf8f8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f32_16x16_bf8f8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::wmma_f32_16x16x32_bf8bf8_gfx13> : public mfma_type_gfx13_16x16x32_base
+{
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_wmma_f32_16x16_bf8bf8_w32<MPerWmma, NPerWmma, clamp, 2>::Run(a, b, reg_c);
     }
 };
 
@@ -2139,7 +2318,7 @@ struct MfmaSelector
 #elif defined(__gfx12__)
         return MfmaInstr::wmma_i32_16x16x16_iu8_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_i32_16x16_iu8_gfx13;
+        return MfmaInstr::wmma_i32_16x16x32_iu8_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_i32_16x16x16_iu8;
 #elif defined(__gfx950__)
@@ -2241,7 +2420,7 @@ struct MfmaSelector
 #elif defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f8f8_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_f32_16x16_f8f8_gfx13;
+        return MfmaInstr::wmma_f32_16x16x32_f8f8_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #elif defined(__gfx950__)
@@ -2392,7 +2571,7 @@ struct MfmaSelector
 #elif defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf8bf8_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_f32_16x16_bf8bf8_gfx13;
+        return MfmaInstr::wmma_f32_16x16x32_bf8bf8_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #elif defined(__gfx950__)
@@ -2442,7 +2621,7 @@ struct MfmaSelector
 #elif defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f8bf8_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_f32_16x16_f8bf8_gfx13;
+        return MfmaInstr::wmma_f32_16x16x32_f8bf8_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #elif defined(__gfx950__)
@@ -2492,7 +2671,7 @@ struct MfmaSelector
 #elif defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf8f8_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_f32_16x16_bf8f8_gfx13;
+        return MfmaInstr::wmma_f32_16x16x32_bf8f8_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #elif defined(__gfx950__)
@@ -2984,6 +3163,11 @@ struct XdlopsGemm
 
         return TransposeC ? CIndex4D{blk_td, I0, blk_id, I0} : CIndex4D{I0, blk_id, I0, blk_td};
     }
+#if defined(__gfx13__)
+    static constexpr index_t MinDoubleRateKPack = 16;
+#else
+    static constexpr index_t MinDoubleRateKPack = 32;
+#endif
 
     // Falls back to single rate instruction on gfx950 if KPack is single rate; no change on gfx942-
     // when base_type is either f8_t or bf8_t, additional_type will always be either f8_t or bf8_t,
@@ -2992,7 +3176,8 @@ struct XdlopsGemm
         (((is_same<base_type, half_t>::value || is_same<base_type, bhalf_t>::value) &&
           KPack <= 4) ||
          (is_same<base_type, int8_t>::value && KPack <= 8) ||
-         ((is_same<base_type, f8_t>::value || is_same<base_type, bf8_t>::value) && KPack < 32) ||
+         ((is_same<base_type, f8_t>::value || is_same<base_type, bf8_t>::value) &&
+          KPack < MinDoubleRateKPack) ||
          is_same<additional_type, pk_i4_t>::value)
 #if defined(__gfx950__)
                 // tf32 on gfx950 is implemented as bf16x3, so it should be treated as bf16.
@@ -3000,6 +3185,7 @@ struct XdlopsGemm
 #endif
             ? true
             : false;
+
     static constexpr auto mfma = MfmaSelector<base_type,
                                               MPerXdlops,
                                               NPerXdlops,
