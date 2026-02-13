@@ -259,6 +259,6 @@ void add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f32_mem_inter_instan
 #endif
 
 } // namespace instance
-} // namespace device
-} // namespace tensor_operation
-} // namespace ck
+} // namespace ck_builder
+} // namespace conv
+} // namespace miopen

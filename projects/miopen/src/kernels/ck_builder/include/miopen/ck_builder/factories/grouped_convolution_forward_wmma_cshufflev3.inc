@@ -259,6 +259,6 @@ void add_device_grouped_conv3d_fwd_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_f16_inst
 #endif
 
 } // namespace instance
-} // namespace device
-} // namespace tensor_operation
-} // namespace ck
+} // namespace ck_builder
+} // namespace conv
+} // namespace miopen

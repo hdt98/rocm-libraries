@@ -162,6 +162,6 @@ void add_device_grouped_conv3d_fwd_xdl_large_tensor_ndhwgc_gkzyxc_ndhwgk_f32_tf3
 #endif
 
 } // namespace instance
-} // namespace device
-} // namespace tensor_operation
-} // namespace ck
+} // namespace ck_builder
+} // namespace conv
+} // namespace miopen

@@ -68,6 +68,6 @@ void add_device_grouped_conv2d_fwd_dl_gnhwc_gkyxc_gnhwk_f16_instances(
 #endif
 
 } // namespace instance
-} // namespace device
-} // namespace tensor_operation
-} // namespace ck
+} // namespace ck_builder
+} // namespace conv
+} // namespace miopen
