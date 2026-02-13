@@ -41,7 +41,7 @@ target_include_directories(rocprim
 
 # This target links against HIP library
 add_library(rocprim_hip INTERFACE)
-target_link_libraries(rocprim_hip INTERFACE rocprim)
+target_link_libraries(rocprim_hip INTERFACE rocprim hip::device)
 
 # Installation
 if (ROCPRIM_INSTALL)
