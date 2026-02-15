@@ -19,12 +19,12 @@
 // THE SOFTWARE.
 
 #include "tree_node.h"
-#include "../../shared/precision_type.h"
 #include "function_pool.h"
 #include "kernel_launch.h"
 #include "logging.h"
 #include "plan.h"
 #include "repo.h"
+#include "rocfft_enum_helpers.h"
 #include "rocfft_mpi.h"
 #include "twiddles.h"
 

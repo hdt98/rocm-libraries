@@ -21,9 +21,9 @@
 #include <optional>
 
 #include "../../shared/arithmetic.h"
-#include "../../shared/array_predicate.h"
 #include "function_pool.h"
 #include "kernel_launch.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_stockham_gen.h"
 #include "rtc_stockham_kernel.h"
 #include "tree_node.h"

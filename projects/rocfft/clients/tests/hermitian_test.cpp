@@ -22,7 +22,7 @@
 #include "../../shared/client_except.h"
 #include "../../shared/gpubuf.h"
 #include "../../shared/params_gen.h"
-#include "../../shared/rocfft_params.h"
+#include "../rocfft_params.h"
 #include "../samples/rocfft/examplekernels.h"
 #include "../samples/rocfft/exampleutils.h"
 #include "rocfft/rocfft.h"

@@ -25,10 +25,10 @@
 #include <tuple>
 #include <vector>
 
-#include "../../../shared/precision_type.h"
 #include "compute_scheme.h"
 #include "data_descriptor.h"
 #include "enum_printer.h"
+#include "rocfft_enum_helpers.h"
 #include "twiddles.h"
 
 struct KernelConfig

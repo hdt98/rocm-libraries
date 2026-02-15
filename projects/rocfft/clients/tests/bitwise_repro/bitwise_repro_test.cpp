@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "../../../shared/params_gen.h"
-#include "../../../shared/rocfft_params.h"
+#include "../../rocfft_params.h"
 #include "../accuracy_tests_range.h"
 #include "bitwise_repro_test.h"
 

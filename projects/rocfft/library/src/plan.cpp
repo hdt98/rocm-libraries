@@ -19,13 +19,11 @@
 // THE SOFTWARE.
 
 #include "plan.h"
+#include "../../clients/rocfft_params.h"
 #include "../../shared/arithmetic.h"
-#include "../../shared/array_predicate.h"
 #include "../../shared/device_properties.h"
 #include "../../shared/environment.h"
-#include "../../shared/precision_type.h"
 #include "../../shared/ptrdiff.h"
-#include "../../shared/rocfft_params.h"
 #include "assignment_policy.h"
 #include "enum_printer.h"
 #include "function_pool.h"
@@ -35,6 +33,7 @@
 #include "rocfft/rocfft-version.h"
 #include "rocfft/rocfft.h"
 #include "rocfft_current_function.h"
+#include "rocfft_enum_helpers.h"
 #include "rocfft_exception.h"
 #include "rocfft_mpi.h"
 #include "rocfft_ostream.hpp"
@@ -72,6 +71,15 @@ const char* ROCFFT_VERSION_STRING = (TO_STR(rocfft_version_major) "." \
                                      TO_STR(rocfft_version_patch) "." \
                                      TO_STR(rocfft_version_tweak) );
 // clang-format on
+
+constexpr bool is_real_domain(const rocfft_transform_type& dft_type, const io_data_label& io)
+{
+    return dft_is_real(dft_type) && (dft_is_forward(dft_type) ^ (io == io_data_label::OUTPUT));
+}
+constexpr bool is_hermitian_domain(const rocfft_transform_type& dft_type, const io_data_label& io)
+{
+    return dft_is_real(dft_type) && !is_real_domain(dft_type, io);
+}
 
 rocfft_status rocfft_plan_description_set_scale_factor(rocfft_plan_description description,
                                                        const double            scale_factor)
@@ -115,33 +123,20 @@ void rocfft_plan_description_t::finalize_for(rocfft_transform_type   dft_type,
 {
     for(auto io : {io_data_label::INPUT, io_data_label::OUTPUT})
     {
-        auto&      io_array_type = io == io_data_label::INPUT ? inArrayType : outArrayType;
-        const bool is_real_domain
-            = (dft_type == rocfft_transform_type_real_forward && io == io_data_label::INPUT)
-              || (dft_type == rocfft_transform_type_real_inverse && io == io_data_label::OUTPUT);
-        const bool is_hermitian_domain
-            = (dft_type == rocfft_transform_type_real_forward && io == io_data_label::OUTPUT)
-              || (dft_type == rocfft_transform_type_real_inverse && io == io_data_label::INPUT);
-
+        auto& io_array_type = io == io_data_label::INPUT ? inArrayType : outArrayType;
         if(io_array_type == rocfft_array_type_unset)
         {
-            switch(dft_type)
-            {
-            case rocfft_transform_type_complex_forward:
-            case rocfft_transform_type_complex_inverse:
+            if(is_real_domain(dft_type, io))
+                io_array_type = rocfft_array_type_real;
+            else if(is_hermitian_domain(dft_type, io))
+                io_array_type = rocfft_array_type_hermitian_interleaved;
+            else
                 io_array_type = rocfft_array_type_complex_interleaved;
-                break;
-            case rocfft_transform_type_real_forward:
-            case rocfft_transform_type_real_inverse:
-                io_array_type = is_real_domain ? rocfft_array_type_real
-                                               : rocfft_array_type_hermitian_interleaved;
-                break;
-            }
         }
 
         auto&               io_layout = io == io_data_label::INPUT ? input_layout : output_layout;
         std::vector<size_t> io_lengths(user_lengths, user_lengths + len_rank);
-        if(is_hermitian_domain)
+        if(is_hermitian_domain(dft_type, io))
             io_lengths[0] = user_lengths[0] / 2 + 1;
         else
             io_lengths[0] = user_lengths[0];
@@ -151,7 +146,7 @@ void rocfft_plan_description_t::finalize_for(rocfft_transform_type   dft_type,
                         current_strides,
                         {number_of_transforms},
                         current_distances,
-                        is_real_domain && placement == rocfft_placement_inplace);
+                        is_real_domain(dft_type, io) && placement == rocfft_placement_inplace);
         auto& io_fields = io == io_data_label::INPUT ? inFields : outFields;
         std::for_each(io_fields.begin(), io_fields.end(), [&io_layout](auto& io_field) {
             io_field.finalize_bricks_for(io_layout);
@@ -187,9 +182,8 @@ void rocfft_plan_description_t::finalize_for(rocfft_transform_type   dft_type,
         };
 
         // 0th length dimension must not be modified for real DFTs
-        const bool is_real_dft = dft_type == rocfft_transform_type_real_forward
-                                 || dft_type == rocfft_transform_type_real_inverse;
-        size_t len_dim = is_real_dft ? 1 : 0;
+        const auto is_real_dft = dft_is_real(dft_type);
+        size_t     len_dim     = is_real_dft ? 1 : 0;
         while(len_dim < input_layout.get_len_rank() && input_layout.get_len_rank() > 1)
         {
             if(may_erase_length_dimension(len_dim, io_data_label::INPUT)
@@ -281,49 +275,20 @@ void rocfft_plan_description_t::throw_if_inconsistent_or_invalid_for(
     for(auto io : {io_data_label::INPUT, io_data_label::OUTPUT})
     {
         const auto& io_array_type = io == io_data_label::INPUT ? inArrayType : outArrayType;
-        switch(dft_type)
-        {
-        case rocfft_transform_type_complex_forward:
-        case rocfft_transform_type_complex_inverse:
-            // We need complex (but not hermitian) data
-            if(!array_type_is_complex_but_not_hermitian(io_array_type))
-                throw rocfft_status_invalid_array_type;
-            break;
-        case rocfft_transform_type_real_forward:
-        case rocfft_transform_type_real_inverse:
-            if((io == io_data_label::INPUT) == (dft_type == rocfft_transform_type_real_forward))
-            {
-                // We need real data
-                if(io_array_type != rocfft_array_type_real)
-                    throw rocfft_status_invalid_array_type;
-            }
-            else
-            {
-                // We need hermitian data
-                if(!array_type_is_hermitian(io_array_type))
-                    throw rocfft_status_invalid_array_type;
-            }
-            break;
-        }
+        if((is_real_domain(dft_type, io) && !array_type_is_real(io_array_type))
+           || (is_hermitian_domain(dft_type, io) && !array_type_is_hermitian(io_array_type))
+           || (dft_is_complex(dft_type) && !array_type_is_complex(io_array_type)))
+            throw rocfft_status_invalid_array_type;
     }
     if(placement == rocfft_placement_inplace)
     {
-        switch(dft_type)
+        if((dft_is_complex(dft_type) && (inArrayType != outArrayType))
+           || (is_hermitian_domain(dft_type, io_data_label::INPUT)
+               && !array_type_is_interleaved(inArrayType))
+           || (is_hermitian_domain(dft_type, io_data_label::OUTPUT)
+               && !array_type_is_interleaved(outArrayType)))
         {
-        case rocfft_transform_type_complex_forward:
-        case rocfft_transform_type_complex_inverse:
-            // We need same array type for input and output
-            if(inArrayType != outArrayType)
-                throw rocfft_status_invalid_array_type;
-            break;
-        case rocfft_transform_type_real_forward:
-        case rocfft_transform_type_real_inverse:
-            // Hermitian planar is ruled out
-            const auto hermitian_array_type
-                = dft_type == rocfft_transform_type_real_forward ? outArrayType : inArrayType;
-            if(hermitian_array_type == rocfft_array_type_hermitian_planar)
-                throw rocfft_status_invalid_array_type;
-            break;
+            throw rocfft_status_invalid_array_type;
         }
     }
 
@@ -342,20 +307,16 @@ void rocfft_plan_description_t::throw_if_inconsistent_or_invalid_for(
         throw std::runtime_error(
             "Input and/or output layouts unexpectedly detected to be partial by "
             + std::string(ROCFFT_CURRENT_FUNCTION));
-    const bool is_real_dft = dft_type == rocfft_transform_type_real_forward
-                             || dft_type == rocfft_transform_type_real_inverse;
     for(size_t dim = 0; dim < input_layout.get_full_rank(); dim++)
     {
         bool consistent_io_dim = true;
-        if(dim == 0 && is_real_dft)
+        if(dim == 0 && dft_is_real(dft_type))
         {
-            const auto hermitian_length = dft_type == rocfft_transform_type_real_forward
-                                              ? output_layout[dim].upper
-                                              : input_layout[dim].upper;
-            const auto real_length      = dft_type == rocfft_transform_type_real_forward
-                                              ? input_layout[dim].upper
-                                              : output_layout[dim].upper;
-            consistent_io_dim &= hermitian_length == real_length / 2 + 1;
+            const auto hermitian_length
+                = dft_is_forward(dft_type) ? output_layout[dim].upper : input_layout[dim].upper;
+            const auto real_length
+                = dft_is_forward(dft_type) ? input_layout[dim].upper : output_layout[dim].upper;
+            consistent_io_dim = hermitian_length == real_length / 2 + 1;
         }
         else
             consistent_io_dim = input_layout[dim].upper == output_layout[dim].upper;
@@ -373,8 +334,8 @@ void rocfft_plan_description_t::throw_if_inconsistent_or_invalid_for(
         {
             if(comm_type == rocfft_comm_none)
                 continue;
-            throw std::runtime_error(
-                "Multi-process transforms require both input and output fields to be specified");
+            throw std::runtime_error("Multi-process transforms require both input and output "
+                                     "fields to be specified");
         }
         const auto& io_full_range_layout
             = io == io_data_label::INPUT ? input_layout : output_layout;
@@ -436,10 +397,8 @@ void rocfft_plan_description_t::throw_if_inconsistent_or_invalid_for(
             const auto& in_layout = inFields.empty() ? input_layout : inFields[0].bricks[0].layout;
             const auto& out_layout
                 = outFields.empty() ? output_layout : outFields[0].bricks[0].layout;
-            switch(dft_type)
+            if(dft_is_complex(dft_type))
             {
-            case rocfft_transform_type_complex_forward:
-            case rocfft_transform_type_complex_inverse:
                 if(in_layout != out_layout)
                     throw std::runtime_error("Identical input and output layouts are required for "
                                              "single-device in-place complex transforms.");
@@ -451,18 +410,16 @@ void rocfft_plan_description_t::throw_if_inconsistent_or_invalid_for(
                         throw std::runtime_error("Identical offsets are required for "
                                                  "single-device in-place complex transforms.");
                 }
-                break;
-            case rocfft_transform_type_real_forward:
-            case rocfft_transform_type_real_inverse:
+            }
+            else
+            {
                 if(input_layout[0].inbuffer_stride != 1 || output_layout[0].inbuffer_stride != 1)
                     throw std::runtime_error(
                         "Single-device, in-place real transforms require unit strides along the "
                         "first length dimension on input and output.");
-                const auto& real_layout
-                    = dft_type == rocfft_transform_type_real_forward ? in_layout : out_layout;
-                const auto& hermitian_layout
-                    = dft_type == rocfft_transform_type_real_forward ? out_layout : in_layout;
-                const auto min_nonunit_stride = 2 * (real_layout[0].logical_span() / 2 + 1);
+                const auto& real_layout        = dft_is_forward(dft_type) ? in_layout : out_layout;
+                const auto& hermitian_layout   = dft_is_forward(dft_type) ? out_layout : in_layout;
+                const auto  min_nonunit_stride = 2 * (real_layout[0].logical_span() / 2 + 1);
                 for(size_t dim = 1; dim < input_layout.get_full_rank(); dim++)
                 {
                     if(real_layout[dim].logical_span() == 1) // e.g., unbatched case
@@ -475,15 +432,12 @@ void rocfft_plan_description_t::throw_if_inconsistent_or_invalid_for(
                 // check offsets
                 if(inFields.empty() && outFields.empty())
                 {
-                    const auto& real_offset
-                        = dft_type == rocfft_transform_type_real_forward ? inOffset : outOffset;
-                    const auto& hermitian_offset
-                        = dft_type == rocfft_transform_type_real_forward ? outOffset : inOffset;
+                    const auto& real_offset      = dft_is_forward(dft_type) ? inOffset : outOffset;
+                    const auto& hermitian_offset = dft_is_forward(dft_type) ? outOffset : inOffset;
                     if(real_offset[0] != 2 * hermitian_offset[0])
                         throw std::runtime_error(
                             "Inconsistent offsets for single-device in-place real transforms.");
                 }
-                break;
             }
             if((inFields.empty() && inOffset[0] != 0 && !outFields.empty())
                || (outFields.empty() && outOffset[0] != 0 && !inFields.empty()))
@@ -974,10 +928,8 @@ std::string rocfft_bench_command(const rocfft_plan& plan)
     params.scale_factor   = plan->desc.storeOps.scale_factor;
 
     // reverse-copy lengths and strides (col-major to row-major)
-    const auto lengths  = plan->transformType == rocfft_transform_type_complex_forward
-                                 || plan->transformType == rocfft_transform_type_real_forward
-                              ? plan->desc.input_layout.lengths()
-                              : plan->desc.output_layout.lengths();
+    const auto lengths  = dft_is_forward(plan->transformType) ? plan->desc.input_layout.lengths()
+                                                              : plan->desc.output_layout.lengths();
     const auto istrides = plan->desc.input_layout.strides();
     const auto ostrides = plan->desc.output_layout.strides();
     params.length.assign(lengths.rbegin(), lengths.rend());
@@ -1043,10 +995,8 @@ static void set_bluestein_strides(const rocfft_plan_t& plan, NodeMetaData& planD
     const auto precision     = plan.precision;
     const auto transformType = plan.transformType;
     const auto rank          = plan.desc.rank();
-    const auto fftLength     = transformType == rocfft_transform_type_complex_inverse
-                                   || transformType == rocfft_transform_type_real_inverse
-                                   ? plan.desc.input_layout.lengths()
-                                   : plan.desc.output_layout.lengths();
+    const auto fftLength     = dft_is_inverse(transformType) ? plan.desc.input_layout.lengths()
+                                                             : plan.desc.output_layout.lengths();
     const auto placement     = plan.placement;
     const auto dimension     = planData.dimension;
 
@@ -1177,10 +1127,7 @@ static NodeMetaData make_single_dev_root_plan(const rocfft_plan_t& plan)
     root_plan.dimension    = plan.desc.rank();
     root_plan.batch        = plan.desc.batch();
     root_plan.precision    = plan.precision;
-    root_plan.direction    = ((plan.transformType == rocfft_transform_type_complex_forward)
-                           || (plan.transformType == rocfft_transform_type_real_forward))
-                                 ? -1
-                                 : 1;
+    root_plan.direction    = dft_is_forward(plan.transformType) ? -1 : 1;
     root_plan.inArrayType  = plan.desc.inArrayType;
     root_plan.outArrayType = plan.desc.outArrayType;
     root_plan.rootIsC2C    = (root_plan.inArrayType != rocfft_array_type_real)
@@ -1974,13 +1921,11 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
             // the fastest dimension.  So only apply a solution if
             // we're not doing even-length real, or if fastest dim
             // stride is 1.
-            const auto& realLength     = transformType == rocfft_transform_type_real_forward
+            const auto& realLength     = dft_is_forward(transformType)
                                              ? execPlan.rootPlan->length
                                              : execPlan.rootPlan->outputLength;
-            const bool  evenLengthReal = (transformType == rocfft_transform_type_real_forward
-                                         || transformType == rocfft_transform_type_real_inverse)
-                                        && realLength.front() % 2 == 0;
-            const bool stride1 = execPlan.rootPlan->inStride.front() == 1
+            const bool  evenLengthReal = dft_is_real(transformType) && realLength.front() % 2 == 0;
+            const bool  stride1        = execPlan.rootPlan->inStride.front() == 1
                                  && execPlan.rootPlan->outStride.front() == 1;
             if(evenLengthReal && !stride1)
             {
@@ -2101,19 +2046,18 @@ static size_t C2CBrickOneDimension(rocfft_plan_t&                 plan,
     transformLengths.pop_back();
     transformStride.pop_back();
 
-    rootPlanData.dimension = 1;
-    rootPlanData.length    = transformLengths;
-    rootPlanData.inStride  = transformStride;
-    rootPlanData.outStride = transformStride;
-    rootPlanData.direction = plan.transformType == rocfft_transform_type_complex_forward
-                                     || plan.transformType == rocfft_transform_type_real_forward
-                                 ? -1
-                                 : 1;
+    rootPlanData.dimension    = 1;
+    rootPlanData.length       = transformLengths;
+    rootPlanData.outputLength = transformLengths;
+    rootPlanData.inStride     = transformStride;
+    rootPlanData.outStride    = transformStride;
+    rootPlanData.direction    = dft_is_forward(plan.transformType) ? -1 : 1;
     rootPlanData.placement
         = input == output ? rocfft_placement_inplace : rocfft_placement_notinplace;
     rootPlanData.precision    = plan.precision;
     rootPlanData.inArrayType  = rocfft_array_type_complex_interleaved;
     rootPlanData.outArrayType = rocfft_array_type_complex_interleaved;
+    rootPlanData.rootIsC2C    = true;
     rootPlanData.deviceProp   = get_curr_device_prop();
 
     auto singlePlan       = BuildSingleDevicePlan(rootPlanData,
@@ -2863,8 +2807,7 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
     size_t transposeNumber = 0;
 
     // currently, can only optimize c2c
-    if(transformType != rocfft_transform_type_complex_forward
-       && transformType != rocfft_transform_type_complex_inverse)
+    if(!dft_is_complex(transformType))
         return false;
 
     // must be out-of-place so that we don't have to worry about
@@ -3874,21 +3817,15 @@ try
     rocfft_cout << "precision: " << precision_name(plan->precision) << std::endl;
 
     rocfft_cout << "transform type: ";
-    switch(plan->transformType)
-    {
-    case rocfft_transform_type_complex_forward:
-        rocfft_cout << "complex forward";
-        break;
-    case rocfft_transform_type_complex_inverse:
-        rocfft_cout << "complex inverse";
-        break;
-    case rocfft_transform_type_real_forward:
-        rocfft_cout << "real forward";
-        break;
-    case rocfft_transform_type_real_inverse:
-        rocfft_cout << "real inverse";
-        break;
-    }
+    if(dft_is_complex(plan->transformType))
+        rocfft_cout << "complex ";
+    else
+        rocfft_cout << "real ";
+
+    if(dft_is_forward(plan->transformType))
+        rocfft_cout << "forward";
+    else
+        rocfft_cout << "inverse";
     rocfft_cout << std::endl;
 
     rocfft_cout << "result placement: ";
@@ -3958,10 +3895,8 @@ try
 
     rocfft_cout << "dimensions: " << plan->desc.rank() << std::endl;
 
-    const auto lengths = plan->transformType == rocfft_transform_type_complex_forward
-                                 || plan->transformType == rocfft_transform_type_real_forward
-                             ? plan->desc.input_layout.lengths()
-                             : plan->desc.output_layout.lengths();
+    const auto lengths = dft_is_forward(plan->transformType) ? plan->desc.input_layout.lengths()
+                                                             : plan->desc.output_layout.lengths();
     rocfft_cout << "lengths: " << lengths[0];
     for(auto len : lengths)
         rocfft_cout << ", " << len;

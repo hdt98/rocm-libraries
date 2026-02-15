@@ -20,12 +20,12 @@
 
 #include "rocfft/rocfft.h"
 
+#include "../../library/src/include/rocfft_enum_helpers.h"
 #include "../../shared/client_except.h"
 #include "../../shared/concurrency.h"
 #include "../../shared/environment.h"
 #include "../../shared/gpubuf.h"
 #include "../../shared/params_gen.h"
-#include "../../shared/precision_type.h"
 #include "../../shared/rocfft_complex.h"
 #include "hip/hip_runtime_api.h"
 #include <condition_variable>

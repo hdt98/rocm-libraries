@@ -25,12 +25,11 @@
 #include <iostream>
 #include <vector>
 
-#include "../../shared/array_predicate.h"
-#include "../../shared/precision_type.h"
 #include "callback_map.h"
 #include "logging.h"
 #include "plan.h"
 #include "rocfft/rocfft.h"
+#include "rocfft_enum_helpers.h"
 #include "rocfft_exception.h"
 #include "transform.h"
 

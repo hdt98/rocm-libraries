@@ -20,11 +20,11 @@
 
 #include "tree_node_1D.h"
 #include "../../shared/arithmetic.h"
-#include "../../shared/precision_type.h"
 #include "function_pool.h"
 #include "fuse_shim.h"
 #include "node_factory.h"
 #include "repo.h"
+#include "rocfft_enum_helpers.h"
 #include "tuning_helper.h"
 #include <numeric>
 

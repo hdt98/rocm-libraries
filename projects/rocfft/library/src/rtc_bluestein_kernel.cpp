@@ -20,10 +20,9 @@
 
 #include "rtc_bluestein_kernel.h"
 #include "../../shared/arithmetic.h"
-#include "../../shared/array_predicate.h"
-#include "../../shared/precision_type.h"
 #include "function_pool.h"
 #include "kernel_launch.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_bluestein_gen.h"
 #include "tree_node.h"
 

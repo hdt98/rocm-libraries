@@ -19,8 +19,8 @@
 // THE SOFTWARE.
 
 #include "rtc_transpose_gen.h"
-#include "../../shared/array_predicate.h"
 #include "device/generator/generator.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_test_harness.h"
 
 #include "device/kernel-generator-embed.h"

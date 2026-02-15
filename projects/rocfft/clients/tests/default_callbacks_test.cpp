@@ -29,7 +29,7 @@
 #include "../../shared/fftw_transform.h"
 #include "../../shared/hip_object_wrapper.h"
 #include "../../shared/params_gen.h"
-#include "../../shared/rocfft_params.h"
+#include "../rocfft_params.h"
 #include "rocfft/rocfft.h"
 
 // -------------------------------------

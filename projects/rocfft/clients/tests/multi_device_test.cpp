@@ -21,7 +21,7 @@
 #include "../../shared/accuracy_test.h"
 #include "../../shared/fft_enums.h"
 #include "../../shared/params_gen.h"
-#include "../../shared/rocfft_params.h"
+#include "../rocfft_params.h"
 #include <gtest/gtest.h>
 #include <hip/hip_runtime_api.h>
 

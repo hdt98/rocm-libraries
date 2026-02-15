@@ -20,7 +20,7 @@
 
 #include "../../shared/fft_hash.h"
 #include "../../shared/params_gen.h"
-#include "../../shared/rocfft_params.h"
+#include "../rocfft_params.h"
 #include <algorithm>
 #include <gtest/gtest.h>
 #include <memory>

@@ -42,13 +42,13 @@
 #include "../../shared/environment.h"
 #include "../../shared/fft_enums.h"
 #include "../../shared/hostbuf.h"
-#include "../../shared/rocfft_accuracy_test.h"
 #include "../../shared/sys_mem.h"
 #include "../../shared/test_params.h"
 #include "../../shared/work_queue.h"
 #include "bitwise_repro/bitwise_repro_db.h"
 #include "bitwise_repro/bitwise_repro_test.h"
 #include "rocfft/rocfft.h"
+#include "rocfft_accuracy_test.h"
 
 // Control output verbosity:
 int verbose;

@@ -19,7 +19,6 @@
 // THE SOFTWARE.
 
 #include "rtc_kernel.h"
-#include "../../shared/array_predicate.h"
 #include "../../shared/device_properties.h"
 #include "../../shared/environment.h"
 #include "device/generator/stockham_gen.h"
@@ -27,6 +26,7 @@
 #include "device/kernel-generator-embed.h"
 #include "kernel_launch.h"
 #include "logging.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_bluestein_kernel.h"
 #include "rtc_cache.h"
 #include "rtc_realcomplex_kernel.h"

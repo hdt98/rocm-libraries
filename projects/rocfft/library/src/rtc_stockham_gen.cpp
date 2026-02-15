@@ -20,7 +20,7 @@
 
 #include <functional>
 
-#include "../../shared/array_predicate.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_stockham_gen.h"
 #include "rtc_test_harness.h"
 

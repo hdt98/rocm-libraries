@@ -21,7 +21,7 @@
 *******************************************************************************/
 
 #include "../../shared/mpi_worker.h"
-#include "../../shared/rocfft_params.h"
+#include "../rocfft_params.h"
 
 int main(int argc, char* argv[])
 {

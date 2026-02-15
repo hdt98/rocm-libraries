@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 
-#include "../../shared/rocfft_accuracy_test.h"
+#include "rocfft_accuracy_test.h"
 
 #include "../../shared/CLI11.hpp"
 #include "../../shared/client_except.h"

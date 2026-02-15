@@ -22,6 +22,7 @@
 #include "../../shared/arithmetic.h"
 #include "../../shared/ptrdiff.h"
 #include "rocfft_current_function.h"
+#include "rocfft_enum_helpers.h"
 
 #include <algorithm>
 #include <functional>
@@ -562,64 +563,46 @@ std::optional<data_layout_t> data_layout_t::get_corresponding_inplace_layout_for
         throw std::logic_error(std::string(ROCFFT_CURRENT_FUNCTION)
                                + " queried on a layout involving partial lengths");
 
-    std::optional<data_layout_t> ret = std::nullopt;
-    switch(dft_type)
-    {
-    case rocfft_transform_type_complex_forward:
-    case rocfft_transform_type_complex_inverse:
+    if(dft_is_complex(dft_type))
     {
         if(innermost_length_in_corresponding_layout != (*this)[0].logical_span())
             throw std::invalid_argument("Invalid innermost_length_in_corresponding_layout given to "
                                         + std::string(ROCFFT_CURRENT_FUNCTION));
-        ret = std::make_optional<data_layout_t>(*this);
-        break;
+        return std::make_optional<data_layout_t>(*this);
     }
-    case rocfft_transform_type_real_forward:
-    case rocfft_transform_type_real_inverse:
+    // real DFT
+    const auto corresponding_layout_is_real
+        = dft_is_forward(dft_type) ^ (corresponding_layout_label == io_data_label::OUTPUT);
+    if(corresponding_layout_is_real)
     {
-        const auto corresponding_layout_is_real
-            = (dft_type == rocfft_transform_type_real_forward)
-              ^ (corresponding_layout_label == io_data_label::OUTPUT);
-        if(corresponding_layout_is_real)
-        {
-            if(innermost_length_in_corresponding_layout / 2 + 1 != (*this)[0].logical_span())
-                throw std::invalid_argument(
-                    "Invalid innermost_length_in_corresponding_layout given to "
-                    + std::string(ROCFFT_CURRENT_FUNCTION));
-        }
-        else if(innermost_length_in_corresponding_layout != (*this)[0].logical_span() / 2 + 1)
+        if(innermost_length_in_corresponding_layout / 2 + 1 != (*this)[0].logical_span())
             throw std::invalid_argument("Invalid innermost_length_in_corresponding_layout given to "
                                         + std::string(ROCFFT_CURRENT_FUNCTION));
-        // real transform: unit stride is required along the inner-most axis
-        if((*this)[0].inbuffer_stride != 1)
-            break;
-        if(!corresponding_layout_is_real)
-        {
-            bool strides_are_consistent = true;
-            for(size_t dim = 1; strides_are_consistent && dim < get_full_rank(); dim++)
-                strides_are_consistent &= (*this)[dim].inbuffer_stride % 2 == 0
-                                          && (*this)[dim].inbuffer_stride
-                                                 >= 2 * innermost_length_in_corresponding_layout;
-            if(!strides_are_consistent)
-                break;
-        }
-        // copy layout and modify what needs be
-        ret             = std::make_optional<data_layout_t>(*this);
-        (*ret)[0].upper = innermost_length_in_corresponding_layout;
-        for(size_t dim = 1; dim < ret->get_full_rank(); dim++)
-        {
-            (*ret)[dim].inbuffer_stride = corresponding_layout_is_real
-                                              ? 2 * (*this)[dim].inbuffer_stride
-                                              : (*this)[dim].inbuffer_stride / 2;
-        }
-        break;
     }
-    default:
-    {
-        throw std::invalid_argument("Unknown type of transform given to "
+    else if(innermost_length_in_corresponding_layout != (*this)[0].logical_span() / 2 + 1)
+        throw std::invalid_argument("Invalid innermost_length_in_corresponding_layout given to "
                                     + std::string(ROCFFT_CURRENT_FUNCTION));
-        break;
+    // real transform: unit stride is required along the inner-most axis
+    if((*this)[0].inbuffer_stride != 1)
+        return std::nullopt;
+    if(!corresponding_layout_is_real)
+    {
+        bool strides_are_consistent = true;
+        for(size_t dim = 1; strides_are_consistent && dim < get_full_rank(); dim++)
+            strides_are_consistent
+                &= (*this)[dim].inbuffer_stride % 2 == 0
+                   && (*this)[dim].inbuffer_stride >= 2 * innermost_length_in_corresponding_layout;
+        if(!strides_are_consistent)
+            return std::nullopt;
     }
+    // copy layout and modify what needs be
+    auto ret        = std::make_optional<data_layout_t>(*this);
+    (*ret)[0].upper = innermost_length_in_corresponding_layout;
+    for(size_t dim = 1; dim < ret->get_full_rank(); dim++)
+    {
+        (*ret)[dim].inbuffer_stride = corresponding_layout_is_real
+                                          ? 2 * (*this)[dim].inbuffer_stride
+                                          : (*this)[dim].inbuffer_stride / 2;
     }
     return ret;
 }

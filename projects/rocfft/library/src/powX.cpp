@@ -43,12 +43,11 @@
 #include "function_pool.h"
 
 #include "real2complex.h"
+#include "rocfft_enum_helpers.h"
 
-#include "../../shared/array_predicate.h"
 #include "../../shared/environment.h"
 #include "../../shared/fft_hash.h"
 #include "../../shared/hip_object_wrapper.h"
-#include "../../shared/precision_type.h"
 #include "../../shared/printbuffer.h"
 #include "../../shared/ptrdiff.h"
 #include "../../shared/rocfft_complex.h"

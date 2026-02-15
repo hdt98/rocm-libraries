@@ -23,8 +23,8 @@ using namespace std::placeholders;
 
 #include "../../../../shared/arithmetic.h"
 #include "../../../../shared/device_properties.h"
-#include "../../../../shared/precision_type.h"
 #include "generator.h"
+#include "rocfft_enum_helpers.h"
 #include "stockham_gen.h"
 #include <algorithm>
 #include <array>

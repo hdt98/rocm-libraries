@@ -31,8 +31,8 @@
 #include "../../../shared/enum_to_string.h"
 #include "../../../shared/fft_params.h"
 #include "../../../shared/gpubuf.h"
-#include "../../../shared/rocfft_params.h"
 #include "../../../shared/test_params.h"
+#include "../../rocfft_params.h"
 #include "bitwise_repro_db.h"
 
 extern int                          verbose;

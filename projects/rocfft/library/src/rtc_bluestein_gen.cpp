@@ -20,10 +20,10 @@
 
 #include "rtc_bluestein_gen.h"
 #include "../../shared/arithmetic.h"
-#include "../../shared/array_predicate.h"
 #include "device/generator/fftgenerator.h"
 #include "device/generator/generator.h"
 #include "device/kernel-generator-embed.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_kernel.h"
 #include "rtc_test_harness.h"
 

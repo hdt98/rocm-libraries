@@ -27,8 +27,8 @@
 #include <mpi-ext.h>
 #endif
 
-#include "../../../shared/array_predicate.h"
 #include "rocfft/rocfft.h"
+#include "rocfft_enum_helpers.h"
 
 class MPI_Comm_wrapper_t
 {

@@ -27,7 +27,6 @@
 #include <list>
 #include <vector>
 
-#include "../../../shared/array_predicate.h"
 #include "data_layout.h"
 #include "function_pool.h"
 #include "load_store_ops.h"

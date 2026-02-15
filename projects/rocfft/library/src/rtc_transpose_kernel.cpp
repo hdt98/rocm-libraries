@@ -21,8 +21,8 @@
 #include <numeric>
 
 #include "../../shared/arithmetic.h"
-#include "../../shared/array_predicate.h"
 #include "kernel_launch.h"
+#include "rocfft_enum_helpers.h"
 #include "rtc_transpose_gen.h"
 #include "rtc_transpose_kernel.h"
 #include "tree_node.h"
