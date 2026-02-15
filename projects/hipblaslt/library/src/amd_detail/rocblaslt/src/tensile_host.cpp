@@ -1877,12 +1877,22 @@ namespace
         tensileProblem.setParams().setBiasEnum(
             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
 
-        tensileProblem.setUseScaleAB(
-            (prob.scaleA == nullptr && prob.scaleB == nullptr)
-                ? ""
-                : ((prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
-                       ? "Vector"
-                       : "Scalar"));
+	// TODO: currently mixing MX data type and non-MX data type is not
+	// supported (so only scaleAType) is checked, and need to update this
+	// when supported.
+	if((prob.scaleA == nullptr && prob.scaleB == nullptr) or
+		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
+		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT)
+	{
+	    tensileProblem.setUseScaleAB("");
+	}
+	else
+	{
+	    tensileProblem.setUseScaleAB(
+		    (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
+			? "Vector"
+			: "Scalar");
+	}
         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
         tensileProblem.setScaleAlphaVec(compute_type, d.sizes()[0]);
