@@ -807,8 +807,11 @@ namespace TensileLite
                                           autoWGMXCCCHUNK,
                                           autoGsuVal);
 
-        if(!problemType.useScaleAB.empty()) //kernel input data
-        {
+	// TODO: this is a workaround by looking at mxBlockA/mBlockB to detect if using mx data types as
+	// useScaleAB is empty when using MX data types. useScaleAB should have a new value for mx data
+	// types.
+        if(!problemType.useScaleAB.empty() or (problemType.mxBlockA == 32 && problemType.mxBlockB == 32)) //kernel input data
+	{
             args.template append<void const*>("scaleA", inputs.scaleA);
             args.template append<void const*>("scaleB", inputs.scaleB);
         }
