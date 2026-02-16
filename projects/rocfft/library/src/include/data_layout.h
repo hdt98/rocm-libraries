@@ -22,9 +22,11 @@
 #define DATA_LAYOUT_H
 
 #include "rocfft/rocfft.h"
+#include "rocfft_enum_helpers.h"
 
 #include <cstring>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -43,6 +45,15 @@ constexpr io_data_label other()
 {
     static_assert(io == io_data_label::INPUT || io == io_data_label::OUTPUT);
     return io == io_data_label::INPUT ? io_data_label::OUTPUT : io_data_label::INPUT;
+}
+
+constexpr bool is_real_domain(const rocfft_transform_type& dft_type, const io_data_label& io)
+{
+    return dft_is_real(dft_type) && (dft_is_forward(dft_type) ^ (io == io_data_label::OUTPUT));
+}
+constexpr bool is_hermitian_domain(const rocfft_transform_type& dft_type, const io_data_label& io)
+{
+    return dft_is_real(dft_type) && (dft_is_forward(dft_type) ^ (io == io_data_label::INPUT));
 }
 
 /**
@@ -336,6 +347,14 @@ struct data_layout_t
      * @return `true` if any (length or batch) axis covers a partial range.
      */
     bool is_partial() const;
+    /**
+     * @return `true` if any length axis covers a full range.
+     */
+    bool has_some_full_length_axis() const;
+    /**
+     * @return `true` if any batch axis covers a full range.
+     */
+    bool has_some_full_batch_axis() const;
 
     /**
      * @param[in] other data layout which must be dimensionally consistent with
@@ -362,30 +381,65 @@ struct data_layout_t
     /**
      * @brief Verifies whether this object's layout is consistent as input
      * (resp. output) for specific types of in-place Discrete Fourier Transforms
-     * and, if so, returns the corresponding output (resp. input) layout.
+     * along its full lengths axes and, if so, returns the corresponding output
+     * (resp. input) layout.
      * 
-     * @tparam corresponding_layout_label label for the "corresponding" layout,
-     * i.e., this object's layout is considered an input (resp. output) layout
-     * if the specialization value is `io_data_label::OUTPUT` (resp. `io_data_label::INPUT`)
+     * @tparam other_layout_label label for the "other" layout, i.e., this object's
+     * layout is considered an input (resp. output) layout if the specialization
+     * value is `io_data_label::OUTPUT` (resp. `io_data_label::INPUT`)
      * @param[in] dft_type intended type of in-place Discrete Fourier Transforms
-     * @param[in] innermost_length_in_corresponding_layout span of the logical
-     * index range along the innermost length axis in the corresponding layout.
+     * @param[in] other_real_innermost_length_is_odd flag indicating whether the
+     * logical span of the innermost length axis in the corresponding layout is
+     * odd (if `true`) or not (if `false`). This is ignored (and can be safely
+     * omitted in calls) *unless* is_real_domain(dft_type, other_layout_label)
+     * is `true`
      * @return An `std::optional<data_layout_t>` object which has a value set
      * iff a corresponding layout for in-place operation does actually exist.
      * 
-     * @note This function does not verify if either layout is self-aliasing
-     * and ignores offsets as `data_layout_t` objects do not capture them.
+     * @note This function does not verify if either layout is self-aliasing and
+     * ignores offsets as `data_layout_t` objects do not capture them.
+     * 
      * 
      * @throw An `std::logic_error` is thrown if the current object is an empty
-     * layout or involves some partial length axes. An `std::invalid_argument` is
-     * thrown if the value of `innermost_length_in_corresponding_layout` is
-     * not a valid value for the request or if `dft_type` is not an expected value.
+     * layout or if
+     * 
+     * - all the current object's length axes are partial;
+     * 
+     * - the innermost (0th) length axis is partial and if `dft_type` corresponds
+     *   to a real transform.
      * 
      */
-    template <io_data_label corresponding_layout_label>
+    template <io_data_label other_layout_label>
     std::optional<data_layout_t>
-        get_corresponding_inplace_layout_for(rocfft_transform_type dft_type,
-                                             size_t innermost_length_in_corresponding_layout) const;
+        get_other_inplace_layout_for(rocfft_transform_type dft_type,
+                                     bool other_real_innermost_length_is_odd = false) const;
+
+    /**
+     * @param[in] len_indices_to_extract set of indices of the length axes to
+     * extract from the current layout.
+     * @return A `data_layout_t` object with
+     * 
+     * - length axes being a subset of this object's length axes;
+     * 
+     * - batch axes being the union of this object's batch axes and its
+     *   remaining length axes.
+     * 
+     * @note Relative ordering of length axes is unchanged in the returned
+     * object when compared to this object's, i.e., if `0` is one of the
+     * elements in `len_indices_to_extract`, the returned object's first
+     * dimension will be identical to this object's.
+     */
+    data_layout_t extract_length_axes(const std::set<size_t>& len_indices_to_extract) const;
+
+    inline data_layout_t extract_length_axis(size_t len_index_to_extract) const
+    {
+        return extract_length_axes({len_index_to_extract});
+    }
+
+    static bool are_consistent_dft_io(const data_layout_t&    input_layout,
+                                      const data_layout_t&    output_layout,
+                                      rocfft_result_placement dft_placement,
+                                      rocfft_transform_type   dfty_type);
 
     //-------------------------------------------------------------------------
     //                        DEFAULT COPIES AND MOVES

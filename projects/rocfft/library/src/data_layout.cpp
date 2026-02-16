@@ -536,6 +536,20 @@ bool data_layout_t::is_partial() const
     return has_some_partial_length_axis() || has_some_partial_batch_axis();
 }
 
+bool data_layout_t::has_some_full_length_axis() const
+{
+    return std::any_of(len_axes.begin(), len_axes.end(), [](const auto& len_axis) {
+        return !len_axis.is_partial;
+    });
+}
+
+bool data_layout_t::has_some_full_batch_axis() const
+{
+    return std::any_of(batch_axes.begin(), batch_axes.end(), [](const auto& batch_axis) {
+        return !batch_axis.is_partial;
+    });
+}
+
 bool data_layout_t::logically_contains(const data_layout_t& other) const
 {
     if(!is_dimensionally_consistent_with(other))
@@ -548,59 +562,53 @@ bool data_layout_t::logically_contains(const data_layout_t& other) const
     return ret;
 }
 
-template <io_data_label corresponding_layout_label>
-std::optional<data_layout_t> data_layout_t::get_corresponding_inplace_layout_for(
-    rocfft_transform_type dft_type, size_t innermost_length_in_corresponding_layout) const
+template <io_data_label other_layout_label>
+std::optional<data_layout_t>
+    data_layout_t::get_other_inplace_layout_for(rocfft_transform_type dft_type,
+                                                bool other_real_innermost_length_is_odd) const
 {
-    static_assert(corresponding_layout_label == io_data_label::INPUT
-                  || corresponding_layout_label == io_data_label::OUTPUT);
+    static_assert(other_layout_label == io_data_label::INPUT
+                  || other_layout_label == io_data_label::OUTPUT);
 
     if(is_empty())
         throw std::logic_error(std::string(ROCFFT_CURRENT_FUNCTION)
                                + " queried on an empty layout");
 
-    if(has_some_partial_length_axis())
+    if(!has_some_full_length_axis())
         throw std::logic_error(std::string(ROCFFT_CURRENT_FUNCTION)
-                               + " queried on a layout involving partial lengths");
+                               + " queried on a layout involving only partial length axes");
+    if(dft_is_real(dft_type) && len_axes[0].is_partial)
+        throw std::logic_error(std::string(ROCFFT_CURRENT_FUNCTION)
+                               + " queried for a real transform on a layout involving a partial "
+                                 "innermost length axis");
 
     if(dft_is_complex(dft_type))
     {
-        if(innermost_length_in_corresponding_layout != (*this)[0].logical_span())
-            throw std::invalid_argument("Invalid innermost_length_in_corresponding_layout given to "
-                                        + std::string(ROCFFT_CURRENT_FUNCTION));
+        // simple copy
         return std::make_optional<data_layout_t>(*this);
     }
-    // real DFT
-    const auto corresponding_layout_is_real
-        = dft_is_forward(dft_type) ^ (corresponding_layout_label == io_data_label::OUTPUT);
-    if(corresponding_layout_is_real)
-    {
-        if(innermost_length_in_corresponding_layout / 2 + 1 != (*this)[0].logical_span())
-            throw std::invalid_argument("Invalid innermost_length_in_corresponding_layout given to "
-                                        + std::string(ROCFFT_CURRENT_FUNCTION));
-    }
-    else if(innermost_length_in_corresponding_layout != (*this)[0].logical_span() / 2 + 1)
-        throw std::invalid_argument("Invalid innermost_length_in_corresponding_layout given to "
-                                    + std::string(ROCFFT_CURRENT_FUNCTION));
     // real transform: unit stride is required along the inner-most axis
     if((*this)[0].inbuffer_stride != 1)
         return std::nullopt;
-    if(!corresponding_layout_is_real)
+    if(is_hermitian_domain(dft_type, other_layout_label))
     {
         bool strides_are_consistent = true;
         for(size_t dim = 1; strides_are_consistent && dim < get_full_rank(); dim++)
             strides_are_consistent
                 &= (*this)[dim].inbuffer_stride % 2 == 0
-                   && (*this)[dim].inbuffer_stride >= 2 * innermost_length_in_corresponding_layout;
+                   && (*this)[dim].inbuffer_stride >= 2 * ((*this)[0].logical_span() / 2 + 1);
         if(!strides_are_consistent)
             return std::nullopt;
     }
     // copy layout and modify what needs be
-    auto ret        = std::make_optional<data_layout_t>(*this);
-    (*ret)[0].upper = innermost_length_in_corresponding_layout;
+    auto ret = std::make_optional<data_layout_t>(*this);
+    (*ret)[0].upper
+        = is_real_domain(dft_type, other_layout_label)
+              ? 2 * ((*this)[0].logical_span() - 1) + (other_real_innermost_length_is_odd ? 1 : 0)
+              : (*this)[0].logical_span() / 2 + 1;
     for(size_t dim = 1; dim < ret->get_full_rank(); dim++)
     {
-        (*ret)[dim].inbuffer_stride = corresponding_layout_is_real
+        (*ret)[dim].inbuffer_stride = is_real_domain(dft_type, other_layout_label)
                                           ? 2 * (*this)[dim].inbuffer_stride
                                           : (*this)[dim].inbuffer_stride / 2;
     }
@@ -609,9 +617,100 @@ std::optional<data_layout_t> data_layout_t::get_corresponding_inplace_layout_for
 
 // explicit instantiations
 template std::optional<data_layout_t>
-    data_layout_t::get_corresponding_inplace_layout_for<io_data_label::INPUT>(rocfft_transform_type,
-                                                                              size_t) const;
-
+    data_layout_t::data_layout_t::get_other_inplace_layout_for<io_data_label::INPUT>(
+        rocfft_transform_type, bool) const;
 template std::optional<data_layout_t>
-    data_layout_t::get_corresponding_inplace_layout_for<io_data_label::OUTPUT>(
-        rocfft_transform_type, size_t) const;
+    data_layout_t::data_layout_t::get_other_inplace_layout_for<io_data_label::OUTPUT>(
+        rocfft_transform_type, bool) const;
+
+data_layout_t
+    data_layout_t::extract_length_axes(const std::set<size_t>& len_indices_to_extract) const
+{
+    if(is_empty())
+        throw std::logic_error(std::string(ROCFFT_CURRENT_FUNCTION)
+                               + " called by an empty object.");
+    const auto len_rank = get_len_rank();
+    if(len_indices_to_extract.empty()
+       || std::any_of(len_indices_to_extract.begin(),
+                      len_indices_to_extract.end(),
+                      [&len_rank](const auto& len_idx) { return len_idx >= len_rank; }))
+    {
+        throw std::invalid_argument("Invalid subset of length indices to extract given to "
+                                    + std::string(ROCFFT_CURRENT_FUNCTION));
+    }
+    data_layout_t ret;
+    for(size_t dim = 0; dim < get_full_rank(); dim++)
+    {
+        if(len_indices_to_extract.contains(dim))
+            ret.len_axes.push_back((*this)[dim]);
+        else
+            ret.batch_axes.push_back((*this)[dim]);
+    }
+    return ret;
+}
+
+bool data_layout_t::are_consistent_dft_io(const data_layout_t&    input_layout,
+                                          const data_layout_t&    output_layout,
+                                          rocfft_result_placement dft_placement,
+                                          rocfft_transform_type   dft_type)
+{
+    if(!input_layout.is_dimensionally_consistent_with(output_layout))
+        return false;
+
+    // In-place stride consistency lambda:
+    auto inbuffer_strides_are_consistent_for_inplace_along_axis
+        = [dft_type, &input_layout, &output_layout](size_t dim) -> bool {
+        if(dft_is_complex(dft_type))
+            return input_layout[dim].inbuffer_stride == output_layout[dim].inbuffer_stride;
+        if(dim == 0)
+            return input_layout[dim].inbuffer_stride == 1
+                   && output_layout[dim].inbuffer_stride == 1;
+        const auto real_stride      = is_real_domain(dft_type, io_data_label::INPUT)
+                                          ? input_layout[dim].inbuffer_stride
+                                          : output_layout[dim].inbuffer_stride;
+        const auto hermitian_stride = is_hermitian_domain(dft_type, io_data_label::INPUT)
+                                          ? input_layout[dim].inbuffer_stride
+                                          : output_layout[dim].inbuffer_stride;
+        const auto min_real_stride  = is_real_domain(dft_type, io_data_label::INPUT)
+                                          ? 2 * (input_layout[0].logical_span() / 2 + 1)
+                                          : 2 * (output_layout[0].logical_span() / 2 + 1);
+        return real_stride == 2 * hermitian_stride && real_stride >= min_real_stride;
+    };
+
+    bool consistent = true;
+    // consistency of length axes:
+    for(size_t dim = 0; consistent && dim < input_layout.get_len_rank(); dim++)
+    {
+        // length axes must all be full
+        consistent &= !input_layout[dim].is_partial && output_layout[dim].is_partial;
+
+        if(dim == 0 && dft_is_real(dft_type))
+        {
+            const auto real_upper      = is_real_domain(dft_type, io_data_label::INPUT)
+                                             ? input_layout[dim].upper
+                                             : output_layout[dim].upper;
+            const auto hermitian_upper = is_real_domain(dft_type, io_data_label::INPUT)
+                                             ? output_layout[dim].upper
+                                             : input_layout[dim].upper;
+            consistent &= (hermitian_upper == real_upper / 2 + 1);
+        }
+        else
+            consistent &= input_layout[dim].has_same_logical_range_as(output_layout[dim]);
+        if(dft_placement == rocfft_placement_inplace)
+        {
+            // check strides consistency
+            consistent &= inbuffer_strides_are_consistent_for_inplace_along_axis(dim);
+        }
+    }
+    // batch axes:
+    for(size_t dim = input_layout.get_len_rank(); consistent && dim < input_layout.get_full_rank();
+        dim++)
+    {
+        // batch axes may be shuffled on output with re-defined ranges (conceptually)
+        // but logical spans must match
+        consistent &= input_layout[dim].logical_span() == output_layout[dim].logical_span();
+        if(dft_placement == rocfft_placement_inplace)
+            consistent &= inbuffer_strides_are_consistent_for_inplace_along_axis(dim);
+    }
+    return consistent;
+}

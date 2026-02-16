@@ -25,6 +25,8 @@
 #include <complex>
 #include <cstring>
 #include <list>
+#include <optional>
+#include <set>
 #include <vector>
 
 #include "data_layout.h"
@@ -161,6 +163,38 @@ struct rocfft_field_t
     }
 
     bool has_dimensionally_consistent_bricks_for(const data_layout_t& full_range_layout) const;
+
+    /**
+     * @param[in] dim the index of the length axis to be verified
+     * @return `true` iff the corresponding length axis is not partial
+     * in any of the bricks' layouts.
+     * 
+     * @throw
+     * 
+     * - An `std::logic_error` is thrown if the field has no bricks or
+     * if its bricks are not dimensionally consistent.
+     * 
+     * - An `std::invalid_argument` is thrown if `dim` is out of range.
+     */
+    bool has_unsplit_length_axis(size_t dim) const;
+
+    template <io_data_label other_io_label>
+    std::optional<rocfft_field_t> get_other_field_for(rocfft_transform_type   dft_type,
+                                                      rocfft_result_placement placement,
+                                                      bool other_real_innermost_length_is_odd
+                                                      = false) const;
+
+    inline bool has_no_split_length() const
+    {
+        return std::all_of(bricks.begin(), bricks.end(), [](const auto& brick) {
+            return !brick.layout.has_some_partial_length_axis();
+        });
+    }
+
+    bool operator==(const rocfft_field_t& other) const
+    {
+        return bricks == other.bricks;
+    }
 };
 
 struct rocfft_plan_description_t
@@ -446,42 +480,43 @@ private:
                                     const std::vector<rocfft_brick_t>& output_bricks,
                                     const std::vector<size_t>&         antecedents);
 
+    struct field_representation_t
+    {
+        rocfft_field_t         field;
+        rocfft_array_type      array_type;
+        std::vector<BufferPtr> buffers;
+        std::string            group_name;
+        // comparisons
+        bool operator==(const field_representation_t& other) const
+        {
+            // group_name is irrelevant to logical comparisons of field representations
+            return field == other.field && array_type == other.array_type
+                   && buffers == other.buffers;
+        }
+        bool operator!=(const field_representation_t& other) const
+        {
+            return !(*this == other);
+        }
+    };
+
     // Transpose the input field to the output field by adding work items
     // to the plan.  Antecedents are provided as a vector of item
     // indexes, one per brick.  Final work item per brick (that future
     // per-brick operations can depend on) is returned in outputItems.
-    //
-    // transposeNumber identifies this particular transpose in the
-    // plan, for debugging.
-    void GlobalTranspose(size_t                     elem_size,
-                         const rocfft_field_t&      inField,
-                         const rocfft_field_t&      outField,
-                         std::vector<BufferPtr>&    input,
-                         std::vector<BufferPtr>&    output,
-                         const std::vector<size_t>& inputAntecedents,
-                         std::vector<size_t>&       outputItems,
-                         size_t                     transposeNumber);
+    std::vector<size_t> GlobalTranspose(const field_representation_t& input,
+                                        const field_representation_t& output,
+                                        const std::vector<size_t>&    antecedents);
 
     // default global all-to-all transpose
-    void GlobalTransposeA2A(size_t                     elem_size,
-                            const rocfft_field_t&      inField,
-                            const rocfft_field_t&      outField,
-                            std::vector<BufferPtr>&    input,
-                            std::vector<BufferPtr>&    output,
-                            const std::vector<size_t>& inputAntecedents,
-                            std::vector<size_t>&       outputItems,
-                            const std::string&         itemGroup);
+    std::vector<size_t> GlobalTransposeA2A(const field_representation_t& input,
+                                           const field_representation_t& output,
+                                           const std::vector<size_t>&    antecedents);
 
     // fallback case for global transpose that uses point-to-point
     // communications, for when all-to-all isn't possible.
-    void GlobalTransposeP2P(size_t                     elem_size,
-                            const rocfft_field_t&      inField,
-                            const rocfft_field_t&      outField,
-                            std::vector<BufferPtr>&    input,
-                            std::vector<BufferPtr>&    output,
-                            const std::vector<size_t>& inputAntecedents,
-                            std::vector<size_t>&       outputItems,
-                            const std::string&         itemGroup);
+    std::vector<size_t> GlobalTransposeP2P(const field_representation_t& input,
+                                           const field_representation_t& output,
+                                           const std::vector<size_t>&    antecedents);
 
     // Transform (complex-complex FFT) a whole field along specified
     // dimensions.  Input and output ptrs are provided as a vector of
@@ -495,14 +530,120 @@ private:
     // Work items are added to the plan.  Final work item per brick (that
     // future per-brick operations can depend on) is returned in
     // outputItems.
-    void C2CField(const rocfft_field_t&          field,
-                  const std::vector<size_t>&     fftDims,
-                  std::vector<BufferPtr>&        input,
-                  std::vector<BufferPtr>&        output,
-                  const std::optional<LoadOps>&  loadOps,
-                  const std::optional<StoreOps>& storeOps,
-                  const std::vector<size_t>&     inputAntecedents,
-                  std::vector<size_t>&           outputItems);
+    //    void C2CField(const rocfft_field_t&          field,
+    //                  const std::set<size_t>&        fftDims,
+    //                  const std::vector<BufferPtr>&  input,
+    //                  std::vector<BufferPtr>&        output,
+    //                  const std::optional<LoadOps>&  loadOps,
+    //                  const std::optional<StoreOps>& storeOps,
+    //                  const std::vector<size_t>&     inputAntecedents,
+    //                  std::vector<size_t>&           outputItems);
+
+    // RAII struct to 'lease' a temp buffer from a multimap of per-device
+    // buffers.  When this struct is destroyed, the buffer is returned to
+    // the map for reuse.
+    struct TempBufferLease
+    {
+        TempBufferLease(
+            std::multimap<rocfft_location_t, std::shared_ptr<InternalTempBuffer>>& _tempBuffers,
+            int                                                                    local_comm_rank,
+            rocfft_location_t                                                      _location,
+            size_t                                                                 byte_size)
+            : location(_location)
+            , tempBuffers(&_tempBuffers)
+        {
+            // no need to allocate anything for non-local ranks
+            if(local_comm_rank != location.comm_rank)
+            {
+                // instead allocate a placeholder that remembers which
+                // rank this was for, to aid debugging
+                buf = std::make_shared<InternalTempBuffer>(location.comm_rank);
+                return;
+            }
+
+            // return an existing buffer that's big enough, if one exists
+            auto i = tempBuffers->lower_bound(location);
+            if(i != tempBuffers->upper_bound(location))
+            {
+                // found a buffer, ensure it's big enough
+                i->second->set_size_bytes(byte_size);
+
+                // leasing out this temp buffer, remove it from the map
+                buf = i->second;
+                tempBuffers->erase(i);
+                return;
+            }
+            // no buffer was found, allocate a new one
+            buf = std::make_shared<InternalTempBuffer>(local_comm_rank);
+            buf->set_size_bytes(byte_size);
+        }
+        ~TempBufferLease()
+        {
+            // return the buffer to the map
+            if(buf)
+                tempBuffers->emplace(std::make_pair(location, std::move(buf)));
+        }
+        // allow moves, disallow copies
+        TempBufferLease(TempBufferLease&& other)
+            : location(other.location)
+            , tempBuffers(other.tempBuffers)
+            , buf(std::move(other.buf))
+        {
+        }
+        TempBufferLease& operator=(TempBufferLease&& other)
+        {
+            location    = other.location;
+            tempBuffers = other.tempBuffers;
+            buf         = std::move(other.buf);
+            return *this;
+        }
+        TempBufferLease(const TempBufferLease& other) = delete;
+        TempBufferLease& operator=(const TempBufferLease& other) = delete;
+
+        std::shared_ptr<InternalTempBuffer> data()
+        {
+            return buf;
+        }
+
+    private:
+        rocfft_location_t                                                      location;
+        std::multimap<rocfft_location_t, std::shared_ptr<InternalTempBuffer>>* tempBuffers;
+        std::shared_ptr<InternalTempBuffer>                                    buf;
+    };
+
+    enum class sub_fft_label
+    {
+        from_user_input_field,
+        // when/if rerouting unfriendly input field first (not done yet):
+        // from_temporary_input_field,
+        from_intermediary_field,
+        to_intermediary_field,
+        // when/if rerouting unfriendly output field first (not done yet):
+        // to_temporary_output_field,
+        to_user_output_field
+    };
+
+    struct sub_fft_t
+    {
+        rocfft_transform_type   fft_type;
+        rocfft_result_placement placement;
+        field_representation_t  input, output;
+        std::set<size_t>        len_dims;
+        std::optional<LoadOps>  load_ops  = std::nullopt;
+        std::optional<StoreOps> store_ops = std::nullopt;
+        sub_fft_label           label;
+    };
+
+    sub_fft_t create_sub_fft(const field_representation_t& sub_fft_field_with_buffers,
+                             const std::set<size_t>&       sub_fft_len_dims,
+                             sub_fft_label                 label,
+                             std::vector<TempBufferLease>& leased_buffers,
+                             bool                          prefer_in_place_if_possible);
+
+    std::vector<size_t> enqueue(const sub_fft_t& sub_fft, const std::vector<size_t>& antecedents);
+
+    template <io_data_label io>
+    field_representation_t get_user_field_representation(size_t field_idx = 0) const;
 };
 
 bool PlanPowX(ExecPlan& execPlan);
