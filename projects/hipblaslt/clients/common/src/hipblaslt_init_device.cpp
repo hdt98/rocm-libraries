@@ -30,6 +30,8 @@
 #include "hipblaslt_random.hpp"
 #include "hipblaslt_test.hpp"
 #include <hipblaslt/hipblaslt.h>
+#include <limits>
+#include <type_traits>
 
 template <typename T, typename F>
 __global__ void fill_kernel(T* A, size_t size, size_t offset, F f)
@@ -258,6 +260,21 @@ void hipblaslt_init_device(ABC_dims                 abc,
             fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T {
                 return uniform_01<T>(idx);
             });
+            break;
+        case hipblaslt_initialization::inf:
+            if constexpr(std::is_floating_point_v<T> || std::is_same_v<T, hipblasLtHalf>
+                         || std::is_same_v<T, hip_bfloat16>)
+            {
+                fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T {
+                    return T(std::numeric_limits<float>::infinity());
+                });
+            }
+            else
+            {
+                hipblaslt_cerr << "hipblaslt_init_device: inf initialization only supported for "
+                                  "floating-point types"
+                               << std::endl;
+            }
             break;
         default:
             hipblaslt_cerr << "Error type in hipblaslt_init_device" << std::endl;
