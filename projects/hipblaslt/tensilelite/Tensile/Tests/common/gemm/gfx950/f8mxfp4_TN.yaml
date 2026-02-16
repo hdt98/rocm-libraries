@@ -1,0 +1,276 @@
+TestParameters:
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx940, skip-gfx941, skip-gfx942, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201]
+
+GlobalParameters:
+  NumElementsToValidate: -1
+  MinimumRequiredVersion: 5.0.0
+  PrintLevel: 1
+  PrintSolutionRejectionReason: True
+  Device: 0
+  CMakeBuildType: Debug
+  KernelTime: True
+  MaxWorkspaceSize: 13421772800
+  DataInitTypeA: 3
+  DataInitTypeB: 3
+  DataInitTypeC: 0
+  DataInitTypeMXSB: 3
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 0
+  BoundsCheck: 0
+  DataInitValueActivationArgs: [-1.5, 1.5]
+  KeepBuildTmp: True
+  MaxFileName: 128
+  DeviceLDS: 163840
+  MaxLDS: 163840
+
+BenchmarkProblems:
+  ########################################
+  # FP8/MXFP4 Mixed TN - TransposeA: 1, TransposeB: 0
+  # DataType: F4 (MXFP4), DataTypeA: F8 (FP8)
+  # DestDataType: S (FP32) and H (BF16)
+  ########################################
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: F4
+      DataTypeA: F8
+      DestDataType: S
+      ComputeDataType: S
+      HighPrecisionAccumulate: True
+      MXBlockB: 32
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: True
+      Batched: True
+      Activation: True
+      ActivationType: hipblaslt_all
+      UseScaleAlphaVec: 1
+      UseBias: 1
+      BiasDataTypeList: [s, h]
+      GroupedGemm: True
+
+    - # BenchmarkProblemSizeGroup
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 128, 1, 1, 1,1, 1,1]  # 64x64
+          - [16, 16, 128, 1, 1, 4,2, 2,2]  # 128x64
+          - [16, 16, 128, 1, 1, 2,4, 2,2]  # 64x128
+          - [16, 16, 128, 1, 1, 4,4, 2,2]  # 128x128
+          - [16, 16, 128, 1, 1, 8,8, 2,2]  # 256x256
+          - [32, 32,  64, 1, 1, 1,1, 1,1]  # 64x64
+          - [32, 32,  64, 1, 1, 2,2, 2,2]  # 128x128
+          - [32, 32,  64, 1, 1, 4,4, 2,2]  # 256x256
+        - ForceDisableShadowInit: [True]
+        - UseSgprForGRO: [0]
+        - DepthU: [128]
+        - AssertFree0ElementMultiple: [1]
+        - AssertFree1ElementMultiple: [1]
+        - AssertSummationElementMultiple: [64]
+        - LocalReadVectorWidth: [16]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - DirectToLds: [0]
+        - PreloadKernArgs: [0]
+        - ClusterLocalRead: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [1]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
+        - ScheduleIterAlg: [1]
+        - InnerUnroll: [1]
+        - ExpandPointerSwap: [0]
+        - TransposeLDS: [1]
+        - WaveSeparateGlobalReadA: [0]
+        - WaveSeparateGlobalReadB: [0]
+        - 1LDSBuffer: [0]
+        - GlobalSplitU: [1]
+        - GlobalReadPerMfma: [1]
+        - LocalWritePerMfma: [-1]
+        - StoreVectorWidth: [-1]
+        - SourceSwap: [1]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          # Edge cases - Valid for DepthU >= 128 (K >= 128)
+          - Exact: [1, 1024, 1, 512]
+          - Exact: [1024, 1, 1, 512]
+          - Exact: [1, 1, 1, 8192]
+
+          # Edge cases - Boundary around powers of 2
+          - Exact: [127, 127, 1, 640]
+          - Exact: [128, 128, 1, 128]
+          - Exact: [129, 129, 1, 640]
+          - Exact: [255, 255, 1, 255]
+          - Exact: [256, 256, 1, 256]
+          - Exact: [257, 257, 1, 257]
+
+          # Medium sizes
+          - Exact: [512, 512, 1, 512]
+          - Exact: [1024, 1024, 1, 1024]
+          - Exact: [2048, 2048, 1, 2048]
+
+          # Large sizes
+          - Exact: [4096, 4096, 1, 4096]
+          - Exact: [8192, 8192, 1, 8192]
+
+          # Target sizes
+          - Exact: [8192, 8192, 1, 16384]
+          - Exact: [8192, 8192, 1, 32768]
+
+          # Rectangular sizes
+          - Exact: [8192, 4096, 1, 8192]
+          - Exact: [4096, 8192, 1, 8192]
+          - Exact: [1024, 512, 1, 2048]
+          - Exact: [512, 1024, 1, 2048]
+          - Exact: [8192, 1024, 1, 16384]
+          - Exact: [1024, 8192, 1, 16384]
+
+          # Matrix-vector like
+          - Exact: [8192, 1, 1, 16384]
+          - Exact: [1, 8192, 1, 16384]
+
+          # Batch size variations
+          - Exact: [1024, 1024, 2, 1024]
+          - Exact: [1024, 1024, 4, 1024]
+          - Exact: [2048, 2048, 2, 2048]
+          - Exact: [4096, 4096, 2, 4096]
+
+          # Range testing (K values 128-aligned)
+          - Range: [[128], [128], [1], [1024,128,1280]]
+          - Range: [[128,1,256], [128], [1], [1024]]
+          - Range: [[128], [128,1,256], [1], [1024]]
+        - BiasTypeArgs: ['s', 'h']
+        - ActivationArgs:
+          - [Enum: none]
+          - [Enum: relu]
+          - [Enum: gelu]
+          - [Enum: swish]
+          - [Enum: clamp]
+          - [Enum: sigmoid]
+        - GroupedGemmCount: [0, 1, 2, 5]
+
+  # BF16 destination variant
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: F4
+      DataTypeA: F8
+      DestDataType: H
+      ComputeDataType: S
+      HighPrecisionAccumulate: True
+      MXBlockB: 32
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: True
+      Batched: True
+      Activation: True
+      ActivationType: hipblaslt_all
+      UseScaleAlphaVec: 1
+      UseBias: 1
+      BiasDataTypeList: [s, h]
+      GroupedGemm: True
+
+    - # BenchmarkProblemSizeGroup
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 128, 1, 1, 1,1, 1,1]  # 64x64
+          - [16, 16, 128, 1, 1, 4,4, 2,2]  # 128x128
+          - [16, 16, 128, 1, 1, 8,8, 2,2]  # 256x256
+          - [32, 32,  64, 1, 1, 2,2, 2,2]  # 128x128
+          - [32, 32,  64, 1, 1, 4,4, 2,2]  # 256x256
+        - ForceDisableShadowInit: [True]
+        - UseSgprForGRO: [0]
+        - DepthU: [128]
+        - AssertFree0ElementMultiple: [1]
+        - AssertFree1ElementMultiple: [1]
+        - AssertSummationElementMultiple: [64]
+        - LocalReadVectorWidth: [16]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - DirectToLds: [0]
+        - PreloadKernArgs: [0]
+        - ClusterLocalRead: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [1]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
+        - ScheduleIterAlg: [1]
+        - InnerUnroll: [1]
+        - ExpandPointerSwap: [0]
+        - TransposeLDS: [1]
+        - WaveSeparateGlobalReadA: [0]
+        - WaveSeparateGlobalReadB: [0]
+        - 1LDSBuffer: [0]
+        - GlobalSplitU: [1]
+        - GlobalReadPerMfma: [1]
+        - LocalWritePerMfma: [-1]
+        - StoreVectorWidth: [-1]
+        - SourceSwap: [1]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          # Edge cases - Valid for DepthU >= 128 (K >= 128)
+          - Exact: [1, 1024, 1, 512]
+          - Exact: [1024, 1, 1, 512]
+          - Exact: [1, 1, 1, 8192]
+
+          # Edge cases - Boundary around powers of 2
+          - Exact: [64, 64, 1, 64]
+          - Exact: [65, 65, 1, 65]
+          - Exact: [127, 127, 1, 640]
+          - Exact: [128, 128, 1, 128]
+          - Exact: [129, 129, 1, 640]
+          - Exact: [255, 255, 1, 255]
+          - Exact: [256, 256, 1, 256]
+          - Exact: [257, 257, 1, 257]
+
+          # Small sizes (K >= 128)
+          - Exact: [72, 72, 1, 72]
+
+          # Medium sizes
+          - Exact: [512, 512, 1, 512]
+          - Exact: [1024, 1024, 1, 1024]
+          - Exact: [2048, 2048, 1, 2048]
+
+          # Large sizes
+          - Exact: [4096, 4096, 1, 4096]
+          - Exact: [8192, 8192, 1, 8192]
+
+          # Target sizes
+          - Exact: [8192, 8192, 1, 16384]
+          - Exact: [8192, 8192, 1, 32768]
+
+          # Rectangular sizes
+          - Exact: [8192, 4096, 1, 8192]
+          - Exact: [4096, 8192, 1, 8192]
+          - Exact: [1024, 512, 1, 2048]
+          - Exact: [512, 1024, 1, 2048]
+          - Exact: [8192, 1024, 1, 16384]
+          - Exact: [1024, 8192, 1, 16384]
+
+          # Matrix-vector like
+          - Exact: [8192, 1, 1, 16384]
+          - Exact: [1, 8192, 1, 16384]
+
+          # Batch size variations
+          - Exact: [1024, 1024, 2, 1024]
+          - Exact: [1024, 1024, 4, 1024]
+          - Exact: [2048, 2048, 2, 2048]
+          - Exact: [4096, 4096, 2, 4096]
+
+          # Range testing
+          - Range: [[128], [128], [1], [1024,64,1280]]
+          - Range: [[128,1,256], [128], [1], [1024]]
+          - Range: [[128], [128,1,256], [1], [1024]]
+        - BiasTypeArgs: ['h']
+        - ActivationArgs:
+          - [Enum: none]
+          - [Enum: relu]
+          - [Enum: gelu]
+        - GroupedGemmCount: [0, 1, 2]
