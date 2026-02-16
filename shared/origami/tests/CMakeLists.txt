@@ -30,6 +30,8 @@ include(CTest)
 include(Catch)
 catch_discover_tests(origami-tests
     DISCOVERY_MODE PRE_TEST
+    # set working directory so the test can find the data directory
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Install CTestTestfile.cmake for installed Origami tests

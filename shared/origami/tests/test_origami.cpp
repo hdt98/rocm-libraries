@@ -29,6 +29,11 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "common.hpp"
 
+#include <fstream>
+#include <map>
+#include <filesystem>
+#include <iostream>
+
 using Catch::Approx;
 
 // Test functions for origami.hpp/cpp
@@ -640,6 +645,103 @@ TEST_CASE("Origami: select_workgroup_mapping unit test", "[Origami]") {
         REQUIRE(out_wgm.wgm == 3);
       else if (gpu_arch == 950)
         REQUIRE(out_wgm.wgm == 4);
+    }
+  }
+}
+
+// TODO this only tests BF16
+TEST_CASE("Origami: ranking test", "[Origami]") {
+  for (int gpu_arch : test_architectures) {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - ranking unit test") {
+      auto hardware = make_hardware(gpu_arch);
+      std::vector<origami::config_t> configs;
+      std::vector<origami::problem_t> problems;
+      std::unordered_map<origami::config_t, int> config_index;
+      std::string line, segment;
+
+      namespace fs = std::filesystem;
+      fs::path data_folder("data");
+      fs::path ranking_file_name(data_folder /
+        fs::path(std::string("ranking_data_") + std::string(origami::hardware_t::arch_enum_to_name(hardware.arch)) + ".csv"));
+
+      std::fstream problem_list_file(data_folder / fs::path("problem_data.csv"));
+      REQUIRE(problem_list_file.is_open());
+      // skip header
+      std::getline(problem_list_file, line);
+      while (std::getline(problem_list_file, line)) {
+        std::stringstream ss(line);
+        size_t m, n, k, batch;
+        std::getline(ss, segment, ',');   // index = std::stoi(segment);
+        std::getline(ss, segment, ',');   m = std::stoi(segment);
+        std::getline(ss, segment, ',');   n = std::stoi(segment);
+        std::getline(ss, segment, ',');   k = std::stoi(segment);
+        std::getline(ss, segment, ',');   batch = std::stoi(segment);
+        for (auto tA : {origami::transpose_t::N, origami::transpose_t::T})
+          for (auto tB : {origami::transpose_t::N, origami::transpose_t::T})
+            problems.push_back(make_problem(m, n, k, tA, tB, batch));
+      }
+      REQUIRE(problems.size() == 800);
+
+      // takes too long? are these all of them?
+      // const std::vector<int> MT{16, 32, 48, 96, 128, 192, 224, 256, 336, 448, 512};
+      // const std::vector<int> DU{16, 32, 64, 128, 512, 1024};
+      const std::vector<int> MT{16, 96, 128, 256, 336, 512};
+      const std::vector<int> DU{16, 128, 1024};
+      for (auto& key : origami::hardware_t::INSTRUCTION_MAP.at(hardware.arch)) {
+        auto mi = key.first;
+        if (mi.mi_input_type != origami::data_type_t::BFloat16)
+          continue;
+        for (int nt_a : {0, 4})
+          for (int nt_b : {0, 4}) {
+            if (nt_a == 4 && nt_b == 4)
+              continue;
+            for (auto mt_m : MT)
+              for (auto mt_n : MT)
+                for (auto mt_k : DU)
+                  configs.push_back(make_config(mt_m, mt_n, mt_k, mi.MI_M, mi.MI_N, mi.MI_K, false, 1, 6, nt_a, nt_b));
+          }
+      }
+      {
+        int index = 0;
+        for (auto& c : configs)
+          config_index[c] = index++;
+      }
+
+#if 0   // enable this to update test data files after you "fix" origami
+      {
+        std::ofstream ranking_file(ranking_file_name);
+        REQUIRE(ranking_file.is_open());
+        for (auto& problem : problems) {
+          auto results = origami::rank_configs(problem, hardware, configs);
+          for (auto& r : results)
+            ranking_file << config_index[r.config] << " ";
+          ranking_file << std::endl;
+        }
+      }
+#endif
+
+      std::vector<std::vector<int>> problem_rankings;
+      {
+        std::fstream ranking_file(ranking_file_name);
+        REQUIRE(ranking_file.is_open());
+        while (std::getline(ranking_file, line)) {
+          std::stringstream ss(line);
+          std::vector<int> ranking;
+          int index;
+          while (ss >> index)
+            ranking.push_back(index);
+          problem_rankings.push_back(ranking);
+        }
+      }
+
+      int p = 0;
+      for (auto& problem : problems) {
+        auto results = origami::rank_configs(problem, hardware, configs);
+        REQUIRE(results.size() == problem_rankings[p].size());
+        REQUIRE(std::equal(results.begin(), results.end(), problem_rankings[p].begin(),
+                [&](auto& r, auto& i){ return config_index[r.config] == i; }));
+        p++;
+      }
     }
   }
 }
