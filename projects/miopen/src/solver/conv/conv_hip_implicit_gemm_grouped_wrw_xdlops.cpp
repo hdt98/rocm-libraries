@@ -573,11 +573,11 @@ void PerformanceConfigHipImplicitGemmGroupWrwXdlops::DefaultKernelFromList()
     for(auto kernel : ranked_1st_applicable)
     {
         auto kernel_str = std::get<0>(kernel);
-        auto it = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
+        auto it         = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
         if(it != valid_kernels.end())
         {
             index     = it - valid_kernels.begin();
-            split_k   = 1;//std::get<1>(kernel);
+            split_k   = 1; // std::get<1>(kernel);
             kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
             return;
         }
