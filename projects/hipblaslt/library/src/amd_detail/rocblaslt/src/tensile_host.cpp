@@ -1697,12 +1697,27 @@ namespace
         tensileProblem.setParams().setBiasEnum(
             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
 
-        tensileProblem.setUseScaleAB(
-            (prob.scaleA == nullptr && prob.scaleB == nullptr)
-                ? ""
-                : ((prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
-                       ? "Vector"
-                       : "Scalar"));
+	// NOTE: for MX data types, Tensile sets useScaleAB field in yaml to be empty.
+	if((prob.scaleA == nullptr && prob.scaleB == nullptr) or
+		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
+		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT)
+	{
+	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
+	    assert( prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
+		    prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
+	    tensileProblem.setUseScaleAB("");
+	}
+	else
+	{
+	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
+	    assert( prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 and
+		    prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
+	    tensileProblem.setUseScaleAB(
+		    (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
+			? "Vector"
+			: "Scalar");
+	}
+
         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
         tensileProblem.setScaleAlphaVec(compute_type, d.sizes()[0]);
@@ -1877,22 +1892,27 @@ namespace
         tensileProblem.setParams().setBiasEnum(
             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
 
-	// TODO: currently mixing MX data type and non-MX data type is not
-	// supported (so only scaleAType) is checked, and need to update this
-	// when supported.
+	// NOTE: for MX data types, Tensile sets useScaleAB field in yaml to be empty.
 	if((prob.scaleA == nullptr && prob.scaleB == nullptr) or
 		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
 		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT)
 	{
+	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
+	    assert( prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
+		    prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
 	    tensileProblem.setUseScaleAB("");
 	}
 	else
 	{
+	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
+	    assert( prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 and
+		    prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
 	    tensileProblem.setUseScaleAB(
 		    (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
 			? "Vector"
 			: "Scalar");
 	}
+
         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
         tensileProblem.setScaleAlphaVec(compute_type, d.sizes()[0]);
@@ -1974,8 +1994,29 @@ namespace
             inputs.bias = reinterpret_cast<const void*>(prob.bias);
         else
             inputs.bias = nullptr;
-        inputs.scaleA        = reinterpret_cast<const void*>(prob.scaleA);
-        inputs.scaleB        = reinterpret_cast<const void*>(prob.scaleB);
+
+	if(prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
+           prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT)
+	{
+	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
+	    assert( prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
+		    prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
+	    inputs.scaleA        = nullptr;
+	    inputs.scaleB        = nullptr;
+	    inputs.mxsa        = reinterpret_cast<const void*>(prob.scaleA);
+	    inputs.mxsb        = reinterpret_cast<const void*>(prob.scaleB);
+	}
+	else
+	{
+	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
+	    assert( prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 and
+		    prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
+	    inputs.scaleA      = reinterpret_cast<const void*>(prob.scaleA);
+	    inputs.scaleB      = reinterpret_cast<const void*>(prob.scaleB);
+	    inputs.mxsa        = nullptr;
+	    inputs.mxsb        = nullptr;
+	}
+
         inputs.scaleC        = reinterpret_cast<const void*>(prob.scaleC);
         inputs.scaleD        = reinterpret_cast<const void*>(prob.scaleD);
         inputs.scaleAlphaVec = reinterpret_cast<const void*>(prob.scaleAlphaVec);
@@ -2671,7 +2712,6 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
             algo = &heuristicResult.algo;
         }
         updateTensileProblem(prob, data->problem);
-	std::cout << "run Contraction Tensile !!!!!!!!!!!!\n";
 
         // Get the values of static member variables flush and rotating size from UserClientArguments
         UserClientArguments ClientArguments;
