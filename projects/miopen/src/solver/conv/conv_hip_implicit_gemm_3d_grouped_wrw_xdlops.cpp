@@ -655,23 +655,22 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
     MIOPEN_LOG_I2("Step 1: AI heuristics not available (MIOPEN_ENABLE_AI_KERNEL_TUNING disabled)");
 #endif
 
-    MIOPEN_LOG_I2("Step 2: Using default initialization (index=0)");
     InitValidKernels(problem);
     if(!valid_kernels.empty())
     {
         index     = 0;
         split_k   = 1;
         kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
+        if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
+            DefaultKernelFromList();
+
         MIOPEN_LOG_I("Step 2: Default initialization selected kernel: " << kernel_id
-                                                                        << " at index: 0");
+                                                                        << " at index: " << index);
     }
     else
     {
         MIOPEN_LOG_W("Step 2: Default initialization failed - no valid kernels found");
     }
-
-    if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
-        DefaultKernelFromList();
 
     // Invariant: split_k must always be 1 in deterministic mode
     assert(!is_deterministic || split_k == 1);

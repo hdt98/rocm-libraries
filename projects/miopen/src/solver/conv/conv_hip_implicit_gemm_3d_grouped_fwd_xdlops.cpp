@@ -802,17 +802,16 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
 #endif
 
     // 4. Default: index remains 0, first valid_kernel will be used
-    MIOPEN_LOG_I2("Step 4: Using default initialization (index=0)");
     InitValidKernels(problem);
     if(!valid_kernels.empty())
     {
         index     = 0;
         kernel_id = valid_kernels[index];
-        MIOPEN_LOG_I("Step 4: Default initialization selected kernel: " << kernel_id
-                                                                        << " at index: 0");
-
         if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
             DefaultKernelFromList();
+
+        MIOPEN_LOG_I("Step 4: Default initialization selected kernel: " << kernel_id
+                                                                        << " at index: " << index);
     }
     else
     {
