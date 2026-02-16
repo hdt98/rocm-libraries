@@ -31,6 +31,7 @@
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_WRW_XDLOPS)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_WRW_XDLOPS_AI_HEUR)
+MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CK_DEFAULT_KERNELS)
 
 #include <miopen/conv/solvers.hpp>
 #include <miopen/generic_search.hpp>
@@ -424,6 +425,111 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::InitValidKernels(
 }
 #endif
 
+// clang-format off
+static std::vector<std::tuple<std::string, int>> ranked_1st_applicable = {
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 256, BlkTile: 128x128x64, WaveTile: 32x32, WaveMap: 2x2, VmemReadVec: 8x8, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3, BlkGemmPipelinePrefetchStages: 2>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 256, BlkTile: 128x128x64, WaveTile: 32x32, WaveMap: 2x2, VmemReadVec: 4x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v4, BlkGemmPipelinePrefetchStages: 3>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 16, 256, 32, Default, 8, 1, 16, 8, 8, 8, 8, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 8>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 16, 128, 32, Default, 8, 1, 8, 4, 8, 4, 8, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 4>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 32, 64, 32, Default, 8, 1, 2, 2, 2, 2, 2, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, 2>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 32, 64, 32, Default, 8, 1, 2, 2, 2, 2, 2, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, 2>", 32),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 32, 64, 32, Default, 8, 1, 2, 2, 2, 2, 2, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 2>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x128x64, WaveTile: 16x16, WaveMap: 1x4, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 64x16x64, WaveTile: 16x16, WaveMap: 2x1, VmemReadVec: 8x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x128x64, WaveTile: 16x16, WaveMap: 1x4, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 64x16x64, WaveTile: 16x16, WaveMap: 2x1, VmemReadVec: 8x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 64x16x64, WaveTile: 16x16, WaveMap: 2x1, VmemReadVec: 8x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 32),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 32),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<Default, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 2x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 256, BlkTile: 128x128x64, WaveTile: 32x32, WaveMap: 2x2, VmemReadVec: 8x8, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 64x16x64, WaveTile: 16x16, WaveMap: 2x1, VmemReadVec: 8x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 64x16x64, WaveTile: 16x16, WaveMap: 2x1, VmemReadVec: 8x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 4),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 4x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 1x8, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 1x8, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x64x64, WaveTile: 16x16, WaveMap: 1x2, VmemReadVec: 1x8, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 64, BlkTile: 16x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 4),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x2, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 64, 112, 32, Default, 8, 4, 7, 4, 4, 7, 4, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v5, 1>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 32),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 64x16x64, WaveTile: 16x16, WaveMap: 2x1, VmemReadVec: 1x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 2>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 1x2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 64, 80, 32, Default, 8, 4, 5, 4, 4, 5, 4, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, 1>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 32),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 16x32x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, BlkGemmPipelinePrefetchStages: 3>", 16),
+std::make_tuple("DeviceGroupedConvBwdWeight_Explicit_Xdl<DeviceBatchedGemmXdlUniversal<MNKPadding, CRR> BlkSize: 128, BlkTile: 32x16x64, WaveTile: 16x16, WaveMap: 1x1, VmemReadVec: 2x1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, BlkGemmPipelinePrefetchStages: 1>", 1),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<256, 64, 64, 64, Default, 8, 1, 1, 2, 8, 2, 8, 1, 1, 2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 1>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<256, 64, 64, 64, Default, 8, 1, 1, 1, 8, 4, 8, 1, 1, 4, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 1>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<256, 64, 64, 64, Default, 8, 1, 1, 4, 8, 1, 8, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 1>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<256, 64, 64, 64, Default, 8, 1, 1, 1, 8, 1, 8, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 1>", -1),
+std::make_tuple("DeviceGroupedConvBwdWeight_Xdl_CShuffle<256, 64, 64, 8, Filter1x1Stride1Pad0, 8, 1, 1, 1, 4, 1, 4, 1, 1, 1>", 64),
+std::make_tuple("DeviceGroupedConvBwdWeight_Xdl_CShuffle<256, 64, 64, 8, Default, 8, 1, 1, 4, 4, 4, 4, 1, 1, 4>", 8),
+std::make_tuple("DeviceGroupedConvBwdWeight_Xdl_CShuffle<64, 32, 64, 4, Default, 4, 1, 2, 1, 2, 4, 4, 1, 1, 4>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Xdl_CShuffle<256, 64, 64, 8, Default, 8, 1, 1, 4, 4, 1, 4, 1, 1, 1>", 128),
+std::make_tuple("DeviceGroupedConvBwdWeight_Xdl_CShuffle<64, 64, 64, 4, Default, 4, 2, 2, 1, 4, 1, 4, 1, 1, 1>", 32)
+};
+// clang-format on
+
+void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::DefaultKernelFromList()
+{
+    for(const auto& kernel : ranked_1st_applicable)
+    {
+        const auto& kernel_str = std::get<0>(kernel);
+        const auto& it         = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
+        if(it != valid_kernels.end())
+        {
+            index     = it - valid_kernels.begin();
+            split_k   = 1; // std::get<1>(kernel);
+            kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
+            return;
+        }
+    }
+}
+
 void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
     [[maybe_unused]] const miopen::ExecutionContext& ctx,
     const ::miopen::conv::ProblemDescription& problem)
@@ -563,6 +669,9 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
     {
         MIOPEN_LOG_W("Step 2: Default initialization failed - no valid kernels found");
     }
+
+    if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
+        DefaultKernelFromList();
 
     // Invariant: split_k must always be 1 in deterministic mode
     assert(!is_deterministic || split_k == 1);
