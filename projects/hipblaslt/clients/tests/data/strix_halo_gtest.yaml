@@ -1,0 +1,662 @@
+---
+# Strix Halo (gfx1150/gfx1151) Specific Test Suite
+# This test file fills gaps in test coverage for RDNA3 APU architectures
+# Created to test features that are supported but not well-covered in generic tests
+
+include: hipblaslt_common.yaml
+include: known_bugs.yaml
+
+Definitions:
+  # Strix Halo specific architectures
+  - &strix_halo_archs
+    architecture: [ gfx1150, gfx1151 ]
+
+  # Common test sizes optimized for APU memory bandwidth
+  - &strix_small_sizes
+    - { M:   64, N:   64, K:   64, batch_count: 1 }
+    - { M:  128, N:  128, K:  128, batch_count: 1 }
+    - { M:  256, N:  256, K:  256, batch_count: 1 }
+    - { M:  512, N:  512, K:  512, batch_count: 1 }
+
+  - &strix_medium_sizes
+    - { M:  512, N:  512, K:  128, batch_count: 1 }
+    - { M: 1024, N: 1024, K:  256, batch_count: 1 }
+    - { M: 2048, N: 2048, K:  512, batch_count: 1 }
+    - { M: 1024, N:  256, K: 1024, batch_count: 1 }
+
+  - &strix_batch_sizes
+    - { M:  256, N:  256, K:  256, batch_count:  4 }
+    - { M:  512, N:  512, K:  512, batch_count:  8 }
+    - { M: 1024, N: 1024, K:  128, batch_count: 16 }
+
+  - &strix_rectangular_sizes
+    - { M:  128, N: 1024, K:  256, batch_count: 1 }
+    - { M: 1024, N:  128, K:  256, batch_count: 1 }
+    - { M:  256, N: 2048, K:  512, batch_count: 1 }
+    - { M: 2048, N:  256, K:  512, batch_count: 1 }
+
+  - &all_transpose_modes
+    - { transA: N, transB: N }
+    - { transA: N, transB: T }
+    - { transA: T, transB: N }
+    - { transA: T, transB: T }
+
+  - &alpha_beta_variants
+    - { alpha:  1.0, beta:  0.0 }
+    - { alpha:  1.0, beta:  1.0 }
+    - { alpha:  2.0, beta:  0.5 }
+    - { alpha:  0.0, beta:  1.0 }
+    - { alpha: -1.0, beta:  1.0 }
+
+  # FP8/BF8 test configurations (NANOO format)
+  - &fp8_test_configs
+    - { a_type: f8_fnuz_r, b_type: f8_fnuz_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+    - { a_type: f8_fnuz_r, b_type: f8_fnuz_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scale_type: f32_r }
+    - { a_type: bf8_fnuz_r, b_type: bf8_fnuz_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+    - { a_type: bf8_fnuz_r, b_type: bf8_fnuz_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scale_type: f32_r }
+
+  # FP8/BF8 mixed precision (OCP format)
+  - &fp8_ocp_test_configs
+    - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+    - { a_type: bf8_r, b_type: bf8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+    - { a_type: f8_r, b_type: bf8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+    - { a_type: bf8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+
+  # INT8 configurations
+  - &int8_test_configs
+    - { a_type: i8_r, b_type: i8_r, c_type: i32_r, d_type: i32_r, compute_type: c_i32_r, scale_type: f32_r }
+    - { a_type: i8_r, b_type: i8_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scale_type: f32_r }
+
+  # Activation types
+  - &activation_types
+    - { activation_type: none }
+    - { activation_type: relu }
+    - { activation_type: gelu }
+
+  # Bias configurations
+  - &bias_configs
+    - { bias_vector: true, bias_source: d }
+    - { bias_vector: false }
+
+  # Scaling formats
+  - &scaling_formats
+    - { scaleA_format: none, scaleB_format: none }
+    - { scaleA_format: Vector, scaleB_format: Vector }
+
+Tests:
+#===================================================================================
+# SECTION 1: FP16 Tests - High Priority for Strix Halo
+#===================================================================================
+- name: strix_halo_fp16_basic
+  category: quick
+  function:
+    matmul: *hpa_half_precision
+  matrix_size: *strix_small_sizes
+  transA_transB: *all_transpose_modes
+  alpha_beta: *alpha_beta_variants
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp16_medium
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size: *strix_medium_sizes
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp16_batched
+  category: pre_checkin
+  function:
+    matmul: *hpa_half_precision
+  matrix_size: *strix_batch_sizes
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp16_rectangular
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size: *strix_rectangular_sizes
+  transA: N
+  transB: [ N, T ]
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 2: FP16 with Epilogue Features
+#===================================================================================
+- name: strix_halo_fp16_bias
+  category: pre_checkin
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+    - { M: 1024, N: 1024, K: 256, batch_count: 1 }
+  transA: N
+  transB: [ N, T ]
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  bias_vector: true
+  bias_source: d
+  bias_type: [ f16_r, f32_r ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp16_activation
+  category: pre_checkin
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+    - { M: 1024, N: 1024, K: 128, batch_count: 1 }
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  activation_type: [ relu, gelu ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp16_bias_activation
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+    - { M: 1024, N: 1024, K: 256, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  bias_vector: true
+  bias_source: d
+  bias_type: [ f16_r ]
+  activation_type: [ relu, gelu ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp16_scaling
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  scaleA_format: Vector
+  scaleB_format: Vector
+  scaleAlpha_format: Vector
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 3: BF16 Tests
+#===================================================================================
+- name: strix_halo_bf16_basic
+  category: quick
+  function:
+    matmul: *hpa_bf16_precision
+  matrix_size: *strix_small_sizes
+  transA_transB: *all_transpose_modes
+  alpha_beta: *alpha_beta_variants
+  arch: *strix_halo_archs
+
+- name: strix_halo_bf16_medium
+  category: nightly
+  function:
+    matmul: *hpa_bf16_precision
+  matrix_size: *strix_medium_sizes
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_bf16_batched
+  category: pre_checkin
+  function:
+    matmul: *hpa_bf16_precision
+  matrix_size: *strix_batch_sizes
+  transA: N
+  transB: [ N, T ]
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_bf16_bias_activation
+  category: nightly
+  function:
+    matmul: *hpa_bf16_precision
+  matrix_size:
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+    - { M: 1024, N: 1024, K: 256, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  bias_vector: true
+  bias_source: d
+  bias_type: [ bf16_r, f32_r ]
+  activation_type: [ relu, gelu ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 4: FP8/BF8 Tests (NANOO format) - Gap Coverage
+#===================================================================================
+- name: strix_halo_fp8_fnuz_basic
+  category: pre_checkin
+  function:
+    matmul: *fp8_test_configs
+  matrix_size:
+    - { M: 128, N: 128, K: 128, batch_count: 1 }
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: [ N, T ]
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp8_fnuz_transpose
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f8_fnuz_r, b_type: f8_fnuz_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+      - { a_type: bf8_fnuz_r, b_type: bf8_fnuz_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp8_fnuz_mixed
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f8_fnuz_r, b_type: bf8_fnuz_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+      - { a_type: bf8_fnuz_r, b_type: f8_fnuz_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp8_fnuz_dst_fp16
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f8_fnuz_r, b_type: f8_fnuz_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scale_type: f32_r }
+      - { a_type: bf8_fnuz_r, b_type: bf8_fnuz_r, c_type: f16_r, d_type: f16_r, compute_type: c_f32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp8_fnuz_dst_bf16
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f8_fnuz_r, b_type: f8_fnuz_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scale_type: f32_r }
+      - { a_type: bf8_fnuz_r, b_type: bf8_fnuz_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 5: FP8/BF8 Tests (OCP format) - Gap Coverage
+#===================================================================================
+- name: strix_halo_fp8_ocp_basic
+  category: nightly
+  function:
+    matmul: *fp8_ocp_test_configs
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp8_ocp_transpose
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+      - { a_type: bf8_r, b_type: bf8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 6: INT8 Tests - Gap Coverage
+#===================================================================================
+- name: strix_halo_int8_basic
+  category: pre_checkin
+  function:
+    matmul: *int8_test_configs
+  matrix_size:
+    - { M: 128, N: 128, K: 128, batch_count: 1 }
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: [ N, T ]
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_int8_transpose
+  category: nightly
+  function:
+    matmul:
+      - { a_type: i8_r, b_type: i8_r, c_type: i32_r, d_type: i32_r, compute_type: c_i32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_int8_bf16_accumulate
+  category: nightly
+  function:
+    matmul:
+      - { a_type: i8_r, b_type: i8_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_int8_scaling
+  category: nightly
+  function:
+    matmul:
+      - { a_type: i8_r, b_type: i8_r, c_type: i32_r, d_type: i32_r, compute_type: c_i32_r, scale_type: f32_r }
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  scaleA_format: Vector
+  scaleB_format: Vector
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 7: FP32 and FP64 Tests (Equality Matching)
+#===================================================================================
+- name: strix_halo_fp32_basic
+  category: quick
+  function:
+    matmul: *single_precision
+  matrix_size:
+    - { M: 128, N: 128, K: 128, batch_count: 1 }
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA_transB: *all_transpose_modes
+  alpha_beta: *alpha_beta_variants
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp32_bias
+  category: nightly
+  function:
+    matmul: *single_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  bias_vector: true
+  bias_source: d
+  bias_type: f32_r
+  arch: *strix_halo_archs
+
+- name: strix_halo_fp64_basic
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f64_r, b_type: f64_r, c_type: f64_r, d_type: f64_r, compute_type: c_f64_r, scale_type: f64_r }
+  matrix_size:
+    - { M: 128, N: 128, K: 128, batch_count: 1 }
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+  transA_transB: *all_transpose_modes
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 8: Strided Batch GEMM
+#===================================================================================
+- name: strix_halo_strided_batch_fp16
+  category: pre_checkin
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 128, N: 128, K: 128, batch_count: 4 }
+    - { M: 256, N: 256, K: 256, batch_count: 8 }
+    - { M: 512, N: 512, K: 128, batch_count: 16 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0, 1.0 ]
+  stride_a: [ 0 ]
+  stride_b: [ 0 ]
+  stride_c: [ 0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_strided_batch_bf16
+  category: nightly
+  function:
+    matmul: *hpa_bf16_precision
+  matrix_size:
+    - { M: 128, N: 128, K: 128, batch_count: 4 }
+    - { M: 256, N: 256, K: 256, batch_count: 8 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  stride_a: [ 0 ]
+  stride_b: [ 0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 9: Edge Cases and Special Scenarios
+#===================================================================================
+- name: strix_halo_edge_cases_small_k
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 1024, N: 1024, K: 16, batch_count: 1 }
+    - { M: 2048, N: 2048, K: 32, batch_count: 1 }
+    - { M: 4096, N: 4096, K: 64, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_edge_cases_large_k
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 128, N: 128, K: 2048, batch_count: 1 }
+    - { M: 256, N: 256, K: 4096, batch_count: 1 }
+    - { M: 512, N: 512, K: 8192, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_edge_cases_very_tall
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 4096, N: 64, K: 256, batch_count: 1 }
+    - { M: 8192, N: 128, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_edge_cases_very_wide
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 64, N: 4096, K: 256, batch_count: 1 }
+    - { M: 128, N: 8192, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 10: Performance Critical Workloads (Common ML Sizes)
+#===================================================================================
+- name: strix_halo_ml_workloads_bert
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 512, N: 512, K: 512, batch_count: 12 }   # BERT base attention
+    - { M: 512, N: 3072, K: 512, batch_count: 12 }  # BERT FFN
+    - { M: 512, N: 512, K: 3072, batch_count: 12 }  # BERT FFN output
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_ml_workloads_resnet
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 3136, N: 64, K: 64, batch_count: 1 }   # ResNet feature maps
+    - { M: 784, N: 128, K: 128, batch_count: 1 }
+    - { M: 196, N: 256, K: 256, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_ml_workloads_gpt_small
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 1024, N: 768, K: 768, batch_count: 1 }  # GPT-2 small attention
+    - { M: 1024, N: 3072, K: 768, batch_count: 1 } # GPT-2 small FFN
+    - { M: 1024, N: 768, K: 3072, batch_count: 1 } # GPT-2 small FFN output
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 11: Auxiliary Output Tests (Gap Coverage)
+#===================================================================================
+- name: strix_halo_aux_output_fp16
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  activation_type: [ relu, gelu ]
+  bias_vector: true
+  bias_source: d
+  bias_type: f16_r
+  use_e: true
+  e_type: f16_r
+  arch: *strix_halo_archs
+
+- name: strix_halo_aux_output_bf16
+  category: nightly
+  function:
+    matmul: *hpa_bf16_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 1 }
+    - { M: 512, N: 512, K: 512, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  activation_type: [ relu, gelu ]
+  bias_vector: true
+  bias_source: d
+  bias_type: bf16_r
+  use_e: true
+  e_type: bf16_r
+  arch: *strix_halo_archs
+
+#===================================================================================
+# SECTION 12: Stress Tests (Memory Bandwidth Limited)
+#===================================================================================
+- name: strix_halo_stress_large_batch
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 256, N: 256, K: 256, batch_count: 64 }
+    - { M: 512, N: 512, K: 512, batch_count: 32 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+
+- name: strix_halo_stress_memory_bound
+  category: nightly
+  function:
+    matmul: *hpa_half_precision
+  matrix_size:
+    - { M: 8192, N: 8192, K: 8, batch_count: 1 }
+    - { M: 16384, N: 16384, K: 16, batch_count: 1 }
+  transA: N
+  transB: N
+  alpha: [ 1.0 ]
+  beta: [ 0.0 ]
+  arch: *strix_halo_archs
+...
