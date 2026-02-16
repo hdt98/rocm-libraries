@@ -473,7 +473,7 @@ static std::vector<std::string> ranked_1st_applicable = {
 
 void PerformanceConfigHipImplicitGemmGroupBwdXdlops::DefaultKernelFromList()
 {
-    for(auto kernel_str : ranked_1st_applicable)
+    for(const auto& kernel_str : ranked_1st_applicable)
     {
         auto it = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
         if(it != valid_kernels.end())

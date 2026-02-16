@@ -570,10 +570,10 @@ std::make_tuple("DeviceGroupedConvBwdWeight_Xdl_CShuffle<256, 64, 64, 8, Default
 
 void PerformanceConfigHipImplicitGemmGroupWrwXdlops::DefaultKernelFromList()
 {
-    for(auto kernel : ranked_1st_applicable)
+    for(const auto& kernel : ranked_1st_applicable)
     {
-        auto kernel_str = std::get<0>(kernel);
-        auto it         = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
+        const auto& kernel_str = std::get<0>(kernel);
+        const auto& it         = std::find(valid_kernels.begin(), valid_kernels.end(), kernel_str);
         if(it != valid_kernels.end())
         {
             index     = it - valid_kernels.begin();
