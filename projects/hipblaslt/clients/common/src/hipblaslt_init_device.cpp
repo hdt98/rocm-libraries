@@ -271,9 +271,8 @@ void hipblaslt_init_device(ABC_dims                 abc,
             }
             else
             {
-                hipblaslt_cerr << "hipblaslt_init_device: inf initialization only supported for "
-                                  "floating-point types"
-                               << std::endl;
+                hipblaslt_cerr << "hipblaslt_init_device: inf initialization only supported for floating-point types."
+                              << std::endl;
             }
             break;
         default:
