@@ -25,14 +25,14 @@
 
 import argparse
 import dataclasses as dc
-import pathlib
+import pytest
 import random
 import time
+from pathlib import Path
 from types import SimpleNamespace as NS
-
-import pytest
-import rrperf.optimize_weights as ow
 import yaml
+
+import rrperf.optimize_weights as ow
 
 
 @pytest.mark.slow
@@ -102,16 +102,18 @@ rnorm:           2.5e-05
 ...
 """
     assert cmd[0] == "client/rocroller-gemm"
-    yaml_file = None
+    yaml_file: Path | None = None
     for arg in cmd:
         if arg.startswith("--yaml"):
-            yaml_file = pathlib.Path(arg.split("=")[1])
+            yaml_file = Path(arg.split("=")[1])
+    if yaml_file is None:
+        raise RuntimeError("Non yaml file specified (use --yaml)")
     yaml_file.write_text(test_yaml)
     return NS(returncode=0, stdout=test_yaml.encode("ascii"))
 
 
 def test_mocked_integration(tmp_path_factory, mocker):
-    mocker.patch("subprocess.run", new=mocked_run)
+    mocker.patch("rrperf.optimize_weights.run_bench_cmd", new=mocked_run)
     output_dir = tmp_path_factory.mktemp("test_mocked_integration")
     run_1_dir = output_dir / "run_1"
     run_2_dir = output_dir / "run_2"
@@ -211,7 +213,7 @@ def test_get_args():
     parser = argparse.ArgumentParser()
     ow.get_args(parser)
     args = parser.parse_args(["--output=testingrequired"])
-    assert args.output_dir == pathlib.Path("testingrequired")
+    assert args.output_dir == Path("testingrequired")
 
     input_args = [
         "--output=testing123",
@@ -224,7 +226,7 @@ def test_get_args():
     ow.get_args(parser)
     args = parser.parse_args(input_args)
 
-    assert args.output_dir == pathlib.Path("testing123")
+    assert args.output_dir == Path("testing123")
     assert args.generations == 2
     assert args.num_parents == 2
     assert args.population == 3

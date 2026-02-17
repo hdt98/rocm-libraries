@@ -277,8 +277,14 @@ class Result:
         return cls(**args)
 
 
-def bench_star(arg):
-    return bench(*arg)
+def run_bench_cmd(cmd, env, cwd):
+    return subprocess.run(
+        cmd,
+        env=env,
+        cwd=cwd,
+        stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE,
+    )
 
 
 def bench(
@@ -311,12 +317,10 @@ def bench(
 
         print(f"Launching {weights.short_hash}")
 
-        process_result = subprocess.run(
+        process_result = run_bench_cmd(
             cmd,
             env=env,
-            cwd=rrperf.utils.get_build_dir(),
-            stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE,
+            cwd=rrperf.utils.get_build_dir()
         )
 
         result.output = process_result.stdout.decode()
@@ -340,6 +344,10 @@ def bench(
 
     finally:
         lock.release()
+
+
+def bench_star(arg):
+    return bench(*arg)
 
 
 def sanity_check(results: Iterable[Result]):
@@ -398,7 +406,8 @@ def generation(
     return sorted(old_results + new_results)
 
 
-def read_gen_results(resfile: Path):
+def read_gen_results(resfile: str):
+    resfile = Path(resfile)
     with resfile.open() as f:
         data = yaml.safe_load(f)
 
