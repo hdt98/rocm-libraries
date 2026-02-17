@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 /*! \file
@@ -715,6 +715,123 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZZgels(hipsolverHandle_t handle,
                                                    size_t            lwork,
                                                    int*              niters,
                                                    int*              devInfo);
+
+// gels_batched
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSSgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               m,
+                                                                     int               n,
+                                                                     int               nrhs,
+                                                                     float*            A[],
+                                                                     int               lda,
+                                                                     float*            B[],
+                                                                     int               ldb,
+                                                                     float*            X[],
+                                                                     int               ldx,
+                                                                     size_t*           lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDDgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               m,
+                                                                     int               n,
+                                                                     int               nrhs,
+                                                                     double*           A[],
+                                                                     int               lda,
+                                                                     double*           B[],
+                                                                     int               ldb,
+                                                                     double*           X[],
+                                                                     int               ldx,
+                                                                     size_t*           lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCCgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               m,
+                                                                     int               n,
+                                                                     int               nrhs,
+                                                                     hipFloatComplex*  A[],
+                                                                     int               lda,
+                                                                     hipFloatComplex*  B[],
+                                                                     int               ldb,
+                                                                     hipFloatComplex*  X[],
+                                                                     int               ldx,
+                                                                     size_t*           lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZZgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               m,
+                                                                     int               n,
+                                                                     int               nrhs,
+                                                                     hipDoubleComplex* A[],
+                                                                     int               lda,
+                                                                     hipDoubleComplex* B[],
+                                                                     int               ldb,
+                                                                     hipDoubleComplex* X[],
+                                                                     int               ldx,
+                                                                     size_t*           lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSSgelsBatched(hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          float*            A[],
+                                                          int               lda,
+                                                          float*            B[],
+                                                          int               ldb,
+                                                          float*            X[],
+                                                          int               ldx,
+                                                          void*             work,
+                                                          size_t            lwork,
+                                                          int*              niters,
+                                                          int*              devInfo,
+                                                          int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDDgelsBatched(hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          double*           A[],
+                                                          int               lda,
+                                                          double*           B[],
+                                                          int               ldb,
+                                                          double*           X[],
+                                                          int               ldx,
+                                                          void*             work,
+                                                          size_t            lwork,
+                                                          int*              niters,
+                                                          int*              devInfo,
+                                                          int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCCgelsBatched(hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          hipFloatComplex*  A[],
+                                                          int               lda,
+                                                          hipFloatComplex*  B[],
+                                                          int               ldb,
+                                                          hipFloatComplex*  X[],
+                                                          int               ldx,
+                                                          void*             work,
+                                                          size_t            lwork,
+                                                          int*              niters,
+                                                          int*              devInfo,
+                                                          int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZZgelsBatched(hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          hipDoubleComplex* A[],
+                                                          int               lda,
+                                                          hipDoubleComplex* B[],
+                                                          int               ldb,
+                                                          hipDoubleComplex* X[],
+                                                          int               ldx,
+                                                          void*             work,
+                                                          size_t            lwork,
+                                                          int*              niters,
+                                                          int*              devInfo,
+                                                          int               batch_count);
 
 // geqrf
 HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgeqrf_bufferSize(
