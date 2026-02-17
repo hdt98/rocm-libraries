@@ -20,7 +20,7 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from rocisa.code import KernelBody, Label, Macro, Module, RegSet, SrdUpperValue, \
                         StructuredModule, TextBlock, ValueEndif, ValueIf, ValueElseIf, ValueSet, SignatureBase
 from rocisa.container import vgpr, sgpr, SMEMModifiers, replaceHolder, EXEC,\
@@ -72,19 +72,19 @@ class CMSKernelInfo:
     name: str
     dtype: str
     supported_layouts: list[str]
-    macro_tile_0: int
-    macro_tile_1: int
-    depth_u: int
-    prefetch_global_read: int
-    prefetch_local_read: int
-    direct_to_lds: bool
-    wave_separate_global_read_a: int
-    wave_separate_global_read_b: int
-    global_read_vector_width_a: int
-    global_read_vector_width_b: int
-    local_read_vector_width: int
-    matrix_instruction: list[int]
-    mi_wave_group: list[int]
+    MacroTile0: int
+    MacroTile1: int
+    DepthU: int
+    PrefetchGlobalRead: int
+    PrefetchLocalRead: int
+    DirectToLds: bool
+    WaveSeparateGlobalReadA: int
+    WaveSeparateGlobalReadB: int
+    GlobalReadVectorWidthA: int
+    GlobalReadVectorWidthB: int
+    LocalReadVectorWidth: int
+    MatrixInstruction: list[int]
+    MIWaveGroup: list[int]
 
     def matches(self, dtype: Optional[str] = None, layout: Optional[str] = None) -> bool:
         """Check if this kernel info matches the given dtype and/or layout filter.
@@ -104,24 +104,7 @@ class CMSKernelInfo:
 
     def to_dict(self) -> dict:
         """Return a dict of the minimum kernel parameters needed for this CMS kernel."""
-        return {
-            "name": self.name,
-            "dtype": self.dtype,
-            "supported_layouts": list(self.supported_layouts),
-            "MacroTile0": self.macro_tile_0,
-            "MacroTile1": self.macro_tile_1,
-            "DepthU": self.depth_u,
-            "PrefetchGlobalRead": self.prefetch_global_read,
-            "PrefetchLocalRead": self.prefetch_local_read,
-            "DirectToLds": self.direct_to_lds,
-            "WaveSeparateGlobalReadA": self.wave_separate_global_read_a,
-            "WaveSeparateGlobalReadB": self.wave_separate_global_read_b,
-            "GlobalReadVectorWidthA": self.global_read_vector_width_a,
-            "GlobalReadVectorWidthB": self.global_read_vector_width_b,
-            "LocalReadVectorWidth": self.local_read_vector_width,
-            "MatrixInstruction": list(self.matrix_instruction),
-            "MIWaveGroup": list(self.mi_wave_group),
-        }
+        return self.asdict()
 
 @dataclass
 class SyncSchedule:
@@ -627,7 +610,7 @@ class TileConfig:
     depth_u: int
     prefetch_global_read: int
     prefetch_local_read: int
-    direct_to_lds: bool
+    DirectToLds: bool
     wave_separate_global_read_a: int
     wave_separate_global_read_b: int
 
@@ -715,19 +698,19 @@ class RegisterSchedule:
             name=func.__name__,
             dtype=dtype_name,
             supported_layouts=list(self.supported_layouts),
-            macro_tile_0=tc.macro_tile_size_0,
-            macro_tile_1=tc.macro_tile_size_1,
-            depth_u=tc.depth_u,
-            prefetch_global_read=tc.prefetch_global_read,
-            prefetch_local_read=tc.prefetch_local_read,
-            direct_to_lds=tc.direct_to_lds,
-            wave_separate_global_read_a=tc.wave_separate_global_read_a,
-            wave_separate_global_read_b=tc.wave_separate_global_read_b,
-            global_read_vector_width_a=self.vector_widths[0],
-            global_read_vector_width_b=self.vector_widths[1],
-            local_read_vector_width=self.vector_widths[2],
-            matrix_instruction=list(self.matrix_inst),
-            mi_wave_group=list(self.mfma_wave_group),
+            MacroTile0=tc.macro_tile_size_0,
+            MacroTile1=tc.macro_tile_size_1,
+            DepthU=tc.depth_u,
+            PrefetchGlobalRead=tc.prefetch_global_read,
+            PrefetchLocalRead=tc.prefetch_local_read,
+            DirectToLds=tc.direct_to_lds,
+            WaveSeparateGlobalReadA=tc.wave_separate_global_read_a,
+            WaveSeparateGlobalReadB=tc.wave_separate_global_read_b,
+            GlobalReadVectorWidthA=self.vector_widths[0],
+            GlobalReadVectorWidthB=self.vector_widths[1],
+            LocalReadVectorWidth=self.vector_widths[2],
+            MatrixInstruction=list(self.matrix_inst),
+            MIWaveGroup=list(self.mfma_wave_group),
         ))
         
         # Return original function unchanged (so it can still be called directly)
