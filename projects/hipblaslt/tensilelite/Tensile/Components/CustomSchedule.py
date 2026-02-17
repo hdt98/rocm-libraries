@@ -3619,6 +3619,7 @@ def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS):
     mfma_wave_group=[2, 2]
 )
 def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
+    numMfma = 72
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
@@ -3834,7 +3835,6 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         return False, None
 
     kernel["MfmaInitCVgprs"] = True
-    numMfma = 72
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     return True, opt1
 
