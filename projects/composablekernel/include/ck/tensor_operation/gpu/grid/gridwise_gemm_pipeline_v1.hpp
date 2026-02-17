@@ -9,6 +9,161 @@
 
 namespace ck {
 
+struct GridwiseGemmDoubleBufferPipeline_v1
+{
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+
+    __host__ __device__ static constexpr bool IsSupported(index_t)
+    {
+        return true;
+    }
+
+    __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
+    {
+        return num_loop > 2;
+    }
+
+    __host__ __device__ static constexpr bool CalculateIsOddLoop(index_t num_loop)
+    {
+        return (num_loop % 2) == 1;
+    }
+
+    template <bool HasMainLoop,
+              typename AGridDesc,
+              typename ABlockDesc,
+              typename ABlockTransfer,
+              typename AGridBuffer,
+              typename ABlockBuffer,
+              typename ABlockTransferStep,
+              typename BGridDesc,
+              typename BBlockDesc,
+              typename BBlockTransfer,
+              typename BGridBuffer,
+              typename BBlockBuffer,
+              typename BBlockTransferStep,
+              typename BlockwiseGemm,
+              typename CThreadBuffer>
+    static __device__ void Run(const AGridDesc& a_grid_desc,
+                               const ABlockDesc& a_block_desc,
+                               ABlockTransfer& a_blockwise_copy,
+                               const AGridBuffer& a_grid_buf,
+                               ABlockBuffer& a_block_buf_0,
+                               ABlockBuffer& a_block_buf_1,
+                               const ABlockTransferStep& a_block_copy_step,
+                               const BGridDesc& b_grid_desc,
+                               const BBlockDesc& b_block_desc,
+                               BBlockTransfer& b_blockwise_copy,
+                               const BGridBuffer& b_grid_buf,
+                               BBlockBuffer& b_block_buf_0,
+                               BBlockBuffer& b_block_buf_1,
+                               const BBlockTransferStep& b_block_copy_step,
+                               const BlockwiseGemm& blockwise_gemm,
+                               CThreadBuffer& c_thread_buf,
+                               index_t num_loop)
+    {
+        // We have two thread scratches indexed by I0, I1 for double buffering.
+        // Optimized with IGLP scheduling for better instruction-level parallelism
+
+        // Prologue - load data into buffer 0
+        // Read from global mem to registers (I0 scratch)
+        a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I0);
+        b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I0);
+
+        // Move source slice window for next read (I1 scratch)
+        a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+        b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+        // Initialize C
+        c_thread_buf.Clear();
+
+        // Write from I0 registers to LDS buffer 0
+        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_0, I0);
+        b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_0, I0);
+
+        // Main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 1;
+
+            do
+            {
+                // Read from global mem to registers (I1 scratch)
+                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I1);
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I1);
+
+                // Move source slice window for next read (I0 scratch)
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+                // Sync LDS to ensure buffer 0 is ready
+                block_sync_lds();
+
+                // Run GEMM on buffer 0 while buffer 1 is loading
+                blockwise_gemm.Run(a_block_buf_0, b_block_buf_0, c_thread_buf);
+
+                // Write from registers (I1 scratch) to LDS buffer 1
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_1, I1);
+                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_1, I1);
+
+                // Read from global mem to registers (I0 scratch)
+                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I0);
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I0);
+
+                // Move source slice window for next read (I1 scratch)
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+                // Sync LDS to ensure buffer 1 is ready
+                block_sync_lds();
+
+                // Run GEMM on buffer 1 while buffer 0 is loading
+                blockwise_gemm.Run(a_block_buf_1, b_block_buf_1, c_thread_buf);
+
+                // Write from registers (I0 scratch) to LDS buffer 0
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_0, I0);
+                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_0, I0);
+
+                i += 2;
+            } while(i <= (num_loop - 2));
+        }
+
+        // tail - handle remaining iterations
+        if (num_loop % 2 == 0)
+        {
+            // Even number of loops: need to process 2 more iterations
+            // Read from global mem to registers (I1 scratch)
+            a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I1);
+            b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I1);
+
+            // Sync LDS to ensure buffer 0 is ready
+            block_sync_lds();
+
+            // Run GEMM on buffer 0
+            blockwise_gemm.Run(a_block_buf_0, b_block_buf_0, c_thread_buf);
+
+            // Write from registers (I1 scratch) to LDS buffer 1
+            a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_1, I1);
+            b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_1, I1);
+
+            // Sync LDS to ensure buffer 1 is ready
+            block_sync_lds();
+
+            // Run GEMM on buffer 1
+            blockwise_gemm.Run(a_block_buf_1, b_block_buf_1, c_thread_buf);
+        }
+        else
+        {
+            // Odd number of loops: need to process 1 more iteration
+            // Sync LDS to ensure buffer 0 is ready
+            block_sync_lds();
+
+            // Run GEMM on buffer 0
+            blockwise_gemm.Run(a_block_buf_0, b_block_buf_0, c_thread_buf);
+        }
+    }
+};
+
 template <index_t NumPrefetch, bool AEnableLds, bool BEnableLds>
 struct GridwiseGemmPipeline_v1;
 
