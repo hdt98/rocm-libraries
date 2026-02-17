@@ -87,7 +87,7 @@ RppStatus rppt_erode_host(RppPtr_t srcPtr, RpptDescPtr srcDescPtr, RppPtr_t dstP
  * \retval RPP_SUCCESS Successful completion.
  * \retval RPP_ERROR* Unsuccessful completion.
  */
-RppStatus rppt_erode_gpu(RppPtr_t srcPtr, RpptDescPtr srcDescPtr, RppPtr_t dstPtr, RpptDescPtr dstDescPtr, Rpp32u kernelSize, RpptROIPtr roiTensorPtrSrc, RpptRoiType roiType, rppHandle_t rppHandle);
+RppStatus rppt_erode(RppPtr_t srcPtr, RpptDescPtr srcDescPtr, RppPtr_t dstPtr, RpptDescPtr dstDescPtr, Rpp32u kernelSize, RpptROIPtr roiTensorPtrSrc, RpptRoiType roiType, rppHandle_t rppHandle, RppBackend executionBackend);
 #endif // GPU_SUPPORT
 
 /*! \brief Dilate augmentation on HOST backend for a NCHW/NHWC layout tensor
@@ -135,7 +135,7 @@ RppStatus rppt_dilate_host(RppPtr_t srcPtr, RpptDescPtr srcDescPtr, RppPtr_t dst
  * \retval RPP_SUCCESS Successful completion.
  * \retval RPP_ERROR* Unsuccessful completion.
  */
-RppStatus rppt_dilate_gpu(RppPtr_t srcPtr, RpptDescPtr srcDescPtr, RppPtr_t dstPtr, RpptDescPtr dstDescPtr, Rpp32u kernelSize, RpptROIPtr roiTensorPtrSrc, RpptRoiType roiType, rppHandle_t rppHandle);
+RppStatus rppt_dilate(RppPtr_t srcPtr, RpptDescPtr srcDescPtr, RppPtr_t dstPtr, RpptDescPtr dstDescPtr, Rpp32u kernelSize, RpptROIPtr roiTensorPtrSrc, RpptRoiType roiType, rppHandle_t rppHandle, RppBackend executionBackend);
 #endif // GPU_SUPPORT
 
 /*! @}
