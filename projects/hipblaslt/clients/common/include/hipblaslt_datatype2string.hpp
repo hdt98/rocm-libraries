@@ -47,6 +47,8 @@ enum class hipblaslt_initialization
     neg_zero   = 891,
     neg_inf    = 892,
     nan        = 893,
+    // norm_dist with one element overwritten by inf, -inf, or nan (deterministic from seed)
+    norm_dist_one_special = 894,
 };
 
 typedef enum class _hipblaslt_activation_type
@@ -266,6 +268,8 @@ constexpr auto hipblaslt_initialization2string(hipblaslt_initialization init)
         return "neg_inf";
     case hipblaslt_initialization::nan:
         return "nan";
+    case hipblaslt_initialization::norm_dist_one_special:
+        return "norm_dist_one_special";
     }
     return "invalid";
 }
@@ -293,6 +297,7 @@ inline hipblaslt_initialization string2hipblaslt_initialization(const std::strin
         value == "neg_zero"  ? hipblaslt_initialization::neg_zero   :
         value == "neg_inf"   ? hipblaslt_initialization::neg_inf   :
         value == "nan"       ? hipblaslt_initialization::nan       :
+        value == "norm_dist_one_special" ? hipblaslt_initialization::norm_dist_one_special :
         static_cast<hipblaslt_initialization>(0);
 }
 // clang-format on
