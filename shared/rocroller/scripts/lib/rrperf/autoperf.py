@@ -182,7 +182,7 @@ def autoperf(
     x_value: str = "timestamp",
     **kwargs,
 ):
-    if not no_fail:
+    if no_fail is None:
         no_fail = []
 
     monorepo_dir = git.top()

@@ -262,7 +262,7 @@ def run_cli(  # noqa: C901
 
     Implements the CLI 'run' subcommand.
     """
-    if not id_filter:
+    if id_filter is None:
         id_filter = []
 
     if pin_clocks:

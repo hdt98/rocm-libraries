@@ -109,7 +109,7 @@ def generate(
 ):
     """Generate kernels!"""
 
-    if not id_filter:
+    if id_filter is None:
         id_filter = []
 
     generator = rrperf.utils.empty()
