@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -172,6 +172,26 @@ void cpu_gels(hipsolverOperation_t transR,
 
 template <typename T>
 void cpu_geqrf(int m, int n, T* A, int lda, T* ipiv, T* work, int sizeW, int* info);
+
+template <typename T>
+void cpu_geqlf(int m, int n, T* A, int lda, T* ipiv, T* work, int sizeW, int* info);
+
+template <typename T>
+void cpu_gelqf(int m, int n, T* A, int lda, T* ipiv, T* work, int sizeW, int* info);
+
+template <typename T>
+void cpu_gerqf(int m, int n, T* A, int lda, T* ipiv, T* work, int sizeW, int* info);
+
+template <typename T>
+void cpu_larft(hipsolverDirectMode_t direct,
+               hipsolverStorevMode_t storev,
+               int                   n,
+               int                   k,
+               T*                    V,
+               int                   ldv,
+               T*                    tau,
+               T*                    T_,
+               int                   ldt);
 
 template <typename T>
 void cpu_gesv(int n, int nrhs, T* A, int lda, int* ipiv, T* B, int ldb, int* info);
