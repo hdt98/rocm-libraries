@@ -162,6 +162,8 @@ namespace rocRoller
                             bool useAltLayoutA = (solutionParams.types.scaleShuffleTileA[0] == 32
                                                   && solutionParams.types.scaleShuffleTileA[2] == 4);
 
+                            std::cout << "Solution:: Add SubTileTranspose with alternative layout: " << useAltLayoutA << std::endl;
+
                             scaleInputA
                                 = command->addOperation(rocRoller::Operations::SubTileTranspose(
                                     *m_tagLoadScaleA, solutionParams.types.scaleShuffleTileA, useAltLayoutA));
@@ -221,6 +223,8 @@ namespace rocRoller
                             // Use alternative layout when tileMN==32 and subTileK==4
                             bool useAltLayoutB = (solutionParams.types.scaleShuffleTileB[0] == 32
                                                   && solutionParams.types.scaleShuffleTileB[2] == 4);
+
+                            std::cout << "Solution:: Add SubTileTranspose with alternative layout: " << useAltLayoutB << std::endl;
 
                             scaleInputB
                                 = command->addOperation(rocRoller::Operations::SubTileTranspose(

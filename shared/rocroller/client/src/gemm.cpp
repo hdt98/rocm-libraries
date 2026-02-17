@@ -278,9 +278,25 @@ namespace rocRoller::Client::GEMMClient
                     preTileSize = {problemParams.types.scalePretileA[1],
                                    problemParams.types.scalePretileA[0]};
                 }
+                auto useAltLayoutA = true;
+                if (useAltLayoutA) {
+                    std::cout << "DGEN:: Using alternative layout for scale A" << std::endl;
+                }
 
-                auto tmpScaleA
-                    = DGen::preSwizzle(hostScaleA, descScaleA.sizes(), preSwizzleSize, preTileSize);
+                std::cout << "DGEN::scaleShuffleTileA: " << problemParams.types.scaleShuffleTileA[0] << " " << problemParams.types.scaleShuffleTileA[1] << " " << problemParams.types.scaleShuffleTileA[2] << std::endl;
+                std::cout << "DGEN::useAltLayoutA: " << useAltLayoutA << std::endl; 
+
+                decltype(hostScaleA) tmpScaleA;
+                if (useAltLayoutA)
+                {
+                    // Use GFX950-specific scale swizzle for alternative layout without pretiling
+                    std::cout << "DGEN:: Using preSwizzleScalesGFX950 for scale A" << std::endl;
+                    tmpScaleA = DGen::preSwizzleScalesGFX950(hostScaleA, descScaleA.sizes());
+                }
+                else
+                {
+                    tmpScaleA = DGen::preSwizzle(hostScaleA, descScaleA.sizes(), preSwizzleSize, preTileSize, useAltLayoutA);
+                }
                 deviceScaleA = make_shared_device(tmpScaleA);
             }
             else
@@ -322,8 +338,24 @@ namespace rocRoller::Client::GEMMClient
                                    problemParams.types.scalePretileB[1]};
                 };
 
-                auto tmpScaleB
-                    = DGen::preSwizzle(hostScaleB, descScaleB.sizes(), preSwizzleSize, preTileSize);
+                auto useAltLayoutB = true;
+                std::cout << "DGEN::scaleShuffleTileB: " << problemParams.types.scaleShuffleTileB[0] << " " << problemParams.types.scaleShuffleTileB[1] << " " << problemParams.types.scaleShuffleTileB[2] << std::endl;
+                std::cout << "DGEN::useAltLayoutB: " << useAltLayoutB << std::endl;
+                if (useAltLayoutB) {
+                    std::cout << "DGEN:: Using alternative layout for scale B" << std::endl;
+                }
+
+                decltype(hostScaleB) tmpScaleB;
+                if (useAltLayoutB)
+                {
+                    // Use GFX950-specific scale swizzle for alternative layout without pretiling
+                    std::cout << "DGEN:: Using preSwizzleScalesGFX950 for scale B" << std::endl;
+                    tmpScaleB = DGen::preSwizzleScalesGFX950(hostScaleB, descScaleB.sizes());
+                }
+                else
+                {
+                    tmpScaleB = DGen::preSwizzle(hostScaleB, descScaleB.sizes(), preSwizzleSize, preTileSize, useAltLayoutB);
+                }
                 deviceScaleB = make_shared_device(tmpScaleB);
             }
             else
