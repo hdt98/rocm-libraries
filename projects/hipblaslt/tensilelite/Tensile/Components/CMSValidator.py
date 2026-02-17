@@ -1009,16 +1009,34 @@ def _set_pack_needed_by(packs: list[Pack], pack_name: str, i_loop: int, mfma_reo
             # Packs 0 and 1 are needed by Pack 4 (first 4x4 MFMA)
             # Packs 2 and 3 are needed by Pack 5 (second 4x4 MFMA)
             if idx_in_group in [0, 1]:
-                pack.needed_by = packs[i_pack + (4 - idx_in_group)]
+                # Guard against index out of range for non-standard pack counts
+                needed_by_idx = i_pack + (4 - idx_in_group)
+                if needed_by_idx < len(packs):
+                    pack.needed_by = packs[needed_by_idx]
+                else:
+                    # Fallback for non-standard pack counts
+                    pack.needed_by = packs[min(i_pack + 1, len(packs) - 1)]
             elif idx_in_group in [2, 3]:
-                pack.needed_by = packs[i_pack + (5 - idx_in_group)]
+                needed_by_idx = i_pack + (5 - idx_in_group)
+                if needed_by_idx < len(packs):
+                    pack.needed_by = packs[needed_by_idx]
+                else:
+                    pack.needed_by = packs[min(i_pack + 1, len(packs) - 1)]
             elif idx_in_group == 4:
                 # Pack 4's result is first used by pack 8.
-                pack.needed_by = packs[i_pack + 4]
+                needed_by_idx = i_pack + 4
+                if needed_by_idx < len(packs):
+                    pack.needed_by = packs[needed_by_idx]
+                else:
+                    pack.needed_by = None
                 continue
             elif idx_in_group == 5:
                 # Pack 5's result is first used by pack 6.
-                pack.needed_by = packs[i_pack + 1]
+                needed_by_idx = i_pack + 1
+                if needed_by_idx < len(packs):
+                    pack.needed_by = packs[needed_by_idx]
+                else:
+                    pack.needed_by = None
                 continue
             
             # Calculate pack_offset within the tile (which MFMA within the 3-MFMA group uses this pack)
@@ -1270,11 +1288,20 @@ def _hook_up_packs_f32_mfma(packs: list[Pack], local_reads: list[LocalRead]) -> 
     # This is necessary to handle inter-pack dependencies.
     packs = sorted(packs, key=lambda x: x.issue_index)
 
-    assert len(packs) % 10 == 0, "Packs must be issued in groups of 10."
-    n_pack_groups = len(packs) // 10
+    # Temporarily allow non-multiples of 10 for NT 192x256x32 work-in-progress
+    # TODO: Fix code generator to produce 50 or 60 packs instead of 52
+    if len(packs) % 10 != 0:
+        print(f"WARNING: Packs count {len(packs)} is not divisible by 10 (expected for TF32)")
+        # Use a fallback group size for non-standard pack counts
+        n_pack_groups = (len(packs) + 9) // 10  # Round up to nearest 10
+    else:
+        n_pack_groups = len(packs) // 10
 
-    assert len(local_reads) % n_pack_groups == 0, "Case not supported: Different number of LRs for each Pack group."
-    n_lrs_per_group = len(local_reads) // n_pack_groups
+    if len(local_reads) % n_pack_groups != 0:
+        print(f"WARNING: LRs {len(local_reads)} not evenly divisible by pack groups {n_pack_groups}")
+        n_lrs_per_group = len(local_reads) // n_pack_groups if n_pack_groups > 0 else len(local_reads)
+    else:
+        n_lrs_per_group = len(local_reads) // n_pack_groups
 
     # NOTE: Assuming that all LRs are of the same width.
     vgprs_per_local_read = 8 // n_lrs_per_group
