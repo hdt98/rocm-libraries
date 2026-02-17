@@ -4848,18 +4848,29 @@ def _get_schedule_256x320x64_16bit(kernel, useLDSTr, TLDS):
         syncs = SyncSchedule()
         syncs.add(-1, dscnt=9, vlcnt=-1, vscnt=-1, comment="Wait for prior local read local write")
         syncs.add(7,  dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for prior local read local write")
-        syncs.add(28, dscnt=0, vlcnt=-1, vscnt=-1, barrier=True, comment="Wait for LRA0 to finish before issuing GRA")
+        syncs.add(14, dscnt=0, vlcnt=-1, vscnt=-1, barrier=True, comment="Wait for LRA0 to finish before issuing GRA")
+        syncs.add(56, dscnt=0, vlcnt=8, vscnt=-1, barrier=True, comment="Wait for LRB0 to finish before issuing LRA1+LRB1+GRB")
         syncs.add(79, dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for prior local read local write")
         syncs.add(136, dscnt=-1, vlcnt=18, vscnt=-1, barrier=True, comment="Wait for GRs from previous iteration")
 
         lra0 = [0,2,3,4,5,6,7,8]
+
+        # Interleave GRA and LRB0 after LRA0 ends.
+        grA = [[14,14, 18,18, 22,22, 26,26, 30,30, 34,34, 38,38, 42,42],
+               [15,15, 19,19, 23,23, 27,27, 31,31, 35,35, 39,39, 43,43]]
+        lrb0 = [[16, 20, 24, 28, 32, 36, 40, 44, 46, 50],
+                [17, 21, 25, 29, 33, 37, 41, 45, 47, 51]]
+
+        # One code path passes the CMS validator.
+        grB = [78,78, 84,84, 90,90, 96,96, 103,103, 109,109, 115,115, 121,121, 128,128, 134,134]
+
+        # Two code paths at the same sync point FAIL the CMS validator.
+        # grB = [[78,78, 84,84, 90,90, 96,96, 103,103, 109,109, 115,115, 121,121, 128,128, 134,134],
+        #        [79,79, 85,85, 91,91, 97,97, 104,104, 110,110, 116,116, 122,122, 129,129, 135,135]]
+
         lra1 = [137,139,140,141,142,143,144,145]
-        
-        lrb0 = [1,9,10,11,12,13,14,15,16,17]
         lrb1 = [138,146,147,148,149,150,151,152,153,154]
 
-        grA = [28,28,34,34,40,40,46,46,53,53,59,59,65,65,71,71]
-        grB = [78,78,84,84,90,90,96,96,103,103,109,109,115,115,121,121,128,128,134,134]
         
         lrsa = [78]
         lrsb = [78]
@@ -4873,13 +4884,13 @@ def _get_schedule_256x320x64_16bit(kernel, useLDSTr, TLDS):
 
         optSchedule = {
             'SYNC': [syncs.get_indicies()],
-            'GRA': [grA],
+            'GRA': [*grA],
             'GRB': [grB],
             'GRIncA': [grIncA],
             'GRIncB': [grIncB],
             'LRA0': [lra0],
             'LRA1': [lra1],
-            'LRB0': [lrb0],
+            'LRB0': [*lrb0],
             'LRB1': [lrb1],
             'LRSA': [lrsa],
             'LRSB': [lrsb],
@@ -4891,5 +4902,6 @@ def _get_schedule_256x320x64_16bit(kernel, useLDSTr, TLDS):
         return False, None
     
     nllshift = nglshift = num_gr
-    opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode=syncs.get_code(), nllshift=nllshift, nglshift=nglshift)
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode=syncs.get_code(), nllshift=nllshift, nglshift=nglshift)
     return True, opt1
+
