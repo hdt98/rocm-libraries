@@ -56,6 +56,7 @@ function(create_individual_gemm_target datatype layout trait tile_config config_
                 --datatype ${datatype}
                 --layout ${layout}
                 --config_json ${config_json}
+                --gpu_target "${GEMM_GPU_TARGETS_INDIVIDUAL}"
                 --gen_single
                 --kernel_name "${datatype}_${layout}_${trait}_${tile_config}"
                 --tile_config "${tile_config}"
@@ -169,6 +170,7 @@ function(build_individual_gemm_targets datatype layout)
                 --datatype ${datatype}
                 --layout ${layout}
                 --config_json ${json_blob}
+                --gpu_target "${GEMM_GPU_TARGETS_INDIVIDUAL}"
                 --list_kernels
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         RESULT_VARIABLE ret
@@ -211,22 +213,35 @@ endfunction()
 message(STATUS "=== Starting Tile Engine StreamK GEMM Configuration ===")
 message(STATUS "GEMM_STREAMK_DATATYPE: ${GEMM_STREAMK_DATATYPE}")
 message(STATUS "GEMM_STREAMK_LAYOUT: ${GEMM_STREAMK_LAYOUT}")
+message(STATUS "GPU_TARGETS: ${GPU_TARGETS}")
 message(STATUS "SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
 
-# Filter GPU targets to only gfx90a, gfx942
+# Resolve StreamK GPU targets from user-provided GPU_TARGETS when available.
+# Fallback to SUPPORTED_GPU_TARGETS if GPU_TARGETS is not set.
 set(GEMM_GPU_TARGETS_INDIVIDUAL "")
-set(DESIRED_TARGETS "gfx90a;gfx942") # TODO: Add gfx950 when supported
 
-foreach(target IN LISTS SUPPORTED_GPU_TARGETS)
-    if(target IN_LIST DESIRED_TARGETS)
+set(_gemm_streamk_requested_targets "")
+if(GPU_TARGETS)
+    set(_gemm_streamk_requested_targets ${GPU_TARGETS})
+    message(STATUS "Using user-specified GPU_TARGETS for StreamK: ${_gemm_streamk_requested_targets}")
+else()
+    set(_gemm_streamk_requested_targets ${SUPPORTED_GPU_TARGETS})
+    message(STATUS "GPU_TARGETS not set; using SUPPORTED_GPU_TARGETS for StreamK: ${_gemm_streamk_requested_targets}")
+endif()
+
+# Keep only targets that the current toolchain reports as supported.
+foreach(target IN LISTS _gemm_streamk_requested_targets)
+    if(target IN_LIST SUPPORTED_GPU_TARGETS)
         list(APPEND GEMM_GPU_TARGETS_INDIVIDUAL ${target})
-        message(STATUS "  Adding GPU target: ${target}")
+        message(STATUS "  Adding GPU target for StreamK build: ${target}")
+    else()
+        message(WARNING "  Requested GPU target '${target}' is not in SUPPORTED_GPU_TARGETS='${SUPPORTED_GPU_TARGETS}' and will be skipped.")
     endif()
 endforeach()
 
 # Skip build if no matching targets found
 if(NOT GEMM_GPU_TARGETS_INDIVIDUAL)
-    message(WARNING "Skipping Tile Engine GEMM build: No supported GPU targets (gfx90a, gfx942, gfx950) found in SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
+    message(WARNING "Skipping Tile Engine GEMM StreamK build: no valid targets from GPU_TARGETS='${GPU_TARGETS}' within SUPPORTED_GPU_TARGETS='${SUPPORTED_GPU_TARGETS}'")
 else()
     message(STATUS "Building individual GEMM targets for GPU targets: ${GEMM_GPU_TARGETS_INDIVIDUAL}")
 

@@ -1,13 +1,10 @@
 {
     "_comment": [
-        "Warp tile combinations restricted to CK-proven 32x32 MFMA variants.",
-        "The CK example (40_streamk_gemm) uses 32x32x8 for FP16 and the CK test uses 32x32x16.",
-        "Other valid MFMA tiles (16x16x16, 4x64x16, 64x4x16) are not supported by the CK",
-        "StreamK pipeline templates (GemmPipelineAgBgCrCompV3 + CShuffleEpilogue) and will",
-        "produce 'Cannot find Symbol' errors at runtime.",
-        "For FP8, only 32x32x16 passes validation (32x32x8 is not a valid FP8 MFMA).",
-        "Padding (pad_m/n/k) is set to true to match the CK example and test configurations.",
-        "IMPORTANT: Rebuild after modifying: cmake .. && cmake --build . --target benchmark_gemm_streamk_all -j$(nproc)"
+        "EXPERIMENTAL: Full MFMA-valid warp tile configurations for gfx942.",
+        "WARNING: Many of these configurations are NOT supported by the CK StreamK pipeline",
+        "templates and will fail at runtime with 'Cannot find Symbol' errors.",
+        "Use the default_config.json for reliable benchmarking.",
+        "To use this config: cmake .. -DGEMM_CONFIG_FILE=full_config.json"
     ],
     "problem": {
     },
@@ -42,7 +39,11 @@
         },
         "warp_tile_combinations": [
             [32, 32, 8],
-            [32, 32, 16]
+            [32, 32, 16],
+            [16, 16, 16],
+            [16, 16, 32],
+            [4, 64, 16],
+            [64, 4, 16]
         ]
     },
     "trait_config": {

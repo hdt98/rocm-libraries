@@ -21,11 +21,19 @@ logging.basicConfig(level=logging.INFO)
 
 
 class GemmKernelBuilder:
-    def __init__(self, working_path, datatype, layout, config_json=None):
+    def __init__(self, working_path, datatype, layout, config_json=None, gpu_targets=None):
         self.working_path = Path(working_path)
         self.datatype = datatype
         self.layout = layout
         self.config_json = config_json
+        self.gpu_targets = []
+        if gpu_targets:
+            # Support semicolon/comma separated CLI inputs from CMake.
+            if isinstance(gpu_targets, str):
+                parsed_targets = gpu_targets.replace(",", ";").split(";")
+                self.gpu_targets = [t.strip() for t in parsed_targets if t.strip()]
+            else:
+                self.gpu_targets = [str(t).strip() for t in gpu_targets if str(t).strip()]
 
         # Create working directory if it doesn't exist
         self.working_path.mkdir(parents=True, exist_ok=True)
@@ -262,6 +270,7 @@ class GemmKernelBuilder:
                 b_datatype,
                 c_datatype,
                 pipeline,
+                gpu_targets=self.gpu_targets,
             )
 
     def _generate_trait_combinations(self):
@@ -467,7 +476,7 @@ struct SelectedKernel {{
     static constexpr bool DoubleSmemBuffer = {"true" if pipeline == "compv4" else "false"};
     static constexpr int kBlockPerCu       = 1;
     static constexpr bool StructuredSparsity = false;
-    static constexpr bool NumWaveGroup       = 1;
+    static constexpr ck_tile::index_t NumWaveGroup = 1;
 
     static constexpr bool TransposeC = false;
     static constexpr bool UsePersistentKernel = {"true" if str(persistent).lower() == "true" else "false"};
@@ -823,6 +832,11 @@ def main():
     )
     parser.add_argument("--config_json", help="Configuration JSON file")
     parser.add_argument(
+        "--gpu_target",
+        default="",
+        help="GPU target(s) used for validation (semicolon-separated, e.g. gfx942;gfx90a).",
+    )
+    parser.add_argument(
         "--num_workers", type=int, help="Number of parallel workers (default: auto)"
     )
     parser.add_argument(
@@ -848,7 +862,11 @@ def main():
 
     # Create builder
     builder = GemmKernelBuilder(
-        args.working_path, args.datatype, args.layout, args.config_json
+        args.working_path,
+        args.datatype,
+        args.layout,
+        args.config_json,
+        gpu_targets=args.gpu_target,
     )
 
     if args.list_kernels:

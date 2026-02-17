@@ -11,7 +11,7 @@ import subprocess
 import re
 from functools import lru_cache
 import logging
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 # Element size mapping for different data types
 ELEMENT_SIZE_MAP = {
@@ -125,6 +125,14 @@ def element_size(data_type: str) -> float:
 GPU_NAME_PATTERN = re.compile(r"Name:\s*(gfx\d+\w*)")
 
 
+def _normalize_gpu_target(target: str) -> str:
+    """Normalize target IDs like 'gfx942:xnack+' -> 'gfx942'."""
+    if not target:
+        return ""
+    normalized = str(target).strip().split(":")[0]
+    return normalized
+
+
 @lru_cache(maxsize=1)
 def get_gpu_name_by_id(gpu_id: int = 0) -> str:
     """Retrieve GPU name (e.g. gfx90a) by device ID"""
@@ -236,7 +244,8 @@ def validate_warp_tile_combination(
     a_datatype: str,
     b_datatype: str,
     c_datatype: str,
-    gpu_name: str = None,
+    gpu_name: Optional[str] = None,
+    gpu_targets: Optional[List[str]] = None,
 ) -> Tuple[bool, str]:
     """Validate warp tile combination against GPU-specific supported combinations.
 
@@ -244,8 +253,43 @@ def validate_warp_tile_combination(
     falls back to DEFAULT_FALLBACK_GPU (gfx942) to avoid generating kernels with
     invalid MFMA instructions that would crash at runtime.
     """
+    # If explicit build targets are provided, validate against ALL of them.
+    # This guarantees generated kernels are compatible with every target code
+    # object requested by CMake's GPU_TARGETS.
+    if gpu_targets:
+        normalized_targets = [_normalize_gpu_target(t) for t in gpu_targets if t]
+        normalized_targets = [t for t in normalized_targets if t]
+        if not normalized_targets:
+            return False, "No valid GPU targets provided for validation"
+
+        unsupported_targets = [
+            t for t in normalized_targets if t not in WARP_TILE_SUPPORTED_COMBINATIONS
+        ]
+        if unsupported_targets:
+            return False, (
+                f"No warp-tile validation data for GPU target(s): {unsupported_targets}. "
+                "Update WARP_TILE_SUPPORTED_COMBINATIONS or use a supported target."
+            )
+
+        for target in normalized_targets:
+            ok, msg = validate_warp_tile_combination(
+                warp_tile_m,
+                warp_tile_n,
+                warp_tile_k,
+                a_datatype,
+                b_datatype,
+                c_datatype,
+                gpu_name=target,
+                gpu_targets=None,
+            )
+            if not ok:
+                return False, msg
+        return True, ""
+
     if gpu_name is None:
         gpu_name = get_gpu_name_by_id(0)
+    else:
+        gpu_name = _normalize_gpu_target(gpu_name)
 
     # Construct the key for looking up supported combinations
     warp_tile_key = f"{a_datatype}_{b_datatype}_{c_datatype}"
@@ -307,6 +351,7 @@ def is_tile_config_valid(
     c_datatype: str,
     pipeline: str,
     trait_name: str = None,
+    gpu_targets: Optional[List[str]] = None,
 ) -> bool:
     """
     Comprehensive tile configuration validation.
@@ -365,7 +410,13 @@ def is_tile_config_valid(
 
     # Validate warp tile combination
     warp_tile_valid, warp_tile_error = validate_warp_tile_combination(
-        warp_tile_m, warp_tile_n, warp_tile_k, a_datatype, b_datatype, c_datatype
+        warp_tile_m,
+        warp_tile_n,
+        warp_tile_k,
+        a_datatype,
+        b_datatype,
+        c_datatype,
+        gpu_targets=gpu_targets,
     )
     if not warp_tile_valid:
         logging.debug(f"Warp tile validation failed: {warp_tile_error}")
