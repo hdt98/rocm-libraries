@@ -889,7 +889,8 @@ std::vector<ConvFpropToleranceTestCase>
 
 // Half / Float / Float (High Precision Compute: Linear)
 template <>
-std::vector<ConvFpropToleranceTestCase> getConvFpropToleranceTestCases<TypeTriple<half, float, float>>()
+std::vector<ConvFpropToleranceTestCase>
+    getConvFpropToleranceTestCases<TypeTriple<half, float, float>>()
 {
     return {
         {-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
@@ -909,7 +910,8 @@ std::vector<ConvFpropToleranceTestCase> getConvFpropToleranceTestCases<TypeTripl
 
 // Half / Half / Half (Lower Precision: Statistical)
 template <>
-std::vector<ConvFpropToleranceTestCase> getConvFpropToleranceTestCases<TypeTriple<half, half, half>>()
+std::vector<ConvFpropToleranceTestCase>
+    getConvFpropToleranceTestCases<TypeTriple<half, half, half>>()
 {
     return {{-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
             {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},

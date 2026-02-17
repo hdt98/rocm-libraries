@@ -358,11 +358,8 @@ float calculateConvDgradTolerance(
  * @return The calculated tolerance value cast to `OutputType`.
  */
 template <typename OutputType, typename InputType, typename ComputeType = float>
-OutputType calculateConvFpropTolerance(double inputMin,
-                                       double inputMax,
-                                       double wMin,
-                                       double wMax,
-                                       const std::vector<int64_t>& wDims)
+OutputType calculateConvFpropTolerance(
+    double inputMin, double inputMax, double wMin, double wMax, const std::vector<int64_t>& wDims)
 {
     // Validate ComputeType
     static_assert(std::is_same_v<ComputeType, float> || std::is_same_v<ComputeType, double>
