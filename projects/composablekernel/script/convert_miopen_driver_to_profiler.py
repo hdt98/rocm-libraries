@@ -35,11 +35,24 @@ def filter_to_best_config(output):
     result_lines = []
     in_best_config = False
     
+    # Valid prefixes for best config section
+    valid_prefixes = ('Best configuration parameters:', 'name:', 'avg_time:', 'tflops:', 'GB/s:')
+    
     for line in lines:
         if 'Best configuration parameters:' in line:
             in_best_config = True
+        
         if in_best_config:
-            result_lines.append(line)
+            stripped = line.strip()
+            # Stop if we hit an error line, empty line after content, or other unexpected content
+            if stripped.startswith('Error:') or stripped.startswith('max err:'):
+                continue
+            # Only include lines that are part of the best config or empty
+            if stripped == '' or any(stripped.startswith(p) for p in valid_prefixes):
+                result_lines.append(line)
+            elif stripped and not any(stripped.startswith(p) for p in valid_prefixes):
+                # Unknown line after best config section - stop
+                continue
     
     # Remove trailing empty lines
     while result_lines and not result_lines[-1].strip():
@@ -64,7 +77,7 @@ def run_ck_profiler_cmd(cmd, capture_output=False):
         capture_output: If True, capture and return stdout/stderr instead of printing
         
     Returns:
-        If capture_output is True, returns a string with the command and its output.
+        If capture_output is True, returns a tuple (output_string, has_errors).
         Otherwise returns None.
     """
     cmd_concatenated_str = ""
@@ -75,14 +88,17 @@ def run_ck_profiler_cmd(cmd, capture_output=False):
         output = StringIO()
         output.write("ckProfiler command:\n")
         output.write(cmd_concatenated_str + "\n")
+        has_errors = False
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
             output.write(result.stdout)
             if result.stderr:
+                has_errors = True
                 output.write(result.stderr)
         except Exception as e:
+            has_errors = True
             output.write(f"Error running command: {e}\n")
-        return output.getvalue()
+        return (output.getvalue(), has_errors)
     else:
         print("ckProfiler command:")
         print(cmd_concatenated_str)
@@ -191,7 +207,8 @@ def run_ck_grouped_conv_fwd(args, capture_output=False):
     cmd += [str(args.in_channels)]
     add_conv_params_to_cmd(args, cmd)
 
-    return run_ck_profiler_cmd(cmd, capture_output)
+    result = run_ck_profiler_cmd(cmd, capture_output)
+    return result
 
 
 def run_ck_grouped_conv_bwd_data(args, capture_output=False):
@@ -261,7 +278,7 @@ def run_ck_profiler(args, capture_output=False):
         capture_output: If True, capture and return output instead of printing
         
     Returns:
-        If capture_output is True, returns a string with all outputs.
+        If capture_output is True, returns a tuple (output_string, has_errors).
         Otherwise returns None.
     """
     # MIOpen get number of channel per all groups, CK profiler get number of
@@ -270,22 +287,35 @@ def run_ck_profiler(args, capture_output=False):
     args.out_channels = int(args.out_channels / args.group_count)
 
     outputs = []
+    any_errors = False
     
     if args.forw == 0 or args.forw == 1 or args.forw == 3 or args.forw == 5:
         result = run_ck_grouped_conv_fwd(args, capture_output)
         if result:
-            outputs.append(result)
+            if capture_output:
+                outputs.append(result[0])
+                any_errors = any_errors or result[1]
+            else:
+                outputs.append(result)
     if args.forw == 0 or args.forw == 2 or args.forw == 3 or args.forw == 6:
         result = run_ck_grouped_conv_bwd_data(args, capture_output)
         if result:
-            outputs.append(result)
+            if capture_output:
+                outputs.append(result[0])
+                any_errors = any_errors or result[1]
+            else:
+                outputs.append(result)
     if args.forw == 0 or args.forw == 4 or args.forw == 5 or args.forw == 6:
         result = run_ck_grouped_conv_bwd_weight(args, capture_output)
         if result:
-            outputs.append(result)
+            if capture_output:
+                outputs.append(result[0])
+                any_errors = any_errors or result[1]
+            else:
+                outputs.append(result)
     
     if capture_output:
-        return "\n".join(outputs)
+        return ("\n".join(outputs), any_errors)
     return None
 
 
@@ -617,9 +647,17 @@ def process_single_command(command_line, parser, capture_output=False, profiler_
     
     result = run_ck_profiler(args, capture_output)
     
-    # Filter output if not verbose and capturing output
-    if capture_output and not verbose and result:
-        result = filter_to_best_config(result)
+    # Handle captured output
+    if capture_output and result:
+        output_str, has_errors = result
+        if verbose:
+            return output_str
+        else:
+            # Filter to best config and add warning if there were errors
+            filtered = filter_to_best_config(output_str)
+            if has_errors:
+                filtered += "\nWARNING: Some kernels produced incorrect results"
+            return filtered
     
     return result
 
