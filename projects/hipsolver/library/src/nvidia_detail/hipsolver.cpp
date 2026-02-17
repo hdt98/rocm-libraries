@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -2004,6 +2004,317 @@ try
                                                        lwork,
                                                        niters,
                                                        devInfo));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+/******************** GELS_BATCHED ********************/
+hipsolverStatus_t hipsolverSSgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    int               nrhs,
+                                                    float*            A[],
+                                                    int               lda,
+                                                    float*            B[],
+                                                    int               ldb,
+                                                    float*            X[],
+                                                    int               ldx,
+                                                    size_t*           lwork,
+                                                    int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // cuBLAS gelsBatched typically requires no workspace
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDDgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    int               nrhs,
+                                                    double*           A[],
+                                                    int               lda,
+                                                    double*           B[],
+                                                    int               ldb,
+                                                    double*           X[],
+                                                    int               ldx,
+                                                    size_t*           lwork,
+                                                    int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // cuBLAS gelsBatched typically requires no workspace
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverCCgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    int               nrhs,
+                                                    hipFloatComplex*  A[],
+                                                    int               lda,
+                                                    hipFloatComplex*  B[],
+                                                    int               ldb,
+                                                    hipFloatComplex*  X[],
+                                                    int               ldx,
+                                                    size_t*           lwork,
+                                                    int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // cuBLAS gelsBatched typically requires no workspace
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverZZgelsBatched_bufferSize(hipsolverHandle_t handle,
+                                                    int               m,
+                                                    int               n,
+                                                    int               nrhs,
+                                                    hipDoubleComplex* A[],
+                                                    int               lda,
+                                                    hipDoubleComplex* B[],
+                                                    int               ldb,
+                                                    hipDoubleComplex* X[],
+                                                    int               ldx,
+                                                    size_t*           lwork,
+                                                    int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!lwork)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // cuBLAS gelsBatched typically requires no workspace
+    *lwork = 0;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverSSgelsBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         int               nrhs,
+                                         float*            A[],
+                                         int               lda,
+                                         float*            B[],
+                                         int               ldb,
+                                         float*            X[],
+                                         int               ldx,
+                                         void*             work,
+                                         size_t            lwork,
+                                         int*              niters,
+                                         int*              devInfo,
+                                         int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    if(B != X)
+    {
+        for(int i = 0; i < batch_count; i++)
+        {
+            // Calculate the actual matrix size (max(m,n) x nrhs)
+            int    rows = (m >= n) ? m : n;
+            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(float);
+            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
+        }
+    }
+
+    // Call cuBLAS gelsBatched
+    return hipsolver::cuda2hip_status(cublasSgelsBatched((cublasHandle_t)handle,
+                                                         CUBLAS_OP_N,
+                                                         m,
+                                                         n,
+                                                         nrhs,
+                                                         (float* const*)A,
+                                                         lda,
+                                                         (float**)((B == X) ? B : X),
+                                                         (B == X) ? ldb : ldx,
+                                                         devInfo,
+                                                         nullptr,
+                                                         batch_count));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDDgelsBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         int               nrhs,
+                                         double*           A[],
+                                         int               lda,
+                                         double*           B[],
+                                         int               ldb,
+                                         double*           X[],
+                                         int               ldx,
+                                         void*             work,
+                                         size_t            lwork,
+                                         int*              niters,
+                                         int*              devInfo,
+                                         int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    if(B != X)
+    {
+        for(int i = 0; i < batch_count; i++)
+        {
+            int    rows = (m >= n) ? m : n;
+            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(double);
+            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
+        }
+    }
+
+    return hipsolver::cuda2hip_status(cublasDgelsBatched((cublasHandle_t)handle,
+                                                         CUBLAS_OP_N,
+                                                         m,
+                                                         n,
+                                                         nrhs,
+                                                         (double* const*)A,
+                                                         lda,
+                                                         (double**)((B == X) ? B : X),
+                                                         (B == X) ? ldb : ldx,
+                                                         devInfo,
+                                                         nullptr,
+                                                         batch_count));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverCCgelsBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         int               nrhs,
+                                         hipFloatComplex*  A[],
+                                         int               lda,
+                                         hipFloatComplex*  B[],
+                                         int               ldb,
+                                         hipFloatComplex*  X[],
+                                         int               ldx,
+                                         void*             work,
+                                         size_t            lwork,
+                                         int*              niters,
+                                         int*              devInfo,
+                                         int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    if(B != X)
+    {
+        for(int i = 0; i < batch_count; i++)
+        {
+            int    rows = (m >= n) ? m : n;
+            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(hipFloatComplex);
+            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
+        }
+    }
+
+    return hipsolver::cuda2hip_status(cublasCgelsBatched((cublasHandle_t)handle,
+                                                         CUBLAS_OP_N,
+                                                         m,
+                                                         n,
+                                                         nrhs,
+                                                         (cuComplex* const*)A,
+                                                         lda,
+                                                         (cuComplex**)((B == X) ? B : X),
+                                                         (B == X) ? ldb : ldx,
+                                                         devInfo,
+                                                         nullptr,
+                                                         batch_count));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverZZgelsBatched(hipsolverHandle_t handle,
+                                         int               m,
+                                         int               n,
+                                         int               nrhs,
+                                         hipDoubleComplex* A[],
+                                         int               lda,
+                                         hipDoubleComplex* B[],
+                                         int               ldb,
+                                         hipDoubleComplex* X[],
+                                         int               ldx,
+                                         void*             work,
+                                         size_t            lwork,
+                                         int*              niters,
+                                         int*              devInfo,
+                                         int               batch_count)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    if(B != X)
+    {
+        for(int i = 0; i < batch_count; i++)
+        {
+            int    rows = (m >= n) ? m : n;
+            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(hipDoubleComplex);
+            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
+        }
+    }
+
+    return hipsolver::cuda2hip_status(cublasZgelsBatched((cublasHandle_t)handle,
+                                                         CUBLAS_OP_N,
+                                                         m,
+                                                         n,
+                                                         nrhs,
+                                                         (cuDoubleComplex* const*)A,
+                                                         lda,
+                                                         (cuDoubleComplex**)((B == X) ? B : X),
+                                                         (B == X) ? ldb : ldx,
+                                                         devInfo,
+                                                         nullptr,
+                                                         batch_count));
 }
 catch(...)
 {
