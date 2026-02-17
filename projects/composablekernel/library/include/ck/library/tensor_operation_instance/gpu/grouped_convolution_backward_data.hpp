@@ -359,7 +359,7 @@ struct DeviceOperationInstanceFactory<
                              is_same_v<ComputeTypeB, BF16>)
                 {
                     add_device_grouped_conv3d_bwd_data_xdl_ngkdhw_gkzyxc_ngcdhw_bf16_instances(
-                    op_ptrs);
+                        op_ptrs);
                 }
 #endif
             }
