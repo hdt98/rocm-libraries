@@ -42,26 +42,7 @@
 
 #include <rocwmma/rocwmma.hpp>
 
-#include "common.hpp"
-
-// GTest-compatible error handling macros for HIP RTC
-// Unlike the samples/common.hpp CHECK_HIPRTC_ERROR macro which calls exit(),
-// these macros use GTest's ASSERT/EXPECT to allow proper test failure reporting
-#define ASSERT_HIPRTC_SUCCESS(expression)                                             \
-    do                                                                                \
-    {                                                                                 \
-        hiprtcResult status = (expression);                                           \
-        ASSERT_EQ(status, HIPRTC_SUCCESS) << "hipRTC error: " << hiprtcGetErrorString(status) \
-                                          << " at " << __FILE__ << ":" << __LINE__;   \
-    } while(0)
-
-#define EXPECT_HIPRTC_SUCCESS(expression)                                             \
-    do                                                                                \
-    {                                                                                 \
-        hiprtcResult status = (expression);                                           \
-        EXPECT_EQ(status, HIPRTC_SUCCESS) << "hipRTC error: " << hiprtcGetErrorString(status) \
-                                          << " at " << __FILE__ << ":" << __LINE__;   \
-    } while(0)
+#include "regression/reg_common.hpp"
 
 // ============================================================================
 // Kernel Sources
@@ -103,48 +84,6 @@ __global__ void vectorMultiply(const float* a, const float* b, float* c, int n)
     }
 }
 )";
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-// Get ROCM installation path from environment or use default
-std::string getRocmPath()
-{
-    const char* rocmPath = std::getenv("ROCM_PATH");
-    return rocmPath ? std::string(rocmPath) : "/opt/rocm";
-}
-
-// Build standard compilation options for HIP RTC
-std::vector<const char*> buildCompileOptions()
-{
-    static std::string rocmIncludePath = "-I" + getRocmPath() + "/include";
-
-    std::vector<const char*> options;
-    options.push_back("-D__HIP_PLATFORM_AMD__");
-    options.push_back("--std=c++17");
-    options.push_back(rocmIncludePath.c_str());
-
-    return options;
-}
-
-// CPU reference implementation for vector addition
-void vectorAddCPU(const int* a, const int* b, int* c, int n)
-{
-    for(int i = 0; i < n; i++)
-    {
-        c[i] = a[i] + b[i];
-    }
-}
-
-// CPU reference implementation for vector multiplication
-void vectorMultiplyCPU(const float* a, const float* b, float* c, int n)
-{
-    for(int i = 0; i < n; i++)
-    {
-        c[i] = a[i] * b[i];
-    }
-}
 
 // ============================================================================
 // Test Suite
