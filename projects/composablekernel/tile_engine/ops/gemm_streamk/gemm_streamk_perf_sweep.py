@@ -43,6 +43,15 @@ import numpy as np
 # GPU architecture detection & binary compatibility
 # ---------------------------------------------------------------------------
 
+
+def _extract_arches(text: str) -> List[str]:
+    """Extract and sort unique gfx architecture IDs from tool output."""
+    if not text:
+        return []
+    # Accept variants like gfx942, gfx90a, gfx12-generic, gfx942:xnack+.
+    matches = re.findall(r"(gfx[0-9A-Za-z\-]+)", text)
+    return sorted(set(m.split(":")[0] for m in matches if m))
+
 def detect_gpu_arch() -> str:
     """Detect GPU architecture (e.g. 'gfx942') using rocminfo."""
     try:
@@ -66,8 +75,6 @@ def check_binary_gpu_targets(binary_path: Path) -> List[str]:
     Uses roc-obj-ls (preferred) or llvm-objdump to list embedded code objects.
     Returns a list of architecture strings like ['gfx90a', 'gfx942'].
     """
-    archs = set()
-
     # Try roc-obj-ls first (ROCm 6.x+)
     for tool in ["roc-obj-ls", "roc-obj-extract"]:
         try:
@@ -75,12 +82,23 @@ def check_binary_gpu_targets(binary_path: Path) -> List[str]:
                 [tool, str(binary_path)],
                 text=True, stderr=subprocess.PIPE, timeout=10,
             )
-            for line in out.splitlines():
-                match = re.search(r"(gfx\w+)", line)
-                if match:
-                    archs.add(match.group(1))
+            archs = _extract_arches(out)
             if archs:
-                return sorted(archs)
+                return archs
+        except (subprocess.CalledProcessError, FileNotFoundError,
+                subprocess.TimeoutExpired):
+            continue
+
+    # Fallback: llvm-objdump can inspect bundled/offloading sections.
+    for tool in ["/opt/rocm/llvm/bin/llvm-objdump", "llvm-objdump"]:
+        try:
+            out = subprocess.check_output(
+                [tool, "--offloading", str(binary_path)],
+                text=True, stderr=subprocess.PIPE, timeout=10,
+            )
+            archs = _extract_arches(out)
+            if archs:
+                return archs
         except (subprocess.CalledProcessError, FileNotFoundError,
                 subprocess.TimeoutExpired):
             continue
@@ -91,8 +109,12 @@ def check_binary_gpu_targets(binary_path: Path) -> List[str]:
             ["strings", str(binary_path)],
             text=True, stderr=subprocess.PIPE, timeout=10,
         )
-        for match in re.finditer(r"amdhsa--.+?(gfx\w+)", out):
-            archs.add(match.group(1))
+        archs = set()
+        for match in re.finditer(r"amdhsa--.+?(gfx[0-9A-Za-z\-]+)", out):
+            archs.add(match.group(1).split(":")[0])
+        # Last-resort generic scan if amdhsa marker did not surface.
+        if not archs:
+            archs.update(_extract_arches(out))
         if archs:
             return sorted(archs)
     except (subprocess.CalledProcessError, FileNotFoundError,
