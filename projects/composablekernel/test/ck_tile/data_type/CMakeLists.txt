@@ -57,45 +57,14 @@ endif()
 
 # BF16 tests - modular approach
 if(GPU_TARGETS MATCHES "gfx9|gfx11|gfx12")
-    # Core conversion tests
-    add_gtest_executable(test_ck_tile_bf16_conversion test_bf16_conversion.cpp)
-    target_compile_options(test_ck_tile_bf16_conversion PRIVATE -Wno-float-equal)
-    
-    # # Numeric traits tests
-    add_gtest_executable(test_ck_tile_bf16_numeric_traits test_bf16_numeric_traits.cpp)
-    target_compile_options(test_ck_tile_bf16_numeric_traits PRIVATE -Wno-float-equal)
-    
-    # # Math function tests
-    add_gtest_executable(test_ck_tile_bf16_math test_bf16_math.cpp)
-    target_compile_options(test_ck_tile_bf16_math PRIVATE -Wno-float-equal)
-    
-    # Arithmetic operations (conditional)
-    if(CK_TILE_USE_CUSTOM_DATA_TYPE)
-        add_gtest_executable(test_ck_tile_bf16_arithmetic test_bf16_arithmetic.cpp)
-        target_compile_options(test_ck_tile_bf16_arithmetic PRIVATE -Wno-float-equal)
-        target_compile_definitions(test_ck_tile_bf16_arithmetic PRIVATE CK_TILE_USE_CUSTOM_DATA_TYPE=1)
-    endif()
-    
-    # Vector operations
-    add_gtest_executable(test_ck_tile_bf16_vector test_bf16_vector.cpp)
-    target_compile_options(test_ck_tile_bf16_vector PRIVATE -Wno-float-equal)
-    
-    # Platform-specific tests
-    add_gtest_executable(test_ck_tile_bf16_platform test_bf16_platform.cpp)
-    target_compile_options(test_ck_tile_bf16_platform PRIVATE -Wno-float-equal)
-    
+    # Consolidated BF16 tests (all tests in one file for consistency with other data type tests)
+    add_gtest_executable(test_ck_tile_bf16 test_bf16.cpp)
+    target_compile_options(test_ck_tile_bf16 PRIVATE -Wno-float-equal)
+
     # Apply common compile definitions based on build configuration
     set(BF16_TEST_TARGETS
-        test_ck_tile_bf16_conversion 
-        test_ck_tile_bf16_numeric_traits 
-        test_ck_tile_bf16_math 
-        test_ck_tile_bf16_vector 
-        test_ck_tile_bf16_platform
+        test_ck_tile_bf16
     )
-    
-    if(CK_TILE_USE_CUSTOM_DATA_TYPE)
-        list(APPEND BF16_TEST_TARGETS test_ck_tile_bf16_arithmetic)
-    endif()
     
     foreach(test_target ${BF16_TEST_TARGETS})
 
