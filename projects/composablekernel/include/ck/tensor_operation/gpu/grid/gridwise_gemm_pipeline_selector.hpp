@@ -19,10 +19,15 @@ template <PipelineVersion PipelineVer,
           index_t NumPrefetch     = 1,
           LoopScheduler LoopSched = LoopScheduler::Default,
           bool AEnableLds         = true,
-          bool BEnableLds         = true>
+          bool BEnableLds         = true,
+          bool DoubleBuffer       = false>
 constexpr auto GridwiseGemmPipeline_Selector()
 {
-    if constexpr(PipelineVer == PipelineVersion::v1)
+    if constexpr (DoubleBuffer)
+    {
+        return GridwiseGemmDoubleBufferPipeline_v1{};
+    }
+    else if constexpr(PipelineVer == PipelineVersion::v1)
     {
         if constexpr(LoopSched == LoopScheduler::Default)
         {

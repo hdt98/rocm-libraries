@@ -71,7 +71,8 @@ template <typename AsDataType,
           index_t CDEShuffleBlockTransferScalarPerVector_NPerBlock,
           LoopScheduler LoopSched,
           PipelineVersion PipelineVer = PipelineVersion::v1,
-          typename BComputeDataType_  = AComputeDataType_>
+          typename BComputeDataType_  = AComputeDataType_,
+          bool DoubleBuffer = false>
 struct GridwiseGemmMultipleABD_xdl_cshuffle
     : public GridwiseGemm_xdl_cshuffle_base<
           tensor_layout::gemm::RowMajor,
@@ -189,7 +190,7 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
     static constexpr auto BK0PerBlock = Base::BK0Number;
 
     using GridwiseGemmPipe = remove_cvref_t<
-        decltype(GridwiseGemmPipeline_Selector<PipelineVer, NumGemmKPrefetchStage, LoopSched>())>;
+        decltype(GridwiseGemmPipeline_Selector<PipelineVer, NumGemmKPrefetchStage, LoopSched, true, true, DoubleBuffer>())>;
 
 #if CK_GFX90A_DENORM_WORKAROUND
     using AComputeDataType =
@@ -594,7 +595,8 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
                                    ds_grid_desc_mblock_mperblock_nblock_nperblock,
                                const EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock&
                                    e_grid_desc_mblock_mperblock_nblock_nperblock,
-                               const Block2ETileMap& block_2_etile_map)
+                               const Block2ETileMap& block_2_etile_map,
+                               void* __restrict__ p_shared_1 = nullptr)
     {
         const auto as_grid_buf = generate_tuple(
             [&](auto i) {
@@ -759,10 +761,42 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
             KPerBlock);
 
         // gridwise GEMM pipeline
+        constexpr bool EnableLDS = true;
         const auto gridwise_gemm_pipeline =
-            GridwiseGemmPipeline_Selector<PipelineVer, NumGemmKPrefetchStage, LoopSched>();
+            GridwiseGemmPipeline_Selector<PipelineVer, NumGemmKPrefetchStage, LoopSched, EnableLDS, EnableLDS, DoubleBuffer>();
 
-        gridwise_gemm_pipeline.template Run<HasMainKBlockLoop>(as_grid_desc_ak0_m_ak1,
+        if constexpr (DoubleBuffer)
+        {
+            //Double buffers for A and B in LDS
+            auto a_block_buf_extra = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+                static_cast<AElementDataType*>(p_shared_1), 
+                a_block_desc_ak0_m_ak1.GetElementSpaceSize());
+
+            auto b_block_buf_extra = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+                static_cast<BElementDataType*>(p_shared_1) + a_block_space_size_aligned,
+                b_block_desc_bk0_n_bk1.GetElementSpaceSize());
+
+            gridwise_gemm_pipeline.template Run<HasMainKBlockLoop>(as_grid_desc_ak0_m_ak1,
+                                                               a_block_desc_ak0_m_ak1,
+                                                               a_blockwise_copy,
+                                                               as_grid_buf,
+                                                               a_block_buf,
+                                                               a_block_buf_extra,
+                                                               a_block_slice_copy_step,
+                                                               bs_grid_desc_bk0_n_bk1,
+                                                               b_block_desc_bk0_n_bk1,
+                                                               b_blockwise_copy,
+                                                               bs_grid_buf,
+                                                               b_block_buf,
+                                                               b_block_buf_extra,
+                                                               b_block_slice_copy_step,
+                                                               blockwise_gemm,
+                                                               c_thread_buf,
+                                                               num_k_block_main_loop);
+        }
+        else
+        {
+            gridwise_gemm_pipeline.template Run<HasMainKBlockLoop>(as_grid_desc_ak0_m_ak1,
                                                                a_block_desc_ak0_m_ak1,
                                                                a_blockwise_copy,
                                                                as_grid_buf,
@@ -777,6 +811,7 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
                                                                blockwise_gemm,
                                                                c_thread_buf,
                                                                num_k_block_main_loop);
+        }
 
         Base::template RunMultiDEpilogue<EGlobalMemoryDataOperation, false, false, false>(
             blockwise_gemm,
