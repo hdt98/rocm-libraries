@@ -29,14 +29,13 @@ import argparse
 import datetime
 import importlib.util
 import os
-import pandas as pd
 import subprocess
-import yaml
-from dataclasses import fields
 from collections.abc import Iterable
+from dataclasses import fields
 from itertools import chain
 from pathlib import Path
 
+import pandas as pd
 import rrperf.args
 import rrperf.dump_csv
 import rrperf.git
@@ -45,6 +44,7 @@ import rrperf.rocm_control
 import rrperf.rrsuites
 import rrperf.specs
 import rrperf.utils
+import yaml
 
 
 def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:

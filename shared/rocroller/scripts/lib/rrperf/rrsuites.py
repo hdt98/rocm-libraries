@@ -27,13 +27,7 @@ import pathlib
 from collections.abc import Iterable
 from itertools import product
 
-from rrperf.problems import (
-    CodeGenRun,
-    GEMMRun,
-    MKNLTuple,
-    TensileRun,
-    TypeParameters,
-)
+from rrperf.problems import CodeGenRun, GEMMRun, MKNLTuple, TensileRun, TypeParameters
 from rrperf.utils import rocm_gfx
 
 repo_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent

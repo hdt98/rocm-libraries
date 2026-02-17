@@ -51,9 +51,7 @@ def generate_kernels(
     failed = []
 
     for i, problem in enumerate(generator):
-        if not any(
-            problem.id.startswith(filt) for filt in id_filter
-        ):
+        if not any(problem.id.startswith(filt) for filt in id_filter):
             continue
 
         if problem in already_run:

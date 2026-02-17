@@ -24,9 +24,9 @@
 ################################################################################
 
 import pathlib
-import yaml
 from dataclasses import asdict, dataclass, field, fields
 
+import yaml
 from rrperf.utils import get_dataclass_id
 
 repo_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent

@@ -49,18 +49,18 @@ import hashlib
 import itertools
 import math
 import multiprocessing
-import numpy as np
 import os
 import random
 import subprocess
-import yaml
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
+import numpy as np
 import rrperf.problems
 import rrperf.rrsuites
 import rrperf.utils
+import yaml
 
 gpus = {}
 mp_pool = None
@@ -317,11 +317,7 @@ def bench(
 
         print(f"Launching {weights.short_hash}")
 
-        process_result = run_bench_cmd(
-            cmd,
-            env=env,
-            cwd=rrperf.utils.get_build_dir()
-        )
+        process_result = run_bench_cmd(cmd, env=env, cwd=rrperf.utils.get_build_dir())
 
         result.output = process_result.stdout.decode()
 

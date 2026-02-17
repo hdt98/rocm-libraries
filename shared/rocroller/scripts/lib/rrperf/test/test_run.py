@@ -23,10 +23,9 @@
 #
 ################################################################################
 
-import pytest
-
 from pathlib import Path
 
+import pytest
 import rrperf.run
 import rrperf.utils as utils
 

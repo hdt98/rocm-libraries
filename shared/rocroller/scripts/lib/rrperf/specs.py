@@ -30,11 +30,11 @@ import re
 import shutil
 import socket
 import subprocess
-import yaml
-
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
+
+import yaml
 
 
 @dataclass

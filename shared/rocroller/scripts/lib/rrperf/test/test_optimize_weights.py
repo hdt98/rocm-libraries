@@ -25,14 +25,14 @@
 
 import argparse
 import dataclasses as dc
-import pytest
 import random
 import time
 from pathlib import Path
 from types import SimpleNamespace as NS
-import yaml
 
+import pytest
 import rrperf.optimize_weights as ow
+import yaml
 
 
 @pytest.mark.slow

@@ -28,20 +28,20 @@
 import argparse
 import datetime
 import io
-import numpy as np
-import pandas as pd
 import os
 import pathlib
 import re
-import scipy.stats
 import statistics
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 
+import numpy as np
+import pandas as pd
 import rrperf.args as args
 import rrperf.problems
 import rrperf.rrsuites
 import rrperf.specs
+import scipy.stats
 from rrperf.problems import GEMMResult, RRPerfResult
 from rrperf.specs import MachineSpecs
 
