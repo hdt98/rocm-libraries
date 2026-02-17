@@ -128,13 +128,13 @@ rocblas_status rocsolver_ormlq_unmlq_template(rocblas_handle handle,
             handle, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, C, shiftC, ldc,
             strideC, batch_count, scalars, AbyxORwork, diagORtmptr, workArr);
 
-    rocblas_int ldw = xxMxQ_BLOCKSIZE;
+    I ldw = xxMxQ_BLOCKSIZE;
     rocblas_stride strideW = rocblas_stride(ldw) * ldw;
 
     // determine limits and indices
     bool left = (side == rocblas_side_left);
     bool transpose = (trans != rocblas_operation_none);
-    rocblas_int start, step, nq, ncol, nrow, ic, jc;
+    I start, step, nq, ncol, nrow, ic, jc;
     if(left)
     {
         nq = m;
@@ -174,8 +174,8 @@ rocblas_status rocsolver_ormlq_unmlq_template(rocblas_handle handle,
     else
         transB = (COMPLEX ? rocblas_operation_conjugate_transpose : rocblas_operation_transpose);
 
-    rocblas_int i, ib;
-    for(rocblas_int j = 0; j < k; j += ldw)
+    I i, ib;
+    for(I j = 0; j < k; j += ldw)
     {
         i = start + step * j; // current householder block
         ib = std::min(ldw, k - i);

@@ -124,17 +124,17 @@ rocblas_status rocsolver_orgql_ungql_template(rocblas_handle handle,
         return rocsolver_org2l_ung2l_template<T>(handle, m, n, k, A, shiftA, lda, strideA, ipiv,
                                                  strideP, batch_count, scalars, Abyx_tmptr, workArr);
 
-    rocblas_int ldw = xxGQx_BLOCKSIZE;
+    I ldw = xxGQx_BLOCKSIZE;
     rocblas_stride strideW = rocblas_stride(ldw) * ldw;
 
     // size of unblocked part
-    rocblas_int jb = ldw;
-    rocblas_int kk = std::min(k, ((k - xxGQx_xxGQx2_SWITCHSIZE + jb - 1) / jb) * jb);
+    I jb = ldw;
+    I kk = std::min(k, ((k - xxGQx_xxGQx2_SWITCHSIZE + jb - 1) / jb) * jb);
 
     // start of first blocked block is j + n - k = n - kk
-    rocblas_int j = k - kk;
+    I j = k - kk;
 
-    rocblas_int blocksy, blocksx;
+    I blocksy, blocksx;
 
     // compute the unblocked part and set to zero the
     // corresponding bottom submatrix

@@ -130,14 +130,14 @@ rocblas_status rocsolver_gerqf_template(rocblas_handle handle,
                                            batch_count, scalars, work_workArr, Abyx_norms_trfact,
                                            diag_tmptr);
 
-    rocblas_int k = std::min(m, n); // total number of pivots
-    rocblas_int nb = GExQF_BLOCKSIZE;
-    rocblas_int ki = ((k - GExQF_GExQ2_SWITCHSIZE - 1) / nb) * nb;
-    rocblas_int kk = std::min(k, ki + nb);
-    rocblas_int jb, j = k - kk + ki;
-    rocblas_int mu = m, nu = n;
+    I k = std::min(m, n); // total number of pivots
+    I nb = GExQF_BLOCKSIZE;
+    I ki = ((k - GExQF_GExQ2_SWITCHSIZE - 1) / nb) * nb;
+    I kk = std::min(k, ki + nb);
+    I jb, j = k - kk + ki;
+    I mu = m, nu = n;
 
-    rocblas_int ldw = GEQxF_BLOCKSIZE;
+    I ldw = GEQxF_BLOCKSIZE;
     rocblas_stride strideW = rocblas_stride(ldw) * ldw;
 
     while(j >= k - kk)

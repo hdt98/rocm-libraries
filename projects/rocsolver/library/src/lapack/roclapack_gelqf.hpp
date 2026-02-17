@@ -130,11 +130,11 @@ rocblas_status rocsolver_gelqf_template(rocblas_handle handle,
                                            batch_count, scalars, work_workArr, Abyx_norms_trfact,
                                            diag_tmptr);
 
-    rocblas_int dim = std::min(m, n); // total number of pivots
-    rocblas_int jb, j = 0;
+    I dim = std::min(m, n); // total number of pivots
+    I jb, j = 0;
 
-    rocblas_int nb = GExQF_BLOCKSIZE;
-    rocblas_int ldw = GExQF_BLOCKSIZE;
+    I nb = GExQF_BLOCKSIZE;
+    I ldw = GExQF_BLOCKSIZE;
     rocblas_stride strideW = rocblas_stride(ldw) * ldw;
 
     while(j < dim - GExQF_GExQ2_SWITCHSIZE)
