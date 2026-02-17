@@ -3691,6 +3691,145 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         }
 
         nglshift = nllshift = 10 # vmcnt shift for ngl and nll
+    elif isNT(kernel) and not useLDSTr and TLDS==0:
+        kernel["UsePLRPack"] = True
+        kernel["UseMFMAF32XEmulation"] = True
+
+        # Used the following constrains to create schedule
+        #  - LRA0 + PACKA0 needs to be done before 1/4 MFMAs / 18
+        #  - LBR0 + PACKB0 needs to be done before 2/4 MFMAs / 36
+        #  - LRB3 + PACKB3 needs to start after 2/4 MFMAs / 36
+        #  - LRA3 + PACKA3 needs to start after 3/4 MFMAs /54
+
+        # LRA0 + GRIncA
+        lra0 = create_range(min_val=0, num=4, step=1, repeat=6)
+        grIncA = create_range(min_val=0, num=3, step=1, repeat=3)
+
+        waitLRA0 = max(lra0)+1
+        startPACKA0 = waitLRA0-1
+
+        # Reordering of packA instructions.
+        # 4 CVT + 2 4x4x4_16B MFMAs + 4 CVTs
+        # we interleave the 3 blocks together to avoid :
+        # - having a 5 state wait after each 4x4x4_16B MFMA
+        # - having extra latency when switching between MFMA types
+        packAOffset = [
+            1, 1, 1, 1,
+            4, 4,
+            5, 5, 5, 5,
+
+            2, 2, 2, 2, 
+            4, 4,
+            6, 6, 6, 6,
+
+            3, 3, 3, 3, 
+            4, 4,
+            7, 7, 7, 7,
+        ]
+
+        packA0 = [x + startPACKA0 for x in packAOffset]
+
+        packA0Done = max(packA0)
+
+        # Sanity check
+        assert packA0Done < numMfma//4
+
+        # LRB0 + GRIncB + packB0
+        lrb0 = create_range(min_val=waitLRA0, num=4, step=1, repeat=4)
+        grIncB = create_range(min_val=max(grIncA)+1, num=3, max_val=max(lrb0)+4, step=1, repeat=3)
+        waitLRB0 = max(lrb0)+1
+        startPACKB0 = waitLRB0+4
+        packBOffset = [
+            1, 1, 1, 1,
+            3, 3,
+            4, 4, 4, 4,
+
+            2, 2, 2, 2, 
+            3, 3,
+            5, 5, 5, 5,
+        ]
+        packB0 = [x + startPACKB0 for x in packBOffset]
+
+        # GRB
+        grB = create_range(min_val=max(lrb0)+4, num=2, step=2, repeat=2)
+        grB += create_range(min_val=max(grB)+4, num=2, step=2, repeat=2)
+
+        # GRA        
+        grA = create_range(min_val=max(grB)+2, num=3, step=2, repeat=2)
+        grA += create_range(min_val=max(grA)+4,num=3,step=2, repeat=2)
+
+        halfMFMA = numMfma//2
+        assert max(packB0) < halfMFMA
+
+        # LR3
+        lrb3 = create_range(min_val=max(grB)+3, num=5, step=2, repeat=2)
+        lrb3 += create_range(min_val=max(lrb3)+4, num=3, step=2, repeat=2)
+        waitLRB3 = max(lrb3)+1
+
+        # PackB3
+        packB3 = [x + waitLRB3 + 4 for x in packBOffset]
+
+        # LRA3 + PACKA3
+        startLRA3 = (3*numMfma)//4 # Can't start before 3/4 MFMAs
+        lra3 = create_range(min_val=startLRA3, num=8, step=1, repeat=3)
+
+        waitLRA3 = max(lra3)+1
+        packA3 = [x + waitLRA3 for x in packAOffset]
+
+        syncTable = [
+            -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA3s for next iteration"),
+
+            waitLRA0, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait first 20 LRA0 to complete"),
+            waitLRA0+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRA0 to complete"),
+
+            waitLRB0, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB0s to complete"),
+            waitLRB0+3, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB0s to complete"),
+            waitLRB0+3, SBarrier(comment="Barrier before GRA&GRB"),
+
+            max(grB)+3, SWaitCnt(dscnt=-1, vlcnt=6, vscnt=-1, comment="Wait for previous GRA&GRB"),
+            max(grB)+3, SBarrier(comment=""),
+
+            max(grA)+1, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Wait for previous GRA&GRB"),
+            max(grA)+1, SBarrier(comment=""),
+
+            waitLRB3, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB3s to complete"),
+            waitLRB3+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB3s to complete"),
+
+            waitLRA3+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA3s to complete"),
+        ]
+
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+
+            'GRIncA' : [grIncA],
+            'GRIncB' : [grIncB],
+
+            'LRA0'   : [lra0],
+            'LRB0'   : [lrb0],
+
+            'PackA0' : [packA0],
+            'PackB0' : [packB0],
+
+            'GRA'    : [grA],
+            'GRB'    : [grB],  
+
+            'LRSA'   : [[max(grIncB)+1]],
+            'LRSB'   : [[max(grIncB)+2]],
+
+            'LWSA'   : [[52]],
+            'LWSB'   : [[52]],
+
+            'LCC'    : [[numMfma-1, numMfma-1]],
+
+            'LRA3'   : [lra3],
+            'LRB3'   : [lrb3],
+
+            'PackB3' : [packB3],
+            'PackA3' : [packA3],
+        }
+
+        syncCode = syncTable[1::2]
+        nglshift = nllshift = len(optSchedule['GRA'][0])//2 + len(optSchedule['GRB'][0])//2
     else:
         return False, None
 
