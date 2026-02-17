@@ -52,6 +52,77 @@ class ScheduleMatchStatus(Enum):
 # Global registry for schedule functions
 _SCHEDULE_REGISTRY = []
 
+# Global registry for schedule metadata (parallel to _SCHEDULE_REGISTRY)
+_SCHEDULE_METADATA: list["CMSKernelInfo"] = []
+
+# Map dtype predicate functions to human-readable names
+_DTYPE_PREDICATE_NAMES: dict[Callable, str] = {}
+
+def _register_dtype_name(func: Callable, name: str) -> Callable:
+    """Helper to register a dtype predicate name mapping."""
+    _DTYPE_PREDICATE_NAMES[func] = name
+    return func
+
+@dataclass(frozen=True)
+class CMSKernelInfo:
+    """
+    Metadata about registered CMS kernels 
+    Contains the minimum combination of parameters needed to use the CMS kernel.
+    """
+    name: str
+    dtype: str
+    supported_layouts: list[str]
+    macro_tile_0: int
+    macro_tile_1: int
+    depth_u: int
+    prefetch_global_read: int
+    prefetch_local_read: int
+    direct_to_lds: bool
+    wave_separate_global_read_a: int
+    wave_separate_global_read_b: int
+    global_read_vector_width_a: int
+    global_read_vector_width_b: int
+    local_read_vector_width: int
+    matrix_instruction: list[int]
+    mi_wave_group: list[int]
+
+    def matches(self, dtype: Optional[str] = None, layout: Optional[str] = None) -> bool:
+        """Check if this kernel info matches the given dtype and/or layout filter.
+
+        Args:
+            dtype:  Data type filter string (e.g. "16bit", "8bit", "TF32"), or None for any.
+            layout: Layout filter string (e.g. "TN", "NT", "NN", "TT"), or None for any.
+
+        Returns:
+            True if the kernel matches all provided filters.
+        """
+        if dtype is not None and self.dtype.lower() != dtype.lower():
+            return False
+        if layout is not None and layout.upper() not in (l.upper() for l in self.supported_layouts):
+            return False
+        return True
+
+    def to_dict(self) -> dict:
+        """Return a dict of the minimum kernel parameters needed for this CMS kernel."""
+        return {
+            "name": self.name,
+            "dtype": self.dtype,
+            "supported_layouts": list(self.supported_layouts),
+            "MacroTile0": self.macro_tile_0,
+            "MacroTile1": self.macro_tile_1,
+            "DepthU": self.depth_u,
+            "PrefetchGlobalRead": self.prefetch_global_read,
+            "PrefetchLocalRead": self.prefetch_local_read,
+            "DirectToLds": self.direct_to_lds,
+            "WaveSeparateGlobalReadA": self.wave_separate_global_read_a,
+            "WaveSeparateGlobalReadB": self.wave_separate_global_read_b,
+            "GlobalReadVectorWidthA": self.global_read_vector_width_a,
+            "GlobalReadVectorWidthB": self.global_read_vector_width_b,
+            "LocalReadVectorWidth": self.local_read_vector_width,
+            "MatrixInstruction": list(self.matrix_instruction),
+            "MIWaveGroup": list(self.mi_wave_group),
+        }
+
 @dataclass
 class SyncSchedule:
     schedule: list[tuple[int, Union[SWaitCnt, SBarrier]]] = field(default_factory=list)
@@ -446,6 +517,74 @@ def hasCustomSchedule(kernel):
     return False, None
 
 
+def query_cms_kernels(dtype: Optional[str] = None, layout: Optional[str] = None) -> list[dict]:
+    """Query for available CMS kernels matching the given data type and/or layout.
+
+    This function searches the CMS kernel registry and returns the minimum
+    combination of parameters needed for each matching CMS kernel.
+
+    Args:
+        dtype:  Data type filter (case-insensitive).
+                Accepted values: "16bit", "8bit", "TF32", or None for all.
+        layout: Layout / transpose e.g. ("TN", "NT", "NN", "TT", or None for all)
+                
+
+    Returns:
+        A list of dicts, each containing the minimum parameter combination
+        needed for a matching CMS kernel. Each dict includes:
+            - name:                     Schedule function name
+            - dtype:                    Data type string
+            - supported_layouts:        List of all layouts this kernel supports
+            - MacroTile0, MacroTile1, DepthU
+            - PrefetchGlobalRead, PrefetchLocalRead, DirectToLds
+            - WaveSeparateGlobalReadA, WaveSeparateGlobalReadB
+            - GlobalReadVectorWidthA, GlobalReadVectorWidthB, LocalReadVectorWidth
+            - MatrixInstruction, MIWaveGroup
+
+    """
+    results = []
+    for info in _SCHEDULE_METADATA:
+        if info.matches(dtype=dtype, layout=layout):
+            results.append(info.to_dict())
+    return results
+
+
+def get_cms_kernel_info_objects(dtype: Optional[str] = None, layout: Optional[str] = None) -> list[CMSKernelInfo]:
+    """Query for available CMS kernels and return CMSKernelInfo objects.
+
+    Same filtering as :func:`query_cms_kernels` but returns the raw
+    ``CMSKernelInfo`` dataclass instances instead of dicts.
+
+    Args:
+        dtype:  Data type filter (case-insensitive), or None for all.
+        layout: Layout filter (case-insensitive), or None for all.
+
+    Returns:
+        A list of CMSKernelInfo objects matching the filters.
+    """
+    return [info for info in _SCHEDULE_METADATA if info.matches(dtype=dtype, layout=layout)]
+
+
+def get_available_dtypes() -> list[str]:
+    """Return a sorted list of all data type strings that have at least one CMS kernel."""
+    return sorted({info.dtype for info in _SCHEDULE_METADATA})
+
+
+def get_available_layouts(dtype: Optional[str] = None) -> list[str]:
+    """Return a sorted list of all layout strings available for the given data type.
+
+    Args:
+        dtype: Optional data type filter, or None for all data types.
+
+    Returns:
+        Sorted list of unique layout strings (e.g. ["NN", "NT", "TN", "TT"]).
+    """
+    layouts: set[str] = set()
+    for info in _SCHEDULE_METADATA:
+        if dtype is None or info.dtype.lower() == dtype.lower():
+            layouts.update(info.supported_layouts)
+    return sorted(layouts)
+
 @CallableGuard
 def isNN(kernel):
     return not kernel["ProblemType"]["TransposeA"] and not kernel["ProblemType"]["TransposeB"]
@@ -465,10 +604,12 @@ def isTN(kernel):
 @CallableGuard
 def is16bit(kernel):
     return kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16()
+_register_dtype_name(is16bit, "16bit")
 
 @CallableGuard
 def is8bit(kernel):
     return kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()
+_register_dtype_name(is8bit, "8bit")
 
 @CallableGuard
 def isMixed(kernel):
@@ -477,6 +618,7 @@ def isMixed(kernel):
 @CallableGuard
 def isTF32(kernel):
     return kernel["UseF32XEmulation"]
+_register_dtype_name(isTF32, "TF32")
 
 @dataclass(frozen=True)
 class TileConfig:
@@ -501,13 +643,15 @@ class RegisterSchedule:
             dtype_predicate=is16bit,
             vector_widths=[8, 8, 8],
             matrix_inst=[16, 16, 32, 1],
-            mfma_wave_group=[2, 2]
+            mfma_wave_group=[2, 2],
+            supported_layouts=["TN", "NN"]
         )
         def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
             ...
     """
     
-    def __init__(self, tile_config: TileConfig, dtype_predicate: Callable, vector_widths: list[int], matrix_inst: list[int], mfma_wave_group: list[int]):
+    def __init__(self, tile_config: TileConfig, dtype_predicate: Callable, vector_widths: list[int], matrix_inst: list[int], mfma_wave_group: list[int],
+                 supported_layouts: list[str] = None):
         """
         Initialize the registration decorator with matching criteria.
         
@@ -517,12 +661,14 @@ class RegisterSchedule:
             vector_widths:      List of [GRVWA, GRVWB, LRVW]
             matrix_inst:        List [M, N, K, B] for MI
             mfma_wave_group:    List [rows, cols] for MIWG
+            supported_layouts:  List of supported layout strings, e.g. ["TN", "NN", "NT", "TT"]
         """
         self.tile_config = tile_config
         self.dtype_predicate = dtype_predicate
         self.vector_widths = vector_widths
         self.matrix_inst = matrix_inst
         self.mfma_wave_group = mfma_wave_group
+        self.supported_layouts = [l.upper() for l in (supported_layouts or [])]
     
     def __call__(self, func: Callable) -> Callable:
         """Wrap the function with matching logic and register it."""
@@ -562,6 +708,28 @@ class RegisterSchedule:
             return ScheduleMatchStatus.UNSUPPORTED_VARIANT, None
                
         _SCHEDULE_REGISTRY.append(wrapped_func)
+
+        # Store metadata for query API
+        dtype_name = _DTYPE_PREDICATE_NAMES.get(self.dtype_predicate, str(self.dtype_predicate))
+        tc = self.tile_config
+        _SCHEDULE_METADATA.append(CMSKernelInfo(
+            name=func.__name__,
+            dtype=dtype_name,
+            supported_layouts=list(self.supported_layouts),
+            macro_tile_0=tc.macro_tile_size_0,
+            macro_tile_1=tc.macro_tile_size_1,
+            depth_u=tc.depth_u,
+            prefetch_global_read=tc.prefetch_global_read,
+            prefetch_local_read=tc.prefetch_local_read,
+            direct_to_lds=tc.direct_to_lds,
+            wave_separate_global_read_a=tc.wave_separate_global_read_a,
+            wave_separate_global_read_b=tc.wave_separate_global_read_b,
+            global_read_vector_width_a=self.vector_widths[0],
+            global_read_vector_width_b=self.vector_widths[1],
+            local_read_vector_width=self.vector_widths[2],
+            matrix_instruction=list(self.matrix_inst),
+            mi_wave_group=list(self.mfma_wave_group),
+        ))
         
         # Return original function unchanged (so it can still be called directly)
         return func
@@ -571,7 +739,8 @@ class RegisterSchedule:
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN"]
 )
 def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
 
@@ -682,7 +851,8 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["NN", "TN", "NT"]
 )
 def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -820,7 +990,8 @@ def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NT", "NN"]
 )
 def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS):
     numMfma = 96
@@ -958,7 +1129,8 @@ def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is8bit,
     vector_widths=[16, 16, 16],
     matrix_inst=[16, 16, 128, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -1011,7 +1183,8 @@ def _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NT", "NN", "TT"]
 )
 def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -1157,7 +1330,8 @@ def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN", "NT"]
 )
 def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS):
     numMfma = 80
@@ -1286,7 +1460,8 @@ def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NT"]
 )
 def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     kernel["MfmaInitCVgprs"] = True
@@ -1429,7 +1604,8 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["NN", "TN", "NT"]
 )
 def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
@@ -1560,7 +1736,8 @@ def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 2, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[4, 1]
+    mfma_wave_group=[4, 1],
+    supported_layouts=["TN", "NT", "NN"]
 )
 def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -1664,7 +1841,8 @@ def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 2, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[4, 1]
+    mfma_wave_group=[4, 1],
+    supported_layouts=["TN", "NN"]
 )
 def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -1783,7 +1961,8 @@ def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
     """192x128x64 TN schedule (BF16/FP16)."""
@@ -1856,7 +2035,8 @@ def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN", "NT"]
 )
 def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -2007,7 +2187,8 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NT"]
 )
 def _get_schedule_224x256x64_16bit(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
@@ -2094,7 +2275,8 @@ def _get_schedule_224x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["NN", "TN", "NT"]
 )
 def _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS):
     numMfma = 120
@@ -2222,7 +2404,8 @@ def _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NT"]
 )
 def _get_schedule_256x224x64_16bit(kernel, useLDSTr, TLDS):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
@@ -2320,7 +2503,8 @@ def _get_schedule_256x224x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["NN", "TN", "NT"]
 )
 def _get_schedule_320x192x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -2457,7 +2641,8 @@ def _get_schedule_320x192x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[2, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[1, 4]
+    mfma_wave_group=[1, 4],
+    supported_layouts=["TN", "NT", "NN"]
 )
 def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -2575,7 +2760,8 @@ def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[2, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[1, 4]
+    mfma_wave_group=[1, 4],
+    supported_layouts=["TN", "NN", "NT"]
 )
 def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS):
     numMfma = 104
@@ -2698,7 +2884,8 @@ def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN", "NT"]
 )
 def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -2808,7 +2995,8 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
     """128x192x64 TN schedule (BF16/FP16)."""
@@ -2877,7 +3065,8 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -2943,7 +3132,8 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN"]
 )
 def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     numMfma = 144
@@ -3273,7 +3463,8 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN"]
 )
 def _get_schedule_256x192x32_TF32(kernel, useLDSTr, TLDS):
     numMfma = 144
@@ -3553,7 +3744,8 @@ def _get_schedule_256x192x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS):
     numMfma = 192
@@ -3692,7 +3884,8 @@ def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
     optSchedule = dict()
@@ -3780,7 +3973,8 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x128x32_TF32(kernel, useLDSTr, TLDS):
     n_mfma = 4 * 4 * 3    # 128 MT0 / 2 WT0 / 16 mfma dim  * 128/2/16 * 3 bf16 MFMAs per tf32 mfma
@@ -3869,7 +4063,8 @@ def _get_schedule_128x128x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[32, 32, 16, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN", "NN"]
 )
 def _get_schedule_128x128x32_TF32_plr1(kernel, useLDSTr, TLDS):
     n_mfma = 128//2//32 * 128//2//32 * 3 * 2    # 128 MT0 / 2 WT0 / 32 mfma dim  * 128/2/32 * 3 bf16 MFMAs per tf32 mfma * 2 PLR=1
@@ -4002,7 +4197,8 @@ def _get_schedule_128x128x32_TF32_plr1(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x128x64_TF32(kernel, useLDSTr, TLDS):
     n_mfma = 96
@@ -4096,7 +4292,8 @@ def _get_schedule_128x128x64_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     numMfma = 96
@@ -4413,7 +4610,8 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
     n_mfma = 120
@@ -4506,7 +4704,8 @@ def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_256x128x32_TF32(kernel, useLDSTr, TLDS):
     numMfma = 96
@@ -4604,7 +4803,8 @@ def _get_schedule_256x128x32_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS):
     n_mfma = 48
@@ -4696,7 +4896,8 @@ def _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["TN"]
 )
 def _get_schedule_128x64x64_TF32(kernel, useLDSTr, TLDS):
     valid, opt = _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS)
@@ -4711,7 +4912,8 @@ def _get_schedule_128x64x64_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["NN", "TN"]
 )
 def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
     n_mfma = 120
@@ -4834,7 +5036,8 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
     dtype_predicate=is16bit,
     vector_widths=[8, 8, 8],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[2, 2],
+    supported_layouts=["NN"]
 )
 def _get_schedule_128x256x64_16bit(kernel, useLDSTr, TLDS):
     numMfma = 64
