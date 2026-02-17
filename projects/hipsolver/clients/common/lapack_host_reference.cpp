@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,7 @@
 
 #include "../include/lapack_host_reference.hpp"
 #include "hipsolver.h"
+#include <vector>
 
 /*!\file
  * \brief provide template functions interfaces to BLAS and LAPACK interfaces, it is
@@ -773,6 +774,23 @@ void sgetrf_(int* m, int* n, float* A, int* lda, int* ipiv, int* info);
 void dgetrf_(int* m, int* n, double* A, int* lda, int* ipiv, int* info);
 void cgetrf_(int* m, int* n, hipsolverComplex* A, int* lda, int* ipiv, int* info);
 void zgetrf_(int* m, int* n, hipsolverDoubleComplex* A, int* lda, int* ipiv, int* info);
+
+void sgetri_(int* n, float* A, int* lda, int* ipiv, float* work, int* lwork, int* info);
+void dgetri_(int* n, double* A, int* lda, int* ipiv, double* work, int* lwork, int* info);
+void cgetri_(int*              n,
+             hipsolverComplex* A,
+             int*              lda,
+             int*              ipiv,
+             hipsolverComplex* work,
+             int*              lwork,
+             int*              info);
+void zgetri_(int*                    n,
+             hipsolverDoubleComplex* A,
+             int*                    lda,
+             int*                    ipiv,
+             hipsolverDoubleComplex* work,
+             int*                    lwork,
+             int*                    info);
 
 void sgetrs_(
     char* trans, int* n, int* nrhs, float* A, int* lda, int* ipiv, float* B, int* ldb, int* info);
@@ -2510,6 +2528,64 @@ void cpu_getrf<hipsolverDoubleComplex>(
     int m, int n, hipsolverDoubleComplex* A, int lda, int* ipiv, int* info)
 {
     zgetrf_(&m, &n, A, &lda, ipiv, info);
+}
+
+// getri
+template <>
+void cpu_getri<float>(int n, float* A, int lda, int* ipiv, int* info)
+{
+    // Query optimal workspace size
+    int   lwork = -1;
+    float work_query;
+    sgetri_(&n, A, &lda, ipiv, &work_query, &lwork, info);
+
+    // Allocate workspace and perform computation
+    lwork = static_cast<int>(work_query);
+    std::vector<float> work(lwork);
+    sgetri_(&n, A, &lda, ipiv, work.data(), &lwork, info);
+}
+
+template <>
+void cpu_getri<double>(int n, double* A, int lda, int* ipiv, int* info)
+{
+    // Query optimal workspace size
+    int    lwork = -1;
+    double work_query;
+    dgetri_(&n, A, &lda, ipiv, &work_query, &lwork, info);
+
+    // Allocate workspace and perform computation
+    lwork = static_cast<int>(work_query);
+    std::vector<double> work(lwork);
+    dgetri_(&n, A, &lda, ipiv, work.data(), &lwork, info);
+}
+
+template <>
+void cpu_getri<hipsolverComplex>(int n, hipsolverComplex* A, int lda, int* ipiv, int* info)
+{
+    // Query optimal workspace size
+    int              lwork = -1;
+    hipsolverComplex work_query;
+    cgetri_(&n, A, &lda, ipiv, &work_query, &lwork, info);
+
+    // Allocate workspace and perform computation
+    lwork = static_cast<int>(work_query.real());
+    std::vector<hipsolverComplex> work(lwork);
+    cgetri_(&n, A, &lda, ipiv, work.data(), &lwork, info);
+}
+
+template <>
+void cpu_getri<hipsolverDoubleComplex>(
+    int n, hipsolverDoubleComplex* A, int lda, int* ipiv, int* info)
+{
+    // Query optimal workspace size
+    int                    lwork = -1;
+    hipsolverDoubleComplex work_query;
+    zgetri_(&n, A, &lda, ipiv, &work_query, &lwork, info);
+
+    // Allocate workspace and perform computation
+    lwork = static_cast<int>(work_query.real());
+    std::vector<hipsolverDoubleComplex> work(lwork);
+    zgetri_(&n, A, &lda, ipiv, work.data(), &lwork, info);
 }
 
 // getrs
