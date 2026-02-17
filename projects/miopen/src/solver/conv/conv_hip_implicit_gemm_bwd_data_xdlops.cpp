@@ -176,24 +176,23 @@ bool ConvHipImplicitGemmBwdXdlops::CheckCKApplicability(const ProblemDescription
 // clang-format off
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
 static const std::vector<std::string> ranked_1st_applicable = {
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 64, 4, 4, 2, 1, 4, 4, 1, 4> Filter1x1Stride1Pad0",
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4> Filter1x1Stride1Pad0",
-"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4>",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 4, 1, 2, 4, 4, 4, 4> Filter1x1Stride1Pad0",
-"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<64, 32, 64, 4, 4, 1, 2, 4, 4, 4, 4>",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<128, 128, 32, 4, 4, 2, 1, 4, 4, 1, 4> Filter1x1Stride1Pad0",
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 4, 2, 1, 4, 4, 2, 4> Filter1x1Stride1Pad0",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 4, 2, 1, 4, 4, 2, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 64, 4, 4, 2, 1, 4, 4, 1, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 64, 4, 4, 2, 2, 4, 4, 4, 4>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 4, 1, 2, 4, 4, 4, 4>",
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 8, 1, 2, 8, 8, 2, 8> Filter1x1Stride1Pad0",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 128, 4, 8, 2, 2, 8, 8, 2, 8>",
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 64, 128, 4, 8, 1, 2, 8, 8, 2, 8>",
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 64, 4, 8, 2, 1, 8, 8, 1, 8> Filter1x1Stride1Pad0",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<128, 128, 32, 4, 8, 2, 1, 8, 8, 1, 8> Filter1x1Stride1Pad0",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 8, 2, 1, 8, 8, 2, 8> Filter1x1Stride1Pad0",
-"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 128, 128, 4, 8, 2, 2, 8, 8, 2, 8>",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 8, 1, 2, 8, 8, 2, 8>",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 128, 64, 4, 8, 2, 1, 8, 8, 1, 8>",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<128, 128, 32, 4, 8, 2, 1, 8, 8, 1, 8>",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 8, 2, 1, 8, 8, 2, 8>",
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 128, 64, 4, 8, 2, 1, 8, 8, 1, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 64, 4, 8, 2, 2, 8, 8, 4, 8> Filter1x1Stride1Pad0",
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 8, 1, 2, 8, 8, 2, 8> Filter1x1Stride1Pad0",
-"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 8, 1, 2, 8, 8, 2, 8>"
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<128, 32, 128, 4, 8, 1, 2, 8, 8, 4, 8>",
+"DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 64, 32, 4, 8, 2, 1, 8, 8, 2, 8> Filter1x1Stride1Pad0",
+"DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<128, 128, 32, 4, 8, 2, 1, 8, 8, 1, 8>"
 };
 // clang-format on
 
