@@ -490,7 +490,8 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::IsModelApplicable(
 }
 
 // clang-format off
-static std::vector<std::tuple<std::string, int>> ranked_1st_applicable = {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
+static const std::vector<std::tuple<std::string, int>> ranked_1st_applicable = {
 std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 32, 128, 32, Default, 8, 1, 4, 8, 8, 8, 8, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v5, 8>", -1),
 std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 128, 32, 32, Default, 8, 4, 1, 8, 8, 8, 8, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2, 8>", 32),
 std::make_tuple("DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<64, 64, 32, 32, Default, 8, 2, 1, 4, 4, 4, 4, 1, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 4>", 16),

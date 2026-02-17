@@ -429,7 +429,8 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::IsModelApplicable(
 // list of best guess kernel configurations
 // best average performance when selected by 1st applicable in list
 // clang-format off
-static std::vector<std::string> ranked_1st_applicable = {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
+static const std::vector<std::string> ranked_1st_applicable = {
 "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 16, 32, Filter3x3, 16, 16, 4, 1, 4, 1, 1, 1, 1, 16>",
 "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 16, 32, Default, 16, 16, 4, 1, 4, 1, 1, 1, 1, 8>",
 "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 16, 16, Filter3x3, 16, 16, 4, 1, 4, 1, 1, 1, 1, 16>",

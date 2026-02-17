@@ -174,7 +174,8 @@ bool ConvHipImplicitGemmBwdXdlops::CheckCKApplicability(const ProblemDescription
 #endif
 
 // clang-format off
-static std::vector<std::string> ranked_1st_applicable = {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
+static const std::vector<std::string> ranked_1st_applicable = {
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4> Filter1x1Stride1Pad0",
 "DeviceConv2dBwdDataXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K<256, 64, 128, 4, 4, 1, 2, 4, 4, 2, 4>",
 "DeviceConvNdBwdDataNwcKxcNwk_Xdl<64, 32, 64, 4, 4, 1, 2, 4, 4, 4, 4> Filter1x1Stride1Pad0",
