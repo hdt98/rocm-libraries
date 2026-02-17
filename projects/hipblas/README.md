@@ -1,3 +1,6 @@
+# Test
+This is a test!
+
 # hipBLAS
 
 hipBLAS is a Basic Linear Algebra Subprograms (BLAS) marshalling library with multiple supported
