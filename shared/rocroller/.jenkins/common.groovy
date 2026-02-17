@@ -50,6 +50,17 @@ def runCompileCommand(platform, project, jobName, boolean codeCoverage=false, bo
     String yamlBackendFlag = useYamlCpp ? '' : '-DROCROLLER_ENABLE_YAML_CPP=OFF'
     String useCppCheck = staticAnalysis ? '-DROCROLLER_ENABLE_CPPCHECK=ON' : ''
 
+    String formatCheckCommand = staticAnalysis ? """
+                                                # Formatting check
+                                                scripts/fix-format
+                                                if git diff --exit-code; then
+                                                    echo "Files appear properly formatted."
+                                                else
+                                                    echo "Error: formatting of files not in expected state (run scripts/fix-format)."
+                                                    exit 1
+                                                fi
+                                                """ : ''
+
     withSSH(platform) {
         sshBlock ->
         def command = """#!/usr/bin/env bash
@@ -57,6 +68,8 @@ def runCompileCommand(platform, project, jobName, boolean codeCoverage=false, bo
                 cd ${project.paths.project_build_prefix}
 
                 ${sshBlock}
+
+                ${formatCheckCommand}
 
                 mkdir -p build
                 cd build
