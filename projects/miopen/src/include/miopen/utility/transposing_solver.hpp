@@ -258,10 +258,6 @@ struct BatchedTransposeSolverImpl : TransposePseudoSolver
         const auto& desc = problem.input;
         const auto& lens = desc.GetLengths();
 
-        // Batched transpose supports 4D (NCHW <-> NHWC) and 5D (NCDHW <-> NDHWC)
-        if(lens.size() != 4 && lens.size() != 5)
-            return false;
-
         // Delegate to BatchedTransposeSolution's validation which checks data type and dimensions
         // For both 4D and 5D, we pass h*w (or d*h*w) as the spatial dimension
         // Unified validation for both 4D and 5D
@@ -519,8 +515,7 @@ struct ProblemTensorTransposeDescriptor
     {
         const auto& desc_from = (src.*cdescriptor)();
         auto& desc_to         = (dest.*descriptor)();
-
-        desc_to = Transpose(desc_from);
+        desc_to               = Transpose(desc_from);
     }
 
     inline void Transpose(const InvokeParams& src, InvokeParams& dest) const
@@ -765,8 +760,7 @@ struct TransposingSolver : Base
         {
             const auto& descriptor = (transposed_problem.*(transpose.cdescriptor))();
             const auto e_size      = get_data_size(descriptor.GetType());
-            const auto tensor_size = descriptor.GetElementSpace() * e_size;
-            ws_size += tensor_size;
+            ws_size += descriptor.GetElementSpace() * e_size;
         }
 
         return ws_size;
