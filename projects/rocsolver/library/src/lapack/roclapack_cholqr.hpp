@@ -1099,7 +1099,7 @@ static void cal_gnorm_sq(hipStream_t stream,
 
     auto const num_cu = get_num_cu();
     auto const warp_size = get_warp_size();
-    I const lds_size = sizeof(S);
+    I const lds_size = sizeof(double);
 
     I const max_threads = 1024;
     I const nx = warp_size; // !!! note nx <= warp_size is necessary
