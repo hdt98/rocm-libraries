@@ -14,9 +14,13 @@ make sanitizer-racecheck
 # Run racecheck on stebz
 make stebz-racecheck
 
+# Run racecheck on stedc solve (slaed4)
+make stedc-racecheck
+
 # Run with custom parameters
 make sanitizer-custom M=32 N=16 BATCH=4
 make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4
+make stedc-racecheck STEDC_N=32 STEDC_REF=1
 ```
 
 ## Available Kernels
@@ -60,6 +64,31 @@ make stebz-racecheck
 make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=all
 ```
 
+### 3. stedc_solve_kernels (Secular Equation Solvers)
+
+Secular equation solvers used in the merge phase of divide-and-conquer eigenvalue computation (STEDC). These kernels compute eigenvalues of a rank-1 perturbation of a diagonal matrix: D + rho * z * z^T.
+
+Includes:
+- `slaed6` - Solves modified secular equation using 3 poles (Gragg-Thornton-Warner scheme)
+- `slaed4` - Reference LAPACK-style solver, calls slaed6 for 3-pole interpolation
+- `seq_eval` - Evaluates secular equation at a point
+- `seq_solve` - Optimized solver for internal eigenvalues
+- `seq_solve_ext` - Optimized solver for the last eigenvalue
+- `stedc_mergeValues_Solve_kernel` - Main kernel that calls the solvers
+
+```bash
+# Build
+make sandbox_stedc_solve
+
+# Run
+./sandbox_stedc_solve [n] [batch_count] [use_reference]
+# use_reference: 1 for slaed4, 0 for seq_solve
+
+# Run with sanitizer
+make stedc-racecheck
+make stedc-racecheck STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
+```
+
 ## Files
 
 ### Common Files
@@ -75,6 +104,10 @@ make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=all
 ### stebz
 - `kernels/stebz_kernels.cuh` - Eigenvalue bisection kernels
 - `sandbox_stebz.cu` - Driver program
+
+### stedc_solve
+- `kernels/stedc_solve_kernels.cuh` - Secular equation solvers (slaed4, slaed6, seq_solve)
+- `sandbox_stedc_solve.cu` - Driver program
 
 ## Adding New Kernels
 
@@ -101,6 +134,7 @@ make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=all
 - `make all` - Build all sandbox executables
 - `make sandbox_getf2_small` - Build getf2_small sandbox only
 - `make sandbox_stebz` - Build stebz sandbox only
+- `make sandbox_stedc_solve` - Build stedc solve sandbox only
 - `make clean` - Remove built executables
 
 ### getf2_small Sanitizer
@@ -120,6 +154,15 @@ make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=all
 - `make stebz-synccheck`
 - `make stebz-all`
 
+### STEDC Solve Sanitizer
+- `make run-stedc-solve` - Run without sanitizer
+- `make stedc-memcheck`
+- `make stedc-racecheck`
+- `make stedc-racecheck-all`
+- `make stedc-initcheck`
+- `make stedc-synccheck`
+- `make stedc-all`
+
 ### Custom Parameters
 ```bash
 # getf2_small
@@ -129,4 +172,8 @@ make sanitizer-custom M=32 N=16 BATCH=4
 # stebz
 make run-stebz STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=all
 make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=value
+
+# stedc_solve
+make run-stedc-solve STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
+make stedc-racecheck STEDC_N=16 STEDC_REF=0
 ```

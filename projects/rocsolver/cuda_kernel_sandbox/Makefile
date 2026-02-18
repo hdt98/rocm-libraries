@@ -28,7 +28,7 @@ CUDA_ARCH ?= -gencode arch=compute_75,code=sm_75 \
 INCLUDES = -I. -I./kernels
 
 # All sandbox executables
-SANDBOXES = sandbox_getf2_small sandbox_stebz
+SANDBOXES = sandbox_getf2_small sandbox_stebz sandbox_stedc_solve
 
 # Default target
 all: $(SANDBOXES)
@@ -46,6 +46,13 @@ sandbox_stebz: sandbox_stebz.cu \
                cuda_compat.cuh \
                rocsolver_types.cuh \
                device_helpers.cuh
+	$(NVCC) $(NVCC_FLAGS) $(CUDA_ARCH) $(INCLUDES) -o $@ $<
+
+sandbox_stedc_solve: sandbox_stedc_solve.cu \
+                     kernels/stedc_solve_kernels.cuh \
+                     cuda_compat.cuh \
+                     rocsolver_types.cuh \
+                     device_helpers.cuh
 	$(NVCC) $(NVCC_FLAGS) $(CUDA_ARCH) $(INCLUDES) -o $@ $<
 
 # Clean
@@ -127,6 +134,41 @@ stebz-synccheck: sandbox_stebz
 stebz-all: stebz-memcheck stebz-racecheck stebz-initcheck stebz-synccheck
 
 ###############################################################################
+# STEDC Solve (slaed4) Sanitizer Targets
+###############################################################################
+
+STEDC_N ?= 16
+STEDC_BATCH ?= 1
+STEDC_REF ?= 0
+
+# Run stedc_solve
+run-stedc-solve: sandbox_stedc_solve
+	./sandbox_stedc_solve $(STEDC_N) $(STEDC_BATCH) $(STEDC_REF)
+
+# Memory error detection for stedc_solve
+stedc-memcheck: sandbox_stedc_solve
+	compute-sanitizer --tool memcheck ./sandbox_stedc_solve $(STEDC_N) $(STEDC_BATCH) $(STEDC_REF)
+
+# Race condition detection for stedc_solve
+stedc-racecheck: sandbox_stedc_solve
+	compute-sanitizer --tool racecheck ./sandbox_stedc_solve $(STEDC_N) $(STEDC_BATCH) $(STEDC_REF)
+
+# More aggressive racecheck for stedc_solve
+stedc-racecheck-all: sandbox_stedc_solve
+	compute-sanitizer --tool racecheck --racecheck-report all ./sandbox_stedc_solve $(STEDC_N) $(STEDC_BATCH) $(STEDC_REF)
+
+# Uninitialized memory detection for stedc_solve
+stedc-initcheck: sandbox_stedc_solve
+	compute-sanitizer --tool initcheck ./sandbox_stedc_solve $(STEDC_N) $(STEDC_BATCH) $(STEDC_REF)
+
+# Synchronization error detection for stedc_solve
+stedc-synccheck: sandbox_stedc_solve
+	compute-sanitizer --tool synccheck ./sandbox_stedc_solve $(STEDC_N) $(STEDC_BATCH) $(STEDC_REF)
+
+# Run all sanitizer checks on stedc_solve
+stedc-all: stedc-memcheck stedc-racecheck stedc-initcheck stedc-synccheck
+
+###############################################################################
 # Help
 ###############################################################################
 
@@ -137,6 +179,7 @@ help:
 	@echo "  all                  - Build all sandbox executables"
 	@echo "  sandbox_getf2_small  - Build getf2_small sandbox"
 	@echo "  sandbox_stebz        - Build stebz sandbox"
+	@echo "  sandbox_stedc_solve  - Build stedc solve (slaed4) sandbox"
 	@echo "  clean                - Remove built executables"
 	@echo ""
 	@echo "getf2_small Sanitizer targets:"
@@ -156,6 +199,15 @@ help:
 	@echo "  stebz-synccheck      - Run synchronization error detection"
 	@echo "  stebz-all            - Run all sanitizer checks on stebz"
 	@echo ""
+	@echo "STEDC Solve (slaed4) Sanitizer targets:"
+	@echo "  run-stedc-solve      - Run stedc solve sandbox"
+	@echo "  stedc-memcheck       - Run memory error detection"
+	@echo "  stedc-racecheck      - Run race condition detection"
+	@echo "  stedc-racecheck-all  - Racecheck with full hazard reporting"
+	@echo "  stedc-initcheck      - Run uninitialized memory detection"
+	@echo "  stedc-synccheck      - Run synchronization error detection"
+	@echo "  stedc-all            - Run all sanitizer checks on stedc"
+	@echo ""
 	@echo "Custom test targets:"
 	@echo "  test-custom          - Run getf2 with params: make test-custom M=32 N=16 BATCH=4"
 	@echo "  sanitizer-custom     - Run racecheck with custom params"
@@ -165,10 +217,13 @@ help:
 	@echo "  CUDA_ARCH            - Target CUDA architectures"
 	@echo "  M, N, BATCH          - getf2_small matrix parameters"
 	@echo "  STEBZ_N, STEBZ_BATCH, STEBZ_RANGE - stebz parameters"
+	@echo "  STEDC_N, STEDC_BATCH, STEDC_REF - stedc solve parameters (REF=1 for slaed4)"
 
 .PHONY: all clean help \
         sanitizer-memcheck sanitizer-racecheck sanitizer-racecheck-all \
         sanitizer-initcheck sanitizer-synccheck sanitizer-all \
         test-custom sanitizer-custom \
         run-stebz stebz-memcheck stebz-racecheck stebz-racecheck-all \
-        stebz-initcheck stebz-synccheck stebz-all
+        stebz-initcheck stebz-synccheck stebz-all \
+        run-stedc-solve stedc-memcheck stedc-racecheck stedc-racecheck-all \
+        stedc-initcheck stedc-synccheck stedc-all
