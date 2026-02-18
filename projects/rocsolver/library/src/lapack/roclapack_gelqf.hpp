@@ -150,9 +150,9 @@ rocblas_status rocsolver_gelqf_template(rocblas_handle handle,
         {
             // compute block reflector
             rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_row_wise,
-                                        (I)(n - j), (I)jb, A, shiftA + idx2D(j, j, lda), (I)lda,
-                                        strideA, (ipiv + j), strideP, Abyx_norms_trfact, (I)ldw,
-                                        strideW, (I)batch_count, scalars, (T*)work_workArr, workArr);
+                                        (n - j), jb, A, shiftA + idx2D(j, j, lda), lda, strideA,
+                                        (ipiv + j), strideP, Abyx_norms_trfact, ldw, strideW,
+                                        batch_count, scalars, (T*)work_workArr, workArr);
 
             // apply the block reflector
             rocsolver_larfb_template<BATCHED, STRIDED, T>(

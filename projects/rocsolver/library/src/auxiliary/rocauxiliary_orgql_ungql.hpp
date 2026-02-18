@@ -156,10 +156,10 @@ rocblas_status rocsolver_orgql_ungql_template(rocblas_handle handle,
         // applying the current block reflector using larft + larfb
         if(n - k + j > 0)
         {
-            rocsolver_larft_template<T>(
-                handle, rocblas_backward_direction, rocblas_column_wise, (I)(m - k + j + jb), (I)jb,
-                A, shiftA + idx2D(0, n - k + j, lda), (I)lda, strideA, (ipiv + j), strideP, trfact,
-                (I)ldw, strideW, (I)batch_count, scalars, work, workArr);
+            rocsolver_larft_template<T>(handle, rocblas_backward_direction, rocblas_column_wise,
+                                        (m - k + j + jb), jb, A, shiftA + idx2D(0, n - k + j, lda),
+                                        lda, strideA, (ipiv + j), strideP, trfact, ldw, strideW,
+                                        batch_count, scalars, work, workArr);
 
             rocsolver_larfb_template<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_none, rocblas_backward_direction,

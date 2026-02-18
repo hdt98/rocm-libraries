@@ -158,9 +158,9 @@ rocblas_status rocsolver_orgqr_ungqr_template(rocblas_handle handle,
         if(j + jb < n)
         {
             rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                        (I)(m - j), (I)jb, A, shiftA + idx2D(j, j, lda), (I)lda,
-                                        strideA, (ipiv + j), strideP, trfact, (I)ldw, strideW,
-                                        (I)batch_count, scalars, work, workArr);
+                                        (m - j), jb, A, shiftA + idx2D(j, j, lda), lda, strideA,
+                                        (ipiv + j), strideP, trfact, ldw, strideW, batch_count,
+                                        scalars, work, workArr);
 
             rocsolver_larfb_template<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_none, rocblas_forward_direction,
