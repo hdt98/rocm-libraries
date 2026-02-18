@@ -20,7 +20,7 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from rocisa.code import KernelBody, Label, Macro, Module, RegSet, SrdUpperValue, \
                         StructuredModule, TextBlock, ValueEndif, ValueIf, ValueElseIf, ValueSet, SignatureBase
 from rocisa.container import vgpr, sgpr, SMEMModifiers, replaceHolder, EXEC,\
@@ -78,6 +78,7 @@ class CMSKernelInfo:
     PrefetchGlobalRead: int
     PrefetchLocalRead: int
     DirectToLds: bool
+    DtlPlusLdsBuf: int
     WaveSeparateGlobalReadA: int
     WaveSeparateGlobalReadB: int
     GlobalReadVectorWidthA: int
@@ -104,7 +105,7 @@ class CMSKernelInfo:
 
     def to_dict(self) -> dict:
         """Return a dict of the minimum kernel parameters needed for this CMS kernel."""
-        return self.asdict()
+        return asdict(self)
 
 @dataclass
 class SyncSchedule:
@@ -112,7 +113,7 @@ class SyncSchedule:
 
     def add(self, idx: int, dscnt: int = -1, vlcnt: int = -1, vscnt: int = -1, comment: str = "", barrier: bool = False, barrier_idx: Optional[int] = None, barrier_comment: str = ""):
         """ Add a SWaitCnt (and optionally a SBarrier) to the schedule at the given index.
-
+test_cms_api_query
         Args:
             idx:             The index at which to add the SWaitCnt.
             dscnt:           The dscnt value for the SWaitCnt.
@@ -785,6 +786,7 @@ class RegisterSchedule:
             PrefetchGlobalRead=tc.prefetch_global_read,
             PrefetchLocalRead=tc.prefetch_local_read,
             DirectToLds=tc.direct_to_lds,
+            DtlPlusLdsBuf=tc.dtl_plus_lds_buf,
             WaveSeparateGlobalReadA=tc.wave_separate_global_read_a,
             WaveSeparateGlobalReadB=tc.wave_separate_global_read_b,
             GlobalReadVectorWidthA=self.vector_widths[0],

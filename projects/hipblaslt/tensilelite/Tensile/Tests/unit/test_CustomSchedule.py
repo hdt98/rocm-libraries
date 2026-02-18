@@ -26,7 +26,7 @@ from unittest.mock import MagicMock
 from Tensile.Components.CustomSchedule import (
     hasCustomSchedule, ScheduleInfo, RegisterSchedule, TileConfig,
     _SCHEDULE_METADATA, _SCHEDULE_REGISTRY,
-    isTN, isNT, isNN, isTT, is16bit,
+    isTN, isNT, isNN, isTT, is16bit, query_cms_kernels
 )
 from Tensile.Components.CMSValidator import isValid
 from Tensile.Common import IsaVersion
@@ -1085,7 +1085,7 @@ class TestLayoutAutoDetection:
         del _SCHEDULE_METADATA[orig_metadata_len:]
 
     # Shared tile config for all fake functions (arbitrary but valid)
-    TILE = TileConfig(256, 256, 64, 2, 1, True, 0, 0)
+    TILE = TileConfig(256, 256, 64, 2, 1, 1, True, 0, 0)
 
     def test_detect_tn_only(self):
         """A function that only handles TN should detect exactly ['TN']."""
@@ -1234,3 +1234,43 @@ class TestLayoutAutoDetection:
         for name in EXPECTED:
             assert name in found_names, f"{name} not found in _SCHEDULE_METADATA"
 
+    def test_cms_api_query(self):
+        """Test the CMS API query function."""
+        # test all 16 bit types and layouts
+        
+        results = query_cms_kernels()
+        assert len(results) > 0
+        assert all(isinstance(result, dict) for result in results)
+        assert all("name" in result for result in results)
+        assert all("dtype" in result for result in results)
+        assert all("supported_layouts" in result for result in results)
+        assert all("MacroTile0" in result for result in results)
+        assert all("MacroTile1" in result for result in results)
+        assert all("DepthU" in result for result in results)
+
+
+        for dtype in ["16bit", "TF32"]:
+            results = query_cms_kernels(dtype=dtype)
+            assert len(results) > 0
+            assert all(isinstance(result, dict) for result in results)
+            assert all("name" in result for result in results)
+            assert all("dtype" in result for result in results)
+            assert all("supported_layouts" in result for result in results)
+            assert all("MacroTile0" in result for result in results)
+            assert all("MacroTile1" in result for result in results)
+            assert all("DepthU" in result for result in results)
+
+        for layout in ["TN", "NT", "NN"]:
+            results = query_cms_kernels(dtype="16bit", layout=layout)
+            assert len(results) > 0
+            assert all(isinstance(result, dict) for result in results)
+            assert all("name" in result for result in results)
+            assert all("dtype" in result for result in results)
+            assert all("supported_layouts" in result for result in results)
+            assert all("MacroTile0" in result for result in results)
+            assert all("MacroTile1" in result for result in results)
+            assert all("DepthU" in result for result in results)
+
+            
+
+        
