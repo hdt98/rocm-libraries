@@ -103,3 +103,11 @@ enum rocblas_eorder {
 
 // Generic block size for kernel launches
 #define BS1 256
+#define BS2 16
+
+// rocblas_fill - triangular matrix fill type (for POTF2)
+enum rocblas_fill {
+    rocblas_fill_upper = 121, // Upper triangular
+    rocblas_fill_lower = 122, // Lower triangular
+    rocblas_fill_full = 123   // Full matrix
+};

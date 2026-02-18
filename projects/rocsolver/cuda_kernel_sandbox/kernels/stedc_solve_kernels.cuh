@@ -855,8 +855,22 @@ __device__ I laed4_alt(I n,
         }
         iim1 = ii - 1;
         iip1 = ii + 1;
-        S diim1 = DELTA(iim1);
-        S diip1 = DELTA(iip1);
+
+        // Handle i=1 edge case separately to avoid out-of-bounds access
+        S diim1, diip1;
+        if(i == 1)
+        {
+            // When i=1 and orgati=true, ii=1, so iim1=0 would cause delta[-1] access
+            // Set diim1 to 0 since it won't be used in the psi loop (loop from 1 to iim1=0 is empty)
+            diim1 = S(0.);
+            diip1 = (iip1 <= n) ? DELTA(iip1) : S(0.);
+        }
+        else
+        {
+            diim1 = DELTA(iim1);
+            diip1 = (iip1 <= n) ? DELTA(iip1) : S(0.);
+        }
+
         if(orgati)
         {
             for(int j = 1 + threadIdx.x; j <= n; j += blockDim.x)

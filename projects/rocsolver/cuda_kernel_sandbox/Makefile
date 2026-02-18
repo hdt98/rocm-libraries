@@ -28,7 +28,7 @@ CUDA_ARCH ?= -gencode arch=compute_75,code=sm_75 \
 INCLUDES = -I. -I./kernels
 
 # All sandbox executables
-SANDBOXES = sandbox_getf2_small sandbox_stebz sandbox_stedc_solve
+SANDBOXES = sandbox_getf2_small sandbox_stebz sandbox_stedc_solve sandbox_potf2
 
 # Default target
 all: $(SANDBOXES)
@@ -53,6 +53,13 @@ sandbox_stedc_solve: sandbox_stedc_solve.cu \
                      cuda_compat.cuh \
                      rocsolver_types.cuh \
                      device_helpers.cuh
+	$(NVCC) $(NVCC_FLAGS) $(CUDA_ARCH) $(INCLUDES) -o $@ $<
+
+sandbox_potf2: sandbox_potf2.cu \
+               kernels/potf2_kernels.cuh \
+               cuda_compat.cuh \
+               rocsolver_types.cuh \
+               device_helpers.cuh
 	$(NVCC) $(NVCC_FLAGS) $(CUDA_ARCH) $(INCLUDES) -o $@ $<
 
 # Clean
@@ -169,6 +176,41 @@ stedc-synccheck: sandbox_stedc_solve
 stedc-all: stedc-memcheck stedc-racecheck stedc-initcheck stedc-synccheck
 
 ###############################################################################
+# POTF2 (Cholesky) Sanitizer Targets
+###############################################################################
+
+POTF2_N ?= 32
+POTF2_BATCH ?= 1
+POTF2_UPLO ?= lower
+
+# Run potf2
+run-potf2: sandbox_potf2
+	./sandbox_potf2 $(POTF2_N) $(POTF2_BATCH) $(POTF2_UPLO)
+
+# Memory error detection for potf2
+potf2-memcheck: sandbox_potf2
+	compute-sanitizer --tool memcheck ./sandbox_potf2 $(POTF2_N) $(POTF2_BATCH) $(POTF2_UPLO)
+
+# Race condition detection for potf2
+potf2-racecheck: sandbox_potf2
+	compute-sanitizer --tool racecheck ./sandbox_potf2 $(POTF2_N) $(POTF2_BATCH) $(POTF2_UPLO)
+
+# More aggressive racecheck for potf2
+potf2-racecheck-all: sandbox_potf2
+	compute-sanitizer --tool racecheck --racecheck-report all ./sandbox_potf2 $(POTF2_N) $(POTF2_BATCH) $(POTF2_UPLO)
+
+# Uninitialized memory detection for potf2
+potf2-initcheck: sandbox_potf2
+	compute-sanitizer --tool initcheck ./sandbox_potf2 $(POTF2_N) $(POTF2_BATCH) $(POTF2_UPLO)
+
+# Synchronization error detection for potf2
+potf2-synccheck: sandbox_potf2
+	compute-sanitizer --tool synccheck ./sandbox_potf2 $(POTF2_N) $(POTF2_BATCH) $(POTF2_UPLO)
+
+# Run all sanitizer checks on potf2
+potf2-all: potf2-memcheck potf2-racecheck potf2-initcheck potf2-synccheck
+
+###############################################################################
 # Help
 ###############################################################################
 
@@ -180,6 +222,7 @@ help:
 	@echo "  sandbox_getf2_small  - Build getf2_small sandbox"
 	@echo "  sandbox_stebz        - Build stebz sandbox"
 	@echo "  sandbox_stedc_solve  - Build stedc solve (slaed4) sandbox"
+	@echo "  sandbox_potf2        - Build potf2 (Cholesky) sandbox"
 	@echo "  clean                - Remove built executables"
 	@echo ""
 	@echo "getf2_small Sanitizer targets:"
@@ -208,6 +251,15 @@ help:
 	@echo "  stedc-synccheck      - Run synchronization error detection"
 	@echo "  stedc-all            - Run all sanitizer checks on stedc"
 	@echo ""
+	@echo "POTF2 (Cholesky) Sanitizer targets:"
+	@echo "  run-potf2            - Run potf2 sandbox"
+	@echo "  potf2-memcheck       - Run memory error detection"
+	@echo "  potf2-racecheck      - Run race condition detection"
+	@echo "  potf2-racecheck-all  - Racecheck with full hazard reporting"
+	@echo "  potf2-initcheck      - Run uninitialized memory detection"
+	@echo "  potf2-synccheck      - Run synchronization error detection"
+	@echo "  potf2-all            - Run all sanitizer checks on potf2"
+	@echo ""
 	@echo "Custom test targets:"
 	@echo "  test-custom          - Run getf2 with params: make test-custom M=32 N=16 BATCH=4"
 	@echo "  sanitizer-custom     - Run racecheck with custom params"
@@ -218,6 +270,7 @@ help:
 	@echo "  M, N, BATCH          - getf2_small matrix parameters"
 	@echo "  STEBZ_N, STEBZ_BATCH, STEBZ_RANGE - stebz parameters"
 	@echo "  STEDC_N, STEDC_BATCH, STEDC_REF - stedc solve parameters (REF=1 for slaed4)"
+	@echo "  POTF2_N, POTF2_BATCH, POTF2_UPLO - potf2 parameters (UPLO=lower|upper)"
 
 .PHONY: all clean help \
         sanitizer-memcheck sanitizer-racecheck sanitizer-racecheck-all \
@@ -226,4 +279,6 @@ help:
         run-stebz stebz-memcheck stebz-racecheck stebz-racecheck-all \
         stebz-initcheck stebz-synccheck stebz-all \
         run-stedc-solve stedc-memcheck stedc-racecheck stedc-racecheck-all \
-        stedc-initcheck stedc-synccheck stedc-all
+        stedc-initcheck stedc-synccheck stedc-all \
+        run-potf2 potf2-memcheck potf2-racecheck potf2-racecheck-all \
+        potf2-initcheck potf2-synccheck potf2-all

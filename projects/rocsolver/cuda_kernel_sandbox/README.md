@@ -17,10 +17,14 @@ make stebz-racecheck
 # Run racecheck on stedc solve (slaed4)
 make stedc-racecheck
 
+# Run racecheck on potf2 (Cholesky)
+make potf2-racecheck
+
 # Run with custom parameters
 make sanitizer-custom M=32 N=16 BATCH=4
 make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4
 make stedc-racecheck STEDC_N=32 STEDC_REF=1
+make potf2-racecheck POTF2_N=32 POTF2_BATCH=4 POTF2_UPLO=lower
 ```
 
 ## Available Kernels
@@ -89,6 +93,29 @@ make stedc-racecheck
 make stedc-racecheck STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
 ```
 
+### 4. potf2_kernels (Cholesky Factorization)
+
+Cholesky factorization for symmetric positive definite matrices. Computes A = L*L' (lower) or A = U'*U (upper).
+
+Includes:
+- `potf2_kernel_small` - Shared memory kernel for small matrices (n <= 64)
+- `potf2_simple` - Device function performing the factorization
+- `sqrtDiagOnward` - Diagonal element processing kernel
+- `potf2_unrolled_kernel` - Alternative unrolled implementation
+
+```bash
+# Build
+make sandbox_potf2
+
+# Run
+./sandbox_potf2 [n] [batch_count] [uplo]
+# uplo: lower or upper
+
+# Run with sanitizer
+make potf2-racecheck
+make potf2-racecheck POTF2_N=32 POTF2_BATCH=4 POTF2_UPLO=lower
+```
+
 ## Files
 
 ### Common Files
@@ -108,6 +135,10 @@ make stedc-racecheck STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
 ### stedc_solve
 - `kernels/stedc_solve_kernels.cuh` - Secular equation solvers (slaed4, slaed6, seq_solve)
 - `sandbox_stedc_solve.cu` - Driver program
+
+### potf2
+- `kernels/potf2_kernels.cuh` - Cholesky factorization kernels
+- `sandbox_potf2.cu` - Driver program
 
 ## Adding New Kernels
 
@@ -135,6 +166,7 @@ make stedc-racecheck STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
 - `make sandbox_getf2_small` - Build getf2_small sandbox only
 - `make sandbox_stebz` - Build stebz sandbox only
 - `make sandbox_stedc_solve` - Build stedc solve sandbox only
+- `make sandbox_potf2` - Build potf2 sandbox only
 - `make clean` - Remove built executables
 
 ### getf2_small Sanitizer
@@ -163,6 +195,15 @@ make stedc-racecheck STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
 - `make stedc-synccheck`
 - `make stedc-all`
 
+### POTF2 (Cholesky) Sanitizer
+- `make run-potf2` - Run without sanitizer
+- `make potf2-memcheck`
+- `make potf2-racecheck`
+- `make potf2-racecheck-all`
+- `make potf2-initcheck`
+- `make potf2-synccheck`
+- `make potf2-all`
+
 ### Custom Parameters
 ```bash
 # getf2_small
@@ -176,4 +217,8 @@ make stebz-racecheck STEBZ_N=128 STEBZ_BATCH=4 STEBZ_RANGE=value
 # stedc_solve
 make run-stedc-solve STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
 make stedc-racecheck STEDC_N=16 STEDC_REF=0
+
+# potf2
+make run-potf2 POTF2_N=32 POTF2_BATCH=4 POTF2_UPLO=lower
+make potf2-racecheck POTF2_N=64 POTF2_UPLO=upper
 ```
