@@ -712,18 +712,16 @@ class RegisterSchedule:
         def as_str(transpose: bool) -> str:
             return "T" if transpose else "N"
         
-        detected = []
+        detected = set()
         for transA, transB in product([True, False], repeat=2):
             for useLDSTr, TLDS in product([True, False], [1, 0]):                
                 probe = self._make_probe_kernel(transA, transB, useLDSTr, TLDS)
-                try:
-                    found, _ = func(probe, useLDSTr, TLDS)
-                    if found:
-                        detected.append(as_str(transA) + as_str(transB))
-                        break
-                except ValueError:
-                    continue            
-        return detected
+                
+                found, _ = func(probe, useLDSTr, TLDS)
+                if found:
+                    detected.add(as_str(transA) + as_str(transB))
+                    
+        return list(detected)
 
     def __call__(self, func: Callable) -> Callable:
         """Wrap the function with matching logic and register it."""
