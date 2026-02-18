@@ -15,13 +15,13 @@ import numpy as np
 
 
 def parse_results_file(filepath):
-    """Parse a results file and extract command -> tflops mapping.
+    """Parse a results file and extract command -> (tflops, avg_time) mapping.
     
     Args:
         filepath: Path to the results file
         
     Returns:
-        Dictionary mapping input commands to tflops values.
+        Dictionary mapping input commands to dict with 'tflops' and 'avg_time' values.
         Commands with errors are excluded.
     """
     results = {}
@@ -49,11 +49,14 @@ def parse_results_file(filepath):
                     i += 1
                     continue
                 
-                # Extract tflops
+                # Extract tflops and avg_time
                 tflops_match = re.search(r'tflops:\s*([\d.]+)', result_block)
-                if tflops_match:
-                    tflops = float(tflops_match.group(1))
-                    results[command] = tflops
+                avg_time_match = re.search(r'avg_time:\s*([\d.]+)', result_block)
+                if tflops_match and avg_time_match:
+                    results[command] = {
+                        'tflops': float(tflops_match.group(1)),
+                        'avg_time': float(avg_time_match.group(1))
+                    }
         
         i += 1
     
@@ -135,8 +138,8 @@ def plot_comparison(baseline_results, improved_results, bin_width=0, output_file
     """Create a comparison bar chart.
     
     Args:
-        baseline_results: Dictionary of baseline command -> tflops
-        improved_results: Dictionary of improved command -> tflops
+        baseline_results: Dictionary of baseline command -> {'tflops', 'avg_time'}
+        improved_results: Dictionary of improved command -> {'tflops', 'avg_time'}
         bin_width: Width for binning tflops values (0 = no binning)
         output_file: Output file path (None = show plot)
     """
@@ -151,59 +154,77 @@ def plot_comparison(baseline_results, improved_results, bin_width=0, output_file
     commands = sorted(common_commands)
     
     # Extract and optionally bin values
-    baseline_values = []
-    improved_values = []
+    baseline_tflops = []
+    improved_tflops = []
+    baseline_times = []
+    improved_times = []
     labels = []
     
     for cmd in commands:
-        baseline_val = baseline_results[cmd]
-        improved_val = improved_results[cmd]
+        baseline_tf = baseline_results[cmd]['tflops']
+        improved_tf = improved_results[cmd]['tflops']
+        baseline_t = baseline_results[cmd]['avg_time']
+        improved_t = improved_results[cmd]['avg_time']
         
         if bin_width > 0:
-            baseline_val = bin_value(baseline_val, bin_width)
-            improved_val = bin_value(improved_val, bin_width)
+            baseline_tf = bin_value(baseline_tf, bin_width)
+            improved_tf = bin_value(improved_tf, bin_width)
         
-        baseline_values.append(baseline_val)
-        improved_values.append(improved_val)
+        baseline_tflops.append(baseline_tf)
+        improved_tflops.append(improved_tf)
+        baseline_times.append(baseline_t)
+        improved_times.append(improved_t)
         labels.append(create_short_label(cmd))
     
-    # Calculate speedup
-    speedups = [imp / base if base > 0 else 0 for base, imp in zip(baseline_values, improved_values)]
+    # Calculate speedup (for tflops, higher is better)
+    speedups = [imp / base if base > 0 else 0 for base, imp in zip(baseline_tflops, improved_tflops)]
     
-    # Create figure
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12))
+    # Create figure with 3 subplots
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(16, 16))
     
-    # Bar chart comparison
     x = np.arange(len(labels))
     width = 0.35
     
-    bars1 = ax1.bar(x - width/2, baseline_values, width, label='Baseline', color='steelblue')
-    bars2 = ax1.bar(x + width/2, improved_values, width, label='Double buf added', color='darkorange')
+    # Plot 1: TFLOPS comparison
+    bars1 = ax1.bar(x - width/2, baseline_tflops, width, label='Baseline', color='steelblue')
+    bars2 = ax1.bar(x + width/2, improved_tflops, width, label='Double buf added', color='darkorange')
     
     ax1.set_xlabel('Test Case')
     ax1.set_ylabel('TFLOPS')
-    ax1.set_title('Baseline vs Double buffered kernels added')
+    ax1.set_title('TFLOPS: Baseline vs Double buffered kernels added')
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
     ax1.legend()
     ax1.grid(axis='y', alpha=0.3)
     
-    # Speedup chart
-    colors = ['green' if s >= 1.0 else 'red' for s in speedups]
-    bars3 = ax2.bar(x, speedups, color=colors, alpha=0.7)
-    ax2.axhline(y=1.0, color='black', linestyle='--', linewidth=1, label='No change')
+    # Plot 2: Average time comparison
+    bars4 = ax2.bar(x - width/2, baseline_times, width, label='Baseline', color='steelblue')
+    bars5 = ax2.bar(x + width/2, improved_times, width, label='Double buf added', color='darkorange')
     
     ax2.set_xlabel('Test Case')
-    ax2.set_ylabel('Speedup (Improved / Baseline)')
-    ax2.set_title('Speedup per Test Case')
+    ax2.set_ylabel('Average Time (ms)')
+    ax2.set_title('Average Time: Baseline vs Double buffered kernels added')
     ax2.set_xticks(x)
     ax2.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
+    ax2.legend()
     ax2.grid(axis='y', alpha=0.3)
+    
+    # Plot 3: Speedup chart
+    colors = ['green' if s >= 1.0 else 'red' for s in speedups]
+    bars3 = ax3.bar(x, speedups, color=colors, alpha=0.7)
+    ax3.axhline(y=1.0, color='black', linestyle='--', linewidth=1, label='No change')
+    
+    ax3.set_xlabel('Test Case')
+    ax3.set_ylabel('Speedup (Improved / Baseline)')
+    ax3.set_title('Speedup per Test Case')
+    ax3.set_xticks(x)
+    ax3.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
+    ax3.grid(axis='y', alpha=0.3)
     
     # Add speedup values on bars
     for i, (bar, speedup) in enumerate(zip(bars3, speedups)):
         height = bar.get_height()
-        ax2.annotate(f'{speedup:.2f}x',
+        ax3.annotate(f'{speedup:.2f}x',
                      xy=(bar.get_x() + bar.get_width() / 2, height),
                      xytext=(0, 3),
                      textcoords="offset points",
@@ -220,6 +241,11 @@ def plot_comparison(baseline_results, improved_results, bin_width=0, output_file
     print(f"  Max speedup: {max(speedups):.2f}x")
     print(f"  Cases improved (>1.0x): {sum(1 for s in speedups if s > 1.0)}")
     print(f"  Cases regressed (<1.0x): {sum(1 for s in speedups if s < 1.0)}")
+    
+    # Time statistics
+    time_improvements = [(b - i) / b * 100 if b > 0 else 0 for b, i in zip(baseline_times, improved_times)]
+    print(f"\n  Avg time reduction: {np.mean(time_improvements):.1f}%")
+    print(f"  Median time reduction: {np.median(time_improvements):.1f}%")
     
     if bin_width > 0:
         print(f"  Bin width: {bin_width} TFLOPS")
