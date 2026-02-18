@@ -256,7 +256,11 @@ TEST_F(HipRTC_rocWMMA, RocwmmaBasicIncludeTest)
         hiprtcGetProgramLogSize(prog, &log_size);
         std::string log(log_size, '\0');
         hiprtcGetProgramLog(prog, &log[0]);
-        FAIL() << "Compilation failed:\n" << log;
+        std::string options_str = "";
+        for (auto s: options) {
+            options_str += std::string(s) + " ";
+        }
+        FAIL() << "Build Options: " << options_str << "\nCompilation log:\n" << log;
     }
 
     // Extract compiled code
@@ -389,7 +393,11 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
         hiprtcGetProgramLogSize(prog, &log_size);
         std::string log(log_size, '\0');
         hiprtcGetProgramLog(prog, &log[0]);
-        FAIL() << "Compilation failed:\n" << log;
+        std::string options_str = "";
+        for (auto s: options) {
+            options_str += std::string(s) + " ";
+        }
+        FAIL() << "Build Options: " << options_str << "\nCompilation log:\n" << log;
     }
 
     // Extract compiled code
