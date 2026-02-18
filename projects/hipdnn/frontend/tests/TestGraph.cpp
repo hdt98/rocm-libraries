@@ -3822,6 +3822,8 @@ TEST_F(TestGraph, GetRankedEngineIdsReturnsRankedList)
     EXPECT_EQ(rankedEngineIds[2], 300);
 }
 
+// Test uses BatchnormInference which is only supported via direct FlatBuffers path
+#ifdef HIPDNN_ENABLE_DIRECT_FLATBUFFERS
 TEST_F(TestGraph, BuildMethodSucceedsWithValidGraph)
 {
     ::testing::FLAGS_gmock_verbose = "error";
@@ -4002,6 +4004,7 @@ TEST_F(TestGraph, BuildMethodSucceedsWithValidGraph)
     auto result = graph.build(_handle);
     EXPECT_TRUE(result.is_good()) << result.get_message();
 }
+#endif // HIPDNN_ENABLE_DIRECT_FLATBUFFERS
 
 TEST_F(TestGraph, CreateExecutionPlanExtWithKnobSettings)
 {

@@ -18,6 +18,9 @@ add_library(
     descriptors/ExecutionPlanDescriptor.cpp
     descriptors/GraphDescriptor.cpp
     descriptors/VariantDescriptor.cpp
+    descriptors/TensorDescriptor.cpp
+    descriptors/ConvolutionFwdOperationDescriptor.cpp
+    descriptors/OperationGraphBuilder.cpp
     descriptors/DescriptorFactory.cpp
     handle/HandleFactory.cpp
     handle/Handle.cpp

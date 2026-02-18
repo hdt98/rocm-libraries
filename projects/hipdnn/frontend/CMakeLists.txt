@@ -14,6 +14,12 @@ add_library(hipdnn_frontend INTERFACE)
 
 target_link_libraries(hipdnn_frontend INTERFACE hipdnn_data_sdk hipdnn_backend)
 
+# When enabled, frontend uses FlatBuffers directly for serialization (legacy path)
+# When disabled, frontend uses the descriptor API (new path for FlatBuffers-free consumers)
+if(HIPDNN_ENABLE_DIRECT_FLATBUFFERS)
+    target_compile_definitions(hipdnn_frontend INTERFACE HIPDNN_ENABLE_DIRECT_FLATBUFFERS)
+endif()
+
 set(HIP_DNN_FRONTEND_INSTALL_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}/hipdnn/frontend")
 
 target_include_directories(

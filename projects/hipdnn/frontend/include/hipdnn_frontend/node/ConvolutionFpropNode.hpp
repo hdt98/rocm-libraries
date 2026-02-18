@@ -8,6 +8,7 @@
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/ConvolutionFpropAttributes.hpp>
 #include <hipdnn_frontend/attributes/GraphAttributes.hpp>
+#include <hipdnn_frontend/detail/ScopedHipdnnBackendDescriptor.hpp>
 
 namespace hipdnn_frontend::graph
 {
@@ -364,6 +365,256 @@ public:
             toSdkType(attributes.compute_data_type),
             hipdnn_data_sdk::data_objects::NodeAttributes::ConvolutionFwdAttributes,
             attributes.pack_attributes(builder).Union());
+    }
+
+    // Create operation descriptor using backend API (no FlatBuffers required)
+    Error createOperation(
+        std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor>& tensorDescs,
+        std::vector<detail::ScopedHipdnnBackendDescriptor>& operations) const
+    {
+        // Helper to create tensor descriptor if not already in map
+        auto ensureTensorDesc
+            = [&tensorDescs](
+                  const std::shared_ptr<TensorAttributes>& tensor) -> std::pair<Error, int64_t> {
+            auto uid = tensor->get_uid();
+            if(tensorDescs.find(uid) != tensorDescs.end())
+            {
+                return {{}, uid};
+            }
+
+            detail::ScopedHipdnnBackendDescriptor desc(HIPDNN_BACKEND_TENSOR_DESCRIPTOR);
+            if(!desc.valid())
+            {
+                return {Error(ErrorCode::HIPDNN_BACKEND_ERROR,
+                              "Failed to create tensor descriptor for uid " + std::to_string(uid)),
+                        uid};
+            }
+
+            // Set UID
+            auto status = detail::hipdnnBackend()->backendSetAttribute(
+                desc.get(), HIPDNN_ATTR_TENSOR_UNIQUE_ID, HIPDNN_TYPE_INT64, 1, &uid);
+            if(status != HIPDNN_STATUS_SUCCESS)
+            {
+                return {Error(ErrorCode::HIPDNN_BACKEND_ERROR,
+                              "Failed to set tensor UID for " + std::to_string(uid)),
+                        uid};
+            }
+
+            // Set name
+            auto& name = tensor->get_name();
+            if(!name.empty())
+            {
+                status = detail::hipdnnBackend()->backendSetAttribute(
+                    desc.get(),
+                    HIPDNN_ATTR_TENSOR_NAME,
+                    HIPDNN_TYPE_CHAR,
+                    static_cast<int64_t>(name.size()),
+                    name.c_str());
+                if(status != HIPDNN_STATUS_SUCCESS)
+                {
+                    return {Error(ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set tensor name"),
+                            uid};
+                }
+            }
+
+            // Set data type
+            auto sdkDataType = toSdkType(tensor->get_data_type());
+            status = detail::hipdnnBackend()->backendSetAttribute(
+                desc.get(), HIPDNN_ATTR_TENSOR_DATA_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &sdkDataType);
+            if(status != HIPDNN_STATUS_SUCCESS)
+            {
+                return {Error(ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set tensor data type"),
+                        uid};
+            }
+
+            // Set dimensions
+            auto& dims = tensor->get_dim();
+            status = detail::hipdnnBackend()->backendSetAttribute(desc.get(),
+                                                                  HIPDNN_ATTR_TENSOR_DIMENSIONS,
+                                                                  HIPDNN_TYPE_INT64,
+                                                                  static_cast<int64_t>(dims.size()),
+                                                                  dims.data());
+            if(status != HIPDNN_STATUS_SUCCESS)
+            {
+                return {Error(ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set tensor dimensions"),
+                        uid};
+            }
+
+            // Set strides
+            auto& strides = tensor->get_stride();
+            status
+                = detail::hipdnnBackend()->backendSetAttribute(desc.get(),
+                                                               HIPDNN_ATTR_TENSOR_STRIDES,
+                                                               HIPDNN_TYPE_INT64,
+                                                               static_cast<int64_t>(strides.size()),
+                                                               strides.data());
+            if(status != HIPDNN_STATUS_SUCCESS)
+            {
+                return {Error(ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set tensor strides"),
+                        uid};
+            }
+
+            // Set is_virtual
+            bool isVirtual = tensor->get_is_virtual();
+            status = detail::hipdnnBackend()->backendSetAttribute(
+                desc.get(), HIPDNN_ATTR_TENSOR_IS_VIRTUAL, HIPDNN_TYPE_BOOLEAN, 1, &isVirtual);
+            if(status != HIPDNN_STATUS_SUCCESS)
+            {
+                return {Error(ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set tensor is_virtual"),
+                        uid};
+            }
+
+            // Finalize
+            status = detail::hipdnnBackend()->backendFinalize(desc.get());
+            if(status != HIPDNN_STATUS_SUCCESS)
+            {
+                return {
+                    Error(ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to finalize tensor descriptor"),
+                    uid};
+            }
+
+            tensorDescs.emplace(uid, std::move(desc));
+            return {{}, uid};
+        };
+
+        // Ensure tensor descriptors exist for X, W, Y
+        auto [errX, xUid] = ensureTensorDesc(attributes.get_x());
+        HIPDNN_CHECK_ERROR(errX);
+        auto [errW, wUid] = ensureTensorDesc(attributes.get_w());
+        HIPDNN_CHECK_ERROR(errW);
+        auto [errY, yUid] = ensureTensorDesc(attributes.get_y());
+        HIPDNN_CHECK_ERROR(errY);
+
+        // Create operation descriptor
+        detail::ScopedHipdnnBackendDescriptor opDesc(
+            HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR);
+        if(!opDesc.valid())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Failed to create convolution forward operation descriptor"};
+        }
+
+        // Set tensor references
+        auto xDescPtr = tensorDescs.at(xUid).get();
+        auto status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_X,
+            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+            1,
+            &xDescPtr);
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv X tensor"};
+        }
+
+        auto wDescPtr = tensorDescs.at(wUid).get();
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_W,
+            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+            1,
+            &wDescPtr);
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv W tensor"};
+        }
+
+        auto yDescPtr = tensorDescs.at(yUid).get();
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_Y,
+            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+            1,
+            &yDescPtr);
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv Y tensor"};
+        }
+
+        // Set convolution parameters
+        auto& prePadding = attributes.get_pre_padding();
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_PRE_PADDINGS,
+            HIPDNN_TYPE_INT64,
+            static_cast<int64_t>(prePadding.size()),
+            prePadding.data());
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv pre_padding"};
+        }
+
+        auto& postPadding = attributes.get_post_padding();
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_POST_PADDINGS,
+            HIPDNN_TYPE_INT64,
+            static_cast<int64_t>(postPadding.size()),
+            postPadding.data());
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv post_padding"};
+        }
+
+        auto& stride = attributes.get_stride();
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_STRIDES,
+            HIPDNN_TYPE_INT64,
+            static_cast<int64_t>(stride.size()),
+            stride.data());
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv stride"};
+        }
+
+        auto& dilation = attributes.get_dilation();
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_DILATIONS,
+            HIPDNN_TYPE_INT64,
+            static_cast<int64_t>(dilation.size()),
+            dilation.data());
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv dilation"};
+        }
+
+        auto convMode = static_cast<int64_t>(toSdkType(attributes.get_convolution_mode()));
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_CONV_MODE,
+            HIPDNN_TYPE_INT64,
+            1,
+            &convMode);
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv mode"};
+        }
+
+        // Set compute data type (inherited from graph attributes)
+        auto computeDataType = toSdkType(attributes.compute_data_type);
+        status = detail::hipdnnBackend()->backendSetAttribute(
+            opDesc.get(),
+            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_COMPUTE_DATA_TYPE,
+            HIPDNN_TYPE_DATA_TYPE,
+            1,
+            &computeDataType);
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv compute data type"};
+        }
+
+        // Finalize operation descriptor
+        status = detail::hipdnnBackend()->backendFinalize(opDesc.get());
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Failed to finalize convolution operation descriptor"};
+        }
+
+        operations.push_back(std::move(opDesc));
+        return {};
     }
 };
 
