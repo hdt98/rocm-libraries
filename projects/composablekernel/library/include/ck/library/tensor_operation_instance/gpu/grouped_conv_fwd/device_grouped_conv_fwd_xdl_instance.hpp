@@ -45,6 +45,8 @@ static constexpr auto ConvFwd1x1P0 = ConvolutionForwardSpecialization::Filter1x1
 
 static constexpr auto ConvFwd1x1S1P0 = ConvolutionForwardSpecialization::Filter1x1Stride1Pad0;
 
+static constexpr auto ConvFwd3x3S1D1P0 = ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
+
 static constexpr auto ConvFwdOddC =
     ck::tensor_operation::device::ConvolutionForwardSpecialization::OddC;
 
