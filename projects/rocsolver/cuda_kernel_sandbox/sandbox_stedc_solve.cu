@@ -1,9 +1,14 @@
 /* **************************************************************************
- * rocSOLVER Kernel Sandbox - STEDC Secular Equation Solver Driver
+ * rocSOLVER Kernel Sandbox - STEDC Secular Equation Solver Driver (laed4_alt)
  *
- * This program tests the STEDC secular equation solver kernels (slaed4,
- * seq_solve, seq_solve_ext) for use with CUDA Compute Sanitizer tools
- * (memcheck, racecheck, initcheck, synccheck).
+ * This program tests the STEDC secular equation solver kernel laed4_alt
+ * for use with CUDA Compute Sanitizer tools (memcheck, racecheck, initcheck,
+ * synccheck).
+ *
+ * IMPORTANT: laed4_alt is a parallelized version of the slaed4 solver that
+ * uses STEDC_SOLVE_BDIM threads per eigenvalue. When STEDC_SOLVE_BDIM is a
+ * multiple of 32 (warp size), this enables block-level reductions which may
+ * have race conditions. This is intentional to test sanitizer detection.
  *
  * The secular equation solvers are used in the merge phase of the
  * divide-and-conquer algorithm for computing eigenvalues/eigenvectors
@@ -15,10 +20,10 @@
  * Where:
  *   n             - problem size (number of eigenvalues, default: 16)
  *   batch_count   - number of problems in batch (default: 1)
- *   use_reference - 1 to use slaed4, 0 to use seq_solve (default: 0)
+ *   use_reference - 1 for single-thread behavior, 0 for parallel (default: 0)
  *
  * Example:
- *   compute-sanitizer --tool racecheck ./sandbox_stedc_solve 32 4 1
+ *   compute-sanitizer --tool racecheck ./sandbox_stedc_solve 32 4 0
  * *************************************************************************/
 
 #include <cstdio>
@@ -49,7 +54,7 @@ void print_usage(const char* prog_name)
     printf("Arguments:\n");
     printf("  n             - problem size (number of eigenvalues, default: 16, max: 256)\n");
     printf("  batch_count   - number of problems in batch (default: 1)\n");
-    printf("  use_reference - 1 to use slaed4 (reference), 0 to use seq_solve (default: 0)\n");
+    printf("  use_reference - 1 for single-thread behavior, 0 for parallel laed4_alt (default: 0)\n");
     printf("\n");
     printf("Examples:\n");
     printf("  %s                  # Use defaults: n=16, batch=1, seq_solve\n", prog_name);
@@ -216,19 +221,24 @@ int main(int argc, char** argv)
 
     rocblas_stride strideD = n;
 
-    printf("\nLaunching STEDC solve kernel...\n");
+    printf("\nLaunching STEDC solve kernel (laed4_alt)...\n");
 
-    // Launch kernel
+    // Launch kernel - one block per eigenvalue, STEDC_SOLVE_BDIM threads per block
+    // laed4_alt uses all threads in the block to parallelize the secular equation solve
     int threads_per_block = STEDC_SOLVE_BDIM;
-    int blocks_x = (n + threads_per_block - 1) / threads_per_block;
+    int blocks_x = n;  // One block per eigenvalue
 
     dim3 grid(blocks_x, batch_count);
     dim3 block(threads_per_block);
 
-    printf("  Grid: (%d, %d), Block: %d\n", blocks_x, batch_count, threads_per_block);
+    printf("  Grid: (%d, %d), Block: %d threads (STEDC_SOLVE_BDIM=%d)\n",
+           blocks_x, batch_count, threads_per_block, STEDC_SOLVE_BDIM);
     printf("  eps=%.6e, ssfmin=%.6e, ssfmax=%.6e\n", eps, ssfmin, ssfmax);
+    printf("  use_reference=%s (when true, only thread 0 participates)\n",
+           use_reference ? "true" : "false");
 
-    stedc_mergeValues_Solve_kernel<float><<<grid, block>>>(
+    // Note: Template parameter BDIM must match the block size
+    stedc_mergeValues_Solve_kernel<STEDC_SOLVE_BDIM, float><<<grid, block>>>(
         n,
         d_D, strideD,
         d_evs,
