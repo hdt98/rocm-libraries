@@ -3703,7 +3703,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         #  - LRA3 + PACKA3 needs to start after 3/4 MFMAs /54
 
         # LRA0 + GRIncA
-        lra0 = create_range(min_val=0, num=4, step=1, repeat=6)
+        lra0 = create_range(min_val=0, num=6, step=1, repeat=2)
         grIncA = create_range(min_val=0, num=3, step=1, repeat=3)
 
         waitLRA0 = max(lra0)+1
@@ -3716,16 +3716,20 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         # - having extra latency when switching between MFMA types
         packAOffset = [
             1, 1, 1, 1,
-            4, 4,
-            5, 5, 5, 5,
-
-            2, 2, 2, 2, 
-            4, 4,
+            5, 5,
             6, 6, 6, 6,
 
-            3, 3, 3, 3, 
-            4, 4,
+            2, 2, 2, 2, 
+            5, 5,
             7, 7, 7, 7,
+
+            3, 3, 3, 3, 
+            5, 5,
+            8, 8, 8, 8,
+            
+            4, 4, 4, 4,
+            5, 5,
+            9
         ]
 
         packA0 = [x + startPACKA0 for x in packAOffset]
@@ -3736,18 +3740,20 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         assert packA0Done < numMfma//4
 
         # LRB0 + GRIncB + packB0
-        lrb0 = create_range(min_val=waitLRA0, num=4, step=1, repeat=4)
+        lrb0 = create_range(min_val=waitLRA0, num=4, step=1, repeat=2)
         grIncB = create_range(min_val=max(grIncA)+1, num=3, max_val=max(lrb0)+4, step=1, repeat=3)
         waitLRB0 = max(lrb0)+1
         startPACKB0 = waitLRB0+4
         packBOffset = [
             1, 1, 1, 1,
-            3, 3,
-            4, 4, 4, 4,
+            4, 4,
+            5, 5, 5, 5,
 
             2, 2, 2, 2, 
-            3, 3,
-            5, 5, 5, 5,
+            4, 4,
+            6, 6, 6, 6,
+            
+            3, 3, 3, 3
         ]
         packB0 = [x + startPACKB0 for x in packBOffset]
 
@@ -3763,8 +3769,8 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         assert max(packB0) < halfMFMA
 
         # LR3
-        lrb3 = create_range(min_val=max(grB)+3, num=5, step=2, repeat=2)
-        lrb3 += create_range(min_val=max(lrb3)+4, num=3, step=2, repeat=2)
+        lrb3 = create_range(min_val=max(grB)+3, num=2, step=2, repeat=2)
+        lrb3 += create_range(min_val=max(lrb3)+4, num=2, step=2, repeat=2)
         waitLRB3 = max(lrb3)+1
 
         # PackB3
@@ -3772,7 +3778,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
 
         # LRA3 + PACKA3
         startLRA3 = (3*numMfma)//4 # Can't start before 3/4 MFMAs
-        lra3 = create_range(min_val=startLRA3, num=8, step=1, repeat=3)
+        lra3 = create_range(min_val=startLRA3, num=6, step=1, repeat=2)
 
         waitLRA3 = max(lra3)+1
         packA3 = [x + waitLRA3 for x in packAOffset]
@@ -3780,21 +3786,21 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         syncTable = [
             -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA3s for next iteration"),
 
-            waitLRA0, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait first 20 LRA0 to complete"),
+            waitLRA0, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait first 1/2 LRA0s to complete"),
             waitLRA0+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRA0 to complete"),
 
-            waitLRB0, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB0s to complete"),
+            waitLRB0, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB0s to complete"),
             waitLRB0+3, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB0s to complete"),
             waitLRB0+3, SBarrier(comment="Barrier before GRA&GRB"),
 
             max(grB)+3, SWaitCnt(dscnt=-1, vlcnt=6, vscnt=-1, comment="Wait for previous GRA&GRB"),
             max(grB)+3, SBarrier(comment=""),
-
-            max(grA)+1, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Wait for previous GRA&GRB"),
-            max(grA)+1, SBarrier(comment=""),
-
-            waitLRB3, SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB3s to complete"),
+            
+            waitLRB3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB3s to complete"),
             waitLRB3+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB3s to complete"),
+
+            max(grA)+3, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Wait for previous GRA&GRB"),
+            max(grA)+3, SBarrier(comment=""),
 
             waitLRA3+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA3s to complete"),
         ]
@@ -3836,6 +3842,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
 
     kernel["MfmaInitCVgprs"] = True
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    opt1.disableValidation()
     return True, opt1
 
 @RegisterSchedule(
