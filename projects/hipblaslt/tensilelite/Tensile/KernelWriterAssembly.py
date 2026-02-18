@@ -987,7 +987,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(RegSet("v", "vgprLocalWriteAddrOverhangA", \
             self.states.a.startVgprLocalWriteAddr+1))
     if kernel["ProblemType"]["MXBlockA"]:
-      if not kernel["LocalWriteUseSgprA"] and self.states.mxsa.numVgprLocalWriteAddr > 0:
+      if not kernel["LocalWriteUseSgprMXSA"] and self.states.mxsa.numVgprLocalWriteAddr > 0:
         module.add(RegSet("v", "vgprLocalWriteAddrMXSA", \
             self.states.mxsa.startVgprLocalWriteAddr))
         if self.states.mxsa.numVgprLocalWriteAddr > 1:
@@ -1000,7 +1000,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(RegSet("v", "vgprLocalWriteAddrOverhangB", \
             self.states.b.startVgprLocalWriteAddr+1))
     if kernel["ProblemType"]["MXBlockB"]:
-      if not kernel["LocalWriteUseSgprB"] and self.states.mxsb.numVgprLocalWriteAddr > 0:
+      if not kernel["LocalWriteUseSgprMXSB"] and self.states.mxsb.numVgprLocalWriteAddr > 0:
         module.add(RegSet("v", "vgprLocalWriteAddrMXSB", \
             self.states.mxsb.startVgprLocalWriteAddr))
         if self.states.mxsb.numVgprLocalWriteAddr > 1:
@@ -1052,7 +1052,8 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["DirectToVgprA"]:
         # additional definition G2LA2 for swapping register sets
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LA2", "vgprG2LA_BASE", self.states.a.numVgprG2LAllocated//2))
-      if kernel["ProblemType"]["MXBlockA"]:
+    if kernel["ProblemType"]["MXBlockA"]:
+      if not kernel["DirectToLdsMXSA"] or self.do["KeepDirectToLdsAlloc"]:
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSA", "vgprG2LMXSA_BASE", 0))
         if kernel["DirectToVgprA"]:
           # additional definition G2LA2 for swapping register sets
@@ -1063,7 +1064,8 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["DirectToVgprB"]:
         # additional definition G2LB2 for swapping register sets
         moduleVgprMacroG2LB.add(RegSet("v", "vgprG2LB2", "vgprG2LB_BASE", self.states.b.numVgprG2LAllocated//2))
-      if kernel["ProblemType"]["MXBlockB"]:
+    if kernel["ProblemType"]["MXBlockB"]:
+      if not kernel["DirectToLdsMXSB"] or self.do["KeepDirectToLdsAlloc"]:
         moduleVgprMacroG2LB.add(RegSet("v", "vgprG2LMXSB", "vgprG2LMXSB_BASE", 0))
         if kernel["DirectToVgprB"]:
           # additional definition G2LB2 for swapping register sets
@@ -3293,7 +3295,7 @@ class KernelWriterAssembly(KernelWriter):
 
       module.add(VAddU32(dst=vgpr(grov), src0=vgpr(tmpv), src1=vgpr(grov), \
                          comment="final" ))
-      module.add(VLShiftLeftB32(dst=vgpr(grov), shiftHex=log2(tP["bpeGR"]), src=vgpr(grov)))
+      module.add(vectorMultiplyBpe(vgpr(grov), vgpr(grov), tP["bpeGR"]))
       ptrshift = int(self.states.srdShiftLeft[tc] * tP["bpeGR"])
       module.add(VAddU32(dst=vgpr(grov), src0=ptrshift , src1=vgpr(grov), \
                          comment="ptr-shift" ))
@@ -10161,11 +10163,13 @@ class KernelWriterAssembly(KernelWriter):
       # Skip local write if DTVA or DTVB
       if not ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]):
         localWriteBody(tP)
-        if "MX" in tP:
-          localWriteBody(tP["MX"])
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         if tP["is_sparse"]:
           localWriteBody(tP["tpsMetadata"])
+    if "MX" in tP:
+      tcmx = tP["MX"]["tensorChar"]
+      if (not kernel["DirectToLds%s"%tcmx]) and (not kernel["DirectToVgpr%s"%tcmx]):
+        localWriteBody(tP["MX"])
 
     return imod
 
