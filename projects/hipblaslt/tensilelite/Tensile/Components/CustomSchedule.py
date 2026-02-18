@@ -72,19 +72,19 @@ class CMSKernelInfo:
     name: str
     dtype: str
     supported_layouts: list[str]
-    macro_tile_0: int
-    macro_tile_1: int
-    depth_u: int
-    prefetch_global_read: int
-    prefetch_local_read: int
-    direct_to_lds: bool
-    wave_separate_global_read_a: int
-    wave_separate_global_read_b: int
-    global_read_vector_width_a: int
-    global_read_vector_width_b: int
-    local_read_vector_width: int
-    matrix_instruction: list[int]
-    mi_wave_group: list[int]
+    MacroTile0: int
+    MacroTile1: int
+    DepthU: int
+    PrefetchGlobalRead: int
+    PrefetchLocalRead: int
+    DirectToLds: bool
+    WaveSeparateGlobalReadA: int
+    WaveSeparateGlobalReadB: int
+    GlobalReadVectorWidthA: int
+    GlobalReadVectorWidthB: int
+    LocalReadVectorWidth: int
+    MatrixInstruction: list[int]
+    MIWaveGroup: list[int]
 
     def matches(self, dtype: Optional[str] = None, layout: Optional[str] = None) -> bool:
         """Check if this kernel info matches the given dtype and/or layout filter.
@@ -104,24 +104,7 @@ class CMSKernelInfo:
 
     def to_dict(self) -> dict:
         """Return a dict of the minimum kernel parameters needed for this CMS kernel."""
-        return {
-            "name": self.name,
-            "dtype": self.dtype,
-            "supported_layouts": list(self.supported_layouts),
-            "MacroTile0": self.macro_tile_0,
-            "MacroTile1": self.macro_tile_1,
-            "DepthU": self.depth_u,
-            "PrefetchGlobalRead": self.prefetch_global_read,
-            "PrefetchLocalRead": self.prefetch_local_read,
-            "DirectToLds": self.direct_to_lds,
-            "WaveSeparateGlobalReadA": self.wave_separate_global_read_a,
-            "WaveSeparateGlobalReadB": self.wave_separate_global_read_b,
-            "GlobalReadVectorWidthA": self.global_read_vector_width_a,
-            "GlobalReadVectorWidthB": self.global_read_vector_width_b,
-            "LocalReadVectorWidth": self.local_read_vector_width,
-            "MatrixInstruction": list(self.matrix_instruction),
-            "MIWaveGroup": list(self.mi_wave_group),
-        }
+        return self.asdict()
 
 @dataclass
 class SyncSchedule:
@@ -652,7 +635,7 @@ class RegisterSchedule:
             dtype_predicate=is16bit,
             vector_widths=[8, 8, 8],
             matrix_inst=[16, 16, 32, 1],
-            mfma_wave_group=[2, 2],
+            mfma_wave_group=[2, 2]
         )
         def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
             ...
