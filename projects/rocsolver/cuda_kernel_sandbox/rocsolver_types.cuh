@@ -82,3 +82,24 @@ inline constexpr bool rocblas_is_complex = is_rocblas_complex<T>::value;
 
 // Unreachable macro
 #define ROCSOLVER_UNREACHABLE() __builtin_unreachable()
+
+// rocblas_erange - eigenvalue range specifier (for STEBZ)
+enum rocblas_erange {
+    rocblas_erange_all = 171,   // all eigenvalues
+    rocblas_erange_value = 172, // eigenvalues in (vl, vu] interval
+    rocblas_erange_index = 173  // eigenvalues with index il to iu
+};
+
+// rocblas_eorder - eigenvalue ordering (for STEBZ)
+enum rocblas_eorder {
+    rocblas_eorder_blocks = 181, // ordered within split blocks
+    rocblas_eorder_entire = 182  // ordered across entire matrix
+};
+
+// Block size constants for STEBZ
+#define STEBZ_SPLIT_THDS 256
+#define IBISEC_BLKS 64
+#define IBISEC_THDS 128
+
+// Generic block size for kernel launches
+#define BS1 256

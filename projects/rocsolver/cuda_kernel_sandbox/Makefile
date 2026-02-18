@@ -5,6 +5,7 @@
 # Usage:
 #   make                      # Build all sandboxes
 #   make sanitizer-racecheck  # Run racecheck on getf2_small
+#   make stebz-racecheck      # Run racecheck on stebz
 #   make clean                # Clean build artifacts
 
 NVCC ?= nvcc
@@ -13,7 +14,7 @@ NVCC ?= nvcc
 # -g: host debug info
 # -G: device debug info (required for racecheck)
 # -lineinfo: line number info in device code
-NVCC_FLAGS = -O0 -g -G -lineinfo --std=c++17
+NVCC_FLAGS = -O0 -g -G --std=c++17
 
 # CUDA architectures (adjust for your GPU)
 # Ampere: sm_80, sm_86
@@ -27,7 +28,7 @@ CUDA_ARCH ?= -gencode arch=compute_75,code=sm_75 \
 INCLUDES = -I. -I./kernels
 
 # All sandbox executables
-SANDBOXES = sandbox_getf2_small
+SANDBOXES = sandbox_getf2_small sandbox_stebz
 
 # Default target
 all: $(SANDBOXES)
@@ -40,12 +41,20 @@ sandbox_getf2_small: sandbox_getf2_small.cu \
                      device_helpers.cuh
 	$(NVCC) $(NVCC_FLAGS) $(CUDA_ARCH) $(INCLUDES) -o $@ $<
 
+sandbox_stebz: sandbox_stebz.cu \
+               kernels/stebz_kernels.cuh \
+               cuda_compat.cuh \
+               rocsolver_types.cuh \
+               device_helpers.cuh
+	$(NVCC) $(NVCC_FLAGS) $(CUDA_ARCH) $(INCLUDES) -o $@ $<
+
 # Clean
 clean:
 	rm -f $(SANDBOXES)
 
-# Compute Sanitizer targets
-# Note: These require CUDA Toolkit with compute-sanitizer installed
+###############################################################################
+# getf2_small Sanitizer Targets
+###############################################################################
 
 # Memory error detection
 sanitizer-memcheck: sandbox_getf2_small
@@ -67,7 +76,7 @@ sanitizer-initcheck: sandbox_getf2_small
 sanitizer-synccheck: sandbox_getf2_small
 	compute-sanitizer --tool synccheck ./sandbox_getf2_small
 
-# Run all sanitizer checks
+# Run all sanitizer checks on getf2_small
 sanitizer-all: sanitizer-memcheck sanitizer-racecheck sanitizer-initcheck sanitizer-synccheck
 
 # Custom test with parameters
@@ -82,15 +91,55 @@ test-custom: sandbox_getf2_small
 sanitizer-custom: sandbox_getf2_small
 	compute-sanitizer --tool racecheck ./sandbox_getf2_small $(M) $(N) $(BATCH)
 
+###############################################################################
+# STEBZ Sanitizer Targets
+###############################################################################
+
+STEBZ_N ?= 64
+STEBZ_BATCH ?= 1
+STEBZ_RANGE ?= all
+
+# Run stebz
+run-stebz: sandbox_stebz
+	./sandbox_stebz $(STEBZ_N) $(STEBZ_BATCH) $(STEBZ_RANGE)
+
+# Memory error detection for stebz
+stebz-memcheck: sandbox_stebz
+	compute-sanitizer --tool memcheck ./sandbox_stebz $(STEBZ_N) $(STEBZ_BATCH) $(STEBZ_RANGE)
+
+# Race condition detection for stebz
+stebz-racecheck: sandbox_stebz
+	compute-sanitizer --tool racecheck ./sandbox_stebz $(STEBZ_N) $(STEBZ_BATCH) $(STEBZ_RANGE)
+
+# More aggressive racecheck for stebz
+stebz-racecheck-all: sandbox_stebz
+	compute-sanitizer --tool racecheck --racecheck-report all ./sandbox_stebz $(STEBZ_N) $(STEBZ_BATCH) $(STEBZ_RANGE)
+
+# Uninitialized memory detection for stebz
+stebz-initcheck: sandbox_stebz
+	compute-sanitizer --tool initcheck ./sandbox_stebz $(STEBZ_N) $(STEBZ_BATCH) $(STEBZ_RANGE)
+
+# Synchronization error detection for stebz
+stebz-synccheck: sandbox_stebz
+	compute-sanitizer --tool synccheck ./sandbox_stebz $(STEBZ_N) $(STEBZ_BATCH) $(STEBZ_RANGE)
+
+# Run all sanitizer checks on stebz
+stebz-all: stebz-memcheck stebz-racecheck stebz-initcheck stebz-synccheck
+
+###############################################################################
 # Help
+###############################################################################
+
 help:
 	@echo "rocSOLVER Kernel Sandbox Build System"
 	@echo ""
 	@echo "Targets:"
 	@echo "  all                  - Build all sandbox executables"
+	@echo "  sandbox_getf2_small  - Build getf2_small sandbox"
+	@echo "  sandbox_stebz        - Build stebz sandbox"
 	@echo "  clean                - Remove built executables"
 	@echo ""
-	@echo "Sanitizer targets:"
+	@echo "getf2_small Sanitizer targets:"
 	@echo "  sanitizer-memcheck   - Run memory error detection"
 	@echo "  sanitizer-racecheck  - Run race condition detection"
 	@echo "  sanitizer-racecheck-all - Racecheck with full hazard reporting"
@@ -98,16 +147,28 @@ help:
 	@echo "  sanitizer-synccheck  - Run synchronization error detection"
 	@echo "  sanitizer-all        - Run all sanitizer checks"
 	@echo ""
+	@echo "STEBZ Sanitizer targets:"
+	@echo "  run-stebz            - Run stebz sandbox"
+	@echo "  stebz-memcheck       - Run memory error detection"
+	@echo "  stebz-racecheck      - Run race condition detection"
+	@echo "  stebz-racecheck-all  - Racecheck with full hazard reporting"
+	@echo "  stebz-initcheck      - Run uninitialized memory detection"
+	@echo "  stebz-synccheck      - Run synchronization error detection"
+	@echo "  stebz-all            - Run all sanitizer checks on stebz"
+	@echo ""
 	@echo "Custom test targets:"
-	@echo "  test-custom          - Run with custom params: make test-custom M=32 N=16 BATCH=4"
+	@echo "  test-custom          - Run getf2 with params: make test-custom M=32 N=16 BATCH=4"
 	@echo "  sanitizer-custom     - Run racecheck with custom params"
 	@echo ""
 	@echo "Variables:"
 	@echo "  NVCC                 - NVCC compiler path (default: nvcc)"
 	@echo "  CUDA_ARCH            - Target CUDA architectures"
-	@echo "  M, N, BATCH          - Matrix parameters for custom tests"
+	@echo "  M, N, BATCH          - getf2_small matrix parameters"
+	@echo "  STEBZ_N, STEBZ_BATCH, STEBZ_RANGE - stebz parameters"
 
 .PHONY: all clean help \
         sanitizer-memcheck sanitizer-racecheck sanitizer-racecheck-all \
         sanitizer-initcheck sanitizer-synccheck sanitizer-all \
-        test-custom sanitizer-custom
+        test-custom sanitizer-custom \
+        run-stebz stebz-memcheck stebz-racecheck stebz-racecheck-all \
+        stebz-initcheck stebz-synccheck stebz-all
