@@ -47,6 +47,9 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS_AI
 #include <miopen/conv/heuristics/ai_candidate_selection.hpp>
 #include <miopen/conv/heuristics/ai_conv_3d_kernel_tuning_utils.hpp>
 #endif
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include <miopen/ck_builder/factories/grouped_convolution_forward.hpp>
+#endif
 #endif
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 
@@ -124,10 +127,17 @@ using DeviceOpGFwdScalePtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdScale<DataType, ComputeType>>;
 
+#ifdef CK_EXPERIMENTAL_BUILDER
+template <typename DataType, typename ComputeType = DataType>
+using DeviceOpGFwdDefaultPtrs =
+    miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
+        DeviceOpGFwdDefault<DataType, ComputeType>>;
+#else
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGFwdDefaultPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdDefault<DataType, ComputeType>>;
+#endif
 
 namespace {
 

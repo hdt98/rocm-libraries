@@ -8,6 +8,7 @@ The grouped 2D forward convolution has been fully ported to the CK Builder frame
 - 8 instance data helpers in `instance_data/`
 - 1 factory dispatch header (`grouped_convolution_forward.hpp`)
 - Static compile-time tests
+- Runtime comparison tests (`test/gtest/ck_builder_xdl.cpp`)
 
 This plan covers porting the **remaining** `DeviceOperationInstanceFactory` uses found in MIOpen
 (documented in `DeviceOperationInstanceFactory_uses.md`) to the CK Builder framework.
@@ -44,6 +45,65 @@ The following files are already implemented and should be reused where applicabl
 - All elementwise operation aliases (PassThrough, Scale, Bilinear, Clamp, etc.)
 - `DeviceOperationInstanceFactory<DeviceOp>` primary template declaration
 
+### Runtime Test Infrastructure (`test/gtest/ck_builder_*.cpp`)
+
+Each phase must include runtime tests that compare the legacy CK factory instance list against the
+new CK builder factory instance list, ensuring 1:1 parity. The existing infrastructure for this is:
+
+- `test/gtest/ck_builder_shared.hpp` - Shared test utilities:
+  - `compare_instance_vectors(ckInstances, builderInstances)` - Compares two instance vectors by
+    converting each instance to a string via `GetInstanceString()`, sorting, and computing set
+    differences. Asserts:
+    1. Total count equality
+    2. No instances missing from CK Builder (`onlyInLegacyInstances == 0`)
+    3. No extra instances in CK Builder (`onlyInCKBuilderInstances == 0`)
+- `test/gtest/ck_builder_xdl.cpp` - Reference test (2D grouped forward):
+  - Defines `DeviceOpGFwdDefault<DataType>` using the CK `DeviceGroupedConvFwdMultipleABD` type
+  - Defines both `DeviceOpGFwdDefaultPtrs<DataType>` (CK factory) and
+    `DeviceOpGFwdBuilderPtrs<DataType>` (CK builder factory)
+  - Tests F32, F16, BF16, I8 data types with NHWGC/GKYXC/NHWGK layout
+- `test/gtest/CMakeLists.txt` - Tests are conditionally compiled behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
+  When enabled, test files link against `ck_builder` and `composable_kernel::device_conv_operations`.
+
+**Test pattern for each phase:**
+
+```cpp
+// 1. Include both CK and CK builder dispatch headers
+#include <ck/library/tensor_operation_instance/gpu/grouped_convolution_*.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_*.hpp>
+
+// 2. Define DeviceOp type alias with specific layouts and data types
+template <typename DataType, typename ComputeType = DataType>
+using DeviceOp = ck::tensor_operation::device::DeviceGroupedConv*<
+    NumDimSpatial, InLayout, WeiLayout, ..., DataType, ..., PassThrough, ...>;
+
+// 3. Define factory aliases for both CK and CK builder
+template <typename DataType, typename ComputeType = DataType>
+using CKFactory = ck::tensor_operation::device::instance::
+    DeviceOperationInstanceFactory<DeviceOp<DataType, ComputeType>>;
+template <typename DataType, typename ComputeType = DataType>
+using BuilderFactory = miopen::conv::ck_builder::instance::
+    DeviceOperationInstanceFactory<DeviceOp<DataType, ComputeType>>;
+
+// 4. Compare instances
+template <typename DataType>
+void CompareInstanceLists() {
+    auto ckInstances      = CKFactory<DataType>::GetInstances();
+    auto builderInstances = BuilderFactory<DataType>::GetInstances();
+    compare_instance_vectors(ckInstances, builderInstances);
+}
+
+// 5. TEST macros for each supported data type
+TEST(CPU_CKBuilder..._FP32, ...) { CompareInstanceLists<float>(); }
+TEST(CPU_CKBuilder..._FP16, ...) { CompareInstanceLists<ck::half_t>(); }
+// etc.
+```
+
+**Important:** Each test file should test with a representative layout combination that exercises
+the full dispatch path (all backends: XDL, WMMA, DL). If a factory supports multiple layout
+families, consider testing with the layout that covers the most backends (typically the `*GC/*GK`
+layouts like NHWGC/NDHWGC).
+
 ---
 
 ## Factories to Port
@@ -74,66 +134,94 @@ From `DeviceOperationInstanceFactory_uses.md`, the following factories remain:
 
 ## Phase Overview
 
-| Phase | Description | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers |
-|-------|-------------|-------------------|-----------------|------------|------------------|
-| 1 | Grouped Conv 3D/1D Forward (remaining .cpp) | 0 | 0 | ~78 | 0 |
-| 2 | Grouped Conv Backward Data (2D+3D) | 3 | ~9 | ~91 | 3 |
-| 3 | Grouped Conv Backward Weight (2D+3D) | 4 | ~12 | ~141 | 3 |
-| 4 | Forward Fused Operations | 0 | ~8 | ~50+ | 5 |
-| 5 | Non-Grouped Convolutions | 2 | ~2 | ~10 | 2 |
-| **Total** | | **~9** | **~31** | **~370+** | **~13** |
+| Phase | Description | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Runtime Tests |
+|-------|-------------|-------------------|-----------------|------------|------------------|---------------|
+| 1 | Grouped Conv 3D Forward (remaining .cpp) | 0 | 0 | ~86 | 0 | 1 test file |
+| 2 | Grouped Conv Backward Data (2D+3D) | 3 | ~9 | ~91 | 3 | 2 test files |
+| 3 | Grouped Conv Backward Weight (2D+3D) | 4 | ~12 | ~141 | 3 | 2 test files |
+| 4 | Forward Fused Operations | 0 | ~8 | ~50+ | 5 | 5 test files |
+| 5 | Non-Grouped Convolutions | 2 | ~2 | ~10 | 2 | 2 test files |
+| **Total** | | **~9** | **~31** | **~370+** | **~13** | **~13 test files** |
 
 ---
 
-## Phase 1: Grouped Conv 3D/1D Forward (Remaining .cpp Files)
+## Phase 1: Grouped Conv 3D Forward (Remaining .cpp Files)
 
 **Covers entries:** #9-11 (3D forward default/bilinear/scale)
 
-The forward factory instance headers (`.hpp`) are already converted and shared across 1D/2D/3D.
-The factory dispatch header (`grouped_convolution_forward.hpp`) already dispatches for 1D and 3D.
+The forward factory instance headers (`.hpp`) are already converted and shared across 2D/3D.
+The factory dispatch header (`grouped_convolution_forward.hpp`) already dispatches for 3D.
 Only the `.cpp` source files need conversion.
 
 ### 1.1 CK Source Locations
 
 | Directory | Files | Description |
 |-----------|-------|-------------|
-| `grouped_conv3d_fwd/xdl/` | ~50 | XDL 3D forward |
-| `grouped_conv3d_fwd/wmma/` | ~24 | WMMA 3D forward |
-| `grouped_conv1d_fwd/xdl/` | 4 | XDL 1D forward |
-| **Total** | **~78** | |
+| `grouped_conv3d_fwd/xdl/` | ~62 | XDL 3D forward (base, comp, mem, merged_groups, large_tensor) |
+| `grouped_conv3d_fwd/wmma/` | ~24 | WMMA 3D forward (base, cshufflev3, large_tensor) |
+| **Total** | **~86** | (74 .cpp + 12 .in sharded templates) |
 
 ### 1.2 Work Items
 
 #### Step 1.2.1: Convert .cpp Source Files
 
-**Source:** `composablekernel/library/src/tensor_operation_instance/gpu/grouped_conv{1,3}d_fwd/`
-**Target:** `factories/grouped_conv{1,3}d_fwd/`
+**Source:** `composablekernel/library/src/tensor_operation_instance/gpu/grouped_conv3d_fwd/`
+**Target:** `factories/grouped_conv3d_fwd/`
 
 Follow the exact same conversion pattern as the completed 2D forward conversion
 (`CPP_CONVERSION_PLAN.md`). The factory functions used are the same ones already in
 `factories/grouped_conv_fwd/device_grouped_conv_fwd_*_instance.hpp`.
 
 **Key difference from 2D:** 3D files use 3D layouts (GNDHWC, GKZYXC, GNDHWK, NDHWGC, NDHWGK, etc.)
-and pass `spatial_dim = 3`. 1D files use 1D layouts (GNWC, GKXC, GNWK) and pass `spatial_dim = 1`.
+and pass `spatial_dim = 3`.
 
 #### Step 1.2.2: Update CMakeLists.txt
 
 ```cmake
 # Grouped Conv3D Forward
 set(GROUPED_CONV3D_FWD_XDL_SOURCES ...)
+set(GROUPED_CONV3D_FWD_XDL_COMP_SOURCES ...)
+set(GROUPED_CONV3D_FWD_XDL_LARGE_TENSOR_SOURCES ...)
+set(GROUPED_CONV3D_FWD_XDL_MEM_SOURCES ...)
+set(GROUPED_CONV3D_FWD_XDL_MERGED_GROUPS_SOURCES ...)
 set(GROUPED_CONV3D_FWD_WMMA_SOURCES ...)
-
-# Grouped Conv1D Forward
-set(GROUPED_CONV1D_FWD_XDL_SOURCES ...)
+set(GROUPED_CONV3D_FWD_WMMA_CSHUFFLEV3_SOURCES ...)
+set(GROUPED_CONV3D_FWD_WMMA_LARGE_TENSOR_SOURCES ...)
 ```
+
+#### Step 1.2.3: Add Runtime Tests
+
+Create runtime comparison tests that verify the CK builder factory produces the same instance
+list as the legacy CK factory for 3D forward convolutions.
+
+**Test file: `test/gtest/ck_builder_grouped_fwd_conv3d.cpp`**
+
+```cpp
+// DeviceOp: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Empty_Tuple, NDHWGK,
+//           DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, PassThrough>
+// Data types to test: F32, F16, BF16, I8
+// Test names: CPU_CKBuilderGroupedFwdConv3D_{FP32,FP16,BFP16,I8}
+```
+
+Update `test/gtest/CMakeLists.txt` to register the test file behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
+
+#### Step 1.2.4: Update Solver Files
+
+Update the 3D forward solver to use the CK Builder factory behind `#ifdef CK_EXPERIMENTAL_BUILDER`:
+
+- `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_fwd_xdlops.cpp` - Add conditional include of
+  `<miopen/ck_builder/factories/grouped_convolution_forward.hpp>` and `#ifdef` branch for
+  `DeviceOpGFwdDefaultPtrs` to use `miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory`.
 
 ### 1.3 Checklist
 
 | Item | Status |
 |------|--------|
-| .cpp files: `grouped_conv3d_fwd/` (~74 files) | [ ] |
-| .cpp files: `grouped_conv1d_fwd/` (4 files) | [ ] |
-| CMakeLists.txt updated | [ ] |
+| .cpp files: `grouped_conv3d_fwd/` (74 .cpp + 12 .in) | [x] |
+| CMakeLists.txt updated | [x] |
+| Solver file: 3D fwd `#ifdef CK_EXPERIMENTAL_BUILDER` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d.cpp` | [ ] |
+| Test CMakeLists.txt updated | [ ] |
 
 ---
 
@@ -286,6 +374,42 @@ Update the solver files to use the ck_builder factories behind `#ifdef CK_EXPERI
 - `src/include/miopen/solver/implicitgemm_ck_util.hpp` (DeviceOpGBwdPtrs)
 - `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_bwd_xdlops.cpp` (3D backward data)
 
+#### Step 2.3.8: Add Runtime Tests
+
+Create runtime comparison tests for backward data factories.
+
+**Test file: `test/gtest/ck_builder_grouped_bwd_data_conv2d.cpp`**
+
+```cpp
+// DeviceOp: DeviceGroupedConvBwdDataMultipleD<2, NHWGK, GKYXC, Empty_Tuple, NHWGC,
+//           DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, PassThrough>
+// Data types to test: F32, F16, BF16
+// Test names: CPU_CKBuilderGroupedBwdDataConv2D_{FP32,FP16,BFP16}
+```
+
+**Test file: `test/gtest/ck_builder_grouped_bwd_data_conv3d.cpp`**
+
+```cpp
+// Default (PassThrough):
+// DeviceOp: DeviceGroupedConvBwdDataMultipleD<3, NDHWGK, GKZYXC, Empty_Tuple, NDHWGC,
+//           DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, PassThrough>
+// Data types: F32, F16, BF16
+
+// Bilinear:
+// DeviceOp: DeviceGroupedConvBwdDataMultipleD<3, NDHWGK, GKZYXC, Tuple<NDHWGC>, NDHWGC,
+//           DataType, DataType, Tuple<DataType>, DataType, PassThrough, PassThrough, Bilinear>
+// Data types: F32, F16, BF16
+
+// Scale:
+// DeviceOp: DeviceGroupedConvBwdDataMultipleD<3, NDHWGK, GKZYXC, Empty_Tuple, NDHWGC,
+//           DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, Scale>
+// Data types: F32, F16, BF16
+
+// Test names: CPU_CKBuilderGroupedBwdDataConv3D_{Default,Bilinear,Scale}_{FP32,FP16,BFP16}
+```
+
+Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
+
 ### 2.4 Checklist
 
 | Item | Status |
@@ -304,6 +428,9 @@ Update the solver files to use the ck_builder factories behind `#ifdef CK_EXPERI
 | .cpp files: `grouped_conv3d_bwd_data_scale/` (6 files) | [ ] |
 | CMakeLists.txt updated | [ ] |
 | Static tests | [ ] |
+| Runtime test: `ck_builder_grouped_bwd_data_conv2d.cpp` | [ ] |
+| Runtime test: `ck_builder_grouped_bwd_data_conv3d.cpp` | [ ] |
+| Test CMakeLists.txt updated | [ ] |
 | Solver file integration | [ ] |
 
 ---
@@ -422,6 +549,47 @@ set(GROUPED_CONV3D_BWD_WEIGHT_BILINEAR_SOURCES ...)
 set(GROUPED_CONV3D_BWD_WEIGHT_SCALE_SOURCES ...)
 ```
 
+#### Step 3.3.6: Add Runtime Tests
+
+Create runtime comparison tests for backward weight factories.
+
+**Test file: `test/gtest/ck_builder_grouped_bwd_weight_conv2d.cpp`**
+
+```cpp
+// DeviceOp: DeviceGroupedConvBwdWeight<2, NHWGC, GKYXC, NHWGK,
+//           DataType, DataType, DataType, PassThrough, PassThrough, PassThrough>
+// Data types to test: F32, F16, BF16
+// Test names: CPU_CKBuilderGroupedBwdWeightConv2D_{FP32,FP16,BFP16}
+```
+
+> **Note:** `DeviceGroupedConvBwdWeight` uses a different DeviceOp type than forward/backward-data.
+> It does NOT have `DsLayout`/`DsDataTypes` in the base form. The test must use
+> `DeviceGroupedConvBwdWeight` (not `DeviceGroupedConvBwdWeightMultipleD`) for the default
+> (PassThrough) factory.
+
+**Test file: `test/gtest/ck_builder_grouped_bwd_weight_conv3d.cpp`**
+
+```cpp
+// Default (PassThrough):
+// DeviceOp: DeviceGroupedConvBwdWeight<3, NDHWGC, GKZYXC, NDHWGK,
+//           DataType, DataType, DataType, PassThrough, PassThrough, PassThrough>
+// Data types: F32, F16, BF16
+
+// Bilinear:
+// DeviceOp: DeviceGroupedConvBwdWeightMultipleD<3, NDHWGC, GKZYXC, Tuple<NDHWGK>, NDHWGK,
+//           DataType, DataType, Tuple<DataType>, DataType, PassThrough, Bilinear, PassThrough>
+// Data types: F32, F16, BF16
+
+// Scale:
+// DeviceOp: DeviceGroupedConvBwdWeightMultipleD<3, NDHWGC, GKZYXC, Empty_Tuple, NDHWGK,
+//           DataType, DataType, Empty_Tuple, DataType, PassThrough, Scale, PassThrough>
+// Data types: F32, F16, BF16
+
+// Test names: CPU_CKBuilderGroupedBwdWeightConv3D_{Default,Bilinear,Scale}_{FP32,FP16,BFP16}
+```
+
+Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
+
 ### 3.4 Checklist
 
 | Item | Status |
@@ -441,6 +609,9 @@ set(GROUPED_CONV3D_BWD_WEIGHT_SCALE_SOURCES ...)
 | .cpp files: `grouped_conv3d_bwd_weight_scale/` (7 files) | [ ] |
 | CMakeLists.txt updated | [ ] |
 | Static tests | [ ] |
+| Runtime test: `ck_builder_grouped_bwd_weight_conv2d.cpp` | [ ] |
+| Runtime test: `ck_builder_grouped_bwd_weight_conv3d.cpp` | [ ] |
+| Test CMakeLists.txt updated | [ ] |
 | Solver file integration | [ ] |
 
 ---
@@ -497,6 +668,63 @@ Each dispatch header specializes `DeviceOperationInstanceFactory` on the full
    - Check if `device_grouped_conv_fwd_xdl_outelementop_instance.hpp` and
      `device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_instance.hpp` are already converted
    - If not, convert them following the `GROUPED_CONV_FWD_CONVERSION_PLAN.md` pattern
+6. Add runtime tests (see Step 4.3.1)
+
+#### Step 4.3.1: Add Runtime Tests
+
+Create runtime comparison tests for each fused forward variant. All use
+`DeviceGroupedConvFwdMultipleABD` with different elementwise operations.
+
+**Test file: `test/gtest/ck_builder_grouped_fwd_bilinear.cpp`**
+
+```cpp
+// DeviceOp: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Tuple<NDHWGK>, NDHWGK,
+//           DataType, DataType, Tuple<DataType>, DataType, PassThrough, PassThrough, Bilinear>
+// Data types: F32, F16, BF16, I8
+// Test names: CPU_CKBuilderGroupedFwdBilinear_{FP32,FP16,BFP16,I8}
+```
+
+**Test file: `test/gtest/ck_builder_grouped_fwd_scale.cpp`**
+
+```cpp
+// DeviceOp: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Empty_Tuple, NDHWGK,
+//           DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, Scale>
+// Data types: F32, F16, BF16, I8
+// Test names: CPU_CKBuilderGroupedFwdScale_{FP32,FP16,BFP16,I8}
+```
+
+**Test file: `test/gtest/ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp`**
+
+```cpp
+// DeviceOp: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Tuple<NDHWGK, NDHWGK>, NDHWGK,
+//           F16, F16, Tuple<F16, F16>, F16, PassThrough, PassThrough, ScaleAddScaleAddRelu>
+// Data types: F16 only
+// Test names: CPU_CKBuilderGroupedFwdScaleAddScaleAddRelu_FP16
+```
+
+**Test file: `test/gtest/ck_builder_grouped_fwd_clamp.cpp`**
+
+```cpp
+// 2D: DeviceGroupedConvFwdMultipleABD<2, NHWGC, GKYXC, Empty_Tuple, NHWGK,
+//     DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, Clamp>
+// 3D: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Empty_Tuple, NDHWGK,
+//     DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, Clamp>
+// Data types: F32, F16, BF16
+// Test names: CPU_CKBuilderGroupedFwdClamp{2D,3D}_{FP32,FP16,BFP16}
+```
+
+**Test file: `test/gtest/ck_builder_grouped_fwd_bias_clamp.cpp`**
+
+```cpp
+// 2D: DeviceGroupedConvFwdMultipleABD<2, NHWGC, GKYXC, Tuple<NHWGK>, NHWGK,
+//     DataType, DataType, Tuple<DataType>, DataType, PassThrough, PassThrough, AddClamp>
+// 3D: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Tuple<NDHWGK>, NDHWGK,
+//     DataType, DataType, Tuple<DataType>, DataType, PassThrough, PassThrough, AddClamp>
+// Data types: F32, F16, BF16
+// Test names: CPU_CKBuilderGroupedFwdBiasClamp{2D,3D}_{FP32,FP16,BFP16}
+```
+
+Update `test/gtest/CMakeLists.txt` to register all 5 test files behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
 
 ### 4.4 Checklist
 
@@ -511,6 +739,12 @@ Each dispatch header specializes `DeviceOperationInstanceFactory` on the full
 | .cpp files for all fused directories | [ ] |
 | CMakeLists.txt updated | [ ] |
 | Missing factory instance headers (if any) | [ ] |
+| Runtime test: `ck_builder_grouped_fwd_bilinear.cpp` | [ ] |
+| Runtime test: `ck_builder_grouped_fwd_scale.cpp` | [ ] |
+| Runtime test: `ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp` | [ ] |
+| Runtime test: `ck_builder_grouped_fwd_clamp.cpp` | [ ] |
+| Runtime test: `ck_builder_grouped_fwd_bias_clamp.cpp` | [ ] |
+| Test CMakeLists.txt updated | [ ] |
 
 ---
 
@@ -550,6 +784,35 @@ justifying separate instance data.
    - `convolution_backward_data.hpp` - specializes `DeviceOperationInstanceFactory<DeviceConvBwdData<...>>`
 3. Convert `.cpp` source files
 4. Update CMakeLists.txt
+5. Add runtime tests (see Step 5.4.1)
+
+#### Step 5.4.1: Add Runtime Tests
+
+Create runtime comparison tests for non-grouped convolutions.
+
+**Test file: `test/gtest/ck_builder_conv_fwd.cpp`**
+
+```cpp
+// DeviceOp: DeviceConvFwd<2, NHWC, KYXC, NHWK,
+//           DataType, DataType, DataType, PassThrough, PassThrough, PassThrough>
+// Data types: F32, F16, BF16, I8
+// Test names: CPU_CKBuilderConvFwd_{FP32,FP16,BFP16,I8}
+```
+
+**Test file: `test/gtest/ck_builder_conv_bwd_data.cpp`**
+
+```cpp
+// DeviceOp: DeviceConvBwdData<2, NHWK, KYXC, NHWC,
+//           DataType, DataType, DataType, PassThrough, PassThrough, PassThrough>
+// Data types: F32, F16, BF16, I8
+// Test names: CPU_CKBuilderConvBwdData_{FP32,FP16,BFP16,I8}
+```
+
+> **Note:** The non-grouped `DeviceConvBwdData` swaps the output/input layout positions compared
+> to `DeviceConvFwd`. The first data type parameter corresponds to the output (gradient) and the
+> last to the input.
+
+Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
 
 ### 5.5 Checklist
 
@@ -561,6 +824,9 @@ justifying separate instance data.
 | .cpp files: `conv2d_fwd/` (~5 files) | [ ] |
 | .cpp files: `conv2d_bwd_data/` (~5 files) | [ ] |
 | CMakeLists.txt updated | [ ] |
+| Runtime test: `ck_builder_conv_fwd.cpp` | [ ] |
+| Runtime test: `ck_builder_conv_bwd_data.cpp` | [ ] |
+| Test CMakeLists.txt updated | [ ] |
 
 ---
 
@@ -631,8 +897,7 @@ src/kernels/ck_builder/
 │   └── shared.hpp                              (existing)
 ├── factories/
 │   ├── grouped_conv2d_fwd/                     (existing - 96 .cpp)
-│   ├── grouped_conv3d_fwd/                     (NEW - Phase 3, ~74 .cpp)
-│   ├── grouped_conv1d_fwd/                     (NEW - Phase 3, ~4 .cpp)
+│   ├── grouped_conv3d_fwd/                     (NEW - Phase 1, ~86 files)
 │   ├── grouped_conv3d_fwd_bilinear/            (NEW - Phase 4)
 │   ├── grouped_conv3d_fwd_scale/               (NEW - Phase 4)
 │   ├── grouped_conv3d_fwd_scaleadd_scaleadd_relu/ (NEW - Phase 4)
@@ -651,6 +916,22 @@ src/kernels/ck_builder/
 │   ├── conv2d_fwd/                             (NEW - Phase 5, ~5 .cpp)
 │   └── conv2d_bwd_data/                        (NEW - Phase 5, ~5 .cpp)
 └── static_tests/                               (existing + NEW tests)
+
+test/gtest/
+├── ck_builder_shared.hpp                        (existing - shared test utilities)
+├── ck_builder_xdl.cpp                           (existing - 2D grouped fwd)
+├── ck_builder_grouped_fwd_conv3d.cpp            (NEW - Phase 1)
+├── ck_builder_grouped_bwd_data_conv2d.cpp       (NEW - Phase 2)
+├── ck_builder_grouped_bwd_data_conv3d.cpp       (NEW - Phase 2)
+├── ck_builder_grouped_bwd_weight_conv2d.cpp     (NEW - Phase 3)
+├── ck_builder_grouped_bwd_weight_conv3d.cpp     (NEW - Phase 3)
+├── ck_builder_grouped_fwd_bilinear.cpp          (NEW - Phase 4)
+├── ck_builder_grouped_fwd_scale.cpp             (NEW - Phase 4)
+├── ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp (NEW - Phase 4)
+├── ck_builder_grouped_fwd_clamp.cpp             (NEW - Phase 4)
+└── ck_builder_grouped_fwd_bias_clamp.cpp        (NEW - Phase 4)
+├── ck_builder_conv_fwd.cpp                      (NEW - Phase 5)
+└── ck_builder_conv_bwd_data.cpp                 (NEW - Phase 5)
 ```
 
 ---
@@ -664,13 +945,15 @@ Phase 1 (Bwd Data)     Phase 2 (Bwd Weight)
     ├─ factory headers      ├─ factory headers
     ├─ dispatch headers     ├─ dispatch headers
     ├─ .cpp files           ├─ .cpp files
+    ├─ runtime tests        ├─ runtime tests
     └─ solver integration   └─ solver integration
 
-Phase 3 (3D/1D Fwd)    Phase 4 (Fwd Fused)     Phase 5 (Non-Grouped)
+Phase 3 (3D Fwd)       Phase 4 (Fwd Fused)     Phase 5 (Non-Grouped)
     │                       │                        │
     ├─ .cpp files only      ├─ dispatch headers      ├─ instance_data (maybe)
-    └─ CMakeLists           ├─ .cpp files            ├─ dispatch headers
-                            └─ solver integration    ├─ .cpp files
+    ├─ solver integration   ├─ .cpp files            ├─ dispatch headers
+    ├─ runtime tests        ├─ runtime tests         ├─ .cpp files
+    └─ CMakeLists           └─ solver integration    ├─ runtime tests
                                                      └─ solver integration
 ```
 
@@ -680,11 +963,11 @@ Phase 3 (3D/1D Fwd)    Phase 4 (Fwd Fused)     Phase 5 (Non-Grouped)
 
 ## Summary
 
-| Phase | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Solver Files |
-|-------|-------------------|-----------------|------------|------------------|--------------|
-| 1 - Bwd Data | 3 | ~9 | ~91 | 3 + .inc | 2 |
-| 2 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 3 |
-| 3 - 3D/1D Fwd | 0 | 0 | ~78 | 0 | 0 |
-| 4 - Fwd Fused | 0 | 0-8 | ~65 | 5 + .inc | 3 |
-| 5 - Non-Grouped | 2 | ~2 | ~10 | 2 | 2 |
-| **Total** | **~9** | **~23-31** | **~385** | **~13** | **~10** |
+| Phase | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Runtime Tests | Solver Files |
+|-------|-------------------|-----------------|------------|------------------|---------------|--------------|
+| 1 - 3D Fwd | 0 | 0 | ~86 | 0 | 1 | 1 |
+| 2 - Bwd Data | 3 | ~9 | ~91 | 3 + .inc | 2 | 2 |
+| 3 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 2 | 3 |
+| 4 - Fwd Fused | 0 | 0-8 | ~65 | 5 + .inc | 5 | 3 |
+| 5 - Non-Grouped | 2 | ~2 | ~10 | 2 | 2 | 2 |
+| **Total** | **~9** | **~23-31** | **~393** | **~13** | **12** | **~11** |
