@@ -433,9 +433,11 @@ def hasCustomSchedule(kernel):
 
     useLDSTr = kernel["LDSTrInst"]
     TLDS = kernel["TransposeLDS"]
+    vwa = kernel["VectorWidthA"]
+    vwb = kernel["VectorWidthB"]
     
     for schedule_func in _SCHEDULE_REGISTRY:
-        status, schedule = schedule_func(kernel, useLDSTr, TLDS)
+        status, schedule = schedule_func(kernel, useLDSTr, TLDS, vwa, vwb)
         if status == ScheduleMatchStatus.FOUND:
             return True, schedule
         elif status == ScheduleMatchStatus.UNSUPPORTED_VARIANT:
@@ -503,7 +505,7 @@ class RegisterSchedule:
             matrix_inst=[16, 16, 32, 1],
             mfma_wave_group=[2, 2]
         )
-        def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
+        def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
             ...
     """
     
@@ -526,7 +528,7 @@ class RegisterSchedule:
     
     def __call__(self, func: Callable) -> Callable:
         """Wrap the function with matching logic and register it."""
-        def wrapped_func(kernel: dict, useLDSTr: bool, TLDS: int) -> tuple[ScheduleMatchStatus, Optional[ScheduleInfo]]:
+        def wrapped_func(kernel: dict, useLDSTr: bool, TLDS: int, vwa: int, vwb: int) -> tuple[ScheduleMatchStatus, Optional[ScheduleInfo]]:
             # TODO: Currently ULSGRO not checked for in CMS, disabled for now
             if kernel["UnrollLoopSwapGlobalReadOrder"]:
                 return ScheduleMatchStatus.NO_MATCH, None
@@ -554,7 +556,7 @@ class RegisterSchedule:
                 return ScheduleMatchStatus.NO_MATCH, None
             
             # All wrapper criteria matched - call inner function
-            match, schedule = func(kernel, useLDSTr, TLDS)
+            match, schedule = func(kernel, useLDSTr, TLDS, vwa, vwb)
             
             if match:
                 return ScheduleMatchStatus.FOUND, schedule
@@ -573,7 +575,7 @@ class RegisterSchedule:
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
 
     optSchedule = dict()
     syncCode = []
@@ -621,7 +623,7 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
             'LWSB'   : [[42]],  # swap after last gr b
             'LCC'   : [[47, 47]],
         }
-    elif isNN(kernel) and useLDSTr and TLDS == 1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS == 1:
 
         nglshift = nllshift = 11
 
@@ -684,11 +686,11 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
-    if isNN(kernel) and useLDSTr and TLDS==1:
+    if isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         # TODO: This schedule can be improved when BC are resolved for MT192
         # Note: A/B Global read orders are swapped
         # i.e. GRA contains GR for B
@@ -768,7 +770,7 @@ def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
             }
         syncCode = syncTable[1::2]
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
-    elif isNT(kernel) and not useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and not useLDSTr and TLDS == 0:
         optSchedule = {
             'SYNC'  : [[-1, 25, 25, 46, 46, 55, 55, 72, 72]],
             'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
@@ -822,7 +824,7 @@ def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 96
     optSchedule = dict()
     syncCode = []
@@ -869,7 +871,7 @@ def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS):
         syncCode = syncTable[1::2]
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         kernel["SwapGlobalReadOrder"] = True
         #index and code pair
         syncTable = [-1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="for LRB1"),
@@ -907,7 +909,7 @@ def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS):
         syncCode = syncTable[1::2]
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNN(kernel) and useLDSTr and TLDS == 1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS == 1:
         kernel["SwapGlobalReadOrder"] = True
         #index and code pair
         syncTable = [-1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRA1"),
@@ -960,7 +962,7 @@ def _get_schedule_256x192x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 128, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
 
@@ -1013,7 +1015,7 @@ def _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
 
@@ -1051,7 +1053,7 @@ def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
                     SBarrier(comment=""),
                     SWaitCnt(dscnt=5, vlcnt=-1, vscnt=-1, comment="Wait for LRA1 and 3/8 LRB1 to complete")]
         nglshift = nllshift = 16
-    elif isNT(kernel) and not useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and not useLDSTr and TLDS == 0:
         kernel["UsePLRPack"] = True
 
         optSchedule = {
@@ -1095,7 +1097,7 @@ def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
                     SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait for LRA1 to complete"),
                     SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for LRB1 to complete")]
         nglshift = nllshift = 16
-    elif (isNN(kernel) or isTT(kernel)) and not useLDSTr and TLDS == 1:
+    elif ((isNN(kernel) and vwa==1) or (isTT(kernel) and vwb==1)) and not useLDSTr and TLDS == 1:
         kernel["UsePLRPack"] = True
 
         optSchedule = {
@@ -1159,7 +1161,7 @@ def _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 80
     optSchedule = dict()
     syncCode = []
@@ -1210,7 +1212,7 @@ def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS):
                    ]
         nglshift = nllshift = 13 # vmcnt shift for ngl and nll
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNN(kernel) and useLDSTr and TLDS==1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         kernel["SwapGlobalReadOrder"] = True
         optSchedule = {
             'SYNC'   : [[-1,
@@ -1248,7 +1250,7 @@ def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS):
                     SBarrier(comment="")]
         nglshift = nllshift = 13
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNT(kernel) and useLDSTr and TLDS==0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS==0:
         optSchedule = {
             'SYNC': [[-1,17,17,57,57]],
             'GRA': [[16,17,20,20,24,24,28,28,31,31]],
@@ -1288,7 +1290,7 @@ def _get_schedule_160x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     kernel["MfmaInitCVgprs"] = True
 
     numMfma = 48
@@ -1364,7 +1366,7 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
 
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift, mfmaReorder=mfmaReorder)
 
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         # A: MIWaveTileA=3 => 2*3 = 6 local/global reads
         # B: MIWaveTileB=8 => 2*8 = 16 local/global reads
         syncTable = [
@@ -1431,10 +1433,10 @@ def _get_schedule_96x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     numMfma = 80
-    if isNN(kernel) and useLDSTr and TLDS==1:
+    if isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         kernel["SwapGlobalReadOrder"] = True
         optSchedule = {
             'SYNC'   : [[-1,
@@ -1521,7 +1523,7 @@ def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS):
         syncCode = syncTable[1::2]
         nglshift = nllshift = 13
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNT(kernel) and useLDSTr and TLDS==0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS==0:
         nglshift = nllshift = 0
         kernel["SwapGlobalReadOrder"] = True
         optSchedule = {
@@ -1562,7 +1564,7 @@ def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[4, 1]
 )
-def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0
@@ -1595,7 +1597,7 @@ def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS):
             SWaitCnt(dscnt=-1, vlcnt=38, vscnt=-1, comment="wait for global reads before using data"),
             SBarrier(comment="earlier final barrier to reduce idle time"),
         ]
-    elif isNT(kernel) and TLDS==0 and useLDSTr:
+    elif isNT(kernel) and vwa==1 and vwb==1 and TLDS==0 and useLDSTr:
         optSchedule = {
             'LRA0': [[0, 1, 1, 2, 2, 3, 3, 4]],
             'LRB0': [[0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]],
@@ -1623,7 +1625,7 @@ def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS):
             SWaitCnt(dscnt=-1, vlcnt=27, vscnt=-1, comment="wait for 54 global reads before idx 96 (16 GRA + 38 GRB). vlcnt = 38 - 11 = 27"),
             SBarrier(comment="barrier at idx 96 - before LRA1/LRB1 start at 98"),
         ]
-    elif isNN(kernel) and TLDS==1 and useLDSTr:
+    elif isNN(kernel) and vwa==1 and TLDS==1 and useLDSTr:
         optSchedule = {
                 'GRIncA': [[0, 0, 0, 1, 1, 1, 2, 2, 2]],
                 'GRIncB': [[3, 3, 3, 4, 4, 4, 5, 5, 5]],
@@ -1666,7 +1668,7 @@ def _get_schedule_256x240x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[4, 1]
 )
-def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0
@@ -1701,7 +1703,7 @@ def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
 
         nglshift = nllshift = 34
 
-    elif isNN(kernel) and useLDSTr and TLDS==1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         kernel["SwapGlobalReadOrder"] = True
         nglshift = nllshift = 0
 
@@ -1785,7 +1787,7 @@ def _get_schedule_256x208x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     """192x128x64 TN schedule (BF16/FP16)."""
     kernel["MfmaInitCVgprs"] = True
 
@@ -1858,7 +1860,7 @@ def _get_schedule_192x128x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     numMfma = 56
@@ -1894,7 +1896,7 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
             SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Outstanding LR are all LRA so no need to wait. All of GR from previous iteration must be done."),
             SBarrier(comment="")
         ]
-    elif isNN(kernel) and useLDSTr and TLDS==1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         optSchedule = {
 
             'SYNC'   : [[-1,3, 16,16, 27, 35,35, 48,48]],
@@ -1933,7 +1935,7 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
                     SBarrier(comment=""),
                    ]
         nglshift = nllshift = 11 # vmcnt shift for ngl and nll
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         # Global read scheduling:
         # Each GR has two instructions (addr update + buffer_load), so we list them explicitly as
         # two adjacent MFMA indices per GR.
@@ -2009,7 +2011,7 @@ def _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_224x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_224x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     optSchedule = dict()
     syncCode = []
@@ -2051,7 +2053,7 @@ def _get_schedule_224x256x64_16bit(kernel, useLDSTr, TLDS):
             SBarrier(comment=""),
         ]
         nglshift = nllshift = 15
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         optSchedule = {
             'SYNC'   : [[-1, 21, 21, 51, 51, 79, 79]],
             'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
@@ -2096,13 +2098,13 @@ def _get_schedule_224x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 120
     nllZeroDscnt = False
     syncs = SyncSchedule()
     gr_inc_step = 0
 
-    if isNN(kernel) and useLDSTr and TLDS==1:
+    if isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         syncs.add(-1, dscnt=9, comment="wait for all LRA1 and one item from LRB1 before starting the sub-iteration")
         lra0   = [0,1,2,3,4,6,8,10,12,14,16,18]
 
@@ -2152,7 +2154,7 @@ def _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS):
 
         gr_inc_step = 1
 
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         lra0   = [0,1,3,5,7, 9,10,12,14,16, 18,19] # 12 loads
         lrb0   = [21,23,25,27,28, 30,32,34,36,37, 39,41,43,45,46, 48,50,52,54,55] # 20 loads
         # need two LRB1 items because a single LRB read gets only half of the data needed for MFMA
@@ -2224,7 +2226,7 @@ def _get_schedule_192x320x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x224x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_256x224x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
     optSchedule = dict()
     syncCode = []
@@ -2269,7 +2271,7 @@ def _get_schedule_256x224x64_16bit(kernel, useLDSTr, TLDS):
             SBarrier(comment=""),
         ]
         nglshift = nllshift = 15
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         optSchedule = {
             'SYNC': [[-1,6,
                        21,21,55,55,60,60]],
@@ -2322,12 +2324,12 @@ def _get_schedule_256x224x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_320x192x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_320x192x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
 
-    if isNN(kernel) and useLDSTr and TLDS == 1:
+    if isNN(kernel) and vwa==1 and useLDSTr and TLDS == 1:
         kernel["SwapGlobalReadOrder"] = True
         syncTable = [
             -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for LRA1 "),
@@ -2406,7 +2408,7 @@ def _get_schedule_320x192x64_16bit(kernel, useLDSTr, TLDS):
             SBarrier(comment="") ,
         ]
         nglshift = nllshift = 16
-    elif isNT(kernel) and useLDSTr and TLDS == 0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS == 0:
         kernel["SwapGlobalReadOrder"] = True
         # Note: A/B Global read orders are swapped
         # i.e. GRA contains GR for B
@@ -2459,7 +2461,7 @@ def _get_schedule_320x192x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[1, 4]
 )
-def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     if isTN(kernel) and TLDS==1:
@@ -2503,7 +2505,7 @@ def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
         numMfma = 120
         nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNT(kernel) and TLDS==0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and TLDS==0:
         optSchedule = {
             'SYNC': [[-1,24,24,59,59]],
             'LRA0': [[0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15]],
@@ -2531,7 +2533,7 @@ def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
         numMfma = 120
         nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2
         opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    elif isNN(kernel) and useLDSTr and TLDS==1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         optSchedule = {
             'SYNC': [[-1,
                       26,26,
@@ -2577,7 +2579,7 @@ def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[1, 4]
 )
-def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 104
     syncs = SyncSchedule()
 
@@ -2607,7 +2609,7 @@ def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS):
         lra1   = [73,74,75,76,78,82,84,86,88,90,92,94,96]
         lrb1   = [80,98,99,100]
 
-    elif isNN(kernel) and useLDSTr and TLDS==1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         syncs.add(-1, dscnt=3, comment="wait for all LRA1 and one item from LRB1 before starting the sub-iteration")
         grinca = [8,9,10,11,13,14,15,16,17]
         grincb = [19,20,21,22,23,24,25,26,27]
@@ -2633,7 +2635,7 @@ def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS):
         lwsa   = [84]
         lwsb   = [85]
 
-    elif isNT(kernel) and useLDSTr and TLDS==0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS==0:
         syncs.add(-1, dscnt=3, comment="wait for all LRA1 and one item from LRB1 before starting the sub-iteration")
         grinca = [8,9,10,11,13,14,15,16,17]
         grincb = [19,20,21,22,23,24,25,26,27]
@@ -2700,7 +2702,7 @@ def _get_schedule_208x256x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
 
@@ -2747,7 +2749,7 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
                     SBarrier(comment=""),
                    ]
         nglshift = nllshift = 11 # vmcnt shift for ngl and nll
-    elif isNN(kernel) and useLDSTr and TLDS==1:
+    elif isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         optSchedule = {
 
             'SYNC'   : [[-1,3, 12,12, 26,27, 45,45]],
@@ -2790,7 +2792,7 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
                    ]
         nglshift = nllshift = 11 # vmcnt shift for ngl and nll
     elif isNT(kernel) and useLDSTr and TLDS == 0:
-        valid, opt = _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS)
+        valid, opt = _get_schedule_224x128x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb)
         if not valid:
             return False, None
         optSchedule = switch_A_B_schedule(opt.optSchedule)
@@ -2810,7 +2812,7 @@ def _get_schedule_128x224x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     """128x192x64 TN schedule (BF16/FP16)."""
     kernel["MfmaInitCVgprs"] = True
 
@@ -2879,11 +2881,11 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
-    if isNN(kernel) and not useLDSTr and TLDS==1:
+    if isNN(kernel) and vwa==1 and not useLDSTr and TLDS==1:
         # TODO: Add NN schedule in upcoming PR
         return False, None
     elif isTN(kernel) and not useLDSTr and TLDS==1:
@@ -2927,7 +2929,7 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
         }
         syncCode = syncTable[1::2]
         nglshift = nllshift = 10
-    elif isNT(kernel) and useLDSTr and TLDS==0:
+    elif isNT(kernel) and vwa==1 and vwb==1 and useLDSTr and TLDS==0:
         # TODO: Add NT schedule in upcoming PR
         return False, None
     else:
@@ -2945,7 +2947,7 @@ def _get_schedule_128x192x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 144
     optSchedule = dict()
     syncCode = []
@@ -3084,7 +3086,7 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
         }
 
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
-    elif isNN(kernel) and TLDS==1:
+    elif isNN(kernel) and vwa==1 and TLDS==1:
         kernel["UsePLRPack"] = True
         kernel["UseMFMAF32XEmulation"] = True
         kernel["UseDot2F32XEmulation"] = False
@@ -3275,7 +3277,7 @@ def _get_schedule_192x256x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x192x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_256x192x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 144
     optSchedule = dict()
     syncCode = []
@@ -3366,7 +3368,7 @@ def _get_schedule_256x192x32_TF32(kernel, useLDSTr, TLDS):
         nglshift = nllshift = 14 # vmcnt shift for ngl and nll
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
 
-    elif isNN(kernel) and TLDS==1:
+    elif isNN(kernel) and vwa==1 and TLDS==1:
         kernel["UsePLRPack"] = True
         kernel["UseMFMAF32XEmulation"] = True
         
@@ -3555,7 +3557,7 @@ def _get_schedule_256x192x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 192
     optSchedule = dict()
     syncCode = []
@@ -3694,7 +3696,7 @@ def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
@@ -3782,7 +3784,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x128x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_128x128x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     n_mfma = 4 * 4 * 3    # 128 MT0 / 2 WT0 / 16 mfma dim  * 128/2/16 * 3 bf16 MFMAs per tf32 mfma
 
     optSchedule = dict()
@@ -3871,7 +3873,7 @@ def _get_schedule_128x128x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[32, 32, 16, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x128x32_TF32_plr1(kernel, useLDSTr, TLDS):
+def _get_schedule_128x128x32_TF32_plr1(kernel, useLDSTr, TLDS, vwa, vwb):
     n_mfma = 128//2//32 * 128//2//32 * 3 * 2    # 128 MT0 / 2 WT0 / 32 mfma dim  * 128/2/32 * 3 bf16 MFMAs per tf32 mfma * 2 PLR=1
 
     optSchedule = dict()
@@ -3919,7 +3921,7 @@ def _get_schedule_128x128x32_TF32_plr1(kernel, useLDSTr, TLDS):
         lwsa   = [                                                                          20] # use delay before mfma4x4x4
         lwsb   = [                                                                          20]
         
-    elif isNN(kernel) and TLDS==1:
+    elif isNN(kernel) and vwa==1 and TLDS==1:
         lra0   = [0,0,0,0,
                    1,1,1,1,
                     2,2,2,2,
@@ -4004,7 +4006,7 @@ def _get_schedule_128x128x32_TF32_plr1(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x128x64_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_128x128x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     n_mfma = 96
     optSchedule = dict()
     nglshift = nllshift = 0
@@ -4098,7 +4100,7 @@ def _get_schedule_128x128x64_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 96
     optSchedule = dict()
     syncCode = []
@@ -4272,7 +4274,7 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
             'PackA3' : [packA3],
         }
         nglshift = nllshift = 12 # vmcnt shift for ngl and nll
-    elif isNN(kernel) and TLDS==1:
+    elif isNN(kernel) and vwa==1 and TLDS==1:
         return False, None
         # kernel["UsePLRPack"] = True
         # kernel["UseMFMAF32XEmulation"] = True
@@ -4415,7 +4417,7 @@ def _get_schedule_128x256x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     n_mfma = 120
     optSchedule = dict()
     nglshift = nllshift = 0
@@ -4508,7 +4510,7 @@ def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_256x128x32_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_256x128x32_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 96
     optSchedule = dict()
     syncCode = []
@@ -4606,7 +4608,7 @@ def _get_schedule_256x128x32_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     n_mfma = 48
     optSchedule = dict()
     nglshift = nllshift = 0
@@ -4698,8 +4700,8 @@ def _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x64x64_TF32(kernel, useLDSTr, TLDS):
-    valid, opt = _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS)
+def _get_schedule_128x64x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
+    valid, opt = _get_schedule_64x128x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb)
     if not valid:
         return False, None
 
@@ -4713,7 +4715,7 @@ def _get_schedule_128x64x64_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
+def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb):
     n_mfma = 120
     optSchedule = dict()
     nglshift = nllshift = 0
@@ -4721,7 +4723,7 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
     syncs = SyncSchedule()
     syncCode = []
 
-    if isNN(kernel) and useLDSTr and TLDS==1:
+    if isNN(kernel) and vwa==1 and useLDSTr and TLDS==1:
         kernel["UseMFMAF32XEmulation"] = True
         kernel["UsePLRPack"] = True
         syncs.add(11, dscnt=8, comment="wait for LRB0 before pack to complete")
@@ -4816,7 +4818,7 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
         opt1 = ScheduleInfo(2, n_mfma, optSchedule, syncCode, nglshift, nllshift)
 
     elif isTN(kernel) and not useLDSTr and TLDS==1:
-        valid, opt = _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS)
+        valid, opt = _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS, vwa, vwb)
         if not valid:
             return False, None
         optSchedule = switch_A_B_schedule(opt.optSchedule)
@@ -4836,14 +4838,14 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
     matrix_inst=[16, 16, 32, 1],
     mfma_wave_group=[2, 2]
 )
-def _get_schedule_128x256x64_16bit(kernel, useLDSTr, TLDS):
+def _get_schedule_128x256x64_16bit(kernel, useLDSTr, TLDS, vwa, vwb):
     numMfma = 64
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0
-    if isNN(kernel) and useLDSTr and TLDS == 1:
+    if isNN(kernel) and vwa==1 and useLDSTr and TLDS == 1:
         lra0 = [create_range(min_val = 1, num = 4, step = 2, repeat = 2),
-                create_range(min_val = 0, num = 4, step = 2, repeat = 2)]
+        create_range(min_val = 0, num = 4, step = 2, repeat = 2)]
 
         GRIncA = [create_range(min_val = 2, num = 3, step = 2, repeat = 3),
                   create_range(min_val = 1, num = 3, step = 2, repeat = 3)]
