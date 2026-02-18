@@ -24,11 +24,14 @@
 ################################################################################
 
 import re
+from collections.abc import Iterable
 
 
 # Remove the text between the first occurance of start and the first occurrence of stop,
 # after start, where stop and start are compiled regex patterns.
-def remove_between_regex(text, start_regex, stop_regex):
+def remove_between_regex(
+    text: str, start_regex: re.Pattern[str], stop_regex: re.Pattern[str]
+) -> str:
     start_match = start_regex.search(text)
     if start_match:
         stop_match = stop_regex.search(text, start_match.end())
@@ -40,9 +43,12 @@ def remove_between_regex(text, start_regex, stop_regex):
 # Repeatedly remove text between the first occurance of start and the first occurrence
 # of stop, after start, until there are no more starts and stops, where stop and start
 # are compiled regex patterns.
-def remove_all_between_regex(text, start_regex, stop_regex):
+def remove_all_between_regex(
+    text: str, start_regex: re.Pattern[str], stop_regex: re.Pattern[str]
+) -> str:
     while True:
         start_match = start_regex.search(text)
+        stop_match = None
         if start_match:
             stop_match = stop_regex.search(text, start_match.end())
         if start_match and stop_match:
@@ -54,7 +60,7 @@ def remove_all_between_regex(text, start_regex, stop_regex):
 
 # Remove the text between the first occurance of start and the first occurrence of stop,
 # after start.
-def remove_between(text, start, stop):
+def remove_between(text: str, start: str, stop: str) -> str:
     return remove_between_regex(
         text,
         re.compile(re.escape(start)),
@@ -64,7 +70,7 @@ def remove_between(text, start, stop):
 
 # Repeatedly remove the text between the first occurance of start and the first
 # occurrence of stop, after start, until there are no more starts and stops.
-def remove_all_between(text, start, stop):
+def remove_all_between(text: str, start: str, stop: str) -> str:
     return remove_all_between_regex(
         text,
         re.compile(re.escape(start)),
@@ -74,8 +80,11 @@ def remove_all_between(text, start, stop):
 
 # Get the text between the first occurance of start and the first occurrence of stop,
 # after start, where stop and start are compiled regex patterns.
-def get_between_regex(text, start_regex, stop_regex):
+def get_between_regex(
+    text: str, start_regex: re.Pattern[str], stop_regex: re.Pattern[str]
+) -> str:
     start_match = start_regex.search(text)
+    stop_match = None
     if start_match:
         stop_match = stop_regex.search(text, start_match.end())
     if start_match and stop_match:
@@ -85,7 +94,7 @@ def get_between_regex(text, start_regex, stop_regex):
 
 # Get the text between the first occurance of start and the first occurrence of stop,
 # after start.
-def get_between(text, start, stop):
+def get_between(text: str, start: str, stop: str):
     return get_between_regex(
         text,
         re.compile(re.escape(start)),
@@ -94,12 +103,12 @@ def get_between(text, start, stop):
 
 
 # Clean up all of the lines by removing comments and whitespace
-def clean_lines(source_lines, leave_comments):
+def clean_lines(source_lines: Iterable[str], leave_comments: bool) -> list[str]:
     comment_start = re.compile(r"/\*")
     comment_end = re.compile(r"\*/")
     meta_start = re.compile(r"\.amdgpu_metadata")
     meta_end = re.compile(r"\.end_amdgpu_metadata")
-    result = []
+    result: list[str] = []
     full_text = "\n".join(source_lines)
     if not leave_comments:
         full_text = remove_all_between_regex(full_text, comment_start, comment_end)
