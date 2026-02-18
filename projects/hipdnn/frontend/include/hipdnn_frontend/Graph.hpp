@@ -714,75 +714,40 @@ public:
             }
         }
 
-        // Create OperationGraphBuilder
-        detail::ScopedHipdnnBackendDescriptor graphBuilder(
-            HIPDNN_BACKEND_OPERATIONGRAPH_BUILDER_DESCRIPTOR);
-        if(!graphBuilder.valid())
+        // Create GraphDescriptor directly (no separate builder needed)
+        detail::ScopedHipdnnBackendDescriptor graphDesc(HIPDNN_BACKEND_OPERATIONGRAPH_DESCRIPTOR);
+        if(!graphDesc.valid())
         {
-            return {ErrorCode::HIPDNN_BACKEND_ERROR,
-                    "Failed to create OperationGraphBuilder descriptor"};
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to create GraphDescriptor"};
         }
 
-        // Set handle on builder
+        // Set handle on graph
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendSetAttribute(graphBuilder.get(),
-                                                         HIPDNN_ATTR_OPERATIONGRAPH_BUILDER_HANDLE,
-                                                         HIPDNN_TYPE_HANDLE,
-                                                         1,
-                                                         &handle),
-            "Failed to set handle on OperationGraphBuilder");
+            detail::hipdnnBackend()->backendSetAttribute(
+                graphDesc.get(), HIPDNN_ATTR_OPERATIONGRAPH_HANDLE, HIPDNN_TYPE_HANDLE, 1, &handle),
+            "Failed to set handle on GraphDescriptor");
 
-        // Set tensors on builder (need to collect raw pointers)
-        std::vector<hipdnnBackendDescriptor_t> tensorDescPtrs;
-        tensorDescPtrs.reserve(tensorDescs.size());
-        for(auto& [uid, desc] : tensorDescs)
-        {
-            tensorDescPtrs.push_back(desc.get());
-        }
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
-                                             graphBuilder.get(),
-                                             HIPDNN_ATTR_OPERATIONGRAPH_BUILDER_TENSORS,
-                                             HIPDNN_TYPE_BACKEND_DESCRIPTOR,
-                                             static_cast<int64_t>(tensorDescPtrs.size()),
-                                             tensorDescPtrs.data()),
-                                         "Failed to set tensors on OperationGraphBuilder");
-
-        // Set operations on builder
+        // Set operations on graph (graph extracts tensors from operations automatically)
         std::vector<hipdnnBackendDescriptor_t> opDescPtrs;
         opDescPtrs.reserve(operations.size());
         for(auto& desc : operations)
         {
             opDescPtrs.push_back(desc.get());
         }
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
-                                             graphBuilder.get(),
-                                             HIPDNN_ATTR_OPERATIONGRAPH_BUILDER_OPERATIONS,
-                                             HIPDNN_TYPE_BACKEND_DESCRIPTOR,
-                                             static_cast<int64_t>(opDescPtrs.size()),
-                                             opDescPtrs.data()),
-                                         "Failed to set operations on OperationGraphBuilder");
-
-        // Finalize the builder (this creates the GraphDescriptor internally)
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendFinalize(graphBuilder.get()),
-            "Failed to finalize OperationGraphBuilder");
-
-        // Get the resulting graph descriptor from the builder.
-        // The returned descriptor holds a shared_ptr to the GraphDescriptor, keeping it alive
-        // even after the builder is destroyed.
-        hipdnnBackendDescriptor_t graphDescRaw = nullptr;
-        int64_t elementCount = 0;
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendGetAttribute(graphBuilder.get(),
-                                                         HIPDNN_ATTR_OPERATIONGRAPH_BUILDER_GRAPH,
+            detail::hipdnnBackend()->backendSetAttribute(graphDesc.get(),
+                                                         HIPDNN_ATTR_OPERATIONGRAPH_OPS,
                                                          HIPDNN_TYPE_BACKEND_DESCRIPTOR,
-                                                         1,
-                                                         &elementCount,
-                                                         &graphDescRaw),
-            "Failed to get graph descriptor from OperationGraphBuilder");
+                                                         static_cast<int64_t>(opDescPtrs.size()),
+                                                         opDescPtrs.data()),
+            "Failed to set operations on GraphDescriptor");
 
-        // Store the graph descriptor - it owns a shared_ptr to the internal GraphDescriptor
-        _graphDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(graphDescRaw);
+        // Finalize the graph (builds GraphT from operations internally)
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendFinalize(graphDesc.get()),
+                                         "Failed to finalize GraphDescriptor");
+
+        // Store the graph descriptor
+        _graphDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(std::move(graphDesc));
 
         return {ErrorCode::OK, ""};
     }

@@ -12,9 +12,53 @@ namespace hipdnn_backend
 
 void GraphDescriptor::finalize()
 {
-    THROW_IF_NULL(_graph, HIPDNN_STATUS_BAD_PARAM, "GraphDescriptor::finalize: graph is null");
     THROW_IF_NULL(_handle, HIPDNN_STATUS_BAD_PARAM, "GraphDescriptor::finalize: handle is null");
+
+    // If operations were set, build graph from them
+    if(!_operations.empty())
+    {
+        buildGraphFromOperations();
+    }
+
+    THROW_IF_NULL(_graph, HIPDNN_STATUS_BAD_PARAM, "GraphDescriptor::finalize: graph is null");
     HipdnnBackendDescriptorImpl<GraphDescriptor>::finalize();
+}
+
+void GraphDescriptor::buildGraphFromOperations()
+{
+    _graph = std::make_unique<hipdnn_data_sdk::data_objects::GraphT>();
+
+    // Collect unique tensors from operations
+    for(const auto& convOp : _operations)
+    {
+        // Get tensor descriptors from operation
+        auto xDesc = convOp->getXDesc();
+        auto wDesc = convOp->getWDesc();
+        auto yDesc = convOp->getYDesc();
+
+        // Add tensors (deduplicated by UID)
+        for(const auto& tensorDesc : {xDesc, wDesc, yDesc})
+        {
+            auto uid = tensorDesc->getData().uid;
+            if(_tensorUids.find(uid) == _tensorUids.end())
+            {
+                _tensorUids.insert(uid);
+                _graph->tensors.push_back(
+                    std::make_unique<hipdnn_data_sdk::data_objects::TensorAttributesT>(
+                        tensorDesc->getData()));
+            }
+        }
+
+        // Build node from operation
+        auto node = std::make_unique<hipdnn_data_sdk::data_objects::NodeT>();
+        node->compute_data_type = convOp->getComputeDataType();
+        node->attributes.Set(
+            hipdnn_data_sdk::data_objects::ConvolutionFwdAttributesT(convOp->getData()));
+        _graph->nodes.push_back(std::move(node));
+    }
+
+    // Clear the serialized buffer since we have a new graph
+    _graphSerializedBuffer = flatbuffers::DetachedBuffer();
 }
 
 void GraphDescriptor::setHandle(hipdnnBackendAttributeType_t attributeType,
@@ -52,6 +96,50 @@ void GraphDescriptor::getAttribute([[maybe_unused]] hipdnnBackendAttributeName_t
                           "GraphDescriptor::getAttribute: not supported");
 }
 
+void GraphDescriptor::setOperations(hipdnnBackendAttributeType_t attributeType,
+                                    int64_t elementCount,
+                                    const void* arrayOfElements)
+{
+    THROW_IF_NE(attributeType,
+                HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                HIPDNN_STATUS_BAD_PARAM,
+                "GraphDescriptor::setOperations: attributeType mismatch");
+    THROW_IF_NULL(arrayOfElements,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "GraphDescriptor::setOperations: arrayOfElements is null");
+
+    auto descriptors = static_cast<HipdnnBackendDescriptor* const*>(arrayOfElements);
+    for(int64_t i = 0; i < elementCount; ++i)
+    {
+        THROW_IF_NULL(descriptors[i],
+                      HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                      "GraphDescriptor::setOperations: descriptor is null");
+        THROW_IF_FALSE(descriptors[i]->isFinalized(),
+                       HIPDNN_STATUS_BAD_PARAM_NOT_FINALIZED,
+                       "GraphDescriptor::setOperations: Operation descriptor not finalized");
+
+        // For now, only support convolution forward
+        auto descType = descriptors[i]->getType();
+        if(descType == HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR)
+        {
+            auto opDesc
+                = HipdnnBackendDescriptor::unpackDescriptor<ConvolutionFwdOperationDescriptor>(
+                    descriptors[i],
+                    HIPDNN_STATUS_BAD_PARAM,
+                    "GraphDescriptor::setOperations: Failed to unpack conv fwd descriptor");
+            _operations.push_back(opDesc);
+        }
+        else
+        {
+            throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
+                                  "GraphDescriptor::setOperations: Unsupported operation type");
+        }
+    }
+
+    // Clear the serialized graph when operations are set
+    _graphSerializedBuffer = flatbuffers::DetachedBuffer();
+}
+
 void GraphDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                                    hipdnnBackendAttributeType_t attributeType,
                                    int64_t elementCount,
@@ -66,17 +154,14 @@ void GraphDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_OPERATIONGRAPH_HANDLE:
         setHandle(attributeType, elementCount, arrayOfElements);
         break;
+    case HIPDNN_ATTR_OPERATIONGRAPH_OPS:
+        setOperations(attributeType, elementCount, arrayOfElements);
+        break;
     default:
         throw HipdnnException(
             HIPDNN_STATUS_NOT_SUPPORTED,
             std::string("GraphDescriptor::setAttribute() is not supported for attribute ")
                 + hipdnn_backend::hipdnnGetAttributeNameString(attributeName) + ".");
-    }
-
-    if(attributeName != HIPDNN_ATTR_OPERATIONGRAPH_HANDLE)
-    {
-        // Clear the serialized graph when the graph is modified
-        _graphSerializedBuffer = flatbuffers::DetachedBuffer();
     }
 }
 

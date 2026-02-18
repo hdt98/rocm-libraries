@@ -84,7 +84,7 @@ void ConvolutionFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
         }
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_PRE_PADDINGS:
+    case HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::getAttribute(): attributeType mismatch");
@@ -99,7 +99,7 @@ void ConvolutionFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
         }
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_POST_PADDINGS:
+    case HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::getAttribute(): attributeType mismatch");
@@ -114,7 +114,7 @@ void ConvolutionFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
         }
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_STRIDES:
+    case HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::getAttribute(): attributeType mismatch");
@@ -129,7 +129,7 @@ void ConvolutionFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
         }
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_DILATIONS:
+    case HIPDNN_ATTR_CONVOLUTION_DILATIONS:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::getAttribute(): attributeType mismatch");
@@ -144,7 +144,7 @@ void ConvolutionFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
         }
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_CONV_MODE:
+    case HIPDNN_ATTR_CONVOLUTION_CONV_MODE:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::getAttribute(): attributeType mismatch");
@@ -159,7 +159,7 @@ void ConvolutionFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
         *static_cast<int64_t*>(arrayOfElements) = static_cast<int64_t>(_data.conv_mode);
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_COMPUTE_DATA_TYPE:
+    case HIPDNN_ATTR_CONVOLUTION_COMP_TYPE:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_DATA_TYPE,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::getAttribute(): attributeType mismatch");
@@ -234,7 +234,7 @@ void ConvolutionFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
         }
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_PRE_PADDINGS:
+    case HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::setAttribute(): attributeType mismatch");
@@ -242,7 +242,7 @@ void ConvolutionFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
                                  static_cast<const int64_t*>(arrayOfElements) + elementCount);
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_POST_PADDINGS:
+    case HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::setAttribute(): attributeType mismatch");
@@ -250,7 +250,7 @@ void ConvolutionFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
                                   static_cast<const int64_t*>(arrayOfElements) + elementCount);
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_STRIDES:
+    case HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::setAttribute(): attributeType mismatch");
@@ -258,7 +258,7 @@ void ConvolutionFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
                             static_cast<const int64_t*>(arrayOfElements) + elementCount);
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_DILATIONS:
+    case HIPDNN_ATTR_CONVOLUTION_DILATIONS:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::setAttribute(): attributeType mismatch");
@@ -266,7 +266,7 @@ void ConvolutionFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
                               static_cast<const int64_t*>(arrayOfElements) + elementCount);
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_CONV_MODE:
+    case HIPDNN_ATTR_CONVOLUTION_CONV_MODE:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::setAttribute(): attributeType mismatch");
@@ -277,7 +277,7 @@ void ConvolutionFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
             *static_cast<const int64_t*>(arrayOfElements));
         break;
 
-    case HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_COMPUTE_DATA_TYPE:
+    case HIPDNN_ATTR_CONVOLUTION_COMP_TYPE:
         THROW_IF_FALSE(attributeType == HIPDNN_TYPE_DATA_TYPE,
                        HIPDNN_STATUS_BAD_PARAM,
                        "ConvolutionFwdOperationDescriptor::setAttribute(): attributeType mismatch");

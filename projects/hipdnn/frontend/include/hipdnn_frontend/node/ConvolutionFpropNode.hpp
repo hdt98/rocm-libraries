@@ -531,50 +531,49 @@ public:
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv Y tensor"};
         }
 
-        // Set convolution parameters
+        // Set convolution parameters (using shared convolution attributes)
         auto& prePadding = attributes.get_pre_padding();
-        status = detail::hipdnnBackend()->backendSetAttribute(
-            opDesc.get(),
-            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_PRE_PADDINGS,
-            HIPDNN_TYPE_INT64,
-            static_cast<int64_t>(prePadding.size()),
-            prePadding.data());
+        status
+            = detail::hipdnnBackend()->backendSetAttribute(opDesc.get(),
+                                                           HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS,
+                                                           HIPDNN_TYPE_INT64,
+                                                           static_cast<int64_t>(prePadding.size()),
+                                                           prePadding.data());
         if(status != HIPDNN_STATUS_SUCCESS)
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv pre_padding"};
         }
 
         auto& postPadding = attributes.get_post_padding();
-        status = detail::hipdnnBackend()->backendSetAttribute(
-            opDesc.get(),
-            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_POST_PADDINGS,
-            HIPDNN_TYPE_INT64,
-            static_cast<int64_t>(postPadding.size()),
-            postPadding.data());
+        status
+            = detail::hipdnnBackend()->backendSetAttribute(opDesc.get(),
+                                                           HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS,
+                                                           HIPDNN_TYPE_INT64,
+                                                           static_cast<int64_t>(postPadding.size()),
+                                                           postPadding.data());
         if(status != HIPDNN_STATUS_SUCCESS)
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv post_padding"};
         }
 
         auto& stride = attributes.get_stride();
-        status = detail::hipdnnBackend()->backendSetAttribute(
-            opDesc.get(),
-            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_STRIDES,
-            HIPDNN_TYPE_INT64,
-            static_cast<int64_t>(stride.size()),
-            stride.data());
+        status
+            = detail::hipdnnBackend()->backendSetAttribute(opDesc.get(),
+                                                           HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES,
+                                                           HIPDNN_TYPE_INT64,
+                                                           static_cast<int64_t>(stride.size()),
+                                                           stride.data());
         if(status != HIPDNN_STATUS_SUCCESS)
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv stride"};
         }
 
         auto& dilation = attributes.get_dilation();
-        status = detail::hipdnnBackend()->backendSetAttribute(
-            opDesc.get(),
-            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_DILATIONS,
-            HIPDNN_TYPE_INT64,
-            static_cast<int64_t>(dilation.size()),
-            dilation.data());
+        status = detail::hipdnnBackend()->backendSetAttribute(opDesc.get(),
+                                                              HIPDNN_ATTR_CONVOLUTION_DILATIONS,
+                                                              HIPDNN_TYPE_INT64,
+                                                              static_cast<int64_t>(dilation.size()),
+                                                              dilation.data());
         if(status != HIPDNN_STATUS_SUCCESS)
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv dilation"};
@@ -582,11 +581,7 @@ public:
 
         auto convMode = static_cast<int64_t>(toSdkType(attributes.get_convolution_mode()));
         status = detail::hipdnnBackend()->backendSetAttribute(
-            opDesc.get(),
-            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_CONV_MODE,
-            HIPDNN_TYPE_INT64,
-            1,
-            &convMode);
+            opDesc.get(), HIPDNN_ATTR_CONVOLUTION_CONV_MODE, HIPDNN_TYPE_INT64, 1, &convMode);
         if(status != HIPDNN_STATUS_SUCCESS)
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv mode"};
@@ -594,12 +589,11 @@ public:
 
         // Set compute data type (inherited from graph attributes)
         auto computeDataType = toSdkType(attributes.compute_data_type);
-        status = detail::hipdnnBackend()->backendSetAttribute(
-            opDesc.get(),
-            HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_COMPUTE_DATA_TYPE,
-            HIPDNN_TYPE_DATA_TYPE,
-            1,
-            &computeDataType);
+        status = detail::hipdnnBackend()->backendSetAttribute(opDesc.get(),
+                                                              HIPDNN_ATTR_CONVOLUTION_COMP_TYPE,
+                                                              HIPDNN_TYPE_DATA_TYPE,
+                                                              1,
+                                                              &computeDataType);
         if(status != HIPDNN_STATUS_SUCCESS)
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to set conv compute data type"};

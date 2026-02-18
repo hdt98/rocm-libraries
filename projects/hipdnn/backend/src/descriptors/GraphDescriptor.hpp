@@ -4,10 +4,13 @@
 #pragma once
 
 #include "BackendDescriptor.hpp"
+#include "ConvolutionFwdOperationDescriptor.hpp"
+#include "TensorDescriptor.hpp"
 #include <flatbuffers/detached_buffer.h>
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
 #include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 namespace hipdnn_backend
@@ -20,9 +23,20 @@ private:
     hipdnnHandle_t _handle = nullptr;
     mutable flatbuffers::DetachedBuffer _graphSerializedBuffer;
 
+    // For building graph from operation descriptors
+    std::vector<std::shared_ptr<ConvolutionFwdOperationDescriptor>> _operations;
+    std::unordered_set<int64_t> _tensorUids; // For deduplication
+
     void setHandle(hipdnnBackendAttributeType_t attributeType,
                    int64_t elementCount,
                    const void* arrayOfElements);
+
+    void setOperations(hipdnnBackendAttributeType_t attributeType,
+                       int64_t elementCount,
+                       const void* arrayOfElements);
+
+    // Build GraphT from operation descriptors
+    void buildGraphFromOperations();
 
 public:
     void finalize() override;

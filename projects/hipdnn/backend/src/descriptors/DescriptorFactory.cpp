@@ -10,7 +10,6 @@
 #include "ExecutionPlanDescriptor.hpp"
 #include "GraphDescriptor.hpp"
 #include "HipdnnException.hpp"
-#include "OperationGraphBuilder.hpp"
 #include "TensorDescriptor.hpp"
 #include "VariantDescriptor.hpp"
 #include "logging/Logging.hpp"
@@ -53,9 +52,6 @@ void DescriptorFactory::create(hipdnnBackendDescriptorType_t descriptorType,
         break;
     case HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR:
         privateDesc = std::make_shared<ConvolutionFwdOperationDescriptor>();
-        break;
-    case HIPDNN_BACKEND_OPERATIONGRAPH_BUILDER_DESCRIPTOR:
-        privateDesc = std::make_shared<OperationGraphBuilder>();
         break;
     default:
         throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,

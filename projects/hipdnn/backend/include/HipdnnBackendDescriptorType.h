@@ -23,6 +23,5 @@ typedef enum
     // Descriptor API types (for building graphs without FlatBuffers in frontend)
     HIPDNN_BACKEND_TENSOR_DESCRIPTOR,
     HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR,
-    HIPDNN_BACKEND_OPERATIONGRAPH_BUILDER_DESCRIPTOR,
 
 } hipdnnBackendDescriptorType_t;
