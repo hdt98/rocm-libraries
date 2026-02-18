@@ -57,6 +57,9 @@ set(CMAKE_HIP_STANDARD 17)
 set(CMAKE_HIP_EXTENSIONS OFF)
 set(CMAKE_HIP_STANDARD_REQUIRED ON)
 
+# Add compile options for HIP debugging/analysis
+# add_compile_options(-save-temps=obj -Wno-gnu-line-marker)
+
 option(ROCSOLVER_EMBED_FMT "Hide libfmt symbols" ON)
 option(OPTIMAL "Build specialized kernels for small matrix sizes" ON)
 option(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG "Skip module mode search for LAPACK" ON)
