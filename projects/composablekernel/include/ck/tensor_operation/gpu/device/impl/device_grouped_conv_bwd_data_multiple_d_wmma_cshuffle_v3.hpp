@@ -424,12 +424,15 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
         }
     }
 
+    using DsLayoutGemm = decltype(generate_tuple(
+        [](auto) { return tensor_layout::gemm::RowMajor{}; }, Number<NumDTensor>{}));
+
     // GridwiseGemm
     using GridwiseGemm = GridwiseGemm_wmma_cshuffle_v3<
-        ALayout,
-        BLayout,
-        DsLayout,
-        ELayout,
+        tensor_layout::gemm::RowMajor,
+        tensor_layout::gemm::RowMajor,
+        DsLayoutGemm,
+        tensor_layout::gemm::RowMajor,
         Tuple<ADataType>,
         Tuple<BDataType>,
         AccDataType,
@@ -479,6 +482,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
         false,
         UseThreadTileTransfer>;
 
+    // TODO: fix ALayout, BLayoyut, DsLayout, ELayout to use GEMM layouts and NOT Conv layouts
 #define GridwiseGemmCTransposeTemplateParameters                                                   \
     ALayout, BLayout, DsLayout, ELayout, Tuple<ADataType>, Tuple<BDataType>, AccDataType,          \
         CShuffleDataType, DsDataType, EDataType, BElementwiseOp, AElementwiseOp, CDEElementwiseOp, \
@@ -1521,6 +1525,27 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
 
                     return false;
                 }
+            }
+        }
+
+        // The way the grid descriptors are defined in TransformConvBwdDataToGemm_v1
+        // relies on buffer loads for correctness in this case because the
+        // GemmK is defined based on KBatch and there is no padding in the K dimension.
+        // We could fix the grid descriptor for the wave transfer in this case but it would
+        // make the code more fragmented. Since this case is going to perform poorly with
+        // splitK anyway, we just don't support it with the wave transfer.
+        if constexpr(GridwiseGemmCTranspose::AWaveTransferApplicable() ||
+                     GridwiseGemmCTranspose::BWaveTransferApplicable())
+        {
+            if(ck::is_gfx12_supported() && ConvK < arg.k_batch_ * KPerBlock)
+            {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "ConvK too small with this KBatch!" << " In " << __FILE__ << ":"
+                              << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
+
+                return false;
             }
         }
 
