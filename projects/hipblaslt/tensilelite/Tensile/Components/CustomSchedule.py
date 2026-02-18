@@ -721,7 +721,7 @@ class RegisterSchedule:
                     if found:
                         detected.append(as_str(transA) + as_str(transB))
                         break
-                except Exception:
+                except ValueError:
                     continue            
         return detected
 
