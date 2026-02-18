@@ -4268,6 +4268,7 @@ struct PerformanceConfigHipImplicitGemmFwdXdlops
         : PerformanceConfigHipImplicitGemmFwdXdlops(0, "")
     {
     }
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
@@ -4350,6 +4351,7 @@ struct PerformanceConfigHipImplicitGemmBwdXdlops
         : PerformanceConfigHipImplicitGemmBwdXdlops(0, "")
     {
     }
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
@@ -4422,6 +4424,8 @@ struct PerformanceConfigHipImplicitGemmGroupFwdXdlops
         : PerformanceConfigHipImplicitGemmGroupFwdXdlops(0, "")
     {
     }
+
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4515,6 +4519,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
         : PerformanceConfigHipImplicitGemm3DGroupFwdXdlops(0, "")
     {
     }
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4594,6 +4599,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupWrwXdlops
         : PerformanceConfigHipImplicitGemm3DGroupWrwXdlops(0, "")
     {
     }
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4680,6 +4686,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
         : PerformanceConfigHipImplicitGemm3DGroupBwdXdlops(0, "")
     {
     }
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4763,6 +4770,7 @@ struct PerformanceConfigHipImplicitGemmGroupBwdXdlops
     {
     }
 
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4861,6 +4869,8 @@ struct PerformanceConfigHipImplicitGemmGroupWrwXdlops
         : PerformanceConfigHipImplicitGemmGroupWrwXdlops(0, "")
     {
     }
+
+    void DefaultKernelFromList();
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
