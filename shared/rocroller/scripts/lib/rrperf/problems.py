@@ -23,13 +23,12 @@
 #
 ################################################################################
 
-import pathlib
 from dataclasses import asdict, dataclass, field, fields
-
+from pathlib import Path
 import yaml
 from rrperf.utils import get_dataclass_id
 
-repo_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+repo_dir = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def field_dict(cls, obj):
@@ -87,7 +86,7 @@ class RRPerfResult:
     """
 
     resultType: str = field(repr=False)
-    path: pathlib.Path = field(repr=False, hash=False)
+    path: Path = field(repr=False, hash=False)
 
     kernelGenerate: int = field(repr=False, hash=False)
     kernelAssemble: int = field(repr=False, hash=False)
@@ -318,7 +317,7 @@ class GEMM(GEMMProblem, GEMMSolution):
 class GEMMRun(GEMM):
     """GEMM run interface."""
 
-    output: pathlib.Path | None = field(
+    output: Path | None = field(
         repr=False,
         default=None,
         hash=False,
@@ -329,7 +328,7 @@ class GEMMRun(GEMM):
     def group(self):
         return "gemm"
 
-    def set_output(self, path: pathlib.Path):
+    def set_output(self, path: Path):
         self.output = path
 
     def command(
@@ -493,7 +492,7 @@ class CodeGen:
 class CodeGenRun(CodeGen):
     """CodeGen run interface."""
 
-    output: pathlib.Path | None = field(
+    output: Path | None = field(
         repr=False,
         default=None,
         hash=False,
@@ -504,7 +503,7 @@ class CodeGenRun(CodeGen):
     def group(self):
         return "codegen"
 
-    def set_output(self, path: pathlib.Path):
+    def set_output(self, path: Path):
         self.output = path
 
     def command(self) -> list[str]:
@@ -531,13 +530,13 @@ class CodeGenResult(CodeGen, RRPerfResult):
 class TensileRun(GEMM):
     """Tensile run interface."""
 
-    config: pathlib.Path | None = field(
+    config: Path | None = field(
         repr=False,
         default=None,
         hash=False,
         compare=False,
     )
-    output: pathlib.Path | None = field(
+    output: Path | None = field(
         repr=False,
         default=None,
         hash=False,
@@ -549,7 +548,7 @@ class TensileRun(GEMM):
     def group(self):
         return "gemm"
 
-    def set_output(self, path: pathlib.Path):
+    def set_output(self, path: Path):
         self.output = path
 
     def command(self, **extra_args) -> list[str]:
@@ -645,7 +644,7 @@ def cast_missing_parameters(result):
         del result["matchMemoryAccess"]
 
 
-def load_results(path: pathlib.Path):
+def load_results(path: Path):
     """
     Load results from a YAML file `path` and return an array of RESULT objects.
     """
