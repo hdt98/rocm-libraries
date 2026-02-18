@@ -44,33 +44,36 @@ void larft_checkBadArgs(const rocblas_handle handle,
                         const I k,
                         T dV,
                         const I ldv,
-                        T dt,
+                        T dTau,
                         T dT,
                         const I ldt)
 {
     // handle
-    EXPECT_ROCBLAS_STATUS(rocsolver_larft(nullptr, direct, storev, n, k, dV, ldv, dt, dT, ldt),
+    EXPECT_ROCBLAS_STATUS(rocsolver_larft(nullptr, direct, storev, n, k, dV, ldv, dTau, dT, ldt),
                           rocblas_status_invalid_handle);
 
     // values
     EXPECT_ROCBLAS_STATUS(
-        rocsolver_larft(handle, rocblas_direct(0), storev, n, k, dV, ldv, dt, dT, ldt),
+        rocsolver_larft(handle, rocblas_direct(0), storev, n, k, dV, ldv, dTau, dT, ldt),
         rocblas_status_invalid_value);
     EXPECT_ROCBLAS_STATUS(
-        rocsolver_larft(handle, direct, rocblas_storev(0), n, k, dV, ldv, dt, dT, ldt),
+        rocsolver_larft(handle, direct, rocblas_storev(0), n, k, dV, ldv, dTau, dT, ldt),
         rocblas_status_invalid_value);
 
     // pointers
-    EXPECT_ROCBLAS_STATUS(rocsolver_larft(handle, direct, storev, n, k, (T) nullptr, ldv, dt, dT, ldt),
-                          rocblas_status_invalid_pointer);
+    EXPECT_ROCBLAS_STATUS(
+        rocsolver_larft(handle, direct, storev, n, k, (T) nullptr, ldv, dTau, dT, ldt),
+        rocblas_status_invalid_pointer);
     EXPECT_ROCBLAS_STATUS(rocsolver_larft(handle, direct, storev, n, k, dV, ldv, (T) nullptr, dT, ldt),
                           rocblas_status_invalid_pointer);
-    EXPECT_ROCBLAS_STATUS(rocsolver_larft(handle, direct, storev, n, k, dV, ldv, dt, (T) nullptr, ldt),
-                          rocblas_status_invalid_pointer);
+    EXPECT_ROCBLAS_STATUS(
+        rocsolver_larft(handle, direct, storev, n, k, dV, ldv, dTau, (T) nullptr, ldt),
+        rocblas_status_invalid_pointer);
 
     // quick return with invalid pointers
-    EXPECT_ROCBLAS_STATUS(rocsolver_larft(handle, direct, storev, 0, k, (T) nullptr, ldv, dt, dT, ldt),
-                          rocblas_status_success);
+    EXPECT_ROCBLAS_STATUS(
+        rocsolver_larft(handle, direct, storev, 0, k, (T) nullptr, ldv, dTau, dT, ldt),
+        rocblas_status_success);
 }
 
 template <typename T, typename I>
@@ -87,14 +90,14 @@ void testing_larft_bad_arg()
 
     // memory allocation
     device_strided_batch_vector<T> dV(1, 1, 1, 1);
-    device_strided_batch_vector<T> dt(1, 1, 1, 1);
+    device_strided_batch_vector<T> dTau(1, 1, 1, 1);
     device_strided_batch_vector<T> dT(1, 1, 1, 1);
     CHECK_HIP_ERROR(dV.memcheck());
     CHECK_HIP_ERROR(dT.memcheck());
-    CHECK_HIP_ERROR(dt.memcheck());
+    CHECK_HIP_ERROR(dTau.memcheck());
 
     // check bad arguments
-    larft_checkBadArgs(handle, direct, storev, n, k, dV.data(), ldv, dt.data(), dT.data(), ldt);
+    larft_checkBadArgs(handle, direct, storev, n, k, dV.data(), ldv, dTau.data(), dT.data(), ldt);
 }
 
 template <bool CPU, bool GPU, typename T, typename I, typename Td, typename Th>
@@ -105,11 +108,11 @@ void larft_initData(const rocblas_handle handle,
                     const I k,
                     Td& dV,
                     const I ldv,
-                    Td& dt,
+                    Td& dTau,
                     Td& dT,
                     const I ldt,
                     Th& hV,
-                    Th& ht,
+                    Th& hTau,
                     Th& hT,
                     std::vector<T>& hw,
                     size_t size_w)
@@ -134,9 +137,9 @@ void larft_initData(const rocblas_handle handle,
             }
 
             if(direct == rocblas_forward_direction)
-                cpu_geqrf(n, k, hV[0], ldv, ht[0], hw.data(), k);
+                cpu_geqrf(n, k, hV[0], ldv, hTau[0], hw.data(), k);
             else
-                cpu_geqlf(n, k, hV[0], ldv, ht[0], hw.data(), k);
+                cpu_geqlf(n, k, hV[0], ldv, hTau[0], hw.data(), k);
         }
         else
         {
@@ -152,9 +155,9 @@ void larft_initData(const rocblas_handle handle,
             }
 
             if(direct == rocblas_forward_direction)
-                cpu_gelqf(k, n, hV[0], ldv, ht[0], hw.data(), k);
+                cpu_gelqf(k, n, hV[0], ldv, hTau[0], hw.data(), k);
             else
-                cpu_gerqf(k, n, hV[0], ldv, ht[0], hw.data(), k);
+                cpu_gerqf(k, n, hV[0], ldv, hTau[0], hw.data(), k);
         }
     }
 
@@ -162,7 +165,7 @@ void larft_initData(const rocblas_handle handle,
     {
         // copy data from CPU to device
         CHECK_HIP_ERROR(dV.transfer_from(hV));
-        CHECK_HIP_ERROR(dt.transfer_from(ht));
+        CHECK_HIP_ERROR(dTau.transfer_from(hTau));
     }
 }
 
@@ -174,11 +177,11 @@ void larft_getError(const rocblas_handle handle,
                     const I k,
                     Td& dV,
                     const I ldv,
-                    Td& dt,
+                    Td& dTau,
                     Td& dT,
                     const I ldt,
                     Th& hV,
-                    Th& ht,
+                    Th& hTau,
                     Th& hT,
                     Th& hTr,
                     double* max_err)
@@ -187,17 +190,17 @@ void larft_getError(const rocblas_handle handle,
     std::vector<T> hw(size_w);
 
     // initialize data
-    larft_initData<true, true, T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV, ht, hT,
-                                     hw, size_w);
+    larft_initData<true, true, T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV, hTau,
+                                     hT, hw, size_w);
 
     // execute computations
     // GPU lapack
     CHECK_ROCBLAS_ERROR(
-        rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv, dt.data(), dT.data(), ldt));
+        rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv, dTau.data(), dT.data(), ldt));
     CHECK_HIP_ERROR(hTr.transfer_from(dT));
 
     // CPU lapack
-    cpu_larft(direct, storev, n, k, hV[0], ldv, ht[0], hT[0], ldt);
+    cpu_larft(direct, storev, n, k, hV[0], ldv, hTau[0], hT[0], ldt);
 
     // error is ||hT - hTr|| / ||hT||
     // (THIS DOES NOT ACCOUNT FOR NUMERICAL REPRODUCIBILITY ISSUES.
@@ -216,11 +219,11 @@ void larft_getPerfData(const rocblas_handle handle,
                        const I k,
                        Td& dV,
                        const I ldv,
-                       Td& dt,
+                       Td& dTau,
                        Td& dT,
                        const I ldt,
                        Th& hV,
-                       Th& ht,
+                       Th& hTau,
                        Th& hT,
                        double* gpu_time_used,
                        double* cpu_time_used,
@@ -234,26 +237,26 @@ void larft_getPerfData(const rocblas_handle handle,
 
     if(!perf)
     {
-        larft_initData<true, false, T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV,
-                                          ht, hT, hw, size_w);
+        larft_initData<true, false, T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV,
+                                          hTau, hT, hw, size_w);
 
         // cpu-lapack performance (only if not in perf mode)
         *cpu_time_used = get_time_us_no_sync();
-        cpu_larft(direct, storev, n, k, hV[0], ldv, ht[0], hT[0], ldt);
+        cpu_larft(direct, storev, n, k, hV[0], ldv, hTau[0], hT[0], ldt);
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
-    larft_initData<true, false, T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV, ht,
-                                      hT, hw, size_w);
+    larft_initData<true, false, T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV,
+                                      hTau, hT, hw, size_w);
 
     // cold calls
     for(int iter = 0; iter < 2; iter++)
     {
-        larft_initData<false, true, T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV,
-                                          ht, hT, hw, size_w);
+        larft_initData<false, true, T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV,
+                                          hTau, hT, hw, size_w);
 
-        CHECK_ROCBLAS_ERROR(rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv, dt.data(),
-                                            dT.data(), ldt));
+        CHECK_ROCBLAS_ERROR(rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv,
+                                            dTau.data(), dT.data(), ldt));
     }
 
     // gpu-lapack performance
@@ -273,11 +276,11 @@ void larft_getPerfData(const rocblas_handle handle,
 
     for(int iter = 0; iter < hot_calls; iter++)
     {
-        larft_initData<false, true, T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV,
-                                          ht, hT, hw, size_w);
+        larft_initData<false, true, T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV,
+                                          hTau, hT, hw, size_w);
 
         timer.start(stream);
-        rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv, dt.data(), dT.data(), ldt);
+        rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv, dTau.data(), dT.data(), ldt);
         timer.end(stream);
     }
     *gpu_time_used = timer.get_combined();
@@ -342,23 +345,23 @@ void testing_larft(Arguments& argus)
     // memory allocations
     host_strided_batch_vector<T> hT(size_T, 1, size_T, 1);
     host_strided_batch_vector<T> hTr(size_Tr, 1, size_Tr, 1);
-    host_strided_batch_vector<T> ht(size_tau, 1, size_tau, 1);
+    host_strided_batch_vector<T> hTau(size_tau, 1, size_tau, 1);
     host_strided_batch_vector<T> hV(size_V, 1, size_V, 1);
     device_strided_batch_vector<T> dT(size_T, 1, size_T, 1);
-    device_strided_batch_vector<T> dt(size_tau, 1, size_tau, 1);
+    device_strided_batch_vector<T> dTau(size_tau, 1, size_tau, 1);
     device_strided_batch_vector<T> dV(size_V, 1, size_V, 1);
     if(size_V)
         CHECK_HIP_ERROR(dV.memcheck());
     if(size_T)
         CHECK_HIP_ERROR(dT.memcheck());
     if(size_tau)
-        CHECK_HIP_ERROR(dt.memcheck());
+        CHECK_HIP_ERROR(dTau.memcheck());
 
     // check quick return
     if(n == 0)
     {
         EXPECT_ROCBLAS_STATUS(rocsolver_larft(handle, direct, storev, n, k, dV.data(), ldv,
-                                              dt.data(), dT.data(), ldt),
+                                              dTau.data(), dT.data(), ldt),
                               rocblas_status_success);
 
         if(argus.timing)
@@ -369,12 +372,12 @@ void testing_larft(Arguments& argus)
 
     // check computations
     if(argus.unit_check || argus.norm_check)
-        larft_getError<T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV, ht, hT, hTr,
-                             &max_error);
+        larft_getError<T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV, hTau, hT,
+                             hTr, &max_error);
 
     // collect performance data
     if(argus.timing && hot_calls > 0)
-        larft_getPerfData<T, I>(handle, direct, storev, n, k, dV, ldv, dt, dT, ldt, hV, ht, hT,
+        larft_getPerfData<T, I>(handle, direct, storev, n, k, dV, ldv, dTau, dT, ldt, hV, hTau, hT,
                                 &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
                                 argus.profile_kernels, argus.perf);
 
