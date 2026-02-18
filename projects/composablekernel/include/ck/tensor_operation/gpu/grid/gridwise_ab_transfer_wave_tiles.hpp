@@ -316,9 +316,13 @@ struct ABTransferWaveTiles
                                             BlockDescriptor& block_descriptor,
                                             ABElementwiseOperation& ab_element_op,
                                             const index_t block_mn_id,
-                                            const index_t)
+                                            const index_t k_id)
     {
         constexpr index_t NumABTensor = ABsDataType::Size();
+
+        // Convert k_id written in terms of K0 to the wave transfer grid descriptor K dimension
+        // This is not nice. It should avoid the conversion and already get the correct k_id
+        index_t k_shift = k_id * ABK1Value / KPack;
 
         const auto wave_idx = GetWaveIdx();
         index_t wave_idK    = wave_idx[I1];
@@ -335,7 +339,7 @@ struct ABTransferWaveTiles
                 index_t lane_group_grid    = grid_lane_id[I0];
                 index_t lane_local_id_grid = grid_lane_id[I1];
                 return make_multi_index(block_mn_id * (MNRepeat_ * MNWaves_) + wave_idMN,
-                                        wave_idK,
+                                        wave_idK + k_shift,
                                         lane_group_grid,
                                         lane_local_id_grid);
             },
