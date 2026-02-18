@@ -42,6 +42,8 @@ from copy import deepcopy
 from typing import Callable, Optional, Union
 from enum import Enum, auto
 import Tensile.Components.CMSValidator as cmsv
+from typing import Callable
+from itertools import product
 
 # Enum to distinguish between different schedule matching outcomes
 class ScheduleMatchStatus(Enum):
@@ -68,6 +70,9 @@ class CMSKernelInfo:
     """
     Metadata about registered CMS kernels 
     Contains the minimum combination of parameters needed to use the CMS kernel.
+    Important Note:
+    If you are adding new parameters to this list (of params use in CMS kernels), please make sure those names match Tensile names.
+    These names will be used by caller/tuning codes to set correct parameter/values.
     """
     name: str
     dtype: str
@@ -705,28 +710,20 @@ class RegisterSchedule:
 
     def _detect_supported_layouts(self, func: Callable) -> list[str]:
         """Probe the inner function to discover which layouts it actually handles."""
+        def as_str(transpose: bool) -> str:
+            return "T" if transpose else "N"
+        
         detected = []
-        for transA, transB, label in [
-            (True, False, "TN"),
-            (False, True, "NT"),
-            (False, False, "NN"),
-            (True, True, "TT"),
-        ]:
-            found = False
-            for useLDSTr in [True, False]:
-                if found:
-                    break
-                for TLDS in [1, 0]:
-                    probe = self._make_probe_kernel(transA, transB, useLDSTr, TLDS)
-                    try:
-                        match, _ = func(probe, useLDSTr, TLDS)
-                        if match:
-                            found = True
-                            break
-                    except Exception:
-                        continue
-            if found:
-                detected.append(label)
+        for transA, transB in product([True, False], repeat=2):
+            for useLDSTr, TLDS in product([True, False], [1, 0]):                
+                probe = self._make_probe_kernel(transA, transB, useLDSTr, TLDS)
+                try:
+                    found, _ = func(probe, useLDSTr, TLDS)
+                    if found:
+                        detected.append(as_str(transA) + as_str(transB))
+                        break
+                except Exception:
+                    continue            
         return detected
 
     def __call__(self, func: Callable) -> Callable:
