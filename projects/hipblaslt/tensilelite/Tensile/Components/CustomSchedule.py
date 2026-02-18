@@ -116,7 +116,6 @@ class SyncSchedule:
 
     def add(self, idx: int, dscnt: int = -1, vlcnt: int = -1, vscnt: int = -1, comment: str = "", barrier: bool = False, barrier_idx: Optional[int] = None, barrier_comment: str = ""):
         """ Add a SWaitCnt (and optionally a SBarrier) to the schedule at the given index.
-test_cms_api_query
         Args:
             idx:             The index at which to add the SWaitCnt.
             dscnt:           The dscnt value for the SWaitCnt.
