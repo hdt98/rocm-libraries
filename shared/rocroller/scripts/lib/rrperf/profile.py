@@ -38,8 +38,8 @@ from pathlib import Path
 
 import rrperf.args
 import rrperf.rrsuites
-import rrperf.utils
 from rrperf.problems import GEMMRun
+from rrperf.utils import project
 
 
 def has_omniperf() -> bool:
@@ -178,7 +178,7 @@ def profile(
 
     if suite is not None:
         if build_dir is None:
-            build_dir = rrperf.utils.get_build_dir()
+            build_dir = project.get_build_dir()
 
         for i, problem in enumerate(rrperf.rrsuites.load_suite(suite)):
             profile_rr(

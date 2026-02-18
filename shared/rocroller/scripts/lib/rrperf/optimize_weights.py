@@ -59,8 +59,8 @@ from pathlib import Path
 import numpy as np
 import rrperf.problems
 import rrperf.rrsuites
-import rrperf.utils
 import yaml
+from rrperf.utils import project
 
 gpus = {}
 mp_pool = None
@@ -317,7 +317,7 @@ def bench(
 
         print(f"Launching {weights.short_hash}")
 
-        process_result = run_bench_cmd(cmd, env=env, cwd=rrperf.utils.get_build_dir())
+        process_result = run_bench_cmd(cmd, env=env, cwd=project.get_build_dir())
 
         result.output = process_result.stdout.decode()
 
@@ -403,8 +403,8 @@ def generation(
 
 
 def read_gen_results(resfile: str):
-    resfile = Path(resfile)
-    with resfile.open() as f:
+    resfile_path = Path(resfile)
+    with resfile_path.open() as f:
         data = yaml.safe_load(f)
 
         def res(el):

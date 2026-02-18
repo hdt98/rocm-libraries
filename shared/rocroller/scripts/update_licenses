@@ -34,7 +34,7 @@ from pathlib import Path
 repo_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(repo_dir / "scripts" / "lib"))
 
-from rrperf import git  # noqa: E402
+from rrperf.utils import git  # noqa: E402
 
 
 def can_add_license(path: Path) -> bool:
@@ -191,8 +191,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     errors = []
-    for x in git.ls_tree(args.dir):
-        path = args.dir / Path(x)
+    for path in git.ls_tree(args.dir, True):
         if path.is_file():
             try:
                 add_and_update_license(path)

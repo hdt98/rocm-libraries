@@ -30,7 +30,7 @@ import datetime
 import importlib.util
 import os
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import fields
 from itertools import chain
 from pathlib import Path
@@ -38,13 +38,11 @@ from pathlib import Path
 import pandas as pd
 import rrperf.args
 import rrperf.dump_csv
-import rrperf.git
 import rrperf.problems
-import rrperf.rocm_control
 import rrperf.rrsuites
 import rrperf.specs
-import rrperf.utils
 import yaml
+from rrperf.utils import git, gpu, project
 
 
 def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
@@ -67,7 +65,7 @@ def from_token(token: str):
 
 
 def run_problems(
-    generator,
+    generator: Iterator[rrperf.rrsuites.GEMMRun],
     build_dir: Path,
     work_dir: Path,
     env: dict[str, str],
@@ -121,7 +119,7 @@ def run_problems(
             if p.returncode == 0:
                 status = "ok"
             elif p.returncode == SOLUTION_NOT_SUPPORTED_ON_ARCH:
-                status = "skipped (not supported on " + rrperf.utils.rocm_gfx() + ")"
+                status = "skipped (not supported on " + gpu.rocm_gfx() + ")"
             else:
                 status = "error"
                 result = False
@@ -176,7 +174,9 @@ def generate_missing_attr_value(run, attr):
             )
 
 
-def backcast(generator, build_dir: Path):
+def backcast(
+    generator: Iterator[rrperf.rrsuites.GEMMRun], build_dir: Path
+) -> Iterator[rrperf.rrsuites.GEMMRun]:
     """Reconstruct run objects from `generator` into run objects from previous rrperf version."""
     pdef = build_dir.parent / "scripts" / "lib" / "rrperf" / "problems.py"
     spec = importlib.util.spec_from_file_location("problems", pdef)
@@ -266,18 +266,18 @@ def run_cli(  # noqa: C901
         id_filter = []
 
     if pin_clocks:
-        rrperf.rocm_control.pin_clocks(rocm_smi)
+        gpu.pin_clocks(rocm_smi)
 
     if suite is None and token is None:
-        if rrperf.utils.rocm_gfx().startswith("gfx120"):
+        if gpu.rocm_gfx().startswith("gfx120"):
             suite = "all_gfx120X"
         else:
             suite = "all"
 
     if build_dir is None:
-        build_dir = rrperf.utils.get_build_dir()
+        build_dir = project.get_build_dir()
 
-    generator = rrperf.utils.empty()
+    generator: Iterator[rrperf.rrsuites.GEMMRun] = (x for x in [])
     if suite is not None:
         generator = chain(generator, rrperf.rrsuites.load_suite(suite))
     if token is not None:
@@ -289,13 +289,13 @@ def run_cli(  # noqa: C901
     env["ROCROLLER_ENFORCE_GRAPH_CONSTRAINTS"] = "1"
     env["ROCROLLER_AUDIT_CONTROL_TRACERS"] = "1"
 
-    rundir = rrperf.utils.get_work_dir(rundir, build_dir)
+    rundir = project.get_work_dir(rundir, build_dir)
     rundir.mkdir(parents=True, exist_ok=True)
 
     # pts.create_git_info(str(wrkdir / "git-commit.txt"))
     git_commit = rundir / "git-commit.txt"
     try:
-        hash = rrperf.git.full_hash(build_dir)
+        hash = git.full_hash(build_dir)
         git_commit.write_text(f"{hash}\n")
     except Exception:
         git_commit.write_text("NO_COMMIT\n")

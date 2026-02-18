@@ -1,27 +1,5 @@
-################################################################################
-#
-# MIT License
-#
-# Copyright 2024-2025 AMD ROCm(TM) Software
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell cop-
-# ies of the Software, and to permit persons to whom the Software is furnished
-# to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IM-
-# PLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNE-
-# CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-################################################################################
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
 
 """Git utilities."""
 
@@ -127,27 +105,81 @@ def rev_list(repo: Path, old_commit: str, new_commit: str) -> list[str]:
     return p.stdout.strip().split("\n")
 
 
-def ls_tree(repo: Path | None = None) -> list[str]:
+def ls_tree(repo: Path | None = None, consider_staged: bool = False) -> list[Path]:
     """
     Returns a list of all files committed into Git in this repo.
+    If `consider_staged` is True, then staged and unmodified files are listed instead.
     """
 
     if repo is None:
         repo = Path.cwd()
 
+    cmd = [
+        "git",
+        "ls-tree",
+        "--full-tree",
+        "--full-name",
+        "-r",
+        "--name-only",
+        "HEAD:shared/rocroller",
+    ]
+
     p = subprocess.run(
-        [
-            "git",
-            "ls-tree",
-            "--full-tree",
-            "--full-name",
-            "-r",
-            "--name-only",
-            "HEAD:shared/rocroller",
-        ],
+        cmd,
         cwd=str(repo),
         stdout=subprocess.PIPE,
         check=True,
     )
 
-    return p.stdout.decode().strip().split("\n")
+    files = [repo / path for path in p.stdout.decode().strip().split("\n")]
+
+    if consider_staged:
+        p = subprocess.run(
+            [
+                "git",
+                "status",
+                "--porcelain=v2",
+            ],
+            cwd=str(repo),
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+
+        for entry in p.stdout.decode().splitlines():
+            fields = entry.split(" ")
+            if fields[0] == "1":
+                if fields[1] == "A.":
+                    files.append(repo / fields[-1])
+                elif fields[1] == "D.":
+                    files.remove(repo / fields[-1])
+            elif fields[0] == "2" and fields[1][0] == "R":
+                added, removed = fields[-1].split("\t")
+                files.append(repo / added)
+                files.remove(repo / removed)
+
+    return files
+
+
+def try_getting_commit(repo: Path | None) -> str | None:
+    if repo is not None:
+        try:
+            return short_hash(repo)
+        except Exception:
+            pass
+    return None
+
+
+def get_commit(
+    rundir: Path | None = None,
+    build_dir: Path | None = None,
+) -> str:
+    commit = try_getting_commit(build_dir)
+    if commit is None:
+        commit = try_getting_commit(rundir)
+    if commit is None:
+        commit = try_getting_commit(Path("."))
+    if commit is None:
+        commit = try_getting_commit(Path(__file__).resolve().parent)
+    if commit is None:
+        commit = "NO_COMMIT"
+    return commit

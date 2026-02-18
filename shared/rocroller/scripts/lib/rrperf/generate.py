@@ -33,9 +33,8 @@ from itertools import chain
 from pathlib import Path
 
 import rrperf.args
-import rrperf.git
 import rrperf.rrsuites
-import rrperf.utils
+from rrperf.utils import git, project
 
 
 def generate_kernels(
@@ -61,15 +60,15 @@ def generate_kernels(
         cmd = problem.command(architecture=architecture, generate_only=True)
         log = (work_dir / f"{problem.group}-{i:06d}.log").resolve()
         rr_env = {k: str(v) for k, v in env.items() if k.startswith("ROC")}
-        rr_env_str = rrperf.utils.sjoin([f"{k}={v}" for k, v in rr_env.items()])
+        rr_env_str = " ".join([f"{k}={v}" for k, v in rr_env.items()])
 
         with log.open("w") as f:
             print(f"# env: {rr_env_str}", file=f, flush=True)
-            print(f"# command: {rrperf.utils.sjoin(cmd)}", file=f, flush=True)
+            print(f"# command: {' '.join(cmd)}", file=f, flush=True)
             print(f"# token: {repr(problem)}", file=f, flush=True)
             print("running:")
             print(f"  id: {id}")
-            print(f"  command: {rrperf.utils.sjoin(cmd)}")
+            print(f"  command: {' '.join(cmd)}")
             print(f"  wrkdir:  {work_dir.resolve()}")
             print(f"  log:     {log.resolve()}")
             p = subprocess.run(cmd, stdout=f, cwd=build_dir, env=env, check=False)
@@ -110,7 +109,7 @@ def generate(
     if id_filter is None:
         id_filter = []
 
-    generator = rrperf.utils.empty()
+    generator = yield from ()
     if suite is not None:
         generator = chain(generator, rrperf.rrsuites.load_suite(suite))
     else:
@@ -118,17 +117,17 @@ def generate(
         return
 
     if build_dir is None:
-        build_dir = rrperf.utils.get_build_dir()
+        build_dir = project.get_build_dir()
 
     env = dict(os.environ)
     env["ROCROLLER_ENFORCE_GRAPH_CONSTRAINTS"] = "1"
 
-    run_dir = rrperf.utils.get_work_dir(rundir, build_dir)
+    run_dir = project.get_work_dir(rundir, build_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     git_commit = run_dir / "git-commit.txt"
     try:
-        hash = rrperf.git.full_hash(build_dir)
+        hash = git.full_hash(build_dir)
         git_commit.write_text(f"{hash}\n")
     except Exception:
         git_commit.write_text("NO_COMMIT\n")

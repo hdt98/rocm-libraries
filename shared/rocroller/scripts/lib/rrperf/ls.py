@@ -31,7 +31,7 @@ import shutil
 
 import rrperf.args as args
 import rrperf.rrsuites
-import rrperf.utils as utils
+from rrperf.utils import gpu
 
 
 @functools.cache
@@ -49,7 +49,7 @@ def run(args):
 
     suite = args.suite
     if suite is None:
-        if utils.rocm_gfx().startswith("gfx120"):
+        if gpu.rocm_gfx().startswith("gfx120"):
             suite = "all_gfx120X"
         else:
             suite = "all"
@@ -61,5 +61,5 @@ def run(args):
         print("Id: ", x.id)
         print("Token: ", x)
         print("")
-        print(utils.sjoin(x.command()))
+        print(" ".join(x.command()))
         print("")

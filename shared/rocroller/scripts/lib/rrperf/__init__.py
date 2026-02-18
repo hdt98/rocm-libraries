@@ -31,11 +31,9 @@ import rrperf.autoperf
 import rrperf.cli
 import rrperf.compare
 import rrperf.generate
-import rrperf.git
 import rrperf.ls
 import rrperf.optimize_weights
 import rrperf.profile
-import rrperf.rocm_control
 import rrperf.rrsuites
 import rrperf.run
 import rrperf.specs

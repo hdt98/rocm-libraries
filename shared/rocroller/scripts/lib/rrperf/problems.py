@@ -23,12 +23,23 @@
 #
 ################################################################################
 
+import json
 from dataclasses import asdict, dataclass, field, fields
+from hashlib import sha1
 from pathlib import Path
+
 import yaml
-from rrperf.utils import get_dataclass_id
 
 repo_dir = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def get_dataclass_id(obj):
+    obj_dict = asdict(obj)
+    for f in fields(obj):
+        if not f.compare:
+            del obj_dict[f.name]
+    data_str = json.dumps(obj_dict, sort_keys=True)
+    return sha1(data_str.encode()).hexdigest()
 
 
 def field_dict(cls, obj):

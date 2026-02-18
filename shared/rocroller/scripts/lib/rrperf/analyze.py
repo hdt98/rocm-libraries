@@ -26,7 +26,9 @@
 """Result reporting routines."""
 
 import argparse
+import itertools
 import pathlib
+from collections.abc import Iterator
 
 import numpy as np
 import rrperf.problems
@@ -57,9 +59,7 @@ def info(res: GEMMResult):
     return (dim, value, time)
 
 
-def read_data(directory: pathlib.Path) -> list[GEMMResult]:
-    import itertools
-
+def read_data(directory: pathlib.Path) -> Iterator[GEMMResult]:
     return itertools.chain(*map(rrperf.problems.load_results, directory.glob("*.yaml")))
 
 

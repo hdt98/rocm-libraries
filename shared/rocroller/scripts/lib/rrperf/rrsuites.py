@@ -24,11 +24,11 @@
 ################################################################################
 
 import pathlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from itertools import product
 
 from rrperf.problems import CodeGenRun, GEMMRun, MKNLTuple, TensileRun, TypeParameters
-from rrperf.utils import rocm_gfx
+from rrperf.utils.gpu import rocm_gfx
 
 repo_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
 
@@ -2128,7 +2128,7 @@ def hgemm_guideposts():
     yield from guidepost_2()
 
 
-def priority_problems():
+def priority_problems() -> dict[str, dict[str, int | str]]:
     return {
         "1. HGEMM Guidepost": {
             "M": 7680,
@@ -2141,12 +2141,12 @@ def priority_problems():
     }
 
 
-def load_suite(suite: str):
+def load_suite(suite: str) -> Iterator[GEMMRun]:
     """Load performance suite from rrsuites.py."""
     return globals()[suite]()
 
 
-def first_problem_from_suite(suite: str):
+def first_problem_from_suite(suite: str) -> GEMMRun:
     for problem in load_suite(suite):
         return problem
     raise RuntimeError(f"Suite {suite} has no problems.")

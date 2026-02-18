@@ -39,8 +39,9 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import rrperf.args as args
-from rrperf import compare, git
+from rrperf import compare
 from rrperf import run as suite_run
+from rrperf.utils import git
 
 
 def build_rocroller(

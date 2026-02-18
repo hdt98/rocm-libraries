@@ -98,14 +98,14 @@ INCLUDED_HEADERS = [
 ]
 
 
-def compute_gflops(m, n, k, runtime_ns):
+def compute_gflops(m: int, n: int, k: int, runtime_ns):
     """Calculate GFLOPS (giga floating-point operations per second)."""
     flo = 2 * m * n * k
     gflops = flo / runtime_ns
     return gflops
 
 
-def compute_gbs(m, n, k, runtime_ns, element_size):
+def compute_gbs(m: int, n: int, k: int, runtime_ns, element_size):
     """Calculate GB/s (gigabytes per second) bandwidth."""
     element_size = float(TYPE_SIZE_BYTES.get(element_size.lower(), 4.0))
     data_movement_bytes = (m * k + k * n + m * n) * element_size
