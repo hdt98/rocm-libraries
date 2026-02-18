@@ -3842,6 +3842,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
 
     kernel["MfmaInitCVgprs"] = True
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    opt1.pretty_print()
     opt1.disableValidation()
     return True, opt1
 
