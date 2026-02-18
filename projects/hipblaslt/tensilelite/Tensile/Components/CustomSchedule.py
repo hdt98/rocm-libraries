@@ -103,9 +103,7 @@ class CMSKernelInfo:
             return False
         return True
 
-    def to_dict(self) -> dict:
-        """Return a dict of the minimum kernel parameters needed for this CMS kernel."""
-        return asdict(self)
+
 
 @dataclass
 class SyncSchedule:
@@ -529,7 +527,7 @@ def query_cms_kernels(dtype: Optional[str] = None, layout: Optional[str] = None)
     results = []
     for info in _SCHEDULE_METADATA:
         if info.matches(dtype=dtype, layout=layout):
-            results.append(info.to_dict())
+            results.append(asdict(info))
     return results
 
 
