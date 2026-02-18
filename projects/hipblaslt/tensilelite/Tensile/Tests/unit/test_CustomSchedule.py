@@ -69,6 +69,8 @@ def create_base_kernel():
         "UseF32XEmulation": False,
         "MIWaveTileA": 2,
         "MIWaveTileB": 2,
+        "VectorWidthA": 1,
+        "VectorWidthB": 1,
     }
     return kernel
 
