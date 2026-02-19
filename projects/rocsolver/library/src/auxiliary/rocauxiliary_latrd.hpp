@@ -70,106 +70,109 @@ __device__ __forceinline__ __amdgpu_buffer_rsrc_t make_buffer_resource(T* ptr, s
         (void*)ptr,
         0,                           // stride = 0 (raw buffer, we calculate offsets manually)
         num_elements * sizeof(T),    // size in BYTES
-        0                            // RAW buffer format, cached
+        0                            // buffer flags
     );
 }
-
 // Load a scalar value from buffer (branchless, no bounds checking)
-// Returns raw bits that must be reinterpreted to type T
-template <typename T>
-__device__ __forceinline__ T buffer_load_scalar(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset);
+// cachepolicy for gfx942/gfx950: bit 0=sc0, bit 1=nt, bit 3=swz, bit 4=sc1
+//   0  = cached (default, reused data)
+//   2  = nt (non-temporal, bypass cache for single-use data)
+//   16 = sc1 (system coherent level 1)
+// NOTE: cachepolicy must be a compile-time constant (template parameter)
 
-// Specialization for float (32-bit)
-template <>
-__device__ __forceinline__ float buffer_load_scalar<float>(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for float (32-bit)
+template <uint cachepolicy = 0>
+__device__ __forceinline__ float buffer_load_scalar(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset, float*)
 {
     union { uint32_t u; float f; } cvt;
-    cvt.u = __builtin_amdgcn_raw_buffer_load_b32(rsrc, byte_offset, 0, 0);
+    cvt.u = __builtin_amdgcn_raw_buffer_load_b32(rsrc, byte_offset, 0, cachepolicy);
     return cvt.f;
 }
 
-// Specialization for double (64-bit)
-template <>
-__device__ __forceinline__ double buffer_load_scalar<double>(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for double (64-bit)
+template <uint cachepolicy = 0>
+__device__ __forceinline__ double buffer_load_scalar(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset, double*)
 {
     typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
     union { uint2_vec v; double d; } cvt;
-    cvt.v = __builtin_amdgcn_raw_buffer_load_b64(rsrc, byte_offset, 0, 0);
+    cvt.v = __builtin_amdgcn_raw_buffer_load_b64(rsrc, byte_offset, 0, cachepolicy);
     return cvt.d;
 }
 
-// Specialization for rocblas_float_complex (64-bit = 2×float)
-template <>
-__device__ __forceinline__ rocblas_float_complex buffer_load_scalar<rocblas_float_complex>(
-    __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for rocblas_float_complex (64-bit = 2×float)
+template <uint cachepolicy = 0>
+__device__ __forceinline__ rocblas_float_complex buffer_load_scalar(
+    __amdgpu_buffer_rsrc_t rsrc, uint byte_offset, rocblas_float_complex*)
 {
     // rocblas_float_complex is a STRUCT (non-POD) - must use memcpy
-    // Cannot use union due to potential struct padding/layout issues
     typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
-    uint2_vec raw = __builtin_amdgcn_raw_buffer_load_b64(rsrc, byte_offset, 0, 0);
+    uint2_vec raw = __builtin_amdgcn_raw_buffer_load_b64(rsrc, byte_offset, 0, cachepolicy);
     rocblas_float_complex result;
     __builtin_memcpy(&result, &raw, sizeof(rocblas_float_complex));
     return result;
 }
 
-// Specialization for rocblas_double_complex (128-bit = 2×double)
-template <>
-__device__ __forceinline__ rocblas_double_complex buffer_load_scalar<rocblas_double_complex>(
-    __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for rocblas_double_complex (128-bit = 2×double)
+template <uint cachepolicy = 0>
+__device__ __forceinline__ rocblas_double_complex buffer_load_scalar(
+    __amdgpu_buffer_rsrc_t rsrc, uint byte_offset, rocblas_double_complex*)
 {
     // rocblas_double_complex is a STRUCT (non-POD) - must use memcpy
     typedef unsigned int uint4_vec __attribute__((ext_vector_type(4)));
-    uint4_vec raw = __builtin_amdgcn_raw_buffer_load_b128(rsrc, byte_offset, 0, 0);
+    uint4_vec raw = __builtin_amdgcn_raw_buffer_load_b128(rsrc, byte_offset, 0, cachepolicy);
     rocblas_double_complex result;
     __builtin_memcpy(&result, &raw, sizeof(rocblas_double_complex));
     return result;
 }
 
 // Store a scalar value to buffer (branchless, no bounds checking)
-template <typename T>
-__device__ __forceinline__ void buffer_store_scalar(T value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset);
+// cachepolicy for gfx942/gfx950: bit 0=sc0, bit 1=nt, bit 3=swz, bit 4=sc1
+//   0  = cached (default, reused data)
+//   2  = nt (non-temporal, bypass cache for single-use data)
+//   16 = sc1 (system coherent level 1, for stores with coherency requirements)
+// NOTE: cachepolicy must be a compile-time constant (template parameter)
 
-// Specialization for float
-template <>
-__device__ __forceinline__ void buffer_store_scalar<float>(float value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for float
+template <uint cachepolicy = 0>
+__device__ __forceinline__ void buffer_store_scalar(float value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset, float*)
 {
     union { float f; uint32_t u; } cvt;
     cvt.f = value;
-    __builtin_amdgcn_raw_buffer_store_b32(cvt.u, rsrc, byte_offset, 0, 0);
+    __builtin_amdgcn_raw_buffer_store_b32(cvt.u, rsrc, byte_offset, 0, cachepolicy);
 }
 
-// Specialization for double
-template <>
-__device__ __forceinline__ void buffer_store_scalar<double>(double value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for double
+template <uint cachepolicy = 0>
+__device__ __forceinline__ void buffer_store_scalar(double value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset, double*)
 {
     typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
     union { double d; uint2_vec v; } cvt;
     cvt.d = value;
-    __builtin_amdgcn_raw_buffer_store_b64(cvt.v, rsrc, byte_offset, 0, 0);
+    __builtin_amdgcn_raw_buffer_store_b64(cvt.v, rsrc, byte_offset, 0, cachepolicy);
 }
 
-// Specialization for rocblas_float_complex
-template <>
-__device__ __forceinline__ void buffer_store_scalar<rocblas_float_complex>(
-    rocblas_float_complex value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for rocblas_float_complex
+template <uint cachepolicy = 0>
+__device__ __forceinline__ void buffer_store_scalar(
+    rocblas_float_complex value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset, rocblas_float_complex*)
 {
     // rocblas_float_complex is a STRUCT (non-POD) - must use memcpy
     typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
     uint2_vec raw;
     __builtin_memcpy(&raw, &value, sizeof(rocblas_float_complex));
-    __builtin_amdgcn_raw_buffer_store_b64(raw, rsrc, byte_offset, 0, 0);
+    __builtin_amdgcn_raw_buffer_store_b64(raw, rsrc, byte_offset, 0, cachepolicy);
 }
 
-// Specialization for rocblas_double_complex
-template <>
-__device__ __forceinline__ void buffer_store_scalar<rocblas_double_complex>(
-    rocblas_double_complex value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+// Overload for rocblas_double_complex
+template <uint cachepolicy = 0>
+__device__ __forceinline__ void buffer_store_scalar(
+    rocblas_double_complex value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset, rocblas_double_complex*)
 {
     // rocblas_double_complex is a STRUCT (non-POD) - must use memcpy
     typedef unsigned int uint4_vec __attribute__((ext_vector_type(4)));
     uint4_vec raw;
     __builtin_memcpy(&raw, &value, sizeof(rocblas_double_complex));
-    __builtin_amdgcn_raw_buffer_store_b128(raw, rsrc, byte_offset, 0, 0);
+    __builtin_amdgcn_raw_buffer_store_b128(raw, rsrc, byte_offset, 0, cachepolicy);
 }
 
 #endif // LATRD_USE_BUFFER_INTRINSICS
@@ -816,7 +819,7 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
         // Strategy: Load unconditionally (may read garbage if OOB), then zero via mask multiplication
         // This eliminates the branch from: ac = (idc == 0 && i < m) ? y[i] : 0;
         int y_valid = (idc == 0) && (i < m);                    // Compute validity mask (no branch, pure ALU)
-        T y_value = buffer_load_scalar<T>(y_buf, i * sizeof(T)); // Unconditional load (returns garbage if OOB)
+        T y_value = buffer_load_scalar(y_buf, i * sizeof(T), (T*)nullptr); // Unconditional load (returns garbage if OOB)
         ac = y_value * T(y_valid);                               // Zero the value if invalid (no branch)
 #else
         // ORIGINAL: Ternary operator (compiler may or may not generate branch)
@@ -835,8 +838,8 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
             // OPTIMIZATION: Branchless x vector loads with explicit predication
             // Original code: sx1 = (j < n) ? conj(x1[j * incx1]) : 0;
             int x_valid = (j < n);                                      // Validity mask
-            T x1_value = buffer_load_scalar<T>(x1_buf, j * incx1 * sizeof(T)); // Unconditional load
-            T x2_value = buffer_load_scalar<T>(x2_buf, j * incx2 * sizeof(T)); // Unconditional load
+            T x1_value = buffer_load_scalar(x1_buf, j * incx1 * sizeof(T), (T*)nullptr); // Unconditional load
+            T x2_value = buffer_load_scalar(x2_buf, j * incx2 * sizeof(T), (T*)nullptr); // Unconditional load
             sx1 = conj(x1_value) * T(x_valid);                          // Apply conjugate then mask
             sx2 = conj(x2_value) * T(x_valid);                          // Apply conjugate then mask
 #else
@@ -852,8 +855,8 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
             int compute_valid = (i < m) && (j < n);                     // Compute validity mask
             rocblas_int A1_offset = i + j * lda1;                       // Matrix element offset
             rocblas_int A2_offset = i + j * lda2;                       // Matrix element offset
-            T A1_value = buffer_load_scalar<T>(A1_buf, A1_offset * sizeof(T)); // Unconditional load
-            T A2_value = buffer_load_scalar<T>(A2_buf, A2_offset * sizeof(T)); // Unconditional load
+            T A1_value = buffer_load_scalar(A1_buf, A1_offset * sizeof(T), (T*)nullptr); // Unconditional load
+            T A2_value = buffer_load_scalar(A2_buf, A2_offset * sizeof(T), (T*)nullptr); // Unconditional load
             T contrib = (A1_value * sx1 + A2_value * sx2) * T(compute_valid);  // Zero if invalid
             ac -= contrib;                                              // Accumulate (always executed)
 #else
@@ -904,15 +907,11 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
         // Only thread with tidc==0 (first column thread) writes after reduction is complete
         // This thread now holds the sum of all threadsc column contributions for row i
 #if LATRD_USE_BUFFER_INTRINSICS
-        // OPTIMIZATION: Branchless y[i] store using buffer intrinsics
-        // Note: Buffer stores don't check bounds, but we only call when valid
-        // We could make this fully branchless with a conditional store, but:
-        // 1. Only 1 thread per row writes (no warp divergence within warps)
-        // 2. Store is not in the hot loop (rpgc iterations)
-        // 3. Buffer intrinsics don't provide conditional store (would need manual assembly)
-        // So we keep the branch here as it's not performance-critical
-        if(tidc == 0 && i < m)
-            buffer_store_scalar<T>(ac, y_buf, i * sizeof(T));
+        // Fully branchless store using predication with SC1 coherency (cachepolicy=16)
+        int store_valid = (tidc == 0) && (i < m);
+        T original = buffer_load_scalar(y_buf, i * sizeof(T), (T*)nullptr);
+        T to_store = store_valid ? ac : original;
+        buffer_store_scalar<16>(to_store, y_buf, i * sizeof(T), (T*)nullptr);
 #else
         // ORIGINAL: Conditional store
         if(tidc == 0 && i < m)
@@ -2256,7 +2255,7 @@ void latrd_get_config_for_updates(const rocblas_int n,
     }
 
     *dr = 4;
-    *dc = 0;  // Changed from 0 to 2 for balanced parallelism
+    *dc = 2;  // Changed from 0 to 2 for balanced parallelism
 }
 
 template <bool BATCHED, typename T>
