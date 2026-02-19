@@ -149,7 +149,7 @@ namespace rocRoller::KernelGraph
                                 ShowValue(sourceNodeBodyParent.value()),
                                 ShowValue(destNodeBodyParent.value()));
 
-                    graph.control.addElement(Dependence(), {sourceNode}, {destNode});
+                    graph.control.addElement(Dependence(), {getTopSetCoordinate(graph, sourceNode)}, {getTopSetCoordinate(graph, destNode)});
                 }
             }
         }

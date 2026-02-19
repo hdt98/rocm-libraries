@@ -448,6 +448,8 @@ namespace rocRoller
              * @param head Tag of Node that is upstream of Edge
              * @return std::optional<int> Tag of connecting Edge, if one exists.
              */
+	    template <typename T = Edge>
+            requires(std::constructible_from<Edge, T>)
             std::optional<int> findEdge(int tail, int head) const;
 
             /**

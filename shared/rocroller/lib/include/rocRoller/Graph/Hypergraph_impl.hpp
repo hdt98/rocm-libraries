@@ -1166,10 +1166,14 @@ namespace rocRoller
             }
         }
 
+	// There might exist multiple types of edges between the nodes.
         template <typename Node, typename Edge, bool Hyper>
+        template <typename T>
+        requires(std::constructible_from<Edge, T>)
         std::optional<int> Hypergraph<Node, Edge, Hyper>::findEdge(int tail, int head) const
         {
             static_assert(!Hyper, "findEdge not supported for hypergraphs.");
+            static_assert(std::constructible_from<Edge, T>);
 
             AssertFatal(m_elements.contains(tail) && m_elements.contains(head),
                         "Graph tags not registered, elements not in graph",
@@ -1180,8 +1184,16 @@ namespace rocRoller
             for(auto src : m_incidence.getSrcs(head))
             {
                 auto rv = std::find(dsts.begin(), dsts.end(), src);
-                if(rv != dsts.end())
-                    return *rv;
+                if constexpr(std::same_as<Edge, T>)
+		{
+                    if(rv != dsts.end())
+                        return *rv;
+		}
+		else
+		{
+                    if(rv != dsts.end() && std::holds_alternative<T>(getEdge(*rv)))
+                        return *rv;
+		}
             }
             return std::nullopt;
         }
