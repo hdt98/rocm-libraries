@@ -9981,7 +9981,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgetrs_strided_batched_64(rocblas_hand
     \brief The SYTRS functions solve a system of n linear equations on ``n`` variables in its factorized form.
 
     \details
-    It solves the linear system using one of the following factorizations, depending on the value of ``uplo``:
+    It solves the linear system \f$ A X = B \f$ using one of the following factorizations, depending on the value of ``uplo``:
 
     \f[
         \begin{array}{cl}
@@ -10025,84 +10025,84 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgetrs_strided_batched_64(rocblas_hand
    ********************************************************************/
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs(rocblas_handle handle,
-                                                 const rocblas_fill uplo,
-                                                 const rocblas_int n,
-                                                 const rocblas_int nrhs,
-                                                 float* A,
-                                                 const rocblas_int lda,
-                                                 const rocblas_int* ipiv,
-                                                 float* B,
-                                                 const rocblas_int ldb);
+                                                 rocblas_fill const uplo,
+                                                 rocblas_int const n,
+                                                 rocblas_int const nrhs,
+                                                 float* const A,
+                                                 rocblas_int const lda,
+                                                 rocblas_int* const ipiv,
+                                                 float* const B,
+                                                 rocblas_int const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs(rocblas_handle handle,
-                                                 const rocblas_fill uplo,
-                                                 const rocblas_int n,
-                                                 const rocblas_int nrhs,
-                                                 double* A,
-                                                 const rocblas_int lda,
-                                                 const rocblas_int* ipiv,
-                                                 double* B,
-                                                 const rocblas_int ldb);
+                                                 rocblas_fill const uplo,
+                                                 rocblas_int const n,
+                                                 rocblas_int const nrhs,
+                                                 double* const A,
+                                                 rocblas_int const lda,
+                                                 rocblas_int* const ipiv,
+                                                 double* const B,
+                                                 rocblas_int const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs(rocblas_handle handle,
-                                                 const rocblas_fill uplo,
-                                                 const rocblas_int n,
-                                                 const rocblas_int nrhs,
-                                                 rocblas_float_complex* A,
-                                                 const rocblas_int lda,
-                                                 const rocblas_int* ipiv,
-                                                 rocblas_float_complex* B,
-                                                 const rocblas_int ldb);
+                                                 rocblas_fill const uplo,
+                                                 rocblas_int const n,
+                                                 rocblas_int const nrhs,
+                                                 rocblas_float_complex* const A,
+                                                 rocblas_int const lda,
+                                                 rocblas_int* const ipiv,
+                                                 rocblas_float_complex* const B,
+                                                 rocblas_int const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs(rocblas_handle handle,
-                                                 const rocblas_fill uplo,
-                                                 const rocblas_int n,
-                                                 const rocblas_int nrhs,
-                                                 rocblas_double_complex* A,
-                                                 const rocblas_int lda,
-                                                 const rocblas_int* ipiv,
-                                                 rocblas_double_complex* B,
-                                                 const rocblas_int ldb);
+                                                 rocblas_fill const uplo,
+                                                 rocblas_int const n,
+                                                 rocblas_int const nrhs,
+                                                 rocblas_double_complex* const A,
+                                                 rocblas_int const lda,
+                                                 rocblas_int* const ipiv,
+                                                 rocblas_double_complex* const B,
+                                                 rocblas_int const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs_64(rocblas_handle handle,
-                                                    const rocblas_fill uplo,
-                                                    const int64_t n,
-                                                    const int64_t nrhs,
-                                                    float* A,
-                                                    const int64_t lda,
-                                                    const int64_t* ipiv,
-                                                    float* B,
-                                                    const int64_t ldb);
+                                                    rocblas_fill const uplo,
+                                                    int64_t const n,
+                                                    int64_t const nrhs,
+                                                    float* const A,
+                                                    int64_t const lda,
+                                                    int64_t* const ipiv,
+                                                    float* const B,
+                                                    int64_t const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs_64(rocblas_handle handle,
-                                                    const rocblas_fill uplo,
-                                                    const int64_t n,
-                                                    const int64_t nrhs,
-                                                    double* A,
-                                                    const int64_t lda,
-                                                    const int64_t* ipiv,
-                                                    double* B,
-                                                    const int64_t ldb);
+                                                    rocblas_fill const uplo,
+                                                    int64_t const n,
+                                                    int64_t const nrhs,
+                                                    double* const A,
+                                                    int64_t const lda,
+                                                    int64_t* const ipiv,
+                                                    double* const B,
+                                                    int64_t const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs_64(rocblas_handle handle,
-                                                    const rocblas_fill uplo,
-                                                    const int64_t n,
-                                                    const int64_t nrhs,
-                                                    rocblas_float_complex* A,
-                                                    const int64_t lda,
-                                                    const int64_t* ipiv,
-                                                    rocblas_float_complex* B,
-                                                    const int64_t ldb);
+                                                    rocblas_fill const uplo,
+                                                    int64_t const n,
+                                                    int64_t const nrhs,
+                                                    rocblas_float_complex* const A,
+                                                    int64_t const lda,
+                                                    int64_t* const ipiv,
+                                                    rocblas_float_complex* const B,
+                                                    int64_t const ldb);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_64(rocblas_handle handle,
-                                                    const rocblas_fill uplo,
-                                                    const int64_t n,
-                                                    const int64_t nrhs,
-                                                    rocblas_double_complex* A,
-                                                    const int64_t lda,
-                                                    const int64_t* ipiv,
-                                                    rocblas_double_complex* B,
-                                                    const int64_t ldb);
+                                                    rocblas_fill const uplo,
+                                                    int64_t const n,
+                                                    int64_t const nrhs,
+                                                    rocblas_double_complex* const A,
+                                                    int64_t const lda,
+                                                    int64_t* const ipiv,
+                                                    rocblas_double_complex* const B,
+                                                    int64_t const ldb);
 //! @}
 
 /*! @{
@@ -10110,7 +10110,8 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_64(rocblas_handle handle,
     variables in its factorized forms.
 
     \details
-    For each instance l in the batch, it solves the linear system using one of the following factorization, depending on the value of ``uplo``:
+    For each instance \f$ l \f$ in the batch, it solves the linear system \f$ A_l X_l = B_l \f$ 
+    using one of the following factorization, depending on the value of ``uplo``:
 
     \f[
         \begin{array}{cl}
@@ -10161,100 +10162,100 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_64(rocblas_handle handle,
    ********************************************************************/
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs_batched(rocblas_handle handle,
-                                                         const rocblas_fill uplo,
-                                                         const rocblas_int n,
-                                                         const rocblas_int nrhs,
+                                                         rocblas_fill const uplo,
+                                                         rocblas_int const n,
+                                                         rocblas_int const nrhs,
                                                          float* const A[],
-                                                         const rocblas_int lda,
-                                                         const rocblas_int* ipiv,
-                                                         const rocblas_stride strideP,
+                                                         rocblas_int const lda,
+                                                         rocblas_int* const ipiv,
+                                                         rocblas_stride const strideP,
                                                          float* const B[],
-                                                         const rocblas_int ldb,
-                                                         const rocblas_int batch_count);
+                                                         rocblas_int const ldb,
+                                                         rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs_batched(rocblas_handle handle,
-                                                         const rocblas_fill uplo,
-                                                         const rocblas_int n,
-                                                         const rocblas_int nrhs,
+                                                         rocblas_fill const uplo,
+                                                         rocblas_int const n,
+                                                         rocblas_int const nrhs,
                                                          double* const A[],
-                                                         const rocblas_int lda,
-                                                         const rocblas_int* ipiv,
-                                                         const rocblas_stride strideP,
+                                                         rocblas_int const lda,
+                                                         rocblas_int* const ipiv,
+                                                         rocblas_stride const strideP,
                                                          double* const B[],
-                                                         const rocblas_int ldb,
-                                                         const rocblas_int batch_count);
+                                                         rocblas_int const ldb,
+                                                         rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs_batched(rocblas_handle handle,
-                                                         const rocblas_fill uplo,
-                                                         const rocblas_int n,
-                                                         const rocblas_int nrhs,
+                                                         rocblas_fill const uplo,
+                                                         rocblas_int const n,
+                                                         rocblas_int const nrhs,
                                                          rocblas_float_complex* const A[],
-                                                         const rocblas_int lda,
-                                                         const rocblas_int* ipiv,
-                                                         const rocblas_stride strideP,
+                                                         rocblas_int const lda,
+                                                         rocblas_int* const ipiv,
+                                                         rocblas_stride const strideP,
                                                          rocblas_float_complex* const B[],
-                                                         const rocblas_int ldb,
-                                                         const rocblas_int batch_count);
+                                                         rocblas_int const ldb,
+                                                         rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_batched(rocblas_handle handle,
-                                                         const rocblas_fill uplo,
-                                                         const rocblas_int n,
-                                                         const rocblas_int nrhs,
+                                                         rocblas_fill const uplo,
+                                                         rocblas_int const n,
+                                                         rocblas_int const nrhs,
                                                          rocblas_double_complex* const A[],
-                                                         const rocblas_int lda,
-                                                         const rocblas_int* ipiv,
-                                                         const rocblas_stride strideP,
+                                                         rocblas_int const lda,
+                                                         rocblas_int* const ipiv,
+                                                         rocblas_stride const strideP,
                                                          rocblas_double_complex* const B[],
-                                                         const rocblas_int ldb,
-                                                         const rocblas_int batch_count);
+                                                         rocblas_int const ldb,
+                                                         rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs_batched_64(rocblas_handle handle,
-                                                            const rocblas_fill uplo,
-                                                            const int64_t n,
-                                                            const int64_t nrhs,
+                                                            rocblas_fill const uplo,
+                                                            int64_t const n,
+                                                            int64_t const nrhs,
                                                             float* const A[],
-                                                            const int64_t lda,
-                                                            const int64_t* ipiv,
-                                                            const rocblas_stride strideP,
+                                                            int64_t const lda,
+                                                            int64_t* const ipiv,
+                                                            rocblas_stride const strideP,
                                                             float* const B[],
-                                                            const int64_t ldb,
-                                                            const int64_t batch_count);
+                                                            int64_t const ldb,
+                                                            int64_t const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs_batched_64(rocblas_handle handle,
-                                                            const rocblas_fill uplo,
-                                                            const int64_t n,
-                                                            const int64_t nrhs,
+                                                            rocblas_fill const uplo,
+                                                            int64_t const n,
+                                                            int64_t const nrhs,
                                                             double* const A[],
-                                                            const int64_t lda,
-                                                            const int64_t* ipiv,
-                                                            const rocblas_stride strideP,
+                                                            int64_t const lda,
+                                                            int64_t* const ipiv,
+                                                            rocblas_stride const strideP,
                                                             double* const B[],
-                                                            const int64_t ldb,
-                                                            const int64_t batch_count);
+                                                            int64_t const ldb,
+                                                            int64_t const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs_batched_64(rocblas_handle handle,
-                                                            const rocblas_fill uplo,
-                                                            const int64_t n,
-                                                            const int64_t nrhs,
+                                                            rocblas_fill const uplo,
+                                                            int64_t const n,
+                                                            int64_t const nrhs,
                                                             rocblas_float_complex* const A[],
-                                                            const int64_t lda,
-                                                            const int64_t* ipiv,
-                                                            const rocblas_stride strideP,
+                                                            int64_t const lda,
+                                                            int64_t* const ipiv,
+                                                            rocblas_stride const strideP,
                                                             rocblas_float_complex* const B[],
-                                                            const int64_t ldb,
-                                                            const int64_t batch_count);
+                                                            int64_t const ldb,
+                                                            int64_t const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_batched_64(rocblas_handle handle,
-                                                            const rocblas_fill uplo,
-                                                            const int64_t n,
-                                                            const int64_t nrhs,
+                                                            rocblas_fill const uplo,
+                                                            int64_t const n,
+                                                            int64_t const nrhs,
                                                             rocblas_double_complex* const A[],
-                                                            const int64_t lda,
-                                                            const int64_t* ipiv,
-                                                            const rocblas_stride strideP,
+                                                            int64_t const lda,
+                                                            int64_t* const ipiv,
+                                                            rocblas_stride const strideP,
                                                             rocblas_double_complex* const B[],
-                                                            const int64_t ldb,
-                                                            const int64_t batch_count);
+                                                            int64_t const ldb,
+                                                            int64_t const batch_count);
 //! @}
 
 /*! @{
@@ -10262,7 +10263,8 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_batched_64(rocblas_handle handl
     on ``n`` variables in its factorized forms.
 
     \details
-    For each instance l in the batch, it solves the linear system using one of the following factorizations, depending on the value of ``uplo``:
+    For each instance l in the batch, it solves the linear system \f$ A_l X_l = B_l \f$ 
+    using one of the following factorizations, depending on the value of ``uplo``:
 
     \f[
         \begin{array}{cl}
@@ -10322,116 +10324,116 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_batched_64(rocblas_handle handl
    ********************************************************************/
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs_strided_batched(rocblas_handle handle,
-                                                                 const rocblas_fill uplo,
-                                                                 const rocblas_int n,
-                                                                 const rocblas_int nrhs,
-                                                                 float* A,
-                                                                 const rocblas_int lda,
-                                                                 const rocblas_stride strideA,
-                                                                 const rocblas_int* ipiv,
-                                                                 const rocblas_stride strideP,
-                                                                 float* B,
-                                                                 const rocblas_int ldb,
-                                                                 const rocblas_stride strideB,
-                                                                 const rocblas_int batch_count);
+                                                                 rocblas_fill const uplo,
+                                                                 rocblas_int const n,
+                                                                 rocblas_int const nrhs,
+                                                                 float* const A,
+                                                                 rocblas_int const lda,
+                                                                 rocblas_stride const strideA,
+                                                                 rocblas_int* const ipiv,
+                                                                 rocblas_stride const strideP,
+                                                                 float* const B,
+                                                                 rocblas_int const ldb,
+                                                                 rocblas_stride const strideB,
+                                                                 rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs_strided_batched(rocblas_handle handle,
-                                                                 const rocblas_fill uplo,
-                                                                 const rocblas_int n,
-                                                                 const rocblas_int nrhs,
-                                                                 double* A,
-                                                                 const rocblas_int lda,
-                                                                 const rocblas_stride strideA,
-                                                                 const rocblas_int* ipiv,
-                                                                 const rocblas_stride strideP,
-                                                                 double* B,
-                                                                 const rocblas_int ldb,
-                                                                 const rocblas_stride strideB,
-                                                                 const rocblas_int batch_count);
+                                                                 rocblas_fill const uplo,
+                                                                 rocblas_int const n,
+                                                                 rocblas_int const nrhs,
+                                                                 double* const A,
+                                                                 rocblas_int const lda,
+                                                                 rocblas_stride const strideA,
+                                                                 rocblas_int* const ipiv,
+                                                                 rocblas_stride const strideP,
+                                                                 double* const B,
+                                                                 rocblas_int const ldb,
+                                                                 rocblas_stride const strideB,
+                                                                 rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs_strided_batched(rocblas_handle handle,
-                                                                 const rocblas_fill uplo,
-                                                                 const rocblas_int n,
-                                                                 const rocblas_int nrhs,
-                                                                 rocblas_float_complex* A,
-                                                                 const rocblas_int lda,
-                                                                 const rocblas_stride strideA,
-                                                                 const rocblas_int* ipiv,
-                                                                 const rocblas_stride strideP,
-                                                                 rocblas_float_complex* B,
-                                                                 const rocblas_int ldb,
-                                                                 const rocblas_stride strideB,
-                                                                 const rocblas_int batch_count);
+                                                                 rocblas_fill const uplo,
+                                                                 rocblas_int const n,
+                                                                 rocblas_int const nrhs,
+                                                                 rocblas_float_complex* const A,
+                                                                 rocblas_int const lda,
+                                                                 rocblas_stride const strideA,
+                                                                 rocblas_int* const ipiv,
+                                                                 rocblas_stride const strideP,
+                                                                 rocblas_float_complex* const B,
+                                                                 rocblas_int const ldb,
+                                                                 rocblas_stride const strideB,
+                                                                 rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_strided_batched(rocblas_handle handle,
-                                                                 const rocblas_fill uplo,
-                                                                 const rocblas_int n,
-                                                                 const rocblas_int nrhs,
-                                                                 rocblas_double_complex* A,
-                                                                 const rocblas_int lda,
-                                                                 const rocblas_stride strideA,
-                                                                 const rocblas_int* ipiv,
-                                                                 const rocblas_stride strideP,
-                                                                 rocblas_double_complex* B,
-                                                                 const rocblas_int ldb,
-                                                                 const rocblas_stride strideB,
-                                                                 const rocblas_int batch_count);
+                                                                 rocblas_fill const uplo,
+                                                                 rocblas_int const n,
+                                                                 rocblas_int const nrhs,
+                                                                 rocblas_double_complex* const A,
+                                                                 rocblas_int const lda,
+                                                                 rocblas_stride const strideA,
+                                                                 rocblas_int* const ipiv,
+                                                                 rocblas_stride const strideP,
+                                                                 rocblas_double_complex* const B,
+                                                                 rocblas_int const ldb,
+                                                                 rocblas_stride const strideB,
+                                                                 rocblas_int const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs_strided_batched_64(rocblas_handle handle,
-                                                                    const rocblas_fill uplo,
-                                                                    const int64_t n,
-                                                                    const int64_t nrhs,
-                                                                    float* A,
-                                                                    const int64_t lda,
-                                                                    const rocblas_stride strideA,
-                                                                    const int64_t* ipiv,
-                                                                    const rocblas_stride strideP,
-                                                                    float* B,
-                                                                    const int64_t ldb,
-                                                                    const rocblas_stride strideB,
-                                                                    const int64_t batch_count);
+                                                                    rocblas_fill const uplo,
+                                                                    int64_t const n,
+                                                                    int64_t const nrhs,
+                                                                    float* const A,
+                                                                    int64_t const lda,
+                                                                    rocblas_stride const strideA,
+                                                                    int64_t* const ipiv,
+                                                                    rocblas_stride const strideP,
+                                                                    float* const B,
+                                                                    int64_t const ldb,
+                                                                    rocblas_stride const strideB,
+                                                                    int64_t const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs_strided_batched_64(rocblas_handle handle,
-                                                                    const rocblas_fill uplo,
-                                                                    const int64_t n,
-                                                                    const int64_t nrhs,
-                                                                    double* A,
-                                                                    const int64_t lda,
-                                                                    const rocblas_stride strideA,
-                                                                    const int64_t* ipiv,
-                                                                    const rocblas_stride strideP,
-                                                                    double* B,
-                                                                    const int64_t ldb,
-                                                                    const rocblas_stride strideB,
-                                                                    const int64_t batch_count);
+                                                                    rocblas_fill const uplo,
+                                                                    int64_t const n,
+                                                                    int64_t const nrhs,
+                                                                    double* const A,
+                                                                    int64_t const lda,
+                                                                    rocblas_stride const strideA,
+                                                                    int64_t* const ipiv,
+                                                                    rocblas_stride const strideP,
+                                                                    double* const B,
+                                                                    int64_t const ldb,
+                                                                    rocblas_stride const strideB,
+                                                                    int64_t const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs_strided_batched_64(rocblas_handle handle,
-                                                                    const rocblas_fill uplo,
-                                                                    const int64_t n,
-                                                                    const int64_t nrhs,
-                                                                    rocblas_float_complex* A,
-                                                                    const int64_t lda,
-                                                                    const rocblas_stride strideA,
-                                                                    const int64_t* ipiv,
-                                                                    const rocblas_stride strideP,
-                                                                    rocblas_float_complex* B,
-                                                                    const int64_t ldb,
-                                                                    const rocblas_stride strideB,
-                                                                    const int64_t batch_count);
+                                                                    rocblas_fill const uplo,
+                                                                    int64_t const n,
+                                                                    int64_t const nrhs,
+                                                                    rocblas_float_complex* const A,
+                                                                    int64_t const lda,
+                                                                    rocblas_stride const strideA,
+                                                                    int64_t* const ipiv,
+                                                                    rocblas_stride const strideP,
+                                                                    rocblas_float_complex* const B,
+                                                                    int64_t const ldb,
+                                                                    rocblas_stride const strideB,
+                                                                    int64_t const batch_count);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_strided_batched_64(rocblas_handle handle,
-                                                                    const rocblas_fill uplo,
-                                                                    const int64_t n,
-                                                                    const int64_t nrhs,
-                                                                    rocblas_double_complex* A,
-                                                                    const int64_t lda,
-                                                                    const rocblas_stride strideA,
-                                                                    const int64_t* ipiv,
-                                                                    const rocblas_stride strideP,
-                                                                    rocblas_double_complex* B,
-                                                                    const int64_t ldb,
-                                                                    const rocblas_stride strideB,
-                                                                    const int64_t batch_count);
+                                                                    rocblas_fill const uplo,
+                                                                    int64_t const n,
+                                                                    int64_t const nrhs,
+                                                                    rocblas_double_complex* const A,
+                                                                    int64_t const lda,
+                                                                    rocblas_stride const strideA,
+                                                                    int64_t* const ipiv,
+                                                                    rocblas_stride const strideP,
+                                                                    rocblas_double_complex* const B,
+                                                                    int64_t const ldb,
+                                                                    rocblas_stride const strideB,
+                                                                    int64_t const batch_count);
 //! @}
 
 /*! @{
