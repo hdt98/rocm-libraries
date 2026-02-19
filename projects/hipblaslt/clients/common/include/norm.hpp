@@ -52,6 +52,8 @@
 extern "C" {
 float  slange_(char* norm_type, int* m, int* n, float* A, int* lda, float* work);
 double dlange_(char* norm_type, int* m, int* n, double* A, int* lda, double* work);
+float  clange_(char* norm_type, int* m, int* n, std::complex<float>* A, int* lda, float* work);
+double zlange_(char* norm_type, int* m, int* n, std::complex<double>* A, int* lda, double* work);
 
 float  slansy_(char* norm_type, char* uplo, int* n, float* A, int* lda, float* work);
 double dlansy_(char* norm_type, char* uplo, int* n, double* A, int* lda, double* work);
@@ -69,6 +71,16 @@ inline float xlange(char* norm_type, int* m, int* n, float* A, int* lda, float* 
 inline double xlange(char* norm_type, int* m, int* n, double* A, int* lda, double* work)
 {
     return dlange_(norm_type, m, n, A, lda, work);
+}
+
+inline float xlange(char* norm_type, int* m, int* n, std::complex<float>* A, int* lda, float* work)
+{
+    return clange_(norm_type, m, n, A, lda, work);
+}
+
+inline double xlange(char* norm_type, int* m, int* n, std::complex<double>* A, int* lda, double* work)
+{
+    return zlange_(norm_type, m, n, A, lda, work);
 }
 
 inline float xlanhe(char* norm_type, char* uplo, int* n, float* A, int* lda, float* work)
@@ -154,10 +166,7 @@ double norm_check_general(char norm_type, int64_t M, int64_t N, int64_t lda, T* 
 
 template <
     typename T,
-    std::enable_if_t<(std::is_same<T, std::complex<float>>{}
-                       || std::is_same<T, std::complex<double>>{}),
-                   int>
-    = 0>
+    std::enable_if_t<(std::is_same<T, std::complex<float>>{}), int> = 0>
 double norm_check_general(char norm_type, int64_t M, int64_t N, int64_t lda, T* hCPU, T* hGPU)
 {
     if(M * N == 0)
@@ -165,38 +174,74 @@ double norm_check_general(char norm_type, int64_t M, int64_t N, int64_t lda, T* 
 
     size_t size = N * (size_t)lda;
 
-    // two vectors needed, one for the norm of hCPU, one for the norm of the error (hGPU - hCPU)
-    // We store the magnitudes (std::abs) of the complex numbers, which are real (double).
-    host_vector<double> hCPU_norm_vec(size);
-    host_vector<double> hError_norm_vec(size);
+    host_vector<std::complex<float>> hCPU_complex_float(size);
+    host_vector<std::complex<float>> hGPU_complex_float(size);
 
     for(int64_t i = 0; i < N; i++)
     {
         for(int64_t j = 0; j < M; j++)
         {
-            size_t idx = j + i * (size_t)lda;
-            // For norm(CPU), we use the magnitude of each element
-            hCPU_norm_vec[idx] = std::abs(hCPU[idx]);
-            // For norm(Error), we use the magnitude of the difference
-            hError_norm_vec[idx] = std::abs(hGPU[idx] - hCPU[idx]);
+            size_t idx       = j + i * (size_t)lda;
+            hCPU_complex_float[idx] = static_cast<T>(hCPU[idx]);
+            hGPU_complex_float[idx] = static_cast<T>(hGPU[idx]);
         }
     }
 
-    double work[1];
+    float work[1];
+    int    incx  = 1;
+    std::complex<float> alpha(-1.0f, 0.0f);  // -1 + 0i
     int    m = static_cast<int>(M);
     int    n = static_cast<int>(N);
     int    l = static_cast<int>(lda);
 
-    // cpu_norm = norm(abs(hCPU))
-    double cpu_norm = xlange(&norm_type, &m, &n, hCPU_norm_vec.data(), &l, work);
-    
-    // error_norm = norm(abs(hGPU - hCPU))
-    double error_norm = xlange(&norm_type, &m, &n, hError_norm_vec.data(), &l, work);
+    const double tolerance = std::numeric_limits<double>::epsilon();
+    double cpu_norm = xlange(&norm_type, &m, &n, hCPU_complex_float.data(), &l, work);
+    m_axpy(&size, &alpha, hCPU_complex_float.data(), &incx, hGPU_complex_float.data(), &incx);
+    double gpu_norm = xlange(&norm_type, &m, &n, hGPU_complex_float.data(), &l, work);
+    if (std::abs(cpu_norm) <= tolerance && std::abs(gpu_norm) <= tolerance) return 0.0f;
 
-    if(cpu_norm == 0)
-        return error_norm == 0 ? 0.0 : 1.0; // Return 0 if both are 0, else 1 (inf error)
+    double error = gpu_norm / cpu_norm;
+    return error;
+}
 
-    return error_norm / cpu_norm;
+template <
+    typename T,
+    std::enable_if_t<(std::is_same<T, std::complex<double>>{}), int> = 0>
+double norm_check_general(char norm_type, int64_t M, int64_t N, int64_t lda, T* hCPU, T* hGPU)
+{
+    if(M * N == 0)
+        return 0;
+
+    size_t size = N * (size_t)lda;
+
+    host_vector<std::complex<double>> hCPU_complex_double(size);
+    host_vector<std::complex<double>> hGPU_complex_double(size);
+
+    for(int64_t i = 0; i < N; i++)
+    {
+        for(int64_t j = 0; j < M; j++)
+        {
+            size_t idx       = j + i * (size_t)lda;
+            hCPU_complex_double[idx] = static_cast<T>(hCPU[idx]);
+            hGPU_complex_double[idx] = static_cast<T>(hGPU[idx]);
+        }
+    }
+
+    double work[1];
+    int    incx  = 1;
+    std::complex<double> alpha(-1.0f, 0.0f);  // -1 + 0i
+    int    m = static_cast<int>(M);
+    int    n = static_cast<int>(N);
+    int    l = static_cast<int>(lda);
+
+    const double tolerance = std::numeric_limits<double>::epsilon();
+    double cpu_norm = xlange(&norm_type, &m, &n, hCPU_complex_double.data(), &l, work);
+    m_axpy(&size, &alpha, hCPU_complex_double.data(), &incx, hGPU_complex_double.data(), &incx);
+    double gpu_norm = xlange(&norm_type, &m, &n, hGPU_complex_double.data(), &l, work);
+    if (std::abs(cpu_norm) <= tolerance && std::abs(gpu_norm) <= tolerance) return 0.0f;
+
+    double error = gpu_norm / cpu_norm;
+    return error;
 }
 
 template <typename T,
