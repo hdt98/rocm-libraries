@@ -113,17 +113,18 @@ RUN apt-get update && apt-get install -y \
 ##
 
 # ROCm
-ARG ROCROLLER_AMDGPU_URL=https://repo.radeon.com/amdgpu-install/6.2.2/ubuntu/jammy/amdgpu-install_6.2.60202-1_all.deb
-ARG ROCROLLER_AMDGPU_BUILD_NUMBER=
-ARG ROCROLLER_AMDGPU_BUILD_URI=
+ARG ROCROLLER_THEROCK_ROCM_NIGHTLY_URL
+ARG ROCROLLER_THEROCK_ROCM_GFX_FAMILY
+ARG ROCROLLER_THEROCK_ROCM_VERSION
 
-RUN wget -nv --show-progress --progress=dot:mega -O /tmp/amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
-    && apt-get update \
-    && apt-get install -y /tmp/amdgpu_install.deb \
-    && rm /tmp/amdgpu_install.deb \
-    && if test -n "${ROCROLLER_AMDGPU_BUILD_NUMBER}"; then amdgpu-repo --amdgpu-build=${ROCROLLER_AMDGPU_BUILD_NUMBER} --rocm-build=${ROCROLLER_AMDGPU_BUILD_URI}; fi \
-    && amdgpu-install -y --usecase=rocmdev --no-dkms
-RUN apt-get update && apt-get install -y rocm-llvm-dev
+RUN pip install \
+  --index-url ${ROCROLLER_THEROCK_ROCM_NIGHTLY_URL}/${ROCROLLER_THEROCK_ROCM_GFX_FAMILY} \
+  "rocm[devel]==${ROCROLLER_THEROCK_ROCM_VERSION}" \
+  --target /opt/rocm/
+ENV PATH="/opt/rocm/bin:${PATH}"
+ENV PYTHONPATH="/opt/rocm:${PYTHONPATH}"
+# This command is executed as root to force the creaton of ROCm SDK metadata files.
+RUN rocm-sdk path --cmake
 
 # g++-13
 RUN apt-get update && apt-get install -y \

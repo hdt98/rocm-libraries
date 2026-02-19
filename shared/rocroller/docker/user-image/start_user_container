@@ -31,8 +31,12 @@ from __future__ import print_function
 import argparse
 import grp
 import os
+import re
 import subprocess
 from pathlib import Path
+from urllib.request import urlopen
+
+from packaging.version import Version
 
 dockerfiles = {
     "clang": "docker/dockerfile-ubuntu-clang",
@@ -167,11 +171,21 @@ def parseArgs():
         help="Whether to skip launching the container.",
     )
 
-    parser.add_argument("--amdgpu-url", help="amdgpu-install DEB URL")
+    parser.add_argument(
+        "--therock-rocm-nightly-url",
+        help="TheRock ROCm Nightly URL",
+        default="https://rocm.nightlies.amd.com/v2",
+    )
 
-    parser.add_argument("--amdgpu-build-number", help="amdgpu-install build number")
+    parser.add_argument(
+        "--therock-rocm-gfx-family",
+        help="TheRock ROCm GFX Family",
+        default="gfx950-dcgpu",
+    )
 
-    parser.add_argument("--amdgpu-build-uri", help="amdgpu-install build uri")
+    parser.add_argument(
+        "--therock-rocm-version", help="TheRock ROCm Version", default=None
+    )
 
     parser.add_argument(
         "--pull",
@@ -183,7 +197,21 @@ def parseArgs():
 
     parser.add_argument("command", nargs=argparse.REMAINDER)
 
-    return parser.parse_args()
+    parsed_args = parser.parse_args()
+
+    def get_latest_therock_rocm_version(base_url, gfx_family):
+        url = f"{base_url}/{gfx_family}/rocm/"
+        html = urlopen(url).read().decode()
+        versions = re.findall(r"<a[^>]*>\s*rocm-([^<]*?)\.tar\.gz", html)
+        return sorted(versions, key=Version)[-1]
+
+
+    if parsed_args.therock_rocm_version is None or parsed_args.therock_rocm_version == "":
+        parsed_args.therock_rocm_version = get_latest_therock_rocm_version(
+            parsed_args.therock_rocm_nightly_url, parsed_args.therock_rocm_gfx_family
+        )
+
+    return parsed_args
 
 
 def buildx_available():
@@ -255,9 +283,9 @@ def get_run_args(args, image_name, container_name):
 def get_amdgpu_args(args):
     build_args = []
     for var in [
-        "ROCROLLER_AMDGPU_URL",
-        "ROCROLLER_AMDGPU_BUILD_NUMBER",
-        "ROCROLLER_AMDGPU_BUILD_URI",
+        "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL",
+        "ROCROLLER_THEROCK_ROCM_GFX_FAMILY",
+        "ROCROLLER_THEROCK_ROCM_VERSION",
     ]:
         prefix = "ROCROLLER_"
         arg = var[len(prefix) :].lower()

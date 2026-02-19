@@ -27,7 +27,7 @@ def runCI =
     nodes.dockerArray.each {
         _, docker ->
         // parameters inherited from target job
-        ["ROCROLLER_AMDGPU_URL", "ROCROLLER_AMDGPU_BUILD_NUMBER", "ROCROLLER_AMDGPU_BUILD_URI"].each {
+        ["ROCROLLER_THEROCK_ROCM_NIGHTLY_URL", "ROCROLLER_THEROCK_ROCM_GFX_FAMILY", "ROCROLLER_THEROCK_ROCM_VERSION"].each {
             param ->
             def value = params?."${param}" ?: baseParams?."${param}";
             if (value)
@@ -85,28 +85,46 @@ def rocRollerGetBaseParameters() {
 ci: {
     String urlJobName = auxiliary.getTopJobName(env.BUILD_URL)
 
+    // URL & GFX family need to be always set, either explicitly or cached,
+    // so the latest version can be retrieved. The latest version is used
+    // byt default unless ROCROLLER_THEROCK_ROCM_VERSION is explicitly set.
+    if (!params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL?.trim()) {
+      error "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL parameter is not set"
+    }
+    if (!params?.ROCROLLER_THEROCK_ROCM_GFX_FAMILY?.trim()) {
+      error "ROCROLLER_THEROCK_ROCM_GFX_FAMILY parameter is not set"
+    }
+    def therock_rocm_nightly_url = params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL
+    def therock_rocm_gfx_family = params?.ROCROLLER_THEROCK_ROCM_GFX_FAMILY
+    def latest_therock_rocm_version = params?.ROCROLLER_THEROCK_ROCM_VERSION ?: ["bash", "-c", """
+      curl -sL '${therock_rocm_nightly_url}/${therock_rocm_gfx_family}/rocm/' \
+        | grep -oP '<a[^>]*>\\s*rocm-\\K[^<]*(?=\\.tar\\.gz)' \
+        | sort -V \
+        | tail -1
+    """].execute().text.trim()
+
     def propertyList = [
         "enterprise":[pipelineTriggers([cron('0 H(0-5) * * *')])],
         "rocm-libraries":[pipelineTriggers([cron('0 H(0-5) * * *')])]
     ]
     def additionalParameters = [
         string(
-            name: "ROCROLLER_AMDGPU_URL",
-            defaultValue: params?.ROCROLLER_AMDGPU_URL ?: "",
+            name: "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL",
+            defaultValue: "${therock_rocm_nightly_url}",
             trim: true,
-            description: "URL to retrieve AMDGPU install package from"
+            description: "URL to retrieve ROCm packages from."
         ),
         string(
-            name: "ROCROLLER_AMDGPU_BUILD_NUMBER",
-            defaultValue: params?.ROCROLLER_AMDGPU_BUILD_NUMBER ?: "",
+            name: "ROCROLLER_THEROCK_ROCM_GFX_FAMILY",
+            defaultValue: "${therock_rocm_gfx_family}",
             trim: true,
-            description: "Build number to use for AMDGPU"
+            description: "Specify the latest target GFX family for the ROCm packages."
         ),
         string(
-            name: "ROCROLLER_AMDGPU_BUILD_URI",
-            defaultValue: params?.ROCROLLER_AMDGPU_BUILD_URI ?: "",
+            name: "ROCROLLER_THEROCK_ROCM_VERSION",
+            defaultValue: "${latest_therock_rocm_version}",
             trim: true,
-            description: "Specify the specific artifact path for AMDGPU"
+            description: "Specify the ROCm version to use."
         ),
         booleanParam(
             name: "Unique Docker image tag",

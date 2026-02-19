@@ -128,6 +128,31 @@ else()
     set(msgpack_libs msgpackc-cxx)
 endif()
 
+find_program(ROCM_SDK rocm-sdk)
+
+if(NOT ROCM_SDK)
+  message(FATAL_ERROR "rocm-sdk not found in PATH")
+endif()
+
+message(STATUS "rocm-sdk found at: ${ROCM_SDK}")
+
+execute_process(COMMAND ${ROCM_SDK} path --cmake
+      OUTPUT_VARIABLE ROCM_SDK_CMAKE_DIR
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+find_program(HIPCONFIG hipconfig)
+
+if(NOT HIPCONFIG)
+  message(FATAL_ERROR "hipconfig not found in PATH")
+endif()
+
+message(STATUS "hipconfig found at: ${HIPCONFIG}")
+
+execute_process(COMMAND ${HIPCONFIG} --platform
+      OUTPUT_VARIABLE HIP_PLATFORM
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+list(APPEND CMAKE_PREFIX_PATH "${ROCM_SDK_CMAKE_DIR}")
 find_package(hip REQUIRED)
 find_package(amd_comgr REQUIRED)
 if(ROCROLLER_ENABLE_LLVM)
