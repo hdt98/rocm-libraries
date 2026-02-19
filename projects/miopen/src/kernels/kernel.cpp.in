@@ -39,6 +39,7 @@ namespace miopen {
 
 namespace {
 
+#ifndef MIOPEN_USE_CLANG_TIDY
 inline void addKernel(std::unordered_map<fs::path, std::string_view, FsPathHash>& map,
                       const char* name,
                       const char* ptr,
@@ -48,6 +49,7 @@ inline void addKernel(std::unordered_map<fs::path, std::string_view, FsPathHash>
 }
 
 #define ADD_KERNEL(map, name, ptr, size) addKernel(map, name, ptr, size)
+#endif
 
 // Build kernel map using emplace() to avoid stack overflow from large initializer_list
 std::unordered_map<fs::path, std::string_view, FsPathHash>* buildKernelMap()
@@ -56,11 +58,10 @@ std::unordered_map<fs::path, std::string_view, FsPathHash>* buildKernelMap()
 #ifndef MIOPEN_USE_CLANG_TIDY
     map->reserve(7000);
     ${INSERT_KERNELS};
+#undef ADD_KERNEL
 #endif
     return map;
 }
-
-#undef ADD_KERNEL
 
 } // anonymous namespace
 
