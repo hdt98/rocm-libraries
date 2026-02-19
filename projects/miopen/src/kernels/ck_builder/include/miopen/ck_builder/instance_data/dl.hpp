@@ -79,7 +79,7 @@ struct DlAlgorithm
 
 static_assert(ckb::factory::FwdDlAlgorithm<DlAlgorithm>);
 
-using DlSignature = ConvSignature;
+using DlSignature = ConvSignature<>;
 
 // Struct to hold both signature and algorithm
 struct DlInstance
@@ -148,11 +148,9 @@ constexpr DlInstance DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK(
     std::size_t c_thread_transfer_src_dst_vector_dim,
     std::size_t c_thread_transfer_dst_scalar_per_vector)
 {
-    // TODO: ds_layouts and ds_data_types are not yet stored in the instance data but will be used
-    // in future work. They are present now so that the parameter list aligns with the original CK
-    // template this function is based on.
+    // DL instances only support NumDTensor == 0 (PassThrough)
     static_assert(NumDTensor == 0,
-                  "ds_layouts and ds_data_types are not yet stored in instance data");
+                  "DL instances do not support D tensors");
     (void)ds_data_types;
     (void)ds_layouts;
 
@@ -181,6 +179,10 @@ constexpr DlInstance DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK(
                     .layout       = output_layout,
                     .data_type    = output_data_type,
                     .compute_type = output_data_type
+                },
+                .operation = {
+                    .elementwise_operation    = output_elementwise_op,
+                    .auxiliary_operand_configs = {}
                 }
             },
             .data_type              = input_data_type,

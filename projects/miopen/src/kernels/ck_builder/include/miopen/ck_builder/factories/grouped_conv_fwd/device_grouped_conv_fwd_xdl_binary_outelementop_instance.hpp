@@ -48,7 +48,7 @@ constexpr auto device_grouped_conv_fwd_xdl_binary_outelementop_f8_instances(
         // clang-format on
     };
 #else
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 #endif
 }
 

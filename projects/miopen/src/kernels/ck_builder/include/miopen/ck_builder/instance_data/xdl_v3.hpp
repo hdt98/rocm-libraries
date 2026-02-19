@@ -57,7 +57,7 @@ static_assert(ckb::factory::FwdXdlV3Algorithm<XdlV3Algorithm>);
 // V3 Instance struct
 struct XdlV3Instance
 {
-    XdlSignature signature;
+    XdlSignature<> signature;
     XdlV3Algorithm algorithm;
 };
 
@@ -134,11 +134,9 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
     // 51. Direct load flag (V3-specific)
     bool direct_load = false)
 {
-    // TODO: ds_layouts and ds_data_types are not yet stored in the instance data but will be used
-    // in future work. They are present now so that the parameter list aligns with the original CK
-    // template this function is based on.
+    // V3 instances only support NumDTensor == 0 (PassThrough)
     static_assert(NumDTensor == 0,
-                  "ds_layouts and ds_data_types are not yet stored in instance data");
+                  "V3 instances do not support D tensors");
     (void)ds_layouts;
     (void)ds_data_types;
 
@@ -171,6 +169,10 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
                     .layout       = output_layout,
                     .data_type    = output_data_type,
                     .compute_type = output_data_type
+                },
+                .operation = {
+                    .elementwise_operation    = output_elementwise_op,
+                    .auxiliary_operand_configs = {}
                 }
             },
             .data_type              = input_data_type,

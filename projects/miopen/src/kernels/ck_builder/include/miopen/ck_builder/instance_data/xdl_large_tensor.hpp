@@ -57,7 +57,7 @@ static_assert(ckb::factory::LargeTensorAlgorithm<XdlLargeTensorAlgorithm>);
 // Struct to hold both signature and algorithm
 struct XdlLargeTensorInstance
 {
-    XdlSignature signature;
+    XdlSignature<> signature;
     XdlLargeTensorAlgorithm algorithm;
 };
 
@@ -130,11 +130,9 @@ constexpr XdlLargeTensorInstance DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Larg
     // 49. Groups to merge
     std::size_t num_conv_groups_to_merge = 1)
 {
-    // TODO: ds_layouts and ds_data_types are not yet stored in the instance data but will be used
-    // in future work. They are present now so that the parameter list aligns with the original CK
-    // template this function is based on.
+    // Large tensor instances only support NumDTensor == 0 (PassThrough)
     static_assert(NumDTensor == 0,
-                  "ds_layouts and ds_data_types are not yet stored in instance data");
+                  "Large tensor instances do not support D tensors");
     (void)ds_layouts;
     (void)ds_data_types;
 
@@ -167,6 +165,10 @@ constexpr XdlLargeTensorInstance DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Larg
                     .layout       = output_layout,
                     .data_type    = output_data_type,
                     .compute_type = output_data_type // Output compute type same as data type
+                },
+                .operation = {
+                    .elementwise_operation    = output_elementwise_op,
+                    .auxiliary_operand_configs = {}
                 }
             },
             .data_type              = input_data_type,

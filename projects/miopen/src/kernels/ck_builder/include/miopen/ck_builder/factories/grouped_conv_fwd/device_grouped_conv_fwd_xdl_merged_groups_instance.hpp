@@ -39,7 +39,7 @@ constexpr auto device_grouped_conv_fwd_xdl_merged_groups_bf16_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,BF16,BF16,F32,BF16,ds_types,BF16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,64,64,16,16,4,4,16,16,4,1,{4,16,1},{0,2,1},{0,2,1},1,4,4,true,{4,16,1},{1,0,2},{1,0,2},2,1,4,true,1,1,{1,16,1,4},1,BF16,BF16,ckb::PipelineScheduler::DEFAULT,32)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 // BF16 merged groups V3 instance
@@ -90,7 +90,7 @@ constexpr auto device_grouped_conv_fwd_xdl_merged_groups_bf16_instances_2x(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,BF16,BF16,F32,BF16,ds_types,BF16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,64,32,8,8,32,32,4,2,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,1,1,{1,32,1,4},8,BF16,BF16,ckb::PipelineScheduler::DEFAULT,8)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 // BF16 merged groups 2x V3 instance
@@ -136,7 +136,7 @@ constexpr auto device_grouped_conv_fwd_xdl_merged_groups_f16_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F16,F16,F32,F16,ds_types,F16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,64,64,16,16,4,4,16,16,4,1,{4,16,1},{0,2,1},{0,2,1},1,4,4,true,{4,16,1},{1,0,2},{1,0,2},2,1,4,true,1,1,{1,16,1,4},1,F16,F16,ckb::PipelineScheduler::DEFAULT,32)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 // F16 merged groups V3 instance
@@ -186,7 +186,7 @@ constexpr auto device_grouped_conv_fwd_xdl_merged_groups_f16_instances_2x(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F16,F16,F32,F16,ds_types,F16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,64,32,8,8,32,32,4,2,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,1,1,{1,32,1,4},8,F16,F16,ckb::PipelineScheduler::DEFAULT,8)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 // F16 merged groups 2x V3 instance
@@ -232,7 +232,7 @@ constexpr auto device_grouped_conv_fwd_xdl_merged_groups_f32_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F32,F32,F32,F32,ds_types,F32,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,64,64,16,16,4,4,16,16,4,1,{4,16,1},{0,2,1},{0,2,1},1,4,4,true,{4,16,1},{1,0,2},{1,0,2},2,1,4,true,1,1,{1,16,1,4},1,F32,F32,ckb::PipelineScheduler::DEFAULT,32)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 // ========================================================================================
@@ -261,7 +261,7 @@ constexpr auto device_grouped_conv_fwd_xdl_merged_groups_f32_tf32_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F32,F32,F32,F32,ds_types,F32,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,64,64,16,16,4,4,16,16,4,1,{4,16,1},{0,2,1},{0,2,1},1,4,4,true,{4,16,1},{1,0,2},{1,0,2},2,1,4,true,1,1,{1,16,1,4},1,TF32,TF32,ckb::PipelineScheduler::DEFAULT,32)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 // ========================================================================================

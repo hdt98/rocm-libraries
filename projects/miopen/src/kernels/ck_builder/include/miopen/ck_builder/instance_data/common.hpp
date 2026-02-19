@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <miopen/ck_builder/shared.hpp>
 
 namespace miopen {
@@ -92,13 +94,41 @@ struct TensorDescriptor
     } config;
 };
 
+// Config for auxiliary (D) tensors — satisfies ckb TensorConfigDescriptor concept
+struct AuxTensorConfig
+{
+    ckb::TensorLayout layout;
+    ckb::DataType data_type = ckb::DataType::UNDEFINED_DATA_TYPE;
+};
+
+// Output tensor descriptor with operation info for CK Builder.
+// The .operation field is what ConvBuilder reads to determine:
+//   - OutElementwiseOp (PassThrough, Scale, Bilinear, etc.)
+//   - DsLayout and DsDataType (from auxiliary_operand_configs)
+template <std::size_t NumDTensor>
+struct OutputTensorDescriptor
+{
+    struct Config
+    {
+        ckb::TensorLayout layout;
+        ckb::DataType data_type;
+        ckb::DataType compute_type;
+    } config;
+    struct Operation
+    {
+        ckb::ElementwiseOperation elementwise_operation;
+        std::array<AuxTensorConfig, NumDTensor> auxiliary_operand_configs;
+    } operation;
+};
+
+template <std::size_t NumDTensor = 0>
 struct ConvSignature
 {
     std::size_t spatial_dim;
     ckb::ConvDirection direction;
     TensorDescriptor input;
     TensorDescriptor weight;
-    TensorDescriptor output;
+    OutputTensorDescriptor<NumDTensor> output;
     ckb::DataType data_type;
     ckb::DataType accumulation_data_type;
 };

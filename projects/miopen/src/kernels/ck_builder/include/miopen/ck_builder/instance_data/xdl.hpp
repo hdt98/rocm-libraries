@@ -50,19 +50,34 @@ struct XdlAlgorithm
 
 static_assert(ckb::factory::FwdXdlAlgorithm<XdlAlgorithm>);
 
-using XdlSignature = ConvSignature;
+template <std::size_t NumDTensor = 0>
+using XdlSignature = ConvSignature<NumDTensor>;
 
 // Struct to hold both signature and algorithm
+template <std::size_t NumDTensor = 0>
 struct XdlInstance
 {
-    XdlSignature signature;
+    XdlSignature<NumDTensor> signature;
     XdlAlgorithm algorithm;
 };
+
+template <std::size_t NumDTensor>
+constexpr std::array<AuxTensorConfig, NumDTensor> make_aux_configs(
+    const std::array<ckb::TensorLayout, NumDTensor>& layouts,
+    const std::array<ckb::DataType, NumDTensor>& data_types)
+{
+    std::array<AuxTensorConfig, NumDTensor> result{};
+    for(std::size_t i = 0; i < NumDTensor; ++i)
+    {
+        result[i] = {layouts[i], data_types[i]};
+    }
+    return result;
+}
 
 // Constexpr function to create XdlInstance from old DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 // template parameters Parameters are in the same order as the template parameters
 template <std::size_t NumDTensor>
-constexpr XdlInstance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle(
+constexpr XdlInstance<NumDTensor> DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts
@@ -127,21 +142,13 @@ constexpr XdlInstance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle(
     // 49. Groups to merge
     std::size_t num_conv_groups_to_merge = 1)
 {
-    // TODO: ds_layouts and ds_data_types are not yet stored in the instance data but will be used
-    // in future work. They are present now so that the parameter list aligns with the original CK
-    // template this function is based on.
-    static_assert(NumDTensor == 0,
-                  "ds_layouts and ds_data_types are not yet stored in instance data");
-    (void)ds_layouts;
-    (void)ds_data_types;
-
     // cshuffle_data_type is not stored because CK Builder derives it internally from the primary
     // data type (see TileConvTensorTypes in conv_tile_tensor_type.hpp).
     (void)cshuffle_data_type;
 
     // Our project auto-formatting makes this initializer hard to read
     // clang-format off
-    return XdlInstance{
+    return XdlInstance<NumDTensor>{
         .signature = {
             .spatial_dim            = spatial_dim,
             .direction              = ckb::ConvDirection::FORWARD,
@@ -164,6 +171,10 @@ constexpr XdlInstance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle(
                     .layout       = output_layout,
                     .data_type    = output_data_type,
                     .compute_type = output_data_type // Output compute type same as data type
+                },
+                .operation = {
+                    .elementwise_operation    = output_elementwise_op,
+                    .auxiliary_operand_configs = make_aux_configs<NumDTensor>(ds_layouts, ds_data_types)
                 }
             },
             .data_type              = input_data_type,

@@ -279,6 +279,24 @@ set(GROUPED_CONV3D_FWD_WMMA_LARGE_TENSOR_SOURCES
     factories/grouped_conv3d_fwd/wmma/large_tensor/device_grouped_conv3d_fwd_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_f16_instance.cpp
 )
 
+# Grouped Conv3D Forward Bilinear - XDL (5 files)
+set(GROUPED_CONV3D_FWD_BILINEAR_XDL_SOURCES
+    factories/grouped_conv3d_fwd_bilinear/xdl/device_grouped_conv3d_fwd_xdl_bilinear_ndhwgc_gkzyxc_ndhwgk_bf16_instance.cpp
+    factories/grouped_conv3d_fwd_bilinear/xdl/device_grouped_conv3d_fwd_xdl_bilinear_ndhwgc_gkzyxc_ndhwgk_f16_instance.cpp
+    factories/grouped_conv3d_fwd_bilinear/xdl/device_grouped_conv3d_fwd_xdl_bilinear_ndhwgc_gkzyxc_ndhwgk_f32_instance.cpp
+    factories/grouped_conv3d_fwd_bilinear/xdl/device_grouped_conv3d_fwd_xdl_bilinear_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instance.cpp
+    factories/grouped_conv3d_fwd_bilinear/xdl/device_grouped_conv3d_fwd_xdl_bilinear_ndhwgc_gkzyxc_ndhwgk_int8_instance.cpp
+)
+
+# Grouped Conv3D Forward Scale - XDL (5 files)
+set(GROUPED_CONV3D_FWD_SCALE_XDL_SOURCES
+    factories/grouped_conv3d_fwd_scale/xdl/device_grouped_conv3d_fwd_xdl_scale_ndhwgc_gkzyxc_ndhwgk_bf16_instance.cpp
+    factories/grouped_conv3d_fwd_scale/xdl/device_grouped_conv3d_fwd_xdl_scale_ndhwgc_gkzyxc_ndhwgk_f16_instance.cpp
+    factories/grouped_conv3d_fwd_scale/xdl/device_grouped_conv3d_fwd_xdl_scale_ndhwgc_gkzyxc_ndhwgk_f32_instance.cpp
+    factories/grouped_conv3d_fwd_scale/xdl/device_grouped_conv3d_fwd_xdl_scale_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instance.cpp
+    factories/grouped_conv3d_fwd_scale/xdl/device_grouped_conv3d_fwd_xdl_scale_ndhwgc_gkzyxc_ndhwgk_int8_instance.cpp
+)
+
 # Sharded instantiations for 3D forward - XDL Base
 generate_sharded_instantiations(
     INSTANCES_NAME device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_bf16_instances
@@ -406,6 +424,10 @@ add_library(ck_builder STATIC
     ${GROUPED_CONV3D_FWD_WMMA_SOURCES}
     ${GROUPED_CONV3D_FWD_WMMA_CSHUFFLEV3_SOURCES}
     ${GROUPED_CONV3D_FWD_WMMA_LARGE_TENSOR_SOURCES}
+
+    # Grouped conv3d fwd fused sources
+    ${GROUPED_CONV3D_FWD_BILINEAR_XDL_SOURCES}
+    ${GROUPED_CONV3D_FWD_SCALE_XDL_SOURCES}
 
     # Sharded sources (generated at configure time)
     ${GROUPED_CONV2D_FWD_XDL_SHARDED_SOURCES}

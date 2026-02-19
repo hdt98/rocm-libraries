@@ -25,6 +25,7 @@ namespace ckb = ck_tile::builder;
 // Elementwise operations
 [[maybe_unused]] constexpr auto PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
 [[maybe_unused]] constexpr auto Bilinear    = ckb::ElementwiseOperation::BILINEAR;
+[[maybe_unused]] constexpr auto Scale       = ckb::ElementwiseOperation::SCALE;
 
 // GEMM specializations
 [[maybe_unused]] constexpr auto GemmDefault    = ckb::GemmSpecialization::Default;

@@ -45,7 +45,7 @@ struct WmmaAlgorithm
 static_assert(ckb::factory::FwdWmmaAlgorithm<WmmaAlgorithm>);
 
 // Reuse XdlSignature from xdl.hpp
-using WmmaSignature = XdlSignature;
+using WmmaSignature = XdlSignature<>;
 
 // Struct to hold both signature and algorithm
 struct WmmaInstance
@@ -119,11 +119,9 @@ constexpr WmmaInstance DeviceGroupedConvFwdMultipleD_Wmma_CShuffle(
     // 46. Pipeline version
     ckb::PipelineVersion pipeline_version = ckb::PipelineVersion::V1)
 {
-    // TODO: ds_layouts and ds_data_types are not yet stored in the instance data but will be used
-    // in future work. They are present now so that the parameter list aligns with the original CK
-    // template this function is based on.
+    // WMMA instances only support NumDTensor == 0 (PassThrough)
     static_assert(NumDTensor == 0,
-                  "ds_layouts and ds_data_types are not yet stored in instance data");
+                  "WMMA instances do not support D tensors");
     (void)ds_layouts;
     (void)ds_data_types;
 
@@ -156,6 +154,10 @@ constexpr WmmaInstance DeviceGroupedConvFwdMultipleD_Wmma_CShuffle(
                     .layout       = output_layout,
                     .data_type    = output_data_type,
                     .compute_type = output_data_type
+                },
+                .operation = {
+                    .elementwise_operation    = output_elementwise_op,
+                    .auxiliary_operand_configs = {}
                 }
             },
             .data_type              = input_data_type,

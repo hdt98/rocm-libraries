@@ -49,6 +49,8 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS_AI
 #endif
 #ifdef CK_EXPERIMENTAL_BUILDER
 #include <miopen/ck_builder/factories/grouped_convolution_forward.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_forward_bilinear.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_forward_scale.hpp>
 #endif
 #include <miopen/ck_builder/factories/meta_device_operation_instance_factory.hpp>
 #endif
@@ -120,12 +122,12 @@ using DeviceOpGFwdDefault =
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGFwdBilinearPtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
         DeviceOpGFwdBilinear<DataType, ComputeType>>;
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGFwdScalePtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
         DeviceOpGFwdScale<DataType, ComputeType>>;
 
 template <typename DataType, typename ComputeType = DataType>

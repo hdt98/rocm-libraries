@@ -142,7 +142,7 @@ constexpr auto device_grouped_conv_fwd_xdl_bilinear_f32_tf32_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F32,F32,F32,F32,ds_types,F32,PassThrough,PassThrough,Bilinear,conv_spec,GemmMNKPadding,1,64,32,64,16,4,4,32,32,1,2,{4,16,1},{1,0,2},{1,0,2},2,4,4,true,{4,16,1},{1,0,2},{1,0,2},2,4,4,true,1,1,{1,8,1,8},4,TF32,TF32)
     //     // clang-format on
     // };
-    return std::array<XdlInstance, 0>{};
+    return std::array<XdlInstance<>, 0>{};
 }
 
 template <std::size_t NumDTensor = 1>
