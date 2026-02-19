@@ -136,7 +136,7 @@ From `DeviceOperationInstanceFactory_uses.md`, the following factories remain:
 
 | Phase | Description | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Runtime Tests |
 |-------|-------------|-------------------|-----------------|------------|------------------|---------------|
-| 1 | Grouped Conv 3D Forward (remaining .cpp) | 0 | 0 | ~86 | 0 | 1 test file |
+| 1 | Grouped Conv 3D Forward Default (remaining .cpp) | 0 | 0 | ~86 | 0 | 1 test file |
 | 2 | Grouped Conv Backward Data (2D+3D) | 3 | ~9 | ~91 | 3 | 2 test files |
 | 3 | Grouped Conv Backward Weight (2D+3D) | 4 | ~12 | ~141 | 3 | 2 test files |
 | 4 | Forward Fused Operations | 0 | ~8 | ~50+ | 5 | 5 test files |
@@ -145,13 +145,16 @@ From `DeviceOperationInstanceFactory_uses.md`, the following factories remain:
 
 ---
 
-## Phase 1: Grouped Conv 3D Forward (Remaining .cpp Files)
+## Phase 1: Grouped Conv 3D Forward Default (Remaining .cpp Files)
 
-**Covers entries:** #9-11 (3D forward default/bilinear/scale)
+**Covers entry:** #11 (3D forward default/PassThrough only)
 
 The forward factory instance headers (`.hpp`) are already converted and shared across 2D/3D.
 The factory dispatch header (`grouped_convolution_forward.hpp`) already dispatches for 3D.
 Only the `.cpp` source files need conversion.
+
+> **Note:** Entries #9 (Bilinear) and #10 (Scale) require separate dispatch headers, `.inc` files,
+> and `.cpp` source files. These are covered in Phase 4 (Forward Fused Variant Factories).
 
 ### 1.1 CK Source Locations
 
@@ -213,14 +216,18 @@ Update the 3D forward solver to use the CK Builder factory behind `#ifdef CK_EXP
   `<miopen/ck_builder/factories/grouped_convolution_forward.hpp>` and `#ifdef` branch for
   `DeviceOpGFwdDefaultPtrs` to use `miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory`.
 
+> **Note:** Only `DeviceOpGFwdDefaultPtrs` (PassThrough) is ifdef'd. `DeviceOpGFwdBilinearPtrs` and
+> `DeviceOpGFwdScalePtrs` remain on the CK factory until Phase 4 provides the corresponding CK
+> Builder dispatch headers and .cpp files.
+
 ### 1.3 Checklist
 
 | Item | Status |
 |------|--------|
-| .cpp files: `grouped_conv3d_fwd/` (74 .cpp + 12 .in) | [x] |
+| .cpp files: `grouped_conv3d_fwd/` default only (74 .cpp + 12 .in) | [x] |
 | CMakeLists.txt updated | [x] |
-| Solver file: 3D fwd `#ifdef CK_EXPERIMENTAL_BUILDER` | [x] |
-| Runtime test: `ck_builder_grouped_fwd_conv3d.cpp` | [x] |
+| Solver file: 3D fwd default `#ifdef CK_EXPERIMENTAL_BUILDER` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d.cpp` (default only) | [x] |
 | Test CMakeLists.txt updated | [x] |
 
 ---
@@ -618,7 +625,7 @@ Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK
 
 ## Phase 4: Forward Fused Variant Factories
 
-**Covers entries:** #9-11 (bilinear/scale), #15 (scaleadd_scaleadd_relu), #16 (clamp), #17 (bias_clamp)
+**Covers entries:** #9-10 (3D fwd bilinear/scale), #15 (scaleadd_scaleadd_relu), #16 (clamp), #17 (bias_clamp)
 
 These use `DeviceGroupedConvFwdMultipleABD` with non-PassThrough elementwise operations.
 The forward factory instance headers already include the converted template aliases for these variants.
@@ -745,6 +752,8 @@ Update `test/gtest/CMakeLists.txt` to register all 5 test files behind `MIOPEN_C
 | Runtime test: `ck_builder_grouped_fwd_clamp.cpp` | [ ] |
 | Runtime test: `ck_builder_grouped_fwd_bias_clamp.cpp` | [ ] |
 | Test CMakeLists.txt updated | [ ] |
+| Solver: 3D fwd bilinear/scale `#ifdef CK_EXPERIMENTAL_BUILDER` | [ ] |
+| Solver: fused ops solver files `#ifdef CK_EXPERIMENTAL_BUILDER` | [ ] |
 
 ---
 
@@ -844,7 +853,7 @@ factories behind `#ifdef CK_EXPERIMENTAL_BUILDER`. This follows the same pattern
 | `src/solver/conv/conv_hip_implicit_gemm_fwd_xdlops.cpp` | 5 | DeviceOpPtrs (non-grouped fwd) |
 | `src/solver/conv/conv_hip_implicit_gemm_bwd_data_xdlops.cpp` | 5 | DeviceOpBwdPtrs (non-grouped bwd) |
 | `src/solver/conv/conv_hip_implicit_gemm_grouped_wrw_xdlops.cpp` | 2 | DeviceOpGWrwPtrs (2D wrw) |
-| `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_fwd_xdlops.cpp` | 2, 3, 4 | DeviceOpGFwdBilinearPtrs (3D fwd bilinear), DeviceOpGFwdScalePtrs (3D fwd scale), DeviceOpGFwdDefaultPtrs (3D fwd default), plus WrW aliases |
+| `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_fwd_xdlops.cpp` | 1 (default done), 4 (bilinear/scale) | DeviceOpGFwdDefaultPtrs (3D fwd default - Phase 1, done), DeviceOpGFwdBilinearPtrs (3D fwd bilinear - Phase 4), DeviceOpGFwdScalePtrs (3D fwd scale - Phase 4) |
 | `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_bwd_xdlops.cpp` | 1 | DeviceOpGBwdBilinearPtrs (3D bwd bilinear), DeviceOpGBwdScalePtrs (3D bwd scale), DeviceOpGBwdDefaultPtrs (3D bwd default) |
 | `src/solver/conv_ck_igemm_fwd_bias_res_add_activ_fused.cpp` | 4 | DeviceOp (3D fwd scaleadd_scaleadd_relu) |
 | `src/solver/conv_ck_igemm_grp_fwd_activ_fused.cpp` | 4 | DeviceOpGFwdActPtrs (N-D fwd clamp) |
@@ -939,7 +948,14 @@ test/gtest/
 ## Implementation Order and Dependencies
 
 ```
-Phase 1 (Bwd Data)     Phase 2 (Bwd Weight)
+Phase 1 (3D Fwd Default)  ← COMPLETE
+    │
+    ├─ .cpp files only
+    ├─ solver integration (default only)
+    ├─ runtime tests
+    └─ CMakeLists
+
+Phase 2 (Bwd Data)     Phase 3 (Bwd Weight)
     │                       │
     ├─ instance_data/       ├─ instance_data/
     ├─ factory headers      ├─ factory headers
@@ -948,26 +964,28 @@ Phase 1 (Bwd Data)     Phase 2 (Bwd Weight)
     ├─ runtime tests        ├─ runtime tests
     └─ solver integration   └─ solver integration
 
-Phase 3 (3D Fwd)       Phase 4 (Fwd Fused)     Phase 5 (Non-Grouped)
-    │                       │                        │
-    ├─ .cpp files only      ├─ dispatch headers      ├─ instance_data (maybe)
-    ├─ solver integration   ├─ .cpp files            ├─ dispatch headers
-    ├─ runtime tests        ├─ runtime tests         ├─ .cpp files
-    └─ CMakeLists           └─ solver integration    ├─ runtime tests
-                                                     └─ solver integration
+Phase 4 (Fwd Fused)     Phase 5 (Non-Grouped)
+    │                        │
+    ├─ dispatch headers      ├─ instance_data (maybe)
+    ├─ .cpp files            ├─ dispatch headers
+    ├─ runtime tests         ├─ .cpp files
+    └─ solver integration    ├─ runtime tests
+       (bilinear/scale +     └─ solver integration
+        fused ops)
 ```
 
-**Phases 1, 2, and 3 are independent** and can be worked on in parallel.
-**Phase 4** depends on Phase 3 (3D forward .cpp files should exist before fused variants).
+**Phases 2 and 3 are independent** and can be worked on in parallel.
+**Phase 4** depends on Phase 1 (3D forward default .cpp files should exist before fused variants).
+  Phase 4 also includes the bilinear/scale solver ifdef for the 3D fwd solver.
 **Phase 5** is independent but lowest priority.
 
 ## Summary
 
 | Phase | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Runtime Tests | Solver Files |
 |-------|-------------------|-----------------|------------|------------------|---------------|--------------|
-| 1 - 3D Fwd | 0 | 0 | ~86 | 0 | 1 | 1 |
+| 1 - 3D Fwd Default | 0 | 0 | ~86 | 0 | 1 | 1 (default only) |
 | 2 - Bwd Data | 3 | ~9 | ~91 | 3 + .inc | 2 | 2 |
 | 3 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 2 | 3 |
-| 4 - Fwd Fused | 0 | 0-8 | ~65 | 5 + .inc | 5 | 3 |
+| 4 - Fwd Fused (incl. bilinear/scale) | 0 | 0-8 | ~65 | 5 + .inc | 5 | 4 |
 | 5 - Non-Grouped | 2 | ~2 | ~10 | 2 | 2 | 2 |
-| **Total** | **~9** | **~23-31** | **~393** | **~13** | **12** | **~11** |
+| **Total** | **~9** | **~23-31** | **~393** | **~13** | **12** | **~12** |
