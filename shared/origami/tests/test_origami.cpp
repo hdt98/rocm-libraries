@@ -558,15 +558,15 @@ TEST_CASE("Origami: simulation mode basic", "[origami][formocast]") {
       config.prediction_mode = origami::prediction_modes_t::simulation;
       
       // Set Formocast-specific parameters (via tensile nested struct)
-      config.tensile.depth_u = 32;
-      config.tensile.global_split_u = 1;
-      config.tensile.grvw_a = 4;
-      config.tensile.grvw_b = 4;
-      config.tensile.gwvw_d = 4;
-      config.tensile.wave_num = 4;
-      config.tensile.wave_group_m = 2;
-      config.tensile.wave_group_n = 2;
-      config.tensile.prefetch_global_read = 2;
+      config.tensile().depth_u = 32;
+      config.tensile().global_split_u = 1;
+      config.tensile().grvw_a = 4;
+      config.tensile().grvw_b = 4;
+      config.tensile().gwvw_d = 4;
+      config.tensile().wave_num = 4;
+      config.tensile().wave_group_m = 2;
+      config.tensile().wave_group_n = 2;
+      config.tensile().prefetch_global_read = 2;
       
       double latency = origami::compute_total_latency(problem, hardware, config, hardware.N_CU);
       
@@ -588,15 +588,15 @@ TEST_CASE("Origami: simulation mode via compute_total_latency", "[origami][formo
       // Create config with simulation mode
       auto config_simulation = make_config(128, 128, 32, 16, 16, 16, false, 8, 2);
       config_simulation.prediction_mode = origami::prediction_modes_t::simulation;
-      config_simulation.tensile.depth_u = 32;
-      config_simulation.tensile.global_split_u = 1;
-      config_simulation.tensile.grvw_a = 4;
-      config_simulation.tensile.grvw_b = 4;
-      config_simulation.tensile.gwvw_d = 4;
-      config_simulation.tensile.wave_num = 4;
-      config_simulation.tensile.wave_group_m = 2;
-      config_simulation.tensile.wave_group_n = 2;
-      config_simulation.tensile.prefetch_global_read = 2;
+      config_simulation.tensile().depth_u = 32;
+      config_simulation.tensile().global_split_u = 1;
+      config_simulation.tensile().grvw_a = 4;
+      config_simulation.tensile().grvw_b = 4;
+      config_simulation.tensile().gwvw_d = 4;
+      config_simulation.tensile().wave_num = 4;
+      config_simulation.tensile().wave_group_m = 2;
+      config_simulation.tensile().wave_group_n = 2;
+      config_simulation.tensile().prefetch_global_read = 2;
       
       double latency_estimation = origami::compute_total_latency(
           problem, hardware, config_estimation, hardware.N_CU);
@@ -631,14 +631,14 @@ TEST_CASE("Origami: Formocast with various problem sizes", "[origami][formocast]
         
         auto config = make_config(128, 128, 32, 16, 16, 16, false, 8, 2);
         config.prediction_mode = origami::prediction_modes_t::simulation;
-        config.tensile.depth_u = 32;
-        config.tensile.global_split_u = 1;
-        config.tensile.grvw_a = 4;
-        config.tensile.grvw_b = 4;
-        config.tensile.gwvw_d = 4;
-        config.tensile.wave_num = 4;
-        config.tensile.wave_group_m = 2;
-        config.tensile.wave_group_n = 2;
+        config.tensile().depth_u = 32;
+        config.tensile().global_split_u = 1;
+        config.tensile().grvw_a = 4;
+        config.tensile().grvw_b = 4;
+        config.tensile().gwvw_d = 4;
+        config.tensile().wave_num = 4;
+        config.tensile().wave_group_m = 2;
+        config.tensile().wave_group_n = 2;
         
         double latency = origami::compute_total_latency(problem, hardware, config, hardware.N_CU);
         
@@ -666,14 +666,14 @@ TEST_CASE("Origami: Formocast with different tile sizes", "[origami][formocast]"
       for (const auto& [mt_m, mt_n, mt_k] : tile_sizes) {
         auto config = make_config(mt_m, mt_n, mt_k, 16, 16, 16, false, 8, 2);
         config.prediction_mode = origami::prediction_modes_t::simulation;
-        config.tensile.depth_u = mt_k;
-        config.tensile.global_split_u = 1;
-        config.tensile.grvw_a = 4;
-        config.tensile.grvw_b = 4;
-        config.tensile.gwvw_d = 4;
-        config.tensile.wave_num = 4;
-        config.tensile.wave_group_m = 2;
-        config.tensile.wave_group_n = 2;
+        config.tensile().depth_u = mt_k;
+        config.tensile().global_split_u = 1;
+        config.tensile().grvw_a = 4;
+        config.tensile().grvw_b = 4;
+        config.tensile().gwvw_d = 4;
+        config.tensile().wave_num = 4;
+        config.tensile().wave_group_m = 2;
+        config.tensile().wave_group_n = 2;
         
         double latency = origami::compute_total_latency(problem, hardware, config, hardware.N_CU);
         
@@ -688,21 +688,21 @@ TEST_CASE("Origami: Formocast config fields have correct defaults", "[origami][f
   origami::config_t config;
   
   // Check default values for Tensile-specific fields (via nested struct)
-  REQUIRE(config.tensile.depth_u == 0);
-  REQUIRE(config.tensile.global_split_u == 1);
-  REQUIRE(config.tensile.global_accumulation == 0);
-  REQUIRE(config.tensile.local_split_u == 1);
-  REQUIRE(config.tensile.grvw_a == 1);
-  REQUIRE(config.tensile.grvw_b == 1);
-  REQUIRE(config.tensile.gwvw_d == 1);
-  REQUIRE(config.tensile.direct_to_vgpr_a == false);
-  REQUIRE(config.tensile.direct_to_vgpr_b == false);
-  REQUIRE(config.tensile.direct_to_lds_a == false);
-  REQUIRE(config.tensile.direct_to_lds_b == false);
-  REQUIRE(config.tensile.wave_num == 4);
-  REQUIRE(config.tensile.wave_group_m == 2);
-  REQUIRE(config.tensile.wave_group_n == 2);
-  REQUIRE(config.tensile.prefetch_global_read == 2);
+  REQUIRE(config.tensile().depth_u == 0);
+  REQUIRE(config.tensile().global_split_u == 1);
+  REQUIRE(config.tensile().global_accumulation == 0);
+  REQUIRE(config.tensile().local_split_u == 1);
+  REQUIRE(config.tensile().grvw_a == 1);
+  REQUIRE(config.tensile().grvw_b == 1);
+  REQUIRE(config.tensile().gwvw_d == 1);
+  REQUIRE(config.tensile().direct_to_vgpr_a == false);
+  REQUIRE(config.tensile().direct_to_vgpr_b == false);
+  REQUIRE(config.tensile().direct_to_lds_a == false);
+  REQUIRE(config.tensile().direct_to_lds_b == false);
+  REQUIRE(config.tensile().wave_num == 4);
+  REQUIRE(config.tensile().wave_group_m == 2);
+  REQUIRE(config.tensile().wave_group_n == 2);
+  REQUIRE(config.tensile().prefetch_global_read == 2);
   REQUIRE(config.prediction_mode == origami::prediction_modes_t::estimation);
 }
 

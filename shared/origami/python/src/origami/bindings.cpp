@@ -142,8 +142,19 @@ NB_MODULE(origami, m) {
       .def_rw("workspace_size_per_elem_c", &origami::config_t::workspace_size_per_elem_c)
       .def_rw("grid_selection", &origami::config_t::grid_selection)
       .def_rw("prediction_mode", &origami::config_t::prediction_mode)
-      // Tensile-specific parameters accessed via nested struct
-      .def_rw("tensile", &origami::config_t::tensile);
+      // Tensile-specific parameters accessed via variant backend
+      .def("tensile",
+           static_cast<origami::tensile_params_t& (origami::config_t::*)()>(
+               &origami::config_t::tensile),
+           nanobind::rv_policy::reference_internal,
+           "Get mutable reference to Tensile params (initializes if not set)")
+      .def("has_tensile_params", &origami::config_t::has_tensile_params,
+           "Check if Tensile params are currently set")
+      .def("set_tensile_params",
+           [](origami::config_t& c, const origami::tensile_params_t& p) {
+             c.backend = p;
+           },
+           "Set Tensile params from a tensile_params_t object");
 
   nanobind::class_<origami::workgroup_mapping_t>(m, "workgroup_mapping_t")
       .def(nanobind::init<>())

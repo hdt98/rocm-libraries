@@ -35,6 +35,7 @@
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
+#include <variant>
 
 #include "origami/math.hpp"
 
@@ -395,6 +396,10 @@ struct tensile_params_t {
   constexpr bool operator==(const tensile_params_t& o) const noexcept = default;
 };
 
+/// Variant holding backend-specific parameters.
+/// std::monostate represents no backend-specific params (default).
+using backend_params_t = std::variant<std::monostate, tensile_params_t>;
+
 /**
  * @brief Full kernel configuration (tile shape + execution parameters).
  *
@@ -439,24 +444,50 @@ struct config_t {
   /// CMS kernel flag
   bool cms_kernel = false;
 
-  /// Tensile/TensileLite-specific parameters (used when prediction_mode == simulation)
-  /// These are ignored by the estimation-based prediction model.
-  tensile_params_t tensile{};
+  /// Backend-specific parameters (type should match target).
+  /// Use tensile() accessor to get/set Tensile-specific params.
+  backend_params_t backend{};
 
-  constexpr bool operator==(const config_t& o) const noexcept {
+  /// Get mutable reference to Tensile params. Initializes if not already set.
+  tensile_params_t& tensile() {
+    if (!std::holds_alternative<tensile_params_t>(backend)) {
+      backend = tensile_params_t{};
+    }
+    return std::get<tensile_params_t>(backend);
+  }
+
+  /// Get const reference to Tensile params. Throws if not set.
+  const tensile_params_t& tensile() const {
+    return std::get<tensile_params_t>(backend);
+  }
+
+  /// Check if Tensile params are currently set.
+  bool has_tensile_params() const noexcept {
+    return std::holds_alternative<tensile_params_t>(backend);
+  }
+
+  bool operator==(const config_t& o) const noexcept {
     return mt == o.mt && mi == o.mi && hand_optimized_main_loop == o.hand_optimized_main_loop &&
            cache_hints_a == o.cache_hints_a && cache_hints_b == o.cache_hints_b &&
            workgroup_mapping == o.workgroup_mapping && prediction_mode == o.prediction_mode &&
-           target == o.target;
+           target == o.target && backend == o.backend;
   }
 
   std::size_t hash() const {
+    std::size_t backend_hash = 0;
+    if (has_tensile_params()) {
+      const auto& t = std::get<tensile_params_t>(backend);
+      backend_hash = std::hash<std::size_t>()(t.depth_u) ^
+                     std::hash<std::int16_t>()(t.global_split_u) ^
+                     std::hash<std::size_t>()(t.wave_num);
+    }
     return std::hash<size_t>()(mt.m) ^ std::hash<size_t>()(mt.n) ^ std::hash<size_t>()(mt.k) ^
            std::hash<size_t>()(mi.m) ^ std::hash<size_t>()(mi.n) ^ std::hash<size_t>()(mi.k) ^
            std::hash<int>()(hand_optimized_main_loop) ^ std::hash<int>()(cache_hints_a) ^
            std::hash<int>()(cache_hints_b) ^ std::hash<int>()(workgroup_mapping) ^
            std::hash<std::uint32_t>()(static_cast<std::uint32_t>(prediction_mode)) ^
-           std::hash<std::uint32_t>()(static_cast<std::uint32_t>(target));
+           std::hash<std::uint32_t>()(static_cast<std::uint32_t>(target)) ^
+           backend_hash;
   }
 
   void validate() const {
