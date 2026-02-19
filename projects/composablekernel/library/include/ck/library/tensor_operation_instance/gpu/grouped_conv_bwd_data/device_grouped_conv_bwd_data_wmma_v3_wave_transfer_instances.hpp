@@ -1,6 +1,6 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-#define USE_WAVE_TRANSFER_BWD_DATA
+
 #pragma once
 
 #include "ck/ck.hpp"
@@ -14,6 +14,7 @@ namespace tensor_operation {
 namespace device {
 namespace instance {
 
+#define USE_WAVE_TRANSFER_BWD_DATA
 
 using BF16 = ck::bhalf_t;
 using F16  = ck::half_t;
@@ -66,10 +67,7 @@ using device_grouped_conv_bwd_data_wmma_cshufflev3_f16_wave_transfer_instances =
         // ##############################################|           |        |        |            |        |      |      |        |         |            |      |             |             |               |                    |      |      |           |      |      |      |    |    |    |       |       |        | Lengths_AK0_M_AK1|   ArrangeOrder|               |               |      PerVector|  PerVector_AK1|          | Lengths_BK0_N_BK1|   ArrangeOrder|               |               |      PerVector|  PerVector_BK1|          |   PerShuffle|   PerShuffle|  _NBlock_NPerBlock|                 |
         // ##############################################|           |        |        |            |        |      |      |        |         |            |      |             |             |               |                    |      |      |           |      |      |      |    |    |    |       |       |        |                  |               |               |               |               |               |          |                  |               |               |               |               |               |          |             |             |                   |                 |  
         // generic instance
-          DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3<NDimSpatial,  ALayout, BLayout,   DsLayout, ELayout,   F16,   F16,     F32,      F16, Empty_Tuple,   F16,  PassThrough,  PassThrough,    PassThrough,            ConvSpec,  true,  true,         64,    64,    64,    32,   8,   8,   16,   16,       4,       2,       S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              1,              8,         1,        S<4, 8, 1>,     S<0, 2, 1>,     S<0, 2, 1>,              1,              1,              8,         1,            1,            1,     S<1, 16, 1, 4>,         S<1,1,1>,BlockGemmPipelineScheduler::Intrawave, BlockGemmPipelineVersion::v1, false>,
-        
-          DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3<NDimSpatial,  ALayout, BLayout,   DsLayout, ELayout,   F16,   F16,     F32,      F16, Empty_Tuple,   F16,  PassThrough,  PassThrough,    PassThrough,            ConvSpec,  true,  true,         64,    64,    32,    64,   8,   8,   16,   16,       4,       1,        S<8, 8, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              4,              8,         1,        S<8, 8, 1>,     S<0, 2, 1>,     S<0, 2, 1>,              1,              4,              8,         1,            1,            1,     S<1, 16, 1, 4>,         S<8,8,8>,BlockGemmPipelineScheduler::Intrawave, BlockGemmPipelineVersion::v1, false>,
-          DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3<NDimSpatial,  ALayout, BLayout,   DsLayout, ELayout,   F16,   F16,     F32,      F16, Empty_Tuple,   F16,  PassThrough,  PassThrough,    PassThrough,            ConvSpec,  true,  true,         64,    64,    64,    32,   8,   8,   16,   16,       4,       2,       S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              4,              8,         1,       S<4, 16, 1>,     S<0, 2, 1>,     S<0, 2, 1>,              1,              4,              8,         1,            1,            1,     S<1, 16, 1, 4>,         S<8,8,8>,BlockGemmPipelineScheduler::Intrawave, BlockGemmPipelineVersion::v1, false>
+      //  DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3<NDimSpatial,  ALayout, BLayout,   DsLayout, ELayout,   F16,   F16,     F32,      F16, Empty_Tuple,   F16,  PassThrough,  PassThrough,    PassThrough,            ConvSpec,  true,  true,         64,    64,    64,    32,   8,   8,   16,   16,       4,       2,       S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,         1,       S<4, 16, 1>,     S<0, 2, 1>,     S<0, 2, 1>,              1,              8,              8,         1,            1,            1,     S<1, 16, 1, 4>,         S<8,8,8>,BlockGemmPipelineScheduler::Intrawave, BlockGemmPipelineVersion::v1, false>
 
     // clang-format on
     >;
