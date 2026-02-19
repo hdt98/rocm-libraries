@@ -50,7 +50,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
                                                                        U AA,
                                                                        const rocblas_stride shiftA,
                                                                        const rocblas_stride strideA,
-                                                                       T* WW,
+                                                                       T* pWW,
                                                                        const rocblas_stride shiftW,
                                                                        const rocblas_stride strideW,
                                                                        T* pTauA,
@@ -60,9 +60,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
     I tid = threadIdx.x;
 
     // select batch instance
-    T* A = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* W = load_ptr_batch<T>(WW, bid, shiftW, strideW);
-    T* tau = load_ptr_batch<T>(pTauA, bid, 0, strideP);
+    T* pA = load_ptr_batch<T>(AA, bid, shiftA, strideA);
+    T* pW = load_ptr_batch<T>(pWW, bid, shiftW, strideW);
+    T* pTau = load_ptr_batch<T>(pTauA, bid, 0, strideP);
 
     // shared variables
     __shared__ T sval[MAX_THDS / WarpSize];
@@ -71,10 +71,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
 
     // dot
     T norm2 = 0;
-    for(I i = tid; i < n; i += MAX_THDS)
+    for(I i = tid; i < n; i += MAX_THDS) //todo: too much runtime determined things
     {
-        T tempA = A[i];
-        T tempW = W[i];
+        T tempA = pA[i];
+        T tempW = pW[i];
         if(i < MAX_THDS)
         {
             sh_A[i] = tempA;
@@ -85,6 +85,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
     }
 
     // reduce squared entries to find squared norm of x
+    // this can be a single builtin wave reduce add
     norm2 += shift_left(norm2, 1);
     norm2 += shift_left(norm2, 2);
     norm2 += shift_left(norm2, 4);
@@ -99,17 +100,37 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
     {
         for(I k = 1; k < MAX_THDS / warpSize; k++)
             norm2 += sval[k];
-        sval[0] = -0.5 * tau[0] * norm2;
+        sval[0] = -0.5 * pTau[0] * norm2;
     }
     __syncthreads();
-
+    auto w_buffer  = __builtin_amdgcn_make_buffer_rsrc(pW, 0,0xffffffff,0x00020000);
     // axpy
+    //TODO, excessive traffic to global memory, can we keep W in registers/shared memory?
+    //make last write to W l2 passthrough
+    const T alpha = sval[0];
     for(I i = tid; i < n; i += MAX_THDS)
     {
+        T result;
         if(i < MAX_THDS)
-            W[i] = sh_W[i] + sval[0] * sh_A[i];
+            result = sh_W[i] + alpha * sh_A[i];
         else
-            W[i] = W[i] + sval[0] * A[i];
+            result = pW[i] + alpha * pA[i];
+
+        int out_addr = i * sizeof(T);
+
+        if constexpr(sizeof(T) == 1)
+            __builtin_amdgcn_raw_buffer_store_b8(result, w_buffer, out_addr, 0,0x0);
+        else if constexpr(sizeof(T) == 2)
+            __builtin_amdgcn_raw_buffer_store_b16(result, w_buffer, out_addr, 0,0x0);
+        else if constexpr(sizeof(T) == 4)
+            __builtin_amdgcn_raw_buffer_store_b32(result, w_buffer, out_addr, 0,0x0);
+        else if constexpr(sizeof(T) == 8)
+        {
+            using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
+            uint32x2_t tmp;
+            memcpy(&tmp, &result, sizeof(T));
+            __builtin_amdgcn_raw_buffer_store_b64(tmp, w_buffer, out_addr, 0,0x0);
+        }
     }
 }
 
@@ -576,7 +597,7 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
                                                  const rocblas_int shiftA,
                                                  const rocblas_int lda,
                                                  const rocblas_stride strideA,
-                                                 T* pWA,
+                                                 T* WA,
                                                  const rocblas_int shiftW,
                                                  const rocblas_int ldw,
                                                  const rocblas_stride strideW)
@@ -597,7 +618,7 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
 
     // select batch instance
     T* A = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* W = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
+    T* W = load_ptr_batch<T>(WA, bid, shiftW, strideW);
 
     /* ------------------------
     formulate gemv problem:
@@ -1183,18 +1204,19 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemv_kernel(const rocblas_int mm,
 }
 
 template <int NB_X, typename T, typename U>
-ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const rocblas_int mm,
+ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const int         blocks,
+                                                        const rocblas_int mm,
                                                         const rocblas_int k,
                                                         const rocblas_int c,
-                                                        U AA,
+                                                        U* pAA,
                                                         const rocblas_int shiftA,
                                                         const rocblas_int lda,
                                                         const rocblas_stride strideA,
-                                                        T* pWA,
+                                                        T* pWA, // Householder panel
                                                         const rocblas_int shiftW,
                                                         const rocblas_int ldw,
                                                         const rocblas_stride strideW,
-                                                        T* yA,
+                                                        T* pYA,
                                                         const rocblas_int shiftY,
                                                         const rocblas_int ldy,
                                                         const rocblas_stride strideY,
@@ -1202,70 +1224,98 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const rocblas_int mm,
                                                         const rocblas_stride strideblk)
 {
     rocblas_int bid = blockIdx.z;
-    rocblas_int tx = threadIdx.x;
-    rocblas_int i = blockIdx.x;
-
-    T* A = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* W = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
-    T* y1 = load_ptr_batch<T>(yA, bid, shiftY, strideY);
-    T* y2 = pWorkA + bid * strideblk;
-
-    int n = c;
-    int cc = mm - c - 1;
-    // int m = mm + cc;
-    int cw = c - mm + k;
-    T* A1 = A;
-    T* A2 = W + idx2D(0, cw + 1, ldw);
-    int lda1 = lda;
-    int lda2 = ldw;
-    T* x = A + idx2D(0, c, lda);
-
-    int it = (i < mm) ? i : i - mm;
-    T* a = (i < mm) ? A1 : A2;
-    int ld = (i < mm) ? lda1 : lda2;
-    T* y = (i < mm) ? y1 : y2;
-
-    if(tx < n)
-        a += tx;
-
-    a += it * size_t(ld);
-
-    T res = 0;
+    rocblas_int tx  = threadIdx.x;
+    T* pA  = load_ptr_batch<T>(pAA, bid, shiftA, strideA);
+    T* pW  = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
+    T* pY1 = load_ptr_batch<T>(pYA, bid, shiftY, strideY);
+    T* pY2 = pWorkA + bid * strideblk;
+    int n        = c;
+    int cc       = mm - c - 1;
+    int cw       = c - mm + k;
+    T* pA1       = pA;
+    T* pA2       = pW + idx2D(0, cw + 1, ldw);
+    int lda1     = lda;
+    int lda2     = ldw;
+    T* pX        = pA + idx2D(0, c, lda);
 
     __shared__ T sdata[NB_X];
 
     // partial sums
     rocblas_int n_full = (n / NB_X) * NB_X;
 
-    if(it != c)
+    for(rocblas_int i = blockIdx.x; i < blocks; i += gridDim.x)
     {
-        for(rocblas_int j = 0; j < n_full; j += NB_X)
-            res += conj(a[j]) * x[tx + j];
+        int it       = (i < mm) ? i    : i - mm;
+        T* pAderived = (i < mm) ? pA1  : pA2;
+        int ld       = (i < mm) ? lda1 : lda2;
+        T* pYderived = (i < mm) ? pY1  : pY2;
 
-        if(tx + n_full < n)
-            res += conj(a[n_full]) * x[tx + n_full];
+        if(tx < n)
+        {
+            pAderived += tx;
+        }
 
-        // reduction of partial sums
-        res += shift_left(res, 1);
-        res += shift_left(res, 2);
-        res += shift_left(res, 4);
-        res += shift_left(res, 8);
-        res += shift_left(res, 16);
-        if(warpSize > 32)
-            res += shift_left(res, 32);
-        if(tx % warpSize == 0)
-            sdata[tx / warpSize] = res;
-        __syncthreads();
+        pAderived += it * size_t(ld);
+        T res = 0;
+
+
+        if(it != c)
+        {
+            for(rocblas_int j = 0; j < n_full; j += NB_X)
+            {
+                res += conj(pAderived[j]) * pX[tx + j];
+            }
+
+            if(tx + n_full < n)
+            {
+                res += conj(pAderived[n_full]) * pX[tx + n_full];
+            }
+
+            // reduction of partial sums
+            res += shift_left(res, 1);
+            res += shift_left(res, 2);
+            res += shift_left(res, 4);
+            res += shift_left(res, 8);
+            res += shift_left(res, 16);
+
+            if(warpSize > 32)
+            {
+                res += shift_left(res, 32);
+            }
+
+            if(tx % warpSize == 0)
+            {
+                sdata[tx / warpSize] = res;
+            }
+
+            __syncthreads();
+            if(tx == 0)
+            {
+                for(rocblas_int k = 1; k < NB_X / warpSize; k++)
+                    res += sdata[k];
+            }
+        }
+
+        auto outBuff  = __builtin_amdgcn_make_buffer_rsrc(pYderived, 0,0xffffffff,0x00020000);
+
         if(tx == 0)
         {
-            for(rocblas_int k = 1; k < NB_X / warpSize; k++)
-                res += sdata[k];
-        }
-    }
 
-    if(tx == 0)
-    {
-        y[it] = res;
+            if constexpr(sizeof(T) == 1)
+                __builtin_amdgcn_raw_buffer_store_b8(res, outBuff, it, 0,0x0);
+            else if constexpr(sizeof(T) == 2)
+                __builtin_amdgcn_raw_buffer_store_b16(res, outBuff, it, 0,0x0);
+            else if constexpr(sizeof(T) == 4)
+                __builtin_amdgcn_raw_buffer_store_b32(res, outBuff, it, 0,0x0);
+            else if constexpr(sizeof(T) == 8)
+            {
+                using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
+                uint32x2_t tmp;
+                memcpy(&tmp, &res, sizeof(T));
+                __builtin_amdgcn_raw_buffer_store_b64(tmp, outBuff, it, 0,0x0);
+            }
+
+        }
     }
 }
 
@@ -1757,10 +1807,10 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
     int idr       = bidr * threadsr + tidr;
 
     // select batch instance
-    T* A    = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* W    = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
-    T* work = pWorkA + bid * strideblk;
-    T* tau  = pTauA + bid * strideP;
+    T* pA    = load_ptr_batch<T>(AA, bid, shiftA, strideA);
+    T* pW    = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
+    T* pWork = pWorkA + bid * strideblk;
+    T* pTau  = pTauA + bid * strideP;
 
     /* ------------------------
     formulate gemv problem:
@@ -1780,15 +1830,15 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
     int n    = mm - c - 1;
     int m    = c;
     int cw   = c - mm + k;
-    T* pY    = W + idx2D(0, cw, ldw);
-    T* pA1   = A + idx2D(0, c + 1, lda);
+    T* pY    = pW + idx2D(0, cw, ldw);
+    T* pA1   = pA + idx2D(0, c + 1, lda);
     int lda1 = lda;
-    T* pA2   = W + idx2D(0, cw + 1, ldw);
+    T* pA2   = pW + idx2D(0, cw + 1, ldw);
     int lda2 = ldw;
-    T* pX1   = work;
-    T* pX2   = W + idx2D(c + 1, cw, ldw);
-    T* t     = tau + c - 1;
-    const auto tauVal =  t[0];
+    T* pX1   = pWork;
+    T* pX2   = pW + idx2D(c + 1, cw, ldw);
+    T* pT     = pTau + c - 1;
+    const auto tauVal =  pT[0];
     // rpgr and rpgc are the number of rounds a group should run
     // to cover all the rows and columns, respectively
     int ngrp = (m - 1) / threadsr + 1;
@@ -1799,11 +1849,11 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
 
     //define buffer types
     //TODO: bounds should be sized correctly instead of set to max
-    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0);
-    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0);
-    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0);
-    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0);
-    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0);
+    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0x00020000);
+    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0x00020000);
+    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0x00020000);
+    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0x00020000);
+    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0x00020000);
 
     // Registers/LDS:
     // ac, acs -> accumulator
@@ -1905,17 +1955,17 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
         const auto result = ac * tauVal;
         const auto Y_out_addr = (i < m) ? (i * sizeof(T)) : 0xffffffff;
         if constexpr(sizeof(T) == 1)
-            __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0, 0x10);
+            __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0,0x0);
         else if constexpr(sizeof(T) == 2)
-            __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0, 0x10);
+            __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0,0x0);
         else if constexpr(sizeof(T) == 4)
-            __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0, 0x10);
+            __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0,0x0);
         else if constexpr(sizeof(T) == 8)
         {
             using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
             uint32x2_t tmp;
             memcpy(&tmp, &result, sizeof(T));
-            __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0, 0x10);
+            __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0,0x0);
         }
     }
 }
@@ -2126,31 +2176,31 @@ void rocsolver_latrd_forsytrd_getMemorySize(const rocblas_int n,
     n3 = sizeof(T) * (n + k) * gr * batch_count;
 
     *size_norms = std::max({n1, n2, n3});
-    *size_work = std::max({w1, w2, w3, w4});
+    *size_work  = std::max({w1, w2, w3, w4});
 }
 
 template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
 rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                                  const rocblas_fill uplo,
-                                                 const rocblas_int n,
-                                                 const rocblas_int k,
-                                                 U A,
+                                                 const rocblas_int n, // matrix dim 1
+                                                 const rocblas_int k, // matrix dim 2
+                                                 U* A,
                                                  const rocblas_int shiftA,
                                                  const rocblas_int lda,
                                                  const rocblas_stride strideA,
-                                                 S* E,
+                                                 S* pE,
                                                  const rocblas_stride strideE,
-                                                 T* tau,
+                                                 T* pTau,
                                                  const rocblas_stride strideP,
-                                                 T* W,
+                                                 T* pW,
                                                  const rocblas_int shiftW,
                                                  const rocblas_int ldw,
                                                  const rocblas_stride strideW,
                                                  const rocblas_int batch_count,
-                                                 T* scalars,
-                                                 T* work,
-                                                 T* norms,
-                                                 T** workArr)
+                                                 T* pScalars,
+                                                 T* pWork,
+                                                 T* pNorms,
+                                                 T** ppWorkArr)
 {
     ROCSOLVER_ENTER("latrd_forsytrd", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA,
                     "lda:", lda, "shiftW:", shiftW, "ldw:", ldw, "bc:", batch_count);
@@ -2180,20 +2230,22 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         for(rocblas_int j = 0; j < k; ++j)
         {
             // update column j of A with reflector computed in step j-1
-            //----------------------------------------------------------
+            //--------------------------------------------------------------
+            dim3 update_grid(grr_updates, grc_updates, batch_count);
+            dim3 update_threads(thr_updates, thc_updates, 1);
             ROCSOLVER_LAUNCH_KERNEL(latrd_lower_updateA_kernel<T>,
-                                    dim3(grr_updates, grc_updates, batch_count),
-                                    dim3(thr_updates, thc_updates, 1), lmemsize_updates, stream, n,
-                                    j, A, shiftA, lda, strideA, W, shiftW, ldw, strideW);
-            //-------------------------------------------------------------
+                                    update_grid,
+                                    update_threads, lmemsize_updates, stream, n,
+                                    j, A, shiftA, lda, strideA, pW, shiftW, ldw, strideW);
+            //--------------------------------------------------------------
 
             // reduce column j of A with new reflector, then copy off-diagonal element
             // to E(j) and set off-diagonal to 1
             //----------------------------------------------------------
-            rocsolver_larfg_template(handle, n - j - 1, A, shiftA + idx2D(j + 1, j, lda), E, j,
+            rocsolver_larfg_template(handle, n - j - 1, A, shiftA + idx2D(j + 1, j, lda), pE, j,
                                      strideE, A, shiftA + idx2D(std::min(j + 2, n - 1), j, lda), 1,
-                                     strideA, (tau + j), strideP, batch_count, work, norms);
-            //-----------------------------------------------------------
+                                     strideA, (pTau + j), strideP, batch_count, pWork, pNorms);
+            //--------------------------------------------------------------
 
             // compute column j of W
             //--------------------------------------------------------------
@@ -2201,21 +2253,21 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             dim3 gemvt_grid(n + j, 1, batch_count);
             dim3 gemvt_threads(NB);
             ROCSOLVER_LAUNCH_KERNEL((latrd_lower_computeW_gemvt_kernel<NB, T>), gemvt_grid,
-                                    gemvt_threads, 0, stream, n, j, A, shiftA, lda, strideA, W,
-                                    shiftW, ldw, strideW, W, shiftW + idx2D(0, j, ldw), ldw,
-                                    strideW, work, strideblk);
+                                    gemvt_threads, 0, stream, n, j, A, shiftA, lda, strideA, pW,
+                                    shiftW, ldw, strideW, pW, shiftW + idx2D(0, j, ldw), ldw,
+                                    strideW, pWork, strideblk);
 
             // update column j of W
             //--------------------------------------------------------------
             ROCSOLVER_LAUNCH_KERNEL(
-                latrd_lower_updateW_kernel<T>, dim3(grr_updates, grc_updates, batch_count),
-                dim3(thr_updates, thc_updates, 1), lmemsize_updates, stream, n, j, A, shiftA, lda,
-                strideA, W, shiftW, ldw, strideW, work, strideblk, tau, strideP);
+                latrd_lower_updateW_kernel<T>, update_grid,
+                update_threads, lmemsize_updates, stream, n, j, A, shiftA, lda,
+                strideA, pW, shiftW, ldw, strideW, pWork, strideblk, pTau, strideP);
 
             ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>), dim3(1, 1, batch_count),
                                     dim3(1024, 1, 1), 0, stream, n - 1 - j, A,
-                                    shiftA + idx2D(j + 1, j, lda), strideA, W,
-                                    shiftW + idx2D(j + 1, j, ldw), strideW, tau + j, strideP);
+                                    shiftA + idx2D(j + 1, j, lda), strideA, pW,
+                                    shiftW + idx2D(j + 1, j, ldw), strideW, pTau + j, strideP);
             //--------------------------------------------------------------
         }
     }
@@ -2225,47 +2277,78 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         // reduce the last k columns of A
         // main loop running forwards (for each column)
         rocblas_int jw;
+
+        // get the hardware compute unit count, take the min of blocksX and 4x cu count to get good occupancy without oversubscribing
+        int cuCount;
+        hipDeviceProp_t deviceProp;
+        hipError_t err = hipGetDeviceProperties(&deviceProp, 0);
+        assert(err == hipSuccess);
+        cuCount = deviceProp.multiProcessorCount;
+
         for(rocblas_int j = n - 1; j >= n - k; --j)
         {
             jw = j - n + k;
-
+            dim3 update_grid(grr_updates, grc_updates, batch_count);
+            dim3 update_threads(thr_updates, thc_updates, 1);
             // update column j of A with reflector computed in step j-1
             //----------------------------------------------------------
             ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
-                                    dim3(grr_updates, grc_updates, batch_count),
-                                    dim3(thr_updates, thc_updates, 1), lmemsize_updates, stream, n,
-                                    k, j, A, shiftA, lda, strideA, W, shiftW, ldw, strideW);
+                                    update_grid,
+                                    update_threads,
+                                    lmemsize_updates,
+                                    stream,
+                                    n, k, j, A, shiftA,
+                                    lda, strideA, pW,
+                                    shiftW, ldw, strideW);
             //-------------------------------------------------------------
 
-            // reduce column j of A with new reflector, then copy off-diagonal element
-            // to E(j) and set off-diagonal to 1
-            //----------------------------------------------------------
-            rocsolver_larfg_template(handle, j, A, shiftA + idx2D(j - 1, j, lda), E, j - 1, strideE,
-                                     A, shiftA + idx2D(0, j, lda), 1, strideA, (tau + j - 1),
-                                     strideP, batch_count, work, norms);
-            //----------------------------------------------------------
+            // // reduce column j of A with new reflector, then copy off-diagonal element
+            // // to E(j) and set off-diagonal to 1
+            // //-------------------------------------------------------------
+            rocsolver_larfg_template(handle,
+                                     j, A, shiftA + idx2D(j - 1, j, lda), pE, j - 1, strideE,
+                                     A, shiftA + idx2D(0, j, lda), 1, strideA, (pTau + j - 1),
+                                     strideP, batch_count, pWork, pNorms);
 
+            //--------------------------------------------------------------
             // compute column j of W
             //--------------------------------------------------------------
             static constexpr int NB = 256;
-            dim3 gemvt_grid(n + n - j - 1, 1, batch_count);
+            const int blocksX = n + n - j - 1;
+            int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
+            int gridX = std::min(blocksX, maxBlocks);
+
+            dim3 gemvt_grid(gridX, 1, batch_count);
             dim3 gemvt_threads(NB);
-            ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>), gemvt_grid,
-                                    gemvt_threads, 0, stream, n, k, j, A, shiftA, lda, strideA, W,
-                                    shiftW, ldw, strideW, W, shiftW + idx2D(0, jw, ldw), ldw,
-                                    strideW, work, strideblk);
+            ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>),
+                                    gemvt_grid,
+                                    gemvt_threads,
+                                    0,
+                                    stream,
+                                    blocksX,
+                                    n, k, j, A, shiftA, lda, strideA, pW,
+                                    shiftW, ldw, strideW, pW, shiftW + idx2D(0, jw, ldw), ldw,
+                                    strideW, pWork, strideblk);
 
             // update column j of W
             //--------------------------------------------------------------
-            ROCSOLVER_LAUNCH_KERNEL(
-                latrd_upper_updateW_kernel<T>, dim3(grr_updates, grc_updates, batch_count),
-                dim3(thr_updates, thc_updates, 1), lmemsize_updates, stream, n, k, j, A, shiftA,
-                lda, strideA, W, shiftW, ldw, strideW, work, strideblk, tau, strideP);
+            ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
+                                    update_grid,
+                                    update_threads,
+                                    lmemsize_updates,
+                                    stream,
+                                    n, k, j, A, shiftA, lda, strideA,
+                                    pW, shiftW, ldw, strideW, pWork,
+                                    strideblk, pTau, strideP);
 
-            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>), dim3(1, 1, batch_count),
-                                    dim3(1024, 1, 1), 0, stream, j, A, shiftA + idx2D(0, j, lda),
-                                    strideA, W, shiftW + idx2D(0, jw, ldw), strideW, tau + j - 1,
-                                    strideP);
+            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>),
+                                    dim3(1, 1, batch_count),
+                                    dim3(1024, 1, 1),
+                                    0,
+                                    stream,
+                                    j, A, shiftA + idx2D(0, j, lda), strideA,
+                                    pW, shiftW + idx2D(0, jw, ldw), strideW,
+                                    pTau + j - 1, strideP);
         }
     }
 
