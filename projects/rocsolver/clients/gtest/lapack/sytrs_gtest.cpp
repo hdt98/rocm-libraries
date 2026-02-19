@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,8 +38,8 @@ typedef std::tuple<vector<int>, vector<int>> sytrs_tuple;
 // each A_range vector is a {N, lda, ldb};
 
 // each B_range vector is a {nrhs, uplo};
-// if uplo = 1 then lower
-// if uplo = 2 then upper
+// if uplo = 0 then lower
+// if uplo = 1 then upper
 
 // case when N = nrhs = 0 will also execute the bad arguments test
 // (null handle, null pointers and invalid values)
@@ -62,24 +62,17 @@ const vector<vector<int>> matrix_sizeB_range = {
     {0, 0},
     // invalid
     {-1, 0},
-    {1, 0},
     // normal (valid) samples
-    {10, 1},
-    {10, 2},
+    {10, 0},
     {20, 1},
-    {20, 2},
-    {30, 1},
-    {30, 2},
+    {30, 0},
 };
 
 // for daily_lapack tests
-// each A_range vector is a {N, lda, ldb};
 const vector<vector<int>> large_matrix_sizeA_range
-    = {{255, 255, 257},    {256, 257, 257},    {257, 257, 257},
-       {1023, 1023, 1023}, {1024, 1024, 1024}, {1025, 1025, 1025}};
-
+    = {{70, 70, 100}, {192, 192, 192}, {600, 700, 645}, {1000, 1000, 1000}, {1000, 2000, 2000}};
 const vector<vector<int>> large_matrix_sizeB_range = {
-    {255, 1}, {256, 1}, {257, 1}, {255, 2}, {256, 2}, {257, 2}, {511, 2}, {512, 2}, {513, 2},
+    {100, 0}, {150, 0}, {200, 1}, {524, 1}, {1000, 1},
 };
 
 Arguments sytrs_setup_arguments(sytrs_tuple tup)
@@ -94,12 +87,18 @@ Arguments sytrs_setup_arguments(sytrs_tuple tup)
     arg.set<rocblas_int>("lda", matrix_sizeA[1]);
     arg.set<rocblas_int>("ldb", matrix_sizeA[2]);
 
-    if(matrix_sizeB[1] == 1)
+    if(matrix_sizeB[1] == 0)
+    {
         arg.set<char>("uplo", 'L');
-    else if(matrix_sizeB[1] == 2)
+    }
+    else if(matrix_sizeB[1] == 1)
+    {
         arg.set<char>("uplo", 'U');
+    }
     else
-        arg.set<char>("uplo", 'G');
+    {
+        arg.set<char>("uplo", ' ');
+    }
 
     // only testing standard use case/defaults for strides
 
