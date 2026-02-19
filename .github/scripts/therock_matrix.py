@@ -7,6 +7,7 @@ import os
 subtree_to_project_map = {
     "dnn-providers/hipblaslt-provider": "hipblaslt-provider",
     "dnn-providers/miopen-provider": "miopen-provider",
+    "projects/composablekernel": "ml-libs",
     "projects/hipblas": "blas",
     "projects/hipblas-common": "blas",
     "projects/hipblaslt": "blas",
@@ -17,7 +18,7 @@ subtree_to_project_map = {
     "projects/hipsolver": "solver",
     "projects/hipsparse": "sparse",
     "projects/hipsparselt": "sparse",
-    "projects/miopen": "miopen",
+    "projects/miopen": "ml-libs",
     "projects/rocblas": "blas",
     "projects/rocfft": "fft",
     "projects/rocprim": "prim",
@@ -45,7 +46,7 @@ project_map = {
         "cmake_options": ["-DTHEROCK_ENABLE_BLAS=ON"],
         "projects_to_test": ["hipblaslt", "rocblas", "hipblas", "rocroller"],
     },
-    "miopen": {
+    "ml-libs": {
         "cmake_options": [
             "-DTHEROCK_ENABLE_MIOPEN=ON",
             "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
