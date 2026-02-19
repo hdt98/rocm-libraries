@@ -37,7 +37,142 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
+// Optimization feature flags
+#define LATRD_USE_BUFFER_INTRINSICS 1  // Enable AMD buffer intrinsic optimization
+
 ROCSOLVER_BEGIN_NAMESPACE
+
+/**************************************************************************************/
+/***************** AMD Buffer Intrinsic Helpers ***************************************/
+/**************************************************************************************/
+
+#if LATRD_USE_BUFFER_INTRINSICS
+
+// Create a raw buffer resource descriptor
+// Arguments:
+//   ptr: Base pointer to memory
+//   num_elements: Number of elements (NOT bytes - we multiply by sizeof(T))
+// Returns: __amdgpu_buffer_rsrc_t buffer resource descriptor for hardware
+//
+// Buffer format flags (0x00027000):
+//   Bits [16-22]: DATA_FORMAT = 0x02 (32-bit chunks)
+//   Bits [8-14]:  NUM_FORMAT = 0x07 (float, but ignored for raw loads)
+//   Bits [24-31]: Cache policy = 0x00 (default cached, good for reused data)
+//
+// Alternative cache policies:
+//   0x01027000 = GLC (bypass L2, good for single-use data like A1/A2 matrices)
+//   0x02027000 = SLC (system-level coherency, for multi-GPU)
+//   0x03027000 = GLC | SLC
+template <typename T>
+__device__ __forceinline__ __amdgpu_buffer_rsrc_t make_buffer_resource(T* ptr, size_t num_elements)
+{
+    return __builtin_amdgcn_make_buffer_rsrc(
+        (void*)ptr,
+        0,                           // stride = 0 (raw buffer, we calculate offsets manually)
+        num_elements * sizeof(T),    // size in BYTES
+        0x00027000                   // RAW buffer format, cached
+    );
+}
+
+// Load a scalar value from buffer (branchless, no bounds checking)
+// Returns raw bits that must be reinterpreted to type T
+template <typename T>
+__device__ __forceinline__ T buffer_load_scalar(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset);
+
+// Specialization for float (32-bit)
+template <>
+__device__ __forceinline__ float buffer_load_scalar<float>(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    union { uint32_t u; float f; } cvt;
+    cvt.u = __builtin_amdgcn_raw_buffer_load_b32(rsrc, byte_offset, 0, 0);
+    return cvt.f;
+}
+
+// Specialization for double (64-bit)
+template <>
+__device__ __forceinline__ double buffer_load_scalar<double>(__amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
+    union { uint2_vec v; double d; } cvt;
+    cvt.v = __builtin_amdgcn_raw_buffer_load_b64(rsrc, byte_offset, 0, 0);
+    return cvt.d;
+}
+
+// Specialization for rocblas_float_complex (64-bit = 2×float)
+template <>
+__device__ __forceinline__ rocblas_float_complex buffer_load_scalar<rocblas_float_complex>(
+    __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    // rocblas_float_complex is a STRUCT (non-POD) - must use memcpy
+    // Cannot use union due to potential struct padding/layout issues
+    typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
+    uint2_vec raw = __builtin_amdgcn_raw_buffer_load_b64(rsrc, byte_offset, 0, 0);
+    rocblas_float_complex result;
+    __builtin_memcpy(&result, &raw, sizeof(rocblas_float_complex));
+    return result;
+}
+
+// Specialization for rocblas_double_complex (128-bit = 2×double)
+template <>
+__device__ __forceinline__ rocblas_double_complex buffer_load_scalar<rocblas_double_complex>(
+    __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    // rocblas_double_complex is a STRUCT (non-POD) - must use memcpy
+    typedef unsigned int uint4_vec __attribute__((ext_vector_type(4)));
+    uint4_vec raw = __builtin_amdgcn_raw_buffer_load_b128(rsrc, byte_offset, 0, 0);
+    rocblas_double_complex result;
+    __builtin_memcpy(&result, &raw, sizeof(rocblas_double_complex));
+    return result;
+}
+
+// Store a scalar value to buffer (branchless, no bounds checking)
+template <typename T>
+__device__ __forceinline__ void buffer_store_scalar(T value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset);
+
+// Specialization for float
+template <>
+__device__ __forceinline__ void buffer_store_scalar<float>(float value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    union { float f; uint32_t u; } cvt;
+    cvt.f = value;
+    __builtin_amdgcn_raw_buffer_store_b32(cvt.u, rsrc, byte_offset, 0, 0);
+}
+
+// Specialization for double
+template <>
+__device__ __forceinline__ void buffer_store_scalar<double>(double value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
+    union { double d; uint2_vec v; } cvt;
+    cvt.d = value;
+    __builtin_amdgcn_raw_buffer_store_b64(cvt.v, rsrc, byte_offset, 0, 0);
+}
+
+// Specialization for rocblas_float_complex
+template <>
+__device__ __forceinline__ void buffer_store_scalar<rocblas_float_complex>(
+    rocblas_float_complex value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    // rocblas_float_complex is a STRUCT (non-POD) - must use memcpy
+    typedef unsigned int uint2_vec __attribute__((ext_vector_type(2)));
+    uint2_vec raw;
+    __builtin_memcpy(&raw, &value, sizeof(rocblas_float_complex));
+    __builtin_amdgcn_raw_buffer_store_b64(raw, rsrc, byte_offset, 0, 0);
+}
+
+// Specialization for rocblas_double_complex
+template <>
+__device__ __forceinline__ void buffer_store_scalar<rocblas_double_complex>(
+    rocblas_double_complex value, __amdgpu_buffer_rsrc_t rsrc, uint byte_offset)
+{
+    // rocblas_double_complex is a STRUCT (non-POD) - must use memcpy
+    typedef unsigned int uint4_vec __attribute__((ext_vector_type(4)));
+    uint4_vec raw;
+    __builtin_memcpy(&raw, &value, sizeof(rocblas_double_complex));
+    __builtin_amdgcn_raw_buffer_store_b128(raw, rsrc, byte_offset, 0, 0);
+}
+
+#endif // LATRD_USE_BUFFER_INTRINSICS
 
 template <int MAX_THDS, typename T, typename I, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n,
@@ -596,7 +731,7 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
     // to cover all the rows and columns, respectively
     int ngrp = (m - 1) / threadsr + 1;
     int rpgr = (ngrp - 1) / groupsr + 1;
-    ngrp = (n - 1) / threadsc + 1;
+    ngrp = (n - 1) / threadsc + 1;       // Thread groups needed for n columns  
     int rpgc = (ngrp - 1) / groupsc + 1; // Column rounds per workgroup (varies 1→64)
     int i, j;  // Loop indices for row and column within each round
 
@@ -624,6 +759,17 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
     T* acs = reinterpret_cast<T*>(smem);  // Typed view of shared memory for accumulator reduction
     T ac;      // Per-thread accumulator: stores partial sum of y[i] across rpgc column rounds
     T sx1, sx2; // Cached x vector elements: broadcast across row threads to avoid repeated loads
+
+#if LATRD_USE_BUFFER_INTRINSICS
+    // OPTIMIZATION: Create buffer resources for branchless loads/stores
+    // Buffer intrinsics eliminate branches by allowing unconditional loads with predication
+    // OOB reads return undefined values (garbage) which we mask away using validity predicates
+    auto y_buf  = make_buffer_resource<T>(y, m);            // Output vector (length m)
+    auto A1_buf = make_buffer_resource<T>(A1, m * n);      // Input matrix 1 (m×n elements)
+    auto A2_buf = make_buffer_resource<T>(A2, m * n);      // Input matrix 2 (m×n elements)
+    auto x1_buf = make_buffer_resource<T>(x1, n * incx1);  // Input vector 1 (n elements with stride)
+    auto x2_buf = make_buffer_resource<T>(x2, n * incx2);  // Input vector 2 (n elements with stride)
+#endif
 
     // IMPLEMENTATION: Main computation loop structure (divide-and-conquer execution)
     //
@@ -665,9 +811,17 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
     {
         i = ii * totalthsr + idr;  // Global row index: ii * (all threads) + my row thread ID
 
-        // ALGORITHM: Initialize accumulator with current y[i] value (read-modify-write pattern)
-        // Only thread with idc==0 (first column thread) reads y to avoid redundant loads
+#if LATRD_USE_BUFFER_INTRINSICS
+        // OPTIMIZATION: Branchless y[i] load using buffer intrinsics with explicit predication
+        // Strategy: Load unconditionally (may read garbage if OOB), then zero via mask multiplication
+        // This eliminates the branch from: ac = (idc == 0 && i < m) ? y[i] : 0;
+        int y_valid = (idc == 0) && (i < m);                    // Compute validity mask (no branch, pure ALU)
+        T y_value = buffer_load_scalar<T>(y_buf, i * sizeof(T)); // Unconditional load (returns garbage if OOB)
+        ac = y_value * T(y_valid);                               // Zero the value if invalid (no branch)
+#else
+        // ORIGINAL: Ternary operator (compiler may or may not generate branch)
         ac = (idc == 0 && i < m) ? y[i] : 0;
+#endif
 
         for(int jj = 0; jj < rpgc; ++jj) // Column rounds: process column tiles (rpgc varies 1→64)
         {
@@ -676,14 +830,40 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
             // All threads in the same column (same jj, different ii) load the same x value
             // sx1, sx2 cached in registers for reuse across the m row computations
             j = jj * totalthsc + idc;  // Global column index
+            
+#if LATRD_USE_BUFFER_INTRINSICS
+            // OPTIMIZATION: Branchless x vector loads with explicit predication
+            // Original code: sx1 = (j < n) ? conj(x1[j * incx1]) : 0;
+            int x_valid = (j < n);                                      // Validity mask
+            T x1_value = buffer_load_scalar<T>(x1_buf, j * incx1 * sizeof(T)); // Unconditional load
+            T x2_value = buffer_load_scalar<T>(x2_buf, j * incx2 * sizeof(T)); // Unconditional load
+            sx1 = conj(x1_value) * T(x_valid);                          // Apply conjugate then mask
+            sx2 = conj(x2_value) * T(x_valid);                          // Apply conjugate then mask
+#else
+            // ORIGINAL: Ternary operators with conjugate
             sx1 = (j < n) ? conj(x1[j * incx1]) : 0;  // x1 with conjugate (for Hermitian/complex)
             sx2 = (j < n) ? conj(x2[j * incx2]) : 0;  // x2 with conjugate
+#endif
 
+#if LATRD_USE_BUFFER_INTRINSICS
+            // OPTIMIZATION: Branchless core computation with explicit predication
+            // Original code: if(i < m && j < n) ac -= A1[i + j * lda1] * sx1 + A2[i + j * lda2] * sx2;
+            // Strategy: Always load and compute, but zero contribution if invalid
+            int compute_valid = (i < m) && (j < n);                     // Compute validity mask
+            rocblas_int A1_offset = i + j * lda1;                       // Matrix element offset
+            rocblas_int A2_offset = i + j * lda2;                       // Matrix element offset
+            T A1_value = buffer_load_scalar<T>(A1_buf, A1_offset * sizeof(T)); // Unconditional load
+            T A2_value = buffer_load_scalar<T>(A2_buf, A2_offset * sizeof(T)); // Unconditional load
+            T contrib = (A1_value * sx1 + A2_value * sx2) * T(compute_valid);  // Zero if invalid
+            ac -= contrib;                                              // Accumulate (always executed)
+#else
+            // ORIGINAL: Conditional computation with branch
             // ALGORITHM: Core dual GEMV operation: ac -= A1[i,j]*sx1 + A2[i,j]*sx2
             // This is the heart of the computation: y = y - A1*x1' - A2*x2'
             // Bounds check ensures we don't access out-of-bounds when n shrinks
             if(i < m && j < n)
                 ac -= A1[i + j * lda1] * sx1 + A2[i + j * lda2] * sx2;
+#endif
         }
         
         // IMPLEMENTATION: Store per-thread accumulator to LDS for reduction across column threads
@@ -723,8 +903,21 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,      // A
         // ALGORITHM: Write final result to global memory
         // Only thread with tidc==0 (first column thread) writes after reduction is complete
         // This thread now holds the sum of all threadsc column contributions for row i
+#if LATRD_USE_BUFFER_INTRINSICS
+        // OPTIMIZATION: Branchless y[i] store using buffer intrinsics
+        // Note: Buffer stores don't check bounds, but we only call when valid
+        // We could make this fully branchless with a conditional store, but:
+        // 1. Only 1 thread per row writes (no warp divergence within warps)
+        // 2. Store is not in the hot loop (rpgc iterations)
+        // 3. Buffer intrinsics don't provide conditional store (would need manual assembly)
+        // So we keep the branch here as it's not performance-critical
+        if(tidc == 0 && i < m)
+            buffer_store_scalar<T>(ac, y_buf, i * sizeof(T));
+#else
+        // ORIGINAL: Conditional store
         if(tidc == 0 && i < m)
             y[i] = ac;  // Final update: y[i] = original_y[i] - (A1*x1' + A2*x2')[i]
+#endif
     }
 }
 
