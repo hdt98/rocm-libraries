@@ -8,7 +8,7 @@ The grouped 2D forward convolution has been fully ported to the CK Builder frame
 - 8 instance data helpers in `instance_data/`
 - 1 factory dispatch header (`grouped_convolution_forward.hpp`)
 - Static compile-time tests
-- Runtime comparison tests (`test/gtest/ck_builder_xdl.cpp`)
+- Runtime comparison tests (`test/gtest/ck_builder_grouped_fwd_conv2d.cpp`)
 
 This plan covers porting the **remaining** `DeviceOperationInstanceFactory` uses found in MIOpen
 (documented in `DeviceOperationInstanceFactory_uses.md`) to the CK Builder framework.
@@ -57,7 +57,7 @@ new CK builder factory instance list, ensuring 1:1 parity. The existing infrastr
     1. Total count equality
     2. No instances missing from CK Builder (`onlyInLegacyInstances == 0`)
     3. No extra instances in CK Builder (`onlyInCKBuilderInstances == 0`)
-- `test/gtest/ck_builder_xdl.cpp` - Reference test (2D grouped forward):
+- `test/gtest/ck_builder_grouped_fwd_conv2d.cpp` - Reference test (2D grouped forward):
   - Defines `DeviceOpGFwdDefault<DataType>` using the CK `DeviceGroupedConvFwdMultipleABD` type
   - Defines both `DeviceOpGFwdDefaultPtrs<DataType>` (CK factory) and
     `DeviceOpGFwdBuilderPtrs<DataType>` (CK builder factory)
@@ -220,8 +220,8 @@ Update the 3D forward solver to use the CK Builder factory behind `#ifdef CK_EXP
 | .cpp files: `grouped_conv3d_fwd/` (74 .cpp + 12 .in) | [x] |
 | CMakeLists.txt updated | [x] |
 | Solver file: 3D fwd `#ifdef CK_EXPERIMENTAL_BUILDER` | [x] |
-| Runtime test: `ck_builder_grouped_fwd_conv3d.cpp` | [ ] |
-| Test CMakeLists.txt updated | [ ] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d.cpp` | [x] |
+| Test CMakeLists.txt updated | [x] |
 
 ---
 
@@ -919,7 +919,7 @@ src/kernels/ck_builder/
 
 test/gtest/
 ├── ck_builder_shared.hpp                        (existing - shared test utilities)
-├── ck_builder_xdl.cpp                           (existing - 2D grouped fwd)
+├── ck_builder_grouped_fwd_conv2d.cpp                           (existing - 2D grouped fwd)
 ├── ck_builder_grouped_fwd_conv3d.cpp            (NEW - Phase 1)
 ├── ck_builder_grouped_bwd_data_conv2d.cpp       (NEW - Phase 2)
 ├── ck_builder_grouped_bwd_data_conv3d.cpp       (NEW - Phase 2)
