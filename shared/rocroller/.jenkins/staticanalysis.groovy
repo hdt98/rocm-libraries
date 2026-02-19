@@ -24,7 +24,7 @@ def runCI =
     nodes.dockerArray.each {
         _, docker ->
         // parameters inherited from target job
-        ["ROCROLLER_THEROCK_ROCM_NIGHTLY_URL", "ROCROLLER_THEROCK_ROCM_GFX_FAMILY", "ROCROLLER_THEROCK_ROCM_VERSION"].each {
+        ["ROCROLLER_THEROCK_ROCM_NIGHTLY_URL", "ROCROLLER_THEROCK_ROCM_GFX", "ROCROLLER_THEROCK_ROCM_VERSION"].each {
             param ->
             def value = params?."${param}" ?: baseParams?."${param}";
             if (value)
@@ -74,13 +74,13 @@ ci: {
     if (!params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL?.trim()) {
       error "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL parameter is not set"
     }
-    if (!params?.ROCROLLER_THEROCK_ROCM_GFX_FAMILY?.trim()) {
-      error "ROCROLLER_THEROCK_ROCM_GFX_FAMILY parameter is not set"
+    if (!params?.ROCROLLER_THEROCK_ROCM_GFX?.trim()) {
+      error "ROCROLLER_THEROCK_ROCM_GFX parameter is not set"
     }
     def therock_rocm_nightly_url = params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL
-    def therock_rocm_gfx_family = params?.ROCROLLER_THEROCK_ROCM_GFX_FAMILY
+    def therock_rocm_gfx = params?.ROCROLLER_THEROCK_ROCM_GFX
     def latest_therock_rocm_version = params?.ROCROLLER_THEROCK_ROCM_VERSION ?: ["bash", "-c", """
-      curl -sL '${therock_rocm_nightly_url}/${therock_rocm_gfx_family}/rocm/' \
+      curl -sL '${therock_rocm_nightly_url}/${therock_rocm_gfx}/rocm/' \
         | grep -oP '<a[^>]*>\\s*rocm-\\K[^<]*(?=\\.tar\\.gz)' \
         | sort -V \
         | tail -1
@@ -94,8 +94,8 @@ ci: {
             description: "URL to retrieve ROCm packages from."
         ),
         string(
-            name: "ROCROLLER_THEROCK_ROCM_GFX_FAMILY",
-            defaultValue: "${therock_rocm_gfx_family}",
+            name: "ROCROLLER_THEROCK_ROCM_GFX",
+            defaultValue: "${therock_rocm_gfx}",
             trim: true,
             description: "Specify the latest target GFX family for the ROCm packages."
         ),

@@ -178,7 +178,7 @@ def parseArgs():
     )
 
     parser.add_argument(
-        "--therock-rocm-gfx-family",
+        "--therock-rocm-gfx",
         help="TheRock ROCm GFX Family",
         default="gfx950-dcgpu",
     )
@@ -208,7 +208,7 @@ def parseArgs():
 
     if parsed_args.therock_rocm_version is None or parsed_args.therock_rocm_version == "":
         parsed_args.therock_rocm_version = get_latest_therock_rocm_version(
-            parsed_args.therock_rocm_nightly_url, parsed_args.therock_rocm_gfx_family
+            parsed_args.therock_rocm_nightly_url, parsed_args.therock_rocm_gfx
         )
 
     return parsed_args
@@ -284,7 +284,7 @@ def get_amdgpu_args(args):
     build_args = []
     for var in [
         "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL",
-        "ROCROLLER_THEROCK_ROCM_GFX_FAMILY",
+        "ROCROLLER_THEROCK_ROCM_GFX",
         "ROCROLLER_THEROCK_ROCM_VERSION",
     ]:
         prefix = "ROCROLLER_"
