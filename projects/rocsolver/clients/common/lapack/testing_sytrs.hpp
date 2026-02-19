@@ -228,21 +228,22 @@ void sytrs_initData(const rocblas_handle handle,
             int info = 0;
             int lwork = lda * n;
             std::vector<T> work(lwork);
-            char c_uplo = (uplo == rocblas_fill_upper) ? 'U' : 'L';
 
-            cpu_sytrf(&c_uplo, n, hA[b], lda, hIpiv_cpu[b], work.data(), &lwork, &info);
+            cpu_sytrf(uplo, n, hA[b], lda, hIpiv_cpu[b], work.data(), lwork, &info);
 
             for(I i = 0; i < n; i++)
+            {
                 hIpiv[b][i] = hIpiv_cpu[b][i];
+            }
         }
     }
 
     if(GPU)
     {
         // now copy pivoting indices and matrices to the GPU
-        CHECK_HIP_ERROR(dA.uplofer_from(hA));
-        CHECK_HIP_ERROR(dB.uplofer_from(hB));
-        CHECK_HIP_ERROR(dIpiv.uplofer_from(hIpiv));
+        CHECK_HIP_ERROR(dA.transfer_from(hA));
+        CHECK_HIP_ERROR(dB.transfer_from(hB));
+        CHECK_HIP_ERROR(dIpiv.transfer_from(hIpiv));
     }
 }
 
@@ -278,7 +279,7 @@ void sytrs_getError(const rocblas_handle handle,
     // GPU lapack
     CHECK_ROCBLAS_ERROR(rocsolver_sytrs(STRIDED, handle, uplo, n, nrhs, dA.data(), lda, stA,
                                         dIpiv.data(), stP, dB.data(), ldb, stB, bc));
-    CHECK_HIP_ERROR(hBRes.uplofer_from(dB));
+    CHECK_HIP_ERROR(hBRes.transfer_from(dB));
 
     // CPU lapack
     for(I b = 0; b < bc; ++b)
