@@ -70,7 +70,7 @@ __device__ __forceinline__ __amdgpu_buffer_rsrc_t make_buffer_resource(T* ptr, s
         (void*)ptr,
         0,                           // stride = 0 (raw buffer, we calculate offsets manually)
         num_elements * sizeof(T),    // size in BYTES
-        0x00027000                   // RAW buffer format, cached
+        0                            // RAW buffer format, cached
     );
 }
 
