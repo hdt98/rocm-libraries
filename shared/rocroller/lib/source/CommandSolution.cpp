@@ -268,7 +268,7 @@ namespace rocRoller
         return *it;
     }
 
-    void CommandKernel::generateKernelGraph(std::string name)
+    void CommandKernel::generateKernelGraph()
     {
         TIMER(t, "CommandKernel::generateKernelGraph");
 
@@ -436,6 +436,7 @@ namespace rocRoller
         transforms.push_back(std::make_shared<KernelGraph::MergeAdjacentDeallocates>());
         transforms.push_back(std::make_shared<KernelGraph::Simplify>());
         transforms.push_back(std::make_shared<KernelGraph::SetWorkitemCount>(m_context));
+        transforms.push_back(std::make_shared<KernelGraph::ModelAddresses>(m_context));
 
         for(auto const& t : transforms)
         {
@@ -490,7 +491,7 @@ namespace rocRoller
 
         if(m_command)
         {
-            generateKernelGraph(m_name);
+            generateKernelGraph();
             generateKernelSource();
         }
         else
