@@ -16,7 +16,13 @@ def runCI =
 
     def uniqueTag = params?."Unique Docker image tag" ? org.apache.commons.lang.RandomStringUtils.random(9, true, true) : ""
 
-    def baseParams = rocRollerGetBaseParameters()
+    def helpersGroovy
+    def runParams
+    node {
+        checkout scm
+        helpersGroovy = load "${WORKSPACE}/shared/rocroller/.jenkins/helpers.groovy"
+    }
+    runParams = helpersGroovy.rocRollerGetRunParams(rocRollerGetBaseParameters(), params)
 
     def nodes = new dockerNodes(nodeDetails, jobName, prj)
     nodes.dockerArray.each {
@@ -24,7 +30,7 @@ def runCI =
         // parameters inherited from target job
         ["ROCROLLER_THEROCK_ROCM_NIGHTLY_URL", "ROCROLLER_THEROCK_ROCM_GFX", "ROCROLLER_THEROCK_ROCM_VERSION"].each {
             param ->
-            def value = params?."${param}" ?: baseParams?."${param}";
+            def value = runParams."${param}";
             if (value)
             {
                 docker.buildArgs += " --build-arg ${param}=${value}"
@@ -72,40 +78,22 @@ def rocRollerGetBaseParameters() {
 ci: {
     String urlJobName = auxiliary.getTopJobName(env.BUILD_URL)
 
-    // URL & GFX family need to be always set, either explicitly or cached,
-    // so the latest version can be retrieved. The latest version is used
-    // by default unless ROCROLLER_THEROCK_ROCM_VERSION is explicitly set.
-    if (!params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL?.trim()) {
-      error "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL parameter is not set"
-    }
-    if (!params?.ROCROLLER_THEROCK_ROCM_GFX?.trim()) {
-      error "ROCROLLER_THEROCK_ROCM_GFX parameter is not set"
-    }
-    def therock_rocm_nightly_url = params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL
-    def therock_rocm_gfx = params?.ROCROLLER_THEROCK_ROCM_GFX
-    def latest_therock_rocm_version = params?.ROCROLLER_THEROCK_ROCM_VERSION ?: ["bash", "-c", """
-      curl -sL '${therock_rocm_nightly_url}/${therock_rocm_gfx}/rocm/' \
-        | grep -oP '<a[^>]*>\\s*rocm-\\K[^<]*(?=\\.tar\\.gz)' \
-        | sort -V \
-        | tail -1
-    """].execute().text.trim()
-
     def additionalParameters = [
         string(
             name: "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL",
-            defaultValue: "${therock_rocm_nightly_url}",
+            defaultValue: null,
             trim: true,
             description: "URL to retrieve ROCm packages from."
         ),
         string(
             name: "ROCROLLER_THEROCK_ROCM_GFX",
-            defaultValue: "${therock_rocm_gfx}",
+            defaultValue: null,
             trim: true,
             description: "Specify the latest target GFX family for the ROCm packages."
         ),
         string(
             name: "ROCROLLER_THEROCK_ROCM_VERSION",
-            defaultValue: "${latest_therock_rocm_version}",
+            defaultValue: null,
             trim: true,
             description: "Specify the ROCm version to use."
         ),
