@@ -67,7 +67,7 @@ ci: {
 
     // URL & GFX family need to be always set, either explicitly or cached,
     // so the latest version can be retrieved. The latest version is used
-    // byt default unless ROCROLLER_THEROCK_ROCM_VERSION is explicitly set.
+    // by default unless ROCROLLER_THEROCK_ROCM_VERSION is explicitly set.
     if (!params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL?.trim()) {
       error "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL parameter is not set"
     }
