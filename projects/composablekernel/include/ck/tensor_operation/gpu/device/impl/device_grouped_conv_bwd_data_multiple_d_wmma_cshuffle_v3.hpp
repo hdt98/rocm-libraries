@@ -379,9 +379,9 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
     static auto
     GetDummyABDsEGridDescriptor(const ConvToGemmBwdDataTransform& conv_to_gemm_transform)
     {
-        const auto a_grid_desc_ak0_m_ak1 = conv_to_gemm_transform.MakeADescriptor_AK0_M_AK1();
+        const auto a_grid_desc_m_k = conv_to_gemm_transform.MakeADescriptor_M_K();
 
-        const auto b_grid_desc_bk0_n_bk1 = conv_to_gemm_transform.MakeBDescriptor_BK0_N_BK1();
+        const auto b_grid_desc_n_k = conv_to_gemm_transform.MakeBDescriptor_N_K();
 
         const auto ds_grid_desc_m_n = generate_tuple(
             [&](auto i) {
@@ -415,12 +415,12 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
         if constexpr(CTranspose)
         {
             return make_tuple(
-                b_grid_desc_bk0_n_bk1, a_grid_desc_ak0_m_ak1, ds_grid_desc_m_n, e_grid_desc_m_n);
+                b_grid_desc_n_k, a_grid_desc_m_k, ds_grid_desc_m_n, e_grid_desc_m_n);
         }
         else
         {
             return make_tuple(
-                a_grid_desc_ak0_m_ak1, b_grid_desc_bk0_n_bk1, ds_grid_desc_m_n, e_grid_desc_m_n);
+                a_grid_desc_m_k, b_grid_desc_n_k, ds_grid_desc_m_n, e_grid_desc_m_n);
         }
     }
 
@@ -504,31 +504,16 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
                            GridwiseGemm_wmma_cshuffle_v3<GridwiseGemmCTransposeTemplateParameters>,
                            GridwiseGemm>;
 
-    template <typename Desc_K0_M_K1>
-    static auto transform_k0_m_k1_to_m_k(const Desc_K0_M_K1& desc_k0_m_k1)
-    {
-        const auto grid_desc_m_k = transform_tensor_descriptor(
-            desc_k0_m_k1,
-            make_tuple(make_pass_through_transform(desc_k0_m_k1.GetLength(I1)),
-                       make_merge_transform(
-                           make_tuple(desc_k0_m_k1.GetLength(I0), desc_k0_m_k1.GetLength(I2)))),
-            make_tuple(Sequence<1>{}, Sequence<0, 2>{}),
-            make_tuple(Sequence<0>{}, Sequence<1>{}));
-
-        return grid_desc_m_k;
-    }
 
     // Note: the dummy function is used just to create the alias
     constexpr static ConvToGemmBwdDataTransform dummy_conv_to_gemm_transform;
     using ABDsEGridDesc = decltype(GetDummyABDsEGridDescriptor(dummy_conv_to_gemm_transform));
 
-    using AGridDesc_AK0_M_AK1 = remove_cvref_t<tuple_element_t<0, ABDsEGridDesc>>;
-    using BGridDesc_BK0_N_BK1 = remove_cvref_t<tuple_element_t<1, ABDsEGridDesc>>;
+    using AGridDesc_M_K       = remove_cvref_t<tuple_element_t<0, ABDsEGridDesc>>;
+    using BGridDesc_N_K       = remove_cvref_t<tuple_element_t<1, ABDsEGridDesc>>;
     using DsGridDesc_M_N      = remove_cvref_t<tuple_element_t<2, ABDsEGridDesc>>;
     using EGridDesc_M_N       = remove_cvref_t<tuple_element_t<3, ABDsEGridDesc>>;
 
-    using AGridDesc_M_K = decltype(transform_k0_m_k1_to_m_k(AGridDesc_AK0_M_AK1{}));
-    using BGridDesc_N_K = decltype(transform_k0_m_k1_to_m_k(BGridDesc_BK0_N_BK1{}));
 
     // Note: here we can call gridwise functions with dummy arguments,
     // just to create the alias
@@ -849,25 +834,25 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
 
                         conv_N_per_block_ = conv_to_gemm_transform_.N_;
 
-                        const auto a_grid_desc_ak0_m_ak1 = [&]() {
+                        const auto a_grid_desc_m_k = [&]() {
                             if constexpr(CTranspose)
                             {
-                                return conv_to_gemm_transform_.MakeBDescriptor_BK0_N_BK1();
+                                return conv_to_gemm_transform_.MakeBDescriptor_N_K();
                             }
                             else
                             {
-                                return conv_to_gemm_transform_.MakeADescriptor_AK0_M_AK1();
+                                return conv_to_gemm_transform_.MakeADescriptor_M_K();
                             }
                         }();
 
-                        const auto b_grid_desc_bk0_n_bk1 = [&]() {
+                        const auto b_grid_desc_n_k = [&]() {
                             if constexpr(CTranspose)
                             {
-                                return conv_to_gemm_transform_.MakeADescriptor_AK0_M_AK1();
+                                return conv_to_gemm_transform_.MakeADescriptor_M_K();
                             }
                             else
                             {
-                                return conv_to_gemm_transform_.MakeBDescriptor_BK0_N_BK1();
+                                return conv_to_gemm_transform_.MakeBDescriptor_N_K();
                             }
                         }();
 
@@ -913,12 +898,6 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffleV3
                         });
 
                         const auto e_grid_desc_m_n = conv_to_gemm_transform_.MakeCDescriptor_M_N();
-
-                        // desc for problem definition
-                        const auto a_grid_desc_m_k =
-                            transform_k0_m_k1_to_m_k(a_grid_desc_ak0_m_ak1);
-                        const auto b_grid_desc_n_k =
-                            transform_k0_m_k1_to_m_k(b_grid_desc_bk0_n_bk1);
 
                         a_grid_desc_m_k_container_.push_back(a_grid_desc_m_k);
                         b_grid_desc_n_k_container_.push_back(b_grid_desc_n_k);
