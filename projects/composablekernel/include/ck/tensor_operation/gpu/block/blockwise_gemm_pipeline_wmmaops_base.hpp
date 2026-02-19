@@ -32,24 +32,19 @@ struct load_thread_vec
     ThreadVec& thread_vec;
     ThreadBuf& thread_buf;
 
-    __host__ __device__ load_thread_vec(ThreadVec& thread_vec_, ThreadBuf& thread_buf_)
+    __host__ __device__ constexpr load_thread_vec(ThreadVec& thread_vec_, ThreadBuf& thread_buf_)
         : thread_vec(thread_vec_), thread_buf(thread_buf_)
     {
     }
 
     template <index_t ik>
-    __host__ __device__ void operator()(Number<ik>) const
+    __host__ __device__ constexpr void operator()(Number<ik>) const
     {
         constexpr index_t kk = ik + k_inner * KPerWaveBlock;
 
         thread_vec.template AsType<ComputeType>()(Number<ik>{}) =
-            thread_buf[Number<ThreadDesc.CalculateOffset(make_tuple(Number<kk / K1>{},
-                                                                     Number<i0>{},
-                                                                     Number<i1>{},
-                                                                     i2,
-                                                                     i3,
-                                                                     i4,
-                                                                     Number<kk % K1>{}))>{}];
+            thread_buf[Number<ThreadDesc.CalculateOffset(make_tuple(
+                Number<kk / K1>{}, Number<i0>{}, Number<i1>{}, i2, i3, i4, Number<kk % K1>{}))>{}];
     }
 };
 
