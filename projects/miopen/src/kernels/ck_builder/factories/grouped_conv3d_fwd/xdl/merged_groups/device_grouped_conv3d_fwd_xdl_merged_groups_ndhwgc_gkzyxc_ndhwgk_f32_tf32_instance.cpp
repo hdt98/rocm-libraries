@@ -26,7 +26,8 @@ using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
     ck::tf32_t,
     ck::tf32_t>;
 
-// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo, g, k]
+// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo,
+// g, k]
 void add_device_grouped_conv3d_fwd_xdl_merged_groups_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
     std::vector<std::unique_ptr<DeviceOp>>& instances)
 {
@@ -40,7 +41,7 @@ void add_device_grouped_conv3d_fwd_xdl_merged_groups_ndhwgc_gkzyxc_ndhwgk_f32_tf
 
     // Specialization aliases
     constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd3x3 = ckb::ConvSpecialization::FILTER_3x3;
+    constexpr auto ConvFwd3x3     = ckb::ConvSpecialization::FILTER_3x3;
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_f32_tf32_instances<0>(
         3, NDHWGC, GKZYXC, {}, NDHWGK, ConvFwdDefault)>(instances);

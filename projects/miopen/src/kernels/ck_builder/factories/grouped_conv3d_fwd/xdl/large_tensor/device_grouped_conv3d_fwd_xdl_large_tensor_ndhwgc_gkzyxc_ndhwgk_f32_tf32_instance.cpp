@@ -26,7 +26,8 @@ using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
     ck::tf32_t,
     ck::tf32_t>;
 
-// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo, g, k]
+// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo,
+// g, k]
 void add_device_grouped_conv3d_fwd_xdl_large_tensor_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
     std::vector<std::unique_ptr<DeviceOp>>& instances)
 {

@@ -25,7 +25,8 @@ using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::PassThrough>;
 
-// Compilation parameters for in[n, g, c, di, hi, wi] * wei[g, k, c, z, y, x] = out[n, g, k, do, ho, wo]
+// Compilation parameters for in[n, g, c, di, hi, wi] * wei[g, k, c, z, y, x] = out[n, g, k, do, ho,
+// wo]
 void add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f16_comp_2x_instances(
     std::vector<std::unique_ptr<DeviceOp>>& instances)
 {
@@ -43,7 +44,7 @@ void add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f16_comp_2x_instance
     if(miopen::get_device_name() == "gfx950")
     {
         add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_instances_2x<0>(
-        3, NGCDHW, GKCZYX, {}, NGKDHW, ConvFwdDefault)>(instances);
+            3, NGCDHW, GKCZYX, {}, NGKDHW, ConvFwdDefault)>(instances);
     }
 }
 

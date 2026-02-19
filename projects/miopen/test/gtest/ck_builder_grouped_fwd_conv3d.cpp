@@ -64,7 +64,4 @@ TEST(CPU_CKBuilderGroupedFwdConv3D_BFP16, CompareInstanceListsBHalf)
     CompareInstanceLists<ck::bhalf_t>();
 }
 
-TEST(CPU_CKBuilderGroupedFwdConv3D_I8, CompareInstanceListsInt8)
-{
-    CompareInstanceLists<int8_t>();
-}
+TEST(CPU_CKBuilderGroupedFwdConv3D_I8, CompareInstanceListsInt8) { CompareInstanceLists<int8_t>(); }
