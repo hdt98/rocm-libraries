@@ -16,7 +16,7 @@ using BDataType = ck::half_t;
 #endif
 
 using AccDataType      = float;
-using CShuffleDataType = float;
+using CShuffleDataType = ck::half_t;
 using CDataType        = ck::half_t;
 
 using ALayout = Row;
@@ -250,7 +250,7 @@ using DeviceGemmInstance =
                false,           // BThreadTransferSrcResetCoordinateAfterRun
                2,               // CShuffleMRepeatPerStore
                4,               // CShuffleNRepeatPerStore
-               S<1, 16, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
+               S<1, 16, 1, 32>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
                8>;              // CBlockTransferScalarPerVector_NWaveNPerXdl
 #endif
 
