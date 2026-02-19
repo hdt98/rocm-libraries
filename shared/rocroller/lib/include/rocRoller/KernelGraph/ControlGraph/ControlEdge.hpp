@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2024-2025 AMD ROCm(TM) Software
+ * Copyright 2024-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40,6 +40,11 @@ namespace rocRoller
         /**
          * Control graph edge types
          */
+
+        /**
+         * Dependence edges indicate data dependencies.
+         */
+        RR_EMPTY_STRUCT_WITH_NAME(Dependence);
 
         /**
          * Sequence edges indicate sequential dependencies.  A node is considered schedulable

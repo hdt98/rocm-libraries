@@ -445,6 +445,7 @@ namespace rocRoller
         transforms.push_back(std::make_shared<KernelGraph::NopExtraScopes>());
         transforms.push_back(std::make_shared<KernelGraph::InlineInits>());
         transforms.push_back(std::make_shared<KernelGraph::InlineIncrements>());
+        transforms.push_back(std::make_shared<KernelGraph::AddDependenceEdges>());
         if(applyScheduleMultiplyAndLDS)
             transforms.push_back(std::make_shared<KernelGraph::RemoveImplicitScheduling>());
         transforms.push_back(std::make_shared<KernelGraph::OrderMultiplyNodes>());

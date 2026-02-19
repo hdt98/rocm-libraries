@@ -6,6 +6,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/AssignIndexExpressions.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/AddConvert.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/AddDeallocate.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/AddDependenceEdges.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/AddDirect2LDS.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/AddF6LDSPadding.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/AddLDS.cpp"

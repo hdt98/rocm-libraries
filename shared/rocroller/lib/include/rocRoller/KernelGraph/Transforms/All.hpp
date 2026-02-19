@@ -28,6 +28,7 @@
 
 #include <rocRoller/KernelGraph/Transforms/AddConvert.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddDeallocate.hpp>
+#include <rocRoller/KernelGraph/Transforms/AddDependenceEdges.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddDirect2LDS.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddF6LDSPadding.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddLDS.hpp>
