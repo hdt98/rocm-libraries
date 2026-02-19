@@ -19,6 +19,9 @@ Definitions:
     - { alpha: 1, alphai: 1, beta: 1, betai: -1 } # Cancellation/Signs
     - { alpha: 2, alphai: 3, beta: 4, betai: 5 } # General
  
+  - &complex_alpha_beta_range_small
+    - { alpha: 1, alphai: 0, beta: 0, betai: 1 } # Imaginary Beta
+    - { alpha: 2, alphai: 3, beta: 4, betai: 5 } # General
 
   - &alpha_beta_range_small
     - { alpha: 2, alphai: 2, beta: -1.0, betai: 2.0 }
@@ -36,6 +39,11 @@ Definitions:
     - { transA: T, transB: T }
     - { transA: C, transB: N }
     - { transA: N, transB: C }
+    - { transA: C, transB: C }
+
+  - &complex_transA_transB_range_small
+    - { transA: T, transB: C }
+    - { transA: C, transB: N }
     - { transA: C, transB: C }
 
   - &deepbench_alpha_beta_range
@@ -329,17 +337,6 @@ Tests:
   K: 24
   alpha_beta: *alpha_beta_range
   transA_transB: *transA_transB_range
-
-- name: matmul_24_complex
-  category: pre_checkin
-  function:
-    matmul: *complex_precisions
-  M: 24
-  N: 24
-  K: 24
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
-  gpu_arch: '9(42|50)'
 
 - name: matmul_algo
   category: pre_checkin
@@ -2451,19 +2448,8 @@ Tests:
   M: 96
   N: 96
   K: 96
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
-  gpu_arch: '9(42|50)'
-
-- name: matmul_128_complex
-  category: pre_checkin
-  function:
-    matmul: *complex_precisions
-  M: 128
-  N: 128
-  K: 128
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
+  alpha_beta: *complex_alpha_beta_range_small
+  transA_transB: *complex_transA_transB_range_small
   gpu_arch: '9(42|50)'
 
 - name: matmul_256_8_16_complex
@@ -2473,41 +2459,41 @@ Tests:
   M: 256
   N: 8
   K: 16
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
+  alpha_beta: *complex_alpha_beta_range_small
+  transA_transB: *complex_transA_transB_range_small
   gpu_arch: '9(42|50)'
 
-- name: matmul_16_256_8_complex
+- name: matmul_2001_5431_3004_complex
   category: pre_checkin
   function:
     matmul: *complex_precisions
-  M: 16
-  N: 256
-  K: 8
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
+  M: 2001
+  N: 5431
+  K: 3004
+  alpha_beta: *complex_alpha_beta_range_small
+  transA_transB: *complex_transA_transB_range_small
   gpu_arch: '9(42|50)'
 
-- name: matmul_8_16_256_complex
+- name: matmul_1093_141_7011_complex
   category: pre_checkin
   function:
     matmul: *complex_precisions
-  M: 8
-  N: 16
-  K: 256
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
+  M: 1093
+  N: 141
+  K: 7011
+  alpha_beta: *complex_alpha_beta_range_small
+  transA_transB: *complex_transA_transB_range_small
   gpu_arch: '9(42|50)'
 
-- name: matmul_512_complex
+- name: matmul_4097_2187_2653_complex
   category: pre_checkin
   function:
     matmul: *complex_precisions
-  M: 512
-  N: 512
-  K: 512
-  alpha_beta: *complex_alpha_beta_range
-  transA_transB: *complex_transA_transB_range
+  M: 4096
+  N: 2187
+  K: 2653
+  alpha_beta: *complex_alpha_beta_range_small
+  transA_transB: *complex_transA_transB_range_small
   gpu_arch: '9(42|50)'
 
 - name: matmul_one_bf16_fp32dst_precision_gfx90a
