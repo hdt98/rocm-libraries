@@ -810,7 +810,7 @@ namespace TensileLite
 	// NOTE: an assumption here is A & B must be both MX data types or non-MX data types.
 	//       Mixing is not supported.
         if(!problemType.useScaleAB.empty() or
-	    (problemType.mxBlockA == 32 && problemType.mxBlockB == 32)) //kernel input data
+           (problemType.mxBlockA != 0 && problemType.mxBlockB != 0)) //kernel input data
         {
             args.template append<void const*>("scaleA", inputs.scaleA);
             args.template append<void const*>("scaleB", inputs.scaleB);
