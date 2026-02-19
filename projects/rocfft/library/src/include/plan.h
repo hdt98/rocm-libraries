@@ -263,12 +263,12 @@ struct rocfft_plan_t
 
     size_t WorkBufBytes() const;
 
-    // Insert core execPlan into multi-item plan, surrounding it with
-    // sufficient items to gather/scatter to/from a single device if
-    // the plan needs it.  Gathering all the data to a single device is
-    // suboptimal but is a first step towards proper multi-device
-    // logic.
-    void GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& execPlan);
+    // Gather data to the current device (if necessary), create a
+    // single-device plan to compute the FFT on that device, and then
+    // scatter the results out (if necessary).  Either input or
+    // output bricks may be empty, indicating that the input or
+    // output is already on the current device.
+    void GatherScatterSingleDevicePlan(NodeMetaData& rootPlanData);
 
     // Construct an optimized multi-device plan for the FFT
     // parameters in *this.  Returns false if:
@@ -292,6 +292,15 @@ struct rocfft_plan_t
     // space will be needed but doesn't allocate.  Allocate the buffers
     // after the space requirements are finalized.
     void AllocateInternalTempBuffers();
+
+    // Construct a single-device execPlan from the specified root plan
+    // data.  It runs on the specified location.
+    std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&                  rootPlanData,
+                                                    int                            local_comm_rank,
+                                                    rocfft_location_t              location,
+                                                    const std::optional<LoadOps>&  loadOps,
+                                                    const std::optional<StoreOps>& storeOps,
+                                                    bool                           partOfMultiPlan);
 
 private:
     // Multi-node or multi-GPU plan is built up from a vector of plan
@@ -405,6 +414,30 @@ private:
                   const std::optional<StoreOps>& storeOps,
                   const std::vector<size_t>&     inputAntecedents,
                   std::vector<size_t>&           outputItems);
+
+    // Transform (complex-complex FFT) one dimension of a brick, by
+    // adding a multi-plan item to the rocfft_plan_t, and return the new
+    // item's index.  A brick is on a single device and has the specified
+    // length and stride.  Input and output may point to the same buffer.
+    //
+    // The specified dimension is assumed to be contiguous on the brick.
+    // Other dimensions (including batch) may have any length (including
+    // length 1).
+    //
+    // Specified antecedent items are required to complete before this
+    // new item will begin execution.
+    //
+    // NOTE: lengths and stride include batch dimension
+    size_t C2CBrickOneDimension(rocfft_plan_t&                 plan,
+                                size_t                         dimIdx,
+                                rocfft_location_t              location,
+                                const std::vector<size_t>&     lengths,
+                                const std::vector<size_t>&     stride,
+                                BufferPtr                      input,
+                                BufferPtr                      output,
+                                const std::optional<LoadOps>&  loadOps,
+                                const std::optional<StoreOps>& storeOps,
+                                const std::vector<size_t>&     antecedents);
 };
 
 bool PlanPowX(ExecPlan& execPlan);

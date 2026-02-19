@@ -1631,26 +1631,8 @@ static bool DimensionSplitInField(size_t length, size_t dimIdx, const rocfft_fie
     return false;
 }
 
-// Construct a single-device execPlan - fill out the provided
-// execPlan with nodes to implement the FFT.
-void rocfft_plan_t::GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& execPlanPtr)
+void rocfft_plan_t::GatherScatterSingleDevicePlan(NodeMetaData& rootPlanData)
 {
-    // The smart pointer will be moved into the multi-plan during this
-    // function, so keep a plain non-owning pointer
-    auto execPlan = execPlanPtr.get();
-
-    // If we have no input/output fields, then the single ExecPlan is
-    // exactly what we need to do
-    if(desc.inFields.empty() && desc.outFields.empty())
-    {
-        AddMultiPlanItem(std::move(execPlanPtr), {});
-        return;
-    }
-
-    // Code below this line is only required for multi-device plans
-    execPlan->mgpuPlan    = true;
-    execPlan->description = "FFT gathered data";
-
     // Ensure fields are real or interleaved - planar is not supported
     if((!desc.inFields.empty() && array_type_is_planar(desc.inArrayType))
        || (!desc.outFields.empty() && array_type_is_planar(desc.outArrayType)))
@@ -1669,14 +1651,17 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& ex
     std::shared_ptr<TempBufferLease> fftBuf;
     std::shared_ptr<TempBufferLease> fftOutBuf;
 
+    // Gather to temp buf if infields were specified and output is not contiguous or is also a field
     BufferPtr gatherBuf;
     {
-        if(!desc.inFields.empty() && desc.outFields.empty() && is_contiguous_output()
-           && execPlan->rootPlan->placement == rocfft_placement_inplace)
+        if(!desc.inFields.empty() && (!is_contiguous_output() || !desc.outFields.empty()))
         {
-            // We can gather directly to the output buffer and will operate in-place
-            // thereafter
-            gatherBuf = BufferPtr::user_output(0, 0);
+            fftBuf    = std::make_shared<TempBufferLease>(tempBuffers,
+                                                       local_comm_rank,
+                                                       rocfft_location_t::rank0_current_device(),
+                                                       in_elem_count,
+                                                       in_elem_size);
+            gatherBuf = BufferPtr::temp(fftBuf->data());
         }
         else if(desc.inFields.empty())
         {
@@ -1684,58 +1669,69 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& ex
         }
         else
         {
-            fftBuf = std::make_shared<TempBufferLease>(
-                tempBuffers, local_comm_rank, execPlanPtr->location, in_elem_count, in_elem_size);
-            gatherBuf = BufferPtr::temp(fftBuf->data());
+            // Else, we can gather directly to the output buffer
+            gatherBuf = BufferPtr::user_output(0, 0);
         }
     }
 
     // Allocate another temp buf if FFT is not-in-place and outfield was specified
     // TODO: this only needs to be done if there are multiple bricks in the output field.
-    if(execPlan->rootPlan->placement == rocfft_placement_notinplace && !desc.outFields.empty())
+    const auto& outputLength
+        = rootPlanData.outputLength.empty() ? rootPlanData.length : rootPlanData.outputLength;
+    if(rootPlanData.placement == rocfft_placement_notinplace && !desc.outFields.empty())
     {
-        const auto   out_elem_size  = element_size(precision, desc.outArrayType);
-        const size_t out_elem_count = compute_ptrdiff(
-            execPlan->rootPlan->GetOutputLength(), desc.outStrides, batch, desc.outDist);
-        fftOutBuf = std::make_shared<TempBufferLease>(
-            tempBuffers, local_comm_rank, execPlanPtr->location, out_elem_count, out_elem_size);
+        const auto   out_elem_size = element_size(precision, desc.outArrayType);
+        const size_t out_elem_count
+            = compute_ptrdiff(outputLength, desc.outStrides, batch, desc.outDist);
+        fftOutBuf = std::make_shared<TempBufferLease>(tempBuffers,
+                                                      local_comm_rank,
+                                                      rocfft_location_t::rank0_current_device(),
+                                                      out_elem_count,
+                                                      out_elem_size);
     }
 
     std::vector<size_t> gatherIndexes;
+    for(const auto& inField : desc.inFields)
     {
-        for(const auto& inField : desc.inFields)
-        {
-            // brick indexes include batch so create a set of comparable field strides
-            auto fieldStrideWithBatch = desc.inStrides;
-            fieldStrideWithBatch.push_back(desc.inDist);
+        // brick indexes include batch so create a set of comparable field strides
+        auto fieldStrideWithBatch = desc.inStrides;
+        fieldStrideWithBatch.push_back(desc.inDist);
 
-            auto fieldLengthWithBatch = lengths;
-            fieldLengthWithBatch.push_back(batch);
+        auto fieldLengthWithBatch = lengths;
+        fieldLengthWithBatch.push_back(batch);
 
-            auto curIndexes = GatherBricksToField(execPlan->location,
-                                                  inField.bricks,
-                                                  precision,
-                                                  desc.inArrayType,
-                                                  fieldLengthWithBatch,
-                                                  fieldStrideWithBatch,
-                                                  gatherBuf,
-                                                  {},
-                                                  element_size(precision, desc.inArrayType));
-            std::copy(curIndexes.begin(), curIndexes.end(), std::back_inserter(gatherIndexes));
-        }
-
-        // Data is gathered and unpacked (if necessary), run the core FFT plan we started with
-        if(gatherBuf)
-            execPlan->inputPtr = gatherBuf;
-        else
-            execPlan->inputPtr = BufferPtr::user_input(0, 0);
-
-        if(execPlan->rootPlan->placement == rocfft_placement_inplace)
-            execPlan->outputPtr = execPlan->inputPtr;
-        else if(fftOutBuf)
-            execPlan->outputPtr = BufferPtr::temp(fftOutBuf->data());
+        auto curIndexes = GatherBricksToField(rocfft_location_t::rank0_current_device(),
+                                              inField.bricks,
+                                              precision,
+                                              desc.inArrayType,
+                                              fieldLengthWithBatch,
+                                              fieldStrideWithBatch,
+                                              gatherBuf,
+                                              {},
+                                              element_size(precision, desc.inArrayType));
+        std::copy(curIndexes.begin(), curIndexes.end(), std::back_inserter(gatherIndexes));
     }
-    auto fftIdx = AddMultiPlanItem(std::move(execPlanPtr), gatherIndexes);
+
+    // Data is gathered and unpacked (if necessary), create the core FFT plan
+    auto execPlan         = BuildSingleDevicePlan(rootPlanData,
+                                          0,
+                                          rocfft_location_t::rank0_current_device(),
+                                          desc.loadOps,
+                                          desc.storeOps,
+                                          true);
+    execPlan->description = "FFT gathered data";
+
+    if(gatherBuf)
+        execPlan->inputPtr = gatherBuf;
+    else
+        execPlan->inputPtr = BufferPtr::user_input(0, 0);
+
+    if(execPlan->rootPlan->placement == rocfft_placement_inplace)
+        execPlan->outputPtr = execPlan->inputPtr;
+    else if(fftOutBuf)
+        execPlan->outputPtr = BufferPtr::temp(fftOutBuf->data());
+    auto scatterSrcBuf = execPlan->outputPtr;
+    auto fftIdx        = AddMultiPlanItem(std::move(execPlan), gatherIndexes);
 
     // Scatter data back out
     for(const auto& outField : desc.outFields)
@@ -1747,31 +1743,25 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& ex
         auto fieldLengthWithBatch = outputLengths;
         fieldLengthWithBatch.push_back(batch);
 
-        auto scatterSrcBuf = execPlan->rootPlan->placement == rocfft_placement_notinplace
-                                 ? fftOutBuf->data()
-                                 : fftBuf->data();
-
-        ScatterFieldToBricks(execPlan->location,
-                             BufferPtr::temp(scatterSrcBuf),
-                             execPlan->rootPlan->precision,
-                             execPlan->rootPlan->outArrayType,
+        ScatterFieldToBricks(rocfft_location_t::rank0_current_device(),
+                             scatterSrcBuf,
+                             precision,
+                             rootPlanData.outArrayType,
                              fieldLengthWithBatch,
                              fieldStrideWithBatch,
                              outField.bricks,
                              {fftIdx},
-                             element_size(precision, execPlan->rootPlan->outArrayType));
+                             element_size(precision, rootPlanData.outArrayType));
     }
 }
 
-// Construct a single-device execPlan - fill out the provided
-// execPlan with nodes to implement the FFT.
-static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         rootPlanData,
-                                                       int                   local_comm_rank,
-                                                       rocfft_location_t     location,
-                                                       rocfft_transform_type transformType,
-                                                       const std::optional<LoadOps>&  loadOps,
-                                                       const std::optional<StoreOps>& storeOps,
-                                                       bool partOfMultiPlan)
+std::unique_ptr<ExecPlan>
+    rocfft_plan_t::BuildSingleDevicePlan(NodeMetaData&                  rootPlanData,
+                                         int                            local_comm_rank,
+                                         rocfft_location_t              location,
+                                         const std::optional<LoadOps>&  loadOps,
+                                         const std::optional<StoreOps>& storeOps,
+                                         bool                           partOfMultiPlan)
 {
     rocfft_scoped_device dev(location.device);
 
@@ -1880,29 +1870,16 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
     }
 }
 
-// Transform (complex-complex FFT) one dimension of a brick, by
-// adding a multi-plan item to the rocfft_plan_t, and return the new
-// item's index.  A brick is on a single device and has the specified
-// length and stride.  Input and output may point to the same buffer.
-//
-// The specified dimension is assumed to be contiguous on the brick.
-// Other dimensions (including batch) may have any length (including
-// length 1).
-//
-// Specified antecedent items are required to complete before this
-// new item will begin execution.
-//
-// NOTE: lengths and stride include batch dimension
-static size_t C2CBrickOneDimension(rocfft_plan_t&                 plan,
-                                   size_t                         dimIdx,
-                                   rocfft_location_t              location,
-                                   const std::vector<size_t>&     lengths,
-                                   const std::vector<size_t>&     stride,
-                                   BufferPtr                      input,
-                                   BufferPtr                      output,
-                                   const std::optional<LoadOps>&  loadOps,
-                                   const std::optional<StoreOps>& storeOps,
-                                   const std::vector<size_t>&     antecedents)
+size_t rocfft_plan_t::C2CBrickOneDimension(rocfft_plan_t&                 plan,
+                                           size_t                         dimIdx,
+                                           rocfft_location_t              location,
+                                           const std::vector<size_t>&     lengths,
+                                           const std::vector<size_t>&     stride,
+                                           BufferPtr                      input,
+                                           BufferPtr                      output,
+                                           const std::optional<LoadOps>&  loadOps,
+                                           const std::optional<StoreOps>& storeOps,
+                                           const std::vector<size_t>&     antecedents)
 {
     auto transformLengths = lengths;
     auto transformStride  = stride;
@@ -1934,14 +1911,8 @@ static size_t C2CBrickOneDimension(rocfft_plan_t&                 plan,
     rootPlanData.outArrayType = rocfft_array_type_complex_interleaved;
     rootPlanData.deviceProp   = get_curr_device_prop();
 
-    auto singlePlan       = BuildSingleDevicePlan(rootPlanData,
-                                            plan.desc.get_local_comm_rank(),
-                                            location,
-                                            plan.transformType,
-                                            loadOps,
-                                            storeOps,
-                                            true);
-    singlePlan->mgpuPlan  = true;
+    auto singlePlan = plan.BuildSingleDevicePlan(
+        rootPlanData, plan.desc.get_local_comm_rank(), location, loadOps, storeOps, true);
     singlePlan->inputPtr  = input;
     singlePlan->outputPtr = output;
     return plan.AddMultiPlanItem(std::move(singlePlan), antecedents);
@@ -3523,13 +3494,13 @@ rocfft_status rocfft_plan_create_internal(rocfft_plan                   plan,
             rootPlanData.deviceProp = get_curr_device_prop();
             set_bluestein_strides(plan, rootPlanData);
 
-            auto singleDevicePlan = BuildSingleDevicePlan(rootPlanData,
-                                                          0,
-                                                          rocfft_location_t::rank0_current_device(),
-                                                          plan->transformType,
-                                                          plan->desc.loadOps,
-                                                          plan->desc.storeOps,
-                                                          false);
+            auto singleDevicePlan
+                = plan->BuildSingleDevicePlan(rootPlanData,
+                                              0,
+                                              rocfft_location_t::rank0_current_device(),
+                                              plan->desc.loadOps,
+                                              plan->desc.storeOps,
+                                              false);
             plan->AddMultiPlanItem(std::move(singleDevicePlan), {});
         }
         else
@@ -3545,16 +3516,7 @@ rocfft_status rocfft_plan_create_internal(rocfft_plan                   plan,
                 rootPlanData.deviceProp = get_curr_device_prop();
                 set_bluestein_strides(plan, rootPlanData);
 
-                auto singleDevicePlan
-                    = BuildSingleDevicePlan(rootPlanData,
-                                            0,
-                                            rocfft_location_t::rank0_current_device(),
-                                            plan->transformType,
-                                            plan->desc.loadOps,
-                                            plan->desc.storeOps,
-                                            true);
-
-                plan->GatherScatterSingleDevicePlan(std::move(singleDevicePlan));
+                plan->GatherScatterSingleDevicePlan(rootPlanData);
             }
         }
 
