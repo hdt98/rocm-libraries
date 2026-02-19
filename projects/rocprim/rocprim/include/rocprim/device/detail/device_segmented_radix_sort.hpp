@@ -91,7 +91,7 @@ public:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     void sort(KeysInputIterator    keys_input,
               key_type*            keys_tmp,
               KeysOutputIterator   keys_output,
@@ -169,7 +169,7 @@ public:
     }
 
     // When all iterators are raw pointers, this overload is used to minimize code duplication in the kernel
-    ROCPRIM_DEVICE ROCPRIM_INLINE
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     void sort(key_type*     keys_input,
               key_type*     keys_tmp,
               key_type*     keys_output,
@@ -244,7 +244,7 @@ private:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     void sort(KeysInputIterator    keys_input,
               KeysOutputIterator   keys_output,
               ValuesInputIterator  values_input,
@@ -316,7 +316,7 @@ public:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     void sort(KeysInputIterator    keys_input,
               Key*                 keys_tmp,
               KeysOutputIterator   keys_output,
@@ -357,7 +357,7 @@ public:
     }
 
     // When all iterators are raw pointers, this overload is used to minimize code duplication in the kernel
-    ROCPRIM_DEVICE ROCPRIM_INLINE
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     void sort(Key*          keys_input,
               Key*          keys_tmp,
               Key*          keys_output,
@@ -386,7 +386,7 @@ public:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     bool sort(KeysInputIterator    keys_input,
               KeysOutputIterator   keys_output,
               ValuesInputIterator  values_input,
@@ -533,8 +533,8 @@ struct segmented_warp_sort_helper
     using storage_type                           = ::rocprim::empty_type;
 
     template<class... Args>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void sort(Args&&...)
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static void sort(Args&&... /* args */)
     {}
 };
 
@@ -581,8 +581,8 @@ public:
 
 private:
     template<typename V = Value, typename F>
-    ROCPRIM_DEVICE
-    auto invoke_warp_sort(Key (&keys)[items_per_thread],
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static auto invoke_warp_sort(Key (&keys)[items_per_thread],
                           Value (&values)[items_per_thread],
                           storage_type& storage,
                           F             comparator)
@@ -593,23 +593,23 @@ private:
     }
 
     template<typename V = Value, typename F>
-    ROCPRIM_DEVICE
-    auto invoke_warp_sort(Key (&keys)[items_per_thread],
-                          Value (&values)[items_per_thread],
-                          storage_type& storage,
-                          F             comparator)
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static auto invoke_warp_sort(Key (&keys)[items_per_thread],
+                                 Value (&values)[items_per_thread],
+                                 storage_type& storage,
+                                 F             comparator)
         -> std::enable_if_t<!std::is_same<V, ::rocprim::empty_type>::value>
     {
         sort_type().sort(keys, values, storage.sort, comparator);
     }
 
     template<class K = Key>
-    ROCPRIM_DEVICE
-    auto invoke_warp_sort(Key (&keys)[items_per_thread],
-                          Value (&values)[items_per_thread],
-                          storage_type& storage,
-                          unsigned int  begin_bit,
-                          unsigned int  end_bit) -> std::enable_if_t<!is_integral<K>::value>
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static auto invoke_warp_sort(Key (&keys)[items_per_thread],
+                                 Value (&values)[items_per_thread],
+                                 storage_type& storage,
+                                 unsigned int  begin_bit,
+                                 unsigned int  end_bit) -> std::enable_if_t<!is_integral<K>::value>
     {
         (void)begin_bit;
         (void)end_bit;
@@ -617,8 +617,8 @@ private:
     }
 
     template<class K = Key>
-    ROCPRIM_DEVICE
-    auto invoke_warp_sort(Key (&keys)[items_per_thread],
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static auto invoke_warp_sort(Key (&keys)[items_per_thread],
                           Value (&values)[items_per_thread],
                           storage_type& storage,
                           unsigned int  begin_bit,
@@ -640,8 +640,8 @@ public:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void sort(KeysInputIterator    keys_input,
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static void sort(KeysInputIterator    keys_input,
               KeysOutputIterator   keys_output,
               ValuesInputIterator  values_input,
               ValuesOutputIterator values_output,
@@ -691,8 +691,8 @@ public:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void sort(KeysInputIterator    keys_input,
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    static void sort(KeysInputIterator    keys_input,
               Key*                 keys_tmp,
               KeysOutputIterator   keys_output,
               ValuesInputIterator  values_input,
