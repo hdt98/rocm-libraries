@@ -201,8 +201,8 @@ inline hipError_t segmented_radix_sort_impl(
     const size_t medium_segment_indices_size = three_way_partitioning ? num_segments : 0;
 
     // Define the buffer size of the segment counters for the partioning results.
-    const size_t segment_count_output_size = 2;
-    const size_t segment_count_output_bytes
+    constexpr size_t segment_count_output_size = 2;
+    constexpr size_t segment_count_output_bytes
         = segment_count_output_size * sizeof(segment_index_type);
 
     // Large and small segments are in the same buffer, expanding from both ends.
@@ -287,7 +287,6 @@ inline hipError_t segmented_radix_sort_impl(
 
     bool is_capturing = false;
     ROCPRIM_RETURN_ON_ERROR(detail::is_graph_capture(stream, is_capturing));
-    // std::cout << "is_capturing: " << is_capturing << std::endl;
 
     std::chrono::steady_clock::time_point start;
     if(do_partitioning)
