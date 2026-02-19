@@ -40,7 +40,7 @@ set( hipblas_benchmark_common
       ${BLIS_CPP}
     )
 
-if(NOT BUILD_FORTRAN_CLIENTS)
+if(BUILD_FORTRAN_CLIENTS)
   add_executable( hipblas-bench ${hipblas_bench_source} ${hipblas_benchmark_common} $<TARGET_OBJECTS:hipblas_fortran_client>)
 else()
   add_executable( hipblas-bench ${hipblas_bench_source} ${hipblas_benchmark_common} )
