@@ -119,6 +119,38 @@ struct NumericLimits<half_t>
     __host__ __device__ static constexpr half_t Infinity() { return bit_cast<half_t>(binary_inf); }
 };
 
+#if CK_USE_LLVM_BUILTIN_BF16
+template <>
+struct NumericLimits<bhalf_t>
+{
+    // bfloat16: 1 sign bit, 8 exponent bits, 7 mantissa bits
+    static constexpr unsigned short binary_min    = 0x0080; // 2^-126 (min positive normal)
+    static constexpr unsigned short binary_max    = 0x7F7F; // max finite
+    static constexpr unsigned short binary_lowest = 0xFF7F; // lowest finite
+    static constexpr unsigned short binary_qnan   = 0x7FC0; // quiet NaN (exp=all 1s, mant!=0)
+    static constexpr unsigned short binary_inf    = 0x7F80; // +infinity
+
+    __host__ __device__ static constexpr bhalf_t Min() { return bit_cast<bhalf_t>(binary_min); }
+
+    __host__ __device__ static constexpr bhalf_t Max() { return bit_cast<bhalf_t>(binary_max); }
+
+    __host__ __device__ static constexpr bhalf_t Lowest()
+    {
+        return bit_cast<bhalf_t>(binary_lowest);
+    }
+
+    __host__ __device__ static constexpr bhalf_t QuietNaN()
+    {
+        return bit_cast<bhalf_t>(binary_qnan);
+    }
+
+    __host__ __device__ static constexpr bhalf_t Infinity()
+    {
+        return bit_cast<bhalf_t>(binary_inf);
+    }
+};
+#endif
+
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 template <>
 struct NumericLimits<int4_t>
@@ -340,6 +372,38 @@ struct NumericLimits<half_t>
 
     __host__ __device__ static constexpr half_t Infinity() { return bit_cast<half_t>(binary_inf); }
 };
+
+#if CK_USE_LLVM_BUILTIN_BF16
+template <>
+struct NumericLimits<bhalf_t>
+{
+    // bfloat16: 1 sign bit, 8 exponent bits, 7 mantissa bits
+    static constexpr unsigned short binary_min    = 0x0080; // 2^-126 (min positive normal)
+    static constexpr unsigned short binary_max    = 0x7F7F; // max finite
+    static constexpr unsigned short binary_lowest = 0xFF7F; // lowest finite
+    static constexpr unsigned short binary_qnan   = 0x7FC0; // quiet NaN (exp=all 1s, mant!=0)
+    static constexpr unsigned short binary_inf    = 0x7F80; // +infinity
+
+    __host__ __device__ static constexpr bhalf_t Min() { return bit_cast<bhalf_t>(binary_min); }
+
+    __host__ __device__ static constexpr bhalf_t Max() { return bit_cast<bhalf_t>(binary_max); }
+
+    __host__ __device__ static constexpr bhalf_t Lowest()
+    {
+        return bit_cast<bhalf_t>(binary_lowest);
+    }
+
+    __host__ __device__ static constexpr bhalf_t QuietNaN()
+    {
+        return bit_cast<bhalf_t>(binary_qnan);
+    }
+
+    __host__ __device__ static constexpr bhalf_t Infinity()
+    {
+        return bit_cast<bhalf_t>(binary_inf);
+    }
+};
+#endif
 
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 template <>

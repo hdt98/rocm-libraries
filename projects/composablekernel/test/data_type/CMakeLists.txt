@@ -128,6 +128,9 @@ endif()
 
 add_gtest_executable(test_type_convert_const type_convert_const.cpp)
 add_gtest_executable(test_bhalf test_bhalf.cpp)
+if(result EQUAL 0)
+  target_link_libraries(test_bhalf PRIVATE utility)
+endif()
 add_gtest_executable(test_pk_i4 test_pk_i4.cpp)
 
 if(GPU_TARGETS MATCHES "gfx1250")

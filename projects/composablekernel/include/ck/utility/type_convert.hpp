@@ -36,21 +36,9 @@ namespace details {
 {
     return amd_assembly_pk_add_f16(x, y);
 }
+
 } // namespace details
 } // namespace
-
-#if defined(__gfx950__)
-inline __device__ bhalf_t static_cast_float_to_bf16(float x)
-{
-    union
-    {
-        uint16_t uint16;
-        __bf16 bf16;
-    } out;
-    out.bf16 = static_cast<__bf16>(x);
-    return out.uint16;
-}
-#endif
 
 // Declare a template function for bf16 conversion using RTN
 template <typename Y, typename X>
@@ -60,13 +48,13 @@ __host__ __device__ constexpr Y bf16_convert_rtn(X x);
 template <>
 inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(float x)
 {
-#if defined(__gfx950__)
-    return static_cast_float_to_bf16(x);
+#if CK_USE_LLVM_BUILTIN_BF16 && (CK_ARCH_SUPPORT_BUILTIN_BF16 || !defined(__HIP_DEVICE_COMPILE__))
+    return static_cast<__bf16>(x);
 #else
     // Nan check
     if(x != x)
     {
-        return uint16_t(0x7FC0);
+        return bit_cast<bhalf_t>(uint16_t(0x7FC0));
     }
 
     union
@@ -78,7 +66,7 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(fl
     const uint32_t first_bf16_mantisa_bit = ((u.int32 >> 16) & 1);
     constexpr uint32_t rounding_bias      = uint32_t((1 << 15) - 1);
 
-    return uint16_t((u.int32 + first_bf16_mantisa_bit + rounding_bias) >> 16);
+    return bit_cast<bhalf_t>(uint16_t((u.int32 + first_bf16_mantisa_bit + rounding_bias) >> 16));
 #endif
 }
 
@@ -119,13 +107,17 @@ __host__ __device__ constexpr Y type_convert(X x)
 template <>
 inline __host__ __device__ constexpr float type_convert<float, bhalf_t>(bhalf_t x)
 {
+#if CK_USE_LLVM_BUILTIN_BF16 && (CK_ARCH_SUPPORT_BUILTIN_BF16 || !defined(__HIP_DEVICE_COMPILE__))
+    return static_cast<float>(x);
+#else
     union
     {
         uint32_t int32;
         float fp32;
-    } u = {uint32_t(x) << 16};
+    } u = {static_cast<uint32_t>(bit_cast<uint16_t>(x)) << 16};
 
     return u.fp32;
+#endif
 }
 
 // convert fp32 to bfp16, round to nearest even
@@ -135,7 +127,8 @@ inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, float>(float 
 #if CK_USE_RNE_BF16_CONVERSION
     return bf16_convert_rtn<bhalf_t>(x);
 #else
-    return uint16_t(static_cast<uint32_t>(x) >> 16);
+    const uint32_t x_bits = bit_cast<uint32_t>(x);
+    return bit_cast<bhalf_t>(uint16_t(x_bits >> 16));
 #endif
 }
 
@@ -161,18 +154,26 @@ inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, half_t>(half_
 template <>
 inline __host__ __device__ constexpr int8_t type_convert<int8_t, bhalf_t>(bhalf_t x)
 {
+#if CK_USE_LLVM_BUILTIN_BF16 && !defined(__HIP_DEVICE_COMPILE__)
+    return static_cast<int8_t>(x);
+#else
     float x_fp32 = type_convert<float>(x);
 
     return static_cast<int8_t>(x_fp32);
+#endif
 }
 
 // convert int8 to bfp16 via fp32
 template <>
 inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, int8_t>(int8_t x)
 {
+#if CK_USE_LLVM_BUILTIN_BF16 && !defined(__HIP_DEVICE_COMPILE__)
+    return static_cast<bhalf_t>(x);
+#else
     float x_fp32 = static_cast<float>(x);
 
     return type_convert<bhalf_t>(x_fp32);
+#endif
 }
 
 template <>

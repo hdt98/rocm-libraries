@@ -1076,11 +1076,13 @@ __host__ __device__ void test_pk8_scaled_convert(uint64_t N, T* p_test, uint64_t
 
     T v_qnan = ck::NumericLimits<T>::QuietNaN();
     T v_max  = ck::NumericLimits<T>::Max();
+#if !CK_USE_LLVM_BUILTIN_BF16
     if constexpr(std::is_same_v<T, bhalf_t>)
     {
         v_qnan = bhalf_t{0x7FFF};
         v_max  = bhalf_t{0x7F7F};
     }
+#endif
     union
     {
         T8 v8;

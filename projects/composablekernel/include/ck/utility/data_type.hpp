@@ -28,13 +28,17 @@ using byte = unsigned char;
 using std::byte;
 #endif
 
-using tf32_t  = _BitInt(19); // 1 sign bit, 8 exponent bits, 10 mantissa bits
+using tf32_t = _BitInt(19); // 1 sign bit, 8 exponent bits, 10 mantissa bits
+#if CK_USE_LLVM_BUILTIN_BF16
+using bhalf_t = __bf16;
+#else
 using bhalf_t = ushort;
-using half_t  = _Float16;
-using int4_t  = _BitInt(4);
-using f4_t    = unsigned _BitInt(4);
-using f6_t    = _BitInt(6);          // e2m3 format
-using bf6_t   = unsigned _BitInt(6); // e3m2 format
+#endif
+using half_t = _Float16;
+using int4_t = _BitInt(4);
+using f4_t   = unsigned _BitInt(4);
+using f6_t   = _BitInt(6);          // e2m3 format
+using bf6_t  = unsigned _BitInt(6); // e3m2 format
 
 // scalar_type
 template <typename TV>

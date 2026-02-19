@@ -177,6 +177,23 @@
 #define CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 0
 #endif
 
+// use llvm builtin bf16 data type after ROCm 6.5
+#ifndef CK_USE_LLVM_BUILTIN_BF16
+#if(HIP_VERSION_MAJOR == 6 && HIP_VERSION_MINOR == 5 && HIP_VERSION_PATCH >= 50421) || \
+    (HIP_VERSION_MAJOR >= 7)
+#define CK_USE_LLVM_BUILTIN_BF16 1
+#else
+#define CK_USE_LLVM_BUILTIN_BF16 0
+#endif
+#endif
+
+// hardware support _bf16 data type
+#if(defined(__gfx950__) || defined(__gfx12__))
+#define CK_ARCH_SUPPORT_BUILTIN_BF16 1
+#else
+#define CK_ARCH_SUPPORT_BUILTIN_BF16 0
+#endif
+
 // set rounding to nearest even as default for bf16 conversions
 #define CK_USE_RNE_BF16_CONVERSION 1
 

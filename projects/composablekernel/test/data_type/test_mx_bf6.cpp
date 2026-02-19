@@ -178,11 +178,13 @@ __host__ __device__ void test_mx_bf6_scaled_convert(uint64_t N, T* p_test, uint6
 
     T v_qnan     = ck::NumericLimits<T>::QuietNaN();
     T v_infinity = ck::NumericLimits<T>::Infinity();
+#if !CK_USE_LLVM_BUILTIN_BF16
     if constexpr(std::is_same_v<T, bhalf_t>)
     {
         v_qnan     = bhalf_t{0x7FFF};
         v_infinity = bhalf_t{0x7F80};
     }
+#endif
 
     // NaN -> saturate to max
     p_test[i++] = type_convert<T>(bf6_convert_rne(v_qnan, 4.0f));
