@@ -213,6 +213,7 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
     float best_tflops     = 0;
     float best_gb_per_sec = 0;
     std::string best_split_k("1");
+    index_t best_instance_index = 0;
 
     // profile device Conv instances
     bool all_pass = true;
@@ -341,11 +342,12 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
 
                 if(tflops > best_tflops)
                 {
-                    best_op_name    = op_name;
-                    best_tflops     = tflops;
-                    best_avg_time   = avg_time;
-                    best_gb_per_sec = gb_per_sec;
-                    best_split_k    = split_k_param_str;
+                    best_op_name        = op_name;
+                    best_tflops         = tflops;
+                    best_avg_time       = avg_time;
+                    best_gb_per_sec     = gb_per_sec;
+                    best_split_k        = split_k_param_str;
+                    best_instance_index = num_kernel - 1;
                 }
 
                 // Synchronize before verification to ensure kernel has completed
@@ -491,15 +493,16 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
             }
             else
             {
-                std::cout << op_ptr->GetTypeString() << " does not support this problem"
-                          << std::endl;
+                // std::cout << op_ptr->GetTypeString() << " does not support this problem"
+                //           << std::endl;
             }
         }
     }
 
     printf("\033[36mvalids: %d\033[0m\n", num_kernel);
 
-    std::cout << "Best configuration parameters:" << "\nname: " << best_op_name
+    std::cout << "Best configuration parameters:" << "\nname: " << best_op_name << " (instance "
+              << best_instance_index << ")"
               << "\navg_time: " << best_avg_time << "\ntflops: " << best_tflops
               << "\nGB/s: " << best_gb_per_sec << ", SplitK " << best_split_k << std::endl;
 

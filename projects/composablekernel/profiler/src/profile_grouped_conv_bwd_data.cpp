@@ -48,7 +48,8 @@ static void print_helper_msg()
         << "arg6: print tensor value (0: no; 1: yes)\n"
         << "arg7: time kernel (0: no, 1: yes)\n"
         << ck::utils::conv::get_conv_param_parser_helper_msg() << std::endl
-        << "arg8: split-K (0: internally computed split-K value; 1, 2, 4, 8, 16, 32, 64, 128: set k batches explicitly)\n";
+        << "arg8: split-K (0: internally computed split-K value; 1, 2, 4, 8, 16, 32, 64, 128: set k batches explicitly)\n"
+        << "arg9: instance index (-1 for all instances)\n";
     // clang-format on
 }
 
@@ -72,7 +73,7 @@ int profile_grouped_conv_bwd_data(int argc, char* argv[])
     const int num_dim_spatial  = std::stoi(argv[8]);
 
     // 8 for control, 1 for num_dim_spatial, 4 for G/N/K/C, and 6 * num_dim_spatial, 1 for split-K
-    if(argc != 8 + 1 + 4 + 6 * num_dim_spatial + 1)
+    if(argc != 8 + 1 + 4 + 6 * num_dim_spatial + 1 + 1)
     {
         print_helper_msg();
         return 1;
@@ -80,7 +81,8 @@ int profile_grouped_conv_bwd_data(int argc, char* argv[])
 
     const auto params = ck::utils::conv::parse_conv_param(num_dim_spatial, 9, argv);
 
-    ck::index_t split_k = std::stoi(argv[8 + 1 + 4 + 6 * num_dim_spatial]);
+    ck::index_t split_k        = std::stoi(argv[8 + 1 + 4 + 6 * num_dim_spatial]);
+    ck::index_t instance_index = std::stoi(argv[8 + 1 + 4 + 6 * num_dim_spatial + 1]);
 
     using F32  = float;
     using F16  = ck::half_t;
@@ -119,7 +121,7 @@ int profile_grouped_conv_bwd_data(int argc, char* argv[])
                                                                      WeiDataType,
                                                                      InDataType,
                                                                      ComputeDataType>(
-            do_verification, init_method, do_log, time_kernel, params, split_k);
+            do_verification, init_method, do_log, time_kernel, params, split_k, instance_index);
 
         return pass ? 0 : 1;
     };

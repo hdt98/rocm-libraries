@@ -61,6 +61,7 @@ static void print_helper_msg()
               << ck::utils::conv::get_conv_param_parser_helper_msg()
               << " SplitK (-1 for internally computed split-K value, positive value to set k "
                  "batches explicitly, or 'all' to test all internal split-K values)\n"
+              << " Instance id (-1 for all valid instances)\n"
               << std::endl;
 }
 
@@ -83,8 +84,9 @@ int profile_grouped_conv_bwd_weight(int argc, char* argv[])
     const bool time_kernel     = std::stoi(argv[7]);
     const int num_dim_spatial  = std::stoi(argv[8]);
 
-    // 8 for control, 1 for num_dim_spatial, 4 for G/N/K/C, and 6 * num_dim_spatial, 1 for split-K
-    if(argc != 8 + 1 + 4 + 6 * num_dim_spatial + 1)
+    // 8 for control, 1 for num_dim_spatial, 4 for G/N/K/C, and 6 * num_dim_spatial, 1 for split-K,
+    // 1 for instance id
+    if(argc != 8 + 1 + 4 + 6 * num_dim_spatial + 1 + 1)
     {
         print_helper_msg();
         return 1;
@@ -93,6 +95,8 @@ int profile_grouped_conv_bwd_weight(int argc, char* argv[])
     const auto params = ck::utils::conv::parse_conv_param(num_dim_spatial, 9, argv);
 
     const auto& split_k = std::string(argv[8 + 1 + 4 + 6 * num_dim_spatial]);
+    const ck::index_t instance_index =
+        std::stoi(std::string(argv[8 + 1 + 4 + 6 * num_dim_spatial + 1]));
 
     using F32  = float;
     using F16  = ck::half_t;
@@ -138,7 +142,7 @@ int profile_grouped_conv_bwd_weight(int argc, char* argv[])
                                                                        OutDataType,
                                                                        ComputeTypeA,
                                                                        ComputeTypeB>(
-            do_verification, init_method, do_log, time_kernel, params, split_k);
+            do_verification, init_method, do_log, time_kernel, params, split_k, instance_index);
 
         return pass ? 0 : 1;
     };

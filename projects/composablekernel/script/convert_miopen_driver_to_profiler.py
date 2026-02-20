@@ -128,6 +128,8 @@ def run_ck_grouped_conv_fwd(args):
     cmd += [str(args.in_channels)]
     add_conv_params_to_cmd(args, cmd)
 
+    cmd += [str(args.instance_index)]
+
     run_ck_profiler_cmd(cmd)
 
 
@@ -168,6 +170,7 @@ def run_ck_grouped_conv_bwd_weight(args):
     add_conv_params_to_cmd(args, cmd)
 
     cmd += [str(args.split_k_value)]
+    cmd += [str(args.instance_index)]
     run_ck_profiler_cmd(cmd)
 
 
@@ -406,7 +409,7 @@ if __name__ == "__main__":
         "-V",
         "--verify",
         "--V",
-        default=1,
+        default=0,
         type=int,
         required=False,
         help="Verify Each Layer (Default=1)",
@@ -460,6 +463,16 @@ if __name__ == "__main__":
         default=1,
         required=False,
         help="Number of Groups (Default=1)",
+    )
+    parser.add_argument(
+        "-instance_index",
+        "-ii",
+        "--instance_index",
+        "--ii",
+        type=int,
+        default=-1,
+        required=False,
+        help="Instance index (Default=-1)",
     )
 
     args, unknown = parser.parse_known_args()

@@ -210,11 +210,12 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
     }
 
     std::string best_op_name;
-    float best_avg_time   = 0;
-    float best_tflops     = 0;
-    float best_gb_per_sec = 0;
-    index_t num_kernel    = 0;
-    int valids            = 0;
+    float best_avg_time         = 0;
+    float best_tflops           = 0;
+    float best_gb_per_sec       = 0;
+    index_t num_kernel          = 0;
+    int valids                  = 0;
+    index_t best_instance_index = 0;
 
     // profile device op instances
     bool pass = true;
@@ -256,10 +257,11 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
 
             if(tflops > best_tflops)
             {
-                best_op_name    = op_name;
-                best_tflops     = tflops;
-                best_avg_time   = avg_time;
-                best_gb_per_sec = gb_per_sec;
+                best_op_name        = op_name;
+                best_tflops         = tflops;
+                best_avg_time       = avg_time;
+                best_gb_per_sec     = gb_per_sec;
+                best_instance_index = num_kernel - 1;
             }
 
             // Synchronize before verification to ensure kernel has completed
@@ -332,7 +334,8 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
         }
         else
         {
-            std::cout << op_ptr->GetTypeString() << " does not support this problem" << std::endl;
+            // std::cout << op_ptr->GetTypeString() << " does not support this problem" <<
+            // std::endl;
         }
     };
 
@@ -384,7 +387,8 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
 
     printf("\033[36mvalids: %d\033[0m\n", valids);
 
-    std::cout << "Best configuration parameters:" << "\nname: " << best_op_name
+    std::cout << "Best configuration parameters:" << "\nname: " << best_op_name << " (instance "
+              << best_instance_index << ")\n"
               << "\navg_time: " << best_avg_time << "\ntflops: " << best_tflops
               << "\nGB/s: " << best_gb_per_sec << std::endl;
     if(instance_index != -1)
