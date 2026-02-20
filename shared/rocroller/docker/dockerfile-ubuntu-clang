@@ -122,6 +122,7 @@ ENV PATH="/opt/rocm/bin:${PATH}"
 ENV PYTHONPATH="/opt/rocm:${PYTHONPATH}"
 # This command is executed as root to force the creaton of ROCm SDK metadata files.
 RUN rocm-sdk path --cmake
+RUN echo "$(rocm-sdk path --root)/lib" > /etc/ld.so.conf.d/rocm.conf && ldconfig
 
 # codeql
 ADD codeql/install_codeql /tmp
