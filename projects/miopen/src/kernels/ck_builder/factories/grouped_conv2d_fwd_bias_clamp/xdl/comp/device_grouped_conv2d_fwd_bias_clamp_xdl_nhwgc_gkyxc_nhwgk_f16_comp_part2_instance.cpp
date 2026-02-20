@@ -3,6 +3,7 @@
 
 #include <miopen/ck_builder/kernel_instantiation.hpp>
 #include <miopen/ck_builder/factories/grouped_conv_fwd/device_grouped_conv_fwd_xdl_comp_instance.hpp>
+#include <miopen/ck_builder/device_prop.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_bias_clamp.hpp"
 
 namespace miopen {
@@ -41,15 +42,19 @@ void add_device_grouped_conv2d_fwd_bias_clamp_xdl_nhwgc_gkyxc_nhwgk_f16_comp_par
     constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
     constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_part2_instances<1>(
+    if(miopen::get_device_name() != "gfx950")
+    {
+
+    add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_instances_part2<1>(
         2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {F16}, AddClamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_part2_instances<1>(
+    add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_instances_part2<1>(
         2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1P0, {F16}, AddClamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_part2_instances<1>(
+    add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_instances_part2<1>(
         2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1S1P0, {F16}, AddClamp)>(instances);
 
+    }
 }
 
 } // namespace instance

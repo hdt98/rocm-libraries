@@ -3,6 +3,7 @@
 
 #include <miopen/ck_builder/kernel_instantiation.hpp>
 #include <miopen/ck_builder/factories/grouped_conv_fwd/device_grouped_conv_fwd_xdl_merged_groups_instance.hpp>
+#include <miopen/ck_builder/device_prop.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_bias_clamp.hpp"
 
 namespace miopen {
@@ -37,18 +38,25 @@ void add_device_grouped_conv2d_fwd_bias_clamp_xdl_merged_groups_nhwgc_gkyxc_nhwg
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd3x3     = ckb::ConvSpecialization::FILTER_3x3;
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<1>(
-        2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
+    if(miopen::get_device_name() == "gfx950")
+    {
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances_2x<
+            1>(2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<1>(
-        2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1P0, {BF16}, AddClamp)>(instances);
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances_2x<
+            1>(2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd3x3, {BF16}, AddClamp)>(instances);
+    }
+    else
+    {
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<1>(
+            2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<1>(
-        2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1S1P0, {BF16}, AddClamp)>(instances);
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<1>(
+            2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd3x3, {BF16}, AddClamp)>(instances);
+    }
 
 }
 

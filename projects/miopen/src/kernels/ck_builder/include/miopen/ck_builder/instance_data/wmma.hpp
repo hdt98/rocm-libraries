@@ -45,19 +45,21 @@ struct WmmaAlgorithm
 static_assert(ckb::factory::FwdWmmaAlgorithm<WmmaAlgorithm>);
 
 // Reuse XdlSignature from xdl.hpp
-using WmmaSignature = XdlSignature<>;
+template <std::size_t NumDTensor = 0>
+using WmmaSignature = XdlSignature<NumDTensor>;
 
 // Struct to hold both signature and algorithm
+template <std::size_t NumDTensor = 0>
 struct WmmaInstance
 {
-    WmmaSignature signature;
+    WmmaSignature<NumDTensor> signature;
     WmmaAlgorithm algorithm;
 };
 
 // Constexpr function to create WmmaInstance from DeviceGroupedConvFwdMultipleD_Wmma_CShuffle
 // template parameters
 template <std::size_t NumDTensor>
-constexpr WmmaInstance DeviceGroupedConvFwdMultipleD_Wmma_CShuffle(
+constexpr WmmaInstance<NumDTensor> DeviceGroupedConvFwdMultipleD_Wmma_CShuffle(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts
@@ -119,19 +121,13 @@ constexpr WmmaInstance DeviceGroupedConvFwdMultipleD_Wmma_CShuffle(
     // 46. Pipeline version
     ckb::PipelineVersion pipeline_version = ckb::PipelineVersion::V1)
 {
-    // WMMA instances only support NumDTensor == 0 (PassThrough)
-    static_assert(NumDTensor == 0,
-                  "WMMA instances do not support D tensors");
-    (void)ds_layouts;
-    (void)ds_data_types;
-
     // cshuffle_data_type is not stored because CK Builder derives it internally from the primary
     // data type (see TileConvTensorTypes in conv_tile_tensor_type.hpp).
     (void)cshuffle_data_type;
 
     // Our project auto-formatting makes this initializer hard to read
     // clang-format off
-    return WmmaInstance{
+    return WmmaInstance<NumDTensor>{
         .signature = {
             .spatial_dim            = spatial_dim,
             .direction              = ckb::ConvDirection::FORWARD,
@@ -157,7 +153,7 @@ constexpr WmmaInstance DeviceGroupedConvFwdMultipleD_Wmma_CShuffle(
                 },
                 .operation = {
                     .elementwise_operation    = output_elementwise_op,
-                    .auxiliary_operand_configs = {}
+                    .auxiliary_operand_configs = make_aux_configs<NumDTensor>(ds_layouts, ds_data_types)
                 }
             },
             .data_type              = input_data_type,

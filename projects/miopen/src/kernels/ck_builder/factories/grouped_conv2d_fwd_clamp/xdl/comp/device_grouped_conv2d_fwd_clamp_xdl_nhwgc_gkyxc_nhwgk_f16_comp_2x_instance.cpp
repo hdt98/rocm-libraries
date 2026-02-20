@@ -3,6 +3,7 @@
 
 #include <miopen/ck_builder/kernel_instantiation.hpp>
 #include <miopen/ck_builder/factories/grouped_conv_fwd/device_grouped_conv_fwd_xdl_comp_instance.hpp>
+#include <miopen/ck_builder/device_prop.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_clamp.hpp"
 
 namespace miopen {
@@ -41,6 +42,8 @@ void add_device_grouped_conv2d_fwd_clamp_xdl_nhwgc_gkyxc_nhwgk_f16_comp_2x_insta
     constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
     constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
+     if(miopen::get_device_name() == "gfx950")
+    {
     add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_instances_2x<0>(
         2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);
 
@@ -49,6 +52,7 @@ void add_device_grouped_conv2d_fwd_clamp_xdl_nhwgc_gkyxc_nhwgk_f16_comp_2x_insta
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_f16_comp_instances_2x<0>(
         2, NHWGC, GKYXC, {}, NHWGK, ConvFwd1x1S1P0, {}, Clamp)>(instances);
+    }
 }
 
 } // namespace instance

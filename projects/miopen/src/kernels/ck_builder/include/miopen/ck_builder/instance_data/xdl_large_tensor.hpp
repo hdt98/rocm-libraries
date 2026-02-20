@@ -55,9 +55,10 @@ struct XdlLargeTensorAlgorithm
 static_assert(ckb::factory::LargeTensorAlgorithm<XdlLargeTensorAlgorithm>);
 
 // Struct to hold both signature and algorithm
+template <std::size_t NumDTensor = 0>
 struct XdlLargeTensorInstance
 {
-    XdlSignature<> signature;
+    XdlSignature<NumDTensor> signature;
     XdlLargeTensorAlgorithm algorithm;
 };
 
@@ -65,7 +66,7 @@ struct XdlLargeTensorInstance
 // DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor template parameters
 // Parameters are in the same order as the template parameters
 template <std::size_t NumDTensor>
-constexpr XdlLargeTensorInstance DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor(
+constexpr XdlLargeTensorInstance<NumDTensor> DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts
@@ -130,19 +131,13 @@ constexpr XdlLargeTensorInstance DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Larg
     // 49. Groups to merge
     std::size_t num_conv_groups_to_merge = 1)
 {
-    // Large tensor instances only support NumDTensor == 0 (PassThrough)
-    static_assert(NumDTensor == 0,
-                  "Large tensor instances do not support D tensors");
-    (void)ds_layouts;
-    (void)ds_data_types;
-
     // cshuffle_data_type is not stored because CK Builder derives it internally from the primary
     // data type (see TileConvTensorTypes in conv_tile_tensor_type.hpp).
     (void)cshuffle_data_type;
 
     // Our project auto-formatting makes this initializer hard to read
     // clang-format off
-    return XdlLargeTensorInstance{
+    return XdlLargeTensorInstance<NumDTensor>{
         .signature = {
             .spatial_dim            = spatial_dim,
             .direction              = ckb::ConvDirection::FORWARD,
@@ -168,7 +163,7 @@ constexpr XdlLargeTensorInstance DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Larg
                 },
                 .operation = {
                     .elementwise_operation    = output_elementwise_op,
-                    .auxiliary_operand_configs = {}
+                    .auxiliary_operand_configs = make_aux_configs<NumDTensor>(ds_layouts, ds_data_types)
                 }
             },
             .data_type              = input_data_type,

@@ -55,9 +55,10 @@ struct XdlV3Algorithm
 static_assert(ckb::factory::FwdXdlV3Algorithm<XdlV3Algorithm>);
 
 // V3 Instance struct
+template <std::size_t NumDTensor = 0>
 struct XdlV3Instance
 {
-    XdlSignature<> signature;
+    XdlSignature<NumDTensor> signature;
     XdlV3Algorithm algorithm;
 };
 
@@ -65,7 +66,7 @@ struct XdlV3Instance
 // DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 template parameters. Parameters are in the same
 // order as the template parameters, with V3-specific additions.
 template <std::size_t NumDTensor>
-constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
+constexpr XdlV3Instance<NumDTensor> DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts
@@ -134,19 +135,13 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
     // 51. Direct load flag (V3-specific)
     bool direct_load = false)
 {
-    // V3 instances only support NumDTensor == 0 (PassThrough)
-    static_assert(NumDTensor == 0,
-                  "V3 instances do not support D tensors");
-    (void)ds_layouts;
-    (void)ds_data_types;
-
     // cshuffle_data_type is not stored because CK Builder derives it internally from the primary
     // data type (see TileConvTensorTypes in conv_tile_tensor_type.hpp).
     (void)cshuffle_data_type;
 
     // Our project auto-formatting makes this initializer hard to read
     // clang-format off
-    return XdlV3Instance{
+    return XdlV3Instance<NumDTensor>{
         .signature = {
             .spatial_dim            = spatial_dim,
             .direction              = ckb::ConvDirection::FORWARD,
@@ -172,7 +167,7 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
                 },
                 .operation = {
                     .elementwise_operation    = output_elementwise_op,
-                    .auxiliary_operand_configs = {}
+                    .auxiliary_operand_configs = make_aux_configs<NumDTensor>(ds_layouts, ds_data_types)
                 }
             },
             .data_type              = input_data_type,

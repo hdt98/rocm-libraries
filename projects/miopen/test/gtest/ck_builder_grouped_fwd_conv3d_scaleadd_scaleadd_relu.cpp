@@ -19,7 +19,8 @@ using PassThrough          = ck::tensor_operation::element_wise::PassThrough;
 using ScaleAddScaleAddRelu = ck::tensor_operation::element_wise::ScaleAddScaleAddRelu;
 static constexpr ck::index_t NumDimSpatial = 3;
 
-template <typename DataType, typename ComputeType = DataType>
+// AccumDataType is used for the D tensors (z & bias). For int8, these are F32.
+template <typename DataType, typename AccumDataType = DataType, typename ComputeType = DataType>
 using DeviceOpGFwdSAR =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial,
                                                                   InLayout,
@@ -28,28 +29,28 @@ using DeviceOpGFwdSAR =
                                                                   OutLayout,
                                                                   DataType,
                                                                   DataType,
-                                                                  ck::Tuple<DataType, DataType>,
+                                                                  ck::Tuple<AccumDataType, AccumDataType>,
                                                                   DataType,
                                                                   PassThrough,
                                                                   PassThrough,
                                                                   ScaleAddScaleAddRelu,
                                                                   ComputeType>;
 
-template <typename DataType, typename ComputeType = DataType>
+template <typename DataType, typename AccumDataType = DataType, typename ComputeType = DataType>
 using DeviceOpGFwdSARPtrs =
     ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
-        DeviceOpGFwdSAR<DataType, ComputeType>>;
+        DeviceOpGFwdSAR<DataType, AccumDataType, ComputeType>>;
 
-template <typename DataType, typename ComputeType = DataType>
+template <typename DataType, typename AccumDataType = DataType, typename ComputeType = DataType>
 using DeviceOpGFwdSARBuilderPtrs =
     miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
-        DeviceOpGFwdSAR<DataType, ComputeType>>;
+        DeviceOpGFwdSAR<DataType, AccumDataType, ComputeType>>;
 
-template <typename DataType>
+template <typename DataType, typename AccumDataType = DataType>
 void CompareInstanceLists()
 {
-    auto ckFactoryInstances      = DeviceOpGFwdSARPtrs<DataType>::GetInstances();
-    auto builderFactoryInstances = DeviceOpGFwdSARBuilderPtrs<DataType>::GetInstances();
+    auto ckFactoryInstances      = DeviceOpGFwdSARPtrs<DataType, AccumDataType>::GetInstances();
+    auto builderFactoryInstances = DeviceOpGFwdSARBuilderPtrs<DataType, AccumDataType>::GetInstances();
 
     compare_instance_vectors(ckFactoryInstances, builderFactoryInstances);
 }
@@ -71,5 +72,5 @@ TEST(CPU_CKBuilderGroupedFwdConv3DScaleAddScaleAddRelu_BFP16, CompareInstanceLis
 
 TEST(CPU_CKBuilderGroupedFwdConv3DScaleAddScaleAddRelu_I8, CompareInstanceListsInt8)
 {
-    CompareInstanceLists<int8_t>();
+    CompareInstanceLists<int8_t, float>();
 }

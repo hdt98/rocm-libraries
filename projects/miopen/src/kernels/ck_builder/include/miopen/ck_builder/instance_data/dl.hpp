@@ -4,6 +4,7 @@
 #pragma once
 
 #include <miopen/ck_builder/instance_data/common.hpp>
+#include <miopen/ck_builder/instance_data/xdl.hpp>
 
 namespace miopen {
 namespace conv {
@@ -79,19 +80,21 @@ struct DlAlgorithm
 
 static_assert(ckb::factory::FwdDlAlgorithm<DlAlgorithm>);
 
-using DlSignature = ConvSignature<>;
+template <std::size_t NumDTensor = 0>
+using DlSignature = ConvSignature<NumDTensor>;
 
 // Struct to hold both signature and algorithm
+template <std::size_t NumDTensor = 0>
 struct DlInstance
 {
-    DlSignature signature;
+    DlSignature<NumDTensor> signature;
     DlAlgorithm algorithm;
 };
 
 // Constexpr function to create DlInstance from old DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK
 // template parameters Parameters are in the same order as the template parameters
 template <std::size_t NumDTensor>
-constexpr DlInstance DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK(
+constexpr DlInstance<NumDTensor> DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Data types
@@ -148,15 +151,9 @@ constexpr DlInstance DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK(
     std::size_t c_thread_transfer_src_dst_vector_dim,
     std::size_t c_thread_transfer_dst_scalar_per_vector)
 {
-    // DL instances only support NumDTensor == 0 (PassThrough)
-    static_assert(NumDTensor == 0,
-                  "DL instances do not support D tensors");
-    (void)ds_data_types;
-    (void)ds_layouts;
-
     // Our project auto-formatting makes this initializer hard to read
     // clang-format off
-    return DlInstance{
+    return DlInstance<NumDTensor>{
         .signature = {
             .spatial_dim            = spatial_dim,
             .direction              = ckb::ConvDirection::FORWARD,
@@ -182,7 +179,7 @@ constexpr DlInstance DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK(
                 },
                 .operation = {
                     .elementwise_operation    = output_elementwise_op,
-                    .auxiliary_operand_configs = {}
+                    .auxiliary_operand_configs = make_aux_configs<NumDTensor>(ds_layouts, ds_data_types)
                 }
             },
             .data_type              = input_data_type,

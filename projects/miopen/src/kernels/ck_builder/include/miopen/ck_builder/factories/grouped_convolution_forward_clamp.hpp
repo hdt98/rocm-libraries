@@ -108,9 +108,9 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
             }
 #endif
 #ifdef CK_ENABLE_FP16
-            if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
-                         is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
-                         is_same_v<BComputeType, half_t>)
+            if constexpr(is_same_v<InDataType, ck::half_t> && is_same_v<WeiDataType,ck::half_t> &&
+                         is_same_v<OutDataType,ck::half_t> && is_same_v<AComputeType,ck::half_t> &&
+                         is_same_v<BComputeType,ck::half_t>)
             {
                 add_device_grouped_conv2d_fwd_clamp_xdl_nhwgc_gkyxc_nhwgk_f16_instances(op_ptrs);
                 add_device_grouped_conv2d_fwd_clamp_xdl_nhwgc_gkyxc_nhwgk_f16_16x16_instances(
@@ -207,9 +207,9 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
             }
 #endif
 #ifdef CK_ENABLE_FP16
-            if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
-                         is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
-                         is_same_v<BComputeType, half_t>)
+            if constexpr(is_same_v<InDataType,ck::half_t> && is_same_v<WeiDataType,ck::half_t> &&
+                         is_same_v<OutDataType,ck::half_t> && is_same_v<AComputeType,ck::half_t> &&
+                         is_same_v<BComputeType,ck::half_t>)
             {
                 add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f16_instances(op_ptrs);
                 add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f16_16x16_instances(
@@ -301,9 +301,9 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
             }
 #endif
 #ifdef CK_ENABLE_FP16
-            if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
-                         is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
-                         is_same_v<BComputeType, half_t>)
+            if constexpr(is_same_v<InDataType,ck::half_t> && is_same_v<WeiDataType,ck::half_t> &&
+                         is_same_v<OutDataType,ck::half_t> && is_same_v<AComputeType,ck::half_t> &&
+                         is_same_v<BComputeType,ck::half_t>)
             {
                 add_device_grouped_conv2d_fwd_clamp_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_f16_instances_part1(
                     op_ptrs);
@@ -347,9 +347,9 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
             }
 #endif
 #ifdef CK_ENABLE_FP16
-            if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
-                         is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
-                         is_same_v<BComputeType, half_t>)
+            if constexpr(is_same_v<InDataType,ck::half_t> && is_same_v<WeiDataType,ck::half_t> &&
+                         is_same_v<OutDataType,ck::half_t> && is_same_v<AComputeType,ck::half_t> &&
+                         is_same_v<BComputeType,ck::half_t>)
             {
                 add_device_grouped_conv3d_fwd_clamp_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_f16_instances_part1(
                     op_ptrs);

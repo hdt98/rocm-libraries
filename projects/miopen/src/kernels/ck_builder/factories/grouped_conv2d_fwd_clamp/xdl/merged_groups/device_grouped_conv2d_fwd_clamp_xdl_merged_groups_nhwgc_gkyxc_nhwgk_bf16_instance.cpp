@@ -3,6 +3,7 @@
 
 #include <miopen/ck_builder/kernel_instantiation.hpp>
 #include <miopen/ck_builder/factories/grouped_conv_fwd/device_grouped_conv_fwd_xdl_merged_groups_instance.hpp>
+#include <miopen/ck_builder/device_prop.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_clamp.hpp"
 
 namespace miopen {
@@ -37,10 +38,25 @@ void add_device_grouped_conv2d_fwd_clamp_xdl_merged_groups_nhwgc_gkyxc_nhwgk_bf1
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd3x3     = ckb::ConvSpecialization::FILTER_3x3;
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<0>(
-        2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);
+    if(miopen::get_device_name() == "gfx950")
+    {
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances_2x<
+            0>(2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);
+
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances_2x<
+            0>(2, NHWGC, GKYXC, {}, NHWGK, ConvFwd3x3, {}, Clamp)>(instances);
+    }
+    else
+    {
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<0>(
+            2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);
+
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<0>(
+            2, NHWGC, GKYXC, {}, NHWGK, ConvFwd3x3, {}, Clamp)>(instances);
+    }
 }
 
 } // namespace instance
