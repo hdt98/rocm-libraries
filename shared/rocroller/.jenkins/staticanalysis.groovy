@@ -77,19 +77,19 @@ ci: {
     def additionalParameters = [
         string(
             name: "ROCROLLER_THEROCK_ROCM_NIGHTLY_URL",
-            defaultValue: null,
+            defaultValue: params?.ROCROLLER_THEROCK_ROCM_NIGHTLY_URL,
             trim: true,
             description: "URL to retrieve ROCm packages from."
         ),
         string(
             name: "ROCROLLER_THEROCK_ROCM_GFX",
-            defaultValue: null,
+            defaultValue: params?.ROCROLLER_THEROCK_ROCM_GFX,
             trim: true,
             description: "Specify the latest target GFX family for the ROCm packages."
         ),
         string(
             name: "ROCROLLER_THEROCK_ROCM_VERSION",
-            defaultValue: null,
+            defaultValue: params?.ROCROLLER_THEROCK_ROCM_VERSION,
             trim: true,
             description: "Specify the ROCm version to use."
         ),
