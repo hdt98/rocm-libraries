@@ -28,6 +28,8 @@
 
 #include <Tensile/msgpack/Loading.hpp>
 
+#include <cstdio>
+#include <exception>
 #include <fstream>
 
 namespace TensileLite
@@ -160,6 +162,7 @@ namespace TensileLite
             return nullptr;
 
         // copy data from msgpack::object_handle into MasterSolutionLibrary
+        std::fprintf(stderr, "[hipblaslt msgpack] Loading library file: %s\n", filename.c_str());
         try
         {
             std::shared_ptr<MasterSolutionLibrary<MyProblem, MySolution>> rv;
@@ -182,6 +185,16 @@ namespace TensileLite
 
             return rv;
         }
+        catch(std::bad_cast const& e)
+        {
+            std::fprintf(stderr,
+                        "[hipblaslt msgpack] std::bad_cast while loading file: %s\n",
+                        filename.c_str());
+            std::fprintf(stderr,
+                        "[hipblaslt msgpack] variable being deserialized: \"%s\"\n",
+                        Serialization::g_msgpack_debug_current_key.c_str());
+            throw;
+        }
         catch(std::runtime_error const& exc)
         {
             if(Debug::Instance().printDataInit())
@@ -195,6 +208,7 @@ namespace TensileLite
     std::shared_ptr<SolutionLibrary<MyProblem, MySolution>>
         MessagePackLoadLibraryData(std::vector<uint8_t> const& data)
     {
+        std::fprintf(stderr, "[hipblaslt msgpack] Loading library data (in-memory, %zu bytes)\n", data.size());
         try
         {
             std::shared_ptr<MasterSolutionLibrary<MyProblem, MySolution>> rv;
@@ -217,6 +231,15 @@ namespace TensileLite
             }
 
             return rv;
+        }
+        catch(std::bad_cast const& e)
+        {
+            std::fprintf(stderr,
+                        "[hipblaslt msgpack] std::bad_cast while loading library data (in-memory)\n");
+            std::fprintf(stderr,
+                        "[hipblaslt msgpack] variable being deserialized: \"%s\"\n",
+                        Serialization::g_msgpack_debug_current_key.c_str());
+            throw;
         }
         catch(std::runtime_error const& exc)
         {

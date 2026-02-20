@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <string>
 #include <type_traits>
 
 #include <Tensile/ContractionLibrary.hpp>
@@ -93,6 +94,9 @@ namespace TensileLite
         void objectToMap(const msgpack::object&                            object,
                          std::unordered_map<std::string, msgpack::object>& map);
 
+        // Instrumentation: current key being deserialized (for bad_cast / error logging)
+        inline thread_local std::string g_msgpack_debug_current_key;
+
         struct MessagePackInput
         {
             msgpack::object          object;
@@ -132,6 +136,7 @@ namespace TensileLite
                 {
                     auto&            value  = iterator->second;
                     MessagePackInput subRef = createSubRef(value);
+                    g_msgpack_debug_current_key = key;
                     subRef.input(obj);
                     error.insert(error.end(), subRef.error.begin(), subRef.error.end());
                     if(TensileLite::Debug::Instance().printDataInit())
@@ -165,6 +170,7 @@ namespace TensileLite
                 if(iterator != objectMap.end())
                 {
                     auto& value = iterator->second;
+                    g_msgpack_debug_current_key = key;
                     createSubRef(value).input(obj);
                     if(TensileLite::Debug::Instance().printDataInit())
                         usedKeys.insert(key);
@@ -342,6 +348,25 @@ namespace TensileLite
                 }
 
                 return v[index];
+            }
+        };
+
+        /** Deserialize int from either bool (false->0, true->1) or integer (for MessagePack .dat compatibility). */
+        template <>
+        struct MappingTraits<IntFromBoolOrInt, MessagePackInput>
+        {
+            static void mapping(MessagePackInput& io, IntFromBoolOrInt& obj)
+            {
+                try
+                {
+                    bool b = false;
+                    io.object.convert(b);
+                    obj.value = b ? 1 : 0;
+                }
+                catch(...)
+                {
+                    io.object.convert(obj.value);
+                }
             }
         };
 

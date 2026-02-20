@@ -27,6 +27,7 @@
 #include <cerrno>
 #include <csetjmp>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <regex>
@@ -35,6 +36,11 @@
 #define strcasecmp(A, B) _stricmp(A, B)
 #else
 #include <pthread.h>
+#include <unistd.h>
+#endif
+#if defined(__linux__) && defined(__GLIBC__)
+#include <cxxabi.h>
+#include <execinfo.h>
 #include <unistd.h>
 #endif
 
@@ -249,6 +255,80 @@ void catch_signals_and_exceptions_as_failures(std::function<void()> test, bool s
         try
         {
             test();
+        }
+        catch(const std::bad_cast& e)
+        {
+#if defined(__linux__) && defined(__GLIBC__)
+            // Capture backtrace (note: stack is already unwound, so this shows catch path)
+            void* array[64];
+            int   nptrs = backtrace(array, 64);
+            // Resolve addresses to file:line via addr2line / llvm-addr2line
+            char exe_path[1024];
+            ssize_t exe_len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+            if(exe_len > 0)
+            {
+                exe_path[exe_len] = '\0';
+                const char* addr2line_cmd = "llvm-addr2line -e %s -f -C 2>/dev/null || addr2line -e %s -f -C 2>/dev/null";
+                std::fprintf(stderr,
+                             "\n[hipblaslt-test] std::bad_cast backtrace (%d frames, resolved with addr2line):\n",
+                             nptrs);
+                for(int i = 0; i < nptrs; i++)
+                {
+                    char cmd[2048];
+                    std::snprintf(cmd,
+                                  sizeof(cmd),
+                                  "llvm-addr2line -e %s -f -C -a %p 2>/dev/null || addr2line -e %s -f -C -a %p 2>/dev/null",
+                                  exe_path,
+                                  array[i],
+                                  exe_path,
+                                  array[i]);
+                    FILE* fp = popen(cmd, "r");
+                    if(fp)
+                    {
+                        char line[512];
+                        int  first = 1;
+                        while(std::fgets(line, sizeof(line), fp))
+                        {
+                            for(char* p = line; *p; p++)
+                                if(*p == '\n')
+                                {
+                                    *p = '\0';
+                                    break;
+                                }
+                            if(first)
+                                std::fprintf(stderr, "  %2d: %s\n", i, line);
+                            else
+                                std::fprintf(stderr, "      %s\n", line);
+                            first = 0;
+                        }
+                        if(first)
+                            std::fprintf(stderr, "  %2d: %p\n", i, array[i]);
+                        pclose(fp);
+                    }
+                    else
+                    {
+                        std::fprintf(stderr, "  %2d: %p (addr2line failed)\n", i, array[i]);
+                    }
+                }
+                std::fprintf(stderr,
+                             "[hipblaslt-test] For exact throw site, run: gdb -ex \"catch throw\" -ex run -ex \"bt full\" -ex quit --args ./hipblaslt-test <args>\n");
+            }
+            else
+            {
+                char** strings = backtrace_symbols(array, nptrs);
+                if(strings)
+                {
+                    std::fprintf(stderr,
+                                 "\n[hipblaslt-test] std::bad_cast backtrace (%d frames):\n",
+                                 nptrs);
+                    for(int i = 0; i < nptrs; i++)
+                        std::fprintf(stderr, "  %2d: %s\n", i, strings[i]);
+                    std::free(strings);
+                }
+            }
+#endif
+            FAIL() << "Received uncaught exception: " << e.what()
+                   << " (check stderr for backtrace)";
         }
         catch(const std::exception& e)
         {

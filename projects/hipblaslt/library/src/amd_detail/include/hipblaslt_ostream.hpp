@@ -306,6 +306,27 @@ public:
         return os;
     }
 
+    // Print first element when value is pointer to int64_t array (M, N, K, lda, etc. in Arguments)
+    friend hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os,
+                                                  std::pair<char const*, int64_t*> p)
+    {
+        os << p.first << ": ";
+        os.m_yaml = true;
+        os << (p.second ? *p.second : int64_t(0));
+        os.m_yaml = false;
+        return os;
+    }
+
+    friend hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os,
+                                                  std::pair<char const*, int64_t const*> p)
+    {
+        os << p.first << ": ";
+        os.m_yaml = true;
+        os << (p.second ? *p.second : int64_t(0));
+        os.m_yaml = false;
+        return os;
+    }
+
     // Floating-point output
     friend hipblaslt_internal_ostream& operator<<(hipblaslt_internal_ostream& os, double x)
     {

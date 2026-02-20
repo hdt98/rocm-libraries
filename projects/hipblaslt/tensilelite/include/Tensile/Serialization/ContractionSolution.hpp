@@ -128,7 +128,9 @@ namespace TensileLite
                 iot::mapRequired(io, "synchronizerSizePerWG", s.synchronizerSizePerWG);
                 iot::mapRequired(io, "nonTemporalA", s.nonTemporalA);
                 iot::mapRequired(io, "nonTemporalB", s.nonTemporalB);
-                iot::mapRequired(io, "customMainLoopScheduling", s.customMainLoopScheduling);
+                IntFromBoolOrInt customMainLoopSchedulingTmp;
+                iot::mapRequired(io, "customMainLoopScheduling", customMainLoopSchedulingTmp);
+                s.customMainLoopScheduling = customMainLoopSchedulingTmp.value;
                 iot::mapRequired(io, "NonTemporalD", s.NonTemporalD);
                 iot::mapRequired(io, "WaveSeparateGlobalReadA", s.WaveSeparateGlobalReadA);
                 iot::mapRequired(io, "WaveSeparateGlobalReadB", s.WaveSeparateGlobalReadB);

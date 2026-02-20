@@ -47,6 +47,12 @@ namespace TensileLite
         {
         };
 
+        /** Helper for deserializing a field that may be stored as bool or int (e.g. customMainLoopScheduling). */
+        struct IntFromBoolOrInt
+        {
+            int value = 0;
+        };
+
         template <typename IO>
         struct IOTraits
         {
