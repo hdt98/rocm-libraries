@@ -364,7 +364,7 @@ inline hipError_t segmented_radix_sort_impl(
 
         // Define individual kernel launches.
         //
-        // When we have a host-defined grid size (i.e. not a grapgh capture),
+        // When we have a host-defined grid size (i.e. not a graph capture),
         // we need to pass this grid size, otherwise use maximum active blocks.
         // We implement this using 'launch_maybe_bounded_plan' and call this for
         // each of our kernel launches.

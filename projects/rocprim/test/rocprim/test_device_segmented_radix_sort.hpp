@@ -343,7 +343,7 @@ inline void sort_keys_large_segments()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
