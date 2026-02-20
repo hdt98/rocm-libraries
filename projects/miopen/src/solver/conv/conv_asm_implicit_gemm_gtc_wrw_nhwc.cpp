@@ -1122,7 +1122,7 @@ ConvSolution ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC::GetSolution(
     std::ostringstream options;                   // Common options for both kernels.
     std::ostringstream msg;
     GenerateClangDefsym(options, "ROCM_METADATA_VERSION", ctx.rmv.UseV3() ? 5 : 4);
-    if(ctx.GetStream().GetDeviceName() == "gfx942")
+    if(ctx.GetStream().GetDeviceName() == "gfx942" && !problem.IsBfp16())
     {
         GenerateClangDefsym(options, "force_sc0_sc1", 0);
         GenerateClangDefsym(options, "atomic_add_using_cas", 0);
