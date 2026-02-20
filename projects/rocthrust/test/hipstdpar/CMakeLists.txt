@@ -71,21 +71,18 @@ function(add_hipstdpar_test TEST TEST_TYPE INTERPOSE_ALLOC)
     endif()
 
     rocm_install(TARGETS ${TEST_TARGET} COMPONENT tests)
-    if (WIN32 AND NOT DEFINED DLLS_COPIED)
-      set(DLLS_COPIED "YES")
-      set(DLLS_COPIED ${DLLS_COPIED} PARENT_SCOPE)
-      # for now adding in all .dll as dependency chain is not cmake based on win32
-      file( GLOB third_party_dlls
-            LIST_DIRECTORIES ON
-            CONFIGURE_DEPENDS
-            ${HIP_DIR}/bin/*.dll
-            ${CMAKE_SOURCE_DIR}/rtest.*
-      )
-      foreach( file_i ${third_party_dlls})
-        add_custom_command( TARGET ${TEST_TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test )
-      endforeach( file_i )
-    endif()
 endfunction()
+
+# Copy DLLs and test support files at configure time on Windows.
+if(WIN32)
+  file(GLOB _test_support_files
+    ${HIP_DIR}/bin/*.dll
+    ${CMAKE_SOURCE_DIR}/rtest.*
+  )
+  if(_test_support_files)
+    file(COPY ${_test_support_files} DESTINATION ${PROJECT_BINARY_DIR}/test)
+  endif()
+endif()
 
 # Make sure that hipstdpar tests are compiled for C++17, without changing the global state
 set(ROCTHRUST_CMAKE_CXX_STANDARD ${CMAKE_CXX_STANDARD})

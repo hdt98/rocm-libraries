@@ -123,20 +123,6 @@ function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
       )
   endif()
 
-  if (WIN32 AND NOT DEFINED DLLS_COPIED_2)
-    set(DLLS_COPIED_2 "YES")
-    set(DLLS_COPIED_2 ${DLLS_COPIED_2} PARENT_SCOPE)
-    # for now adding in all .dll as dependency chain is not cmake based on win32
-    file( GLOB third_party_dlls
-    LIST_DIRECTORIES ON
-    CONFIGURE_DEPENDS
-    ${HIP_DIR}/bin/*.dll
-    ${CMAKE_SOURCE_DIR}/rtest.*
-    )
-    foreach( file_i ${third_party_dlls})
-      add_custom_command( TARGET ${TEST_TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test/rocprim )
-    endforeach( file_i )
-  endif()
 endfunction()
 
 # Returns a list of values that match the pattern
@@ -258,6 +244,17 @@ function(add_rocprim_cpp_standard_test STANDARD EXTENSIONS TARGET_SUFFIX TEST_NA
       HIP_EXTENSIONS ${EXTENSIONS})
   endif()
 endfunction()
+
+# Copy DLLs and test support files at configure time on Windows.
+if(WIN32)
+  file(GLOB _test_support_files
+    ${HIP_DIR}/bin/*.dll
+    ${CMAKE_SOURCE_DIR}/rtest.*
+  )
+  if(_test_support_files)
+    file(COPY ${_test_support_files} DESTINATION ${PROJECT_BINARY_DIR}/test/rocprim)
+  endif()
+endif()
 
 # ****************************************************************************
 # Tests

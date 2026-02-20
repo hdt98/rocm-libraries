@@ -95,6 +95,19 @@ if(BUILD_CODE_COVERAGE)
   )
 endif()
 
+# Copy DLLs and test support files at configure time on Windows.
+if(WIN32)
+  file(GLOB _test_support_files
+    ${HIP_DIR}/bin/*.dll
+    ${HIP_DIR}/bin/hipinfo.exe
+    ${ROCRAND_PATH}/bin/rocrand.dll
+    ${CMAKE_SOURCE_DIR}/rtest.*
+  )
+  if(_test_support_files)
+    file(COPY ${_test_support_files} DESTINATION ${CMAKE_BINARY_DIR}/test)
+  endif()
+endif()
+
 # Build hipRAND tests
 foreach(test_src ${hipRAND_TEST_SRCS})
     get_filename_component(test_name ${test_src} NAME_WE)
@@ -146,22 +159,6 @@ foreach(test_src ${hipRAND_TEST_SRCS})
         )
     endif()
     rocm_install(TARGETS ${test_name} COMPONENT tests)
-    if (WIN32 AND NOT DEFINED DLLS_COPIED)
-      set(DLLS_COPIED "YES")
-      set(DLLS_COPIED ${DLLS_COPIED} PARENT_SCOPE)
-      # for now adding in all .dll as dependency chain is not cmake based on win32
-      file( GLOB third_party_dlls
-      LIST_DIRECTORIES ON
-      CONFIGURE_DEPENDS
-      ${HIP_DIR}/bin/*.dll
-      ${HIP_DIR}/bin/hipinfo.exe
-      ${ROCRAND_PATH}/bin/rocrand.dll
-      ${CMAKE_SOURCE_DIR}/rtest.*
-      )
-      foreach( file_i ${third_party_dlls})
-        add_custom_command( TARGET ${test_name} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${CMAKE_BINARY_DIR}/test )
-      endforeach( file_i )
-    endif()
 
     if (BUILD_CODE_COVERAGE)
       add_dependencies(coverage_analysis ${test_name})
