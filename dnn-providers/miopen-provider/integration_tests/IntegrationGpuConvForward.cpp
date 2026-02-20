@@ -39,7 +39,7 @@ protected:
         }
     }
 
-    void runGraphTest(DataType tolerance, const TensorLayout& layout = TensorLayout::NCHW) override
+    void runGraphTest(DataType tolerance, const TensorLayout& layout = TensorLayout::NCHW)
     {
         // Skipping until CK is working on Windows
         SKIP_IF_WINDOWS();
@@ -72,9 +72,7 @@ protected:
 
         yAttr->set_output(true);
 
-        this->registerValidator(yAttr, tolerance);
-
-        this->verifyGraph(graphObj, testCase.seed);
+        this->verifyGraph(graphObj, testCase.seed, tolerance);
     }
 
     float _minVal = IntegrationGraphVerificationHarness<DataType, ConvTestCase>::DEFAULT_MIN;
@@ -127,11 +125,11 @@ TEST_P(IntegrationGpuConvFwdNchwBfp16, Correctness)
 {
     const auto& testCase = GetParam();
     auto tolerance
-        = calculateConvFpropTolerance<hip_bfloat16, hip_bfloat16, float>(static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         testCase.wDims);
+        = calculateConvFpropTolerance<bfloat16, bfloat16, float>(static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 testCase.wDims);
     runGraphTest(tolerance, TensorLayout::NCHW);
 }
 
@@ -139,11 +137,11 @@ TEST_P(IntegrationGpuConvFwdNcdhwBfp16, Correctness)
 {
     const auto& testCase = GetParam();
     auto tolerance
-        = calculateConvFpropTolerance<hip_bfloat16, hip_bfloat16, float>(static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         testCase.wDims);
+        = calculateConvFpropTolerance<bfloat16, bfloat16, float>(static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 testCase.wDims);
     runGraphTest(tolerance, TensorLayout::NCDHW);
 }
 
@@ -195,11 +193,11 @@ TEST_P(IntegrationGpuConvFwdNhwcBfp16, Correctness)
 {
     const auto& testCase = GetParam();
     auto tolerance
-        = calculateConvFpropTolerance<hip_bfloat16, hip_bfloat16, float>(static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         testCase.wDims);
+        = calculateConvFpropTolerance<bfloat16, bfloat16, float>(static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 testCase.wDims);
     runGraphTest(tolerance, TensorLayout::NHWC);
 }
 
@@ -207,11 +205,11 @@ TEST_P(IntegrationGpuConvFwdNdhwcBfp16, Correctness)
 {
     const auto& testCase = GetParam();
     auto tolerance
-        = calculateConvFpropTolerance<hip_bfloat16, hip_bfloat16, float>(static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         static_cast<double>(_minVal),
-                                                                         static_cast<double>(_maxVal),
-                                                                         testCase.wDims);
+        = calculateConvFpropTolerance<bfloat16, bfloat16, float>(static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 static_cast<double>(_minVal),
+                                                                 static_cast<double>(_maxVal),
+                                                                 testCase.wDims);
     runGraphTest(tolerance, TensorLayout::NDHWC);
 }
 

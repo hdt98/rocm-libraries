@@ -854,7 +854,7 @@ std::vector<ConvFpropToleranceTestCase>
 // HipBfloat16 / Float / Float (High Precision Compute: Linear)
 template <>
 std::vector<ConvFpropToleranceTestCase>
-    getConvFpropToleranceTestCases<TypeTriple<hip_bfloat16, float, float>>()
+    getConvFpropToleranceTestCases<TypeTriple<bfloat16, float, float>>()
 {
     return {
         {-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
@@ -875,7 +875,7 @@ std::vector<ConvFpropToleranceTestCase>
 // HipBfloat16 / HipBfloat16 / HipBfloat16 (Lower Precision: Statistical)
 template <>
 std::vector<ConvFpropToleranceTestCase>
-    getConvFpropToleranceTestCases<TypeTriple<hip_bfloat16, hip_bfloat16, hip_bfloat16>>()
+    getConvFpropToleranceTestCases<TypeTriple<bfloat16, bfloat16, bfloat16>>()
 {
     return {{-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
             {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
@@ -945,7 +945,7 @@ protected:
             auto tol = calculateConvFpropTolerance<Out, In, Comp>(
                 params.inputMin, params.inputMax, params.wMin, params.wMax, params.wDims);
 
-            auto expected = hipdnn_data_sdk::utilities::staticCast<Out>(params.expectedTolerance);
+            auto expected = static_cast<Out>(params.expectedTolerance);
 
             EXPECT_NEAR(tol, expected, 1e-5) << "Failed for dims size: " << params.wDims.size();
         }
@@ -975,7 +975,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::ValuesIn(getConvFpropToleranceTestCases<TypeTriple<float, double, float>>()));
 
 using TestCalculateConvFpropToleranceComputeFloatBfp16
-    = TestCalculateConvFpropTolerance<hip_bfloat16, float, float>;
+    = TestCalculateConvFpropTolerance<bfloat16, float, float>;
 TEST_P(TestCalculateConvFpropToleranceComputeFloatBfp16, VerifyTolerance)
 {
     this->verifyTolerance();
@@ -983,10 +983,10 @@ TEST_P(TestCalculateConvFpropToleranceComputeFloatBfp16, VerifyTolerance)
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     TestCalculateConvFpropToleranceComputeFloatBfp16,
-    ::testing::ValuesIn(getConvFpropToleranceTestCases<TypeTriple<hip_bfloat16, float, float>>()));
+    ::testing::ValuesIn(getConvFpropToleranceTestCases<TypeTriple<bfloat16, float, float>>()));
 
 using TestCalculateConvFpropToleranceBfp16
-    = TestCalculateConvFpropTolerance<hip_bfloat16, hip_bfloat16, hip_bfloat16>;
+    = TestCalculateConvFpropTolerance<bfloat16, bfloat16, bfloat16>;
 TEST_P(TestCalculateConvFpropToleranceBfp16, VerifyTolerance)
 {
     this->verifyTolerance();
@@ -995,7 +995,7 @@ INSTANTIATE_TEST_SUITE_P(
     Smoke,
     TestCalculateConvFpropToleranceBfp16,
     ::testing::ValuesIn(
-        getConvFpropToleranceTestCases<TypeTriple<hip_bfloat16, hip_bfloat16, hip_bfloat16>>()));
+        getConvFpropToleranceTestCases<TypeTriple<bfloat16, bfloat16, bfloat16>>()));
 
 using TestCalculateConvFpropToleranceComputeFloatFp16
     = TestCalculateConvFpropTolerance<half, float, float>;
@@ -1044,7 +1044,7 @@ TEST(TestCalculateConvFpropTolerance, DetectsFailure)
     EXPECT_GT(tol, 0.09_h);
 
     auto validator = hipdnn_test_sdk::utilities::createAllCloseValidator(
-        hipdnn_data_sdk::data_objects::DataType::FLOAT, tol, 0);
+        hipdnn_data_sdk::data_objects::DataType::FLOAT, static_cast<float>(tol), 0.0f);
 
     bool valid = validator->allClose(*baseline, *actualPassing);
     EXPECT_TRUE(valid) << "Validator should have passed";
