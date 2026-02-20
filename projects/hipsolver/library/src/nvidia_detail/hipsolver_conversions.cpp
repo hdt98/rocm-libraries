@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -80,6 +80,32 @@ hipsolverFillMode_t cuda2hip_fill(cublasFillMode_t fill)
         return HIPSOLVER_FILL_MODE_UPPER;
     case CUBLAS_FILL_MODE_LOWER:
         return HIPSOLVER_FILL_MODE_LOWER;
+    default:
+        throw HIPSOLVER_STATUS_INVALID_ENUM;
+    }
+}
+
+cublasDiagType_t hip2cuda_diag(hipsolverDiagType_t diag)
+{
+    switch(diag)
+    {
+    case HIPSOLVER_DIAG_NON_UNIT:
+        return CUBLAS_DIAG_NON_UNIT;
+    case HIPSOLVER_DIAG_UNIT:
+        return CUBLAS_DIAG_UNIT;
+    default:
+        throw HIPSOLVER_STATUS_INVALID_ENUM;
+    }
+}
+
+hipsolverDiagType_t cuda2hip_diag(cublasDiagType_t diag)
+{
+    switch(diag)
+    {
+    case CUBLAS_DIAG_NON_UNIT:
+        return HIPSOLVER_DIAG_NON_UNIT;
+    case CUBLAS_DIAG_UNIT:
+        return HIPSOLVER_DIAG_UNIT;
     default:
         throw HIPSOLVER_STATUS_INVALID_ENUM;
     }

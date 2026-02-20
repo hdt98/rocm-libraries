@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -80,6 +80,32 @@ hipsolverFillMode_t rocblas2hip_fill(rocblas_fill_ fill)
         return HIPSOLVER_FILL_MODE_UPPER;
     case rocblas_fill_lower:
         return HIPSOLVER_FILL_MODE_LOWER;
+    default:
+        throw HIPSOLVER_STATUS_INVALID_ENUM;
+    }
+}
+
+rocblas_diagonal_ hip2rocblas_diag(hipsolverDiagType_t diag)
+{
+    switch(diag)
+    {
+    case HIPSOLVER_DIAG_NON_UNIT:
+        return rocblas_diagonal_non_unit;
+    case HIPSOLVER_DIAG_UNIT:
+        return rocblas_diagonal_unit;
+    default:
+        throw HIPSOLVER_STATUS_INVALID_ENUM;
+    }
+}
+
+hipsolverDiagType_t rocblas2hip_diag(rocblas_diagonal_ diag)
+{
+    switch(diag)
+    {
+    case rocblas_diagonal_non_unit:
+        return HIPSOLVER_DIAG_NON_UNIT;
+    case rocblas_diagonal_unit:
+        return HIPSOLVER_DIAG_UNIT;
     default:
         throw HIPSOLVER_STATUS_INVALID_ENUM;
     }
