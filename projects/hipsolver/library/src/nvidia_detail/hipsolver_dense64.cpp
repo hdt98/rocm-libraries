@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -378,6 +378,71 @@ try
                                                        B,
                                                        ldb,
                                                        info));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+/******************** TRTRI ********************/
+hipsolverStatus_t hipsolverDnXtrtri_bufferSize(hipsolverDnHandle_t handle,
+                                               hipsolverFillMode_t uplo,
+                                               hipsolverDiagType_t diag,
+                                               int64_t             n,
+                                               hipDataType         dataTypeA,
+                                               const void*         A,
+                                               int64_t             lda,
+                                               size_t*             lworkOnDevice,
+                                               size_t*             lworkOnHost)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    return hipsolver::cuda2hip_status(cusolverDnXtrtri_bufferSize((cusolverDnHandle_t)handle,
+                                                                  hipsolver::hip2cuda_fill(uplo),
+                                                                  hipsolver::hip2cuda_diag(diag),
+                                                                  n,
+                                                                  dataTypeA,
+                                                                  A,
+                                                                  lda,
+                                                                  lworkOnDevice,
+                                                                  lworkOnHost));
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDnXtrtri(hipsolverDnHandle_t handle,
+                                    hipsolverFillMode_t uplo,
+                                    hipsolverDiagType_t diag,
+                                    int64_t             n,
+                                    hipDataType         dataTypeA,
+                                    void*               A,
+                                    int64_t             lda,
+                                    void*               workOnDevice,
+                                    size_t              lworkOnDevice,
+                                    void*               workOnHost,
+                                    size_t              lworkOnHost,
+                                    int*                devInfo)
+try
+{
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    return hipsolver::cuda2hip_status(cusolverDnXtrtri((cusolverDnHandle_t)handle,
+                                                       hipsolver::hip2cuda_fill(uplo),
+                                                       hipsolver::hip2cuda_diag(diag),
+                                                       n,
+                                                       dataTypeA,
+                                                       A,
+                                                       lda,
+                                                       workOnDevice,
+                                                       lworkOnDevice,
+                                                       workOnHost,
+                                                       lworkOnHost,
+                                                       devInfo));
 }
 catch(...)
 {
