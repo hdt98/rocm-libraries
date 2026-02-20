@@ -71,7 +71,7 @@ protected:
         auto yAttr = graphObj.conv_fprop(xTensorAttr, wTensorAttr, convAttrs);
 
         yAttr->set_output(true);
-        this->registerValidator(yAttr, tolerance);
+        this->registerValidator(yAttr, static_cast<float>(tolerance));
 
         this->verifyGraph(graphObj, testCase.seed);
     }
