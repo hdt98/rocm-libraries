@@ -345,15 +345,6 @@ struct tensile_params_t {
   /// Local split-K factor
   int local_split_u = 1;
 
-  /// Global read vector width for matrix A
-  std::size_t grvw_a = 1;
-
-  /// Global read vector width for matrix B
-  std::size_t grvw_b = 1;
-
-  /// Global write vector width for matrix D
-  std::size_t gwvw_d = 1;
-
   /// DirectToVGPR flags - bypass LDS for register file
   bool direct_to_vgpr_a = false;
   bool direct_to_vgpr_b = false;
@@ -365,10 +356,6 @@ struct tensile_params_t {
   /// Number of loads that can be coalesced
   int num_loads_coalesced_a = 1;
   int num_loads_coalesced_b = 1;
-
-  /// Vector width for matrix operands
-  int vector_width_a = 1;
-  int vector_width_b = 1;
 
   /// Number of waves per workgroup
   std::size_t wave_num = 4;
@@ -444,6 +431,21 @@ struct config_t {
   /// CMS kernel flag
   bool cms_kernel = false;
 
+  /// Global read vector width for matrix A (elements per load, default=128-bit)
+  std::size_t grvw_a = 1;
+
+  /// Global read vector width for matrix B (elements per load, default=128-bit)
+  std::size_t grvw_b = 1;
+
+  /// Global write vector width for matrix D (elements per store, default=128-bit)
+  std::size_t gwvw_d = 1;
+
+  /// LDS load vector width for matrix A
+  int vector_width_a = 1;
+
+  /// LDS load vector width for matrix B
+  int vector_width_b = 1;
+
   /// Backend-specific parameters (type should match target).
   /// Use tensile() accessor to get/set Tensile-specific params.
   backend_params_t backend{};
@@ -487,6 +489,9 @@ struct config_t {
            std::hash<int>()(cache_hints_b) ^ std::hash<int>()(workgroup_mapping) ^
            std::hash<std::uint32_t>()(static_cast<std::uint32_t>(prediction_mode)) ^
            std::hash<std::uint32_t>()(static_cast<std::uint32_t>(target)) ^
+           std::hash<std::size_t>()(grvw_a) ^ std::hash<std::size_t>()(grvw_b) ^
+           std::hash<std::size_t>()(gwvw_d) ^ std::hash<int>()(vector_width_a) ^
+           std::hash<int>()(vector_width_b) ^
            backend_hash;
   }
 

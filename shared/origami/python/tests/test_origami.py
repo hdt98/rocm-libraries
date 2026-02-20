@@ -345,14 +345,18 @@ def test_config_has_formocast_fields():
     # Get tensile params (initializes if not set)
     tensile = config.tensile()
     
+    # Check vectorization fields on config (generic, not Tensile-specific)
+    assert hasattr(config, 'grvw_a')
+    assert hasattr(config, 'grvw_b')
+    assert hasattr(config, 'gwvw_d')
+    assert hasattr(config, 'vector_width_a')
+    assert hasattr(config, 'vector_width_b')
+    
     # Check Tensile-specific fields
     assert hasattr(tensile, 'depth_u')
     assert hasattr(tensile, 'global_split_u')
     assert hasattr(tensile, 'global_accumulation')
     assert hasattr(tensile, 'local_split_u')
-    assert hasattr(tensile, 'grvw_a')
-    assert hasattr(tensile, 'grvw_b')
-    assert hasattr(tensile, 'gwvw_d')
     assert hasattr(tensile, 'direct_to_vgpr_a')
     assert hasattr(tensile, 'direct_to_vgpr_b')
     assert hasattr(tensile, 'wave_num')
@@ -405,9 +409,9 @@ def test_simulation_mode_returns_valid_latency():
     # Set Formocast-specific parameters (via tensile nested struct)
     config.tensile().depth_u = 32
     config.tensile().global_split_u = 1
-    config.tensile().grvw_a = 4
-    config.tensile().grvw_b = 4
-    config.tensile().gwvw_d = 4
+    config.grvw_a = 4
+    config.grvw_b = 4
+    config.gwvw_d = 4
     config.tensile().wave_num = 4
     config.tensile().wave_group_m = 2
     config.tensile().wave_group_n = 2
@@ -466,9 +470,9 @@ def test_simulation_mode_via_compute_total_latency():
     config_simulation.prediction_mode = origami.prediction_modes_t.simulation
     config_simulation.tensile().depth_u = 32
     config_simulation.tensile().global_split_u = 1
-    config_simulation.tensile().grvw_a = 4
-    config_simulation.tensile().grvw_b = 4
-    config_simulation.tensile().gwvw_d = 4
+    config_simulation.grvw_a = 4
+    config_simulation.grvw_b = 4
+    config_simulation.gwvw_d = 4
     config_simulation.tensile().wave_num = 4
     config_simulation.tensile().wave_group_m = 2
     config_simulation.tensile().wave_group_n = 2
@@ -524,9 +528,9 @@ def test_simulation_mode_various_problem_sizes(m, n, k):
     config.prediction_mode = origami.prediction_modes_t.simulation
     config.tensile().depth_u = 32
     config.tensile().global_split_u = 1
-    config.tensile().grvw_a = 4
-    config.tensile().grvw_b = 4
-    config.tensile().gwvw_d = 4
+    config.grvw_a = 4
+    config.grvw_b = 4
+    config.gwvw_d = 4
     config.tensile().wave_num = 4
     config.tensile().wave_group_m = 2
     config.tensile().wave_group_n = 2

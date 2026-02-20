@@ -559,8 +559,16 @@ double compute_l2_hit_rate_global(const problem_t& problem,
 
 inline size_t round_up_mul(size_t x, size_t m) { return (x + m - 1) / m * m; }
 
+size_t round_elements_to_vw(size_t elements, size_t element_size_bits, size_t vector_width) {
+  if (vector_width == 0) { vector_width = 1; }
+  const size_t transaction_bits = vector_width * element_size_bits;
+  const size_t g                = std::gcd(element_size_bits, transaction_bits);
+  const size_t E_block          = transaction_bits / g;  // elements per vector-aligned chunk
+  return round_up_mul(elements, E_block);
+}
+
 size_t round_elements_to_128B(size_t elements, size_t element_size_bits) {
-  const size_t transaction_bits = 128u * 8u;  // 1024
+  const size_t transaction_bits = 128u * 8u;  // 1024 bits = 128 bytes
   const size_t g                = std::gcd(element_size_bits, transaction_bits);
   const size_t E_block          = transaction_bits / g;  // elements per 128B-aligned chunk
   return round_up_mul(elements, E_block);
@@ -610,10 +618,11 @@ double compute_memory_latency(const problem_t& problem,
           : 0.0;  // MALL is not supported, so we emulate every read as a miss
 
   // 3) Total loads are loads from A and loads from B
-  size_t Ld_A_value = a_trans ? MT_M * round_elements_to_128B(MT_K, a_bits)
-                              : round_elements_to_128B(MT_M, a_bits) * MT_K;
-  size_t Ld_B_value = b_trans ? round_elements_to_128B(MT_N, b_bits) * MT_K
-                              : MT_N * round_elements_to_128B(MT_K, b_bits);
+  // Use configured vector widths (grvw_a/grvw_b) for load alignment calculations
+  size_t Ld_A_value = a_trans ? MT_M * round_elements_to_vw(MT_K, a_bits, config.grvw_a)
+                              : round_elements_to_vw(MT_M, a_bits, config.grvw_a) * MT_K;
+  size_t Ld_B_value = b_trans ? round_elements_to_vw(MT_N, b_bits, config.grvw_b) * MT_K
+                              : MT_N * round_elements_to_vw(MT_K, b_bits, config.grvw_b);
   auto Ld_CU_bytes  = (Ld_A_value * a_bytes)    // A Bytes
                      + (Ld_B_value * b_bytes);  // B Bytes
 
@@ -774,16 +783,17 @@ double compute_tile_latency(const problem_t& problem,
   L_prologue *= occupancy_factor;
 
   // 3-2) Epilogue: writes from all active CUs with limited bandwidth
-  double mem_bw_occ            = compute_mem_bw_from_occupancy(hardware, num_active_cus);
-  double mem_bw_occ_limited    = hardware.mem3_perf_ratio * mem_bw_occ;
-  size_t MT_M_rounded_128bytes = round_elements_to_128B(MT_M, datatype_to_bits(problem.a_dtype));
+  double mem_bw_occ         = compute_mem_bw_from_occupancy(hardware, num_active_cus);
+  double mem_bw_occ_limited = hardware.mem3_perf_ratio * mem_bw_occ;
+  // Use gwvw_d for output matrix store alignment
+  size_t MT_M_rounded = round_elements_to_vw(MT_M, datatype_to_bits(problem.d_dtype), config.gwvw_d);
 
   // Each block can be independently calculated and reordered
   epilogue_components_t epilogue_comp = {};
 
   // Block 1: Initial memory write latency
   epilogue_comp.initial_memory_write = (static_cast<double>(num_active_cus / splitting_factor) *
-                                        MT_M_rounded_128bytes * MT_N * d_bytes) /
+                                        MT_M_rounded * MT_N * d_bytes) /
                                        mem_bw_occ_limited;
 
   // Block 2: One compute iteration in the epilogue
@@ -809,11 +819,11 @@ double compute_tile_latency(const problem_t& problem,
 
     // Only the reduction CU reads from all splits.
     double partial_read_bytes =
-        grid_m * grid_n * n_partials * MT_M_rounded_128bytes * MT_N * static_cast<double>(d_bytes);
+        grid_m * grid_n * n_partials * MT_M_rounded * MT_N * static_cast<double>(d_bytes);
 
     // All CUs write (once for each partial, and once by the reduction CU for the output.)
     double partial_write_bytes =
-        grid_m * grid_n * MT_M_rounded_128bytes * MT_N * static_cast<double>(d_bytes);
+        grid_m * grid_n * MT_M_rounded * MT_N * static_cast<double>(d_bytes);
 
     double partial_readwrite_bytes = partial_read_bytes + partial_write_bytes;
 
@@ -1045,10 +1055,10 @@ static double compute_formocast_latency(const problem_t& problem,
   size_mapping.globalAccumulation = config.tensile().global_accumulation;
   size_mapping.LocalSplitU = config.tensile().local_split_u;
 
-  size_mapping.grvwA = config.tensile().grvw_a;
-  size_mapping.grvwB = config.tensile().grvw_b;
-  size_mapping.gwvwD = config.tensile().gwvw_d;
-  size_mapping.gwvwC = config.tensile().gwvw_d;  // Typically same as D
+  size_mapping.grvwA = config.grvw_a;
+  size_mapping.grvwB = config.grvw_b;
+  size_mapping.gwvwD = config.gwvw_d;
+  size_mapping.gwvwC = config.gwvw_d;  // Typically same as D
 
   size_mapping.DirectToVgprA = config.tensile().direct_to_vgpr_a;
   size_mapping.DirectToVgprB = config.tensile().direct_to_vgpr_b;
@@ -1057,8 +1067,8 @@ static double compute_formocast_latency(const problem_t& problem,
 
   size_mapping.NumLoadsCoalescedA = config.tensile().num_loads_coalesced_a;
   size_mapping.NumLoadsCoalescedB = config.tensile().num_loads_coalesced_b;
-  size_mapping.VectorWidthA = config.tensile().vector_width_a;
-  size_mapping.VectorWidthB = config.tensile().vector_width_b;
+  size_mapping.VectorWidthA = config.vector_width_a;
+  size_mapping.VectorWidthB = config.vector_width_b;
 
   size_mapping.waveNum = config.tensile().wave_num;
   size_mapping.waveGroup[0] = config.tensile().wave_group_m;
