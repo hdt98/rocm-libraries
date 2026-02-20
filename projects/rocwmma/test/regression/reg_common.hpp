@@ -81,16 +81,19 @@
 // ============================================================================
 
 // Get ROCM installation path from environment or use default
-static inline std::string getRocmPath()
+static inline std::string getRocwmmaIncludePath()
 {
+    const char* rocwmmaPath = std::getenv("ROCWMMA_INCLUDE_PATH");
+    if (rocwmmaPath)
+        return std::string(rocwmmaPath);
     const char* rocmPath = std::getenv("ROCM_PATH");
-    return rocmPath ? std::string(rocmPath) : "/opt/rocm";
+    return rocmPath ? std::string(rocmPath) + "/include" : "/opt/rocm/include";
 }
 
 // Build standard compilation options for HIP RTC
 static inline std::vector<const char*> buildCompileOptions()
 {
-    static std::string rocmIncludePath = "-I" + getRocmPath() + "/include";
+    static std::string rocmIncludePath = "-I" + getRocwmmaIncludePath();
 
     std::vector<const char*> options;
     options.push_back("-D__HIP_PLATFORM_AMD__");
