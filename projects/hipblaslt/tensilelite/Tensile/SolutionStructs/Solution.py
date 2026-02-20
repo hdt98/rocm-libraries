@@ -2644,8 +2644,9 @@ class Solution(collections.abc.Mapping):
         state["StaggerUStride"] = 0
         # need to disable SuppressNoLoadLoop
         state["SuppressNoLoadLoop"] = False
-        # disable UseCustomMainLoopSchedule
-        state["UseCustomMainLoopSchedule"] = 0
+        if state["UseCustomMainLoopSchedule"] == 1:
+          reject(state, printRejectionReason, "UseCustomMainLoopSchedule=1 is incompatible with TailloopInNll=True")
+          return
         state["InternalSupportParams"]["SupportCustomStaggerU"] = False # Disable CustomStaggerU for TailloopInNll
 
     # Determine if we can load directly-to-Vgpr
