@@ -104,8 +104,8 @@ bool SampleRunner::operator()(const TensorLayout& layout)
             xTensor, wTensor, yRefTensor, {u, v}, {dilH, dilW}, {padH, padW});
 
         // Use dynamic tolerance calculation instead of static tolerance
-        auto tolerance
-            = hipdnn_test_sdk::utilities::conv::calculateConvFpropTolerance<InputType, float>(
+        auto tolerance = hipdnn_test_sdk::utilities::conv::
+            calculateConvFpropTolerance<InputType, InputType, float>(
                 0.0, 1.0, 0.0, 1.0, wAttr->get_dim());
 
         auto yValidator
