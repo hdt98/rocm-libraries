@@ -560,8 +560,12 @@ double compute_l2_hit_rate_global(const problem_t& problem,
 inline size_t round_up_mul(size_t x, size_t m) { return (x + m - 1) / m * m; }
 
 size_t round_elements_to_vw(size_t elements, size_t element_size_bits, size_t vector_width) {
-  if (vector_width == 0) { vector_width = 1; }
-  const size_t transaction_bits = vector_width * element_size_bits;
+  // Default (0 or 1) means use 128-bit transactions for backward compatibility
+  constexpr size_t default_transaction_bits = 128u * 8u;  // 1024 bits = 128 bytes
+  const size_t effective_vw = (vector_width <= 1)
+                                  ? (default_transaction_bits / element_size_bits)
+                                  : vector_width;
+  const size_t transaction_bits = effective_vw * element_size_bits;
   const size_t g                = std::gcd(element_size_bits, transaction_bits);
   const size_t E_block          = transaction_bits / g;  // elements per vector-aligned chunk
   return round_up_mul(elements, E_block);

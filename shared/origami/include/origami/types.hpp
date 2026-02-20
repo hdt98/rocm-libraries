@@ -380,7 +380,22 @@ struct tensile_params_t {
   bool global_split_u_coalesced = false;
   bool global_split_u_wgm_round_robin = false;
 
-  constexpr bool operator==(const tensile_params_t& o) const noexcept = default;
+  constexpr bool operator==(const tensile_params_t& o) const noexcept {
+    return depth_u == o.depth_u && global_split_u == o.global_split_u &&
+           global_accumulation == o.global_accumulation && local_split_u == o.local_split_u &&
+           direct_to_vgpr_a == o.direct_to_vgpr_a && direct_to_vgpr_b == o.direct_to_vgpr_b &&
+           direct_to_lds_a == o.direct_to_lds_a && direct_to_lds_b == o.direct_to_lds_b &&
+           num_loads_coalesced_a == o.num_loads_coalesced_a &&
+           num_loads_coalesced_b == o.num_loads_coalesced_b && wave_num == o.wave_num &&
+           wave_group_m == o.wave_group_m && wave_group_n == o.wave_group_n &&
+           prefetch_global_read == o.prefetch_global_read &&
+           math_clocks_unrolled_loop == o.math_clocks_unrolled_loop &&
+           swizzle_a == o.swizzle_a && swizzle_b == o.swizzle_b &&
+           workgroup_mapping_xcc == o.workgroup_mapping_xcc &&
+           workgroup_mapping_xcc_group == o.workgroup_mapping_xcc_group &&
+           global_split_u_coalesced == o.global_split_u_coalesced &&
+           global_split_u_wgm_round_robin == o.global_split_u_wgm_round_robin;
+  }
 };
 
 /// Variant holding backend-specific parameters.
