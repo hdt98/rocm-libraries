@@ -50,6 +50,8 @@ def runTestCommand (platform, project)
                 set -x
                 cd ${project.paths.project_build_prefix}
                 cd ${project.testDirectory}
+                export ROCM_PATH=$(readlink -f ${project.testDirectory}/../)
+                export ROCWMMA_INCLUDE_PATH=$(readlink -f ${project.testDirectory}/../)
                 ${testCommand} ${testCommandExclude}
             """
 
