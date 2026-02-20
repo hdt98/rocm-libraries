@@ -85,7 +85,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
     }
 
     // reduce squared entries to find squared norm of x
-    // this can be a single builtin wave reduce add
     norm2 += shift_left(norm2, 1);
     norm2 += shift_left(norm2, 2);
     norm2 += shift_left(norm2, 4);
@@ -103,7 +102,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
         sval[0] = -0.5 * pTau[0] * norm2;
     }
     __syncthreads();
-    auto w_buffer  = __builtin_amdgcn_make_buffer_rsrc(pW, 0,0xffffffff,0x00020000);
+    auto w_buffer  = __builtin_amdgcn_make_buffer_rsrc(pW, 0,0xffffffff,0);
     // axpy
     //TODO, excessive traffic to global memory, can we keep W in registers/shared memory?
     //make last write to W l2 passthrough
@@ -119,17 +118,17 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
         int out_addr = i * sizeof(T);
 
         if constexpr(sizeof(T) == 1)
-            __builtin_amdgcn_raw_buffer_store_b8(result, w_buffer, out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b8(result, w_buffer, out_addr, 0, 0x10);
         else if constexpr(sizeof(T) == 2)
-            __builtin_amdgcn_raw_buffer_store_b16(result, w_buffer, out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b16(result, w_buffer, out_addr, 0, 0x10);
         else if constexpr(sizeof(T) == 4)
-            __builtin_amdgcn_raw_buffer_store_b32(result, w_buffer, out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b32(result, w_buffer, out_addr, 0, 0x10);
         else if constexpr(sizeof(T) == 8)
         {
             using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
             uint32x2_t tmp;
             memcpy(&tmp, &result, sizeof(T));
-            __builtin_amdgcn_raw_buffer_store_b64(tmp, w_buffer, out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b64(tmp, w_buffer, out_addr, 0, 0x10);
         }
     }
 }
@@ -597,28 +596,28 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
                                                  const rocblas_int shiftA,
                                                  const rocblas_int lda,
                                                  const rocblas_stride strideA,
-                                                 T* WA,
+                                                 T* pWA,
                                                  const rocblas_int shiftW,
                                                  const rocblas_int ldw,
                                                  const rocblas_stride strideW)
 {
-    int bid = hipBlockIdx_z;
-    int bidr = hipBlockIdx_x;
-    int bidc = hipBlockIdx_y;
-    int tidr = hipThreadIdx_x;
-    int tidc = hipThreadIdx_y;
-    int threadsr = hipBlockDim_x;
-    int threadsc = hipBlockDim_y;
-    int groupsr = hipGridDim_x;
-    int groupsc = hipGridDim_y;
+    int bid       = hipBlockIdx_z;
+    int bidr      = hipBlockIdx_x;
+    int bidc      = hipBlockIdx_y;
+    int tidr      = hipThreadIdx_x;
+    int tidc      = hipThreadIdx_y;
+    int threadsr  = hipBlockDim_x;
+    int threadsc  = hipBlockDim_y;
+    int groupsr   = hipGridDim_x;
+    int groupsc   = hipGridDim_y;
     int totalthsr = groupsr * threadsr;
     int totalthsc = groupsc * threadsc;
-    int idc = bidc * threadsc + tidc;
-    int idr = bidr * threadsr + tidr;
+    int idc       = bidc * threadsc + tidc;
+    int idr       = bidr * threadsr + tidr;
 
     // select batch instance
-    T* A = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* W = load_ptr_batch<T>(WA, bid, shiftW, strideW);
+    T* pA = load_ptr_batch<T>(AA, bid, shiftA, strideA);
+    T* pW = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
 
     /* ------------------------
     formulate gemv problem:
@@ -637,14 +636,14 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
     int n = mm - c - 1;
     int m = c + 1;
     int cw = c - mm + k;
-    T* y = A + idx2D(0, c, lda);
-    T* A1 = A + idx2D(0, c + 1, lda);
+    T* pY = pA + idx2D(0, c, lda);
+    T* pA1 = pA + idx2D(0, c + 1, lda);
     int lda1 = lda;
-    T* A2 = W + idx2D(0, cw + 1, ldw);
+    T* pA2 = pW + idx2D(0, cw + 1, ldw);
     int lda2 = ldw;
-    T* x1 = W + idx2D(c, cw + 1, ldw);
+    T* pX1 = pW + idx2D(c, cw + 1, ldw);
     int incx1 = ldw;
-    T* x2 = A + idx2D(c, c + 1, lda);
+    T* pX2 = pA + idx2D(c, c + 1, lda);
     int incx2 = lda;
 
     // rpgr and rpgc are the number of rounds a group should run
@@ -655,11 +654,19 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
     int rpgc = (ngrp - 1) / groupsc + 1;
     int i, j;
 
+
+    //TODO: bounds should be sized correctly instead of set to max
+    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0);
+    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0);
+    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0);
+    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0);
+    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0);
+
     // Registers/LDS:
     // ac, acs -> accumulator
     // sx -> hold the elements of 'x'
     extern __shared__ double smem[]; //min size should be threadsr x threadsc
-    T* acs = reinterpret_cast<T*>(smem);
+    T* pAcs_smem = reinterpret_cast<T*>(smem);
     T ac;
     T sx1, sx2;
 
@@ -668,20 +675,80 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
         i = ii * totalthsr + idr;
 
         // read y
-        ac = (idc == 0 && i < m) ? y[i] : 0;
+        const auto Y_ld_addr = (idc == 0 && i < m) ? i * sizeof(T) : 0xffffffff;
+        if constexpr(sizeof(T) == 1)
+            ac =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
+        else if constexpr(sizeof(T) == 2)
+            ac =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
+        else if constexpr(sizeof(T) == 4)
+            ac = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
+        else if constexpr(sizeof(T) == 8)
+        {
+            const auto tmp =  __builtin_amdgcn_raw_buffer_load_b64(Y_buffer, Y_ld_addr, 0, 0);
+            memcpy(&ac, &tmp, sizeof(T));
+        }
 
         for(int jj = 0; jj < rpgc; ++jj)
         {
             // read x
             j = jj * totalthsc + idc;
-            sx1 = (j < n) ? conj(x1[j * incx1]) : 0;
-            sx2 = (j < n) ? conj(x2[j * incx2]) : 0;
 
-            // operation for all rows
-            if(i < m && j < n)
-                ac -= A1[i + j * lda1] * sx1 + A2[i + j * lda2] * sx2;
+            const auto x_addr = (j < n) ? j * sizeof(T) : 0xffffffff;
+            if constexpr(sizeof(T) == 1)
+            {
+                sx1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
+                sx2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
+            }
+            else if constexpr(sizeof(T) == 2)
+            {
+                sx1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
+                sx2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
+            }
+            else if constexpr(sizeof(T) == 4)
+            {
+                sx1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
+                sx2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
+            }
+            else if constexpr(sizeof(T) == 8)
+            {
+                const auto tmp1 = __builtin_amdgcn_raw_buffer_load_b64(X1_buffer, x_addr, 0, 0);
+                const auto tmp2 = __builtin_amdgcn_raw_buffer_load_b64(X2_buffer, x_addr, 0, 0);
+                memcpy(&sx1, &tmp1, sizeof(T));
+                memcpy(&sx2, &tmp2, sizeof(T));
+            }
+
+            sx1 = conj(sx1);
+            sx2 = conj(sx2);
+
+            const auto A1_addr = (i < m && j < n) ? (i + j * lda1) * sizeof(T) : 0xffffffff;
+            const auto A2_addr = (i < m && j < n) ? (i + j * lda2) * sizeof(T) : 0xffffffff;
+            T a1_val, a2_val = 0;
+            if constexpr(sizeof(T) == 1)
+            {
+                a1_val = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
+                a2_val = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
+            }
+            else if constexpr(sizeof(T) == 2)
+            {
+                a1_val = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
+                a2_val = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
+            }
+            else if constexpr(sizeof(T) == 4)
+            {
+                a1_val = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
+                a2_val = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
+            }
+            else if constexpr(sizeof(T) == 8)
+            {
+                const auto tmp1 = __builtin_amdgcn_raw_buffer_load_b64(A1_buffer, A1_addr, 0, 0);
+                const auto tmp2 = __builtin_amdgcn_raw_buffer_load_b64(A2_buffer, A2_addr, 0, 0);
+                memcpy(&a1_val, &tmp1, sizeof(T));
+                memcpy(&a2_val, &tmp2, sizeof(T));
+            }
+            ac -= a1_val * sx1 + a2_val * sx2;
+
         }
-        acs[tidr + tidc * threadsr] = ac;
+        pAcs_smem[tidr + tidc * threadsr] = ac;
         __syncthreads();
 
         // group reduction
@@ -689,15 +756,28 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(const rocblas_int mm,
         {
             if(tidc < r)
             {
-                ac += acs[tidr + (tidc + r) * threadsr];
-                acs[tidr + tidc * threadsr] = ac;
+                ac += pAcs_smem[tidr + (tidc + r) * threadsr];
+                pAcs_smem[tidr + tidc * threadsr] = ac;
             }
             __syncthreads();
         }
 
-        // write results
-        if(tidc == 0 && i < m)
-            y[i] = ac;
+// write groups results in temp array for further reduction
+        const auto result = ac;
+        const auto Y_out_addr = (i < m) ? (i * sizeof(T)) : 0xffffffff;
+        if constexpr(sizeof(T) == 1)
+            __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0, 0x10);
+        else if constexpr(sizeof(T) == 2)
+            __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0, 0x10);
+        else if constexpr(sizeof(T) == 4)
+            __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0, 0x10);
+        else if constexpr(sizeof(T) == 8)
+        {
+            using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
+            uint32x2_t tmp;
+            memcpy(&tmp, &result, sizeof(T));
+            __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0, 0x10);
+        }
     }
 }
 
@@ -1296,23 +1376,23 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const int         blocks
             }
         }
 
-        auto outBuff  = __builtin_amdgcn_make_buffer_rsrc(pYderived, 0,0xffffffff,0x00020000);
+        auto outBuff  = __builtin_amdgcn_make_buffer_rsrc(pYderived, 0,0xffffffff,0);
 
         if(tx == 0)
         {
 
             if constexpr(sizeof(T) == 1)
-                __builtin_amdgcn_raw_buffer_store_b8(res, outBuff, it, 0,0x0);
+                __builtin_amdgcn_raw_buffer_store_b8(res, outBuff, it, 0, 0x10);
             else if constexpr(sizeof(T) == 2)
-                __builtin_amdgcn_raw_buffer_store_b16(res, outBuff, it, 0,0x0);
+                __builtin_amdgcn_raw_buffer_store_b16(res, outBuff, it, 0, 0x10);
             else if constexpr(sizeof(T) == 4)
-                __builtin_amdgcn_raw_buffer_store_b32(res, outBuff, it, 0,0x0);
+                __builtin_amdgcn_raw_buffer_store_b32(res, outBuff, it, 0, 0x10);
             else if constexpr(sizeof(T) == 8)
             {
                 using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
                 uint32x2_t tmp;
                 memcpy(&tmp, &res, sizeof(T));
-                __builtin_amdgcn_raw_buffer_store_b64(tmp, outBuff, it, 0,0x0);
+                __builtin_amdgcn_raw_buffer_store_b64(tmp, outBuff, it, 0, 0x10);
             }
 
         }
@@ -1849,11 +1929,11 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
 
     //define buffer types
     //TODO: bounds should be sized correctly instead of set to max
-    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0x00020000);
-    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0x00020000);
-    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0x00020000);
-    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0x00020000);
-    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0x00020000);
+    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0);
+    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0);
+    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0);
+    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0);
+    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0);
 
     // Registers/LDS:
     // ac, acs -> accumulator
@@ -1870,20 +1950,11 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
         // read y
         const auto Y_ld_addr = (idc == 0 && i < m) ? i * sizeof(T) : 0xffffffff;
         if constexpr(sizeof(T) == 1)
-        {
-            uint8_t tmp1 =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
-            ac = *reinterpret_cast<T*>(&tmp1);
-        }
+            ac =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
         else if constexpr(sizeof(T) == 2)
-        {
-            uint16_t tmp1 =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
-            ac = *reinterpret_cast<T*>(&tmp1);
-        }
+            ac =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
         else if constexpr(sizeof(T) == 4)
-        {
-            uint32_t tmp1 = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
-            ac = *reinterpret_cast<T*>(&tmp1);
-        }
+            ac = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
         else if constexpr(sizeof(T) == 8)
         {
             const auto tmp =  __builtin_amdgcn_raw_buffer_load_b64(Y_buffer, Y_ld_addr,0,0);
@@ -1898,24 +1969,18 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
             const auto x_addr = (j < n) ? j * sizeof(T) : 0xffffffff;
             if constexpr(sizeof(T) == 1)
             {
-                uint8_t tmp1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
-                uint8_t tmp2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
-                sx1 = *reinterpret_cast<T*>(&tmp1);
-                sx2 = *reinterpret_cast<T*>(&tmp2);
+                sx1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
+                sx2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
             }
             else if constexpr(sizeof(T) == 2)
             {
-                uint16_t tmp1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
-                uint16_t tmp2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
-                sx1 = *reinterpret_cast<T*>(&tmp1);
-                sx2 = *reinterpret_cast<T*>(&tmp2);
+                sx1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
+                sx2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
             }
             else if constexpr(sizeof(T) == 4)
             {
-                uint32_t tmp1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
-                uint32_t tmp2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
-                sx1 = *reinterpret_cast<T*>(&tmp1);
-                sx2 = *reinterpret_cast<T*>(&tmp2);
+                sx1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
+                sx2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
             }
             else if constexpr(sizeof(T) == 8)
             {
@@ -1930,24 +1995,18 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
             T a1_val, a2_val = 0;
             if constexpr(sizeof(T) == 1)
             {
-                uint8_t tmp1 = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
-                uint8_t tmp2 = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
-                a1_val = *reinterpret_cast<T*>(&tmp1);
-                a2_val = *reinterpret_cast<T*>(&tmp2);
+                a1_val = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
+                a2_val = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
             }
             else if constexpr(sizeof(T) == 2)
             {
-                uint16_t tmp1 = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
-                uint16_t tmp2 = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
-                a1_val = *reinterpret_cast<T*>(&tmp1);
-                a2_val = *reinterpret_cast<T*>(&tmp2);
+                a1_val = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
+                a2_val = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
             }
             else if constexpr(sizeof(T) == 4)
             {
-                uint32_t tmp1 = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
-                uint32_t tmp2 = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
-                a1_val = *reinterpret_cast<T*>(&tmp1);
-                a2_val = *reinterpret_cast<T*>(&tmp2);
+                a1_val = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
+                a2_val = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
             }
             else if constexpr(sizeof(T) == 8)
             {
@@ -1976,17 +2035,17 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
         const auto result = ac * tauVal;
         const auto Y_out_addr = (i < m) ? (i * sizeof(T)) : 0xffffffff;
         if constexpr(sizeof(T) == 1)
-            __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0, 0x10);
         else if constexpr(sizeof(T) == 2)
-            __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0, 0x10);
         else if constexpr(sizeof(T) == 4)
-            __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0, 0x10);
         else if constexpr(sizeof(T) == 8)
         {
             using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
             uint32x2_t tmp;
             memcpy(&tmp, &result, sizeof(T));
-            __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0,0x0);
+            __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0, 0x10);
         }
     }
 }
@@ -2305,72 +2364,148 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         hipError_t err = hipGetDeviceProperties(&deviceProp, 0);
         assert(err == hipSuccess);
         cuCount = deviceProp.multiProcessorCount;
+        HIP_CHECK(hipStreamSynchronize(stream));
 
-        for(rocblas_int j = n - 1; j >= n - k; --j)
+        // Tunable parameter: number of loop iterations to capture per graph
+        // Adjust this value based on performance profiling for different problem sizes
+        constexpr rocblas_int GRAPH_BLOCK_SIZE = 8;
+
+        // Calculate total iterations and blocking parameters
+        const rocblas_int total_iters = k;  // columns to process: n-1 down to n-k
+        const rocblas_int num_full_blocks = total_iters / GRAPH_BLOCK_SIZE;
+        const rocblas_int remainder = total_iters % GRAPH_BLOCK_SIZE;
+
+        auto graphCreated = false;
+        auto graphExec = hipGraphExec_t{};
+        auto graphStream = hipStream_t{};
+        HIP_CHECK(hipStreamCreate(&graphStream));
+        rocblas_set_stream(handle, graphStream);
+        // Helper lambda to capture and process a block of iterations
+        auto captureBlock = [&](rocblas_int startCol, rocblas_int blockSize) {
+            auto graph = hipGraph_t{};
+            HIP_CHECK(hipStreamBeginCapture(graphStream, hipStreamCaptureModeGlobal));
+
+            // Process blockSize iterations within this graph capture
+            for(rocblas_int iter = 0; iter < blockSize; ++iter)
+            {
+                rocblas_int j = startCol - iter;
+                jw = j - n + k;
+
+                dim3 update_grid(grr_updates, grc_updates, batch_count);
+                dim3 update_threads(thr_updates, thc_updates, 1);
+
+                // update column j of A with reflector computed in step j-1
+                //----------------------------------------------------------
+                ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
+                                        update_grid,
+                                        update_threads,
+                                        lmemsize_updates,
+                                        graphStream,
+                                        n, k, j, A, shiftA,
+                                        lda, strideA, pW,
+                                        shiftW, ldw, strideW);
+                //-------------------------------------------------------------
+
+                // reduce column j of A with new reflector, then copy off-diagonal element
+                // to E(j) and set off-diagonal to 1
+                //-------------------------------------------------------------
+                rocsolver_larfg_template(handle,
+                                         j, A, shiftA + idx2D(j - 1, j, lda), pE, j - 1, strideE,
+                                         A, shiftA + idx2D(0, j, lda), 1, strideA, (pTau + j - 1),
+                                         strideP, batch_count, pWork, pNorms);
+
+                //--------------------------------------------------------------
+                // compute column j of W
+                //--------------------------------------------------------------
+                static constexpr int NB = 256;
+                const int blocksX = n + n - j - 1;
+                int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
+                int gridX = std::min(blocksX, maxBlocks);
+
+                dim3 gemvt_grid(gridX, 1, batch_count);
+                dim3 gemvt_threads(NB);
+                ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>),
+                                        gemvt_grid,
+                                        gemvt_threads,
+                                        0,
+                                        graphStream,
+                                        blocksX,
+                                        n, k, j, A, shiftA, lda, strideA, pW,
+                                        shiftW, ldw, strideW, pW, shiftW + idx2D(0, jw, ldw), ldw,
+                                        strideW, pWork, strideblk);
+
+                // update column j of W
+                //--------------------------------------------------------------
+                ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
+                                        update_grid,
+                                        update_threads,
+                                        lmemsize_updates,
+                                        graphStream,
+                                        n, k, j, A, shiftA, lda, strideA,
+                                        pW, shiftW, ldw, strideW, pWork,
+                                        strideblk, pTau, strideP);
+
+                ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>),
+                                        dim3(1, 1, batch_count),
+                                        dim3(1024, 1, 1),
+                                        0,
+                                        graphStream,
+                                        j, A, shiftA + idx2D(0, j, lda), strideA,
+                                        pW, shiftW + idx2D(0, jw, ldw), strideW,
+                                        pTau + j - 1, strideP);
+            }
+
+            HIP_CHECK(hipStreamEndCapture(graphStream, &graph));
+
+            if(!graphCreated)
+            {
+                HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
+                graphCreated = true;
+            }
+            else
+            {
+                auto result = hipGraphExecUpdateResult{};
+                auto errorNode = hipGraphNode_t{};
+                auto updateStatus = hipGraphExecUpdate(graphExec, graph, &errorNode, &result);
+
+                // If update fails (graph structure changed), recreate the executable graph
+                if(updateStatus != hipSuccess || result != hipGraphExecUpdateSuccess)
+                {
+                    // Wait for any pending work on the graph stream before destroying
+                    HIP_CHECK(hipStreamSynchronize(stream));
+                    HIP_CHECK(hipGraphExecDestroy(graphExec));
+                    HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
+                }
+            }
+
+            HIP_CHECK(hipGraphLaunch(graphExec, stream));
+            HIP_CHECK(hipGraphDestroy(graph));
+        };
+
+        // Starting column index
+        rocblas_int currentCol = n - 1;
+
+        // Process remainder first (if any) to handle cases where k is not divisible by GRAPH_BLOCK_SIZE
+        if(remainder > 0)
         {
-            jw = j - n + k;
-            dim3 update_grid(grr_updates, grc_updates, batch_count);
-            dim3 update_threads(thr_updates, thc_updates, 1);
-            // update column j of A with reflector computed in step j-1
-            //----------------------------------------------------------
-            ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
-                                    update_grid,
-                                    update_threads,
-                                    lmemsize_updates,
-                                    stream,
-                                    n, k, j, A, shiftA,
-                                    lda, strideA, pW,
-                                    shiftW, ldw, strideW);
-            //-------------------------------------------------------------
-
-            // // reduce column j of A with new reflector, then copy off-diagonal element
-            // // to E(j) and set off-diagonal to 1
-            // //-------------------------------------------------------------
-            rocsolver_larfg_template(handle,
-                                     j, A, shiftA + idx2D(j - 1, j, lda), pE, j - 1, strideE,
-                                     A, shiftA + idx2D(0, j, lda), 1, strideA, (pTau + j - 1),
-                                     strideP, batch_count, pWork, pNorms);
-
-            //--------------------------------------------------------------
-            // compute column j of W
-            //--------------------------------------------------------------
-            static constexpr int NB = 256;
-            const int blocksX = n + n - j - 1;
-            int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
-            int gridX = std::min(blocksX, maxBlocks);
-
-            dim3 gemvt_grid(gridX, 1, batch_count);
-            dim3 gemvt_threads(NB);
-            ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>),
-                                    gemvt_grid,
-                                    gemvt_threads,
-                                    0,
-                                    stream,
-                                    blocksX,
-                                    n, k, j, A, shiftA, lda, strideA, pW,
-                                    shiftW, ldw, strideW, pW, shiftW + idx2D(0, jw, ldw), ldw,
-                                    strideW, pWork, strideblk);
-
-            // update column j of W
-            //--------------------------------------------------------------
-            ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
-                                    update_grid,
-                                    update_threads,
-                                    lmemsize_updates,
-                                    stream,
-                                    n, k, j, A, shiftA, lda, strideA,
-                                    pW, shiftW, ldw, strideW, pWork,
-                                    strideblk, pTau, strideP);
-
-            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>),
-                                    dim3(1, 1, batch_count),
-                                    dim3(1024, 1, 1),
-                                    0,
-                                    stream,
-                                    j, A, shiftA + idx2D(0, j, lda), strideA,
-                                    pW, shiftW + idx2D(0, jw, ldw), strideW,
-                                    pTau + j - 1, strideP);
+            captureBlock(currentCol, remainder);
+            currentCol -= remainder;
         }
+
+        // Process full blocks
+        for(rocblas_int block = 0; block < num_full_blocks; ++block)
+        {
+            captureBlock(currentCol, GRAPH_BLOCK_SIZE);
+            currentCol -= GRAPH_BLOCK_SIZE;
+        }
+
+        HIP_CHECK(hipStreamSynchronize(stream));
+        if(graphCreated)
+        {
+            HIP_CHECK(hipGraphExecDestroy(graphExec));
+        }
+        rocblas_set_stream(handle, stream);
+        HIP_CHECK(hipStreamDestroy(graphStream));
     }
 
     roctxRangePop();
