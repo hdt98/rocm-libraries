@@ -1870,11 +1870,20 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
         // read y
         const auto Y_ld_addr = (idc == 0 && i < m) ? i * sizeof(T) : 0xffffffff;
         if constexpr(sizeof(T) == 1)
-            ac =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
+        {
+            uint8_t tmp1 =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
+            ac = *reinterpret_cast<T*>(&tmp1);
+        }
         else if constexpr(sizeof(T) == 2)
-            ac =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
+        {
+            uint16_t tmp1 =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
+            ac = *reinterpret_cast<T*>(&tmp1);
+        }
         else if constexpr(sizeof(T) == 4)
-            ac = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
+        {
+            uint32_t tmp1 = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
+            ac = *reinterpret_cast<T*>(&tmp1);
+        }
         else if constexpr(sizeof(T) == 8)
         {
             const auto tmp =  __builtin_amdgcn_raw_buffer_load_b64(Y_buffer, Y_ld_addr,0,0);
@@ -1889,18 +1898,24 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
             const auto x_addr = (j < n) ? j * sizeof(T) : 0xffffffff;
             if constexpr(sizeof(T) == 1)
             {
-                sx1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
-                sx2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
+                uint8_t tmp1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
+                uint8_t tmp2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
+                sx1 = *reinterpret_cast<T*>(&tmp1);
+                sx2 = *reinterpret_cast<T*>(&tmp2);
             }
             else if constexpr(sizeof(T) == 2)
             {
-                sx1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
-                sx2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
+                uint16_t tmp1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
+                uint16_t tmp2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
+                sx1 = *reinterpret_cast<T*>(&tmp1);
+                sx2 = *reinterpret_cast<T*>(&tmp2);
             }
             else if constexpr(sizeof(T) == 4)
             {
-                sx1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
-                sx2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
+                uint32_t tmp1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
+                uint32_t tmp2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
+                sx1 = *reinterpret_cast<T*>(&tmp1);
+                sx2 = *reinterpret_cast<T*>(&tmp2);
             }
             else if constexpr(sizeof(T) == 8)
             {
@@ -1915,18 +1930,24 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(const rocblas_int mm,
             T a1_val, a2_val = 0;
             if constexpr(sizeof(T) == 1)
             {
-                a1_val = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
-                a2_val = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
+                uint8_t tmp1 = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
+                uint8_t tmp2 = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
+                a1_val = *reinterpret_cast<T*>(&tmp1);
+                a2_val = *reinterpret_cast<T*>(&tmp2);
             }
             else if constexpr(sizeof(T) == 2)
             {
-                a1_val = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
-                a2_val = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
+                uint16_t tmp1 = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
+                uint16_t tmp2 = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
+                a1_val = *reinterpret_cast<T*>(&tmp1);
+                a2_val = *reinterpret_cast<T*>(&tmp2);
             }
             else if constexpr(sizeof(T) == 4)
             {
-                a1_val = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
-                a2_val = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
+                uint32_t tmp1 = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
+                uint32_t tmp2 = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
+                a1_val = *reinterpret_cast<T*>(&tmp1);
+                a2_val = *reinterpret_cast<T*>(&tmp2);
             }
             else if constexpr(sizeof(T) == 8)
             {
