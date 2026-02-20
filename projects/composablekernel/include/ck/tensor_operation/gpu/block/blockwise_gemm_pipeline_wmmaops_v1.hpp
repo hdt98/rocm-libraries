@@ -1295,7 +1295,7 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                                                                  ComputeTypeA,
                                                                  m0,
                                                                  k0>{
-                                        a_thread_vec, a_thread_buf, a_thread_desc_};
+                                        a_thread_vec, a_thread_buf};
 
                                     auto loadB =
                                         load_thread_vec<k_inner,
@@ -1311,8 +1311,7 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                                                         n0,
                                                         I0,
                                                         k0>{b_thread_vec,
-                                                            b_thread_bufs[wmma_reg_buf],
-                                                            b_thread_desc_};
+                                                            b_thread_bufs[wmma_reg_buf]};
 
                                     static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
                                     static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
