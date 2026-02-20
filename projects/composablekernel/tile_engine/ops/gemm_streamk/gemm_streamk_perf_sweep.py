@@ -566,10 +566,16 @@ def probe_kernels(
                 any_detail = next(iter(names))
                 detail_text = failure_map.get(any_detail, "")
                 if "Cannot find Symbol" in detail_text:
-                    print(f"    Cause: HIP runtime cannot find kernel symbol in the binary.")
-                    print(f"           This means the binary was NOT compiled for the running GPU.")
-                    print(f"           Check GPU arch vs binary targets (see diagnostic above).")
-                    print(f"           FIX: rebuild with correct -DGPU_TARGETS=<your_gpu_arch>")
+                    print(f"    Cause: HIP runtime cannot find the requested kernel symbol.")
+                    print(f"           Common causes:")
+                    print(f"             1) GPU arch mismatch (check diagnostic above)")
+                    print(f"             2) ROCm toolchain/runtime mismatch (compile with one")
+                    print(f"                ROCm install, but link/run with another)")
+                    print(f"             3) Unsupported template config emitted by generator")
+                    print(f"           FIX: rebuild with one consistent ROCm root and")
+                    print(f"                correct -DGPU_TARGETS=<your_gpu_arch>.")
+                    print(f"                Verify CMAKE_PREFIX_PATH, CMAKE_HIP_COMPILER,")
+                    print(f"                and runtime libamdhip64 come from same ROCm.")
                 else:
                     print(f"    Cause: kernel crashed ({signal_name}). "
                           f"This usually means the warp tile config")
