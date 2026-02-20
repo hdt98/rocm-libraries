@@ -1,3 +1,4 @@
+<<<<<<< users/mahesh-lak/refactor-lazysingleton
 /*******************************************************************************
  *
  * MIT License
@@ -24,6 +25,10 @@
  *
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
+=======
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+>>>>>>> develop
 
 #pragma once
 
