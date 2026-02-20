@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2024-2026 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 #ifndef HIPSOLVER_DENSE64_H
@@ -144,6 +144,30 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXpotrs(hipsolverDnHandle_t handle,
                                                      void*               B,
                                                      int64_t             ldb,
                                                      int*                info);
+
+// trtri
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXtrtri_bufferSize(hipsolverDnHandle_t handle,
+                                                                hipsolverFillMode_t uplo,
+                                                                hipsolverDiagType_t diag,
+                                                                int64_t             n,
+                                                                hipDataType         dataTypeA,
+                                                                const void*         A,
+                                                                int64_t             lda,
+                                                                size_t*             lworkOnDevice,
+                                                                size_t*             lworkOnHost);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXtrtri(hipsolverDnHandle_t handle,
+                                                     hipsolverFillMode_t uplo,
+                                                     hipsolverDiagType_t diag,
+                                                     int64_t             n,
+                                                     hipDataType         dataTypeA,
+                                                     void*               A,
+                                                     int64_t             lda,
+                                                     void*               workOnDevice,
+                                                     size_t              lworkOnDevice,
+                                                     void*               workOnHost,
+                                                     size_t              lworkOnHost,
+                                                     int*                devInfo);
 
 #ifdef __cplusplus
 }
