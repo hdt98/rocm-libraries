@@ -837,7 +837,23 @@ std::vector<ConvFpropToleranceTestCase>
              -1000.0,
              1000.0,
              {1, 10, 1, 1},
-             (20.0 * std::pow(2.0, -23)) / (1.0 - 20.0 * std::pow(2.0, -23)) * 1.0e7}};
+             (20.0 * std::pow(2.0, -23)) / (1.0 - 20.0 * std::pow(2.0, -23)) * 1.0e7},
+            // 3D Convolution (5D tensors): C=1, D=1, R=1, S=1. Accum = 1. Tol = 2 * 2^-23
+            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1, 1}, 2.0 * std::pow(2.0, -23)},
+            // 3D Convolution: C=2, D=2, R=2, S=2. Accum = 16. Tol = 2 * 16^2 * 2^-23 = 512 * 2^-23
+            {-1.0,
+             1.0,
+             -1.0,
+             1.0,
+             {1, 2, 2, 2, 2},
+             (32.0 * std::pow(2.0, -23)) / (1.0 - 32.0 * std::pow(2.0, -23)) * 16.0},
+            // 3D Convolution: C=3, D=3, R=3, S=3. Accum = 81. Tol = gamma * 81
+            {-1.0,
+             1.0,
+             -1.0,
+             1.0,
+             {1, 3, 3, 3, 3},
+             (162.0 * std::pow(2.0, -23)) / (1.0 - 162.0 * std::pow(2.0, -23)) * 81.0}};
 }
 
 // Float / Double / Float (Input casting error)
@@ -869,7 +885,14 @@ std::vector<ConvFpropToleranceTestCase>
          -1.0,
          1.0,
          {1, 10, 1, 1},
-         200.0 * std::pow(2.0, -23) + 10.0 * std::pow(2.0, -7)}};
+         200.0 * std::pow(2.0, -23) + 10.0 * std::pow(2.0, -7)},
+        // 3D Convolution: C=2, D=2, R=2, S=2. Accum = 16. Tol = 512 * 2^-23 + 16 * 2^-7
+        {-1.0,
+         1.0,
+         -1.0,
+         1.0,
+         {1, 2, 2, 2, 2},
+         512.0 * std::pow(2.0, -23) + 16.0 * std::pow(2.0, -7)}};
 }
 
 // HipBfloat16 / HipBfloat16 / HipBfloat16 (Lower Precision: Statistical)
@@ -877,14 +900,17 @@ template <>
 std::vector<ConvFpropToleranceTestCase>
     getConvFpropToleranceTestCases<TypeTriple<bfloat16, bfloat16, bfloat16>>()
 {
-    return {{-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
-            {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
-            // C=1, R=1, S=1. Accum = 1. Tol = 6 * 1 * sqrt(2) * 2^-7
-            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 0.06640625},
-            // C=2, R=1, S=1. Accum = 2. Tol = 6 * 2 * sqrt(4) * 2^-7 = 24 * 2^-7
-            {-1.0, 1.0, -1.0, 1.0, {1, 2, 1, 1}, 0.1875},
-            // C=10, R=1, S=1. Accum = 10. Tol = 6 * 10 * sqrt(20) * 2^-7
-            {-1.0, 1.0, -1.0, 1.0, {1, 10, 1, 1}, 2.09375}};
+    return {
+        {-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
+        {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
+        // C=1, R=1, S=1. Accum = 1. Tol = 6 * 1 * sqrt(2) * 2^-7
+        {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 0.06640625},
+        // C=2, R=1, S=1. Accum = 2. Tol = 6 * 2 * sqrt(4) * 2^-7 = 24 * 2^-7
+        {-1.0, 1.0, -1.0, 1.0, {1, 2, 1, 1}, 0.1875},
+        // C=10, R=1, S=1. Accum = 10. Tol = 6 * 10 * sqrt(20) * 2^-7
+        {-1.0, 1.0, -1.0, 1.0, {1, 10, 1, 1}, 2.09375},
+        // 3D Convolution: C=2, D=2, R=2, S=2. Accum = 16. Tol = 6 * 16 * sqrt(32) * 2^-7
+        {-1.0, 1.0, -1.0, 1.0, {1, 2, 2, 2, 2}, 6.0 * 16.0 * std::sqrt(32.0) * std::pow(2.0, -7)}};
 }
 
 // Half / Float / Float (High Precision Compute: Linear)
@@ -905,7 +931,14 @@ std::vector<ConvFpropToleranceTestCase>
          -1.0,
          1.0,
          {1, 10, 1, 1},
-         200.0 * std::pow(2.0, -23) + 10.0 * std::pow(2.0, -10)}};
+         200.0 * std::pow(2.0, -23) + 10.0 * std::pow(2.0, -10)},
+        // 3D Convolution: C=2, D=2, R=2, S=2. Accum = 16. Tol = 512 * 2^-23 + 16 * 2^-10
+        {-1.0,
+         1.0,
+         -1.0,
+         1.0,
+         {1, 2, 2, 2, 2},
+         512.0 * std::pow(2.0, -23) + 16.0 * std::pow(2.0, -10)}};
 }
 
 // Half / Half / Half (Lower Precision: Statistical)
@@ -913,14 +946,17 @@ template <>
 std::vector<ConvFpropToleranceTestCase>
     getConvFpropToleranceTestCases<TypeTriple<half, half, half>>()
 {
-    return {{-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
-            {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
-            // C=1, R=1, S=1. Accum = 1. Tol = 6 * 1 * sqrt(2) * 2^-10
-            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 6.0 * std::sqrt(2.0) * std::pow(2.0, -10)},
-            // C=2, R=1, S=1. Accum = 2. Tol = 6 * 2 * sqrt(4) * 2^-10 = 24 * 2^-10
-            {-1.0, 1.0, -1.0, 1.0, {1, 2, 1, 1}, 24.0 * std::pow(2.0, -10)},
-            // C=10, R=1, S=1. Accum = 10. Tol = 6 * 10 * sqrt(20) * 2^-10
-            {-1.0, 1.0, -1.0, 1.0, {1, 10, 1, 1}, 60.0 * std::sqrt(20.0) * std::pow(2.0, -10)}};
+    return {
+        {-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
+        {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
+        // C=1, R=1, S=1. Accum = 1. Tol = 6 * 1 * sqrt(2) * 2^-10
+        {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 6.0 * std::sqrt(2.0) * std::pow(2.0, -10)},
+        // C=2, R=1, S=1. Accum = 2. Tol = 6 * 2 * sqrt(4) * 2^-10 = 24 * 2^-10
+        {-1.0, 1.0, -1.0, 1.0, {1, 2, 1, 1}, 24.0 * std::pow(2.0, -10)},
+        // C=10, R=1, S=1. Accum = 10. Tol = 6 * 10 * sqrt(20) * 2^-10
+        {-1.0, 1.0, -1.0, 1.0, {1, 10, 1, 1}, 60.0 * std::sqrt(20.0) * std::pow(2.0, -10)},
+        // 3D Convolution: C=2, D=2, R=2, S=2. Accum = 16. Tol = 6 * 16 * sqrt(32) * 2^-10
+        {-1.0, 1.0, -1.0, 1.0, {1, 2, 2, 2, 2}, 6.0 * 16.0 * std::sqrt(32.0) * std::pow(2.0, -10)}};
 }
 
 // Test fixture for ConvFprop tolerance
