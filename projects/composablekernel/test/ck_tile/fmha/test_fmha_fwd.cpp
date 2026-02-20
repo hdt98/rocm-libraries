@@ -96,7 +96,10 @@ struct TestConfigs<FmhaFwdMxFp4>
     static constexpr bool def_lse            = true;
     static constexpr bool def_is_v_rowmajor  = false;
     static constexpr auto init_method        = "3";
-    static int adjust_seqlen(int seqlen) { return ck_tile::integer_least_multiple(seqlen, 2); }
+    static int adjust_seqlen(int seqlen)
+    {
+        return seqlen < 0 ? seqlen : ck_tile::integer_least_multiple(seqlen, 2);
+    }
 };
 
 template <>
