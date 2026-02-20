@@ -1032,7 +1032,8 @@ struct medium_segment_config_extractor
 };
 
 template<class TargetConfig,
-         template<class> class ConfigExtractor,
+         template<class>
+         class ConfigExtractor,
          bool Descending,
          bool IsUnknownGridSize,
          class KeysInputIterator,
