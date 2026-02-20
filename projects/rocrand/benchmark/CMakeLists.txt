@@ -50,6 +50,11 @@ function(add_rocrand_benchmark benchmark_src legacy)
 endfunction()
 
 # Copy DLLs and test support files at configure time on Windows.
+# Uses file(COPY) at file scope rather than per-target POST_BUILD commands
+# to avoid build-time races when parallel targets copy the same files.
+# The file list is determined by glob at configure time in either approach;
+# if HIP or other dependencies are rebuilt, a reconfigure is needed to pick
+# up changes (consistent with the find_package(hip) contract).
 if(WIN32)
   file(GLOB _test_support_files
     ${HIP_DIR}/bin/*.dll
