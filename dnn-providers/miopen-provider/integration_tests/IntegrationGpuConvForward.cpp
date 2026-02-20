@@ -71,8 +71,9 @@ protected:
         auto yAttr = graphObj.conv_fprop(xTensorAttr, wTensorAttr, convAttrs);
 
         yAttr->set_output(true);
+        this->registerValidator(yAttr, tolerance);
 
-        this->verifyGraph(graphObj, testCase.seed, tolerance);
+        this->verifyGraph(graphObj, testCase.seed);
     }
 
     float _minVal = IntegrationGraphVerificationHarness<DataType, ConvTestCase>::DEFAULT_MIN;

@@ -947,7 +947,8 @@ protected:
 
             auto expected = static_cast<Out>(params.expectedTolerance);
 
-            EXPECT_NEAR(tol, expected, 1e-5) << "Failed for dims size: " << params.wDims.size();
+            EXPECT_NEAR(static_cast<double>(tol), static_cast<double>(expected), 1e-5)
+                << "Failed for dims size: " << params.wDims.size();
         }
     }
 };
