@@ -15,7 +15,7 @@ static auto _ = []() {
         using BQuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, 128>>;
         using TypeConfig =
             decltype(GemmQuantTypeConfig<ck_tile::fp8_t, ck_tile::fp8_t, ck_tile::half_t, float>{});
-        return run_gemm_example_prec_type<GemmConfigPrefill<ck_tile::fp8_t, false>,
+        return run_gemm_example_prec_type<GemmConfigPrefill<ck_tile::fp8_t>,
                                           TypeConfig,
                                           AQuantGroupSize,
                                           BQuantGroupSize,
