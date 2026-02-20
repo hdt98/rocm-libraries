@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -97,7 +97,9 @@ void rocsolver_getrs_getMemorySize(rocblas_operation trans,
                                             &optim_mem, lda, ldb, inca, incb);
 
     work_helper->set_optim_mem(optim_mem);
-    work_helper->assign_sizes({}, {size_work1, size_work2, size_work3, size_work4});
+    work_helper->assign_sizes(
+        {},
+        {{"work1", size_work1}, {"work2", size_work2}, {"work3", size_work3}, {"work4", size_work4}});
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>

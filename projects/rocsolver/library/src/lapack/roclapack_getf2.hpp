@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -500,7 +500,7 @@ void rocsolver_getf2_getMemorySize(const I m,
     size_t size_pivotidx = pivot ? sizeof(I) * batch_count : 0;
 
     work_helper->add_scalars<T>();
-    work_helper->assign_sizes({size_pivotval, size_pivotidx});
+    work_helper->assign_sizes({{"pivotval", size_pivotval}, {"pivotidx", size_pivotidx}});
 }
 
 /** argument checking **/
