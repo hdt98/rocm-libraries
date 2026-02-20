@@ -363,9 +363,8 @@ OutputType calculateConvFpropTolerance(
 {
     // Validate ComputeType
     static_assert(std::is_same_v<ComputeType, float> || std::is_same_v<ComputeType, double>
-                      || std::is_same_v<ComputeType, half>
-                      || std::is_same_v<ComputeType, hip_bfloat16>,
-                  "ComputeType must be float, double, half, or hip_bfloat16");
+                      || std::is_same_v<ComputeType, half> || std::is_same_v<ComputeType, bfloat16>,
+                  "ComputeType must be float, double, half, or bfloat16");
 
     // wDims: [K, C, R, S]
     // Accumulation for output (y) happens over C (input channels) and R, S (filter spatial dimensions).
@@ -391,7 +390,7 @@ OutputType calculateConvFpropTolerance(
     // Bound on sum(|x_i * w_i|)
     double sumAbsProductBound = static_cast<double>(numberOfAccumulations) * maxProduct;
 
-    double epsilon = getEpsilon<ComputeType>();
+    auto epsilon = static_cast<double>(std::numeric_limits<ComputeType>::epsilon());
     double accumulatedTolerance = 0.0;
 
     if constexpr(std::is_same_v<ComputeType, float> || std::is_same_v<ComputeType, double>)
@@ -433,7 +432,8 @@ OutputType calculateConvFpropTolerance(
     // If InputType has lower precision (larger epsilon) than ComputeType, we preserve precision (upcasting).
     // Example: half -> float.
     // We only need to add tolerance if we are downcasting.
-    if constexpr(getEpsilon<InputType>() < getEpsilon<ComputeType>())
+    auto inputEpsilon = static_cast<double>(std::numeric_limits<InputType>::epsilon());
+    if(inputEpsilon < epsilon)
     {
         // Input precision is higher than compute precision, so we have casting error.
         // We add this to the tolerance.
@@ -461,10 +461,10 @@ OutputType calculateConvFpropTolerance(
     // If OutputType has higher precision (smaller epsilon) than ComputeType, the value is exactly representable (upcasting).
     // Example: float -> double.
     // We only need to add tolerance if we are downcasting.
-    if constexpr(getEpsilon<OutputType>() > getEpsilon<ComputeType>())
+    auto outputEpsilon = static_cast<double>(std::numeric_limits<OutputType>::epsilon());
+    if(outputEpsilon > epsilon)
     {
         // The error is bounded by the precision of the OutputType at the final value.
-        double outputEpsilon = getEpsilon<OutputType>();
         castTolerance = std::abs(maxPossibleOutputValue) * outputEpsilon;
     }
 
@@ -472,13 +472,13 @@ OutputType calculateConvFpropTolerance(
     double totalTolerance = accumulatedTolerance + castTolerance;
 
     // Check if totalTolerance exceeds the maximum representable value of OutputType
-    if(totalTolerance > getMax<OutputType>())
+    if(totalTolerance > static_cast<double>(std::numeric_limits<OutputType>::max()))
     {
         throw std::overflow_error(
             "Calculated tolerance exceeds the maximum representable value of the output type.");
     }
 
-    return hipdnn_data_sdk::utilities::staticCast<OutputType>(totalTolerance);
+    return static_cast<OutputType>(totalTolerance);
 }
 
 } // namespace hipdnn_test_sdk::utilities::conv
