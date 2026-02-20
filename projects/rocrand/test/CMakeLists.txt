@@ -30,6 +30,7 @@ file(WRITE "${INSTALL_TEST_FILE}"
 ]=]
 )
 
+# Add a test with a relative path to the executable.
 function(add_relative_test test_name test_target)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")

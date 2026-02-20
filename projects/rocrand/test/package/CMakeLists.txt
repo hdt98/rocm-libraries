@@ -51,7 +51,6 @@ endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-
 if(NOT CMAKE_CXX_STANDARD EQUAL 17)
   message(FATAL_ERROR "Only C++17 is supported")
 endif()
@@ -84,6 +83,7 @@ file(GLOB rocrand_pkg_TEST_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand*.cpp)
 # Enable testing (ctest)
 enable_testing()
 
+# Add a test with a relative path to the executable.
 function(add_relative_test test_name test_target)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")

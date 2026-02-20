@@ -22,6 +22,7 @@
 
 # Benchmarks
 
+# Add a rocRAND benchmark executable and install it.
 function(add_rocrand_benchmark benchmark_src legacy)
   get_filename_component(BENCHMARK_TARGET ${benchmark_src} NAME_WE)
   add_executable(${BENCHMARK_TARGET} ${benchmark_src})
