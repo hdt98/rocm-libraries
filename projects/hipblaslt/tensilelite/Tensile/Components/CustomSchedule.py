@@ -435,7 +435,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
                 return "\\useGRInc == 1"
             elif key in ['GRA', 'GRB', 'LWSA', 'LWSB']:
                 return "\\useGR == 1"
-            elif key in ['LRA%u' % lastIter, 'LRB%u' % lastIter, 'LRSA', 'LRSB']:
+            elif key in ['LRA%u' % lastIter, 'LRB%u' % lastIter, 'LRSA', 'LRSB', 'PackA%u' % lastIter, 'PackB%u' % lastIter]:
                 return "\\usePLR == 1"
             elif key in ['LCC']:
                 return "\\useLoop == 1"
