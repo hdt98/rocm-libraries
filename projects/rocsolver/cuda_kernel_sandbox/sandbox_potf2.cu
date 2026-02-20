@@ -10,19 +10,23 @@
  *   A = L * L'  (lower triangular)
  *   A = U' * U  (upper triangular)
  *
- * The potf2_kernel_small kernel uses shared memory with packed storage
- * to perform the factorization efficiently for small matrices.
+ * The potf2_kernel_small kernel uses a blocked algorithm with:
+ * - Register-based storage for the triangular matrix
+ * - Shared memory for panel factorization
+ * - Support for NB panels of size PANEL_SIZE (32)
+ *
+ * This version is derived from rocm-libraries-angelo-potf2.
  *
  * Usage:
  *   ./sandbox_potf2 [n] [batch_count] [uplo]
  *
  * Where:
- *   n           - matrix dimension (default: 32, max: 64 for small kernel)
+ *   n           - matrix dimension (default: 64, max: 256)
  *   batch_count - number of matrices in batch (default: 1)
  *   uplo        - triangular part: lower or upper (default: lower)
  *
  * Example:
- *   compute-sanitizer --tool racecheck ./sandbox_potf2 32 4 lower
+ *   compute-sanitizer --tool racecheck ./sandbox_potf2 64 4 lower
  * *************************************************************************/
 
 #include <cstdio>
@@ -51,17 +55,22 @@ void print_usage(const char* prog_name)
     printf("Usage: %s [n] [batch_count] [uplo]\n", prog_name);
     printf("\n");
     printf("Arguments:\n");
-    printf("  n           - matrix dimension (default: 32, max: 64 for small kernel)\n");
+    printf("  n           - matrix dimension (default: 64, max: %d)\n", POTF2_MAX_SMALL_SIZE);
     printf("  batch_count - number of matrices in batch (default: 1)\n");
     printf("  uplo        - triangular part: lower or upper (default: lower)\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s                  # Use defaults: n=32, batch=1, uplo=lower\n", prog_name);
-    printf("  %s 32 4 lower       # n=32, batch=4, lower triangular\n", prog_name);
-    printf("  %s 16 1 upper       # n=16, batch=1, upper triangular\n", prog_name);
+    printf("  %s                  # Use defaults: n=64, batch=1, uplo=lower\n", prog_name);
+    printf("  %s 64 4 lower       # n=64, batch=4, lower triangular\n", prog_name);
+    printf("  %s 32 1 upper       # n=32, batch=1, upper triangular\n", prog_name);
+    printf("\n");
+    printf("Kernel uses blocked algorithm with:\n");
+    printf("  - Panel size: %d\n", POTF2_PANEL_SIZE);
+    printf("  - Max NB panels: %d\n", POTF2_MAX_NB);
+    printf("  - Thread block: %dx%d\n", POTF2_PANEL_SIZE, POTF2_PANEL_SIZE);
     printf("\n");
     printf("Run with CUDA Compute Sanitizer:\n");
-    printf("  compute-sanitizer --tool racecheck %s 32 4\n", prog_name);
+    printf("  compute-sanitizer --tool racecheck %s 64 4\n", prog_name);
 }
 
 // Generate a symmetric positive definite matrix
@@ -142,7 +151,7 @@ int main(int argc, char** argv)
     }
 
     // Default parameters
-    int n = 32;           // Matrix dimension
+    int n = 64;           // Matrix dimension
     int batch_count = 1;  // Number of matrices in batch
     bool is_upper = false;  // Lower triangular by default
 
@@ -158,6 +167,10 @@ int main(int argc, char** argv)
     printf("=== rocSOLVER Kernel Sandbox: POTF2 (Cholesky Factorization) ===\n");
     printf("Parameters: n=%d, batch_count=%d, uplo=%s\n", n, batch_count,
            is_upper ? "upper" : "lower");
+
+    // Calculate number of panels
+    int nb = (n + POTF2_PANEL_SIZE - 1) / POTF2_PANEL_SIZE;
+    printf("Blocked algorithm: NB=%d panels of size %d\n", nb, POTF2_PANEL_SIZE);
 
     // Validate parameters
     if (n < 1 || n > POTF2_MAX_SMALL_SIZE) {
@@ -209,24 +222,25 @@ int main(int argc, char** argv)
     CUDA_CHECK(cudaMemcpy(d_A, h_A, strideA * batch_count * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(d_info, 0, batch_count * sizeof(int)));
 
-    // Calculate shared memory size (packed storage: n*(n+1)/2 elements)
-    size_t shared_mem_size = sizeof(float) * (n * (n + 1)) / 2;
+    // Calculate shared memory size
+    size_t shared_mem_size = sizeof(float) * nb * POTF2_PANEL_SIZE * POTF2_PANEL_SIZE;
 
-    printf("\nLaunching POTF2 small kernel...\n");
-    printf("  Grid: (1, 1, %d), Block: (%d, %d, 1)\n", batch_count, POTF2_BS, POTF2_BS);
+    printf("\nLaunching POTF2 kernel (blocked algorithm)...\n");
+    printf("  Grid: (1, 1, %d), Block: (%d, %d, 1)\n",
+           batch_count, POTF2_PANEL_SIZE, POTF2_PANEL_SIZE);
     printf("  Shared memory: %zu bytes\n", shared_mem_size);
+    printf("  Register storage: %d elements per thread\n", (nb * (nb + 1)) / 2);
 
-    dim3 grid(1, 1, batch_count);
-    dim3 block(POTF2_BS, POTF2_BS, 1);
-
-    potf2_kernel_small<float, int, int, float*><<<grid, block, shared_mem_size>>>(
+    // Launch the kernel using the helper function
+    launch_potf2_kernel_small<float, int, int>(
         is_upper,
         n,
         d_A,
         0,  // shiftA
         lda,
         strideA,
-        d_info);
+        d_info,
+        batch_count);
 
     CUDA_CHECK(cudaGetLastError());
 

@@ -97,11 +97,16 @@ make stedc-racecheck STEDC_N=32 STEDC_BATCH=4 STEDC_REF=1
 
 Cholesky factorization for symmetric positive definite matrices. Computes A = L*L' (lower) or A = U'*U (upper).
 
+Derived from `rocm-libraries-angelo-potf2` - uses a blocked algorithm with:
+- Register-based storage for triangular matrix in packed format
+- Shared memory for panel factorization
+- NB panels of size PANEL_SIZE (32)
+- Support for matrices up to 256x256 (8 panels)
+
 Includes:
-- `potf2_kernel_small` - Shared memory kernel for small matrices (n <= 64)
-- `potf2_simple` - Device function performing the factorization
-- `sqrtDiagOnward` - Diagonal element processing kernel
-- `potf2_unrolled_kernel` - Alternative unrolled implementation
+- `potf2_kernel_small<NB, PANEL_SIZE>` - Main blocked kernel with template parameters
+- `sqrtDiagOnward` - Diagonal element processing kernel for large matrices
+- `launch_potf2_kernel_small` - Helper to select correct NB template
 
 ```bash
 # Build
@@ -113,7 +118,7 @@ make sandbox_potf2
 
 # Run with sanitizer
 make potf2-racecheck
-make potf2-racecheck POTF2_N=32 POTF2_BATCH=4 POTF2_UPLO=lower
+make potf2-racecheck POTF2_N=64 POTF2_BATCH=4 POTF2_UPLO=lower
 ```
 
 ## Files

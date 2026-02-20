@@ -2,11 +2,18 @@
  * rocSOLVER Kernel Sandbox - POTF2 Kernels
  *
  * Cholesky factorization kernels for symmetric positive definite matrices.
- * potf2_kernel_small performs Cholesky factorization using shared memory
- * for small matrices that fit entirely in LDS cache.
+ * potf2_kernel_small performs Cholesky factorization using a blocked
+ * algorithm with register-based storage and shared memory panels.
  *
  * Derived from:
- * - roclapack_potf2_specialized_kernels.hpp
+ * - rocm-libraries-angelo-potf2/projects/rocsolver/library/src/specialized/
+ *   roclapack_potf2_specialized_kernels.hpp
+ * - rocm-libraries-angelo-potf2/projects/rocsolver/library/src/lapack/
+ *   roclapack_potf2.hpp
+ *
+ * This version uses a blocked algorithm with NB panels of size PANEL_SIZE.
+ * The matrix is loaded into registers in packed triangular format, and
+ * panels are processed through shared memory.
  *
  * Adapted for CUDA compilation with nvcc.
  * *************************************************************************/
@@ -19,54 +26,25 @@
 
 #include <algorithm>
 #include <cmath>
+#include <array>
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-// Block size for POTF2 small kernel (threads per dimension)
-#ifndef POTF2_BS
-#define POTF2_BS 16
+// Panel size for POTF2 small kernel (threads per dimension)
+// This defines the panel width for the blocked algorithm
+#ifndef POTF2_PANEL_SIZE
+#define POTF2_PANEL_SIZE BS2  // BS2 = 32
 #endif
 
-// Maximum matrix size for small kernel (n*(n+1)/2 elements must fit in shared memory)
+// Maximum matrix size for small kernel
+// Complex (16 bytes): max 128x128 = 4 panels
+// Real (4-8 bytes): max 256x256 = 8 panels
 #ifndef POTF2_MAX_SMALL_SIZE
-#define POTF2_MAX_SMALL_SIZE 64
+#define POTF2_MAX_SMALL_SIZE 256
 #endif
 
-/**
- * indexing for packed storage
- * for upper triangular
- *
- * ---------------------------
- * 0 1 3
- *   2 4
- *     5
- * ---------------------------
- *
- **/
-
-template <typename I>
-__device__ static I idx_upper(I i, I j, I n)
-{
-    return (i + (j * (j + 1)) / 2);
-}
-
-/**
- * indexing for packed storage
- * for lower triangular
- *
- * ---------------------------
- * 0
- * 1      n
- * *      (n+1)
- * *
- * (n-1)  ...        n*(n+1)/2
- * ---------------------------
- **/
-template <typename I>
-__device__ static I idx_lower(I i, I j, I n)
-{
-    return ((i - j) + (j * (2 * n + 1 - j)) / 2);
-}
+// Maximum number of panels (NB) supported
+#define POTF2_MAX_NB 8
 
 /**
  * Conjugate helper for real types (no-op)
@@ -87,96 +65,175 @@ __device__ __host__ __forceinline__ T conj(T val)
 }
 
 /**
+ * std::real for non-complex types
+ */
+template <typename T, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
+__device__ __host__ __forceinline__ T real_part(T val)
+{
+    return val;
+}
+
+/**
+ * std::real for complex types
+ */
+template <typename T, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
+__device__ __host__ __forceinline__ auto real_part(T val)
+{
+    return val.real();
+}
+
+/**
  * ------------------------------------------------------
  * Perform Cholesky factorization for small n by n matrix.
- * The function executes in a single thread block.
+ * The function executes in a single thread block per matrix.
+ * ------------------------------------------------------
  *
- * Uses packed storage in shared memory to minimize LDS usage.
+ * NB           Number of panels to perform blocked decomposition.
+ *              ceildiv(n, PANEL_SIZE)
+ * PANEL_SIZE   Size of panel to perform non-blocked decomposition.
+ *              PANEL_SIZE == BlockDim.x == BlockDim.y
  *
  * Algorithm:
- * For lower triangular (A = L*L'):
- *   [  l11     ]  * [ l11'   vl21' ]  =  [ a11       ]
- *   [ vl21  L22]    [        L22' ]     [ va21, A22 ]
+ * 1. Load A to registers in compact triangular storage: Arg[(NB*(NB+1))/2]
+ * 2. For each panel kb = 0 to NB-1:
+ *    a. Write panel to LDS shared memory (as lower triangular)
+ *    b. Factorize panel using column-wise Cholesky
+ *    c. Update trailing matrix in registers
+ *    d. Load factored panel back to registers
+ * 3. Write A from registers back to global memory
  *
- *   (1) l11 = sqrt(a11), scalar computation
- *   (2) vl21 = va21 / l11', scale vector
- *   (3) A22 = A22 - vl21 * vl21', symmetric rank-1 update
- *   (4) Recurse on L22
- *
- * For upper triangular (A = U'*U):
- *   Similar with upper triangular storage.
- * ------------------------------------------------------
+ * This blocked approach enables:
+ * - Register reuse for trailing matrix updates
+ * - Shared memory for panel factorization with full thread parallelism
+ * - Support for matrices up to NB*PANEL_SIZE x NB*PANEL_SIZE
 **/
-template <typename T, typename I, typename INFO>
-__device__ static void potf2_simple(bool const is_upper, I const n, T* const A, INFO* const info)
+template <int NB, int PANEL_SIZE, typename T, typename I, typename INFO, typename U>
+ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
+                                         const I n,
+                                         U AA,
+                                         const rocblas_stride shiftA,
+                                         const I lda,
+                                         const rocblas_stride strideA,
+                                         INFO* const info)
 {
-    auto const lda = n;
-    bool const is_lower = (!is_upper);
+    auto const tid = hipThreadIdx_y * hipBlockDim_x + hipThreadIdx_x;
+    auto const inc = hipBlockDim_y * hipBlockDim_x;
+    auto const tidx = hipThreadIdx_x;
+    auto const tidy = hipThreadIdx_y;
 
-    auto const i_start = hipThreadIdx_x;
-    auto const i_inc = hipBlockDim_x;
-    auto const j_start = hipThreadIdx_y;
-    auto const j_inc = hipBlockDim_y;
+    // get batch index
+    auto const bid = hipBlockIdx_z;
 
-    auto const tid = hipThreadIdx_x + hipThreadIdx_y * hipBlockDim_x
-        + hipThreadIdx_z * (hipBlockDim_x * hipBlockDim_y);
-    auto const nthreads = (hipBlockDim_x * hipBlockDim_y) * hipBlockDim_z;
+    T* const A = load_ptr_batch(AA, bid, shiftA, strideA);
+    INFO* const info_bid = info + bid;
 
-    auto const j0_start = tid;
-    auto const j0_inc = nthreads;
+    extern __shared__ rocblas_int lsmem[];
+    T* Ash = reinterpret_cast<T*>(lsmem);
+    auto constexpr ldash = NB * PANEL_SIZE;
 
-    if(is_lower)
+    bool failed = false;
+
+    // load A to registers
+    T Arg[(NB * (NB + 1)) / 2] = {0};
+
+    I arg_idx = 0;
+    for(I jb = 0; jb < NB; jb++)
     {
-        // ---------------------------------------------------
-        // [  l11     ]  * [ l11'   vl21' ]  =  [ a11       ]
-        // [ vl21  L22]    [        L22' ]     [ va21, A22 ]
-        //
-        //
-        //   assume l11 is scalar 1x1 matrix
-        //
-        //   (1) l11 * l11' = a11 =>  l11 = sqrt( abs(a11) ), scalar computation
-        //   (2) vl21 * l11' = va21 =>  vl21 = va21/ l11', scale vector
-        //   (3) L22 * L22' + vl21 * vl21' = A22
-        //
-        //   (3a) A22 = A22 - vl21 * vl21',  symmetric rank-1 update
-        //   (3b) L22 * L22' = A22,   cholesky factorization, tail recursion
-        // ---------------------------------------------------
-
-        for(I kcol = 0; kcol < n; kcol++)
+        for(I i = jb; i < NB; i++)
         {
-            auto kk = idx_lower(kcol, kcol, lda);
-            auto const akk = A[kk];  // For real types, this is just the real value
+            if(is_upper)
+            {
+                const auto col = i * PANEL_SIZE + tidy;
+                const auto row = jb * PANEL_SIZE + tidx;
+                if(col < n && row < n && row <= col)
+                {
+                    const auto idx = col * lda + row;
+                    Arg[arg_idx] = A[idx];
+                }
+            }
+            else
+            {
+                const auto col = jb * PANEL_SIZE + tidy;
+                const auto row = i * PANEL_SIZE + tidx;
+                if(col < n && row < n && row >= col)
+                {
+                    const auto idx = col * lda + row;
+                    Arg[arg_idx] = A[idx];
+                }
+            }
+
+            arg_idx++;
+        }
+    }
+
+    // Panel Cholesky decomposition
+    arg_idx = 0;
+    for(I kb = 0; kb < NB; kb++)
+    {
+        // write panel to lds
+        for(I i = 0; i < NB - kb; i++)
+        {
+            // write to lds as lower and compute as lower
+            if(is_upper)
+            {
+                const auto col = i * PANEL_SIZE + tidy;
+                const auto idx = tidx * ldash + col;
+                Ash[idx] = Arg[arg_idx + i];
+            }
+            else
+            {
+                const auto row = i * PANEL_SIZE + tidx;
+                const auto idx = tidy * ldash + row;
+                Ash[idx] = Arg[arg_idx + i];
+            }
+        }
+
+        __syncthreads();
+
+        I nn = n - kb * PANEL_SIZE;
+
+        // factorize panel
+        for(I kcol = 0; kcol < PANEL_SIZE; kcol++)
+        {
+            if(kcol >= nn)
+                break;
+
+            auto kk = kcol * ldash + kcol;
+            auto const akk = real_part(Ash[kk]);
             bool const isok = (akk > 0) && (isfinite(akk));
+
+            __syncthreads();
+
             if(!isok)
             {
                 if(tid == 0)
                 {
-                    A[kk] = akk;
+                    Ash[kk] = akk;
                     // Fortran 1-based index
-                    if(*info == 0)
-                        *info = kcol + 1;
+                    if(*info_bid == 0)
+                        *info_bid = kb * PANEL_SIZE + kcol + 1;
                 }
+                failed = true;
+                __syncthreads();
                 break;
             }
 
             auto const lkk = sqrtf(akk);
             if(tid == 0)
             {
-                A[kk] = lkk;
+                Ash[kk] = lkk;
             }
-
-            __syncthreads();
 
             // ------------------------------------------------------------
             //   (2) vl21 * l11' = va21 =>  vl21 = va21/ l11', scale vector
             // ------------------------------------------------------------
 
             auto const conj_lkk = conj(lkk);
-            for(I j0 = (kcol + 1) + j0_start; j0 < n; j0 += j0_inc)
+            for(I j0 = (kcol + 1) + tid; j0 < nn; j0 += inc)
             {
-                auto const j0k = idx_lower(j0, kcol, lda);
+                auto const j0k = j0 + kcol * ldash;
 
-                A[j0k] = (A[j0k] / conj_lkk);
+                Ash[j0k] = (Ash[j0k] / conj_lkk);
             }
 
             __syncthreads();
@@ -187,226 +244,104 @@ __device__ static void potf2_simple(bool const is_upper, I const n, T* const A, 
             //   note: update lower triangular part
             // ------------------------------------------------------------
 
-            for(I j = (kcol + 1) + j_start; j < n; j += j_inc)
+            for(I j = (kcol + 1) + tidy; j < PANEL_SIZE; j += hipBlockDim_y)
             {
-                auto const vj = A[idx_lower(j, kcol, lda)];
-                for(I i = (kcol + 1) + i_start; i < n; i += i_inc)
+                auto const vj = Ash[j + kcol * ldash];
+                for(I i = j + tidx; i < nn; i += hipBlockDim_x)
                 {
-                    bool const lower_part = (i >= j);
-                    if(lower_part)
-                    {
-                        auto const vi = A[idx_lower(i, kcol, lda)];
-                        auto const ij = idx_lower(i, j, lda);
+                    auto const vi = Ash[i + kcol * ldash];
+                    auto const ij = i + j * ldash;
 
-                        A[ij] = A[ij] - vi * conj(vj);
+                    Ash[ij] = Ash[ij] - vi * conj(vj);
+                }
+            }
+            __syncthreads();
+        }
+
+        // update trailing matrix
+        I upd_arg_idx = arg_idx + NB - kb;
+        for(I j = kb + 1; j < NB; j++)
+        {
+            for(I i = j; i < NB; i++)
+            {
+                if(is_upper)
+                {
+                    const auto col = (i - kb) * PANEL_SIZE + tidy;
+                    const auto row = (j - kb) * PANEL_SIZE + tidx;
+
+                    for(I p = 0; p < PANEL_SIZE; p++)
+                    {
+                        Arg[upd_arg_idx + i - j] -= conj(Ash[row + p * ldash]) * Ash[col + p * ldash];
+                    }
+                }
+                else
+                {
+                    const auto col = (j - kb) * PANEL_SIZE + tidy;
+                    const auto row = (i - kb) * PANEL_SIZE + tidx;
+
+                    for(I p = 0; p < PANEL_SIZE; p++)
+                    {
+                        Arg[upd_arg_idx + i - j] -= Ash[row + p * ldash] * conj(Ash[col + p * ldash]);
                     }
                 }
             }
+            upd_arg_idx += NB - j;
+        }
 
-            __syncthreads();
-
-        } // end for kcol
-    }
-    else
-    {
-        // --------------------------------------------------
-        // [u11'        ] * [u11    vU12 ] = [ a11     vA12 ]
-        // [vU12'   U22']   [       U22  ]   [ vA12'   A22  ]
-        //
-        // (1) u11' * u11 = a11 =?  u11 = sqrt( abs( a11 ) )
-        // (2) vU12' * u11 = vA12', or u11' * vU12 = vA12
-        //     or vU12 = vA12/u11'
-        // (3) vU12' * vU12 + U22'*U22 = A22
-        //
-        // (3a) A22 = A22 - vU12' * vU12
-        // (3b) U22' * U22 = A22,  cholesky factorization, tail recursion
-        // --------------------------------------------------
-
-        for(I kcol = 0; kcol < n; kcol++)
+        // load panel back to registers
+        for(I i = 0; i < NB - kb; i++)
         {
-            auto const kk = idx_upper(kcol, kcol, lda);
-            auto const akk = A[kk];
-            bool const isok = (akk > 0) && (isfinite(akk));
-            if(!isok)
+            if(is_upper)
             {
-                if(tid == 0)
+                const auto col = i * PANEL_SIZE + tidy;
+                const auto idx = tidx * ldash + col;
+                Arg[arg_idx + i] = Ash[idx];
+            }
+            else
+            {
+                const auto row = i * PANEL_SIZE + tidx;
+                const auto idx = tidy * ldash + row;
+                Arg[arg_idx + i] = Ash[idx];
+            }
+        }
+        arg_idx += NB - kb;
+
+        __syncthreads();
+
+        if(failed)
+            break;
+    }
+
+    // write A from registers
+    arg_idx = 0;
+    for(I jb = 0; jb < NB; jb++)
+    {
+        for(I i = jb; i < NB; i++)
+        {
+            if(is_upper)
+            {
+                const auto col = i * PANEL_SIZE + tidy;
+                const auto row = jb * PANEL_SIZE + tidx;
+                if(col < n && row < n && row <= col)
                 {
-                    A[kk] = akk;
-                    // Fortran 1-based index
-                    if(*info == 0)
-                        *info = kcol + 1;
+                    const auto idx = col * lda + row;
+                    A[idx] = Arg[arg_idx];
                 }
-
-                break;
             }
-
-            auto const ukk = sqrtf(akk);
-            if(tid == 0)
+            else
             {
-                A[kk] = ukk;
-            }
-            __syncthreads();
-
-            // ----------------------------------------------
-            // (2) vU12' * u11 = vA12', or u11' * vU12 = vA12
-            // ----------------------------------------------
-            for(I j0 = (kcol + 1) + j0_start; j0 < n; j0 += j0_inc)
-            {
-                auto const kj0 = idx_upper(kcol, j0, lda);
-
-                A[kj0] = A[kj0] / ukk;
-            }
-
-            __syncthreads();
-
-            // -----------------------------
-            // (3a) A22 = A22 - vU12' * vU12
-            //
-            // note: update upper triangular part
-            // -----------------------------
-            for(I j = (kcol + 1) + j_start; j < n; j += j_inc)
-            {
-                auto const vj = A[idx_upper(kcol, j, lda)];
-                for(I i = (kcol + 1) + i_start; i < n; i += i_inc)
+                const auto col = jb * PANEL_SIZE + tidy;
+                const auto row = i * PANEL_SIZE + tidx;
+                if(col < n && row < n && row >= col)
                 {
-                    bool const upper_part = (i <= j);
-                    if(upper_part)
-                    {
-                        auto const vi = A[idx_upper(kcol, i, lda)];
-                        auto const ij = idx_upper(i, j, lda);
-
-                        A[ij] = A[ij] - conj(vi) * vj;
-                    }
+                    const auto idx = col * lda + row;
+                    A[idx] = Arg[arg_idx];
                 }
             }
 
-            __syncthreads();
-
-        } // end for kcol
-    }
-}
-
-/**
- * ------------------------------------------------------
- * Main POTF2 kernel for small matrices.
- *
- * Loads the triangular matrix into shared memory using packed storage,
- * performs the Cholesky factorization, then writes results back.
- *
- * Block dimensions: (POTF2_BS, POTF2_BS, 1)
- * Grid dimensions: (1, 1, batch_count)
- *
- * Shared memory: sizeof(T) * n * (n+1) / 2 bytes (packed storage)
- * ------------------------------------------------------
-**/
-template <typename T, typename I, typename INFO, typename U>
-ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
-                                         const I n,
-                                         U AA,
-                                         const rocblas_stride shiftA,
-                                         const I lda,
-                                         const rocblas_stride strideA,
-                                         INFO* const info)
-{
-    bool const is_lower = (!is_upper);
-
-    auto const i_start = hipThreadIdx_x;
-    auto const i_inc = hipBlockDim_x;
-    auto const j_start = hipThreadIdx_y;
-    auto const j_inc = hipBlockDim_y;
-
-    // --------------------------------
-    // note hipGridDim_z == batch_count
-    // --------------------------------
-    auto const bid = hipBlockIdx_z;
-
-    T* const A = load_ptr_batch(AA, bid, shiftA, strideA);
-    INFO* const info_bid = info + bid;
-
-    // -----------------------------------------
-    // assume n by n matrix will fit in LDS cache
-    // -----------------------------------------
-    extern __shared__ rocblas_int lsmem[];
-    T* Ash = reinterpret_cast<T*>(lsmem);
-
-    // --------------------------------------------------------
-    // factoring Lower triangular matrix may be slightly faster
-    // due to simpler index calculation down a column
-    // --------------------------------------------------------
-    bool const use_compute_lower = true;
-
-    // ------------------------------------
-    // copy n by n packed matrix into shared memory
-    // ------------------------------------
-    __syncthreads();
-
-    if(is_lower)
-    {
-        for(I j = j_start; j < n; j += j_inc)
-        {
-            for(I i = j + i_start; i < n; i += i_inc)
-            {
-                auto const ij = i + j * static_cast<int64_t>(lda);
-                auto const ij_packed = idx_lower(i, j, n);
-
-                Ash[ij_packed] = A[ij];
-            }
+            arg_idx++;
         }
     }
-    else
-    {
-        for(I j = j_start; j < n; j += j_inc)
-        {
-            for(I i = i_start; i <= j; i += i_inc)
-            {
-                auto const ij = i + j * static_cast<int64_t>(lda);
-                auto const ij_packed = (use_compute_lower) ? idx_lower(j, i, n) : idx_upper(i, j, n);
-
-                auto const aij = A[ij];
-                Ash[ij_packed] = (use_compute_lower) ? conj(aij) : aij;
-            }
-        }
-    }
-
-    __syncthreads();
-
-    bool const is_up = (use_compute_lower) ? false : is_upper;
-    potf2_simple<T>(is_up, n, Ash, info_bid);
-
-    __syncthreads();
-
-    // -------------------------------------
-    // copy n by n packed matrix into global memory
-    // -------------------------------------
-    if(is_lower)
-    {
-        for(I j = j_start; j < n; j += j_inc)
-        {
-            for(I i = j + i_start; i < n; i += i_inc)
-            {
-                auto const ij = i + j * static_cast<int64_t>(lda);
-                auto const ij_packed = idx_lower(i, j, n);
-
-                A[ij] = Ash[ij_packed];
-            }
-        }
-    }
-    else
-    {
-        for(I j = j_start; j < n; j += j_inc)
-        {
-            for(I i = i_start; i <= j; i += i_inc)
-            {
-                auto const ij = i + j * static_cast<int64_t>(lda);
-                auto const ij_packed = (use_compute_lower) ? idx_lower(j, i, n) : idx_upper(i, j, n);
-
-                auto const aij_packed = Ash[ij_packed];
-                A[ij] = (use_compute_lower) ? conj(aij_packed) : aij_packed;
-            }
-        }
-    }
-
-    __syncthreads();
 }
 
 /**
@@ -426,7 +361,8 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
  * Grid dimensions: (batch_count, 1, 1)
  * ------------------------------------------------------
 **/
-template <typename T, typename I, typename INFO, typename U>
+template <typename T, typename I, typename INFO, typename U,
+          std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
 ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
                                      const rocblas_stride shiftA,
                                      const rocblas_stride strideA,
@@ -457,153 +393,106 @@ ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
 }
 
 /**
- * ------------------------------------------------------
- * Alternative unrolled POTF2 kernel that processes the entire
- * factorization without external BLAS calls.
- *
- * This version is useful for testing and can be used to verify
- * the shared-memory kernel implementation.
- *
- * Uses dense column-major storage (not packed).
- * ------------------------------------------------------
-**/
-template <typename T, typename I, typename INFO>
-ROCSOLVER_KERNEL void potf2_unrolled_kernel(const bool is_upper,
-                                            const I n,
-                                            T* A,
-                                            const I lda,
-                                            const rocblas_stride strideA,
-                                            INFO* info)
+ * sqrtDiagOnward for complex types
+ */
+template <typename T, typename I, typename INFO, typename U,
+          std::enable_if_t<rocblas_is_complex<T>, int> = 0>
+ROCSOLVER_KERNEL void sqrtDiagOnward(U A,
+                                     const rocblas_stride shiftA,
+                                     const rocblas_stride strideA,
+                                     const size_t loc,
+                                     const I j,
+                                     T* res,
+                                     INFO* info)
 {
-    auto const bid = hipBlockIdx_z;
-    auto const tid = hipThreadIdx_x;
-    auto const nthreads = hipBlockDim_x;
+    I id = hipBlockIdx_x;
 
-    T* M = A + bid * strideA;
-    INFO* info_bid = info + bid;
+    T* M = load_ptr_batch<T>(A, id, shiftA, strideA);
+    auto t = M[loc].real() - res[id].real();
 
-    // Shared memory for storing the current column's computed values
-    extern __shared__ char smem[];
-    T* scol = reinterpret_cast<T*>(smem);
-
-    if(is_upper)
+    if(t <= 0.0)
     {
-        // Upper triangular: A = U' * U
-        for(I j = 0; j < n; j++)
-        {
-            // Compute U(j,j)
-            T sum = T(0);
-            for(I k = tid; k < j; k += nthreads)
-            {
-                T ukj = M[k + j * lda];
-                sum += ukj * ukj;
-            }
-
-            // Reduce sum across threads
-            scol[tid] = sum;
-            __syncthreads();
-
-            for(I s = nthreads / 2; s > 0; s >>= 1)
-            {
-                if(tid < s)
-                    scol[tid] += scol[tid + s];
-                __syncthreads();
-            }
-
-            if(tid == 0)
-            {
-                T ajj = M[j + j * lda] - scol[0];
-                if(ajj <= T(0) || !isfinite(ajj))
-                {
-                    M[j + j * lda] = ajj;
-                    if(*info_bid == 0)
-                        *info_bid = j + 1;
-                    // Continue to signal error, but don't proceed
-                }
-                else
-                {
-                    M[j + j * lda] = sqrtf(ajj);
-                }
-                scol[0] = M[j + j * lda];  // Store for other threads to use
-            }
-            __syncthreads();
-
-            if(*info_bid != 0)
-                break;
-
-            T ujj = scol[0];
-
-            // Update U(j, j+1:n)
-            for(I i = j + 1 + tid; i < n; i += nthreads)
-            {
-                T sum_i = T(0);
-                for(I k = 0; k < j; k++)
-                {
-                    sum_i += M[k + j * lda] * M[k + i * lda];
-                }
-                M[j + i * lda] = (M[j + i * lda] - sum_i) / ujj;
-            }
-            __syncthreads();
-        }
+        // error for non-positive definiteness
+        if(info[id] == 0)
+            info[id] = j + 1; // use fortran 1-based index
+        M[loc] = t;
+        res[id] = T(0, 0);
     }
     else
     {
-        // Lower triangular: A = L * L'
-        for(I j = 0; j < n; j++)
-        {
-            // Compute L(j,j)
-            T sum = T(0);
-            for(I k = tid; k < j; k += nthreads)
-            {
-                T ljk = M[j + k * lda];
-                sum += ljk * ljk;
-            }
+        // minor is positive definite
+        M[loc] = sqrtf(t);
+        res[id] = T(1, 0) / M[loc];
+    }
+}
 
-            // Reduce sum across threads
-            scol[tid] = sum;
-            __syncthreads();
+/**
+ * Helper function to launch the appropriate kernel based on matrix size.
+ * Selects the right NB template parameter based on n.
+ */
+template <typename T, typename I, typename INFO>
+void launch_potf2_kernel_small(bool is_upper,
+                               I n,
+                               T* A,
+                               rocblas_stride shiftA,
+                               I lda,
+                               rocblas_stride strideA,
+                               INFO* info,
+                               I batch_count,
+                               cudaStream_t stream = 0)
+{
+    const int nb = (n + POTF2_PANEL_SIZE - 1) / POTF2_PANEL_SIZE;
+    size_t shared_mem_size = sizeof(T) * nb * POTF2_PANEL_SIZE * POTF2_PANEL_SIZE;
 
-            for(I s = nthreads / 2; s > 0; s >>= 1)
-            {
-                if(tid < s)
-                    scol[tid] += scol[tid + s];
-                __syncthreads();
-            }
+    dim3 grid(1, 1, batch_count);
+    dim3 block(POTF2_PANEL_SIZE, POTF2_PANEL_SIZE, 1);
 
-            if(tid == 0)
-            {
-                T ajj = M[j + j * lda] - scol[0];
-                if(ajj <= T(0) || !isfinite(ajj))
-                {
-                    M[j + j * lda] = ajj;
-                    if(*info_bid == 0)
-                        *info_bid = j + 1;
-                }
-                else
-                {
-                    M[j + j * lda] = sqrtf(ajj);
-                }
-                scol[0] = M[j + j * lda];
-            }
-            __syncthreads();
-
-            if(*info_bid != 0)
-                break;
-
-            T ljj = scol[0];
-
-            // Update L(j+1:n, j)
-            for(I i = j + 1 + tid; i < n; i += nthreads)
-            {
-                T sum_i = T(0);
-                for(I k = 0; k < j; k++)
-                {
-                    sum_i += M[i + k * lda] * M[j + k * lda];
-                }
-                M[i + j * lda] = (M[i + j * lda] - sum_i) / ljj;
-            }
-            __syncthreads();
-        }
+    // Select kernel based on nb
+    switch(nb)
+    {
+    case 1:
+        potf2_kernel_small<1, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 2:
+        potf2_kernel_small<2, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 3:
+        potf2_kernel_small<3, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 4:
+        potf2_kernel_small<4, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 5:
+        potf2_kernel_small<5, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 6:
+        potf2_kernel_small<6, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 7:
+        potf2_kernel_small<7, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    case 8:
+        potf2_kernel_small<8, POTF2_PANEL_SIZE, T, I, INFO, T*>
+            <<<grid, block, shared_mem_size, stream>>>(
+                is_upper, n, A, shiftA, lda, strideA, info);
+        break;
+    default:
+        // Unsupported size - should not reach here if n <= POTF2_MAX_SMALL_SIZE
+        break;
     }
 }
 
