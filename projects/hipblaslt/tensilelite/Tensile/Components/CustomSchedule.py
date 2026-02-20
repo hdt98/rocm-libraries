@@ -721,7 +721,7 @@ class RegisterSchedule:
                     found, _ = func(probe, useLDSTr, TLDS)
                     if found:
                         detected.add(as_str(transA) + as_str(transB))
-                except ValueError as e:
+                except (ValueError, KeyError) as e:
                     layout = as_str(transA) + as_str(transB)
                     printWarning(
                         f"Layout probe failed for func '{func.__name__}' "

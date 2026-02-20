@@ -2623,6 +2623,9 @@ class Solution(collections.abc.Mapping):
 
     # TailloopInNll optimization check
     if state["TailloopInNll"]:
+      if state["UseCustomMainLoopSchedule"] == 1:
+          reject(state, printRejectionReason, "UseCustomMainLoopSchedule=1 is incompatible with TailloopInNll=True")
+          return
       # Disable TailloopInNll
       # - (not MFMA) or WMMA
       # - PrefetchGlobalRead is 0
@@ -2644,8 +2647,6 @@ class Solution(collections.abc.Mapping):
         state["StaggerUStride"] = 0
         # need to disable SuppressNoLoadLoop
         state["SuppressNoLoadLoop"] = False
-        # disable UseCustomMainLoopSchedule
-        state["UseCustomMainLoopSchedule"] = 0
         state["InternalSupportParams"]["SupportCustomStaggerU"] = False # Disable CustomStaggerU for TailloopInNll
 
     # Determine if we can load directly-to-Vgpr
