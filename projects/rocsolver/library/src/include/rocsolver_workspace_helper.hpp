@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@
 #include "lib_host_helpers.hpp"
 #include "rocsolver/rocsolver.h"
 
+#include <unordered_map>
 #include <vector>
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -45,6 +46,7 @@ class rocsolver_workspace_helper
 private:
     bool has_scalars_r, has_scalars_c, optim_mem;
     size_t num_excl, size_excl, size_shared;
+    std::unordered_map<std::string, size_t> indices;
     std::vector<uint8_t*> pointers;
     std::vector<size_t> sizes;
     std::vector<rocsolver_workspace_helper*> nested;
@@ -59,7 +61,7 @@ private:
             pointers.push_back(scalars_c);
 
         uint8_t* nested_ptr = curr_ptr;
-        for(int i = 0; i < sizes.size(); i++)
+        for(size_t i = 0; i < sizes.size(); i++)
         {
             pointers.push_back(curr_ptr);
             curr_ptr += sizes[i];
@@ -67,7 +69,7 @@ private:
                 nested_ptr = curr_ptr;
         }
 
-        for(int i = 0; i < nested.size(); i++)
+        for(size_t i = 0; i < nested.size(); i++)
             nested[i]->assign_buffer(scalars_r, scalars_c, nested_ptr);
     }
 
@@ -80,7 +82,7 @@ private:
 
         size_t shared = this->size_shared;
 
-        for(int i = 0; i < nested.size(); i++)
+        for(size_t i = 0; i < nested.size(); i++)
             shared = std::max(shared, nested[i]->get_internal_size(has_scalars_r, has_scalars_c));
 
         return this->size_excl + shared;
@@ -110,7 +112,7 @@ public:
     /* Destructor */
     ~rocsolver_workspace_helper()
     {
-        for(int i = 0; i < nested.size(); i++)
+        for(size_t i = 0; i < nested.size(); i++)
             delete nested[i];
     }
 
@@ -125,6 +127,10 @@ public:
         this->size_excl = 0;
         this->size_shared = 0;
 
+        this->indices.clear();
+
+        this->pointers.clear();
+
         this->sizes.clear();
         this->sizes.reserve(sizes_excl.size() + sizes_shared.size());
 
@@ -132,7 +138,7 @@ public:
         this->sizes.insert(this->sizes.end(), sizes_shared);
 
         // round up sizes to nearest MIN_CHUNK_SIZE
-        for(int i = 0; i < sizes.size(); i++)
+        for(size_t i = 0; i < sizes.size(); i++)
         {
             this->sizes[i]
                 = ((this->sizes[i] + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
@@ -143,15 +149,61 @@ public:
                 this->size_shared += this->sizes[i];
         }
     }
+    /* Assigns the given workspace sizes to the workspace helper with associated names. Workspace sizes are passed in
+       two separate lists: sizes_excl for workspaces that must not be overwritten by nested functions, and sizes_shared
+       for workspaces that may be overwritten by nested functions. Also rounds the sizes up to the nearest MIN_CHUNK_SIZE
+       for better alignment. */
+    void assign_sizes(std::initializer_list<std::pair<std::string, size_t>> sizes_excl,
+                      std::initializer_list<std::pair<std::string, size_t>> sizes_shared = {})
+    {
+        this->num_excl = sizes_excl.size();
+        this->size_excl = 0;
+        this->size_shared = 0;
+
+        this->indices.clear();
+
+        this->pointers.clear();
+
+        this->sizes.clear();
+        this->sizes.reserve(sizes_excl.size() + sizes_shared.size());
+
+        // round up sizes to nearest MIN_CHUNK_SIZE
+        for(auto pair : sizes_excl)
+        {
+            this->indices[pair.first] = sizes.size();
+
+            size_t size = pair.second;
+            size = ((size + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+            this->sizes.push_back(size);
+
+            this->size_excl += size;
+        }
+
+        for(auto pair : sizes_shared)
+        {
+            this->indices[pair.first] = sizes.size();
+
+            size_t size = pair.second;
+            size = ((size + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+            this->sizes.push_back(size);
+
+            this->size_shared += size;
+        }
+    }
     /* Gets the size of the workspace array at position i, rounded up to a multiple of MIN_CHUNK_SIZE. */
-    size_t get_size(int i)
+    size_t get_size(size_t i)
     {
         return sizes[i];
+    }
+    /* Gets the size of the named workspace array, rounded up to a multiple of MIN_CHUNK_SIZE. */
+    size_t get_size(std::string name)
+    {
+        return sizes[indices[name]];
     }
 
     /* Sets the capacity of the internal vector that holds workspace helpers for nested functions. Optional,
        but should be called before add_nested. */
-    void set_nested_capacity(int capacity)
+    void set_nested_capacity(size_t capacity)
     {
         nested.reserve(capacity);
     }
@@ -165,7 +217,7 @@ public:
     }
     /* Gets a pointer to the nested workspace helper at position i, which was created by the ith call to
        add_nested. */
-    rocsolver_workspace_helper* get_nested(int i)
+    rocsolver_workspace_helper* get_nested(size_t i)
     {
         return nested[i];
     }
@@ -220,9 +272,14 @@ public:
     }
     /* Gets a pointer to the workspace array at position i, whose size is >= the assigned size at position i.
        Only called after assign_buffer. */
-    void* operator[](int i)
+    void* operator[](size_t i)
     {
         return pointers[i + has_scalars_r + has_scalars_c];
+    }
+    /* Gets a pointer to the named workspace array. Only called after assign_buffer. */
+    void* operator[](std::string name)
+    {
+        return pointers[indices[name] + has_scalars_r + has_scalars_c];
     }
 
     /* Sets a value indicating that the function requires the device-side scalar array. Only called before
@@ -305,7 +362,7 @@ public:
         bool has_scalars_c = 0;
 
         std::cerr << "Num Sizes: " << sizes.size() << std::endl;
-        for(int i = 0; i < sizes.size(); i++)
+        for(size_t i = 0; i < sizes.size(); i++)
         {
             std::cerr << sizes[i] << " bytes";
             if(i < pointers.size())
