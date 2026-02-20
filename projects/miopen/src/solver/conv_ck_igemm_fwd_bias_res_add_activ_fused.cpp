@@ -39,6 +39,10 @@
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 #include <ck/tensor_operation/gpu/device/device_conv_fwd_bias_activation.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scaleadd_scaleadd_relu.hpp>
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include <miopen/ck_builder/factories/grouped_convolution_forward_scaleadd_scaleadd_relu.hpp>
+#endif
+#include <miopen/ck_builder/factories/meta_device_operation_instance_factory.hpp>
 #endif
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_CK_IGEMM_FWD_BIAS_RES_ADD_ACTIV)
 
@@ -53,7 +57,7 @@ using CK_OutLayout = ck::tensor_layout::convolution::NDHWGK;
 // DataType also applies to weights
 // AccumDataType also applies to added z & bias tensors
 template <typename DataType, typename AccumDataType = DataType>
-using DeviceOp = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+using DeviceOpType =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
         3,
         ck::tensor_layout::convolution::NDHWGC,
@@ -66,8 +70,11 @@ using DeviceOp = ck::tensor_operation::device::instance::DeviceOperationInstance
         DataType,                                // out data type
         ck::tensor_operation::element_wise::PassThrough,
         ck::tensor_operation::element_wise::PassThrough,
-        ck::tensor_operation::element_wise::
-            ScaleAddScaleAddRelu>>; // end DeviceOperationInstanceFactory
+        ck::tensor_operation::element_wise::ScaleAddScaleAddRelu>;
+
+template <typename DataType, typename AccumDataType = DataType>
+using DeviceOp = miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
+    DeviceOpType<DataType, AccumDataType>>;
 
 namespace {
 

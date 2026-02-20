@@ -48,6 +48,12 @@ struct ElementwiseOpToCK<ElementwiseOperation::SCALEADD_SCALEADD_RELU>
 };
 
 template <>
+struct ElementwiseOpToCK<ElementwiseOperation::ADD_CLAMP>
+{
+    using Op = ck::tensor_operation::element_wise::AddClamp;
+};
+
+template <>
 struct ElementwiseOpToCK<ElementwiseOperation::BIAS_BNORM_CLAMP>
 {
     using Op = ck::tensor_operation::element_wise::BiasNormalizeInInferClamp;

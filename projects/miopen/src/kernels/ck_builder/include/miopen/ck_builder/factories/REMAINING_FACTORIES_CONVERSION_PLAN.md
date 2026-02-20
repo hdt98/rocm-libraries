@@ -139,9 +139,10 @@ From `DeviceOperationInstanceFactory_uses.md`, the following factories remain:
 | 1 | Grouped Conv 3D Forward Default (remaining .cpp) | 0 | 0 | ~86 | 0 | 1 test file |
 | 2 | Grouped Conv Backward Data (2D+3D) | 3 | ~9 | ~91 | 3 | 2 test files |
 | 3 | Grouped Conv Backward Weight (2D+3D) | 4 | ~12 | ~141 | 3 | 2 test files |
-| 4 | Forward Fused Operations | 0 | ~8 | ~50+ | 5 | 5 test files |
+| 4a | Forward Fused: Bilinear + Scale | 0 | 0 | ~10 | 2 | 2 test files |
+| 4b | Forward Fused: Clamp, BiasClamp, ScaleAddScaleAddRelu | 0 | ~8 | ~45+ | 3 | 3 test files |
 | 5 | Non-Grouped Convolutions | 2 | ~2 | ~10 | 2 | 2 test files |
-| **Total** | | **~9** | **~31** | **~370+** | **~13** | **~13 test files** |
+| **Total** | | **~9** | **~31** | **~370+** | **~13** | **~12 test files** |
 
 ---
 
@@ -623,9 +624,49 @@ Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK
 
 ---
 
-## Phase 4: Forward Fused Variant Factories
+## Phase 4a: Forward Fused Bilinear + Scale ← COMPLETE
 
-**Covers entries:** #9-10 (3D fwd bilinear/scale), #15 (scaleadd_scaleadd_relu), #16 (clamp), #17 (bias_clamp)
+**Covers entries:** #9 (3D fwd bilinear), #10 (3D fwd scale)
+
+These use `DeviceGroupedConvFwdMultipleABD` with Bilinear/Scale elementwise operations.
+The forward factory instance headers already include the converted template aliases for these.
+
+### 4a.1 Completed Items
+
+| Item | File(s) |
+|------|---------|
+| Dispatch header | `grouped_convolution_forward_bilinear.hpp` |
+| Dispatch header | `grouped_convolution_forward_scale.hpp` |
+| `.inc` file | `grouped_convolution_forward_bilinear_xdl.inc` |
+| `.inc` file | `grouped_convolution_forward_scale_xdl.inc` |
+| .cpp files (5) | `factories/grouped_conv3d_fwd_bilinear/xdl/` (bf16, f16, f32, f32_tf32, int8) |
+| .cpp files (5) | `factories/grouped_conv3d_fwd_scale/xdl/` (bf16, f16, f32, f32_tf32, int8) |
+| CMakeLists.txt | `GROUPED_CONV3D_FWD_BILINEAR_XDL_SOURCES`, `GROUPED_CONV3D_FWD_SCALE_XDL_SOURCES` |
+| Runtime test | `test/gtest/ck_builder_grouped_fwd_conv3d_bilinear.cpp` |
+| Runtime test | `test/gtest/ck_builder_grouped_fwd_conv3d_scale.cpp` |
+| Test CMakeLists.txt | Tests registered behind `MIOPEN_CK_BUILDER_EXPERIMENTAL` |
+| Solver integration | `conv_hip_implicit_gemm_3d_grouped_fwd_xdlops.cpp` — `DeviceOpGFwdBilinearPtrs` and `DeviceOpGFwdScalePtrs` use `MetaDeviceOperationInstanceFactory` behind `#ifdef CK_EXPERIMENTAL_BUILDER` |
+
+### 4a.2 Checklist
+
+| Item | Status |
+|------|--------|
+| Dispatch: `grouped_convolution_forward_bilinear.hpp` | [x] |
+| Dispatch: `grouped_convolution_forward_scale.hpp` | [x] |
+| `.inc` files: bilinear_xdl, scale_xdl | [x] |
+| .cpp files: `grouped_conv3d_fwd_bilinear/xdl/` (5 files) | [x] |
+| .cpp files: `grouped_conv3d_fwd_scale/xdl/` (5 files) | [x] |
+| CMakeLists.txt updated | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d_bilinear.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d_scale.cpp` | [x] |
+| Test CMakeLists.txt updated | [x] |
+| Solver: 3D fwd bilinear/scale `#ifdef CK_EXPERIMENTAL_BUILDER` | [x] |
+
+---
+
+## Phase 4b: Forward Fused Clamp, BiasClamp, ScaleAddScaleAddRelu
+
+**Covers entries:** #15 (scaleadd_scaleadd_relu), #16 (clamp), #17 (bias_clamp)
 
 These use `DeviceGroupedConvFwdMultipleABD` with non-PassThrough elementwise operations.
 The forward factory instance headers already include the converted template aliases for these variants.
@@ -634,12 +675,10 @@ What's needed are:
 2. **`.inc` files** declaring the `add_device_*` functions
 3. **`.cpp` source files** from the corresponding CK directories
 
-### 4.1 Factory Dispatch Headers Needed
+### 4b.1 Factory Dispatch Headers Needed
 
 | File | Element Ops | CK Factory | MIOpen Entry |
 |------|------------|-------------|-------------|
-| `grouped_convolution_forward_bilinear.hpp` | PassThrough, PassThrough, Bilinear | `grouped_convolution_forward_bilinear.hpp` | #9 |
-| `grouped_convolution_forward_scale.hpp` | PassThrough, PassThrough, Scale | `grouped_convolution_forward_scale.hpp` | #10 |
 | `grouped_convolution_forward_scaleadd_scaleadd_relu.hpp` | PassThrough, PassThrough, ScaleAddScaleAddRelu | `grouped_convolution_forward_scaleadd_scaleadd_relu.hpp` | #15 |
 | `grouped_convolution_forward_clamp.hpp` | PassThrough, PassThrough, Clamp | `grouped_convolution_forward_clamp.hpp` | #16 |
 | `grouped_convolution_forward_bias_clamp.hpp` | PassThrough, PassThrough, AddClamp | `grouped_convolution_forward_bias_clamp.hpp` | #17 |
@@ -648,26 +687,24 @@ Each dispatch header specializes `DeviceOperationInstanceFactory` on the full
 `DeviceGroupedConvFwdMultipleABD<..., specific_ops>` type and dispatches to the appropriate
 `add_device_*` functions.
 
-### 4.2 CK Source Locations
+### 4b.2 CK Source Locations
 
 | Directory | Files | Description |
 |-----------|-------|-------------|
-| `grouped_conv3d_fwd_bilinear/` | ~10 | 3D forward bilinear |
-| `grouped_conv3d_fwd_scale/` | ~10 | 3D forward scale |
 | `grouped_conv3d_fwd_scaleadd_scaleadd_relu/` | ~5 | 3D forward fused |
 | `grouped_conv2d_fwd_clamp/` | ~10 | 2D forward clamp |
 | `grouped_conv3d_fwd_clamp/` | ~10 | 3D forward clamp |
 | `grouped_conv2d_fwd_bias_clamp/` | ~10 | 2D forward bias+clamp |
 | `grouped_conv3d_fwd_bias_clamp/` | ~10 | 3D forward bias+clamp |
-| **Total** | **~65** | (estimate) |
+| **Total** | **~45** | (estimate) |
 
 > **Note:** Additional fused directories exist in CK (convinvscale, convscale, convscale_add,
 > convscale_relu, dynamic_op, bias_bnorm_clamp, scaleadd_ab) but are NOT referenced by
 > `DeviceOperationInstanceFactory_uses.md`. These can be deferred as future work.
 
-### 4.3 Work Items
+### 4b.3 Work Items
 
-1. Create factory dispatch headers (5 files)
+1. Create factory dispatch headers (3 files)
 2. Create `.inc` files for each dispatch header
 3. Convert `.cpp` source files from CK directories
 4. Update CMakeLists.txt
@@ -675,30 +712,12 @@ Each dispatch header specializes `DeviceOperationInstanceFactory` on the full
    - Check if `device_grouped_conv_fwd_xdl_outelementop_instance.hpp` and
      `device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_instance.hpp` are already converted
    - If not, convert them following the `GROUPED_CONV_FWD_CONVERSION_PLAN.md` pattern
-6. Add runtime tests (see Step 4.3.1)
+6. Add runtime tests (see Step 4b.3.1)
 
-#### Step 4.3.1: Add Runtime Tests
+#### Step 4b.3.1: Add Runtime Tests
 
-Create runtime comparison tests for each fused forward variant. All use
+Create runtime comparison tests for each remaining fused forward variant. All use
 `DeviceGroupedConvFwdMultipleABD` with different elementwise operations.
-
-**Test file: `test/gtest/ck_builder_grouped_fwd_bilinear.cpp`**
-
-```cpp
-// DeviceOp: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Tuple<NDHWGK>, NDHWGK,
-//           DataType, DataType, Tuple<DataType>, DataType, PassThrough, PassThrough, Bilinear>
-// Data types: F32, F16, BF16, I8
-// Test names: CPU_CKBuilderGroupedFwdBilinear_{FP32,FP16,BFP16,I8}
-```
-
-**Test file: `test/gtest/ck_builder_grouped_fwd_scale.cpp`**
-
-```cpp
-// DeviceOp: DeviceGroupedConvFwdMultipleABD<3, NDHWGC, GKZYXC, Empty_Tuple, NDHWGK,
-//           DataType, DataType, Empty_Tuple, DataType, PassThrough, PassThrough, Scale>
-// Data types: F32, F16, BF16, I8
-// Test names: CPU_CKBuilderGroupedFwdScale_{FP32,FP16,BFP16,I8}
-```
 
 **Test file: `test/gtest/ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp`**
 
@@ -731,29 +750,33 @@ Create runtime comparison tests for each fused forward variant. All use
 // Test names: CPU_CKBuilderGroupedFwdBiasClamp{2D,3D}_{FP32,FP16,BFP16}
 ```
 
-Update `test/gtest/CMakeLists.txt` to register all 5 test files behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
+Update `test/gtest/CMakeLists.txt` to register all 3 test files behind `MIOPEN_CK_BUILDER_EXPERIMENTAL`.
 
-### 4.4 Checklist
+### 4b.4 Checklist
 
 | Item | Status |
 |------|--------|
-| Dispatch: `grouped_convolution_forward_bilinear.hpp` | [ ] |
-| Dispatch: `grouped_convolution_forward_scale.hpp` | [ ] |
-| Dispatch: `grouped_convolution_forward_scaleadd_scaleadd_relu.hpp` | [ ] |
-| Dispatch: `grouped_convolution_forward_clamp.hpp` | [ ] |
-| Dispatch: `grouped_convolution_forward_bias_clamp.hpp` | [ ] |
-| `.inc` files for each dispatch header | [ ] |
-| .cpp files for all fused directories | [ ] |
-| CMakeLists.txt updated | [ ] |
-| Missing factory instance headers (if any) | [ ] |
-| Runtime test: `ck_builder_grouped_fwd_bilinear.cpp` | [ ] |
-| Runtime test: `ck_builder_grouped_fwd_scale.cpp` | [ ] |
-| Runtime test: `ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp` | [ ] |
-| Runtime test: `ck_builder_grouped_fwd_clamp.cpp` | [ ] |
-| Runtime test: `ck_builder_grouped_fwd_bias_clamp.cpp` | [ ] |
-| Test CMakeLists.txt updated | [ ] |
-| Solver: 3D fwd bilinear/scale `#ifdef CK_EXPERIMENTAL_BUILDER` | [ ] |
-| Solver: fused ops solver files `#ifdef CK_EXPERIMENTAL_BUILDER` | [ ] |
+| Dispatch: `grouped_convolution_forward_scaleadd_scaleadd_relu.hpp` | [x] |
+| Dispatch: `grouped_convolution_forward_clamp.hpp` | [x] |
+| Dispatch: `grouped_convolution_forward_bias_clamp.hpp` | [x] |
+| `.inc` files for each dispatch header (6 files: xdl + wmma per op) | [x] |
+| Instance header: `device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_instance.hpp` | [x] |
+| Instance header: `device_grouped_conv_fwd_wmma_cshufflev3_scaleadd_scaleadd_relu_instance.hpp` | [x] |
+| .cpp files: `grouped_conv3d_fwd_scaleadd_scaleadd_relu/` (6 files) | [x] |
+| .cpp files: `grouped_conv2d_fwd_clamp/` (46 files) | [x] |
+| .cpp files: `grouped_conv3d_fwd_clamp/` (40 files) | [x] |
+| .cpp files: `grouped_conv2d_fwd_bias_clamp/` (46 files) | [x] |
+| .cpp files: `grouped_conv3d_fwd_bias_clamp/` (40 files) | [x] |
+| CMakeLists.txt updated (178 source files) | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d_scaleadd_scaleadd_relu.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv2d_clamp.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d_clamp.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv2d_bias_clamp.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_fwd_conv3d_bias_clamp.cpp` | [x] |
+| Test CMakeLists.txt updated | [x] |
+| Solver: `conv_ck_igemm_fwd_bias_res_add_activ_fused.cpp` `MetaDeviceOperationInstanceFactory` | [x] |
+| Solver: `conv_ck_igemm_grp_fwd_activ_fused.cpp` `MetaDeviceOperationInstanceFactory` | [x] |
+| Solver: `conv_ck_igemm_grp_fwd_bias_activ_fused.cpp` `MetaDeviceOperationInstanceFactory` | [x] |
 
 ---
 
@@ -853,11 +876,11 @@ factories behind `#ifdef CK_EXPERIMENTAL_BUILDER`. This follows the same pattern
 | `src/solver/conv/conv_hip_implicit_gemm_fwd_xdlops.cpp` | 5 | DeviceOpPtrs (non-grouped fwd) |
 | `src/solver/conv/conv_hip_implicit_gemm_bwd_data_xdlops.cpp` | 5 | DeviceOpBwdPtrs (non-grouped bwd) |
 | `src/solver/conv/conv_hip_implicit_gemm_grouped_wrw_xdlops.cpp` | 2 | DeviceOpGWrwPtrs (2D wrw) |
-| `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_fwd_xdlops.cpp` | 1 (default done), 4 (bilinear/scale) | DeviceOpGFwdDefaultPtrs (3D fwd default - Phase 1, done), DeviceOpGFwdBilinearPtrs (3D fwd bilinear - Phase 4), DeviceOpGFwdScalePtrs (3D fwd scale - Phase 4) |
+| `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_fwd_xdlops.cpp` | 1 (done), 4a (done) | DeviceOpGFwdDefaultPtrs (Phase 1, done), DeviceOpGFwdBilinearPtrs (Phase 4a, done), DeviceOpGFwdScalePtrs (Phase 4a, done) |
 | `src/solver/conv/conv_hip_implicit_gemm_3d_grouped_bwd_xdlops.cpp` | 1 | DeviceOpGBwdBilinearPtrs (3D bwd bilinear), DeviceOpGBwdScalePtrs (3D bwd scale), DeviceOpGBwdDefaultPtrs (3D bwd default) |
-| `src/solver/conv_ck_igemm_fwd_bias_res_add_activ_fused.cpp` | 4 | DeviceOp (3D fwd scaleadd_scaleadd_relu) |
-| `src/solver/conv_ck_igemm_grp_fwd_activ_fused.cpp` | 4 | DeviceOpGFwdActPtrs (N-D fwd clamp) |
-| `src/solver/conv_ck_igemm_grp_fwd_bias_activ_fused.cpp` | 4 | DeviceOpGFwdBiasActivPtrs (N-D fwd bias_clamp) |
+| `src/solver/conv_ck_igemm_fwd_bias_res_add_activ_fused.cpp` | 4b | DeviceOp (3D fwd scaleadd_scaleadd_relu) |
+| `src/solver/conv_ck_igemm_grp_fwd_activ_fused.cpp` | 4b | DeviceOpGFwdActPtrs (N-D fwd clamp) |
+| `src/solver/conv_ck_igemm_grp_fwd_bias_activ_fused.cpp` | 4b | DeviceOpGFwdBiasActivPtrs (N-D fwd bias_clamp) |
 
 ---
 
@@ -885,11 +908,11 @@ src/kernels/ck_builder/
 │   ├── factories/
 │   │   ├── device_operation_instance_factory.hpp   (existing)
 │   │   ├── grouped_convolution_forward.hpp         (existing)
-│   │   ├── grouped_convolution_forward_bilinear.hpp      (NEW - Phase 4)
-│   │   ├── grouped_convolution_forward_scale.hpp         (NEW - Phase 4)
-│   │   ├── grouped_convolution_forward_scaleadd_scaleadd_relu.hpp (NEW - Phase 4)
-│   │   ├── grouped_convolution_forward_clamp.hpp         (NEW - Phase 4)
-│   │   ├── grouped_convolution_forward_bias_clamp.hpp    (NEW - Phase 4)
+│   │   ├── grouped_convolution_forward_bilinear.hpp      (existing - Phase 4a)
+│   │   ├── grouped_convolution_forward_scale.hpp         (existing - Phase 4a)
+│   │   ├── grouped_convolution_forward_scaleadd_scaleadd_relu.hpp (NEW - Phase 4b)
+│   │   ├── grouped_convolution_forward_clamp.hpp         (NEW - Phase 4b)
+│   │   ├── grouped_convolution_forward_bias_clamp.hpp    (NEW - Phase 4b)
 │   │   ├── grouped_convolution_backward_data.hpp         (NEW - Phase 1)
 │   │   ├── grouped_convolution_backward_data_bilinear.hpp (NEW - Phase 1)
 │   │   ├── grouped_convolution_backward_data_scale.hpp    (NEW - Phase 1)
@@ -907,13 +930,13 @@ src/kernels/ck_builder/
 ├── factories/
 │   ├── grouped_conv2d_fwd/                     (existing - 96 .cpp)
 │   ├── grouped_conv3d_fwd/                     (NEW - Phase 1, ~86 files)
-│   ├── grouped_conv3d_fwd_bilinear/            (NEW - Phase 4)
-│   ├── grouped_conv3d_fwd_scale/               (NEW - Phase 4)
-│   ├── grouped_conv3d_fwd_scaleadd_scaleadd_relu/ (NEW - Phase 4)
-│   ├── grouped_conv2d_fwd_clamp/               (NEW - Phase 4)
-│   ├── grouped_conv3d_fwd_clamp/               (NEW - Phase 4)
-│   ├── grouped_conv2d_fwd_bias_clamp/          (NEW - Phase 4)
-│   ├── grouped_conv3d_fwd_bias_clamp/          (NEW - Phase 4)
+│   ├── grouped_conv3d_fwd_bilinear/            (existing - Phase 4a, 5 .cpp)
+│   ├── grouped_conv3d_fwd_scale/               (existing - Phase 4a, 5 .cpp)
+│   ├── grouped_conv3d_fwd_scaleadd_scaleadd_relu/ (NEW - Phase 4b)
+│   ├── grouped_conv2d_fwd_clamp/               (NEW - Phase 4b)
+│   ├── grouped_conv3d_fwd_clamp/               (NEW - Phase 4b)
+│   ├── grouped_conv2d_fwd_bias_clamp/          (NEW - Phase 4b)
+│   ├── grouped_conv3d_fwd_bias_clamp/          (NEW - Phase 4b)
 │   ├── grouped_conv2d_bwd_data/                (NEW - Phase 1, ~39 .cpp)
 │   ├── grouped_conv3d_bwd_data/                (NEW - Phase 1, ~40 .cpp)
 │   ├── grouped_conv3d_bwd_data_bilinear/       (NEW - Phase 1, ~6 .cpp)
@@ -934,11 +957,11 @@ test/gtest/
 ├── ck_builder_grouped_bwd_data_conv3d.cpp       (NEW - Phase 2)
 ├── ck_builder_grouped_bwd_weight_conv2d.cpp     (NEW - Phase 3)
 ├── ck_builder_grouped_bwd_weight_conv3d.cpp     (NEW - Phase 3)
-├── ck_builder_grouped_fwd_bilinear.cpp          (NEW - Phase 4)
-├── ck_builder_grouped_fwd_scale.cpp             (NEW - Phase 4)
-├── ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp (NEW - Phase 4)
-├── ck_builder_grouped_fwd_clamp.cpp             (NEW - Phase 4)
-└── ck_builder_grouped_fwd_bias_clamp.cpp        (NEW - Phase 4)
+├── ck_builder_grouped_fwd_conv3d_bilinear.cpp   (existing - Phase 4a)
+├── ck_builder_grouped_fwd_conv3d_scale.cpp      (existing - Phase 4a)
+├── ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp (NEW - Phase 4b)
+├── ck_builder_grouped_fwd_clamp.cpp             (NEW - Phase 4b)
+├── ck_builder_grouped_fwd_bias_clamp.cpp        (NEW - Phase 4b)
 ├── ck_builder_conv_fwd.cpp                      (NEW - Phase 5)
 └── ck_builder_conv_bwd_data.cpp                 (NEW - Phase 5)
 ```
@@ -955,6 +978,15 @@ Phase 1 (3D Fwd Default)  ← COMPLETE
     ├─ runtime tests
     └─ CMakeLists
 
+Phase 4a (Fwd Bilinear/Scale)  ← COMPLETE
+    │
+    ├─ dispatch headers
+    ├─ .inc files
+    ├─ .cpp files (10 files)
+    ├─ runtime tests
+    ├─ CMakeLists
+    └─ solver integration (bilinear/scale)
+
 Phase 2 (Bwd Data)     Phase 3 (Bwd Weight)
     │                       │
     ├─ instance_data/       ├─ instance_data/
@@ -964,28 +996,36 @@ Phase 2 (Bwd Data)     Phase 3 (Bwd Weight)
     ├─ runtime tests        ├─ runtime tests
     └─ solver integration   └─ solver integration
 
-Phase 4 (Fwd Fused)     Phase 5 (Non-Grouped)
-    │                        │
-    ├─ dispatch headers      ├─ instance_data (maybe)
-    ├─ .cpp files            ├─ dispatch headers
-    ├─ runtime tests         ├─ .cpp files
-    └─ solver integration    ├─ runtime tests
-       (bilinear/scale +     └─ solver integration
-        fused ops)
+Phase 4b (Fwd Fused Remaining)  ← COMPLETE
+    │
+    ├─ dispatch headers (3)
+    ├─ .inc files (6)
+    ├─ instance headers (2)
+    ├─ .cpp files (178)
+    ├─ runtime tests (5)
+    └─ solver integration (3)
+
+Phase 5 (Non-Grouped)
+    │
+    ├─ instance_data (maybe)
+    ├─ dispatch headers
+    ├─ .cpp files
+    ├─ runtime tests
+    └─ solver integration
 ```
 
 **Phases 2 and 3 are independent** and can be worked on in parallel.
-**Phase 4** depends on Phase 1 (3D forward default .cpp files should exist before fused variants).
-  Phase 4 also includes the bilinear/scale solver ifdef for the 3D fwd solver.
+**Phase 4b** depends on Phase 1 (3D forward default .cpp files should exist before fused variants).
 **Phase 5** is independent but lowest priority.
 
 ## Summary
 
-| Phase | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Runtime Tests | Solver Files |
-|-------|-------------------|-----------------|------------|------------------|---------------|--------------|
-| 1 - 3D Fwd Default | 0 | 0 | ~86 | 0 | 1 | 1 (default only) |
-| 2 - Bwd Data | 3 | ~9 | ~91 | 3 + .inc | 2 | 2 |
-| 3 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 2 | 3 |
-| 4 - Fwd Fused (incl. bilinear/scale) | 0 | 0-8 | ~65 | 5 + .inc | 5 | 4 |
-| 5 - Non-Grouped | 2 | ~2 | ~10 | 2 | 2 | 2 |
-| **Total** | **~9** | **~23-31** | **~393** | **~13** | **12** | **~12** |
+| Phase | New Instance Data | Factory Headers | .cpp Files | Dispatch Headers | Runtime Tests | Solver Files | Status |
+|-------|-------------------|-----------------|------------|------------------|---------------|--------------|--------|
+| 1 - 3D Fwd Default | 0 | 0 | ~86 | 0 | 1 | 1 | COMPLETE |
+| 4a - Fwd Bilinear/Scale | 0 | 0 | 10 | 2 + .inc | 2 | 1 | COMPLETE |
+| 2 - Bwd Data | 3 | ~9 | ~91 | 3 + .inc | 2 | 2 | TODO |
+| 3 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 2 | 3 | TODO |
+| 4b - Fwd Fused (clamp, bias_clamp, scaleadd) | 0 | 2 | 178 | 3 + 6 .inc | 5 | 3 | COMPLETE |
+| 5 - Non-Grouped | 2 | ~2 | ~10 | 2 | 2 | 2 | TODO |
+| **Total** | **~9** | **~23-31** | **~383** | **~13** | **12** | **~12** | |
