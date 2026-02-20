@@ -48,54 +48,6 @@ namespace rocRoller::KernelGraph
                 return std::nullopt;
             };
 
-            auto loop = getLoopOp(nodes.front()).value_or(-1);
-
-            auto colouring = colourByUnrollValue(graph, -1);
-
-            Log::debug(toString(colouring));
-
-            using Colour = std::set<std::pair<int, int>>;
-
-            std::map<Colour, std::vector<int>> reverse;
-
-            for(auto node : nodes)
-            {
-                auto const& opColour = colouring.operationColour.at(node);
-
-                Colour key(opColour.begin(), opColour.end());
-
-                reverse[key].push_back(node);
-            }
-
-            for(auto& [key, keyOps] : reverse)
-            {
-                std::ranges::sort(keyOps, TopologicalCompare(graph));
-            }
-
-            std::set<int> edgesToKeep;
-
-            for(auto& [key, keyOps] : reverse)
-            {
-                for(int idx = 0; idx + 1 < keyOps.size(); idx++)
-                {
-                    auto thisEdge = graph.control.findEdge(keyOps[idx], keyOps[idx + 1]);
-
-                    if(!thisEdge)
-                    {
-                        AssertFatal(graph.control.compareNodes(
-                                        UseCacheIfAvailable, keyOps[idx], keyOps[idx + 1])
-                                    == ControlGraph::NodeOrdering::LeftFirst);
-
-                        thisEdge = graph.control.addElement(
-                            ControlGraph::Sequence(), {keyOps[idx]}, {keyOps[idx + 1]});
-                    }
-
-                    edgesToKeep.insert(*thisEdge);
-                }
-            }
-
-            Log::debug("Keeping edges ({})", fmt::join(edgesToKeep, ", "));
-
             auto notMultiply = [&graph](int idx) {
                 if(graph.control.getElementType(idx) != Graph::ElementType::Node)
                     return false;
@@ -122,6 +74,8 @@ namespace rocRoller::KernelGraph
 
             Log::debug("Got connections.");
 
+            auto dependenceDAG = NodeScheduling::constructDataDependenceDAG(graph);
+
             for(auto nodeA : nodes)
             {
                 for(auto nodeB : nodes)
@@ -129,9 +83,21 @@ namespace rocRoller::KernelGraph
                     if(nodeA == nodeB)
                         continue;
 
-                    auto thisEdge = graph.control.findEdge(nodeA, nodeB);
+                    auto depEdge = dependenceDAG.findEdge(nodeA, nodeB);
+                    auto seqEdge = graph.control.findEdge(nodeA, nodeB);
 
-                    if(thisEdge.has_value() && !edgesToKeep.contains(*thisEdge))
+                    if(depEdge.has_value())
+                    {
+                        if(!seqEdge.has_value())
+                        {
+                            AssertFatal(
+                                graph.control.compareNodes(UseCacheIfAvailable, nodeA, nodeB)
+                                == ControlGraph::NodeOrdering::LeftFirst);
+
+                            graph.control.addElement(ControlGraph::Sequence(), {nodeA}, {nodeB});
+                        }
+                    }
+                    else if(seqEdge.has_value())
                     {
                         auto upstream = connectionsToKeep.at(nodeB);
                         auto order
@@ -141,8 +107,8 @@ namespace rocRoller::KernelGraph
                                     ShowValue(order),
                                     ShowValue(upstream),
                                     ShowValue(nodeB),
-                                    ShowValue(*thisEdge));
-                        graph.control.deleteElement(*thisEdge);
+                                    ShowValue(seqEdge.value()));
+                        graph.control.deleteElement(seqEdge.value());
                         if(order == ControlGraph::NodeOrdering::LeftFirst)
                             graph.control.chain<ControlGraph::Sequence>(upstream, nodeB);
                         else
@@ -157,6 +123,7 @@ namespace rocRoller::KernelGraph
     {
         auto rv = original;
 
+        // grouped by immediate body-parent
         auto groupedMultiplyNodes = NodeScheduling::getGroupedNodes<ControlGraph::Multiply>(rv);
 
         for(auto& [parent, nodes] : groupedMultiplyNodes)

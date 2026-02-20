@@ -56,7 +56,7 @@ namespace rocRoller::KernelGraph
          * The sub-graph is created by adding the given nodes to a new control graph, and then
          * adding edges between the nodes based on the order of the nodes in the original
          * control graph.
-         * 
+         *
          * rv.compare(cacheMode, a, b) should always return the same result as the original
          * control graph as long as a and b are both in `nodes`.
          */
@@ -70,6 +70,11 @@ namespace rocRoller::KernelGraph
          * `graph.control`.
          */
         void orderNodes(KernelGraph const& graph, std::vector<int>& nodes, auto const& comp);
+
+        /**
+     * Builds the data dependence graph for the given kernel graph
+     */
+        ControlGraph::ControlGraph constructDataDependenceDAG(KernelGraph const& graph);
     }
 }
 

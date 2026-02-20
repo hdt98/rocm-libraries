@@ -75,4 +75,127 @@ namespace rocRoller::KernelGraph::NodeScheduling
         return subGraph;
     }
 
+    ControlGraph::ControlGraph constructDataDependenceDAG(KernelGraph const& graph)
+    {
+        ControlGraph::ControlGraph dependenceDAG;
+
+        // Insert all control graph nodes into the data dependence DAG
+        for(auto node : graph.control.getNodes())
+        {
+            dependenceDAG.setElement(node, graph.control.getElement(node));
+        }
+
+        // Create tracer and get all the trace records from it.
+        auto tracer  = ControlFlowRWTracer(graph);
+        auto records = tracer.coordinatesReadWrite();
+
+        std::map<int, int>                     latestWriteToCoord;
+        std::map<int, std::unordered_set<int>> latestReadsToCoord;
+
+        // This assumes that the trace is ordered and records for the
+        // same control operation are consecutive.
+        auto it = records.begin();
+        while(it != records.end())
+        {
+            int currentControl = it->control;
+            while(it != records.end() && it->control == currentControl)
+            {
+                auto coord = it->coordinate;
+
+                // adds WW(output dep) and WR(flow dep) edges
+                if(latestWriteToCoord.contains(coord))
+                {
+                    AssertFatal(latestWriteToCoord[coord] != currentControl,
+                                ShowValue(it->control),
+                                ShowValue(it->coordinate),
+                                ShowValue(it->rw));
+
+                    auto sourceNodeBodyParent
+                        = bodyParents(getTopSetCoordinate(graph, latestWriteToCoord[coord]), graph)
+                              .take(1)
+                              .only();
+                    AssertFatal(sourceNodeBodyParent.has_value(),
+                                "Source node has no body parent",
+                                ShowValue(latestWriteToCoord[coord]));
+
+                    auto destNodeBodyParent
+                        = bodyParents(getTopSetCoordinate(graph, currentControl), graph)
+                              .take(1)
+                              .only();
+                    AssertFatal(destNodeBodyParent.has_value(),
+                                "Dest node has no body parent",
+                                ShowValue(currentControl));
+
+                    if(sourceNodeBodyParent.value() == destNodeBodyParent.value())
+                    {
+                        auto order = graph.control.compareNodes(
+                            UseCacheIfAvailable, latestWriteToCoord[coord], currentControl);
+                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                                        || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                                    ShowValue(latestWriteToCoord[coord]),
+                                    ShowValue(currentControl),
+                                    ShowValue(order));
+
+                        dependenceDAG.addElement(ControlGraph::Sequence(),
+                                                 {latestWriteToCoord[coord]},
+                                                 {currentControl});
+                    }
+                }
+
+                if(it->rw == ControlFlowRWTracer::WRITE || it->rw == ControlFlowRWTracer::READWRITE)
+                {
+                    // adds RW(anti dep) edges
+                    for(auto const read : latestReadsToCoord[coord])
+                    {
+                        if(read == currentControl)
+                            continue;
+
+                        auto sourceNodeBodyParent
+                            = bodyParents(getTopSetCoordinate(graph, read), graph).take(1).only();
+                        AssertFatal(sourceNodeBodyParent.has_value(),
+                                    "Source node has no body parent",
+                                    ShowValue(read));
+
+                        auto destNodeBodyParent
+                            = bodyParents(getTopSetCoordinate(graph, currentControl), graph)
+                                  .take(1)
+                                  .only();
+                        AssertFatal(destNodeBodyParent.has_value(),
+                                    "Dest node has no body parent",
+                                    ShowValue(currentControl));
+
+                        if(sourceNodeBodyParent.value() == destNodeBodyParent.value())
+                        {
+                            auto order = graph.control.compareNodes(
+                                UseCacheIfAvailable, read, currentControl);
+                            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                                            || order
+                                                   == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                                        ShowValue(read),
+                                        ShowValue(currentControl),
+                                        ShowValue(order));
+
+                            dependenceDAG.addElement(
+                                ControlGraph::Sequence(), {read}, {currentControl});
+                        }
+                    }
+
+                    // Since the current control node writes into this coord,
+                    // the latest reads info needs to be reset.
+                    latestReadsToCoord[coord].clear();
+
+                    // update the latest write to coord
+                    latestWriteToCoord[coord] = currentControl;
+                }
+
+                if(it->rw == ControlFlowRWTracer::READ || it->rw == ControlFlowRWTracer::READWRITE)
+                {
+                    latestReadsToCoord[coord].insert(currentControl);
+                }
+
+                it++;
+            }
+        }
+        return dependenceDAG;
+    }
 }
