@@ -93,12 +93,13 @@ static inline std::string getRocwmmaIncludePath()
 // Build standard compilation options for HIP RTC
 static inline std::vector<const char*> buildCompileOptions()
 {
-    static std::string rocmIncludePath = "-I" + getRocwmmaIncludePath();
+    static std::string rocwmmaIncludePath = "-I" + getRocwmmaIncludePath();
 
     std::vector<const char*> options;
     options.push_back("-D__HIP_PLATFORM_AMD__");
     options.push_back("--std=c++17");
-    options.push_back(rocmIncludePath.c_str());
+    options.push_back(rocwmmaIncludePath.c_str());
+    options.push_back("-I/opt/rocm/include");
 
     return options;
 }
