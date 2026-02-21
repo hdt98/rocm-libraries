@@ -8,6 +8,7 @@
 #include "ck_tile/ops/fmha/block/block_dropout.hpp"
 #include "ck_tile/ops/fmha/block/cast_tile_mx.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_pipeline_qr_ks_vs_default_policy.hpp"
+#include "ck_tile/ops/gemm/warp/warp_wmma_gemm_gfx11_utils.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
 
 namespace ck_tile {
@@ -891,9 +892,17 @@ struct BlockFmhaPipelineQRKSVS
                 }
                 else
                 {
-                    return make_tuple(cast_tile<PDataType>(
-                                          tile_elementwise_in(p_compute_element_func, p_compute)),
-                                      null_tensor{});
+#if defined(__gfx11__)
+                    auto p_result = make_static_distributed_tensor<PDataType>(
+                        decltype(gemm_1)::template MakeABlockTileDistribution<kM0, kN0>());
+                    PermuteWarpGemmCToA(p_result,
+                                        cast_tile<PDataType>(tile_elementwise_in(
+                                            p_compute_element_func, p_compute)));
+#else
+                    const auto p_result = cast_tile<PDataType>(
+                        tile_elementwise_in(p_compute_element_func, p_compute));
+#endif
+                    return make_tuple(p_result, null_tensor{});
                 }
             }();
             const auto p       = p_p_scale[number<0>{}];
