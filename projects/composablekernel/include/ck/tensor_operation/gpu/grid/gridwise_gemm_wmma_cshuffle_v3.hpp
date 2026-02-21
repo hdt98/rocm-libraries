@@ -618,7 +618,6 @@ struct GridwiseGemm_wmma_cshuffle_v3
             return true;
         }
     }
-
     template <typename Argument>
     __host__ static bool CheckValidity(const Argument& karg, bool allow_short_v3_pipe = false)
     {
