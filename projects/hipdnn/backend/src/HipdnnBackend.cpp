@@ -6,6 +6,7 @@
 #include "HipdnnException.hpp"
 #include "descriptors/BackendDescriptor.hpp"
 #include "descriptors/DescriptorFactory.hpp"
+#include "descriptors/GraphDescriptor.hpp"
 #include "descriptors/VariantDescriptor.hpp"
 #include "handle/Handle.hpp"
 #include "handle/HandleFactory.hpp"
@@ -14,6 +15,8 @@
 #include "plugin/EnginePluginResourceManager.hpp"
 
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
+
+#include <cstring>
 
 using namespace hipdnn_backend;
 
@@ -240,6 +243,38 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnBackendCreateAndDeserializeGraph_ext(
             descriptor, serializedGraph, graphByteSize);
 
         LOG_API_SUCCESS(apiName, "created_descriptor={}", logPtr(*descriptor));
+    });
+}
+
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnBackendGetSerializedGraph_ext(
+    hipdnnBackendDescriptor_t descriptor, size_t* graphByteSize, uint8_t* serializedGraph)
+{
+    LOG_API_ENTRY("descriptor={}, graphByteSize_ptr={:p}, serializedGraph_ptr={:p}",
+                  logPtr(descriptor),
+                  static_cast<void*>(graphByteSize),
+                  static_cast<void*>(serializedGraph));
+
+    return hipdnn_backend::tryCatch([&, apiName = __func__]() {
+        throwIfInvalidDescriptor(descriptor);
+        throwIfNull(graphByteSize);
+
+        if(!descriptor->isFinalized())
+        {
+            throw hipdnn_backend::HipdnnException(HIPDNN_STATUS_NOT_INITIALIZED,
+                                                  "Descriptor is not finalized");
+        }
+
+        auto graphDesc = descriptor->asDescriptor<hipdnn_backend::GraphDescriptor>();
+        auto data = graphDesc->getSerializedGraph();
+
+        *graphByteSize = data.size;
+
+        if(serializedGraph != nullptr)
+        {
+            std::memcpy(serializedGraph, data.ptr, data.size);
+        }
+
+        LOG_API_SUCCESS(apiName, "graphByteSize={}", *graphByteSize);
     });
 }
 

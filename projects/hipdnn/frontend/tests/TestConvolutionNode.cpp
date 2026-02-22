@@ -4,9 +4,23 @@
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/ConvolutionFpropAttributes.hpp>
 #include <hipdnn_frontend/node/ConvolutionFpropNode.hpp>
+#include <hipdnn_test_sdk/constants/ConvFpropConstants.hpp>
+#include <hipdnn_test_sdk/utilities/ToVec.hpp>
+
+#include "fake_backend/BackendTestMatchers.hpp"
+#include "fake_backend/MockHipdnnBackend.hpp"
+
+#include <algorithm>
+#include <cstring>
+#include <string>
+#include <vector>
 
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
+using namespace hipdnn_tests::constants;
+using hipdnn_tests::toVec;
+using namespace ::testing;
+using namespace hipdnn_frontend::test;
 
 TEST(TestConvolutionNode, PreValidateNode)
 {
@@ -2054,4 +2068,84 @@ TEST(TestConvolutionNode, PreValidateNodeInputTooSmall)
 
     auto error = node.pre_validate_node();
     EXPECT_EQ(error.code, error_code_t::INVALID_VALUE);
+}
+
+// =============================================================================
+// create_operation() Tests
+// =============================================================================
+
+class TestConvolutionNodeCreateOperation : public ::testing::Test
+{
+protected:
+    std::shared_ptr<Mock_hipdnn_backend> _mockBackend;
+
+    void SetUp() override
+    {
+        _mockBackend = std::make_shared<Mock_hipdnn_backend>();
+        detail::IHipdnnBackend::setInstance(_mockBackend);
+    }
+    void TearDown() override
+    {
+        detail::IHipdnnBackend::resetInstance();
+        _mockBackend.reset();
+    }
+
+    static ConvolutionFpropNode makeConvNode()
+    {
+        ConvFpropAttributes attrs;
+        auto x = std::make_shared<TensorAttributes>();
+        x->set_uid(K_TENSOR_X_UID)
+            .set_name("X")
+            .set_data_type(DataType::FLOAT)
+            .set_dim(toVec(K_TENSOR_X_DIMS))
+            .set_stride(toVec(K_TENSOR_X_STRIDES));
+        auto w = std::make_shared<TensorAttributes>();
+        w->set_uid(K_TENSOR_W_UID)
+            .set_name("W")
+            .set_data_type(DataType::FLOAT)
+            .set_dim(toVec(K_TENSOR_W_DIMS))
+            .set_stride(toVec(K_TENSOR_W_STRIDES));
+        auto y = std::make_shared<TensorAttributes>();
+        y->set_uid(K_TENSOR_Y_UID)
+            .set_name("Y")
+            .set_data_type(DataType::FLOAT)
+            .set_dim(toVec(K_TENSOR_Y_DIMS))
+            .set_stride(toVec(K_TENSOR_Y_STRIDES));
+
+        attrs.set_x(x);
+        attrs.set_w(w);
+        attrs.set_y(y);
+        attrs.set_pre_padding(toVec(K_CONV_PADDING));
+        attrs.set_post_padding(toVec(K_CONV_PADDING));
+        attrs.set_stride(toVec(K_CONV_STRIDE));
+        attrs.set_dilation(toVec(K_CONV_DILATION));
+        attrs.compute_data_type = DataType::FLOAT;
+
+        GraphAttributes graphAttrs;
+        return {std::move(attrs), graphAttrs};
+    }
+};
+
+TEST_F(TestConvolutionNodeCreateOperation, PropagatesBackendError)
+{
+    // Tensor creation succeeds, but operation creation fails
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_TENSOR_DESCRIPTOR, _))
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend,
+                backendCreateDescriptor(HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR, _))
+        .WillOnce(Return(HIPDNN_STATUS_INTERNAL_ERROR));
+    EXPECT_CALL(*_mockBackend, backendDestroyDescriptor(_))
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend, backendSetAttribute(_, _, _, _, _))
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend, backendFinalize(_)).WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend, getLastErrorString(_, _)).Times(AnyNumber());
+
+    auto node = makeConvNode();
+    std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor> tensorDescs;
+    std::vector<detail::ScopedHipdnnBackendDescriptor> operations;
+
+    auto err = node.create_operation(tensorDescs, operations);
+    EXPECT_TRUE(err.is_bad());
+    EXPECT_EQ(err.code, ErrorCode::HIPDNN_BACKEND_ERROR);
 }

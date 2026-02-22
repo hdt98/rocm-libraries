@@ -28,16 +28,16 @@ void GraphDescriptor::buildGraphFromOperations()
 {
     _graph = std::make_unique<hipdnn_data_sdk::data_objects::GraphT>();
 
-    // Collect unique tensors from operations
-    for(const auto& convOp : _operations)
-    {
-        // Get tensor descriptors from operation
-        auto xDesc = convOp->getXDesc();
-        auto wDesc = convOp->getWDesc();
-        auto yDesc = convOp->getYDesc();
+    // Apply graph-level attributes
+    _graph->compute_data_type = _computeDataType;
+    _graph->intermediate_data_type = _intermediateDataType;
+    _graph->io_data_type = _ioDataType;
+    _graph->preferred_engine_id = _preferredEngineId;
 
-        // Add tensors (deduplicated by UID)
-        for(const auto& tensorDesc : {xDesc, wDesc, yDesc})
+    for(const auto& op : _operations)
+    {
+        // Collect unique tensors (deduplicated by UID)
+        for(const auto& tensorDesc : op->getTensorDescriptors())
         {
             auto uid = tensorDesc->getData().uid;
             if(_tensorUids.find(uid) == _tensorUids.end())
@@ -50,15 +50,65 @@ void GraphDescriptor::buildGraphFromOperations()
         }
 
         // Build node from operation
-        auto node = std::make_unique<hipdnn_data_sdk::data_objects::NodeT>();
-        node->compute_data_type = convOp->getComputeDataType();
-        node->attributes.Set(
-            hipdnn_data_sdk::data_objects::ConvolutionFwdAttributesT(convOp->getData()));
-        _graph->nodes.push_back(std::move(node));
+        _graph->nodes.push_back(op->buildNode());
     }
 
     // Clear the serialized buffer since we have a new graph
     _graphSerializedBuffer = flatbuffers::DetachedBuffer();
+}
+
+void GraphDescriptor::setDataType(hipdnnBackendAttributeName_t attributeName,
+                                  hipdnnBackendAttributeType_t attributeType,
+                                  int64_t elementCount,
+                                  const void* arrayOfElements)
+{
+    THROW_IF_NE(attributeType,
+                HIPDNN_TYPE_DATA_TYPE,
+                HIPDNN_STATUS_BAD_PARAM,
+                "GraphDescriptor::setDataType: Invalid attribute type.");
+    THROW_IF_NE(elementCount,
+                1,
+                HIPDNN_STATUS_BAD_PARAM,
+                "GraphDescriptor::setDataType: Invalid element count.");
+    THROW_IF_NULL(arrayOfElements,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "GraphDescriptor::setDataType: Null pointer.");
+
+    auto dataType = *static_cast<const hipdnn_data_sdk::data_objects::DataType*>(arrayOfElements);
+
+    switch(attributeName)
+    {
+    case HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE:
+        _computeDataType = dataType;
+        break;
+    case HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE:
+        _intermediateDataType = dataType;
+        break;
+    case HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE:
+        _ioDataType = dataType;
+        break;
+    default:
+        break;
+    }
+}
+
+void GraphDescriptor::setPreferredEngineId(hipdnnBackendAttributeType_t attributeType,
+                                           int64_t elementCount,
+                                           const void* arrayOfElements)
+{
+    THROW_IF_NE(attributeType,
+                HIPDNN_TYPE_INT64,
+                HIPDNN_STATUS_BAD_PARAM,
+                "GraphDescriptor::setPreferredEngineId: Invalid attribute type.");
+    THROW_IF_NE(elementCount,
+                1,
+                HIPDNN_STATUS_BAD_PARAM,
+                "GraphDescriptor::setPreferredEngineId: Invalid element count.");
+    THROW_IF_NULL(arrayOfElements,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "GraphDescriptor::setPreferredEngineId: Null pointer.");
+
+    _preferredEngineId = *static_cast<const int64_t*>(arrayOfElements);
 }
 
 void GraphDescriptor::setHandle(hipdnnBackendAttributeType_t attributeType,
@@ -109,6 +159,11 @@ void GraphDescriptor::setOperations(hipdnnBackendAttributeType_t attributeType,
                   "GraphDescriptor::setOperations: arrayOfElements is null");
 
     auto descriptors = static_cast<HipdnnBackendDescriptor* const*>(arrayOfElements);
+
+    // Clear existing operations and tensor UIDs so setAttribute replaces rather than appends
+    _operations.clear();
+    _tensorUids.clear();
+
     for(int64_t i = 0; i < elementCount; ++i)
     {
         THROW_IF_NULL(descriptors[i],
@@ -118,22 +173,12 @@ void GraphDescriptor::setOperations(hipdnnBackendAttributeType_t attributeType,
                        HIPDNN_STATUS_BAD_PARAM_NOT_FINALIZED,
                        "GraphDescriptor::setOperations: Operation descriptor not finalized");
 
-        // For now, only support convolution forward
-        auto descType = descriptors[i]->getType();
-        if(descType == HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR)
-        {
-            auto opDesc
-                = HipdnnBackendDescriptor::unpackDescriptor<ConvolutionFwdOperationDescriptor>(
-                    descriptors[i],
-                    HIPDNN_STATUS_BAD_PARAM,
-                    "GraphDescriptor::setOperations: Failed to unpack conv fwd descriptor");
-            _operations.push_back(opDesc);
-        }
-        else
-        {
-            throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
-                                  "GraphDescriptor::setOperations: Unsupported operation type");
-        }
+        auto graphOp = descriptors[i]->tryAsInterface<IGraphOperation>();
+        THROW_IF_NULL(graphOp,
+                      HIPDNN_STATUS_NOT_SUPPORTED,
+                      "GraphDescriptor::setOperations: Descriptor does not implement "
+                      "IGraphOperation");
+        _operations.push_back(graphOp);
     }
 
     // Clear the serialized graph when operations are set
@@ -156,6 +201,14 @@ void GraphDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
         break;
     case HIPDNN_ATTR_OPERATIONGRAPH_OPS:
         setOperations(attributeType, elementCount, arrayOfElements);
+        break;
+    case HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE:
+    case HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE:
+    case HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE:
+        setDataType(attributeName, attributeType, elementCount, arrayOfElements);
+        break;
+    case HIPDNN_ATTR_OPERATIONGRAPH_PREFERRED_ENGINE_ID:
+        setPreferredEngineId(attributeType, elementCount, arrayOfElements);
         break;
     default:
         throw HipdnnException(

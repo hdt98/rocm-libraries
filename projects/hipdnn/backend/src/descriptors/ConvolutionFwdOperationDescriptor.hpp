@@ -4,6 +4,7 @@
 #pragma once
 
 #include "BackendDescriptor.hpp"
+#include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
 #include <hipdnn_data_sdk/data_objects/convolution_fwd_attributes_generated.h>
 
@@ -11,7 +12,8 @@ namespace hipdnn_backend
 {
 
 class ConvolutionFwdOperationDescriptor
-    : public HipdnnBackendDescriptorImpl<ConvolutionFwdOperationDescriptor>
+    : public HipdnnBackendDescriptorImpl<ConvolutionFwdOperationDescriptor>,
+      public IGraphOperation
 {
 public:
     void finalize() override;
@@ -53,6 +55,10 @@ public:
         return _computeDataType;
     }
 
+    // IGraphOperation interface
+    std::vector<std::shared_ptr<TensorDescriptor>> getTensorDescriptors() const override;
+    std::unique_ptr<hipdnn_data_sdk::data_objects::NodeT> buildNode() const override;
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
@@ -68,6 +74,73 @@ private:
     // Compute data type for this operation (stored at node level in graph)
     hipdnn_data_sdk::data_objects::DataType _computeDataType
         = hipdnn_data_sdk::data_objects::DataType::UNSET;
+
+    // Private setAttribute helpers
+    void setTensorDesc(hipdnnBackendAttributeName_t attributeName,
+                       hipdnnBackendAttributeType_t attributeType,
+                       int64_t elementCount,
+                       const void* arrayOfElements);
+
+    void setPrePadding(hipdnnBackendAttributeType_t attributeType,
+                       int64_t elementCount,
+                       const void* arrayOfElements);
+
+    void setPostPadding(hipdnnBackendAttributeType_t attributeType,
+                        int64_t elementCount,
+                        const void* arrayOfElements);
+
+    void setFilterStrides(hipdnnBackendAttributeType_t attributeType,
+                          int64_t elementCount,
+                          const void* arrayOfElements);
+
+    void setDilations(hipdnnBackendAttributeType_t attributeType,
+                      int64_t elementCount,
+                      const void* arrayOfElements);
+
+    void setConvMode(hipdnnBackendAttributeType_t attributeType,
+                     int64_t elementCount,
+                     const void* arrayOfElements);
+
+    void setCompType(hipdnnBackendAttributeType_t attributeType,
+                     int64_t elementCount,
+                     const void* arrayOfElements);
+
+    // Private getAttribute helpers
+    void getTensorDesc(hipdnnBackendAttributeName_t attributeName,
+                       hipdnnBackendAttributeType_t attributeType,
+                       int64_t requestedElementCount,
+                       int64_t* elementCount,
+                       void* arrayOfElements) const;
+
+    void getPrePadding(hipdnnBackendAttributeType_t attributeType,
+                       int64_t requestedElementCount,
+                       int64_t* elementCount,
+                       void* arrayOfElements) const;
+
+    void getPostPadding(hipdnnBackendAttributeType_t attributeType,
+                        int64_t requestedElementCount,
+                        int64_t* elementCount,
+                        void* arrayOfElements) const;
+
+    void getFilterStrides(hipdnnBackendAttributeType_t attributeType,
+                          int64_t requestedElementCount,
+                          int64_t* elementCount,
+                          void* arrayOfElements) const;
+
+    void getDilations(hipdnnBackendAttributeType_t attributeType,
+                      int64_t requestedElementCount,
+                      int64_t* elementCount,
+                      void* arrayOfElements) const;
+
+    void getConvMode(hipdnnBackendAttributeType_t attributeType,
+                     int64_t requestedElementCount,
+                     int64_t* elementCount,
+                     void* arrayOfElements) const;
+
+    void getCompType(hipdnnBackendAttributeType_t attributeType,
+                     int64_t requestedElementCount,
+                     int64_t* elementCount,
+                     void* arrayOfElements) const;
 };
 
 } // namespace hipdnn_backend

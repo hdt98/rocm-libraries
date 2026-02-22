@@ -28,6 +28,7 @@ add_executable(
     TestConvolutionFwdAttributes.cpp
     TestConvolutionDgradNode.cpp
     TestConvolutionNode.cpp
+    TestDescriptorHelpers.cpp
     TestConvolutionWgradAttributes.cpp
     TestConvolutionWgradNode.cpp
     TestError.cpp

@@ -36,6 +36,62 @@ public:
     std::string toString() const override;
 
 private:
+    void setUniqueId(hipdnnBackendAttributeType_t attributeType,
+                     int64_t elementCount,
+                     const void* arrayOfElements);
+    void getUniqueId(hipdnnBackendAttributeType_t attributeType,
+                     int64_t requestedElementCount,
+                     int64_t* elementCount,
+                     void* arrayOfElements) const;
+
+    void setName(hipdnnBackendAttributeType_t attributeType,
+                 int64_t elementCount,
+                 const void* arrayOfElements);
+    void getName(hipdnnBackendAttributeType_t attributeType,
+                 int64_t requestedElementCount,
+                 int64_t* elementCount,
+                 void* arrayOfElements) const;
+
+    void setDataType(hipdnnBackendAttributeType_t attributeType,
+                     int64_t elementCount,
+                     const void* arrayOfElements);
+    void getDataType(hipdnnBackendAttributeType_t attributeType,
+                     int64_t requestedElementCount,
+                     int64_t* elementCount,
+                     void* arrayOfElements) const;
+
+    void setDimensions(hipdnnBackendAttributeType_t attributeType,
+                       int64_t elementCount,
+                       const void* arrayOfElements);
+    void getDimensions(hipdnnBackendAttributeType_t attributeType,
+                       int64_t requestedElementCount,
+                       int64_t* elementCount,
+                       void* arrayOfElements) const;
+
+    void setStrides(hipdnnBackendAttributeType_t attributeType,
+                    int64_t elementCount,
+                    const void* arrayOfElements);
+    void getStrides(hipdnnBackendAttributeType_t attributeType,
+                    int64_t requestedElementCount,
+                    int64_t* elementCount,
+                    void* arrayOfElements) const;
+
+    void setIsVirtual(hipdnnBackendAttributeType_t attributeType,
+                      int64_t elementCount,
+                      const void* arrayOfElements);
+    void getIsVirtual(hipdnnBackendAttributeType_t attributeType,
+                      int64_t requestedElementCount,
+                      int64_t* elementCount,
+                      void* arrayOfElements) const;
+
+    void setTensorValue(hipdnnBackendAttributeType_t attributeType,
+                        int64_t elementCount,
+                        const void* arrayOfElements);
+    void getTensorValue(hipdnnBackendAttributeType_t attributeType,
+                        int64_t requestedElementCount,
+                        int64_t* elementCount,
+                        void* arrayOfElements) const;
+
     hipdnn_data_sdk::data_objects::TensorAttributesT _data;
 };
 
