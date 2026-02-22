@@ -52,9 +52,6 @@ void GraphDescriptor::buildGraphFromOperations()
         // Build node from operation
         _graph->nodes.push_back(op->buildNode());
     }
-
-    // Clear the serialized buffer since we have a new graph
-    _graphSerializedBuffer = flatbuffers::DetachedBuffer();
 }
 
 void GraphDescriptor::setDataType(hipdnnBackendAttributeName_t attributeName,
@@ -180,9 +177,6 @@ void GraphDescriptor::setOperations(hipdnnBackendAttributeType_t attributeType,
                       "IGraphOperation");
         _operations.push_back(graphOp);
     }
-
-    // Clear the serialized graph when operations are set
-    _graphSerializedBuffer = flatbuffers::DetachedBuffer();
 }
 
 void GraphDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
@@ -233,6 +227,10 @@ void GraphDescriptor::deserializeGraph(const uint8_t* serializedGraph, size_t gr
 
 hipdnnPluginConstData_t GraphDescriptor::getSerializedGraph() const
 {
+    THROW_IF_FALSE(isFinalized(),
+                   HIPDNN_STATUS_BAD_PARAM_NOT_FINALIZED,
+                   "GraphDescriptor::getSerializedGraph: graph is not finalized");
+
     if(_graphSerializedBuffer.size() == 0)
     {
         THROW_IF_NULL(_graph,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "TensorDescriptor.hpp"
+#include "DescriptorAttributeUtils.hpp"
 #include "HipdnnBackendDescriptorType.h"
 #include "HipdnnException.hpp"
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
@@ -41,22 +42,50 @@ void TensorDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
     switch(attributeName)
     {
     case HIPDNN_ATTR_TENSOR_UNIQUE_ID:
-        getUniqueId(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        getScalar(_data.uid,
+                  HIPDNN_TYPE_INT64,
+                  attributeType,
+                  requestedElementCount,
+                  elementCount,
+                  arrayOfElements,
+                  "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_NAME_EXT:
         getName(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_TENSOR_DATA_TYPE:
-        getDataType(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        getScalar(_data.data_type,
+                  HIPDNN_TYPE_DATA_TYPE,
+                  attributeType,
+                  requestedElementCount,
+                  elementCount,
+                  arrayOfElements,
+                  "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_DIMENSIONS:
-        getDimensions(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        getInt64Vector(_data.dims,
+                       attributeType,
+                       requestedElementCount,
+                       elementCount,
+                       arrayOfElements,
+                       "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_STRIDES:
-        getStrides(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        getInt64Vector(_data.strides,
+                       attributeType,
+                       requestedElementCount,
+                       elementCount,
+                       arrayOfElements,
+                       "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_IS_VIRTUAL:
-        getIsVirtual(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        getScalar(_data.virtual_,
+                  HIPDNN_TYPE_BOOLEAN,
+                  attributeType,
+                  requestedElementCount,
+                  elementCount,
+                  arrayOfElements,
+                  "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_VALUE_EXT:
         getTensorValue(attributeType, requestedElementCount, elementCount, arrayOfElements);
@@ -79,22 +108,45 @@ void TensorDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
     switch(attributeName)
     {
     case HIPDNN_ATTR_TENSOR_UNIQUE_ID:
-        setUniqueId(attributeType, elementCount, arrayOfElements);
+        setScalar(_data.uid,
+                  HIPDNN_TYPE_INT64,
+                  attributeType,
+                  elementCount,
+                  arrayOfElements,
+                  "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_NAME_EXT:
         setName(attributeType, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_TENSOR_DATA_TYPE:
-        setDataType(attributeType, elementCount, arrayOfElements);
+        setScalar(_data.data_type,
+                  HIPDNN_TYPE_DATA_TYPE,
+                  attributeType,
+                  elementCount,
+                  arrayOfElements,
+                  "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_DIMENSIONS:
-        setDimensions(attributeType, elementCount, arrayOfElements);
+        setInt64Vector(_data.dims,
+                       attributeType,
+                       elementCount,
+                       arrayOfElements,
+                       "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_STRIDES:
-        setStrides(attributeType, elementCount, arrayOfElements);
+        setInt64Vector(_data.strides,
+                       attributeType,
+                       elementCount,
+                       arrayOfElements,
+                       "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_IS_VIRTUAL:
-        setIsVirtual(attributeType, elementCount, arrayOfElements);
+        setScalar(_data.virtual_,
+                  HIPDNN_TYPE_BOOLEAN,
+                  attributeType,
+                  elementCount,
+                  arrayOfElements,
+                  "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_VALUE_EXT:
         setTensorValue(attributeType, elementCount, arrayOfElements);
@@ -103,45 +155,6 @@ void TensorDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
         throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
                               "TensorDescriptor::setAttribute: attributeName not supported");
     }
-}
-
-void TensorDescriptor::setUniqueId(hipdnnBackendAttributeType_t attributeType,
-                                   int64_t elementCount,
-                                   const void* arrayOfElements)
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): attributeType is not HIPDNN_TYPE_INT64");
-    THROW_IF_FALSE(elementCount == 1,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): elementCount is not 1");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::setAttribute(): arrayOfElements is null");
-
-    _data.uid = *static_cast<const int64_t*>(arrayOfElements);
-}
-
-void TensorDescriptor::getUniqueId(hipdnnBackendAttributeType_t attributeType,
-                                   int64_t requestedElementCount,
-                                   int64_t* elementCount,
-                                   void* arrayOfElements) const
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): attributeType is not HIPDNN_TYPE_INT64");
-    THROW_IF_FALSE(requestedElementCount >= 1,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): requestedElementCount < 1");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::getAttribute(): arrayOfElements is null");
-
-    if(elementCount != nullptr)
-    {
-        *elementCount = 1;
-    }
-    *static_cast<int64_t*>(arrayOfElements) = _data.uid;
 }
 
 void TensorDescriptor::setName(hipdnnBackendAttributeType_t attributeType,
@@ -178,156 +191,6 @@ void TensorDescriptor::getName(hipdnnBackendAttributeType_t attributeType,
         *elementCount = static_cast<int64_t>(copyLen);
     }
     std::memcpy(arrayOfElements, _data.name.c_str(), copyLen);
-}
-
-void TensorDescriptor::setDataType(hipdnnBackendAttributeType_t attributeType,
-                                   int64_t elementCount,
-                                   const void* arrayOfElements)
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_DATA_TYPE,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): attributeType is not HIPDNN_TYPE_DATA_TYPE");
-    THROW_IF_FALSE(elementCount == 1,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): elementCount is not 1");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::setAttribute(): arrayOfElements is null");
-
-    _data.data_type = *static_cast<const hipdnn_data_sdk::data_objects::DataType*>(arrayOfElements);
-}
-
-void TensorDescriptor::getDataType(hipdnnBackendAttributeType_t attributeType,
-                                   int64_t requestedElementCount,
-                                   int64_t* elementCount,
-                                   void* arrayOfElements) const
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_DATA_TYPE,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): attributeType is not HIPDNN_TYPE_DATA_TYPE");
-    THROW_IF_FALSE(requestedElementCount >= 1,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): requestedElementCount < 1");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::getAttribute(): arrayOfElements is null");
-
-    if(elementCount != nullptr)
-    {
-        *elementCount = 1;
-    }
-    *static_cast<hipdnn_data_sdk::data_objects::DataType*>(arrayOfElements) = _data.data_type;
-}
-
-void TensorDescriptor::setDimensions(hipdnnBackendAttributeType_t attributeType,
-                                     int64_t elementCount,
-                                     const void* arrayOfElements)
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): attributeType is not HIPDNN_TYPE_INT64");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::setAttribute(): arrayOfElements is null");
-
-    _data.dims.assign(static_cast<const int64_t*>(arrayOfElements),
-                      static_cast<const int64_t*>(arrayOfElements) + elementCount);
-}
-
-void TensorDescriptor::getDimensions(hipdnnBackendAttributeType_t attributeType,
-                                     int64_t requestedElementCount,
-                                     int64_t* elementCount,
-                                     void* arrayOfElements) const
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): attributeType is not HIPDNN_TYPE_INT64");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::getAttribute(): arrayOfElements is null");
-
-    auto copyCount
-        = std::min<size_t>(static_cast<size_t>(requestedElementCount), _data.dims.size());
-    if(elementCount != nullptr)
-    {
-        *elementCount = static_cast<int64_t>(copyCount);
-    }
-    std::memcpy(arrayOfElements, _data.dims.data(), copyCount * sizeof(int64_t));
-}
-
-void TensorDescriptor::setStrides(hipdnnBackendAttributeType_t attributeType,
-                                  int64_t elementCount,
-                                  const void* arrayOfElements)
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): attributeType is not HIPDNN_TYPE_INT64");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::setAttribute(): arrayOfElements is null");
-
-    _data.strides.assign(static_cast<const int64_t*>(arrayOfElements),
-                         static_cast<const int64_t*>(arrayOfElements) + elementCount);
-}
-
-void TensorDescriptor::getStrides(hipdnnBackendAttributeType_t attributeType,
-                                  int64_t requestedElementCount,
-                                  int64_t* elementCount,
-                                  void* arrayOfElements) const
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): attributeType is not HIPDNN_TYPE_INT64");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::getAttribute(): arrayOfElements is null");
-
-    auto copyCount
-        = std::min<size_t>(static_cast<size_t>(requestedElementCount), _data.strides.size());
-    if(elementCount != nullptr)
-    {
-        *elementCount = static_cast<int64_t>(copyCount);
-    }
-    std::memcpy(arrayOfElements, _data.strides.data(), copyCount * sizeof(int64_t));
-}
-
-void TensorDescriptor::setIsVirtual(hipdnnBackendAttributeType_t attributeType,
-                                    int64_t elementCount,
-                                    const void* arrayOfElements)
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_BOOLEAN,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): attributeType is not HIPDNN_TYPE_BOOLEAN");
-    THROW_IF_FALSE(elementCount == 1,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::setAttribute(): elementCount is not 1");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::setAttribute(): arrayOfElements is null");
-
-    _data.virtual_ = *static_cast<const bool*>(arrayOfElements);
-}
-
-void TensorDescriptor::getIsVirtual(hipdnnBackendAttributeType_t attributeType,
-                                    int64_t requestedElementCount,
-                                    int64_t* elementCount,
-                                    void* arrayOfElements) const
-{
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_BOOLEAN,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): attributeType is not HIPDNN_TYPE_BOOLEAN");
-    THROW_IF_FALSE(requestedElementCount >= 1,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "TensorDescriptor::getAttribute(): requestedElementCount < 1");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "TensorDescriptor::getAttribute(): arrayOfElements is null");
-
-    if(elementCount != nullptr)
-    {
-        *elementCount = 1;
-    }
-    *static_cast<bool*>(arrayOfElements) = _data.virtual_;
 }
 
 void TensorDescriptor::setTensorValue(hipdnnBackendAttributeType_t attributeType,

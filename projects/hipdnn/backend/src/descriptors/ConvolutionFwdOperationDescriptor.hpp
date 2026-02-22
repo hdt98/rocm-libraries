@@ -81,27 +81,7 @@ private:
                        int64_t elementCount,
                        const void* arrayOfElements);
 
-    void setPrePadding(hipdnnBackendAttributeType_t attributeType,
-                       int64_t elementCount,
-                       const void* arrayOfElements);
-
-    void setPostPadding(hipdnnBackendAttributeType_t attributeType,
-                        int64_t elementCount,
-                        const void* arrayOfElements);
-
-    void setFilterStrides(hipdnnBackendAttributeType_t attributeType,
-                          int64_t elementCount,
-                          const void* arrayOfElements);
-
-    void setDilations(hipdnnBackendAttributeType_t attributeType,
-                      int64_t elementCount,
-                      const void* arrayOfElements);
-
     void setConvMode(hipdnnBackendAttributeType_t attributeType,
-                     int64_t elementCount,
-                     const void* arrayOfElements);
-
-    void setCompType(hipdnnBackendAttributeType_t attributeType,
                      int64_t elementCount,
                      const void* arrayOfElements);
 
@@ -112,32 +92,7 @@ private:
                        int64_t* elementCount,
                        void* arrayOfElements) const;
 
-    void getPrePadding(hipdnnBackendAttributeType_t attributeType,
-                       int64_t requestedElementCount,
-                       int64_t* elementCount,
-                       void* arrayOfElements) const;
-
-    void getPostPadding(hipdnnBackendAttributeType_t attributeType,
-                        int64_t requestedElementCount,
-                        int64_t* elementCount,
-                        void* arrayOfElements) const;
-
-    void getFilterStrides(hipdnnBackendAttributeType_t attributeType,
-                          int64_t requestedElementCount,
-                          int64_t* elementCount,
-                          void* arrayOfElements) const;
-
-    void getDilations(hipdnnBackendAttributeType_t attributeType,
-                      int64_t requestedElementCount,
-                      int64_t* elementCount,
-                      void* arrayOfElements) const;
-
     void getConvMode(hipdnnBackendAttributeType_t attributeType,
-                     int64_t requestedElementCount,
-                     int64_t* elementCount,
-                     void* arrayOfElements) const;
-
-    void getCompType(hipdnnBackendAttributeType_t attributeType,
                      int64_t requestedElementCount,
                      int64_t* elementCount,
                      void* arrayOfElements) const;

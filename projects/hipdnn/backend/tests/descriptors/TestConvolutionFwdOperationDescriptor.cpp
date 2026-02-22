@@ -30,31 +30,6 @@ public:
         return _wrapper->asDescriptor<ConvolutionFwdOperationDescriptor>();
     }
 
-    // Create a finalized tensor descriptor with the given UID
-    static std::unique_ptr<HipdnnBackendDescriptor>
-        createFinalizedTensor(int64_t uid,
-                              std::vector<int64_t> dims = {1, 3, 32, 32},
-                              std::vector<int64_t> strides = {3072, 1024, 32, 1},
-                              DataType dataType = DataType::FLOAT)
-    {
-        auto wrapper = createDescriptor<TensorDescriptor>();
-        auto desc = wrapper->asDescriptor<TensorDescriptor>();
-
-        desc->setAttribute(HIPDNN_ATTR_TENSOR_UNIQUE_ID, HIPDNN_TYPE_INT64, 1, &uid);
-        desc->setAttribute(HIPDNN_ATTR_TENSOR_DIMENSIONS,
-                           HIPDNN_TYPE_INT64,
-                           static_cast<int64_t>(dims.size()),
-                           dims.data());
-        desc->setAttribute(HIPDNN_ATTR_TENSOR_STRIDES,
-                           HIPDNN_TYPE_INT64,
-                           static_cast<int64_t>(strides.size()),
-                           strides.data());
-        desc->setAttribute(HIPDNN_ATTR_TENSOR_DATA_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &dataType);
-        desc->finalize();
-
-        return wrapper;
-    }
-
     void setTensors() const
     {
         auto desc = getDescriptor();
