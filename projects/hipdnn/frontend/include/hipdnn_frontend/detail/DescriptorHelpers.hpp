@@ -122,7 +122,7 @@ inline std::pair<Error, int64_t>
     auto& name = tensor->get_name();
     if(!name.empty())
     {
-        err = setDescriptorAttrString(desc.get(), HIPDNN_ATTR_TENSOR_NAME, name, "tensor name");
+        err = setDescriptorAttrString(desc.get(), HIPDNN_ATTR_TENSOR_NAME_EXT, name, "tensor name");
         if(err.is_bad())
         {
             return {std::move(err), uid};

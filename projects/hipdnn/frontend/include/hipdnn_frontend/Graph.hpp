@@ -18,6 +18,7 @@
 #include <hipdnn_frontend/detail/BackendWrapper.hpp>
 #include <hipdnn_frontend/detail/CreateBackendDescriptor.hpp>
 #include <hipdnn_frontend/detail/GraphDetail.hpp>
+#include <hipdnn_frontend/detail/GraphPacker.hpp>
 #include <hipdnn_frontend/detail/ScopedHipdnnBackendDescriptor.hpp>
 #include <hipdnn_frontend/knob/Knob.hpp>
 #include <hipdnn_frontend/node/BatchnormBackwardNode.hpp>
@@ -690,8 +691,9 @@ protected:
         return _graphDesc ? _graphDesc->get() : nullptr;
     }
 
-    // Build path using descriptor API (no FlatBuffers in frontend).
-    // Each node creates its own operation descriptor(s) via create_operation().
+    /// Builds the operation graph using the backend descriptor C API.
+    /// Each node creates its operation descriptor(s) via virtual dispatch,
+    /// then the GraphDescriptor is assembled and finalized.
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error build_operation_graph_via_descriptors(hipdnnHandle_t handle)
     {
@@ -712,82 +714,15 @@ protected:
             HIPDNN_CHECK_ERROR(node->create_operation(tensorDescs, operations));
         }
 
-        // Create GraphDescriptor directly (no separate builder needed)
-        detail::ScopedHipdnnBackendDescriptor graphDesc(HIPDNN_BACKEND_OPERATIONGRAPH_DESCRIPTOR);
-        if(!graphDesc.valid())
-        {
-            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to create GraphDescriptor"};
-        }
-
-        // Set handle on graph
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendSetAttribute(
-                graphDesc.get(), HIPDNN_ATTR_OPERATIONGRAPH_HANDLE, HIPDNN_TYPE_HANDLE, 1, &handle),
-            "Failed to set handle on GraphDescriptor");
-
-        // Set operations on graph (graph extracts tensors from operations automatically)
-        std::vector<hipdnnBackendDescriptor_t> opDescPtrs;
-        opDescPtrs.reserve(operations.size());
-        for(auto& desc : operations)
-        {
-            opDescPtrs.push_back(desc.get());
-        }
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendSetAttribute(graphDesc.get(),
-                                                         HIPDNN_ATTR_OPERATIONGRAPH_OPS,
-                                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
-                                                         static_cast<int64_t>(opDescPtrs.size()),
-                                                         opDescPtrs.data()),
-            "Failed to set operations on GraphDescriptor");
-
-        // Set graph-level data types
-        auto computeType = toSdkType(graph_attributes.get_compute_data_type());
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
-                                             graphDesc.get(),
-                                             HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE,
-                                             HIPDNN_TYPE_DATA_TYPE,
-                                             1,
-                                             &computeType),
-                                         "Failed to set compute data type on GraphDescriptor");
-
-        auto intermediateType = toSdkType(graph_attributes.get_intermediate_data_type());
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
-                                             graphDesc.get(),
-                                             HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE,
-                                             HIPDNN_TYPE_DATA_TYPE,
-                                             1,
-                                             &intermediateType),
-                                         "Failed to set intermediate data type on GraphDescriptor");
-
-        auto ioType = toSdkType(graph_attributes.get_io_data_type());
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendSetAttribute(graphDesc.get(),
-                                                         HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE,
-                                                         HIPDNN_TYPE_DATA_TYPE,
-                                                         1,
-                                                         &ioType),
-            "Failed to set io data type on GraphDescriptor");
-
-        // Set preferred engine ID if specified
-        if(_preferredEngineId.has_value())
-        {
-            auto engineId = _preferredEngineId.value();
-            HIPDNN_RETURN_ON_BACKEND_FAILURE(
-                detail::hipdnnBackend()->backendSetAttribute(
-                    graphDesc.get(),
-                    HIPDNN_ATTR_OPERATIONGRAPH_PREFERRED_ENGINE_ID,
-                    HIPDNN_TYPE_INT64,
-                    1,
-                    &engineId),
-                "Failed to set preferred engine ID on GraphDescriptor");
-        }
-
-        // Finalize the graph (builds GraphT from operations internally)
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendFinalize(graphDesc.get()),
-                                         "Failed to finalize GraphDescriptor");
-
-        // Store the graph descriptor
-        _graphDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(std::move(graphDesc));
+        // Assemble the graph descriptor from operations
+        HIPDNN_CHECK_ERROR(detail::assembleGraphDescriptor(
+            operations,
+            handle,
+            toSdkType(graph_attributes.get_compute_data_type()),
+            toSdkType(graph_attributes.get_intermediate_data_type()),
+            toSdkType(graph_attributes.get_io_data_type()),
+            _preferredEngineId,
+            _graphDesc));
 
         return {ErrorCode::OK, ""};
     }

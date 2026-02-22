@@ -43,7 +43,7 @@ void TensorDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_TENSOR_UNIQUE_ID:
         getUniqueId(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
-    case HIPDNN_ATTR_TENSOR_NAME:
+    case HIPDNN_ATTR_TENSOR_NAME_EXT:
         getName(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_TENSOR_DATA_TYPE:
@@ -58,7 +58,7 @@ void TensorDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_TENSOR_IS_VIRTUAL:
         getIsVirtual(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
-    case HIPDNN_ATTR_TENSOR_VALUE:
+    case HIPDNN_ATTR_TENSOR_VALUE_EXT:
         getTensorValue(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
     default:
@@ -81,7 +81,7 @@ void TensorDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_TENSOR_UNIQUE_ID:
         setUniqueId(attributeType, elementCount, arrayOfElements);
         break;
-    case HIPDNN_ATTR_TENSOR_NAME:
+    case HIPDNN_ATTR_TENSOR_NAME_EXT:
         setName(attributeType, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_TENSOR_DATA_TYPE:
@@ -96,7 +96,7 @@ void TensorDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_TENSOR_IS_VIRTUAL:
         setIsVirtual(attributeType, elementCount, arrayOfElements);
         break;
-    case HIPDNN_ATTR_TENSOR_VALUE:
+    case HIPDNN_ATTR_TENSOR_VALUE_EXT:
         setTensorValue(attributeType, elementCount, arrayOfElements);
         break;
     default:
@@ -340,14 +340,31 @@ void TensorDescriptor::setTensorValue(hipdnnBackendAttributeType_t attributeType
     THROW_IF_NULL(arrayOfElements,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "TensorDescriptor::setAttribute(): arrayOfElements is null");
+    THROW_IF_TRUE(_data.data_type == hipdnn_data_sdk::data_objects::DataType::UNSET,
+                  HIPDNN_STATUS_BAD_PARAM,
+                  "TensorDescriptor::setAttribute(): data type must be set before tensor value");
 
     using namespace hipdnn_data_sdk::data_objects;
 
     switch(attributeType)
     {
     case HIPDNN_TYPE_FLOAT:
-        _data.value.Set(Float32Value(*static_cast<const float*>(arrayOfElements)));
+    {
+        auto val = *static_cast<const float*>(arrayOfElements);
+        switch(_data.data_type)
+        {
+        case DataType::HALF:
+            _data.value.Set(Float16Value(val));
+            break;
+        case DataType::BFLOAT16:
+            _data.value.Set(BFloat16Value(val));
+            break;
+        default:
+            _data.value.Set(Float32Value(val));
+            break;
+        }
         break;
+    }
     case HIPDNN_TYPE_DOUBLE:
         _data.value.Set(Float64Value(*static_cast<const double*>(arrayOfElements)));
         break;

@@ -1243,6 +1243,100 @@ TEST_F(TestGraphDescriptorEquivalence, ConvOpWithNonUnitStrideAndDilation)
     EXPECT_EQ(descConv->dilation[1], 2);
 }
 
+// =============================================================================
+// Graph-Level Attribute Tests
+// =============================================================================
+
+TEST_F(TestGraphDescriptorOps, GraphLevelDataTypesPreserved)
+{
+    auto xDesc = createFinalizedTensor(1);
+    auto wDesc = createFinalizedTensor(2, {64, 3, 3, 3}, {27, 9, 3, 1});
+    auto yDesc = createFinalizedTensor(3, {1, 64, 32, 32}, {65536, 1024, 32, 1});
+    auto convOp = createFinalizedConvOp(xDesc.get(), wDesc.get(), yDesc.get());
+
+    auto desc = getDescriptor();
+    setHandle();
+
+    std::array<HipdnnBackendDescriptor*, 1> ops = {convOp.get()};
+    desc->setAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_OPS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, ops.data());
+
+    // Set graph-level data types before finalize
+    auto computeDt = DataType::HALF;
+    desc->setAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeDt);
+
+    auto intermediateDt = DataType::BFLOAT16;
+    desc->setAttribute(HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE_EXT,
+                       HIPDNN_TYPE_DATA_TYPE,
+                       1,
+                       &intermediateDt);
+
+    auto ioDt = DataType::FLOAT;
+    desc->setAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &ioDt);
+
+    desc->finalize();
+
+    auto serialized = desc->getSerializedGraph();
+    auto graphT = GetGraph(serialized.ptr)->UnPack();
+
+    EXPECT_EQ(graphT->compute_data_type, DataType::HALF);
+    EXPECT_EQ(graphT->intermediate_data_type, DataType::BFLOAT16);
+    EXPECT_EQ(graphT->io_data_type, DataType::FLOAT);
+}
+
+TEST_F(TestGraphDescriptorOps, PreferredEngineIdPreserved)
+{
+    auto xDesc = createFinalizedTensor(1);
+    auto wDesc = createFinalizedTensor(2, {64, 3, 3, 3}, {27, 9, 3, 1});
+    auto yDesc = createFinalizedTensor(3, {1, 64, 32, 32}, {65536, 1024, 32, 1});
+    auto convOp = createFinalizedConvOp(xDesc.get(), wDesc.get(), yDesc.get());
+
+    auto desc = getDescriptor();
+    setHandle();
+
+    std::array<HipdnnBackendDescriptor*, 1> ops = {convOp.get()};
+    desc->setAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_OPS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, ops.data());
+
+    int64_t engineId = 42;
+    desc->setAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_PREFERRED_ENGINE_ID_EXT, HIPDNN_TYPE_INT64, 1, &engineId);
+
+    desc->finalize();
+
+    auto serialized = desc->getSerializedGraph();
+    auto graphT = GetGraph(serialized.ptr)->UnPack();
+
+    EXPECT_EQ(graphT->preferred_engine_id, 42);
+}
+
+TEST_F(TestGraphDescriptorOps, GraphLevelDataTypesDefaultToUnset)
+{
+    auto xDesc = createFinalizedTensor(1);
+    auto wDesc = createFinalizedTensor(2, {64, 3, 3, 3}, {27, 9, 3, 1});
+    auto yDesc = createFinalizedTensor(3, {1, 64, 32, 32}, {65536, 1024, 32, 1});
+    auto convOp = createFinalizedConvOp(xDesc.get(), wDesc.get(), yDesc.get());
+
+    auto desc = getDescriptor();
+    setHandle();
+
+    std::array<HipdnnBackendDescriptor*, 1> ops = {convOp.get()};
+    desc->setAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_OPS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, ops.data());
+
+    // Finalize without setting any graph-level data types
+    desc->finalize();
+
+    auto serialized = desc->getSerializedGraph();
+    auto graphT = GetGraph(serialized.ptr)->UnPack();
+
+    EXPECT_EQ(graphT->compute_data_type, DataType::UNSET);
+    EXPECT_EQ(graphT->intermediate_data_type, DataType::UNSET);
+    EXPECT_EQ(graphT->io_data_type, DataType::UNSET);
+}
+
 TEST_F(TestGraphDescriptorOps, SharedTensorDifferentPositions)
 {
     // Same tensor used as Y in first op and X in second op

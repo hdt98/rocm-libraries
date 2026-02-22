@@ -80,7 +80,7 @@ protected:
             .WillOnce(Return(HIPDNN_STATUS_SUCCESS));
         EXPECT_CALL(*_mockBackend,
                     backendSetAttribute(_,
-                                        HIPDNN_ATTR_TENSOR_NAME,
+                                        HIPDNN_ATTR_TENSOR_NAME_EXT,
                                         HIPDNN_TYPE_CHAR,
                                         static_cast<int64_t>(name.size()),
                                         pointsToString(name)))

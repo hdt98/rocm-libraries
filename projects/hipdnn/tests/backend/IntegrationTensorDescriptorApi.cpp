@@ -79,7 +79,7 @@ TEST_F(IntegrationTensorDescriptorApi, SetAndGetAllAttributes)
 
     std::array<char, 256> gotName{};
     EXPECT_EQ(hipdnnBackendGetAttribute(desc,
-                                        HIPDNN_ATTR_TENSOR_NAME,
+                                        HIPDNN_ATTR_TENSOR_NAME_EXT,
                                         HIPDNN_TYPE_CHAR,
                                         static_cast<int64_t>(gotName.size()),
                                         &elementCount,
@@ -87,7 +87,8 @@ TEST_F(IntegrationTensorDescriptorApi, SetAndGetAllAttributes)
               HIPDNN_STATUS_SUCCESS);
     EXPECT_STREQ(gotName.data(), "test_tensor");
 
-    int8_t gotDataType = 0;
+    hipdnn_data_sdk::data_objects::DataType gotDataType
+        = hipdnn_data_sdk::data_objects::DataType::UNSET;
     EXPECT_EQ(hipdnnBackendGetAttribute(desc,
                                         HIPDNN_ATTR_TENSOR_DATA_TYPE,
                                         HIPDNN_TYPE_DATA_TYPE,
@@ -95,7 +96,7 @@ TEST_F(IntegrationTensorDescriptorApi, SetAndGetAllAttributes)
                                         &elementCount,
                                         &gotDataType),
               HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(gotDataType, static_cast<int8_t>(hipdnn_data_sdk::data_objects::DataType::FLOAT));
+    EXPECT_EQ(gotDataType, hipdnn_data_sdk::data_objects::DataType::FLOAT);
 
     std::vector<int64_t> gotDims(4);
     EXPECT_EQ(hipdnnBackendGetAttribute(desc,
@@ -140,17 +141,198 @@ TEST_F(IntegrationTensorDescriptorApi, SetAndGetTensorValue)
 
     float tensorValue = K_SCALAR_VALUE;
     ASSERT_EQ(hipdnnBackendSetAttribute(
-                  desc, HIPDNN_ATTR_TENSOR_VALUE, HIPDNN_TYPE_FLOAT, 1, &tensorValue),
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &tensorValue),
               HIPDNN_STATUS_SUCCESS);
 
     ASSERT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
 
     int64_t elementCount = 0;
     float gotValue = 0.0f;
-    EXPECT_EQ(hipdnnBackendGetAttribute(
-                  desc, HIPDNN_ATTR_TENSOR_VALUE, HIPDNN_TYPE_FLOAT, 1, &elementCount, &gotValue),
-              HIPDNN_STATUS_SUCCESS);
+    EXPECT_EQ(
+        hipdnnBackendGetAttribute(
+            desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &elementCount, &gotValue),
+        HIPDNN_STATUS_SUCCESS);
     EXPECT_FLOAT_EQ(gotValue, K_SCALAR_VALUE);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetAndGetTensorValueDouble)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    ASSERT_NO_FATAL_FAILURE(
+        setAllTensorAttributes(desc,
+                               K_TENSOR_UID,
+                               "scalar_double",
+                               toVec(K_SCALAR_DIMS),
+                               toVec(K_SCALAR_STRIDES),
+                               false,
+                               hipdnn_data_sdk::data_objects::DataType::DOUBLE));
+
+    double tensorValue = 2.718281828;
+    ASSERT_EQ(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_DOUBLE, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
+
+    int64_t elementCount = 0;
+    double gotValue = 0.0;
+    EXPECT_EQ(
+        hipdnnBackendGetAttribute(
+            desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_DOUBLE, 1, &elementCount, &gotValue),
+        HIPDNN_STATUS_SUCCESS);
+    EXPECT_DOUBLE_EQ(gotValue, 2.718281828);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetAndGetTensorValueInt32)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    ASSERT_NO_FATAL_FAILURE(setAllTensorAttributes(desc,
+                                                   K_TENSOR_UID,
+                                                   "scalar_int32",
+                                                   toVec(K_SCALAR_DIMS),
+                                                   toVec(K_SCALAR_STRIDES),
+                                                   false,
+                                                   hipdnn_data_sdk::data_objects::DataType::INT32));
+
+    int32_t tensorValue = 42;
+    ASSERT_EQ(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_INT32, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
+
+    int64_t elementCount = 0;
+    int32_t gotValue = 0;
+    EXPECT_EQ(
+        hipdnnBackendGetAttribute(
+            desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_INT32, 1, &elementCount, &gotValue),
+        HIPDNN_STATUS_SUCCESS);
+    EXPECT_EQ(gotValue, 42);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetAndGetTensorValueHalf)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    ASSERT_NO_FATAL_FAILURE(setAllTensorAttributes(desc,
+                                                   K_TENSOR_UID,
+                                                   "scalar_half",
+                                                   toVec(K_SCALAR_DIMS),
+                                                   toVec(K_SCALAR_STRIDES),
+                                                   false,
+                                                   hipdnn_data_sdk::data_objects::DataType::HALF));
+
+    float tensorValue = 1.5f;
+    ASSERT_EQ(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
+
+    int64_t elementCount = 0;
+    float gotValue = 0.0f;
+    EXPECT_EQ(
+        hipdnnBackendGetAttribute(
+            desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &elementCount, &gotValue),
+        HIPDNN_STATUS_SUCCESS);
+    EXPECT_FLOAT_EQ(gotValue, 1.5f);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetAndGetTensorValueBFloat16)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    ASSERT_NO_FATAL_FAILURE(
+        setAllTensorAttributes(desc,
+                               K_TENSOR_UID,
+                               "scalar_bf16",
+                               toVec(K_SCALAR_DIMS),
+                               toVec(K_SCALAR_STRIDES),
+                               false,
+                               hipdnn_data_sdk::data_objects::DataType::BFLOAT16));
+
+    float tensorValue = 1.5f;
+    ASSERT_EQ(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
+
+    int64_t elementCount = 0;
+    float gotValue = 0.0f;
+    EXPECT_EQ(
+        hipdnnBackendGetAttribute(
+            desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &elementCount, &gotValue),
+        HIPDNN_STATUS_SUCCESS);
+    EXPECT_FLOAT_EQ(gotValue, 1.5f);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetTensorValueTypeMismatchFails)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    ASSERT_NO_FATAL_FAILURE(setAllTensorAttributes(
+        desc, K_TENSOR_UID, "scalar", toVec(K_SCALAR_DIMS), toVec(K_SCALAR_STRIDES)));
+
+    float tensorValue = 1.0f;
+    ASSERT_EQ(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
+
+    int64_t elementCount = 0;
+    double gotValue = 0.0;
+    EXPECT_NE(
+        hipdnnBackendGetAttribute(
+            desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_DOUBLE, 1, &elementCount, &gotValue),
+        HIPDNN_STATUS_SUCCESS);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetTensorValueUnsupportedTypeFails)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    ASSERT_NO_FATAL_FAILURE(setAllTensorAttributes(
+        desc, K_TENSOR_UID, "scalar", toVec(K_SCALAR_DIMS), toVec(K_SCALAR_STRIDES)));
+
+    bool tensorValue = true;
+    EXPECT_NE(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_BOOLEAN, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
+
+    hipdnnBackendDestroyDescriptor(desc);
+}
+
+TEST_F(IntegrationTensorDescriptorApi, SetTensorValueWithoutDataTypeFails)
+{
+    auto desc = createTensorDesc();
+    ASSERT_NE(desc, nullptr);
+
+    float tensorValue = 1.0f;
+    EXPECT_NE(hipdnnBackendSetAttribute(
+                  desc, HIPDNN_ATTR_TENSOR_VALUE_EXT, HIPDNN_TYPE_FLOAT, 1, &tensorValue),
+              HIPDNN_STATUS_SUCCESS);
 
     hipdnnBackendDestroyDescriptor(desc);
 }

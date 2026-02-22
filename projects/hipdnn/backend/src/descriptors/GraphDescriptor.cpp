@@ -78,13 +78,13 @@ void GraphDescriptor::setDataType(hipdnnBackendAttributeName_t attributeName,
 
     switch(attributeName)
     {
-    case HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE:
+    case HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE_EXT:
         _computeDataType = dataType;
         break;
-    case HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE:
+    case HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE_EXT:
         _intermediateDataType = dataType;
         break;
-    case HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE:
+    case HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE_EXT:
         _ioDataType = dataType;
         break;
     default:
@@ -202,12 +202,12 @@ void GraphDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_OPERATIONGRAPH_OPS:
         setOperations(attributeType, elementCount, arrayOfElements);
         break;
-    case HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE:
-    case HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE:
-    case HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE:
+    case HIPDNN_ATTR_OPERATIONGRAPH_COMPUTE_DATA_TYPE_EXT:
+    case HIPDNN_ATTR_OPERATIONGRAPH_INTERMEDIATE_DATA_TYPE_EXT:
+    case HIPDNN_ATTR_OPERATIONGRAPH_IO_DATA_TYPE_EXT:
         setDataType(attributeName, attributeType, elementCount, arrayOfElements);
         break;
-    case HIPDNN_ATTR_OPERATIONGRAPH_PREFERRED_ENGINE_ID:
+    case HIPDNN_ATTR_OPERATIONGRAPH_PREFERRED_ENGINE_ID_EXT:
         setPreferredEngineId(attributeType, elementCount, arrayOfElements);
         break;
     default:
