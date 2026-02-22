@@ -184,13 +184,14 @@ void TensorDescriptor::getName(hipdnnBackendAttributeType_t attributeType,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "TensorDescriptor::getAttribute(): arrayOfElements is null");
 
-    auto copyLen
-        = std::min<size_t>(static_cast<size_t>(requestedElementCount), _data.name.size() + 1);
+    auto maxSize = static_cast<size_t>(requestedElementCount);
+    hipdnn_data_sdk::utilities::copyMaxSizeWithNullTerminator(
+        static_cast<char*>(arrayOfElements), _data.name.c_str(), maxSize);
+
     if(elementCount != nullptr)
     {
-        *elementCount = static_cast<int64_t>(copyLen);
+        *elementCount = static_cast<int64_t>(std::min(_data.name.size() + 1, maxSize));
     }
-    std::memcpy(arrayOfElements, _data.name.c_str(), copyLen);
 }
 
 void TensorDescriptor::setTensorValue(hipdnnBackendAttributeType_t attributeType,

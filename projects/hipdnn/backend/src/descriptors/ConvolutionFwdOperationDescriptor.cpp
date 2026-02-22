@@ -139,10 +139,17 @@ void ConvolutionFwdOperationDescriptor::setTensorDesc(hipdnnBackendAttributeName
         _wDesc = tensorDesc;
         _data.w_tensor_uid = tensorDesc->getData().uid;
     }
-    else
+    else if(attributeName == HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_Y)
     {
         _yDesc = tensorDesc;
         _data.y_tensor_uid = tensorDesc->getData().uid;
+    }
+    else
+    {
+        THROW_IF_TRUE(true,
+                      HIPDNN_STATUS_BAD_PARAM,
+                      "ConvolutionFwdOperationDescriptor::setTensorDesc(): unsupported attribute "
+                      "name");
     }
 }
 
@@ -272,9 +279,16 @@ void ConvolutionFwdOperationDescriptor::getTensorDesc(hipdnnBackendAttributeName
     {
         desc = _wDesc;
     }
-    else
+    else if(attributeName == HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_Y)
     {
         desc = _yDesc;
+    }
+    else
+    {
+        THROW_IF_TRUE(true,
+                      HIPDNN_STATUS_BAD_PARAM,
+                      "ConvolutionFwdOperationDescriptor::getTensorDesc(): unsupported attribute "
+                      "name");
     }
     HipdnnBackendDescriptor::packDescriptor(desc, arrayOfElements);
 }

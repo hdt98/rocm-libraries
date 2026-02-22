@@ -749,7 +749,28 @@ TEST_F(TestGraphDescriptorOps, GraphHasCorrectTensorCount)
 // Equivalence Tests - Compare FlatBuffer path vs Descriptor path
 // =============================================================================
 
-class TestGraphDescriptorEquivalence : public TestGraphDescriptorOps
+struct ConvEquivalenceParams
+{
+    std::string name;
+    int64_t xUid;
+    int64_t wUid;
+    int64_t yUid;
+    std::vector<int64_t> xDims;
+    std::vector<int64_t> xStrides;
+    std::vector<int64_t> wDims;
+    std::vector<int64_t> wStrides;
+    std::vector<int64_t> yDims;
+    std::vector<int64_t> yStrides;
+    std::vector<int64_t> prePadding;
+    std::vector<int64_t> postPadding;
+    std::vector<int64_t> stride;
+    std::vector<int64_t> dilation;
+    DataType tensorDataType;
+    DataType computeDataType;
+};
+
+class TestGraphDescriptorEquivalence : public TestGraphDescriptorOps,
+                                       public ::testing::WithParamInterface<ConvEquivalenceParams>
 {
 public:
     // Build a graph via FlatBuffer serialization (the "old" path)
@@ -860,327 +881,170 @@ public:
         auto graph = GetGraph(serialized.ptr);
         return std::unique_ptr<GraphT>(graph->UnPack());
     }
+
+    void verifyEquivalence(const ConvEquivalenceParams& p)
+    {
+        // Build via FlatBuffer path
+        TensorAttributesT xTensor;
+        xTensor.uid = p.xUid;
+        xTensor.dims = p.xDims;
+        xTensor.strides = p.xStrides;
+        xTensor.data_type = p.tensorDataType;
+
+        TensorAttributesT wTensor;
+        wTensor.uid = p.wUid;
+        wTensor.dims = p.wDims;
+        wTensor.strides = p.wStrides;
+        wTensor.data_type = p.tensorDataType;
+
+        TensorAttributesT yTensor;
+        yTensor.uid = p.yUid;
+        yTensor.dims = p.yDims;
+        yTensor.strides = p.yStrides;
+        yTensor.data_type = p.tensorDataType;
+
+        ConvolutionFwdAttributesT convAttrs;
+        convAttrs.x_tensor_uid = p.xUid;
+        convAttrs.w_tensor_uid = p.wUid;
+        convAttrs.y_tensor_uid = p.yUid;
+        convAttrs.pre_padding = p.prePadding;
+        convAttrs.post_padding = p.postPadding;
+        convAttrs.stride = p.stride;
+        convAttrs.dilation = p.dilation;
+
+        auto flatbufferBuffer
+            = buildGraphViaFlatBuffer(xTensor, wTensor, yTensor, convAttrs, p.computeDataType);
+        auto flatbufferGraphT = GetGraph(flatbufferBuffer.data())->UnPack();
+
+        // Build via descriptor path
+        auto descriptorGraphT = buildGraphViaDescriptors(p.xUid,
+                                                         p.wUid,
+                                                         p.yUid,
+                                                         p.xDims,
+                                                         p.xStrides,
+                                                         p.wDims,
+                                                         p.wStrides,
+                                                         p.yDims,
+                                                         p.yStrides,
+                                                         p.prePadding,
+                                                         p.postPadding,
+                                                         p.stride,
+                                                         p.dilation,
+                                                         p.tensorDataType,
+                                                         p.computeDataType);
+
+        // Verify structural equivalence
+        ASSERT_EQ(flatbufferGraphT->tensors.size(), descriptorGraphT->tensors.size());
+        ASSERT_EQ(flatbufferGraphT->nodes.size(), descriptorGraphT->nodes.size());
+
+        // Compare tensors (order may differ, so compare by UID)
+        std::map<int64_t, const TensorAttributesT*> fbTensors;
+        for(const auto& t : flatbufferGraphT->tensors)
+        {
+            fbTensors[t->uid] = t.get();
+        }
+
+        for(const auto& descTensor : descriptorGraphT->tensors)
+        {
+            auto it = fbTensors.find(descTensor->uid);
+            ASSERT_NE(it, fbTensors.end())
+                << "Tensor UID " << descTensor->uid << " not found in FlatBuffer graph";
+
+            const auto* fbTensor = it->second;
+            EXPECT_EQ(fbTensor->uid, descTensor->uid);
+            EXPECT_EQ(fbTensor->dims, descTensor->dims);
+            EXPECT_EQ(fbTensor->strides, descTensor->strides);
+            EXPECT_EQ(fbTensor->data_type, descTensor->data_type);
+        }
+
+        // Compare nodes
+        ASSERT_EQ(flatbufferGraphT->nodes.size(), 1);
+        ASSERT_EQ(descriptorGraphT->nodes.size(), 1);
+
+        const auto& fbNode = flatbufferGraphT->nodes[0];
+        const auto& descNode = descriptorGraphT->nodes[0];
+
+        EXPECT_EQ(fbNode->compute_data_type, descNode->compute_data_type);
+        EXPECT_EQ(fbNode->attributes.type, descNode->attributes.type);
+        EXPECT_EQ(fbNode->attributes.type, NodeAttributes::ConvolutionFwdAttributes);
+
+        const auto* fbConv = fbNode->attributes.AsConvolutionFwdAttributes();
+        const auto* descConv = descNode->attributes.AsConvolutionFwdAttributes();
+
+        ASSERT_NE(fbConv, nullptr);
+        ASSERT_NE(descConv, nullptr);
+
+        EXPECT_EQ(fbConv->x_tensor_uid, descConv->x_tensor_uid);
+        EXPECT_EQ(fbConv->w_tensor_uid, descConv->w_tensor_uid);
+        EXPECT_EQ(fbConv->y_tensor_uid, descConv->y_tensor_uid);
+        EXPECT_EQ(fbConv->pre_padding, descConv->pre_padding);
+        EXPECT_EQ(fbConv->post_padding, descConv->post_padding);
+        EXPECT_EQ(fbConv->stride, descConv->stride);
+        EXPECT_EQ(fbConv->dilation, descConv->dilation);
+    }
 };
 
-TEST_F(TestGraphDescriptorEquivalence, SingleConvOpEquivalence)
+TEST_P(TestGraphDescriptorEquivalence, ConvOpEquivalence)
 {
-    // Test parameters
-    const int64_t xUid = 1;
-    const int64_t wUid = 2;
-    const int64_t yUid = 3;
-    const std::vector<int64_t> xDims = {1, 3, 32, 32};
-    const std::vector<int64_t> xStrides = {3072, 1024, 32, 1};
-    const std::vector<int64_t> wDims = {64, 3, 3, 3};
-    const std::vector<int64_t> wStrides = {27, 9, 3, 1};
-    const std::vector<int64_t> yDims = {1, 64, 32, 32};
-    const std::vector<int64_t> yStrides = {65536, 1024, 32, 1};
-    const std::vector<int64_t> prePadding = {1, 1};
-    const std::vector<int64_t> postPadding = {1, 1};
-    const std::vector<int64_t> stride = {1, 1};
-    const std::vector<int64_t> dilation = {1, 1};
-    const auto tensorDataType = DataType::FLOAT;
-    const auto computeDataType = DataType::FLOAT;
-
-    // Build via FlatBuffer path
-    TensorAttributesT xTensor;
-    xTensor.uid = xUid;
-    xTensor.dims = xDims;
-    xTensor.strides = xStrides;
-    xTensor.data_type = tensorDataType;
-
-    TensorAttributesT wTensor;
-    wTensor.uid = wUid;
-    wTensor.dims = wDims;
-    wTensor.strides = wStrides;
-    wTensor.data_type = tensorDataType;
-
-    TensorAttributesT yTensor;
-    yTensor.uid = yUid;
-    yTensor.dims = yDims;
-    yTensor.strides = yStrides;
-    yTensor.data_type = tensorDataType;
-
-    ConvolutionFwdAttributesT convAttrs;
-    convAttrs.x_tensor_uid = xUid;
-    convAttrs.w_tensor_uid = wUid;
-    convAttrs.y_tensor_uid = yUid;
-    convAttrs.pre_padding = prePadding;
-    convAttrs.post_padding = postPadding;
-    convAttrs.stride = stride;
-    convAttrs.dilation = dilation;
-
-    auto flatbufferBuffer
-        = buildGraphViaFlatBuffer(xTensor, wTensor, yTensor, convAttrs, computeDataType);
-    auto flatbufferGraph = GetGraph(flatbufferBuffer.data());
-    auto flatbufferGraphT = flatbufferGraph->UnPack();
-
-    // Build via descriptor path
-    auto descriptorGraphT = buildGraphViaDescriptors(xUid,
-                                                     wUid,
-                                                     yUid,
-                                                     xDims,
-                                                     xStrides,
-                                                     wDims,
-                                                     wStrides,
-                                                     yDims,
-                                                     yStrides,
-                                                     prePadding,
-                                                     postPadding,
-                                                     stride,
-                                                     dilation,
-                                                     tensorDataType,
-                                                     computeDataType);
-
-    // Verify structural equivalence
-    ASSERT_EQ(flatbufferGraphT->tensors.size(), descriptorGraphT->tensors.size());
-    ASSERT_EQ(flatbufferGraphT->nodes.size(), descriptorGraphT->nodes.size());
-
-    // Compare tensors (order may differ, so compare by UID)
-    std::map<int64_t, const TensorAttributesT*> fbTensors;
-    for(const auto& t : flatbufferGraphT->tensors)
-    {
-        fbTensors[t->uid] = t.get();
-    }
-
-    for(const auto& descTensor : descriptorGraphT->tensors)
-    {
-        auto it = fbTensors.find(descTensor->uid);
-        ASSERT_NE(it, fbTensors.end())
-            << "Tensor UID " << descTensor->uid << " not found in FlatBuffer graph";
-
-        const auto* fbTensor = it->second;
-        EXPECT_EQ(fbTensor->uid, descTensor->uid);
-        EXPECT_EQ(fbTensor->dims, descTensor->dims);
-        EXPECT_EQ(fbTensor->strides, descTensor->strides);
-        EXPECT_EQ(fbTensor->data_type, descTensor->data_type);
-    }
-
-    // Compare nodes
-    ASSERT_EQ(flatbufferGraphT->nodes.size(), 1);
-    ASSERT_EQ(descriptorGraphT->nodes.size(), 1);
-
-    const auto& fbNode = flatbufferGraphT->nodes[0];
-    const auto& descNode = descriptorGraphT->nodes[0];
-
-    EXPECT_EQ(fbNode->compute_data_type, descNode->compute_data_type);
-    EXPECT_EQ(fbNode->attributes.type, descNode->attributes.type);
-    EXPECT_EQ(fbNode->attributes.type, NodeAttributes::ConvolutionFwdAttributes);
-
-    // Compare conv attributes
-    const auto* fbConv = fbNode->attributes.AsConvolutionFwdAttributes();
-    const auto* descConv = descNode->attributes.AsConvolutionFwdAttributes();
-
-    ASSERT_NE(fbConv, nullptr);
-    ASSERT_NE(descConv, nullptr);
-
-    EXPECT_EQ(fbConv->x_tensor_uid, descConv->x_tensor_uid);
-    EXPECT_EQ(fbConv->w_tensor_uid, descConv->w_tensor_uid);
-    EXPECT_EQ(fbConv->y_tensor_uid, descConv->y_tensor_uid);
-    EXPECT_EQ(fbConv->pre_padding, descConv->pre_padding);
-    EXPECT_EQ(fbConv->post_padding, descConv->post_padding);
-    EXPECT_EQ(fbConv->stride, descConv->stride);
-    EXPECT_EQ(fbConv->dilation, descConv->dilation);
+    verifyEquivalence(GetParam());
 }
 
-TEST_F(TestGraphDescriptorEquivalence, ConvOpWithHalfPrecision)
+std::string convEquivalenceParamName(const ::testing::TestParamInfo<ConvEquivalenceParams>& info)
 {
-    // Test with HALF data type
-    const int64_t xUid = 10;
-    const int64_t wUid = 20;
-    const int64_t yUid = 30;
-    const std::vector<int64_t> xDims = {2, 64, 56, 56};
-    const std::vector<int64_t> xStrides = {200704, 3136, 56, 1};
-    const std::vector<int64_t> wDims = {128, 64, 3, 3};
-    const std::vector<int64_t> wStrides = {576, 9, 3, 1};
-    const std::vector<int64_t> yDims = {2, 128, 56, 56};
-    const std::vector<int64_t> yStrides = {401408, 3136, 56, 1};
-    const std::vector<int64_t> prePadding = {1, 1};
-    const std::vector<int64_t> postPadding = {1, 1};
-    const std::vector<int64_t> stride = {1, 1};
-    const std::vector<int64_t> dilation = {1, 1};
-    const auto tensorDataType = DataType::HALF;
-    const auto computeDataType = DataType::HALF;
-
-    // Build via FlatBuffer path
-    TensorAttributesT xTensor;
-    xTensor.uid = xUid;
-    xTensor.dims = xDims;
-    xTensor.strides = xStrides;
-    xTensor.data_type = tensorDataType;
-
-    TensorAttributesT wTensor;
-    wTensor.uid = wUid;
-    wTensor.dims = wDims;
-    wTensor.strides = wStrides;
-    wTensor.data_type = tensorDataType;
-
-    TensorAttributesT yTensor;
-    yTensor.uid = yUid;
-    yTensor.dims = yDims;
-    yTensor.strides = yStrides;
-    yTensor.data_type = tensorDataType;
-
-    ConvolutionFwdAttributesT convAttrs;
-    convAttrs.x_tensor_uid = xUid;
-    convAttrs.w_tensor_uid = wUid;
-    convAttrs.y_tensor_uid = yUid;
-    convAttrs.pre_padding = prePadding;
-    convAttrs.post_padding = postPadding;
-    convAttrs.stride = stride;
-    convAttrs.dilation = dilation;
-
-    auto flatbufferBuffer
-        = buildGraphViaFlatBuffer(xTensor, wTensor, yTensor, convAttrs, computeDataType);
-    auto flatbufferGraph = GetGraph(flatbufferBuffer.data());
-    auto flatbufferGraphT = flatbufferGraph->UnPack();
-
-    // Build via descriptor path
-    auto descriptorGraphT = buildGraphViaDescriptors(xUid,
-                                                     wUid,
-                                                     yUid,
-                                                     xDims,
-                                                     xStrides,
-                                                     wDims,
-                                                     wStrides,
-                                                     yDims,
-                                                     yStrides,
-                                                     prePadding,
-                                                     postPadding,
-                                                     stride,
-                                                     dilation,
-                                                     tensorDataType,
-                                                     computeDataType);
-
-    // Verify structural equivalence
-    ASSERT_EQ(flatbufferGraphT->tensors.size(), descriptorGraphT->tensors.size());
-    ASSERT_EQ(flatbufferGraphT->nodes.size(), descriptorGraphT->nodes.size());
-
-    // Compare tensors by UID with full field verification
-    std::map<int64_t, const TensorAttributesT*> fbTensors;
-    for(const auto& t : flatbufferGraphT->tensors)
-    {
-        fbTensors[t->uid] = t.get();
-    }
-
-    for(const auto& descTensor : descriptorGraphT->tensors)
-    {
-        auto it = fbTensors.find(descTensor->uid);
-        ASSERT_NE(it, fbTensors.end()) << "Tensor UID " << descTensor->uid << " not found";
-
-        const auto* fbTensor = it->second;
-        EXPECT_EQ(fbTensor->dims, descTensor->dims);
-        EXPECT_EQ(fbTensor->strides, descTensor->strides);
-        EXPECT_EQ(fbTensor->data_type, descTensor->data_type);
-        EXPECT_EQ(fbTensor->data_type, DataType::HALF);
-    }
-
-    // Compare nodes
-    const auto& fbNode = flatbufferGraphT->nodes[0];
-    const auto& descNode = descriptorGraphT->nodes[0];
-
-    EXPECT_EQ(fbNode->compute_data_type, DataType::HALF);
-    EXPECT_EQ(descNode->compute_data_type, DataType::HALF);
-
-    // Compare conv attributes with full field verification
-    const auto* fbConv = fbNode->attributes.AsConvolutionFwdAttributes();
-    const auto* descConv = descNode->attributes.AsConvolutionFwdAttributes();
-
-    ASSERT_NE(fbConv, nullptr);
-    ASSERT_NE(descConv, nullptr);
-
-    EXPECT_EQ(fbConv->x_tensor_uid, descConv->x_tensor_uid);
-    EXPECT_EQ(fbConv->w_tensor_uid, descConv->w_tensor_uid);
-    EXPECT_EQ(fbConv->y_tensor_uid, descConv->y_tensor_uid);
-    EXPECT_EQ(fbConv->pre_padding, descConv->pre_padding);
-    EXPECT_EQ(fbConv->post_padding, descConv->post_padding);
-    EXPECT_EQ(fbConv->stride, descConv->stride);
-    EXPECT_EQ(fbConv->dilation, descConv->dilation);
+    return info.param.name;
 }
 
-TEST_F(TestGraphDescriptorEquivalence, ConvOpWithNonUnitStrideAndDilation)
-{
-    // Test with non-unit stride and dilation
-    const int64_t xUid = 100;
-    const int64_t wUid = 200;
-    const int64_t yUid = 300;
-    const std::vector<int64_t> xDims = {1, 256, 28, 28};
-    const std::vector<int64_t> xStrides = {200704, 784, 28, 1};
-    const std::vector<int64_t> wDims = {512, 256, 3, 3};
-    const std::vector<int64_t> wStrides = {2304, 9, 3, 1};
-    const std::vector<int64_t> yDims = {1, 512, 14, 14};
-    const std::vector<int64_t> yStrides = {100352, 196, 14, 1};
-    const std::vector<int64_t> prePadding = {2, 2};
-    const std::vector<int64_t> postPadding = {2, 2};
-    const std::vector<int64_t> stride = {2, 2}; // Non-unit stride
-    const std::vector<int64_t> dilation = {2, 2}; // Non-unit dilation
-    const auto tensorDataType = DataType::FLOAT;
-    const auto computeDataType = DataType::FLOAT;
-
-    // Build via FlatBuffer path
-    TensorAttributesT xTensor;
-    xTensor.uid = xUid;
-    xTensor.dims = xDims;
-    xTensor.strides = xStrides;
-    xTensor.data_type = tensorDataType;
-
-    TensorAttributesT wTensor;
-    wTensor.uid = wUid;
-    wTensor.dims = wDims;
-    wTensor.strides = wStrides;
-    wTensor.data_type = tensorDataType;
-
-    TensorAttributesT yTensor;
-    yTensor.uid = yUid;
-    yTensor.dims = yDims;
-    yTensor.strides = yStrides;
-    yTensor.data_type = tensorDataType;
-
-    ConvolutionFwdAttributesT convAttrs;
-    convAttrs.x_tensor_uid = xUid;
-    convAttrs.w_tensor_uid = wUid;
-    convAttrs.y_tensor_uid = yUid;
-    convAttrs.pre_padding = prePadding;
-    convAttrs.post_padding = postPadding;
-    convAttrs.stride = stride;
-    convAttrs.dilation = dilation;
-
-    auto flatbufferBuffer
-        = buildGraphViaFlatBuffer(xTensor, wTensor, yTensor, convAttrs, computeDataType);
-    auto flatbufferGraph = GetGraph(flatbufferBuffer.data());
-    auto flatbufferGraphT = flatbufferGraph->UnPack();
-
-    // Build via descriptor path
-    auto descriptorGraphT = buildGraphViaDescriptors(xUid,
-                                                     wUid,
-                                                     yUid,
-                                                     xDims,
-                                                     xStrides,
-                                                     wDims,
-                                                     wStrides,
-                                                     yDims,
-                                                     yStrides,
-                                                     prePadding,
-                                                     postPadding,
-                                                     stride,
-                                                     dilation,
-                                                     tensorDataType,
-                                                     computeDataType);
-
-    // Compare conv attributes - especially stride and dilation
-    const auto* fbConv = flatbufferGraphT->nodes[0]->attributes.AsConvolutionFwdAttributes();
-    const auto* descConv = descriptorGraphT->nodes[0]->attributes.AsConvolutionFwdAttributes();
-
-    EXPECT_EQ(fbConv->pre_padding, descConv->pre_padding);
-    EXPECT_EQ(fbConv->post_padding, descConv->post_padding);
-    EXPECT_EQ(fbConv->stride, descConv->stride);
-    EXPECT_EQ(fbConv->dilation, descConv->dilation);
-
-    // Verify the actual values
-    EXPECT_EQ(descConv->stride[0], 2);
-    EXPECT_EQ(descConv->stride[1], 2);
-    EXPECT_EQ(descConv->dilation[0], 2);
-    EXPECT_EQ(descConv->dilation[1], 2);
-}
+INSTANTIATE_TEST_SUITE_P(ConvOps,
+                         TestGraphDescriptorEquivalence,
+                         ::testing::Values(ConvEquivalenceParams{"SingleConvOp",
+                                                                 1,
+                                                                 2,
+                                                                 3,
+                                                                 {1, 3, 32, 32},
+                                                                 {3072, 1024, 32, 1},
+                                                                 {64, 3, 3, 3},
+                                                                 {27, 9, 3, 1},
+                                                                 {1, 64, 32, 32},
+                                                                 {65536, 1024, 32, 1},
+                                                                 {1, 1},
+                                                                 {1, 1},
+                                                                 {1, 1},
+                                                                 {1, 1},
+                                                                 DataType::FLOAT,
+                                                                 DataType::FLOAT},
+                                           ConvEquivalenceParams{"HalfPrecision",
+                                                                 10,
+                                                                 20,
+                                                                 30,
+                                                                 {2, 64, 56, 56},
+                                                                 {200704, 3136, 56, 1},
+                                                                 {128, 64, 3, 3},
+                                                                 {576, 9, 3, 1},
+                                                                 {2, 128, 56, 56},
+                                                                 {401408, 3136, 56, 1},
+                                                                 {1, 1},
+                                                                 {1, 1},
+                                                                 {1, 1},
+                                                                 {1, 1},
+                                                                 DataType::HALF,
+                                                                 DataType::HALF},
+                                           ConvEquivalenceParams{"NonUnitStrideAndDilation",
+                                                                 100,
+                                                                 200,
+                                                                 300,
+                                                                 {1, 256, 28, 28},
+                                                                 {200704, 784, 28, 1},
+                                                                 {512, 256, 3, 3},
+                                                                 {2304, 9, 3, 1},
+                                                                 {1, 512, 14, 14},
+                                                                 {100352, 196, 14, 1},
+                                                                 {2, 2},
+                                                                 {2, 2},
+                                                                 {2, 2},
+                                                                 {2, 2},
+                                                                 DataType::FLOAT,
+                                                                 DataType::FLOAT}),
+                         convEquivalenceParamName);
 
 // =============================================================================
 // Graph-Level Attribute Tests

@@ -52,6 +52,9 @@ void GraphDescriptor::buildGraphFromOperations()
         // Build node from operation
         _graph->nodes.push_back(op->buildNode());
     }
+
+    _operations.clear();
+    _tensorUids.clear();
 }
 
 void GraphDescriptor::setDataType(hipdnnBackendAttributeName_t attributeName,

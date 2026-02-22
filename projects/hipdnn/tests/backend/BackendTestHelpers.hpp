@@ -74,35 +74,13 @@ inline hipdnnBackendDescriptor_t
     EXPECT_EQ(hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_TENSOR_DESCRIPTOR, &desc),
               HIPDNN_STATUS_SUCCESS);
 
-    EXPECT_EQ(
-        hipdnnBackendSetAttribute(desc, HIPDNN_ATTR_TENSOR_UNIQUE_ID, HIPDNN_TYPE_INT64, 1, &uid),
-        HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(hipdnnBackendSetAttribute(desc,
-                                        HIPDNN_ATTR_TENSOR_NAME_EXT,
-                                        HIPDNN_TYPE_CHAR,
-                                        static_cast<int64_t>(std::strlen(name)),
-                                        name),
-              HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(hipdnnBackendSetAttribute(
-                  desc, HIPDNN_ATTR_TENSOR_DATA_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &dataType),
-              HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(hipdnnBackendSetAttribute(desc,
-                                        HIPDNN_ATTR_TENSOR_DIMENSIONS,
-                                        HIPDNN_TYPE_INT64,
-                                        static_cast<int64_t>(dims.size()),
-                                        dims.data()),
-              HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(hipdnnBackendSetAttribute(desc,
-                                        HIPDNN_ATTR_TENSOR_STRIDES,
-                                        HIPDNN_TYPE_INT64,
-                                        static_cast<int64_t>(strides.size()),
-                                        strides.data()),
-              HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(hipdnnBackendSetAttribute(
-                  desc, HIPDNN_ATTR_TENSOR_IS_VIRTUAL, HIPDNN_TYPE_BOOLEAN, 1, &isVirtual),
-              HIPDNN_STATUS_SUCCESS);
-    EXPECT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
+    setAllTensorAttributes(desc, uid, name, dims, strides, isVirtual, dataType);
+    if(::testing::Test::HasFatalFailure())
+    {
+        return desc;
+    }
 
+    EXPECT_EQ(hipdnnBackendFinalize(desc), HIPDNN_STATUS_SUCCESS);
     return desc;
 }
 

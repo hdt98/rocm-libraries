@@ -3919,11 +3919,6 @@ TEST_F(TestGraph, GetRankedEngineIdsReturnsRankedList)
     EXPECT_EQ(rankedEngineIds[2], 300);
 }
 
-// TODO: Remove this guard once BatchNormInferenceNode implements create_operation().
-// This test uses BatchNormInference which currently only supports the FlatBuffers path.
-// When BatchNormInferenceNode is ported to the descriptor API, this test should work
-// on both paths and the #ifdef should be removed.
-#ifdef HIPDNN_ENABLE_DIRECT_FLATBUFFERS
 TEST_F(TestGraph, BuildMethodSucceedsWithValidGraph)
 {
     ::testing::FLAGS_gmock_verbose = "error";
@@ -4104,7 +4099,6 @@ TEST_F(TestGraph, BuildMethodSucceedsWithValidGraph)
     auto result = graph.build(_handle);
     EXPECT_TRUE(result.is_good()) << result.get_message();
 }
-#endif // HIPDNN_ENABLE_DIRECT_FLATBUFFERS
 
 TEST_F(TestGraph, CreateExecutionPlanExtWithKnobSettings)
 {

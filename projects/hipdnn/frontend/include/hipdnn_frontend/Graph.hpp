@@ -1095,11 +1095,7 @@ public:
                            << ", modes count: " << modes.size());
 
         HIPDNN_CHECK_ERROR(validate());
-#ifdef HIPDNN_ENABLE_DIRECT_FLATBUFFERS
         HIPDNN_CHECK_ERROR(build_operation_graph(handle));
-#else
-        HIPDNN_CHECK_ERROR(build_operation_graph_via_descriptors(handle));
-#endif
         HIPDNN_CHECK_ERROR(create_execution_plans(modes));
         HIPDNN_CHECK_ERROR(check_support());
         HIPDNN_CHECK_ERROR(build_plans());

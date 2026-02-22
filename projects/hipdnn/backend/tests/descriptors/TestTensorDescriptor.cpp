@@ -407,9 +407,9 @@ TEST_F(TestTensorDescriptor, GetAttributeNamePartialCopy)
     ASSERT_NO_THROW(desc->getAttribute(
         HIPDNN_ATTR_TENSOR_NAME_EXT, HIPDNN_TYPE_CHAR, 10, &elementCount, buffer.data()));
 
-    // Should copy only 10 characters
+    // Should copy 9 characters + null terminator within the 10-byte buffer
     ASSERT_EQ(elementCount, 10);
-    ASSERT_EQ(std::string(buffer.data(), 10), std::string(name, 10));
+    ASSERT_STREQ(buffer.data(), "this_is_a");
 }
 
 // =============================================================================
