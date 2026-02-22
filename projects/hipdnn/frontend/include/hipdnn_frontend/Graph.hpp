@@ -694,6 +694,9 @@ protected:
     /// Builds the operation graph using the backend descriptor C API.
     /// Each node creates its operation descriptor(s) via virtual dispatch,
     /// then the GraphDescriptor is assembled and finalized.
+    ///
+    /// NOTE: This method is intentionally not yet exposed publicly. It will replace
+    /// the FlatBuffer-based build_operation_graph() once all operation types are implemented.
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error build_operation_graph_via_descriptors(hipdnnHandle_t handle)
     {
@@ -712,6 +715,11 @@ protected:
         for(const auto& node : _sub_nodes)
         {
             HIPDNN_CHECK_ERROR(node->create_operation(tensorDescs, operations));
+        }
+
+        if(operations.empty())
+        {
+            return {ErrorCode::INVALID_VALUE, "No operations created for graph"};
         }
 
         // Assemble the graph descriptor from operations

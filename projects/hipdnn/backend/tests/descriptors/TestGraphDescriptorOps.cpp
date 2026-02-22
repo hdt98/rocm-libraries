@@ -769,6 +769,11 @@ struct ConvEquivalenceParams
     DataType computeDataType;
 };
 
+inline std::ostream& operator<<(std::ostream& os, const ConvEquivalenceParams& p)
+{
+    return os << p.name;
+}
+
 class TestGraphDescriptorEquivalence : public TestGraphDescriptorOps,
                                        public ::testing::WithParamInterface<ConvEquivalenceParams>
 {

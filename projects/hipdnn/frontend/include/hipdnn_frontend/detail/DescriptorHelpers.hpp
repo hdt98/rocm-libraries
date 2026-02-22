@@ -16,6 +16,11 @@
 namespace hipdnn_frontend::detail
 {
 
+// These helpers wrap the hipDNN backend C API, which communicates errors via
+// hipdnnStatus_t return codes. Each helper converts backend failures into
+// frontend Error values (error code + message) for the frontend's non-throwing
+// error model.
+
 // Sets a string attribute (char array) on a backend descriptor.
 inline Error setDescriptorAttrString(hipdnnBackendDescriptor_t desc,
                                      hipdnnBackendAttributeName_t attrName,

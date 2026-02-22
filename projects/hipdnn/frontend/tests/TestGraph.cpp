@@ -1810,6 +1810,16 @@ TEST_F(TestGraph, BuildOperationGraphViaDescriptorsFailsWhenGraphCreateFails)
     EXPECT_EQ(result.code, ErrorCode::HIPDNN_BACKEND_ERROR);
 }
 
+TEST_F(TestGraph, BuildOperationGraphViaDescriptorsFailsOnEmptyGraph)
+{
+    GraphTestUtils graph;
+    graph.set_name("EmptyGraph").set_compute_data_type(DataType::FLOAT);
+
+    auto result = graph.build_operation_graph_via_descriptors(_handle);
+    EXPECT_TRUE(result.is_bad());
+    EXPECT_EQ(result.code, ErrorCode::INVALID_VALUE);
+}
+
 TEST_F(TestGraph, CreatingExecutionPlansFailsWithNoGraph)
 {
     Graph graph;
