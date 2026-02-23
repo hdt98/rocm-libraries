@@ -147,12 +147,38 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                           T* const y, I const incy,
 
                           T* const C, I const ldc) {
-        for(I j = 0 + j_start; j < n; j += j_inc)
+        I ii_start = i_start;
+        I ii_inc = i_inc;
+        I jj_start = j_start;
+        I jj_inc = j_inc;
+
+        {
+            // -----------------------------
+            // optimization for special case
+            // -----------------------------
+            if(n == 1)
+            {
+                jj_start = 0;
+                jj_inc = 1;
+                ii_start = ij_start;
+                ii_inc = ij_inc;
+            }
+
+            if(m == 1)
+            {
+                ii_start = 0;
+                ii_inc = 1;
+                jj_start = ij_start;
+                jj_inc = ij_inc;
+            }
+        }
+
+        for(I j = 0 + jj_start; j < n; j += jj_inc)
         {
             auto const jy = (incy == 1) ? j : j * static_cast<int64_t>(incy);
             T const yj = y[jy];
 
-            for(I i = 0 + i_start; i < m; i += i_inc)
+            for(I i = 0 + ii_start; i < m; i += ii_inc)
             {
                 auto const ix = (incx == 1) ? i : i * static_cast<int64_t>(incx);
 
@@ -199,6 +225,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     //         y <- alpha * A   * x + beta * y
     // or      y <- alpha * A^T * x + beta * y
     // or      y <- alpha * A^H * x + beta * y
+    //
+    // A is m by n matrix
     // ---------------------------------------
     auto sytrs_gemv = [=](char const trans, I const m, I const n,
 
@@ -218,7 +246,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         I const lenx = (is_no_trans) ? n : m;
         I const leny = (is_no_trans) ? m : n;
 
-        for(auto ij = 0 + ij_start; ij < leny; ij += ij_inc)
+        for(I ij = 0 + ij_start; ij < leny; ij += ij_inc)
         {
             auto const iy = (incy == 1) ? ij : ij * static_cast<int64_t>(incy);
             y[iy] = (beta == zero) ? zero : (beta * y[iy]);
@@ -226,7 +254,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
         __syncthreads();
 
-        for(auto j = 0 + j_start; j < leny; j += j_inc)
+        for(I j = 0 + j_start; j < leny; j += j_inc)
         {
             T ysum = zero;
 
@@ -234,11 +262,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
             // note execution in the same warp
             // in the for (i) loop
             // ------------------------------
-            for(auto i = 0 + i_start; i < lenx; i += i_inc)
+            for(I i = 0 + i_start; i < lenx; i += i_inc)
             {
-                auto const ix = (incx == 1) ? i : i * static_cast<int64_t>(incx);
-
-                T const xi = x[ix];
+                T const xi = (incx == 1) ? x[i] : x[i * static_cast<int64_t>(incx)];
                 T const aval = (is_no_trans) ? A[idx2D(j, i, lda)]
                     : (is_only_trans)        ? A[idx2D(i, j, lda)]
                                              : conj(A[idx2D(i, j, lda)]);
@@ -246,7 +272,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                 ysum += aval * xi;
             }
 
+            // -------------
             // sum reduction
+            // -------------
             {
                 auto const wsize = i_inc;
                 __syncwarp();
