@@ -967,7 +967,7 @@ namespace rocRoller
             result.comment = concatenate(
                 "GEN: loadMacroTileLDS OP ", tag, " LDS ", ldsTag, " MacroTile ", tileTag);
 
-            if(m_context->registerTagManager()->hasRegister(ldsTag))
+            if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
             {
                 result.ldsAllocation
                     = m_context->registerTagManager()->getRegister(ldsTag); // stores offset
@@ -976,7 +976,7 @@ namespace rocRoller
             }
             else
             {
-                // Offset not available yet (e.g., modelling before codegen)
+                // Offset not available yet (e.g., modelling before codegen or no context)
                 result.ldsAllocation = nullptr;
                 result.offset        = nullptr;
             }
@@ -1080,7 +1080,7 @@ namespace rocRoller
                          .value_or(ldsTag);
             // Find the LDS allocation that contains the tile and store
             // the offset of the beginning of the allocation into ldsOffset.
-            if(m_context->registerTagManager()->hasRegister(ldsTag))
+            if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
             {
                 result.ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
                 result.offset
@@ -1285,11 +1285,22 @@ namespace rocRoller
             if(!info.comment.empty())
                 co_yield Instruction::Comment(info.comment);
 
+            auto modelledAddresses = m_graph->modelledAddresses.find(tag);
+            auto applyAddresses    = [&](Instruction inst) {
+                if(modelledAddresses != m_graph->modelledAddresses.end())
+                {
+                    inst.setModelledAddresses(modelledAddresses->second);
+                }
+                return inst;
+            };
+
             if(info.ldsAllocation)
                 co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords)
-                    .map(MemoryInstructions::addExtraSrc(info.ldsAllocation));
+                    .map(MemoryInstructions::addExtraSrc(info.ldsAllocation))
+                    .map(applyAddresses);
             else
-                co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords);
+                co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords)
+                    .map(applyAddresses);
         }
 
         Generator<Instruction> LoadStoreTileGenerator::genLoadTileDirect2LDS(
@@ -1354,20 +1365,25 @@ namespace rocRoller
             auto paddingBytes = tile.paddingBytes();
             // Allocate LDS memory, and store the offset of the beginning of the allocation
             // into ldsOffset.
-            Register::ValuePtr ldsAllocation;
-            if(!m_context->registerTagManager()->hasRegister(ldsTag))
-            {
-                auto numElements = GetNumLDSElements(*m_graph, ldsTag);
-                ldsAllocation    = Register::Value::AllocateLDS(
-                    m_context, varType, numElements / packing, /*alignment*/ 4, paddingBytes);
-                m_context->registerTagManager()->addRegister(ldsTag, ldsAllocation);
-            }
-            else
-            {
-                ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
-            }
+            Register::ValuePtr ldsAllocation = nullptr;
+            Register::ValuePtr ldsOffset     = nullptr;
 
-            auto ldsOffset = Register::Value::Literal(ldsAllocation->getLDSAllocation()->offset());
+            if(m_context)
+            {
+                if(!m_context->registerTagManager()->hasRegister(ldsTag))
+                {
+                    auto numElements = GetNumLDSElements(*m_graph, ldsTag);
+                    ldsAllocation    = Register::Value::AllocateLDS(
+                        m_context, varType, numElements / packing, /*alignment*/ 4, paddingBytes);
+                    m_context->registerTagManager()->addRegister(ldsTag, ldsAllocation);
+                }
+                else
+                {
+                    ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
+                }
+
+                ldsOffset = Register::Value::Literal(ldsAllocation->getLDSAllocation()->offset());
+            }
 
             auto [elemXTag, elemX] = m_graph->getDimension<ElementNumber>(tag, 0);
             auto [elemYTag, elemY] = m_graph->getDimension<ElementNumber>(tag, 1);
@@ -1377,18 +1393,18 @@ namespace rocRoller
             AssertFatal(n % packing == 0, ShowValue(n), ShowValue(packing));
             n /= packing;
 
-            LoadStoreTileInfo info{.tag  = tag,
-                                   .kind = MemoryInstructions::MemoryKind::Local,
-                                   .m    = m,
-                                   .n    = n,
-                                   .data
-                                   = m_context->registerTagManager()->hasRegister(tileTag)
-                                         ? m_context->registerTagManager()->getRegister(tileTag)
-                                         : nullptr,
-                                   .varType          = varType,
-                                   .offset           = ldsOffset,
-                                   .isTransposedTile = false,
-                                   .isPadded         = paddingBytes > 0};
+            LoadStoreTileInfo info{
+                .tag     = tag,
+                .kind    = MemoryInstructions::MemoryKind::Local,
+                .m       = m,
+                .n       = n,
+                .data    = (m_context && m_context->registerTagManager()->hasRegister(tileTag))
+                               ? m_context->registerTagManager()->getRegister(tileTag)
+                               : nullptr,
+                .varType = varType,
+                .offset  = ldsOffset,
+                .isTransposedTile = false,
+                .isPadded         = paddingBytes > 0};
             info.comment       = infoComment;
             info.ldsAllocation = ldsAllocation;
             return info;
@@ -1465,21 +1481,28 @@ namespace rocRoller
 
             // Allocate LDS memory, and store the offset of the beginning of the allocation
             // into ldsOffset.
-            Register::ValuePtr ldsAllocation;
-            if(!m_context->registerTagManager()->hasRegister(ldsTag))
-            {
-                auto numElements = GetNumLDSElements(*m_graph, ldsTag);
+            Register::ValuePtr ldsAllocation = nullptr;
+            Register::ValuePtr ldsOffset     = nullptr;
+            Register::ValuePtr agpr          = nullptr;
 
-                ldsAllocation
-                    = Register::Value::AllocateLDS(m_context, varType, numElements / packing);
-                m_context->registerTagManager()->addRegister(ldsTag, ldsAllocation);
-            }
-            else
+            if(m_context)
             {
-                ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
-            }
+                if(!m_context->registerTagManager()->hasRegister(ldsTag))
+                {
+                    auto numElements = GetNumLDSElements(*m_graph, ldsTag);
 
-            auto ldsOffset = Register::Value::Literal(ldsAllocation->getLDSAllocation()->offset());
+                    ldsAllocation
+                        = Register::Value::AllocateLDS(m_context, varType, numElements / packing);
+                    m_context->registerTagManager()->addRegister(ldsTag, ldsAllocation);
+                }
+                else
+                {
+                    ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
+                }
+
+                ldsOffset = Register::Value::Literal(ldsAllocation->getLDSAllocation()->offset());
+                agpr      = m_context->registerTagManager()->getRegister(macTileTag);
+            }
 
             auto [_, lane]         = m_graph->getDimension<Lane>(tag);
             auto activeLanesInWave = getUnsignedInt(evaluate(lane.size));
@@ -1490,23 +1513,24 @@ namespace rocRoller
                         ShowValue(packing),
                         ShowValue(activeLanesInWave * packing));
 
-            comments.push_back(concatenate(ShowValue(waveTile),
-                                           ShowValue(waveTileNumElements),
-                                           ShowValue(activeLanesInWave),
-                                           ShowValue(packing),
-                                           ShowValue(activeLanesInWave * packing),
-                                           ShowValue(store.varType)));
+            if(m_context)
+            {
+                comments.push_back(concatenate(ShowValue(waveTile),
+                                               ShowValue(waveTileNumElements),
+                                               ShowValue(activeLanesInWave),
+                                               ShowValue(packing),
+                                               ShowValue(activeLanesInWave * packing),
+                                               ShowValue(store.varType)));
+
+                comments.push_back(concatenate(ShowValue(agpr->description()),
+                                               ShowValue(waveTile),
+                                               ShowValue(waveTileNumElements),
+                                               ShowValue(activeLanesInWave),
+                                               ShowValue(packing),
+                                               ShowValue(activeLanesInWave * packing)));
+            }
 
             uint numVgpr = waveTileNumElements / activeLanesInWave;
-
-            auto agpr = m_context->registerTagManager()->getRegister(macTileTag);
-
-            comments.push_back(concatenate(ShowValue(agpr->description()),
-                                           ShowValue(waveTile),
-                                           ShowValue(waveTileNumElements),
-                                           ShowValue(activeLanesInWave),
-                                           ShowValue(packing),
-                                           ShowValue(activeLanesInWave * packing)));
 
             auto [vgprBlockNumberTag, vgprBlockNumber]
                 = m_graph->getDimension<VGPRBlockNumber>(tag, 0);
@@ -1643,11 +1667,22 @@ namespace rocRoller
             for(auto const& comment : comments)
                 co_yield Instruction::Comment(comment);
 
+            auto modelledAddresses = m_graph->modelledAddresses.find(tag);
+            auto applyAddresses    = [&](Instruction inst) {
+                if(modelledAddresses != m_graph->modelledAddresses.end())
+                {
+                    inst.setModelledAddresses(modelledAddresses->second);
+                }
+                return inst;
+            };
+
             if(info.ldsAllocation)
                 co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords)
-                    .map(MemoryInstructions::addExtraDst(info.ldsAllocation));
+                    .map(MemoryInstructions::addExtraDst(info.ldsAllocation))
+                    .map(applyAddresses);
             else
-                co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords);
+                co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords)
+                    .map(applyAddresses);
         }
     }
 }
