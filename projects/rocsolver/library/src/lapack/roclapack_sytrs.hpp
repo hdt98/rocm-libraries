@@ -748,11 +748,16 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
         }
     }
 
-    dim3 grid(1, 1, batch_count);
-    dim3 threads(SYTRS_MAX_THDS, 1, 1);
+    I const nthreads = (nrhs >= SYTRS_MAX_THDS) ? SYTRS_MAX_THDS
+        : (nrhs >= (SYTRS_MAX_THDS / 2))        ? (SYTRS_MAX_THDS / 2)
+        : (nrhs >= (SYTRS_MAX_THDS / 4))        ? (SYTRS_MAX_THDS / 4)
+                                                : 64;
+
+    I const max_blocks = 1024;
+    I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
     bool const use_upper = (uplo == rocblas_fill_upper);
-    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, grid, threads, 0, stream,
+    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, dim3(1, 1, nbz), dim3(nthreads, 1, 1), 0, stream,
 
                             use_upper, n, nrhs,
 
