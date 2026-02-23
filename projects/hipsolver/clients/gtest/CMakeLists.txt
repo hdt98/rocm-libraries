@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -58,6 +58,7 @@ set(hipsolverDn_test_source
   potrf_gtest.cpp
   potri_gtest.cpp
   potrs_gtest.cpp
+  trtri_gtest.cpp
   syevd_heevd_gtest.cpp
   syevj_heevj_gtest.cpp
   sygvd_hegvd_gtest.cpp
