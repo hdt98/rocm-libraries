@@ -63,6 +63,8 @@ const vector<vector<int>> matrix_sizeB_range = {
     // invalid
     {-1, 0},
     // normal (valid) samples
+    {1, 0},
+    {1, 1},
     {10, 0},
     {20, 1},
     {30, 0},
