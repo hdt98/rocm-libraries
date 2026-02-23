@@ -74,7 +74,7 @@ namespace rocRoller::KernelGraph
 
             Log::debug("Got connections.");
 
-            auto dependenceDAG = NodeScheduling::constructDataDependenceDAG(graph);
+            auto dependenceDAG = NodeScheduling::ConstructDataDependenceDAG(graph);
 
             for(auto nodeA : nodes)
             {
