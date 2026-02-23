@@ -63,13 +63,13 @@ namespace rocRoller
                                       CoordinateGraph::Transformer            coords);
 
             /**
-              * @brief Generate instructions needed to store a tile to global memory
-              *
-              * @param tag The tag of the node in the control graph
-              * @param load The node in the control graph
-              * @param coords Known coordinates
-              * @return Generator<Instruction>
-              */
+             * @brief Generate instructions needed to store a tile to global memory
+             *
+             * @param tag The tag of the node in the control graph
+             * @param load The node in the control graph
+             * @param coords Known coordinates
+             * @return Generator<Instruction>
+             */
             Generator<Instruction> genStoreTile(int                             tag,
                                                 ControlGraph::StoreTiled const& store,
                                                 CoordinateGraph::Transformer    coords);
@@ -87,16 +87,16 @@ namespace rocRoller
                                                    CoordinateGraph::Transformer      coords);
 
             /**
-              * @brief Generate instructions needed to calculate offset and stride information
-              *
-              * @param tag The tag of the node in the control graph
-              * @param load The node in the control graph
-              * @param coords Known coordinates
-              * @return Generator<Instruction>
-              */
-            Generator<Instruction> genComputeIndex(int                               tag,
-                                                   ControlGraph::ComputeIndex const& ci,
-                                                   CoordinateGraph::Transformer      coords);
+             * @brief Generate instructions needed to load a tile from global into LDS with TDM
+             *
+             * @param tag The tag of the node in the control graph
+             * @param load The node in the control graph
+             * @param coords Known coordinates
+             * @return Generator<Instruction>
+             */
+            Generator<Instruction> genLoadTiledTDMToLDS(int                                    tag,
+                                                        ControlGraph::LoadTiledTDMToLDS const& load,
+                                                        CoordinateGraph::Transformer coords);
 
             /**
               * @brief Information needed in order to load or store a tile.
@@ -132,6 +132,7 @@ namespace rocRoller
                 bool                           isTransposedTile     = false;
                 bool                           isPadded             = false;
                 bool                           isMacroTileRowStride = false;
+                Register::ValuePtr             tdmDesc              = nullptr;
             };
 
         private:

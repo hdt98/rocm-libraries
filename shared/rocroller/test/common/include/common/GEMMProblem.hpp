@@ -10,6 +10,7 @@
 #include <rocRoller/Parameters/Solution/ScaleSkipPermlaneMode.hpp>
 #include <rocRoller/Parameters/Solution/StoreOption.hpp>
 #include <rocRoller/Parameters/Solution/StreamK.hpp>
+
 #include <string>
 #include <vector>
 

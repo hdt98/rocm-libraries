@@ -34,6 +34,7 @@ namespace rocRoller
         Raw32,
         E8M0,
         Buffer,
+        TDM,
         // int16_t*,
         int32_t*,
         int64_t*,

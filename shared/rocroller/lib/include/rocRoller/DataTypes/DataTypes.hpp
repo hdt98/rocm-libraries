@@ -28,6 +28,7 @@
 #include <rocRoller/DataTypes/DataTypes_Int8x4.hpp>
 #include <rocRoller/DataTypes/DataTypes_Raw32.hpp>
 #include <rocRoller/DataTypes/DataTypes_Scale_Utils.hpp>
+#include <rocRoller/DataTypes/DataTypes_TDM.hpp>
 #include <rocRoller/DataTypes/DataTypes_UInt8x4.hpp>
 
 #include <rocRoller/GPUArchitecture/GPUArchitecture_fwd.hpp>
@@ -126,10 +127,7 @@ namespace rocRoller
         PointerLocal,
         PointerGlobal,
         Buffer,
-        TDMDescGroup0,
-        TDMDescGroup1,
-        TDMDescGroup2,
-        TDMDescGroup3,
+        TDM,
 
         Count,
         None = Count
@@ -151,6 +149,7 @@ namespace rocRoller
         WAVE_SWIZZLE,
         WAVE_FROM_GLOBAL,
         WAVE_LDS_FROM_GLOBAL,
+        WAVE_TDMToLDS,
         Literal,
         None,
         Count
