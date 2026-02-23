@@ -91,13 +91,12 @@ def get_dataclass_id(obj):
 @functools.cache
 def rocm_gfx():
     """Return GPU architecture (gfxXXXX) for local GPU device."""
-    output = None
-    try:
-        output = subprocess.run(
+    rocminfo_path = subprocess.run( ["which", "rocminfo"], capture_output=True, text=True,
+                      check=True).stdout.strip()
+    print(f"Path to rocminfo: {rocminfo_path}");
+    output = subprocess.run(
             ["rocminfo"], capture_output=True, text=True, check=True
         ).stdout
-    except subprocess.CalledProcessError:
-        return None
 
     for line in output.splitlines():
         if line.startswith("  Name:"):
