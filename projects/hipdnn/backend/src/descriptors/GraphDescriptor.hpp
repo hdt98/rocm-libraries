@@ -10,7 +10,6 @@
 #include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 #include <memory>
 #include <optional>
-#include <unordered_set>
 #include <vector>
 
 namespace hipdnn_backend
@@ -25,7 +24,6 @@ private:
 
     // For building graph from operation descriptors (type-agnostic)
     std::vector<std::shared_ptr<IGraphOperation>> _operations;
-    std::unordered_set<int64_t> _tensorUids; // For deduplication
 
     // Graph-level attributes set via setAttribute (applied during buildGraphFromOperations)
     hipdnn_data_sdk::data_objects::DataType _computeDataType

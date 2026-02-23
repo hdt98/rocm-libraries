@@ -7,6 +7,8 @@
 #include "HipdnnBackendDescriptorType.h"
 #include "HipdnnException.hpp"
 
+#include <unordered_set>
+
 namespace hipdnn_backend
 {
 
@@ -34,15 +36,17 @@ void GraphDescriptor::buildGraphFromOperations()
     _graph->io_data_type = _ioDataType;
     _graph->preferred_engine_id = _preferredEngineId;
 
+    std::unordered_set<int64_t> tensorUids;
+
     for(const auto& op : _operations)
     {
         // Collect unique tensors (deduplicated by UID)
         for(const auto& tensorDesc : op->getTensorDescriptors())
         {
             auto uid = tensorDesc->getData().uid;
-            if(_tensorUids.find(uid) == _tensorUids.end())
+            if(tensorUids.find(uid) == tensorUids.end())
             {
-                _tensorUids.insert(uid);
+                tensorUids.insert(uid);
                 _graph->tensors.push_back(
                     std::make_unique<hipdnn_data_sdk::data_objects::TensorAttributesT>(
                         tensorDesc->getData()));
@@ -54,7 +58,6 @@ void GraphDescriptor::buildGraphFromOperations()
     }
 
     _operations.clear();
-    _tensorUids.clear();
 }
 
 void GraphDescriptor::setDataType(hipdnnBackendAttributeName_t attributeName,
@@ -162,9 +165,8 @@ void GraphDescriptor::setOperations(hipdnnBackendAttributeType_t attributeType,
 
     auto descriptors = static_cast<HipdnnBackendDescriptor* const*>(arrayOfElements);
 
-    // Clear existing operations and tensor UIDs so setAttribute replaces rather than appends
+    // Clear existing operations so setAttribute replaces rather than appends
     _operations.clear();
-    _tensorUids.clear();
 
     for(int64_t i = 0; i < elementCount; ++i)
     {

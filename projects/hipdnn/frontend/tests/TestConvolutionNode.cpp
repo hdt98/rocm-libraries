@@ -524,7 +524,6 @@ TEST(TestConvolutionNode, StrideInferenceNchwLayoutSuccess)
 
     auto error = node.infer_properties_node();
     EXPECT_EQ(error.code, error_code_t::OK) << error.err_msg;
-    ;
 
     auto inferredStrides = yTensor->get_stride();
     EXPECT_EQ(inferredStrides.size(), 4);
@@ -562,7 +561,6 @@ TEST(TestConvolutionNode, StrideInferenceNhwcLayoutSuccess)
 
     auto error = node.infer_properties_node();
     EXPECT_EQ(error.code, error_code_t::OK) << error.err_msg;
-    ;
 
     auto inferredStrides = yTensor->get_stride();
     EXPECT_EQ(inferredStrides.size(), 4);
@@ -601,7 +599,6 @@ TEST(TestConvolutionNode, StrideInferencePreExistingStridesNotOverwritten)
 
     auto error = node.infer_properties_node();
     EXPECT_EQ(error.code, error_code_t::OK) << error.err_msg;
-    ;
 
     auto finalStrides = yTensor->get_stride();
     // Should keep the pre-existing strides
@@ -895,7 +892,7 @@ TEST(TestConvolutionNode, StrideInferenceWithDilation2x2)
     // Check inferred strides
     auto inferredStrides = yTensor->get_stride();
     EXPECT_EQ(inferredStrides.size(), 4);
-    EXPECT_EQ(inferredStrides[0], 12800); // N stride: 32 * 20 * 20 = 10368
+    EXPECT_EQ(inferredStrides[0], 12800); // N stride: 32 * 20 * 20 = 12800
     EXPECT_EQ(inferredStrides[1], 400); // C stride: 20 * 20 = 400
     EXPECT_EQ(inferredStrides[2], 20); // H stride: 20
     EXPECT_EQ(inferredStrides[3], 1); // W stride: 1
@@ -2148,4 +2145,33 @@ TEST_F(TestConvolutionNodeCreateOperation, PropagatesBackendError)
     auto err = node.create_operation(tensorDescs, operations);
     EXPECT_TRUE(err.is_bad());
     EXPECT_EQ(err.code, ErrorCode::HIPDNN_BACKEND_ERROR);
+}
+
+TEST_F(TestConvolutionNodeCreateOperation, SuccessCreatesThreeTensorsAndOneOperation)
+{
+    // Expect 3 tensor descriptors + 1 operation descriptor created
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_TENSOR_DESCRIPTOR, _))
+        .Times(3)
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend,
+                backendCreateDescriptor(HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR, _))
+        .WillOnce(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend, backendDestroyDescriptor(_))
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+    EXPECT_CALL(*_mockBackend, backendSetAttribute(_, _, _, _, _))
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+
+    // Expect 4 finalize calls: 3 tensors + 1 operation
+    EXPECT_CALL(*_mockBackend, backendFinalize(_))
+        .Times(4)
+        .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
+
+    auto node = makeConvNode();
+    std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor> tensorDescs;
+    std::vector<detail::ScopedHipdnnBackendDescriptor> operations;
+
+    auto err = node.create_operation(tensorDescs, operations);
+    EXPECT_TRUE(err.is_good()) << err.err_msg;
+    EXPECT_EQ(tensorDescs.size(), 3u);
+    EXPECT_EQ(operations.size(), 1u);
 }

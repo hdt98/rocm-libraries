@@ -66,6 +66,11 @@ public:
         return *this;
     }
 
+    const ValueVariant& get_value_variant() const // NOLINT(readability-identifier-naming)
+    {
+        return _value;
+    }
+
     TensorAttributes& clear_value() // NOLINT(readability-identifier-naming)
     {
         _value = {};

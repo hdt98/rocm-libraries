@@ -173,7 +173,7 @@ public:
             HIPDNN_RETURN_IF_LT(dilationVal,
                                 1,
                                 ErrorCode::INVALID_VALUE,
-                                "ConvolutionFpropNode: Dilation must > 0");
+                                "ConvolutionFpropNode: Dilation must be > 0");
 
             HIPDNN_RETURN_IF_LT(prePad,
                                 0,

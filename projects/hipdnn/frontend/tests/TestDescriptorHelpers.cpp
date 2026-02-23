@@ -1,4 +1,4 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
 #include <gmock/gmock.h>
@@ -362,4 +362,33 @@ TEST_F(TestDescriptorHelpers, EnsureTensorDescFailsOnFinalize)
     EXPECT_TRUE(err.is_bad());
     EXPECT_EQ(err.code, ErrorCode::HIPDNN_BACKEND_ERROR);
     EXPECT_TRUE(tensorDescs.empty());
+}
+
+TEST_F(TestDescriptorHelpers, EnsureTensorDescSetsPassByValue)
+{
+    constexpr float K_TENSOR_VALUE = 1.5f;
+
+    expectCreateAndDestroyDescriptor();
+    // set_value() resets dims and strides to {1}, so expect scalar dimensions
+    expectTensorSetAttributes(K_DEFAULT_TENSOR_UID, "tensor_42", {1}, {1});
+
+    // Expect the value attribute to be set
+    EXPECT_CALL(*_mockBackend,
+                backendSetAttribute(_,
+                                    HIPDNN_ATTR_TENSOR_VALUE_EXT,
+                                    HIPDNN_TYPE_FLOAT,
+                                    1,
+                                    pointsToScalar<float>(K_TENSOR_VALUE)))
+        .WillOnce(Return(HIPDNN_STATUS_SUCCESS));
+
+    EXPECT_CALL(*_mockBackend, backendFinalize(_)).WillOnce(Return(HIPDNN_STATUS_SUCCESS));
+
+    std::unordered_map<int64_t, ScopedHipdnnBackendDescriptor> tensorDescs;
+    auto tensor = makeTensor(K_DEFAULT_TENSOR_UID);
+    tensor->set_value(K_TENSOR_VALUE);
+
+    auto [err, uid] = createOrFindTensorDesc(tensorDescs, tensor);
+    EXPECT_TRUE(err.is_good()) << err.err_msg;
+    EXPECT_EQ(uid, K_DEFAULT_TENSOR_UID);
+    EXPECT_EQ(tensorDescs.size(), 1u);
 }

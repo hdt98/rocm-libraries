@@ -176,6 +176,46 @@ inline std::pair<Error, int64_t>
         return {std::move(err), uid};
     }
 
+    if(tensor->get_pass_by_value())
+    {
+        err = std::visit(
+            [&](auto&& arg) -> Error {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr(std::is_same_v<T, std::monostate>)
+                {
+                    return {};
+                }
+                else
+                {
+                    hipdnnBackendAttributeType_t attrType;
+                    if constexpr(std::is_same_v<T, float>)
+                    {
+                        attrType = HIPDNN_TYPE_FLOAT;
+                    }
+                    else if constexpr(std::is_same_v<T, double>)
+                    {
+                        attrType = HIPDNN_TYPE_DOUBLE;
+                    }
+                    else if constexpr(std::is_same_v<T, int32_t>)
+                    {
+                        attrType = HIPDNN_TYPE_INT32;
+                    }
+                    else
+                    {
+                        // half, bfloat16, uint8_t — pass as float
+                        attrType = HIPDNN_TYPE_FLOAT;
+                    }
+                    return setDescriptorAttrScalar(
+                        desc.get(), HIPDNN_ATTR_TENSOR_VALUE_EXT, attrType, arg, "tensor value");
+                }
+            },
+            tensor->get_value_variant());
+        if(err.is_bad())
+        {
+            return {std::move(err), uid};
+        }
+    }
+
     err = finalizeDescriptor(desc.get(), "tensor descriptor");
     if(err.is_bad())
     {
