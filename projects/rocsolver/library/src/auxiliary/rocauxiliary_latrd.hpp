@@ -2520,6 +2520,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
 
             HIP_CHECK(hipGraphLaunch(graphExec, stream));
             HIP_CHECK(hipGraphDestroy(graph));
+            return rocblas_status_success;
         };
 
         // Starting column index
