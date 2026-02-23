@@ -130,7 +130,7 @@ endif()
 
 find_program(ROCM_SDK rocm-sdk)
 if(NOT ROCM_SDK)
-  message(WANRNING "rocm-sdk not found in PATH. CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH} will be used ROCm packages.")
+  message(WANRNING "rocm-sdk not found in PATH. CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH} will be used to locate ROCm packages.")
 else()
   message(STATUS "rocm-sdk found at: ${ROCM_SDK}")
   execute_process(COMMAND ${ROCM_SDK} path --cmake
