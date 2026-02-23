@@ -14,7 +14,7 @@ namespace rocRoller
     {
         /**
          * @brief Hoist loop-invariant Assign operations outside of loops.
-         *
+         * 
          * This transformation identifies Assign operations within loop bodies
          * that do not depend on loop variables and moves them to execute
          * before the loop, improving performance by avoiding redundant

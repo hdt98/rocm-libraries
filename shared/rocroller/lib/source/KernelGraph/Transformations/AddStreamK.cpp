@@ -1529,7 +1529,7 @@ namespace rocRoller
             }
             else
             {
-                // Standard mode -- no selector, no DP dims
+                // Standard mode — no selector, no DP dims
                 auto standardInit = initializeCoordinates(graph,
                                                           scope,
                                                           {{{skForwardForTileIdx,

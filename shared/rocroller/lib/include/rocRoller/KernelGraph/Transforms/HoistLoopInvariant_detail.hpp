@@ -22,10 +22,10 @@ namespace rocRoller
         using CoordinateToLoops  = std::unordered_map<int, LoopToControlNodes>;
         /**
          * @brief Build a mapping of coordinates to loop groups to control nodes
-         *
+         * 
          * Note the loop here is the immediate loop containing the control node,
          * does not include nested loops/scopes.
-         *
+         * 
          * @return Mapping of coordinate -> loop -> [control nodes]
          */
         CoordinateToLoops buildCoordinateLoopMapping(KernelGraph const&         graph,
@@ -38,7 +38,7 @@ namespace rocRoller
 
         /**
          * @brief Count how many times a coordinate is written within a ForLoopOp, including nested loops/scopes
-         *
+         * 
          * @return The number of times the coordinate is written within the loop
          */
         int countCoordinateWritesInLoop(KernelGraph const&         kgraph,
@@ -48,10 +48,10 @@ namespace rocRoller
 
         /**
          * @brief Check if there's a read of the coordinate before the write within the loop
-         *
+         * 
          * This function detects read-before-write patterns that would prevent hoisting,
          * including cases where reads and writes are in different conditional branches.
-         *
+         * 
          * @param graph The kernel graph
          * @param loopNode The loop node to check within
          * @param coordinate The coordinate being checked

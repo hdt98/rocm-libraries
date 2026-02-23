@@ -94,7 +94,7 @@ namespace rocRoller
                             Ts const&... message);
 
     /**
-     * Throw overload used for direct Throw<>(...) calls. The first message argument is
+     * Throw overload used for direct Throw<>(...) calls. The first message argument is 
      * wrapped in MessageWithLocation, which automatically captures source_location
      * at the call site and preserves it in the final error text.
      * Example:
