@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -49,6 +49,19 @@ char hipsolver2char_fill(hipsolverFillMode_t value)
         return 'U';
     case HIPSOLVER_FILL_MODE_LOWER:
         return 'L';
+    default:
+        throw std::invalid_argument("Invalid enum");
+    }
+}
+
+char hipsolver2char_diag(hipsolverDiagType_t value)
+{
+    switch(value)
+    {
+    case HIPSOLVER_DIAG_NON_UNIT:
+        return 'N';
+    case HIPSOLVER_DIAG_UNIT:
+        return 'U';
     default:
         throw std::invalid_argument("Invalid enum");
     }
@@ -158,6 +171,21 @@ hipsolverFillMode_t char2hipsolver_fill(char value)
     case 'l':
     case 'L':
         return HIPSOLVER_FILL_MODE_LOWER;
+    default:
+        throw std::invalid_argument("Invalid character");
+    }
+}
+
+hipsolverDiagType_t char2hipsolver_diag(char value)
+{
+    switch(value)
+    {
+    case 'n':
+    case 'N':
+        return HIPSOLVER_DIAG_NON_UNIT;
+    case 'u':
+    case 'U':
+        return HIPSOLVER_DIAG_UNIT;
     default:
         throw std::invalid_argument("Invalid character");
     }
