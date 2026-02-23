@@ -36,7 +36,7 @@ from Tensile.SolutionStructs.Solution import getTypeMismatchCollector, resetType
 from Tensile.SolutionStructs.Problem import ProblemType, problemTypeToEnum
 from Tensile.Common.GlobalParameters import defaultSolution
 
-from typing import IO, NamedTuple, List, Dict, Optional
+from typing import IO, NamedTuple, Dict, Optional
 from Tensile.SolutionStructs.Solution import BiasTypeArgs, ActivationArgs
 import io
 import os
@@ -477,7 +477,7 @@ def parseLibraryLogicData(
         lazyLibraryLoading: bool
     ):
     """Parses the data of a library logic file."""
-    if isinstance(data, List):
+    if isinstance(data, list):
         # TODO: this can be removed when all logic files have dict format
         data = parseLibraryLogicList(data, srcFile)
     elif isinstance(data, dict) in data:
