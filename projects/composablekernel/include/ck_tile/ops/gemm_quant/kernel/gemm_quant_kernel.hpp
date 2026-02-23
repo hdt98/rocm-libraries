@@ -1345,6 +1345,7 @@ struct QuantGemmKernel
         }
 
         if constexpr(std::is_same_v<CLayout, tensor_layout::gemm::RowMajor>)
+        {
             // For RowMajor C, M is the row dimension — check M alignment here because
             // ALayout=RowMajor does not check M (it only checks K), leaving a gap for
             // the RowMajorA + RowMajorC combination.
@@ -1357,238 +1358,239 @@ struct QuantGemmKernel
                 }
                 return false;
             }
-        if(kargs.N % TilePartitioner::NPerBlock != 0 && GemmPipeline::kPadN == false)
-        {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+            if(kargs.N % TilePartitioner::NPerBlock != 0 && GemmPipeline::kPadN == false)
             {
-                CK_TILE_ERROR(
-                    "Can't support N that is not a multiple of NPerBlock without padding!");
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR(
+                        "Can't support N that is not a multiple of NPerBlock without padding!");
+                }
+                return false;
             }
-            return false;
-        }
-        if(kargs.N % EpiloguePipeline::GetVectorSizeC() != 0)
-        {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+            if(kargs.N % EpiloguePipeline::GetVectorSizeC() != 0)
             {
-                CK_TILE_ERROR("N is not a multiple of vector load size for C tensor!");
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("N is not a multiple of vector load size for C tensor!");
+                }
+                return false;
             }
-            return false;
         }
+        else
+        {
+            if(kargs.M % TilePartitioner::MPerBlock != 0 && GemmPipeline::kPadM == false)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR(
+                        "Can't support M that is not a multiple of MPerBlock without padding!");
+                }
+                return false;
+            }
+            if(kargs.M % EpiloguePipeline::GetVectorSizeC() != 0)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("M is not a multiple of vector load size for C tensor!");
+                }
+                return false;
+            }
+        }
+        return true;
     }
-    else
+
+    /**
+     * @brief Runs single GEMM problem cooperatively by whole workgroup.
+     *
+     * @param a_ptr input A pointer
+     * @param b_ptr input B pointer
+     * @param aq_ptr input AQ pointer
+     * @param bq_ptr input BQ pointer
+     * @param c_ptr output C pointer
+     * @param smem_ptr The start memory pointer of the shared memory block.
+     * @param kargs GEMM kernel arguments
+     * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k batch.
+     * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.
+     * @param block_idx_n The GEMM's output N dimension tile index processed by this workgroup.
+     *
+     */
+    CK_TILE_DEVICE static void RunGemm(const ADataType* a_ptr,
+                                       const BDataType* b_ptr,
+                                       const AQDataType* aq_ptr,
+                                       const BQDataType* bq_ptr,
+                                       CDataType* c_ptr,
+                                       void* smem_ptr,
+                                       const QuantGemmKernelArgs& kargs,
+                                       const SplitKBatchOffset& splitk_batch_offset,
+                                       const index_t block_idx_m,
+                                       const index_t block_idx_n)
     {
-        if(kargs.M % TilePartitioner::MPerBlock != 0 && GemmPipeline::kPadM == false)
-        {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+        // Create block windows using specialized methods
+        const auto& a_block_window =
+            MakeABlockWindow(a_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_m);
+        const auto& b_block_window =
+            MakeBBlockWindow(b_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_n);
+        // Note: Pass aq_group_offset so the tensor view dimension reflects
+        // the remaining K-groups from the split-K offset position.
+        const auto& aq_block_window = MakeAQBlockWindow(
+            aq_ptr, kargs, block_idx_m, block_idx_n, splitk_batch_offset.aq_group_offset);
+        // Note: Pass bq_group_offset so the tensor view dimension reflects
+        // the remaining K-groups from the split-K offset position.
+        const auto& bq_block_window = MakeBQBlockWindow(
+            bq_ptr, kargs, splitk_batch_offset.bq_group_offset, block_idx_m, block_idx_n);
+
+        const index_t num_loop =
+            amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
+
+        // Run GEMM cooperatively by whole workgroup.
+        const auto& c_block_tile = [&]() {
+            if constexpr(kQuantType == QuantType::AQuantGrouped)
             {
-                CK_TILE_ERROR(
-                    "Can't support M that is not a multiple of MPerBlock without padding!");
+                index_t m = 0;
+                if constexpr(APreshuffleQuant)
+                {
+                    m = kargs.M;
+                }
+                return GemmPipeline{}(
+                    a_block_window, b_block_window, aq_block_window, num_loop, smem_ptr, m);
             }
-            return false;
+            else if constexpr(kQuantType == QuantType::BQuantGrouped)
+            {
+                index_t n = 0;
+                if constexpr(BPreshuffleQuant)
+                {
+                    n = kargs.N;
+                }
+                return GemmPipeline{}(
+                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
+            }
+            else if constexpr(kQuantType == QuantType::ABQuantGrouped)
+            {
+                index_t m = 0;
+                index_t n = 0;
+                if constexpr(BPreshuffleQuant)
+                {
+                    // m = kargs.M;
+                    n = kargs.N;
+                }
+                return GemmPipeline{}(a_block_window,
+                                      b_block_window,
+                                      aq_block_window,
+                                      bq_block_window,
+                                      num_loop,
+                                      smem_ptr,
+                                      m,
+                                      n);
+            }
+            else if constexpr(kQuantType == QuantType::RowColQuant ||
+                              kQuantType == QuantType::TensorQuant)
+            {
+                return GemmPipeline{}(a_block_window, b_block_window, num_loop, smem_ptr);
+            }
+        }();
+
+        const index_t k_batch = amd_wave_read_first_lane(kargs.k_batch);
+
+        // Run Epilogue Pipeline with k_batch dispatch
+        if(k_batch == 1)
+        {
+            auto c_block_window = MakeCBlockWindow<memory_operation_enum::set>(
+                c_ptr, kargs, block_idx_m, block_idx_n);
+
+            if constexpr(kQuantType == QuantType::ABQuantGrouped ||
+                         kQuantType == QuantType::AQuantGrouped ||
+                         kQuantType == QuantType::BQuantGrouped)
+            {
+                EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
+            }
+            else if constexpr(kQuantType == QuantType::RowColQuant)
+            {
+                EpiloguePipeline{}(c_block_window,
+                                   c_block_tile,
+                                   c_block_window,
+                                   smem_ptr,
+                                   aq_block_window,
+                                   bq_block_window);
+            }
+            else if constexpr(kQuantType == QuantType::TensorQuant)
+            {
+                const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
+                const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
+                EpiloguePipeline{}(
+                    c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
+            }
         }
-        if(kargs.M % EpiloguePipeline::GetVectorSizeC() != 0)
+        else
         {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+            auto c_block_window = MakeCBlockWindow<memory_operation_enum::atomic_add>(
+                c_ptr, kargs, block_idx_m, block_idx_n);
+
+            if constexpr(kQuantType == QuantType::ABQuantGrouped ||
+                         kQuantType == QuantType::AQuantGrouped ||
+                         kQuantType == QuantType::BQuantGrouped)
             {
-                CK_TILE_ERROR("M is not a multiple of vector load size for C tensor!");
+                EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
             }
-            return false;
+            else if constexpr(kQuantType == QuantType::RowColQuant)
+            {
+                EpiloguePipeline{}(c_block_window,
+                                   c_block_tile,
+                                   c_block_window,
+                                   smem_ptr,
+                                   aq_block_window,
+                                   bq_block_window);
+            }
+            else if constexpr(kQuantType == QuantType::TensorQuant)
+            {
+                const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
+                const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
+                EpiloguePipeline{}(
+                    c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
+            }
         }
     }
-    return true;
-}
 
-/**
- * @brief Runs single GEMM problem cooperatively by whole workgroup.
- *
- * @param a_ptr input A pointer
- * @param b_ptr input B pointer
- * @param aq_ptr input AQ pointer
- * @param bq_ptr input BQ pointer
- * @param c_ptr output C pointer
- * @param smem_ptr The start memory pointer of the shared memory block.
- * @param kargs GEMM kernel arguments
- * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k batch.
- * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.
- * @param block_idx_n The GEMM's output N dimension tile index processed by this workgroup.
- *
- */
-CK_TILE_DEVICE static void
-RunGemm(const ADataType* a_ptr,
-        const BDataType* b_ptr,
-        const AQDataType* aq_ptr,
-        const BQDataType* bq_ptr,
-        CDataType* c_ptr,
-        void* smem_ptr,
-        const QuantGemmKernelArgs& kargs,
-        const SplitKBatchOffset& splitk_batch_offset,
-        const index_t block_idx_m,
-        const index_t block_idx_n)
-{
-    // Create block windows using specialized methods
-    const auto& a_block_window =
-        MakeABlockWindow(a_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_m);
-    const auto& b_block_window =
-        MakeBBlockWindow(b_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_n);
-    // Note: Pass aq_group_offset so the tensor view dimension reflects
-    // the remaining K-groups from the split-K offset position.
-    const auto& aq_block_window = MakeAQBlockWindow(
-        aq_ptr, kargs, block_idx_m, block_idx_n, splitk_batch_offset.aq_group_offset);
-    // Note: Pass bq_group_offset so the tensor view dimension reflects
-    // the remaining K-groups from the split-K offset position.
-    const auto& bq_block_window = MakeBQBlockWindow(
-        bq_ptr, kargs, splitk_batch_offset.bq_group_offset, block_idx_m, block_idx_n);
-
-    const index_t num_loop =
-        amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
-
-    // Run GEMM cooperatively by whole workgroup.
-    const auto& c_block_tile = [&]() {
-        if constexpr(kQuantType == QuantType::AQuantGrouped)
-        {
-            index_t m = 0;
-            if constexpr(APreshuffleQuant)
-            {
-                m = kargs.M;
-            }
-            return GemmPipeline{}(
-                a_block_window, b_block_window, aq_block_window, num_loop, smem_ptr, m);
-        }
-        else if constexpr(kQuantType == QuantType::BQuantGrouped)
-        {
-            index_t n = 0;
-            if constexpr(BPreshuffleQuant)
-            {
-                n = kargs.N;
-            }
-            return GemmPipeline{}(
-                a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
-        }
-        else if constexpr(kQuantType == QuantType::ABQuantGrouped)
-        {
-            index_t m = 0;
-            index_t n = 0;
-            if constexpr(BPreshuffleQuant)
-            {
-                // m = kargs.M;
-                n = kargs.N;
-            }
-            return GemmPipeline{}(a_block_window,
-                                  b_block_window,
-                                  aq_block_window,
-                                  bq_block_window,
-                                  num_loop,
-                                  smem_ptr,
-                                  m,
-                                  n);
-        }
-        else if constexpr(kQuantType == QuantType::RowColQuant ||
-                          kQuantType == QuantType::TensorQuant)
-        {
-            return GemmPipeline{}(a_block_window, b_block_window, num_loop, smem_ptr);
-        }
-    }();
-
-    const index_t k_batch = amd_wave_read_first_lane(kargs.k_batch);
-
-    // Run Epilogue Pipeline with k_batch dispatch
-    if(k_batch == 1)
+    CK_TILE_DEVICE void Run_(const QuantGemmKernelArgs& kargs) const
     {
-        auto c_block_window =
-            MakeCBlockWindow<memory_operation_enum::set>(c_ptr, kargs, block_idx_m, block_idx_n);
+        const auto blockId  = amd_wave_read_first_lane(blockIdx.x);
+        const auto [iM, iN] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
+        const index_t i_m   = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
+        const index_t i_n   = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
+        const SplitKBatchOffset splitk_batch_offset(kargs);
 
-        if constexpr(kQuantType == QuantType::ABQuantGrouped ||
-                     kQuantType == QuantType::AQuantGrouped ||
-                     kQuantType == QuantType::BQuantGrouped)
-        {
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
-        }
-        else if constexpr(kQuantType == QuantType::RowColQuant)
-        {
-            EpiloguePipeline{}(c_block_window,
-                               c_block_tile,
-                               c_block_window,
-                               smem_ptr,
-                               aq_block_window,
-                               bq_block_window);
-        }
-        else if constexpr(kQuantType == QuantType::TensorQuant)
-        {
-            const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
-            const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
-            EpiloguePipeline{}(
-                c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
-        }
+        // Apply splitk offset to input pointers
+        const ADataType* a_ptr =
+            static_cast<const ADataType*>(kargs.a_ptr) + splitk_batch_offset.a_k_split_offset;
+        const BDataType* b_ptr =
+            static_cast<const BDataType*>(kargs.b_ptr) + splitk_batch_offset.b_k_split_offset;
+        // For ABQuantGrouped split-K, aq_ptr is offset by aq_k_split_offset elements to point
+        // to the start of this batch's AQ K-groups (aq_group_offset columns in RowMajor AQ).
+        const AQDataType* aq_ptr =
+            static_cast<const AQDataType*>(kargs.aq_ptr) + splitk_batch_offset.aq_k_split_offset;
+        const BQDataType* bq_ptr =
+            static_cast<const BQDataType*>(kargs.bq_ptr) + splitk_batch_offset.bq_k_split_offset;
+        CDataType* c_ptr = static_cast<CDataType*>(kargs.c_ptr);
+
+        // allocate LDS
+        __shared__ char smem_ptr[GetSmemSize()];
+
+        RunGemm(
+            a_ptr, b_ptr, aq_ptr, bq_ptr, c_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
     }
-    else
+
+    template <typename T, typename = void>
+    static constexpr bool kIsAvailableV = true;
+    template <typename T>
+    static constexpr bool kIsAvailableV<T, std::void_t<decltype(T::kIsAvailable)>> =
+        T::kIsAvailable;
+
+    CK_TILE_DEVICE void operator()(const QuantGemmKernelArgs& kargs) const
     {
-        auto c_block_window = MakeCBlockWindow<memory_operation_enum::atomic_add>(
-            c_ptr, kargs, block_idx_m, block_idx_n);
-
-        if constexpr(kQuantType == QuantType::ABQuantGrouped ||
-                     kQuantType == QuantType::AQuantGrouped ||
-                     kQuantType == QuantType::BQuantGrouped)
-        {
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
-        }
-        else if constexpr(kQuantType == QuantType::RowColQuant)
-        {
-            EpiloguePipeline{}(c_block_window,
-                               c_block_tile,
-                               c_block_window,
-                               smem_ptr,
-                               aq_block_window,
-                               bq_block_window);
-        }
-        else if constexpr(kQuantType == QuantType::TensorQuant)
-        {
-            const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
-            const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
-            EpiloguePipeline{}(
-                c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
-        }
+        if constexpr(!kIsAvailableV<GemmPipeline>)
+            ignore = kargs;
+        else
+            Run_(kargs);
     }
-}
-
-CK_TILE_DEVICE void Run_(const QuantGemmKernelArgs& kargs) const
-{
-    const auto blockId  = amd_wave_read_first_lane(blockIdx.x);
-    const auto [iM, iN] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
-    const index_t i_m   = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
-    const index_t i_n   = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
-    const SplitKBatchOffset splitk_batch_offset(kargs);
-
-    // Apply splitk offset to input pointers
-    const ADataType* a_ptr =
-        static_cast<const ADataType*>(kargs.a_ptr) + splitk_batch_offset.a_k_split_offset;
-    const BDataType* b_ptr =
-        static_cast<const BDataType*>(kargs.b_ptr) + splitk_batch_offset.b_k_split_offset;
-    // For ABQuantGrouped split-K, aq_ptr is offset by aq_k_split_offset elements to point
-    // to the start of this batch's AQ K-groups (aq_group_offset columns in RowMajor AQ).
-    const AQDataType* aq_ptr =
-        static_cast<const AQDataType*>(kargs.aq_ptr) + splitk_batch_offset.aq_k_split_offset;
-    const BQDataType* bq_ptr =
-        static_cast<const BQDataType*>(kargs.bq_ptr) + splitk_batch_offset.bq_k_split_offset;
-    CDataType* c_ptr = static_cast<CDataType*>(kargs.c_ptr);
-
-    // allocate LDS
-    __shared__ char smem_ptr[GetSmemSize()];
-
-    RunGemm(a_ptr, b_ptr, aq_ptr, bq_ptr, c_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
-}
-
-template <typename T, typename = void>
-static constexpr bool kIsAvailableV = true;
-template <typename T>
-static constexpr bool kIsAvailableV<T, std::void_t<decltype(T::kIsAvailable)>> = T::kIsAvailable;
-
-CK_TILE_DEVICE void operator()(const QuantGemmKernelArgs& kargs) const
-{
-    if constexpr(!kIsAvailableV<GemmPipeline>)
-        ignore = kargs;
-    else
-        Run_(kargs);
-}
 };
 
 } // namespace ck_tile
