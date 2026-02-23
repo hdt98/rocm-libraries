@@ -32,12 +32,31 @@
 
 #pragma once
 
-#include "../auxiliary/rocauxiliary_lasyf.hpp"
 #include "rocblas.hpp"
-#include "roclapack_sytf2.hpp"
 #include "rocsolver/rocsolver.h"
 
 ROCSOLVER_BEGIN_NAMESPACE
+
+static size_t get_lds_size()
+{
+    size_t const default_lds_size = 64 * 1024;
+
+    int lds_size = 0;
+    int deviceId = 0;
+    auto const istat_device = hipGetDevice(&deviceId);
+    if(istat_device != hipSuccess)
+    {
+        return (default_lds_size);
+    };
+    auto const attr = hipDeviceAttributeMaxSharedMemoryPerBlock;
+    auto const istat_attr = hipDeviceGetAttribute(&lds_size, attr, deviceId);
+    if(istat_attr != hipSuccess)
+    {
+        return (default_lds_size);
+    };
+
+    return (lds_size);
+}
 
 template <typename T, typename I>
 __device__ static T reduce_sum_shfl_wsize(I const wsize, T val)
@@ -98,10 +117,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
                                                                      UB BB,
                                                                      Istride const shiftB,
-                                                                     I const ldb,
+                                                                     I const ldb_arg,
                                                                      Istride const strideB,
 
-                                                                     I const batch_count)
+                                                                     I const batch_count,
+                                                                     size_t const lds_size)
 {
     // select batch instance
     I const bid_start = hipBlockIdx_z;
@@ -126,12 +146,12 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // Fortran 1-based indexing
     // ------------------------
     auto idx2F
-        = [](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
+        = [](auto i, auto j, auto ld) { return ((i - 1) + ((j - 1) * static_cast<int64_t>(ld))); };
 
     // ------------------
     // C 0-based indexing
     // ------------------
-    auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
+    auto idx2D = [](auto i, auto j, auto ld) { return (i + (j * static_cast<int64_t>(ld))); };
 
     // -------------------------------
     // Compute rank-1 update
@@ -156,15 +176,17 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
             // -----------------------------
             // optimization for special case
             // -----------------------------
-            if(n == 1)
+            bool const use_m_loop = (m >= ij_inc) || (n == 1);
+            bool const use_n_loop = (m == 1);
+
+            if(use_m_loop)
             {
                 jj_start = 0;
                 jj_inc = 1;
                 ii_start = ij_start;
                 ii_inc = ij_inc;
             }
-
-            if(m == 1)
+            else if(use_n_loop)
             {
                 ii_start = 0;
                 ii_inc = 1;
@@ -173,16 +195,15 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
             }
         }
 
+        __syncthreads();
+
         for(I j = 0 + jj_start; j < n; j += jj_inc)
         {
-            auto const jy = (incy == 1) ? j : j * static_cast<int64_t>(incy);
-            T const yj = y[jy];
+            T const yj = (incy == 1) ? y[j] : y[j * static_cast<int64_t>(incy)];
 
             for(I i = 0 + ii_start; i < m; i += ii_inc)
             {
-                auto const ix = (incx == 1) ? i : i * static_cast<int64_t>(incx);
-
-                T const xi = x[ix];
+                T const xi = (incx == 1) ? x[i] : x[i * static_cast<int64_t>(incx)];
 
                 C[idx2D(i, j, ldc)] += xi * (yj * alpha);
             }
@@ -246,6 +267,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         I const lenx = (is_no_trans) ? n : m;
         I const leny = (is_no_trans) ? m : n;
 
+        // --------------
+        // scale vector y
+        // --------------
         for(I ij = 0 + ij_start; ij < leny; ij += ij_inc)
         {
             auto const iy = (incy == 1) ? ij : ij * static_cast<int64_t>(incy);
@@ -292,6 +316,19 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         __syncthreads();
     };
 
+    extern __shared__ std::byte ldsmem[];
+    std::byte* pfree = &(ldsmem[0]);
+
+    size_t const size_B_lds = sizeof(T) * n * nrhs;
+    bool const use_B_lds = (size_B_lds <= lds_size);
+
+    T* const B_lds = (use_B_lds) ? reinterpret_cast<T*>(pfree) : nullptr;
+
+    if(use_B_lds)
+    {
+        pfree += size_B_lds;
+    }
+
     // --------------------------------
     // Main loop over batch index "bid"
     // --------------------------------
@@ -299,8 +336,50 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     {
         // get array pointers
         T* const A_ = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-        T* const B_ = load_ptr_batch<T>(BB, bid, shiftB, strideB);
         I* const ipiv_ = ipivA + (bid * strideP);
+
+        T* const B_bid = load_ptr_batch<T>(BB, bid, shiftB, strideB);
+
+        // --------------------
+        // try to hold B in LDS
+        // --------------------
+
+        T* const B_ = (use_B_lds) ? B_lds : B_bid;
+        I const ldb = (use_B_lds) ? n : ldb_arg;
+
+        if(use_B_lds)
+        {
+            // ---------------
+            // load B into LDS
+            // ---------------
+
+            I ii_start = i_start;
+            I ii_inc = i_inc;
+            I jj_start = j_start;
+            I jj_inc = j_inc;
+
+            if(nrhs == 1)
+            {
+                jj_start = 0;
+                jj_inc = 1;
+
+                ii_start = ij_start;
+                ii_inc = ij_inc;
+            }
+
+            __syncthreads();
+
+            for(I j = 0 + jj_start; j < nrhs; j += jj_inc)
+            {
+                for(I i = 0 + ii_start; i < n; i += ii_inc)
+                {
+                    auto const ij = i + j * ldb;
+                    B_lds[ij] = B_bid[idx2D(i, j, ldb_arg)];
+                }
+            }
+
+            __syncthreads();
+        }
 
         auto A = [=](auto i, auto j) -> T& { return (A_[idx2F(i, j, lda)]); };
 
@@ -682,6 +761,40 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
             } // end while
         }
 
+        if(use_B_lds)
+        {
+            // ---------------------------------
+            // write B from LDS to global memory
+            // ---------------------------------
+            I ii_start = i_start;
+            I ii_inc = i_inc;
+
+            I jj_start = j_start;
+            I jj_inc = j_inc;
+
+            if(nrhs == 1)
+            {
+                jj_start = 0;
+                jj_inc = 1;
+
+                ii_start = ij_start;
+                ii_inc = ij_inc;
+            }
+
+            __syncthreads();
+
+            for(I j = 0 + jj_start; j < nrhs; j += jj_inc)
+            {
+                for(I i = 0 + ii_start; i < n; i += ii_inc)
+                {
+                    auto const ij = i + j * ldb;
+                    B_bid[idx2D(i, j, ldb_arg)] = B_lds[ij];
+                }
+            }
+
+            __syncthreads();
+        }
+
     } // end for (bid)
 }
 
@@ -784,8 +897,10 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     I const max_blocks = 1024;
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
+    size_t const lds_size = get_lds_size();
+
     bool const use_upper = (uplo == rocblas_fill_upper);
-    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, dim3(1, 1, nbz), dim3(nthreads, 1, 1), 0, stream,
+    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, dim3(1, 1, nbz), dim3(nthreads, 1, 1), lds_size, stream,
 
                             use_upper, n, nrhs,
 
@@ -795,7 +910,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
 
                             B, shiftB, ldb, strideB,
 
-                            batch_count);
+                            batch_count, lds_size);
 
     return rocblas_status_success;
 }
