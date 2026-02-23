@@ -268,7 +268,7 @@ namespace rocRoller
         return *it;
     }
 
-    void CommandKernel::generateKernelGraph(std::string name)
+    void CommandKernel::generateKernelGraph()
     {
         TIMER(t, "CommandKernel::generateKernelGraph");
 
@@ -490,7 +490,7 @@ namespace rocRoller
 
         if(m_command)
         {
-            generateKernelGraph(m_name);
+            generateKernelGraph();
             generateKernelSource();
         }
         else
