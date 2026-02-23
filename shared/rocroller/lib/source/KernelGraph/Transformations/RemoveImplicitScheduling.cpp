@@ -90,10 +90,6 @@ namespace rocRoller::KernelGraph
                     {
                         if(!seqEdge.has_value())
                         {
-                            AssertFatal(
-                                graph.control.compareNodes(UseCacheIfAvailable, nodeA, nodeB)
-                                == ControlGraph::NodeOrdering::LeftFirst);
-
                             graph.control.addElement(ControlGraph::Sequence(), {nodeA}, {nodeB});
                         }
                     }

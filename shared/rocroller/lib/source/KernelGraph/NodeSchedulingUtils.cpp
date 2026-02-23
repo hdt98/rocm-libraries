@@ -78,16 +78,6 @@ namespace rocRoller::KernelGraph::NodeScheduling
             if(sourceBodyParent != destBodyParent)
                 return;
 
-            auto order
-                = graph.control.compareNodes(UseCacheIfAvailable, sourceControl, destControl);
-            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                            || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
-                        ShowValue(sourceControl),
-                        ShowValue(destControl),
-                        ShowValue(sourceBodyParent),
-                        ShowValue(destBodyParent),
-                        ShowValue(order));
-
             if(!dependenceDAG.findEdge(sourceControl, destControl).has_value())
             {
                 dependenceDAG.addElement(ControlGraph::Sequence(), {sourceControl}, {destControl});
