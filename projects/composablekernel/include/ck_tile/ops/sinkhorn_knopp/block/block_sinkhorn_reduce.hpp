@@ -27,20 +27,24 @@ CK_TILE_DEVICE void sinkhorn_knopp_naive_full(const InDistributedTensor& input_t
     // Loop the Sinkhorn-Knopp normalization for rows and columns
     for(int i = 0; i < iterations; i++)
     {
-        sweep_tile_span(spans[number<0>{}], [&](const auto idx0) {
-            // 1. Compute row sums
-            ComputeDataType row_sum = 0.0;
-            sweep_tile_span(spans[number<1>{}], [&](const auto idx1) {
-                constexpr auto idx = make_tuple(idx0, idx1);
-                row_sum += compute_tile(idx);
-            });
+        // For each row
+        sweep_tile_span(spans[number<0>{}],
+                        // run function
+                        [&](const auto idx0) {
+                            // 1. Compute row sums
+                            ComputeDataType row_sum = 0.0;
+                            //
+                            sweep_tile_span(spans[number<1>{}], [&](const auto idx1) {
+                                constexpr auto idx = make_tuple(idx0, idx1);
+                                row_sum += compute_tile(idx);
+                            });
 
-            // 2. Divide values in the row by the sum
-            sweep_tile_span(spans[number<1>{}], [&](const auto idx1) {
-                constexpr auto c_idx = make_tuple(idx0, idx1);
-                compute_tile(c_idx)  = compute_tile(c_idx) / row_sum;
-            });
-        });
+                            // 2. Divide values in the row by the sum
+                            sweep_tile_span(spans[number<1>{}], [&](const auto idx1) {
+                                constexpr auto c_idx = make_tuple(idx0, idx1);
+                                compute_tile(c_idx)  = compute_tile(c_idx) / row_sum;
+                            });
+                        });
 
         // Repeat for columns
         sweep_tile_span(spans[number<1>{}], [&](const auto idx1) {

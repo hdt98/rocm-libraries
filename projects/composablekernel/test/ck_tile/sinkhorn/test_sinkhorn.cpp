@@ -30,4 +30,4 @@ using TestTypes = ::testing::Types<TestConfig_F16>;
 
 TYPED_TEST_SUITE(TestCkTileSinkHorn, TestTypes);
 
-TYPED_TEST(TestCkTileSinkHorn, Test_4x4) { this->RunGenericTest({4, 4}, 20); }
+TYPED_TEST(TestCkTileSinkHorn, Test_4x4) { this->RunGenericTest({1, 4, 4}, 20); }
