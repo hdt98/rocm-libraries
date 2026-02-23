@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -7011,6 +7011,230 @@ inline hipsolverStatus_t hipsolver_potrs(testAPI_t               API,
                                         ldb,
                                         info,
                                         bc);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+/********************************************************/
+
+/******************** TRTRI ********************/
+// bufferSize
+inline hipsolverStatus_t hipsolver_trtri_bufferSize(testAPI_t           API,
+                                                    hipsolverHandle_t   handle,
+                                                    hipsolverFillMode_t uplo,
+                                                    hipsolverDiagType_t diag,
+                                                    int64_t             n,
+                                                    float*              A,
+                                                    int64_t             lda,
+                                                    size_t*             lworkOnDevice,
+                                                    size_t*             lworkOnHost)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri_bufferSize(
+            handle, uplo, diag, n, HIP_R_32F, A, lda, lworkOnDevice, lworkOnHost);
+    default:
+        *lworkOnDevice = 0;
+        *lworkOnHost   = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_trtri_bufferSize(testAPI_t           API,
+                                                    hipsolverHandle_t   handle,
+                                                    hipsolverFillMode_t uplo,
+                                                    hipsolverDiagType_t diag,
+                                                    int64_t             n,
+                                                    double*             A,
+                                                    int64_t             lda,
+                                                    size_t*             lworkOnDevice,
+                                                    size_t*             lworkOnHost)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri_bufferSize(
+            handle, uplo, diag, n, HIP_R_64F, A, lda, lworkOnDevice, lworkOnHost);
+    default:
+        *lworkOnDevice = 0;
+        *lworkOnHost   = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_trtri_bufferSize(testAPI_t           API,
+                                                    hipsolverHandle_t   handle,
+                                                    hipsolverFillMode_t uplo,
+                                                    hipsolverDiagType_t diag,
+                                                    int64_t             n,
+                                                    hipsolverComplex*   A,
+                                                    int64_t             lda,
+                                                    size_t*             lworkOnDevice,
+                                                    size_t*             lworkOnHost)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri_bufferSize(
+            handle, uplo, diag, n, HIP_C_32F, A, lda, lworkOnDevice, lworkOnHost);
+    default:
+        *lworkOnDevice = 0;
+        *lworkOnHost   = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_trtri_bufferSize(testAPI_t               API,
+                                                    hipsolverHandle_t       handle,
+                                                    hipsolverFillMode_t     uplo,
+                                                    hipsolverDiagType_t     diag,
+                                                    int64_t                 n,
+                                                    hipsolverDoubleComplex* A,
+                                                    int64_t                 lda,
+                                                    size_t*                 lworkOnDevice,
+                                                    size_t*                 lworkOnHost)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri_bufferSize(
+            handle, uplo, diag, n, HIP_C_64F, A, lda, lworkOnDevice, lworkOnHost);
+    default:
+        *lworkOnDevice = 0;
+        *lworkOnHost   = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+// trtri
+inline hipsolverStatus_t hipsolver_trtri(testAPI_t           API,
+                                         hipsolverHandle_t   handle,
+                                         hipsolverFillMode_t uplo,
+                                         hipsolverDiagType_t diag,
+                                         int64_t             n,
+                                         float*              A,
+                                         int64_t             lda,
+                                         float*              work,
+                                         size_t              lworkOnDevice,
+                                         float*              hwork,
+                                         size_t              lworkOnHost,
+                                         int*                devInfo)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri(handle,
+                                 uplo,
+                                 diag,
+                                 n,
+                                 HIP_R_32F,
+                                 A,
+                                 lda,
+                                 work,
+                                 lworkOnDevice,
+                                 hwork,
+                                 lworkOnHost,
+                                 devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_trtri(testAPI_t           API,
+                                         hipsolverHandle_t   handle,
+                                         hipsolverFillMode_t uplo,
+                                         hipsolverDiagType_t diag,
+                                         int64_t             n,
+                                         double*             A,
+                                         int64_t             lda,
+                                         double*             work,
+                                         size_t              lworkOnDevice,
+                                         double*             hwork,
+                                         size_t              lworkOnHost,
+                                         int*                devInfo)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri(handle,
+                                 uplo,
+                                 diag,
+                                 n,
+                                 HIP_R_64F,
+                                 A,
+                                 lda,
+                                 work,
+                                 lworkOnDevice,
+                                 hwork,
+                                 lworkOnHost,
+                                 devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_trtri(testAPI_t           API,
+                                         hipsolverHandle_t   handle,
+                                         hipsolverFillMode_t uplo,
+                                         hipsolverDiagType_t diag,
+                                         int64_t             n,
+                                         hipsolverComplex*   A,
+                                         int64_t             lda,
+                                         hipsolverComplex*   work,
+                                         size_t              lworkOnDevice,
+                                         hipsolverComplex*   hwork,
+                                         size_t              lworkOnHost,
+                                         int*                devInfo)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri(handle,
+                                 uplo,
+                                 diag,
+                                 n,
+                                 HIP_C_32F,
+                                 A,
+                                 lda,
+                                 work,
+                                 lworkOnDevice,
+                                 hwork,
+                                 lworkOnHost,
+                                 devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_trtri(testAPI_t               API,
+                                         hipsolverHandle_t       handle,
+                                         hipsolverFillMode_t     uplo,
+                                         hipsolverDiagType_t     diag,
+                                         int64_t                 n,
+                                         hipsolverDoubleComplex* A,
+                                         int64_t                 lda,
+                                         hipsolverDoubleComplex* work,
+                                         size_t                  lworkOnDevice,
+                                         hipsolverDoubleComplex* hwork,
+                                         size_t                  lworkOnHost,
+                                         int*                    devInfo)
+{
+    switch(API)
+    {
+    case API_COMPAT:
+        return hipsolverDnXtrtri(handle,
+                                 uplo,
+                                 diag,
+                                 n,
+                                 HIP_C_64F,
+                                 A,
+                                 lda,
+                                 work,
+                                 lworkOnDevice,
+                                 hwork,
+                                 lworkOnHost,
+                                 devInfo);
     default:
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
