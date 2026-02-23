@@ -86,7 +86,7 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
-    kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle(
+    kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v2(
         AsPointer p_as_grid,
         BsPointer p_bs_grid,
         DsPointer p_ds_grid,
@@ -299,6 +299,7 @@ template <
         index_t CShuffleNXdlPerWavePerShuffle,
         typename CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         index_t CDEBlockTransferScalarPerVector_NPerBlock,
+        index_t N_,
         index_t Hi_,
         index_t Wi_,
         index_t Ho_,
@@ -331,8 +332,10 @@ template <
         index_t InRightPadW_,
         index_t ZYX_,
         LoopScheduler LoopSched   = make_default_loop_scheduler(),
-        index_t NumGroupsToMerge  = 1>
-struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
+        index_t NumGroupsToMerge  = 1,
+        typename AComputeDataType = ADataType,
+        typename BComputeDataType = BDataType>
+struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V2
     : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                              ALayout,
                                              BLayout,
@@ -348,7 +351,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                              AComputeDataType,
                                              BComputeDataType>
 {
-    using DeviceOp = DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle;
+    using DeviceOp = DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V2;
     GET_MXDL_PER_WAVE_IMPL
     // Force usage of 16x16 instruction for WMMA
     static constexpr bool Wave32Force16MNPerXDL =
@@ -403,17 +406,14 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         (isATensorColMajor == false) && (is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() ||
                                          is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>());
 
-    static_assert(!NeedTransposeKernel, "Transpose kernel is not yet supported.")
+    static_assert(!NeedTransposeKernel, "Transpose kernel is not yet supported.");
 
     static constexpr bool CTranspose = (NeedTransposeKernel == false) && (isMultiAB == false) &&
                                        (is_same_v<ELayout, tensor_layout::convolution::NGKHW> ||
                                         is_same_v<ELayout, tensor_layout::convolution::NGKDHW>);
 
-    using ConvToGemmFwdTransformer = TransformConvFwdToGemm_v2<
-        NDimSpatial,
-        ALayout,
-        BLayout,
-        ELayout,
+    using ConvToGemmFwdTransformer = TransformConvFwdToGemm_V2<
+        N_,
         Hi_,
         Wi_,
         Ho_,
@@ -533,8 +533,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         remove_cvref_t<decltype(MakeAGridDescriptor_M_K<ALayout>())>;
     using BGridDesc_N_K =
         remove_cvref_t<decltype(MakeBGridDescriptor_N_K<BLayout>())>;
-    using DsGridDesc_M_N =
-        remove_cvref_t<decltype(MakeDsGridDescriptor_M_N())>;
+    using DsGridDesc_M_N = ck::Sequence<>;
+    //     remove_cvref_t<decltype(MakeDsGridDescriptor_M_N())>;
     using EGridDesc_M_N =
         remove_cvref_t<decltype(MakeEGridDescriptor_M_N<ELayout>())>;
 
@@ -644,9 +644,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     using BGridDesc_BK0_N_BK1 =
         remove_cvref_t<decltype(GridwiseGemm64::MakeDefaultBGridDescriptor_BK0_N_BK1(
             BGridDesc_N_K{}))>;
-    using DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock = remove_cvref_t<
-        decltype(GridwiseGemmCTranspose64::MakeDsGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(
-            DsGridDesc_M_N{}))>;
+    using DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock = ck::Sequence<>;
+    //remove_cvref_t<
+    //     decltype(GridwiseGemmCTranspose64::MakeDsGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(
+    //         DsGridDesc_M_N{}))>;
     using EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock = remove_cvref_t<
         decltype(GridwiseGemmCTranspose64::MakeEGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(
             EGridDesc_M_N{}))>;
@@ -720,7 +721,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         Argument(APointers p_as,
                  BPointers p_bs,
-                 const std::array<const void*, NumDTensor>& p_ds,
+                 const std::array<const void*, NumDTensor>&, // p_ds,
                  void* p_e,
                  const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
                  const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
@@ -867,7 +868,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 }
             }
             
-            static_assert(!NeedTransposeKernel, "Transpose kernel is not yet supported.")
+            static_assert(!NeedTransposeKernel, "Transpose kernel is not yet supported.");
         }
 
         std::size_t GetWorkspaceATensorSizeBytes() const
@@ -999,7 +1000,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                     const auto bs_grid_desc_bk0_n_bk1 = generate_tuple(
                         [&](auto) { return arg.b_grid_desc_bk0_n_bk1_; }, Number<NumBTensor>{});
 
-                    const auto kernel = kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle<
+                    const auto kernel = kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v2<
                         GridwiseGemm,
                         AGridPointer,
                         BGridPointer,
@@ -1072,7 +1073,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
                     if constexpr(CTranspose)
                     {
-                        const auto kernel = kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle<
+                        const auto kernel = kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v2<
                             GridwiseGemmCTranspose,
                             const BDataType*,
                             const ADataType*,
@@ -1115,7 +1116,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                     }
                     else
                     {
-                        const auto kernel = kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle<
+                        const auto kernel = kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v2<
                             GridwiseGemm,
                             const ADataType*,
                             const BDataType*,
@@ -1173,92 +1174,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         template <typename GridwiseGemm, typename GridwiseGemmCTranspose>
         float RunImp(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
+            static_assert(!NeedTransposeKernel, "Transpose kernel is not yet supported.");
+            
             float avg_time = 0.f;
-            if constexpr(NeedTransposeKernel)
-            {
-                const index_t a_grid_size =
-                    arg.elementwise_block_2_ctile_map_transpose_a_.CalculateGridSize(
-                        arg.a_in_transpose_desc_);
-                const index_t b_grid_size =
-                    (is_NGCHW_GKCYX_NGKHW<ALayout, BLayout, ELayout>() ||
-                     is_NGCDHW_GKCZYX_NGKDHW<ALayout, BLayout, ELayout>())
-                        ? arg.elementwise_block_2_ctile_map_transpose_b_.CalculateGridSize(
-                              arg.b_in_transpose_desc_)
-                        : 0; // Dont run transpose B if not needed
-
-                ADataType* p_a_out_grid = type_convert<ADataType*>(arg.p_workspace_);
-                BDataType* p_b_out_grid = type_convert<BDataType*>(arg.p_workspace_) +
-                                          arg.GetWorkspaceATensorSizeBytes() / sizeof(BDataType);
-
-                auto kernel_transpose = kernel_elementwise_dual<GridwiseElementwiseInputTranspose,
-                                                                GridwiseElementwiseWeightTranspose,
-                                                                ck::Tuple<NGCHWTransposeDescType>,
-                                                                ck::Tuple<GKCYXTransposeDescType>,
-                                                                ck::Tuple<NHWGCTransposeDescType>,
-                                                                ck::Tuple<GKYXCTransposeDescType>,
-                                                                ck::Tuple<const ADataType*>,
-                                                                ck::Tuple<const BDataType*>,
-                                                                ck::Tuple<ADataType*>,
-                                                                ck::Tuple<BDataType*>,
-                                                                Block2TileMapElementwise,
-                                                                Block2TileMapElementwise,
-                                                                element_wise::PassThrough>;
-
-                avg_time += launch_and_time_kernel(stream_config,
-                                                   kernel_transpose,
-                                                   dim3(a_grid_size + b_grid_size),
-                                                   dim3(ElementwiseBlocksize),
-                                                   0,
-                                                   make_tuple(arg.a_in_transpose_desc_),
-                                                   make_tuple(arg.b_in_transpose_desc_),
-                                                   make_tuple(arg.a_out_transpose_desc_),
-                                                   make_tuple(arg.b_out_transpose_desc_),
-                                                   make_tuple(arg.p_as_grid_.At(I0)),
-                                                   make_tuple(arg.p_bs_grid_.At(I0)),
-                                                   make_tuple(p_a_out_grid),
-                                                   make_tuple(p_b_out_grid),
-                                                   arg.elementwise_block_2_ctile_map_transpose_a_,
-                                                   arg.elementwise_block_2_ctile_map_transpose_b_,
-                                                   element_wise::PassThrough{},
-                                                   a_grid_size);
-            }
-
             avg_time += RunGemm<GridwiseGemm, GridwiseGemmCTranspose>(arg, stream_config);
-
-            if constexpr(NeedTransposeKernel)
-            {
-                const index_t grid_size =
-                    arg.elementwise_block_2_ctile_map_transpose_e_.CalculateGridSize(
-                        arg.e_in_transpose_desc_);
-
-                const EDataType* p_e_in_grid =
-                    type_convert<EDataType*>(arg.p_workspace_) +
-                    (arg.GetWorkspaceATensorSizeBytes() + arg.GetWorkspaceBTensorSizeBytes()) /
-                        sizeof(EDataType);
-
-                EDataType* p_e_out_grid = arg.p_e_grid_;
-
-                auto kernel_transpose = kernel_elementwise<GridwiseElementwiseOutputTranspose,
-                                                           ck::Tuple<NHWGCTransposeDescType>,
-                                                           ck::Tuple<NGCHWTransposeDescType>,
-                                                           ck::Tuple<const EDataType*>,
-                                                           ck::Tuple<EDataType*>,
-                                                           Block2TileMapElementwise,
-                                                           element_wise::PassThrough>;
-
-                avg_time += launch_and_time_kernel(stream_config,
-                                                   kernel_transpose,
-                                                   dim3(grid_size),
-                                                   dim3(ElementwiseBlocksize),
-                                                   0,
-                                                   make_tuple(arg.e_in_transpose_desc_),
-                                                   make_tuple(arg.e_out_transpose_desc_),
-                                                   make_tuple(p_e_in_grid),
-                                                   make_tuple(p_e_out_grid),
-                                                   arg.elementwise_block_2_ctile_map_transpose_e_,
-                                                   element_wise::PassThrough{});
-            }
-
             return avg_time;
         }
 

@@ -14,6 +14,7 @@ namespace ck {
 namespace tensor_operation {
 
 template <
+        index_t N_,
         index_t Hi_,
         index_t Wi_,
         index_t Ho_,
@@ -54,26 +55,8 @@ struct TransformConvFwdToGemm_V2
     public:
     __host__ __device__ constexpr TransformConvFwdToGemm_V2() {}
 
-    __host__ constexpr bool AreDescriptorsSmallerThan2GB() const
-    {
-        constexpr long_index_t TwoGB = (long_index_t{1} << 31);
-
-        constexpr long_index_t in_desc_space_size =
-            I1 + (N_ - I1) * NStrideTensorA_ + (Di_ - I1) * DiStride_ + (Hi_ - I1) * HiStride_ +
-            (Wi_ - I1) * WiStride_ + (C_ - I1) * CStrideTensorA_;
-        constexpr long_index_t out_desc_space_size =
-            I1 + (N_ - I1) * NStrideTensorC_ + (Do_ - I1) * DoStride_ + (Ho_ - I1) * HoStride_ +
-            (Wo_ - I1) * WoStride_ + (K_ - I1) * KStrideTensorC_;
-
-        constexpr bool is_a_descriptor_smaller_than_2GB = (in_desc_space_size * sizeof(ADataType)) <= TwoGB;
-        constexpr bool is_c_descriptor_smaller_than_2GB = (out_desc_space_size * sizeof(CDataType)) <= TwoGB;
-
-        return is_a_descriptor_smaller_than_2GB && is_c_descriptor_smaller_than_2GB;
-    } 
-
-
     template <typename ALayout,
-              typename ck::enable_if<NDimSpatial == 2 &&
+              typename ck::enable_if<
                                          (is_same_v<ALayout, tensor_layout::convolution::G_NHW_C> ||
                                           is_same_v<ALayout, tensor_layout::convolution::NHWGC> ||
                                           is_same_v<ALayout, tensor_layout::convolution::GNHWC>),
@@ -186,16 +169,13 @@ struct TransformConvFwdToGemm_V2
     }
 
     template <typename CLayout,
-              index_t NDimSp = NDimSpatial,
-
-              typename ck::enable_if<NDimSp == 2 &&
+              typename ck::enable_if<
                                          (is_same_v<CLayout, tensor_layout::convolution::G_NHW_K> ||
                                           is_same_v<CLayout, tensor_layout::convolution::NHWGK> ||
                                           is_same_v<CLayout, tensor_layout::convolution::GNHWK>),
                                      bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        static_assert(CTranspose == false);
         constexpr index_t NDoHoWo = N_ * Ho_ * Wo_;
         if constexpr(NumGroupsToMerge == 1)
         {
@@ -242,35 +222,6 @@ struct TransformConvFwdToGemm_V2
                            make_merge_transform(make_tuple(NumGroupsToMerge, K_))),
                 make_tuple(Sequence<0, 1>{}, Sequence<2, 3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-    }
-};
-
-// wrapper class to call member functions on TransformConvToGemm struct at runtime
-// TODO: figure out aq way to properly pass in layout as an argument
-struct TransformConv
-{
-    TransformConv() {}
-
-    template <index_t NDimSpatial,
-              device::ConvolutionForwardSpecialization ConvForwardSpecialization>
-    auto
-    transform_func(TransformConvFwdToGemm<NDimSpatial, ConvForwardSpecialization> conv_fwd_to_gemm)
-    {
-        if(NDimSpatial == 2)
-        {
-            return conv_fwd_to_gemm
-                .template MakeCDescriptor_M_N<ck::tensor_layout::convolution::NHWGK, 2>();
-        }
-        else if(NDimSpatial == 3)
-        {
-            return conv_fwd_to_gemm
-                .template MakeCDescriptor_M_N<tensor_layout::convolution::NDHWGK, 3>();
-        }
-        else if(NDimSpatial == 1)
-        {
-            return conv_fwd_to_gemm
-                .template MakeCDescriptor_M_N<tensor_layout::convolution::NWGK, 1>();
         }
     }
 };

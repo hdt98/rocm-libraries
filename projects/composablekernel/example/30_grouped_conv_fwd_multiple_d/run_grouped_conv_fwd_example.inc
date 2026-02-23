@@ -3,7 +3,7 @@
 
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V2<
         NDimSpatial,
         InputLayout<NDimSpatial>,
         WeightLayout<NDimSpatial>,
@@ -20,6 +20,7 @@ using DeviceConvFwdInstance =
         OutElementOp,
         ConvSpec,    // ConvForwardSpecialization
         GemmSpec,    // GemmSpecialization
+        1,           // Num GEMM-K prefetches.
         256,         // BlockSize
         128,         // MPerBlock
         32,         // NPerBlock
@@ -47,12 +48,33 @@ using DeviceConvFwdInstance =
         1,           // CShuffleMXdlPerWavePerShuffle
         1,           // CShuffleNXdlPerWavePerShuffle
         S<1, 64, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, must match with num merged groups
-        4,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
-        ck::BlockGemmPipelineScheduler::Interwave,
-        ck::BlockGemmPipelineVersion::v1,
-        InKernelDataType, 
-        WeiKernelDataType,
-        false, // No direct load
+        1,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
+        // Conv shape params
+        32,
+        200, 
+        200, 
+        200, 
+        200, 
+        3, 
+        3, 
+        4, 
+        4
+        25600, 
+        128, 
+        25600, 
+        128, 
+        4
+        1, 
+        1, 
+        36, 
+        1
+        5120000, 
+        5120000, 
+        4, 
+        144, 
+        4,
+        // Conv shape params end
+        ck::LoopScheduler::Default,
         8>; // Num groups to merge
 
 template <ck::index_t NDimSpatial>
