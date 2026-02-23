@@ -99,7 +99,6 @@ static inline std::vector<const char*> buildCompileOptions()
     options.push_back("-D__HIP_PLATFORM_AMD__");
     options.push_back("--std=c++17");
     options.push_back(rocwmmaIncludePath.c_str());
-    options.push_back("-I/opt/rocm/include");
 
     return options;
 }
