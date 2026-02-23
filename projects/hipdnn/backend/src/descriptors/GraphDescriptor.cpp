@@ -88,7 +88,9 @@ void GraphDescriptor::setDataType(hipdnnBackendAttributeName_t attributeName,
         _ioDataType = dataType;
         break;
     default:
-        break;
+        throw HipdnnException(HIPDNN_STATUS_BAD_PARAM,
+                              "GraphDescriptor::setDataType: Unsupported attribute name "
+                                  + std::string(hipdnnGetAttributeNameString(attributeName)));
     }
 }
 

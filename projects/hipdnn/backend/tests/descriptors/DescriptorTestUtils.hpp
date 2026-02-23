@@ -8,6 +8,8 @@
 #include "descriptors/TensorDescriptor.hpp"
 #include "hipdnn_backend.h"
 #include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_test_sdk/constants/ConvFpropConstants.hpp>
+#include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
 #include <memory>
 #include <vector>
@@ -27,12 +29,12 @@ std::unique_ptr<HipdnnBackendDescriptor> createDescriptor()
     return std::unique_ptr<HipdnnBackendDescriptor>(createDescriptorPtr<T>());
 }
 
-inline std::unique_ptr<HipdnnBackendDescriptor>
-    createFinalizedTensor(int64_t uid,
-                          std::vector<int64_t> dims = {1, 3, 32, 32},
-                          std::vector<int64_t> strides = {3072, 1024, 32, 1},
-                          hipdnn_data_sdk::data_objects::DataType dataType
-                          = hipdnn_data_sdk::data_objects::DataType::FLOAT)
+inline std::unique_ptr<HipdnnBackendDescriptor> createFinalizedTensor(
+    int64_t uid,
+    std::vector<int64_t> dims = hipdnn_tests::toVec(hipdnn_tests::constants::K_TENSOR_X_DIMS),
+    std::vector<int64_t> strides = hipdnn_tests::toVec(hipdnn_tests::constants::K_TENSOR_X_STRIDES),
+    hipdnn_data_sdk::data_objects::DataType dataType
+    = hipdnn_data_sdk::data_objects::DataType::FLOAT)
 {
     auto wrapper = createDescriptor<TensorDescriptor>();
     auto desc = wrapper->asDescriptor<TensorDescriptor>();
@@ -69,9 +71,9 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
     desc->setAttribute(
         HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_Y, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &yDesc);
 
-    std::vector<int64_t> padding = {1, 1};
-    std::vector<int64_t> stride = {1, 1};
-    std::vector<int64_t> dilation = {1, 1};
+    auto padding = hipdnn_tests::toVec(hipdnn_tests::constants::K_CONV_PADDING);
+    auto stride = hipdnn_tests::toVec(hipdnn_tests::constants::K_CONV_STRIDE);
+    auto dilation = hipdnn_tests::toVec(hipdnn_tests::constants::K_CONV_DILATION);
 
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS, HIPDNN_TYPE_INT64, 2, padding.data());
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS, HIPDNN_TYPE_INT64, 2, padding.data());

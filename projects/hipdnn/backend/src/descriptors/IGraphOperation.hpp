@@ -25,6 +25,7 @@ public:
 
     // Builds a NodeT representing this operation in the graph.
     // Sets the correct flatbuffer union type for the node's attributes.
+    // Implementations must set node->compute_data_type from their stored compute type.
     virtual std::unique_ptr<hipdnn_data_sdk::data_objects::NodeT> buildNode() const = 0;
 };
 

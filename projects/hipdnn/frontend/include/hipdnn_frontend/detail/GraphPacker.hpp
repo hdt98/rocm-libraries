@@ -1,4 +1,4 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
 #pragma once
@@ -96,7 +96,7 @@ inline Error assembleGraphDescriptor(std::vector<ScopedHipdnnBackendDescriptor>&
                                      "Failed to finalize GraphDescriptor");
 
     outGraphDesc = std::make_unique<ScopedHipdnnBackendDescriptor>(std::move(graphDesc));
-    return {ErrorCode::OK, ""};
+    return {};
 }
 
 } // namespace hipdnn_frontend::detail

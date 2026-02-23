@@ -12,6 +12,8 @@
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/data_objects/convolution_fwd_attributes_generated.h>
 #include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_test_sdk/constants/ConvFpropConstants.hpp>
+#include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
 
@@ -21,6 +23,8 @@
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
 using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_tests::constants;
+using hipdnn_tests::toVec;
 
 class TestConvolutionFwdOperationDescriptor : public ::testing::Test
 {
@@ -50,10 +54,10 @@ public:
     void setConvParams() const
     {
         auto desc = getDescriptor();
-        std::vector<int64_t> prePadding = {1, 1};
-        std::vector<int64_t> postPadding = {1, 1};
-        std::vector<int64_t> stride = {1, 1};
-        std::vector<int64_t> dilation = {1, 1};
+        auto prePadding = toVec(K_CONV_PADDING);
+        auto postPadding = toVec(K_CONV_PADDING);
+        auto stride = toVec(K_CONV_STRIDE);
+        auto dilation = toVec(K_CONV_DILATION);
 
         desc->setAttribute(
             HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS, HIPDNN_TYPE_INT64, 2, prePadding.data());
@@ -69,6 +73,9 @@ public:
     {
         setTensors();
         setConvParams();
+        auto computeType = DataType::FLOAT;
+        getDescriptor()->setAttribute(
+            HIPDNN_ATTR_CONVOLUTION_COMP_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
     }
 
     void makeFinalized() const
@@ -87,9 +94,12 @@ protected:
     void SetUp() override
     {
         _wrapper = createDescriptor<ConvolutionFwdOperationDescriptor>();
-        _xDesc = createFinalizedTensor(1, {1, 3, 32, 32}, {3072, 1024, 32, 1});
-        _wDesc = createFinalizedTensor(2, {64, 3, 3, 3}, {27, 9, 3, 1});
-        _yDesc = createFinalizedTensor(3, {1, 64, 32, 32}, {65536, 1024, 32, 1});
+        _xDesc = createFinalizedTensor(
+            K_TENSOR_X_UID, toVec(K_TENSOR_X_DIMS), toVec(K_TENSOR_X_STRIDES));
+        _wDesc = createFinalizedTensor(
+            K_TENSOR_W_UID, toVec(K_TENSOR_W_DIMS), toVec(K_TENSOR_W_STRIDES));
+        _yDesc = createFinalizedTensor(
+            K_TENSOR_Y_UID, toVec(K_TENSOR_Y_DIMS), toVec(K_TENSOR_Y_STRIDES));
         _unfinalizedTensor = createDescriptor<TensorDescriptor>();
     }
 
@@ -162,9 +172,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, FinalizeFailsWithoutPrePadding)
 {
     auto desc = getDescriptor();
     setTensors();
-    std::vector<int64_t> postPadding = {1, 1};
-    std::vector<int64_t> stride = {1, 1};
-    std::vector<int64_t> dilation = {1, 1};
+    auto postPadding = toVec(K_CONV_PADDING);
+    auto stride = toVec(K_CONV_STRIDE);
+    auto dilation = toVec(K_CONV_DILATION);
 
     desc->setAttribute(
         HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS, HIPDNN_TYPE_INT64, 2, postPadding.data());
@@ -178,9 +188,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, FinalizeFailsWithoutPostPadding)
 {
     auto desc = getDescriptor();
     setTensors();
-    std::vector<int64_t> prePadding = {1, 1};
-    std::vector<int64_t> stride = {1, 1};
-    std::vector<int64_t> dilation = {1, 1};
+    auto prePadding = toVec(K_CONV_PADDING);
+    auto stride = toVec(K_CONV_STRIDE);
+    auto dilation = toVec(K_CONV_DILATION);
 
     desc->setAttribute(
         HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS, HIPDNN_TYPE_INT64, 2, prePadding.data());
@@ -194,9 +204,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, FinalizeFailsWithoutStride)
 {
     auto desc = getDescriptor();
     setTensors();
-    std::vector<int64_t> prePadding = {1, 1};
-    std::vector<int64_t> postPadding = {1, 1};
-    std::vector<int64_t> dilation = {1, 1};
+    auto prePadding = toVec(K_CONV_PADDING);
+    auto postPadding = toVec(K_CONV_PADDING);
+    auto dilation = toVec(K_CONV_DILATION);
 
     desc->setAttribute(
         HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS, HIPDNN_TYPE_INT64, 2, prePadding.data());
@@ -211,9 +221,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, FinalizeFailsWithoutDilation)
 {
     auto desc = getDescriptor();
     setTensors();
-    std::vector<int64_t> prePadding = {1, 1};
-    std::vector<int64_t> postPadding = {1, 1};
-    std::vector<int64_t> stride = {1, 1};
+    auto prePadding = toVec(K_CONV_PADDING);
+    auto postPadding = toVec(K_CONV_PADDING);
+    auto stride = toVec(K_CONV_STRIDE);
 
     desc->setAttribute(
         HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS, HIPDNN_TYPE_INT64, 2, prePadding.data());
@@ -222,6 +232,13 @@ TEST_F(TestConvolutionFwdOperationDescriptor, FinalizeFailsWithoutDilation)
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES, HIPDNN_TYPE_INT64, 2, stride.data());
 
     ASSERT_THROW_HIPDNN_STATUS(desc->finalize(), HIPDNN_STATUS_BAD_PARAM);
+}
+
+TEST_F(TestConvolutionFwdOperationDescriptor, FinalizeFailsWithoutComputeType)
+{
+    setTensors();
+    setConvParams();
+    ASSERT_THROW_HIPDNN_STATUS(getDescriptor()->finalize(), HIPDNN_STATUS_BAD_PARAM);
 }
 
 // =============================================================================
@@ -235,7 +252,7 @@ TEST_F(TestConvolutionFwdOperationDescriptor, SetTensorDescriptorX)
         HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_X, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &_xDesc));
 
     // Verify UID extracted via getData()
-    ASSERT_EQ(desc->getData().x_tensor_uid, 1);
+    ASSERT_EQ(desc->getData().x_tensor_uid, K_TENSOR_X_UID);
     ASSERT_NE(desc->getXDesc(), nullptr);
 }
 
@@ -245,7 +262,7 @@ TEST_F(TestConvolutionFwdOperationDescriptor, SetTensorDescriptorW)
     ASSERT_NO_THROW(desc->setAttribute(
         HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_W, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &_wDesc));
 
-    ASSERT_EQ(desc->getData().w_tensor_uid, 2);
+    ASSERT_EQ(desc->getData().w_tensor_uid, K_TENSOR_W_UID);
     ASSERT_NE(desc->getWDesc(), nullptr);
 }
 
@@ -255,7 +272,7 @@ TEST_F(TestConvolutionFwdOperationDescriptor, SetTensorDescriptorY)
     ASSERT_NO_THROW(desc->setAttribute(
         HIPDNN_ATTR_OPERATION_CONVOLUTION_FORWARD_Y, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &_yDesc));
 
-    ASSERT_EQ(desc->getData().y_tensor_uid, 3);
+    ASSERT_EQ(desc->getData().y_tensor_uid, K_TENSOR_Y_UID);
     ASSERT_NE(desc->getYDesc(), nullptr);
 }
 
@@ -404,7 +421,7 @@ TEST_F(TestConvolutionFwdOperationDescriptor, SetComputeDataTypeWrongElementCoun
 TEST_F(TestConvolutionFwdOperationDescriptor, SetConvParamsWrongType)
 {
     auto desc = getDescriptor();
-    std::vector<int64_t> padding = {1, 1};
+    auto padding = toVec(K_CONV_PADDING);
 
     ASSERT_THROW_HIPDNN_STATUS(
         desc->setAttribute(
@@ -477,16 +494,50 @@ TEST_F(TestConvolutionFwdOperationDescriptor, GetAttributeConvParams)
                                        prePadding.data()));
 
     ASSERT_EQ(elementCount, 2);
-    ASSERT_EQ(prePadding[0], 1);
-    ASSERT_EQ(prePadding[1], 1);
+    EXPECT_EQ(prePadding, toVec(K_CONV_PADDING));
+
+    // post_padding
+    std::vector<int64_t> postPadding(2);
+    int64_t postPaddingCount = 0;
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS,
+                                       HIPDNN_TYPE_INT64,
+                                       2,
+                                       &postPaddingCount,
+                                       postPadding.data()));
+    ASSERT_EQ(postPaddingCount, 2);
+    EXPECT_EQ(postPadding, toVec(K_CONV_PADDING));
+
+    // stride
+    std::vector<int64_t> stride(2);
+    int64_t strideCount = 0;
+    ASSERT_NO_THROW(desc->getAttribute(
+        HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES, HIPDNN_TYPE_INT64, 2, &strideCount, stride.data()));
+    ASSERT_EQ(strideCount, 2);
+    EXPECT_EQ(stride, toVec(K_CONV_STRIDE));
+
+    // dilation
+    std::vector<int64_t> dilation(2);
+    int64_t dilationCount = 0;
+    ASSERT_NO_THROW(desc->getAttribute(
+        HIPDNN_ATTR_CONVOLUTION_DILATIONS, HIPDNN_TYPE_INT64, 2, &dilationCount, dilation.data()));
+    ASSERT_EQ(dilationCount, 2);
+    EXPECT_EQ(dilation, toVec(K_CONV_DILATION));
+
+    // conv mode
+    int64_t convMode = -1;
+    int64_t convModeCount = 0;
+    ASSERT_NO_THROW(desc->getAttribute(
+        HIPDNN_ATTR_CONVOLUTION_CONV_MODE, HIPDNN_TYPE_INT64, 1, &convModeCount, &convMode));
+    ASSERT_EQ(convModeCount, 1);
+    EXPECT_EQ(convMode, static_cast<int64_t>(ConvMode::UNSET));
 }
 
 TEST_F(TestConvolutionFwdOperationDescriptor, GetAttributeComputeType)
 {
     auto desc = getDescriptor();
+    setRequiredAttributes();
     auto computeType = DataType::HALF;
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_COMP_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
-    setRequiredAttributes();
     desc->finalize();
 
     DataType retrieved = DataType::UNSET;
@@ -555,9 +606,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, FinalizePreservesTensorReferences)
     ASSERT_NE(desc->getYDesc(), nullptr);
 
     // Verify UIDs match
-    ASSERT_EQ(desc->getXDesc()->getData().uid, 1);
-    ASSERT_EQ(desc->getWDesc()->getData().uid, 2);
-    ASSERT_EQ(desc->getYDesc()->getData().uid, 3);
+    ASSERT_EQ(desc->getXDesc()->getData().uid, K_TENSOR_X_UID);
+    ASSERT_EQ(desc->getWDesc()->getData().uid, K_TENSOR_W_UID);
+    ASSERT_EQ(desc->getYDesc()->getData().uid, K_TENSOR_Y_UID);
 }
 
 // =============================================================================
@@ -571,9 +622,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, ToStringContainsExpectedInfo)
 
     std::string str = desc->toString();
     ASSERT_NE(str.find("ConvolutionFwdOperationDescriptor"), std::string::npos);
-    ASSERT_NE(str.find("x_uid=1"), std::string::npos);
-    ASSERT_NE(str.find("w_uid=2"), std::string::npos);
-    ASSERT_NE(str.find("y_uid=3"), std::string::npos);
+    ASSERT_NE(str.find("x_uid=" + std::to_string(K_TENSOR_X_UID)), std::string::npos);
+    ASSERT_NE(str.find("w_uid=" + std::to_string(K_TENSOR_W_UID)), std::string::npos);
+    ASSERT_NE(str.find("y_uid=" + std::to_string(K_TENSOR_Y_UID)), std::string::npos);
 }
 
 // =============================================================================
@@ -587,9 +638,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, GetTensorDescriptorsReturnsAllTens
 
     auto tensors = desc->getTensorDescriptors();
     ASSERT_EQ(tensors.size(), 3);
-    ASSERT_EQ(tensors[0]->getData().uid, 1);
-    ASSERT_EQ(tensors[1]->getData().uid, 2);
-    ASSERT_EQ(tensors[2]->getData().uid, 3);
+    ASSERT_EQ(tensors[0]->getData().uid, K_TENSOR_X_UID);
+    ASSERT_EQ(tensors[1]->getData().uid, K_TENSOR_W_UID);
+    ASSERT_EQ(tensors[2]->getData().uid, K_TENSOR_Y_UID);
 }
 
 TEST_F(TestConvolutionFwdOperationDescriptor, BuildNodeProducesCorrectNodeT)
@@ -608,9 +659,9 @@ TEST_F(TestConvolutionFwdOperationDescriptor, BuildNodeProducesCorrectNodeT)
 
     auto* convAttrs = node->attributes.AsConvolutionFwdAttributes();
     ASSERT_NE(convAttrs, nullptr);
-    ASSERT_EQ(convAttrs->x_tensor_uid, 1);
-    ASSERT_EQ(convAttrs->w_tensor_uid, 2);
-    ASSERT_EQ(convAttrs->y_tensor_uid, 3);
+    ASSERT_EQ(convAttrs->x_tensor_uid, K_TENSOR_X_UID);
+    ASSERT_EQ(convAttrs->w_tensor_uid, K_TENSOR_W_UID);
+    ASSERT_EQ(convAttrs->y_tensor_uid, K_TENSOR_Y_UID);
     ASSERT_EQ(convAttrs->pre_padding.size(), 2);
     ASSERT_EQ(convAttrs->stride.size(), 2);
     ASSERT_EQ(convAttrs->dilation.size(), 2);
@@ -653,7 +704,7 @@ TEST_F(TestConvolutionFwdOperationDescriptor, TryAsInterfaceReturnsValidGraphOp)
     // Verify the returned interface is the same underlying object
     auto tensors = graphOp->getTensorDescriptors();
     ASSERT_EQ(tensors.size(), 3);
-    ASSERT_EQ(tensors[0]->getData().uid, 1);
+    ASSERT_EQ(tensors[0]->getData().uid, K_TENSOR_X_UID);
 }
 
 TEST_F(TestConvolutionFwdOperationDescriptor, TryAsInterfaceReturnsNullForWrongType)

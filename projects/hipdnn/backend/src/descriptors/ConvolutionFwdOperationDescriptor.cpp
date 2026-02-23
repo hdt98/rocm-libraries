@@ -33,6 +33,10 @@ void ConvolutionFwdOperationDescriptor::finalize()
     THROW_IF_TRUE(_data.dilation.empty(),
                   HIPDNN_STATUS_BAD_PARAM,
                   "ConvolutionFwdOperationDescriptor::finalize() failed: dilation not set");
+    THROW_IF_TRUE(_computeDataType == hipdnn_data_sdk::data_objects::DataType::UNSET,
+                  HIPDNN_STATUS_BAD_PARAM,
+                  "ConvolutionFwdOperationDescriptor::finalize() failed: compute data type not "
+                  "set");
 
     HipdnnBackendDescriptorImpl<ConvolutionFwdOperationDescriptor>::finalize();
 }
@@ -146,10 +150,9 @@ void ConvolutionFwdOperationDescriptor::setTensorDesc(hipdnnBackendAttributeName
     }
     else
     {
-        THROW_IF_TRUE(true,
-                      HIPDNN_STATUS_BAD_PARAM,
-                      "ConvolutionFwdOperationDescriptor::setTensorDesc(): unsupported attribute "
-                      "name");
+        throw HipdnnException(HIPDNN_STATUS_BAD_PARAM,
+                              "ConvolutionFwdOperationDescriptor::setTensorDesc(): unsupported "
+                              "attribute name");
     }
 }
 
@@ -285,10 +288,9 @@ void ConvolutionFwdOperationDescriptor::getTensorDesc(hipdnnBackendAttributeName
     }
     else
     {
-        THROW_IF_TRUE(true,
-                      HIPDNN_STATUS_BAD_PARAM,
-                      "ConvolutionFwdOperationDescriptor::getTensorDesc(): unsupported attribute "
-                      "name");
+        throw HipdnnException(HIPDNN_STATUS_BAD_PARAM,
+                              "ConvolutionFwdOperationDescriptor::getTensorDesc(): unsupported "
+                              "attribute name");
     }
     HipdnnBackendDescriptor::packDescriptor(desc, arrayOfElements);
 }
