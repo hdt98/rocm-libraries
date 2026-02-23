@@ -961,7 +961,10 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
     void SetUpQuantTypeSpecific() {}
     void TearDownQuantTypeSpecific() {}
 
-    void run_test_with_validation(ck_tile::index_t M, ck_tile::index_t N, ck_tile::index_t K)
+    void run_test_with_validation(ck_tile::index_t M,
+                                  ck_tile::index_t N,
+                                  ck_tile::index_t K,
+                                  ck_tile::index_t k_batch = 1)
     {
         const ck_tile::index_t stride_A =
             ck_tile::get_default_stride(M, K, 0, this->is_row_major(ALayout{}));
@@ -1072,6 +1075,13 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
             bq_bqk_bqn_dev_buf.ToDevice(bq_bqk_bqn.data());
         }
 
+        // For split-K (k_batch > 1), the kernel uses atomic_add to accumulate partial results
+        // into C. Zero the output buffer before launching so atomic additions start from zero.
+        if(k_batch > 1)
+        {
+            c_m_n_dev_buf.SetZero();
+        }
+
         // Create args for kernel execution
         ck_tile::QuantGemmHostArgs args{
             a_m_k_dev_buf.GetDeviceBuffer(),      // a_ptr
@@ -1079,7 +1089,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
             c_m_n_dev_buf.GetDeviceBuffer(),      // c_ptr
             aq_m_aqk_dev_buf.GetDeviceBuffer(),   // aq_ptr (scales)
             bq_bqk_bqn_dev_buf.GetDeviceBuffer(), // bq_ptr (scales)
-            1,                                    // k_batch
+            k_batch,                              // k_batch
             M,
             N,
             K,   // M, N, K
@@ -1117,12 +1127,12 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
             ck_tile::host_tensor_descriptor(M, N, stride_C, this->is_row_major(CLayout{})));
         c_m_n_dev_buf.FromDevice(c_m_n_dev_result.mData.data());
 
-        // Calculate error tolerances
+        // Calculate error tolerances (adjusted for split-K accumulation error)
         const float max_accumulated_value =
             *std::max_element(c_m_n_host_ref.mData.begin(), c_m_n_host_ref.mData.end());
         const auto rtol_atol =
             this->template calculate_rtol_atol<ADataType, BDataType, AccDataType, CDataType>(
-                K, 1, max_accumulated_value);
+                K, k_batch, max_accumulated_value);
 
         // Validate results
         bool pass = ck_tile::check_err(c_m_n_dev_result,
@@ -1132,7 +1142,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                        rtol_atol.at(ck_tile::number<1>{}));
 
         EXPECT_TRUE(pass) << "ABQuantGrouped validation failed with M=" << M << ", N=" << N
-                          << ", K=" << K;
+                          << ", K=" << K << ", k_batch=" << k_batch;
 
         if(!pass)
         {
