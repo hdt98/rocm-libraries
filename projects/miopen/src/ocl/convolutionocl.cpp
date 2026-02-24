@@ -50,6 +50,7 @@
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/conv/heuristics/ai_heuristics.hpp>
+#include <miopen/driver_arguments.hpp>
 
 #include <cassert>
 #include <functional>
@@ -61,15 +62,132 @@ MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DUMP_TENSOR_PATH)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_ENABLE_AI_IMMED_MODE_FALLBACK)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK)
 
-namespace miopen::debug {
-// Forward declaration of logging function defined in convolution_api.cpp
-void LogConvolutionExecution(const miopen::Handle& handle,
-                             const miopen::conv::ProblemDescription& problem,
-                             const std::string& network_config,
-                             const miopen::AlgorithmName& algorithm_name);
-} // namespace miopen::debug
-
 namespace miopen {
+
+namespace {
+
+void LogConvolutionExecution(const Handle& handle,
+                             const conv::ProblemDescription& problem,
+                             const std::string& network_config,
+                             const AlgorithmName& algorithm_name)
+{
+    // Only log at Info level (level 5) or higher
+    if(!IsLogging(LoggingLevel::Info))
+        return;
+
+    try
+    {
+        // Get the solver_id that was actually used
+        const auto net_cfg       = NetworkConfig{network_config};
+        const auto solver_id_opt = handle.GetFound1_0SolverId(net_cfg, algorithm_name);
+
+        if(!solver_id_opt.has_value())
+        {
+            MIOPEN_LOG_I(
+                "Unable to retrieve solver_id for algorithm: " << algorithm_name.ToString());
+            return;
+        }
+
+        const auto solver_id_str = solver_id_opt.value();
+        const auto solver_id     = solver::Id{solver_id_str};
+
+        // Get the MIOpenDriver command representation of the problem
+        const auto direction = problem.GetDirection();
+        miopenProblemDirection_t dir;
+        switch(direction)
+        {
+        case conv::Direction::Forward: dir = miopenProblemDirectionForward; break;
+        case conv::Direction::BackwardData: dir = miopenProblemDirectionBackward; break;
+        case conv::Direction::BackwardWeights: dir = miopenProblemDirectionBackwardWeights; break;
+        default:
+            MIOPEN_LOG_I2(
+                "Warning: Unknown direction, skipping summary log");
+            return;
+        }
+
+        // Verify that the network_config matches what the problem generates
+        const auto expected_config = problem.MakeNetworkConfig();
+        if(network_config != expected_config.ToString())
+        {
+            MIOPEN_LOG_I2("Warning: network_config mismatch. "
+                          << "Expected: " << expected_config.ToString() << ", Got: "
+                          << network_config << ". Skipping log to avoid incorrect information.");
+            return;
+        }
+
+        const std::string driver_cmd = debug::ConvArgsForMIOpenDriver(problem.GetIn(),
+                                                                      problem.GetWeights(),
+                                                                      problem.GetConv(),
+                                                                      problem.GetOut(),
+                                                                      dir,
+                                                                      std::nullopt);
+
+        // Query find database for time
+        std::string config_str = "N/A";
+        float kernel_time      = -1.0f;
+
+        FindDbRecord fdb_record{handle, problem};
+
+        // Iterate through find database to find matching solver and extract time
+        for(const auto& pair : fdb_record)
+        {
+            if(pair.first == solver_id_str)
+            {
+                kernel_time = pair.second.time;
+                break;
+            }
+        }
+
+        // Query perf database for tunable configuration
+        // Note: we cannot at present map back from invoker to the kernel config.
+        // So we will simply query the perf db and assume that this (still) matches the kernel that
+        // will be executed.
+
+        // Create a simple wrapper to use the public template GetValues method
+        struct ConfigString
+        {
+            std::string value;
+            bool Deserialize(const std::string& str)
+            {
+                value = str;
+                return true;
+            }
+        };
+
+        // Load perf database and query for configuration
+        auto ctx_for_db = ExecutionContext{};
+        ctx_for_db.SetStream(&handle);
+        auto perf_db         = GetDb(ctx_for_db);
+        auto perf_record_opt = perf_db.FindRecord(problem);
+
+        if(perf_record_opt.has_value())
+        {
+            ConfigString config_wrapper;
+            if(perf_record_opt->GetValues(solver_id_str, config_wrapper))
+            {
+                config_str = config_wrapper.value;
+            }
+        }
+
+        // Verify that the solver from databases matches what we're about to invoke
+        const auto solver_name = solver_id.ToString();
+
+        // Log everything in a single line for easy parsing
+        MIOPEN_LOG_I("Problem=\""
+                     << driver_cmd << "\" Solver=\"" << solver_name << "\" Config(from_perf_db)=\""
+                     << config_str << "\" Time(from_find_db)=" << kernel_time);
+    }
+    catch(const std::exception& ex)
+    {
+        MIOPEN_LOG_I2("Exception during logging: " << ex.what());
+    }
+    catch(...)
+    {
+        MIOPEN_LOG_I2("Unknown exception during logging");
+    }
+}
+
+} // anonymous namespace
 
 struct SolutionTimeComparator
 {
@@ -850,7 +968,7 @@ void ConvolutionDescriptor::ConvolutionForward(const Handle& handle,
 
             // Log convolution execution summary (only if MIOPEN_LOG_LEVEL >= 5)
             // This logs: Problem, Solver, Config, and Time for easy kernel tracking
-            miopen::debug::LogConvolutionExecution(handle, problem, network_config, algorithm_name);
+            LogConvolutionExecution(handle, problem, network_config, algorithm_name);
             return;
         }
 
@@ -1270,7 +1388,7 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
 
         // Log convolution execution summary (only if MIOPEN_LOG_LEVEL >= 5)
         // This logs: Problem, Solver, Config, and Time for easy kernel tracking
-        miopen::debug::LogConvolutionExecution(handle, problem, network_config, algorithm_name);
+        LogConvolutionExecution(handle, problem, network_config, algorithm_name);
     });
 }
 
@@ -1483,7 +1601,7 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
 
         // Log convolution execution summary (only if MIOPEN_LOG_LEVEL >= 5)
         // This logs: Problem, Solver, Config, and Time for easy kernel tracking
-        miopen::debug::LogConvolutionExecution(handle, problem, network_config, algorithm_name);
+        LogConvolutionExecution(handle, problem, network_config, algorithm_name);
     });
 }
 
