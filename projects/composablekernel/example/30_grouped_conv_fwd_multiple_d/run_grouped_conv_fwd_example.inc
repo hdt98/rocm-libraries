@@ -18,7 +18,6 @@ using DeviceConvFwdInstance =
         InElementOp,
         WeiElementOp,
         OutElementOp,
-        ConvSpec,    // ConvForwardSpecialization
         GemmSpec,    // GemmSpecialization
         1,           // Num GEMM-K prefetches.
         256,         // BlockSize
