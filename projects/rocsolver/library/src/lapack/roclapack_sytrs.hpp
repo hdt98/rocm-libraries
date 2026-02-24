@@ -951,7 +951,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
     // -----------------------------------------
-    // each thread block handles 64 columsn of B
+    // each thread block handles NB columns of B
     // -----------------------------------------
     auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
     I const NB = SYTRS_MAX_THDS;
