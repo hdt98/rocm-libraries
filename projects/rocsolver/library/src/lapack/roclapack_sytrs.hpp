@@ -99,13 +99,15 @@ __device__ static T reduce_sum_shfl_wsize(I const wsize, T val)
 // ------------------------------------------------
 // NOTE: intended for execution within single block
 //
-// launch as dim3( 1, 1, batch_count), dim3( SYTRS_MAX_THDS,1,1)
+// launch as dim3( nbx, 1, batch_count), dim3( SYTRS_MAX_THDS,1,1)
+//
+// nrhs_arg  columns of matrix B is spread across nbx thread blocks
 // ------------------------------------------------
 template <typename T, typename I, typename Istride, typename UA, typename UB>
 ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const use_upper,
 
                                                                      I const n,
-                                                                     I const nrhs,
+                                                                     I const nrhs_arg,
 
                                                                      UA AA,
                                                                      Istride const shiftA,
@@ -138,6 +140,37 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
     assert(ij_start == (i_start + j_start * warpSize));
     assert(ij_inc == (i_inc * j_inc));
+
+    I const nbx = hipGridDim_x;
+    I const ibx = hipBlockIdx_x;
+
+    // ----------------------------------------------
+    // each thread block handles about nb_rhs columns
+    // ----------------------------------------------
+    auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
+
+    I const nb_rhs = ceildiv(nrhs_arg, nbx);
+    I const rhs_start = ibx * nb_rhs;
+    I const rhs_end = std::min(nrhs_arg, rhs_start + nb_rhs);
+    I const nrhs = rhs_end - rhs_start;
+
+    // debug
+    if(0)
+    {
+        if(ij_start == 0)
+        {
+            printf("ibx = %d, nbx = %d, rhs_start = %d, rhs_end = %d, nrhs = %d, nrhs_arg = %d\n",
+                   ibx, nbx, rhs_start, rhs_end, nrhs, nrhs_arg);
+        }
+    }
+
+    {
+        bool const has_work_to_do = (nrhs >= 1) && (n >= 1) && (batch_count >= 1);
+        if(!has_work_to_do)
+        {
+            return;
+        }
+    }
 
     T const one = 1;
     T const zero = 0;
@@ -338,7 +371,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         T* const A_ = load_ptr_batch<T>(AA, bid, shiftA, strideA);
         I* const ipiv_ = ipivA + (bid * strideP);
 
-        T* const B_bid = load_ptr_batch<T>(BB, bid, shiftB, strideB);
+        T* const B_bid_no_shift = load_ptr_batch<T>(BB, bid, shiftB, strideB);
+
+        T* const B_bid = B_bid_no_shift + idx2D(0, rhs_start, ldb_arg);
 
         // --------------------
         // try to hold B in LDS
@@ -897,10 +932,18 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     I const max_blocks = 1024;
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
+    // -----------------------------------------
+    // each thread block handles 64 columsn of B
+    // -----------------------------------------
+    auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
+    I const NB = 64;
+    I const nbx = ceildiv(nrhs, NB);
+
     size_t const lds_size = get_lds_size();
 
     bool const use_upper = (uplo == rocblas_fill_upper);
-    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, dim3(1, 1, nbz), dim3(nthreads, 1, 1), lds_size, stream,
+    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, dim3(nbx, 1, nbz), dim3(nthreads, 1, 1), lds_size,
+                            stream,
 
                             use_upper, n, nrhs,
 
