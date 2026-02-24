@@ -8,14 +8,16 @@
 
 namespace ck {
 
-// To be removed, which really does not tell the location of failed HIP functional call
-inline void hip_check_error(hipError_t x)
+inline void hip_check_error(hipError_t x,
+                            const char* file = __builtin_FILE(),
+                            int line = __builtin_LINE(),
+                            const char* func = __builtin_FUNCTION())
 {
     if(x != hipSuccess)
     {
         std::ostringstream ss;
-        ss << "HIP runtime error: " << hipGetErrorString(x) << ". " << "hip_check_error.hpp" << ": "
-           << __LINE__ << "in function: " << __func__;
+        ss << "HIP runtime error: " << hipGetErrorString(x) << ". " << file << ": "
+           << line << " in function: " << func;
         throw std::runtime_error(ss.str());
     }
 }
