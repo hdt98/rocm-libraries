@@ -37,7 +37,28 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-static size_t get_lds_size()
+static inline int get_warp_size()
+{
+    int const default_warp_size = 64;
+
+    int warp_size = 0;
+    int deviceId = 0;
+    auto const istat_device = hipGetDevice(&deviceId);
+    if(istat_device != hipSuccess)
+    {
+        return (default_warp_size);
+    };
+    auto const attr = hipDeviceAttributeWarpSize;
+    auto const istat_attr = hipDeviceGetAttribute(&warp_size, attr, deviceId);
+    if(istat_attr != hipSuccess)
+    {
+        return (default_warp_size);
+    };
+
+    return (warp_size);
+}
+
+static inline size_t get_lds_size()
 {
     size_t const default_lds_size = 64 * 1024;
 
@@ -93,7 +114,7 @@ __device__ static T reduce_sum_shfl_wsize(I const wsize, T val)
 /** thread-block size for calling the sytrs kernel.
     (MAX_THDS sizes must be one of 128, 256, 512, or 1024) **/
 #ifndef SYTRS_MAX_THDS
-#define SYTRS_MAX_THDS 256
+#define SYTRS_MAX_THDS 128
 #endif
 
 // ------------------------------------------------
@@ -924,11 +945,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
         }
     }
 
-    I const nthreads = (nrhs >= SYTRS_MAX_THDS) ? SYTRS_MAX_THDS
-        : (nrhs >= (SYTRS_MAX_THDS / 2))        ? (SYTRS_MAX_THDS / 2)
-        : (nrhs >= (SYTRS_MAX_THDS / 4))        ? (SYTRS_MAX_THDS / 4)
-                                                : 64;
-
+    I const warp_size = get_warp_size();
     I const max_blocks = 1024;
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
@@ -936,8 +953,15 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     // each thread block handles 64 columsn of B
     // -----------------------------------------
     auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
-    I const NB = 64;
+    I const NB = SYTRS_MAX_THDS;
     I const nbx = ceildiv(nrhs, NB);
+
+    I const lrhs = ceildiv(nrhs, nbx);
+
+    I const nthreads = (lrhs >= SYTRS_MAX_THDS) ? SYTRS_MAX_THDS
+        : (lrhs >= (SYTRS_MAX_THDS / 2))        ? (SYTRS_MAX_THDS / 2)
+        : (lrhs >= (SYTRS_MAX_THDS / 4))        ? (SYTRS_MAX_THDS / 4)
+                                                : warp_size;
 
     size_t const lds_size = get_lds_size();
 
