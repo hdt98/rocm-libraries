@@ -84,6 +84,17 @@ def runTestCommand (platform, project)
                 cd ${project.paths.project_build_prefix}
                 export AMD_COMGR_EMIT_VERBOSE_LOGS=1
                 export AMD_COMGR_REDIRECT_LOGS=stderr
+                which amdclang
+                which amdclang++
+                /opt/rocm/bin/amdclang -cc1 -mllvm --help-hidden  | grep amdgpu-kernarg-preload-count
+                /opt/rocm/bin/amdclang -cc1 -mllvm --help-hidden  | grep amdhsa-code-object-version
+                /opt/rocm/bin/amdclang -cc1 -mllvm --help-hidden  | grep amdgpu-prelink
+                /opt/rocm/bin/amdclang++ -cc1 -mllvm --help-hidden | grep amdgpu-kernarg-preload-count
+                /opt/rocm/bin/amdclang++ -cc1 -mllvm --help-hidden | grep amdhsa-code-object-version
+                /opt/rocm/bin/amdclang++ -cc1 -mllvm --help-hidden | grep amdgpu-prelink
+                find /usr -iname '*comgr*.so' -o -iname '*comgr*.a' || true
+                find /usr -iname '*clang*.so' -o -iname '*clang*.a' || true
+                find /usr -iname '*llvm*.so' -o -iname '*llvm*.a' || true
                 # Run sharded tests (auto-detects ncores/2, respecting cgroups)
                 scripts/run-tests-sharded precheckin-mci build
             """
