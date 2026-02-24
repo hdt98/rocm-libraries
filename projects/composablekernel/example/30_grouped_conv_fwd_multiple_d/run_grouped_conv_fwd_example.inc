@@ -142,7 +142,7 @@ using DeviceConvFwdInstance =
         8>; // Num groups to merge
 */
 
-// Baseline
+// Baseline (current best instance)
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
@@ -188,8 +188,8 @@ using DeviceConvFwdInstance =
         1,           // BBlockLdsExtraN
         1,           // CShuffleMXdlPerWavePerShuffle
         1,           // CShuffleNXdlPerWavePerShuffle
-        S<1, 32, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, must match with num merged groups
-        1,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
+        S<1, 64, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, must match with num merged groups
+        4,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
         ck::BlockGemmPipelineScheduler::Interwave,
         ck::BlockGemmPipelineVersion::v1,
         InKernelDataType, 
