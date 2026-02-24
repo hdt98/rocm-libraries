@@ -431,6 +431,30 @@ void testing_sytrs(Arguments& argus)
         return;
     }
 
+    // check non-supported values
+    if((uplo != rocblas_fill_upper) && (uplo != rocblas_fill_lower))
+    {
+        if(BATCHED)
+        {
+            EXPECT_ROCBLAS_STATUS(rocsolver_sytrs(STRIDED, handle, uplo, n, nrhs,
+                                                  (T* const*)nullptr, lda, stA, (I*)nullptr, stP,
+                                                  (T* const*)nullptr, ldb, stB, bc),
+                                  rocblas_status_invalid_value);
+        }
+        else
+        {
+            EXPECT_ROCBLAS_STATUS(rocsolver_sytrs(STRIDED, handle, uplo, n, nrhs, (T*)nullptr, lda,
+                                                  stA, (I*)nullptr, stP, (T*)nullptr, ldb, stB, bc),
+                                  rocblas_status_invalid_size);
+        }
+        if(argus.timing)
+        {
+            rocsolver_bench_inform(informat_invalid_args);
+        }
+
+        return;
+    }
+
     // memory size query is necessary
     if(argus.mem_query)
     {
@@ -537,7 +561,7 @@ void testing_sytrs(Arguments& argus)
     }
 
     // validate results for rocsolver-test
-    // using m * machine_precision as tolerance
+    // using n * machine_precision as tolerance
     if(argus.unit_check)
         ROCSOLVER_TEST_CHECK(T, max_error, n);
 
