@@ -69,12 +69,12 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
     size_t size_iinfo = sizeof(rocblas_int) * batch_count;
 
     // size requirements for getrf
-    rocsolver_workspace_helper* getrf_work = work_helper->add_nested();
+    rocsolver_workspace_helper* getrf_work = work_helper->add_nested("getrf");
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(nb, nb, false, batch_count, getrf_work, ldb,
                                                        incb);
 
     // size requirements for getrs
-    rocsolver_workspace_helper* getrs_work = work_helper->add_nested();
+    rocsolver_workspace_helper* getrs_work = work_helper->add_nested("getrs");
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nb, batch_count,
                                                        getrs_work, ldb, ldc, incb, incc);
 
@@ -162,8 +162,8 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
     rocblas_get_stream(handle, &stream);
 
     // prepare workspace
-    rocsolver_workspace_helper* getrf_work = work_helper->get_nested(0);
-    rocsolver_workspace_helper* getrs_work = work_helper->get_nested(1);
+    rocsolver_workspace_helper* getrf_work = work_helper->get_nested("getrf");
+    rocsolver_workspace_helper* getrs_work = work_helper->get_nested("getrs");
     rocblas_int* iinfo = (rocblas_int*)(*work_helper)[0];
 
     // prepare kernels

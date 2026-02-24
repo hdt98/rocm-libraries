@@ -575,7 +575,7 @@ void rocsolver_getrf_getMemorySize(const I m,
         size_t size_iipiv = pivot ? m * sizeof(I) * batch_count : 0;
 
         // requirements for largest possible GETF2 for the sub blocks
-        rocsolver_workspace_helper* getf2_work = work_helper->add_nested();
+        rocsolver_workspace_helper* getf2_work = work_helper->add_nested("getf2");
         rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, dim, pivot, batch_count, getf2_work, true,
                                                     inca);
 
@@ -662,7 +662,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
     T minone = -1;
 
     // prepare workspace
-    rocsolver_workspace_helper* getf2_work = work_helper->get_nested(0);
+    rocsolver_workspace_helper* getf2_work = work_helper->get_nested("getf2");
     const bool optim_mem = work_helper->get_optim_mem();
     INFO* iinfo = (INFO*)(*work_helper)[0];
     I* iipiv = (I*)(*work_helper)[1];

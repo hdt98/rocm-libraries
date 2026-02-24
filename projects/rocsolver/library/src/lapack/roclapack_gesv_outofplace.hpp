@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -86,11 +86,11 @@ void rocsolver_gesv_outofplace_getMemorySize(const rocblas_int n,
     work_helper->set_nested_capacity(2);
 
     // workspace required for calling GETRF
-    rocsolver_workspace_helper* getrf_work = work_helper->add_nested();
+    rocsolver_workspace_helper* getrf_work = work_helper->add_nested("getrf");
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work);
 
     // workspace required for calling GETRS
-    rocsolver_workspace_helper* getrs_work = work_helper->add_nested();
+    rocsolver_workspace_helper* getrs_work = work_helper->add_nested("getrs");
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
                                                        getrs_work);
 }
@@ -140,8 +140,8 @@ rocblas_status rocsolver_gesv_outofplace_template(rocblas_handle handle,
         return rocblas_status_success;
 
     // prepare workspace
-    rocsolver_workspace_helper* getrf_work = work_helper->get_nested(0);
-    rocsolver_workspace_helper* getrs_work = work_helper->get_nested(1);
+    rocsolver_workspace_helper* getrf_work = work_helper->get_nested("getrf");
+    rocsolver_workspace_helper* getrs_work = work_helper->get_nested("getrs");
 
     // constants in host memory
     const rocblas_int copyblocksx = (n - 1) / 32 + 1;

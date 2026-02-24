@@ -86,15 +86,15 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
 
     // PHASE 1
     // workspace required for calling GETRF
-    rocsolver_workspace_helper* getrf_work = work_helper->add_nested();
+    rocsolver_workspace_helper* getrf_work = work_helper->add_nested("getrf");
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work);
 
     // PHASE 2
-    rocsolver_workspace_helper* phase2_work = work_helper->add_nested();
+    rocsolver_workspace_helper* phase2_work = work_helper->add_nested("phase2");
     phase2_work->set_nested_capacity(1);
 
     // workspace required for calling GETRS
-    rocsolver_workspace_helper* getrs_work = phase2_work->add_nested();
+    rocsolver_workspace_helper* getrs_work = phase2_work->add_nested("getrs");
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
                                                        getrs_work);
 
@@ -145,9 +145,9 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
         return rocblas_status_success;
 
     // prepare workspace
-    rocsolver_workspace_helper* getrf_work = work_helper->get_nested(0);
-    rocsolver_workspace_helper* phase2_work = work_helper->get_nested(1);
-    rocsolver_workspace_helper* getrs_work = phase2_work->get_nested(0);
+    rocsolver_workspace_helper* getrf_work = work_helper->get_nested("getrf");
+    rocsolver_workspace_helper* phase2_work = work_helper->get_nested("phase2");
+    rocsolver_workspace_helper* getrs_work = phase2_work->get_nested("getrs");
     T* copyB = (T*)(*phase2_work)[0];
 
     // constants in host memory
