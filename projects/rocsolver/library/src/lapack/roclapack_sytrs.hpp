@@ -150,14 +150,19 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     I const bid_start = blockIdx.z;
     I const bid_inc = gridDim.z;
 
-    I const ij_start = threadIdx.x;
-    I const ij_inc = blockDim.x;
+    I const tx = threadIdx.x;
+    I const ty = threadIdx.y;
+    I const nx = blockDim.x;
+    I const ny = blockDim.y;
 
-    I const i_start = ij_start % warpSize;
-    I const i_inc = warpSize;
+    I const ij_start = tx + ty * nx;
+    I const ij_inc = nx * ny;
 
-    I const j_start = ij_start / warpSize;
-    I const j_inc = ij_inc / warpSize;
+    I const i_start = tx;
+    I const i_inc = nx;
+
+    I const j_start = ty;
+    I const j_inc = ny;
 
     // ------------------------
     // Fortran 1-based indexing
@@ -954,7 +959,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
     // -----------------------------------------
-    // each thread block handles NB columns of B
+    // each thread block handles about NB columns of B
     // -----------------------------------------
     auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
     I const NB = SYTRS_MAX_THDS;
@@ -967,11 +972,24 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
         : (lrhs >= (SYTRS_MAX_THDS / 4))        ? (SYTRS_MAX_THDS / 4)
                                                 : warp_size;
 
-    size_t const lds_size = get_lds_size();
+    size_t const lds_size_max = get_lds_size();
+
+    I const nx = warp_size;
+    I const ny = std::max(I(1), std::min(I(SYTRS_MAX_THDS), nthreads) / nx);
+
+    // ------------------------------
+    // check whether B can fit in LDS
+    // ------------------------------
+    size_t const size_B_lds = sizeof(T) * n * lrhs;
+    bool const use_B_lds = (size_B_lds <= lds_size_max);
+    I const lds_size = (use_B_lds) ? static_cast<I>(size_B_lds) : I(0);
 
     bool const use_upper = (uplo == rocblas_fill_upper);
-    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>, dim3(nbx, 1, nbz), dim3(nthreads, 1, 1), lds_size,
-                            stream,
+    ROCSOLVER_LAUNCH_KERNEL(sytrs_kernel<T>,
+
+                            dim3(nbx, 1, nbz), dim3(nx, ny, 1),
+
+                            lds_size, stream,
 
                             use_upper, n, nrhs,
 
