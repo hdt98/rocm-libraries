@@ -147,11 +147,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                                                                      size_t const lds_size)
 {
     // select batch instance
-    I const bid_start = hipBlockIdx_z;
-    I const bid_inc = hipGridDim_z;
+    I const bid_start = blockIdx.z;
+    I const bid_inc = gridDim.z;
 
-    I const ij_start = hipThreadIdx_x;
-    I const ij_inc = hipBlockDim_x;
+    I const ij_start = threadIdx.x;
+    I const ij_inc = blockDim.x;
 
     I const i_start = ij_start % warpSize;
     I const i_inc = warpSize;
@@ -179,8 +179,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         // ----------------------------------------------
         // each thread block handles about nb_rhs columns
         // ----------------------------------------------
-        I const nbx = hipGridDim_x;
-        I const ibx = hipBlockIdx_x;
+        I const nbx = gridDim.x;
+        I const ibx = blockIdx.x;
 
         I const nb_rhs = ceildiv(nrhs_arg, nbx);
         I const rhs_start = ibx * nb_rhs;
@@ -198,7 +198,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         }
     }
 
-    T constexpr one = 1;
+    T const one = 1;
 
     // -------------------------------
     // Compute rank-1 update
@@ -282,7 +282,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // scale a vector
     // -------------
     auto sytrs_scal = [=](I const n, T const alpha, T* const x, I const incx) {
-        T constexpr zero = 0;
+        T const zero = 0;
 
         __syncthreads();
 
@@ -322,7 +322,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         I const lenx = (is_no_trans) ? n : m;
         I const leny = (is_no_trans) ? m : n;
 
-        T constexpr zero = 0;
+        T const zero = 0;
 
         // --------------
         // scale vector y
