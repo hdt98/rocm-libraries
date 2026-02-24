@@ -239,8 +239,8 @@ namespace rocRoller::KernelGraph
                 const auto addresses
                     = std::forward<decltype(generator)>(generator).template to<std::vector>();
 
-                // TODO: add assert
-                // AssertFatal(!addresses.empty());
+                AssertFatal(!addresses.empty(),
+                            "LDS addresses should not be empty for LoadLDSTile/StoreLDSTile");
 
                 std::vector<size_t> normalizedAddresses;
                 auto minAddress = *std::min_element(addresses.begin(), addresses.end());
