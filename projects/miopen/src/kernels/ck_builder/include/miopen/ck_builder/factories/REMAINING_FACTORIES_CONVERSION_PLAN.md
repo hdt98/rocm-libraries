@@ -602,24 +602,24 @@ Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK
 
 | Item | Status |
 |------|--------|
-| Instance data: `xdl_bwd_weight.hpp` | [ ] |
-| Instance data: `xdl_two_stage_bwd_weight.hpp` | [ ] |
-| Instance data: `wmma_bwd_weight.hpp` | [ ] |
-| Instance data: `dl_bwd_weight.hpp` | [ ] |
-| Factory headers: 12 files in `factories/grouped_conv_bwd_weight/` | [ ] |
-| Dispatch header: `grouped_convolution_backward_weight.hpp` | [ ] |
-| Dispatch header: `grouped_convolution_backward_weight_bilinear.hpp` | [ ] |
-| Dispatch header: `grouped_convolution_backward_weight_scale.hpp` | [ ] |
-| `.inc` files for dispatch | [ ] |
-| .cpp files: `grouped_conv2d_bwd_weight/` (66 files) | [ ] |
-| .cpp files: `grouped_conv3d_bwd_weight/` (61 files) | [ ] |
-| .cpp files: `grouped_conv3d_bwd_weight_bilinear/` (7 files) | [ ] |
-| .cpp files: `grouped_conv3d_bwd_weight_scale/` (7 files) | [ ] |
-| CMakeLists.txt updated | [ ] |
+| Instance data: `xdl_bwd_weight.hpp` | [x] |
+| Instance data: `xdl_two_stage_bwd_weight.hpp` | [ ] (TODO: two-stage variant) |
+| Instance data: `wmma_bwd_weight.hpp` | [x] |
+| Instance data: `dl_bwd_weight.hpp` | [x] |
+| Factory headers: XDL in `factories/grouped_conv_bwd_weight/` | [x] (common_aliases.hpp + xdl_instance.hpp) |
+| Dispatch header: `grouped_convolution_backward_weight.hpp` | [x] |
+| Dispatch header: `grouped_convolution_backward_weight_bilinear.hpp` | [ ] (TODO) |
+| Dispatch header: `grouped_convolution_backward_weight_scale.hpp` | [ ] (TODO) |
+| `.inc` files for dispatch | [x] (xdl, dl, wmma, explicit_xdl, explicit_wmma) |
+| .cpp files: `grouped_conv2d_bwd_weight/` (56 files) | [x] |
+| .cpp files: `grouped_conv3d_bwd_weight/` (50+6+4 files) | [x] |
+| .cpp files: `grouped_conv3d_bwd_weight_bilinear/` (7 files) | [x] |
+| .cpp files: `grouped_conv3d_bwd_weight_scale/` (7 files) | [x] |
+| CMakeLists.txt updated | [x] |
 | Static tests | [ ] |
-| Runtime test: `ck_builder_grouped_bwd_weight_conv2d.cpp` | [ ] |
-| Runtime test: `ck_builder_grouped_bwd_weight_conv3d.cpp` | [ ] |
-| Test CMakeLists.txt updated | [ ] |
+| Runtime test: `ck_builder_grouped_bwd_weight_conv2d.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_bwd_weight_conv3d.cpp` | [x] |
+| Test CMakeLists.txt updated | [x] |
 | Solver file integration | [ ] |
 
 ---
