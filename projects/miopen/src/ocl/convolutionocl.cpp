@@ -99,10 +99,7 @@ void LogConvolutionExecution(const Handle& handle,
         case conv::Direction::Forward: dir = miopenProblemDirectionForward; break;
         case conv::Direction::BackwardData: dir = miopenProblemDirectionBackward; break;
         case conv::Direction::BackwardWeights: dir = miopenProblemDirectionBackwardWeights; break;
-        default:
-            MIOPEN_LOG_I2(
-                "Warning: Unknown direction, skipping summary log");
-            return;
+        default: MIOPEN_LOG_I2("Warning: Unknown direction, skipping summary log"); return;
         }
 
         // Verify that the network_config matches what the problem generates
@@ -173,9 +170,9 @@ void LogConvolutionExecution(const Handle& handle,
         const auto solver_name = solver_id.ToString();
 
         // Log everything in a single line for easy parsing
-        MIOPEN_LOG_I("Problem=\""
-                     << driver_cmd << "\" Solver=\"" << solver_name << "\" Config(from_perf_db)=\""
-                     << config_str << "\" Time(from_find_db)=" << kernel_time);
+        MIOPEN_LOG_I("Problem=\"" << driver_cmd << "\" Solver=\"" << solver_name
+                                  << "\" Config(from_perf_db)=\"" << config_str
+                                  << "\" Time(from_find_db)=" << kernel_time);
     }
     catch(const std::exception& ex)
     {
