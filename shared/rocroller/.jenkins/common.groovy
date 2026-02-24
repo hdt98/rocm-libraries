@@ -82,6 +82,8 @@ def runTestCommand (platform, project)
     def command = """#!/usr/bin/env bash
                 set -ex
                 cd ${project.paths.project_build_prefix}
+                export AMD_COMGR_EMIT_VERBOSE_LOGS=1
+                export AMD_COMGR_REDIRECT_LOGS=stderr
                 # Run sharded tests (auto-detects ncores/2, respecting cgroups)
                 scripts/run-tests-sharded precheckin-mci build
             """
