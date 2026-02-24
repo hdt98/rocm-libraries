@@ -46,7 +46,7 @@ class rocsolver_workspace_helper
 private:
     bool has_scalars_r, has_scalars_c, optim_mem;
     size_t num_excl, size_excl, size_shared;
-    std::unordered_map<std::string, size_t> indices;
+    std::unordered_map<std::string, size_t> indices, n_indices;
     std::vector<uint8_t*> pointers;
     std::vector<size_t> sizes;
     std::vector<rocsolver_workspace_helper*> nested;
@@ -215,11 +215,25 @@ public:
         nested.push_back(result);
         return result;
     }
+    /* Adds a nested workspace helper to manage workspaces for a nested function. May be called before or
+       after assign_sizes. */
+    rocsolver_workspace_helper* add_nested(std::string name)
+    {
+        this->n_indices[name] = nested.size();
+        rocsolver_workspace_helper* result = new rocsolver_workspace_helper();
+        nested.push_back(result);
+        return result;
+    }
     /* Gets a pointer to the nested workspace helper at position i, which was created by the ith call to
        add_nested. */
     rocsolver_workspace_helper* get_nested(size_t i)
     {
         return nested[i];
+    }
+    /* Gets a pointer to the named nested workspace helper. */
+    rocsolver_workspace_helper* get_nested(std::string name)
+    {
+        return nested[n_indices[name]];
     }
 
     /* Assigns device memory to the workspace helper, to be partitioned into individual workspace arrays
