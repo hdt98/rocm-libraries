@@ -122,6 +122,14 @@ namespace ModelAddressesTest
         {
             auto context = TestContext::ForTestDevice(
                 {{.dsObserver = DSObserverType::WeightlessDSMemObserver}}, variants.name);
+
+            auto const& arch = context->targetArchitecture();
+
+            if(!arch.HasCapability(GPUCapability::HasMFMA))
+            {
+                SKIP("The asserted pattern is only true for MFMA archs");
+            }
+
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
 
             example.setUseLDS(true, true, false);
