@@ -449,7 +449,7 @@ void testing_sytrs(Arguments& argus)
         }
         if(argus.timing)
         {
-            rocsolver_bench_inform(informat_invalid_args);
+            rocsolver_bench_inform(inform_invalid_args);
         }
 
         return;
