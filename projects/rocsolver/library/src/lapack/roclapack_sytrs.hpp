@@ -159,30 +159,35 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     I const j_start = ij_start / warpSize;
     I const j_inc = ij_inc / warpSize;
 
-    assert(ij_start == (i_start + j_start * warpSize));
-    assert(ij_inc == (i_inc * j_inc));
+    // ------------------------
+    // Fortran 1-based indexing
+    // ------------------------
+    auto idx2F
+        = [](auto i, auto j, auto ld) { return ((i - 1) + ((j - 1) * static_cast<int64_t>(ld))); };
 
-    I const nbx = hipGridDim_x;
-    I const ibx = hipBlockIdx_x;
+    // ------------------
+    // C 0-based indexing
+    // ------------------
+    auto idx2D = [](auto i, auto j, auto ld) { return (i + (j * static_cast<int64_t>(ld))); };
 
-    // ----------------------------------------------
-    // each thread block handles about nb_rhs columns
-    // ----------------------------------------------
     auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
 
-    I const nb_rhs = ceildiv(nrhs_arg, nbx);
-    I const rhs_start = ibx * nb_rhs;
-    I const rhs_end = std::min(nrhs_arg, rhs_start + nb_rhs);
-    I const nrhs = rhs_end - rhs_start;
+    I nrhs = nrhs_arg;
+    Istride offsetB = 0;
 
-    // debug
-    if(0)
     {
-        if(ij_start == 0)
-        {
-            printf("ibx = %d, nbx = %d, rhs_start = %d, rhs_end = %d, nrhs = %d, nrhs_arg = %d\n",
-                   ibx, nbx, rhs_start, rhs_end, nrhs, nrhs_arg);
-        }
+        // ----------------------------------------------
+        // each thread block handles about nb_rhs columns
+        // ----------------------------------------------
+        I const nbx = hipGridDim_x;
+        I const ibx = hipBlockIdx_x;
+
+        I const nb_rhs = ceildiv(nrhs_arg, nbx);
+        I const rhs_start = ibx * nb_rhs;
+        I const rhs_end = std::min(nrhs_arg, rhs_start + nb_rhs);
+
+        offsetB = idx2D(0, rhs_start, ldb_arg);
+        nrhs = rhs_end - rhs_start;
     }
 
     {
@@ -194,18 +199,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     }
 
     T const one = 1;
-    T const zero = 0;
-
-    // ------------------------
-    // Fortran 1-based indexing
-    // ------------------------
-    auto idx2F
-        = [](auto i, auto j, auto ld) { return ((i - 1) + ((j - 1) * static_cast<int64_t>(ld))); };
-
-    // ------------------
-    // C 0-based indexing
-    // ------------------
-    auto idx2D = [](auto i, auto j, auto ld) { return (i + (j * static_cast<int64_t>(ld))); };
 
     // -------------------------------
     // Compute rank-1 update
@@ -270,6 +263,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // swap two vectors
     // ----------------
     auto sytrs_swap = [=](I const n, T* const x, I const incx, T* const y, I const incy) {
+        __syncthreads();
+
         for(auto ij = 0 + ij_start; ij < n; ij += ij_inc)
         {
             auto const ix = (incx == 1) ? ij : ij * static_cast<int64_t>(incx);
@@ -287,12 +282,18 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // scale a vector
     // -------------
     auto sytrs_scal = [=](I const n, T const alpha, T* const x, I const incx) {
+        T const zero = 0;
+
+        __syncthreads();
+
         for(auto ij = 0 + ij_start; ij < n; ij += ij_inc)
         {
             auto const ix = (incx == 1) ? ij : ij * static_cast<int64_t>(incx);
 
             x[ix] = (alpha == zero) ? zero : (alpha * x[ix]);
         }
+
+        __syncthreads();
     };
 
     // ---------------------------------------
@@ -320,6 +321,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
         I const lenx = (is_no_trans) ? n : m;
         I const leny = (is_no_trans) ? m : n;
+
+        T const zero = 0;
 
         // --------------
         // scale vector y
@@ -392,9 +395,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         T* const A_ = load_ptr_batch<T>(AA, bid, shiftA, strideA);
         I* const ipiv_ = ipivA + (bid * strideP);
 
-        T* const B_bid_no_shift = load_ptr_batch<T>(BB, bid, shiftB, strideB);
-
-        T* const B_bid = B_bid_no_shift + idx2D(0, rhs_start, ldb_arg);
+        T* const B_bid = load_ptr_batch<T>(BB, bid, shiftB, strideB) + offsetB;
 
         // --------------------
         // try to hold B in LDS
