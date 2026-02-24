@@ -198,7 +198,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         }
     }
 
-    T const one = 1;
+    T constexpr one = 1;
 
     // -------------------------------
     // Compute rank-1 update
@@ -282,7 +282,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // scale a vector
     // -------------
     auto sytrs_scal = [=](I const n, T const alpha, T* const x, I const incx) {
-        T const zero = 0;
+        T constexpr zero = 0;
 
         __syncthreads();
 
@@ -322,7 +322,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         I const lenx = (is_no_trans) ? n : m;
         I const leny = (is_no_trans) ? m : n;
 
-        T const zero = 0;
+        T constexpr zero = 0;
 
         // --------------
         // scale vector y
