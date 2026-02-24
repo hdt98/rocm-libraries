@@ -947,7 +947,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     }
 
     I const warp_size = get_warp_size();
-    I const max_blocks = 1024;
+    I const max_blocks = 64 * 1024 - 2;
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
     // -----------------------------------------
