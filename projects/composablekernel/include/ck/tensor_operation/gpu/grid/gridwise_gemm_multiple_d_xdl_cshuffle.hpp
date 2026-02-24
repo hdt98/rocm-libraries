@@ -423,6 +423,14 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         // check consistency of desc
         if(!(M == e_grid_desc_m_n.GetLength(I0) && N == e_grid_desc_m_n.GetLength(I1) && AK == BK))
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "M = " << M << ", N = " << N << ", AK = " << AK << ", BK == " << BK << std::endl;
+                std::cout << "Output grid (M,N) = " << e_grid_desc_m_n.GetLength(I0) << ", " << e_grid_desc_m_n.GetLength(I1) << std::endl;
+                std::cout << "Invalid tensor desc length: M, N, K are inconsistent among A/B/E tensors."
+                            << " In " << __FILE__ << ":" << __LINE__
+                            << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
         bool valid = true;
@@ -434,12 +442,24 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
 
         if(!valid)
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Invalid tensor desc length: M, N are inconsistent among D tensors and E tensor."
+                          << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
         // check tile size
         if(!(M % MPerBlock == 0 && N % NPerBlock == 0 && AK % KPerBlock == 0))
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Invalid tile size: M, N, K should be divisible by MPerBlock, NPerBlock, KPerBlock respectively."
+                        << " In " << __FILE__ << ":" << __LINE__
+                        << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
@@ -447,6 +467,12 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         const auto num_k_loop = AK / (KPerBlock * k_batch);
         if(!GridwiseGemmPipe::IsSupported(num_k_loop))
         {
+            if (ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Invalid pipeline config: the number of K block loop is not supported by the selected pipeline."
+                          << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
@@ -464,11 +490,23 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
              b_grid_desc_n_k.GetElementSpaceSize() * sizeof(BDataType) <= TwoGB &&
              e_grid_desc_m_n.GetElementSpaceSize() * sizeof(EDataType) <= TwoGB))
         {
+            if (ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Invalid tensor size: the size of A, B, E tensors should be smaller than 2GB each."
+                          << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 #if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
         if(GetSharedMemoryNumberOfByteOnHost() > get_lds_size())
         {
+            if (ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Invalid shared memory size: the required shared memory size is larger than the available shared memory size."
+                          << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 #endif

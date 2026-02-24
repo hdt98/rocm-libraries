@@ -46,7 +46,7 @@ template <
         index_t InRightPadH_,
         index_t InRightPadW_,
         index_t ZYX_,
-        index_t NumGroupsToMerge = 1>
+        index_t NumGroupsToMerge>
 struct TransformConvFwdToGemm_V2
 {
     private:
