@@ -25,10 +25,14 @@ if os.getenv("ROCROLLER_BUILD_DIR") is not None:
 
 gemm = (build / "client" / "rocroller-gemm").resolve()
 
+print(subprocess.run(
+    ["env"], capture_output=True, text=True, check=False
+).stdout)
 ldd_output = subprocess.run(
-    ["ldd", gemm], capture_output=True, text=True, check=True
+    ["ldd", gemm], capture_output=True, text=True, check=False
 ).stdout
 print(f"ldd {gemm}: \n{ldd_output}")
+exit(69)
 
 
 # Python 3.11 has contextlib.chdir but 3.10 doesn't
