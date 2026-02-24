@@ -2415,13 +2415,273 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
 
     else
     {
-        // reduce the last k columns of A
-        // main loop running forwards (for each column)
+        
+        // HIP Graph Configuration
+        // LATRD_GRAPH_MODE controls graph granularity:
+        //   0 = No graphs (original behavior)
+        //   1 = One graph per iteration
+        //   N = N iterations per graph (with multiple graphs)
+        //  -1 = All iterations in a single graph
+#ifndef LATRD_GRAPH_MODE
+        #define LATRD_GRAPH_MODE 4  // Default: no graphs
+#endif
+
+#if LATRD_GRAPH_MODE != 0
+        // Graph capture infrastructure
+        constexpr bool debug_graphs = false;  // Set to true to enable diagnostic output
+        constexpr bool time_graphs = true;   // Set to true to enable timing measurements
+        
+        std::vector<hipGraph_t> graphs;
+        std::vector<hipGraphExec_t> graph_execs;
+        
+        const int total_iters = k;
+        int iters_per_graph;
+        int num_graphs;
+        
+        if(LATRD_GRAPH_MODE == -1) {
+            // Single graph for all iterations
+            iters_per_graph = total_iters;
+            num_graphs = 1;
+        } else if(LATRD_GRAPH_MODE == 1) {
+            // One graph per iteration
+            iters_per_graph = 1;
+            num_graphs = total_iters;
+        } else {
+            // N iterations per graph
+            iters_per_graph = LATRD_GRAPH_MODE;
+            num_graphs = (total_iters + iters_per_graph - 1) / iters_per_graph;
+        }
+        
+        graphs.reserve(num_graphs);
+        graph_execs.reserve(num_graphs);
+        
+        // Timing infrastructure
+        hipEvent_t timing_start, timing_end;
+        float time_capture_total = 0.0f;
+        float time_instantiate_total = 0.0f;
+        float time_launch_total = 0.0f;
+        
+        if(time_graphs) {
+            HIP_CHECK(hipEventCreate(&timing_start));
+            HIP_CHECK(hipEventCreate(&timing_end));
+        }
+        
+        // Create a dedicated stream for graph capture
+        hipStream_t capture_stream;
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Creating dedicated stream for graph capture\n");
+        HIP_CHECK(hipStreamCreate(&capture_stream));
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream created: %p\n", (void*)capture_stream);
+        
+        // Set this stream in the handle so rocsolver_larfg_template uses it
+        rocblas_set_stream(handle, capture_stream);
+        
+        // Capture phase: Record graphs
+        for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
+            hipGraph_t graph;
+            hipGraphExec_t graph_exec;
+            
+            // Determine iteration range for this graph
+            int iter_start = graph_idx * iters_per_graph;
+            int iter_end = std::min(iter_start + iters_per_graph, total_iters);
+            int j_start = n - 1 - iter_start;
+            int j_end = n - 1 - iter_end;  // Exclusive
+            
+            // Ensure stream is idle before capture
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Synchronizing capture_stream before capture\n", graph_idx);
+            hipError_t sync_err = hipStreamSynchronize(capture_stream);
+            if(sync_err != hipSuccess) {
+                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] ERROR: Stream sync failed with error: %s\n", 
+                        hipGetErrorString(sync_err));
+            }
+            HIP_CHECK(sync_err);
+            
+            // Start timing for capture phase
+            if(time_graphs) {
+                HIP_CHECK(hipEventRecord(timing_start, capture_stream));
+            }
+            
+            // Begin stream capture
+            if(debug_graphs) {
+                fprintf(stderr, "[LATRD_GRAPH] Graph %d: About to begin capture (iters %d to %d, n=%d, k=%d)\n", 
+                        graph_idx, iter_start, iter_end, (int)n, (int)k);
+                fprintf(stderr, "[LATRD_GRAPH] Capture stream pointer: %p\n", (void*)capture_stream);
+            }
+            
+            // Try ThreadLocal mode first as it's more permissive
+            hipError_t capture_err = hipStreamBeginCapture(capture_stream, hipStreamCaptureModeThreadLocal);
+            if(capture_err != hipSuccess) {
+                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] ERROR: hipStreamBeginCapture failed with error: %s (%d)\n", 
+                        hipGetErrorString(capture_err), capture_err);
+            }
+            HIP_CHECK(capture_err);
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Capture started successfully\n", graph_idx);
+            
+            // Capture iterations for this graph
+            rocblas_int jw;
+            for(rocblas_int j = j_start; j > j_end; --j)
+            {
+                jw = j - n + k;
+
+                // update column j of A with reflector computed in step j-1
+                //----------------------------------------------------------
+                ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
+                                        dim3(grr_updates, grc_updates, batch_count),
+                                        dim3(thr_updates, thc_updates, 1), lmemsize_updates, capture_stream, n,
+                                        k, j, A, shiftA, lda, strideA, W, shiftW, ldw, strideW);
+                //-------------------------------------------------------------
+
+                // reduce column j of A with new reflector, then copy off-diagonal element
+                // to E(j) and set off-diagonal to 1
+                //----------------------------------------------------------
+                rocsolver_larfg_template(handle, j, A, shiftA + idx2D(j - 1, j, lda), E, j - 1, strideE,
+                                         A, shiftA + idx2D(0, j, lda), 1, strideA, (tau + j - 1),
+                                         strideP, batch_count, work, norms);
+                //----------------------------------------------------------
+
+                // compute column j of W
+                //--------------------------------------------------------------
+                static constexpr int NB = 256;
+                dim3 gemvt_grid(n + n - j - 1, 1, batch_count);
+                dim3 gemvt_threads(NB);
+                ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>), gemvt_grid,
+                                        gemvt_threads, 0, capture_stream, n, k, j, A, shiftA, lda, strideA, W,
+                                        shiftW, ldw, strideW, W, shiftW + idx2D(0, jw, ldw), ldw,
+                                        strideW, work, strideblk);
+
+                // update column j of W
+                //--------------------------------------------------------------
+                ROCSOLVER_LAUNCH_KERNEL(
+                    latrd_upper_updateW_kernel<T>, dim3(grr_updates, grc_updates, batch_count),
+                    dim3(thr_updates, thc_updates, 1), lmemsize_updates, capture_stream, n, k, j, A, shiftA,
+                    lda, strideA, W, shiftW, ldw, strideW, work, strideblk, tau, strideP);
+
+                ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>), dim3(1, 1, batch_count),
+                                        dim3(1024, 1, 1), 0, capture_stream, j, A, shiftA + idx2D(0, j, lda),
+                                        strideA, W, shiftW + idx2D(0, jw, ldw), strideW, tau + j - 1,
+                                        strideP);
+            }
+            
+            // End capture and create graph
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: About to end capture\n", graph_idx);
+            HIP_CHECK(hipStreamEndCapture(capture_stream, &graph));
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Capture ended successfully\n", graph_idx);
+            
+            // End timing for capture phase
+            if(time_graphs) {
+                HIP_CHECK(hipEventRecord(timing_end, capture_stream));
+                HIP_CHECK(hipEventSynchronize(timing_end));
+                float time_capture_ms = 0.0f;
+                HIP_CHECK(hipEventElapsedTime(&time_capture_ms, timing_start, timing_end));
+                time_capture_total += time_capture_ms;
+            }
+            
+            // Start timing for instantiation phase
+            if(time_graphs) {
+                HIP_CHECK(hipEventRecord(timing_start, capture_stream));
+            }
+            
+            // Instantiate the graph for execution
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: About to instantiate\n", graph_idx);
+            HIP_CHECK(hipGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0));
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Instantiated successfully\n", graph_idx);
+            
+            // End timing for instantiation phase
+            if(time_graphs) {
+                HIP_CHECK(hipEventRecord(timing_end, capture_stream));
+                HIP_CHECK(hipEventSynchronize(timing_end));
+                float time_instantiate_ms = 0.0f;
+                HIP_CHECK(hipEventElapsedTime(&time_instantiate_ms, timing_start, timing_end));
+                time_instantiate_total += time_instantiate_ms;
+            };
+            
+            graphs.push_back(graph);
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph size after push back is: %zu\n", graphs.size());
+            graph_execs.push_back(graph_exec);
+        }
+        
+        // Start timing for launch phase
+        if(time_graphs) {
+            HIP_CHECK(hipEventRecord(timing_start, stream));
+        }
+        
+        // Execution phase: Launch all captured graphs on the original stream
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to launch %d graphs on original stream\n", num_graphs);
+        for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Launching graph %d\n", graph_idx);
+            HIP_CHECK(hipGraphLaunch(graph_execs[graph_idx], stream));
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d launched successfully\n", graph_idx);
+        }
+        
+        // Synchronize original stream to ensure all graphs complete
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to synchronize original stream\n");
+        HIP_CHECK(hipStreamSynchronize(stream));
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Original stream synchronized successfully\n");
+        
+        // End timing for launch phase
+        if(time_graphs) {
+            HIP_CHECK(hipEventRecord(timing_end, stream));
+            HIP_CHECK(hipEventSynchronize(timing_end));
+            float time_launch_ms = 0.0f;
+            HIP_CHECK(hipEventElapsedTime(&time_launch_ms, timing_start, timing_end));
+            time_launch_total = time_launch_ms;
+            
+            // Print timing summary in microseconds
+            fprintf(stderr, "\n[LATRD_GRAPH TIMING] n=%d, k=%d, GRAPH_MODE=%d\n", 
+                    (int)n, (int)k, LATRD_GRAPH_MODE);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] Number of graphs: %d\n", num_graphs);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] Iterations per graph: %d\n", iters_per_graph);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] Total capture time:      %10.2f us (%8.2f us per graph)\n", 
+                    time_capture_total * 1000.0f, time_capture_total * 1000.0f / num_graphs);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] Total instantiation time: %10.2f us (%8.2f us per graph)\n", 
+                    time_instantiate_total * 1000.0f, time_instantiate_total * 1000.0f / num_graphs);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] Total launch time:        %10.2f us (%8.2f us per graph)\n", 
+                    time_launch_total * 1000.0f, time_launch_total * 1000.0f / num_graphs);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] TOTAL OVERHEAD:           %10.2f us\n", 
+                    (time_capture_total + time_instantiate_total) * 1000.0f);
+            fprintf(stderr, "[LATRD_GRAPH TIMING] GRAPH EXECUTION TIME:     %10.2f us\n\n", 
+                    time_launch_total * 1000.0f);
+        }
+        
+        // Cleanup: Destroy graph executables and graphs
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to cleanup graphs\n");
+        for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph exec %d\n", graph_idx);
+            HIP_CHECK(hipGraphExecDestroy(graph_execs[graph_idx]));
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph %d\n", graph_idx);
+            HIP_CHECK(hipGraphDestroy(graphs[graph_idx]));
+        }
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] All graphs cleaned up successfully\n");
+        
+        // Restore original stream to the handle before destroying capture_stream
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Restoring original stream to handle\n");
+        rocblas_set_stream(handle, stream);
+        
+        // Destroy the capture stream
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying capture stream\n");
+        HIP_CHECK(hipStreamDestroy(capture_stream));
+        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream destroyed successfully\n");
+        
+        // Cleanup timing events
+        if(time_graphs) {
+            HIP_CHECK(hipEventDestroy(timing_start));
+            HIP_CHECK(hipEventDestroy(timing_end));
+        }
+        
+#else
+        // Original non-graph path
+        constexpr bool time_graphs = true;   // Match graph path timing
+        
+        // Timing infrastructure for non-graph path
+        hipEvent_t timing_start, timing_end;
+        float time_execution_total = 0.0f;
+        
+        if(time_graphs) {
+            HIP_CHECK(hipEventCreate(&timing_start));
+            HIP_CHECK(hipEventCreate(&timing_end));
+            HIP_CHECK(hipEventRecord(timing_start, stream));
+        }
+        
         rocblas_int jw;
-        // std::cerr << "K is " << k << std::endl;
-        // std::cerr << "N is " << k << std::endl;
-        // std::cerr << "J is (at start) " << n-1 << std::endl;
-        // std::cerr << "J range is " << n-k << std::endl;
         for(rocblas_int j = n - 1; j >= n - k; --j)
         {
             jw = j - n + k;
@@ -2463,7 +2723,28 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                     dim3(1024, 1, 1), 0, stream, j, A, shiftA + idx2D(0, j, lda),
                                     strideA, W, shiftW + idx2D(0, jw, ldw), strideW, tau + j - 1,
                                     strideP);
+            //--------------------------------------------------------------
         }
+        
+        // End timing for non-graph path
+        if(time_graphs) {
+            HIP_CHECK(hipEventRecord(timing_end, stream));
+            HIP_CHECK(hipEventSynchronize(timing_end));
+            float time_execution_ms = 0.0f;
+            HIP_CHECK(hipEventElapsedTime(&time_execution_ms, timing_start, timing_end));
+            time_execution_total = time_execution_ms;
+            
+            // Print timing summary for comparison in microseconds
+            fprintf(stderr, "\n[LATRD_NON-GRAPH TIMING] n=%d, k=%d, GRAPH_MODE=0 (disabled)\n", 
+                    (int)n, (int)k);
+            fprintf(stderr, "[LATRD_NON-GRAPH TIMING] Total execution time: %10.2f us\n\n", 
+                    time_execution_total * 1000.0f);
+            
+            // Cleanup timing events
+            HIP_CHECK(hipEventDestroy(timing_start));
+            HIP_CHECK(hipEventDestroy(timing_end));
+        }
+#endif  // LATRD_GRAPH_MODE != 0
     }
 
     return rocblas_status_success;
