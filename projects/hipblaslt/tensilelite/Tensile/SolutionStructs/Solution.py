@@ -1606,6 +1606,8 @@ class Solution(collections.abc.Mapping):
     # backup UsePLRPack from yaml before calling hasCustomSchedule
     backup_UsePLRPack = state["UsePLRPack"] 
     # Check if CMS is available for this solution
+    if type(state['UseCustomMainLoopSchedule']) == bool:
+      reject(state, printRejectionReason, "Detected boolean, UseCustomMainLoopSchedule should be -1, 0 or 1")
     if state["UseCustomMainLoopSchedule"] in [-1, 1]:
       # initialize CMS related config parameters (for CMS only)
       state["SwapGlobalReadOrder"] = False
