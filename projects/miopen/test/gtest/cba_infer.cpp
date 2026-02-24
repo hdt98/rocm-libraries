@@ -283,6 +283,12 @@ INSTANTIATE_TEST_SUITE_P(
     GPU_ConvGrpBiasActivInfer_BFP16,
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
+
+INSTANTIATE_TEST_SUITE_P(
+    FullHuge,
+    GPU_ConvGrpBiasActivInfer_BFP16,
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetHugeConfigs<Direction::Forward>(),
+                          testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer3D_BFP16,
@@ -307,6 +313,11 @@ INSTANTIATE_TEST_SUITE_P(
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
+    FullHuge,
+    GPU_ConvGrpBiasActivInfer_FP16,
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetHugeConfigs<Direction::Forward>(),
+                          testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
+INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer3D_FP16,
     gcbaInferParamGenFull(GroupConvTestConfig<3u>::GetConfigs<Direction::Forward>(),
@@ -328,6 +339,11 @@ INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer_FP32,
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
+                          testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
+INSTANTIATE_TEST_SUITE_P(
+    FullHuge,
+    GPU_ConvGrpBiasActivInfer_FP32,
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetHugeConfigs<Direction::Forward>(),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     Full,
