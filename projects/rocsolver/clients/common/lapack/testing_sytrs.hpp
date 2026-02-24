@@ -180,7 +180,7 @@ void sytrs_initData(const rocblas_handle handle,
             }
 
             // shuffle rows to test pivoting
-            // always the same permuation for debugging purposes
+            // always the same permutation for debugging purposes
             for(rocblas_int i = 0; i < n / 2; i++)
             {
                 for(rocblas_int j = 0; j < n; j++)
