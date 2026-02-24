@@ -899,8 +899,11 @@ void rocsolver_sytrs_getMemorySize(I const n, I const nrhs, I const batch_count,
     // ---------------------------
     // no storage needed for now but
     // may need storage in future
+    //
+    // request 1 byte to avoid possibly getting
+    // a nullptr from rocblas_device_malloc()
     // ---------------------------
-    *size_work = 0;
+    *size_work = 1;
     return;
 }
 
