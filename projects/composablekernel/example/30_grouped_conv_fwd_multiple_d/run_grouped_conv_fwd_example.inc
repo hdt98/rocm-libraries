@@ -58,21 +58,30 @@ using DeviceConvFwdInstance =
         3, 
         3, 
         4, 
-        4
+        4,
         25600, 
         128, 
         25600, 
         128, 
-        4
+        4,
         1, 
         1, 
         36, 
-        1
+        1,
         5120000, 
         5120000, 
         4, 
         144, 
         4,
+        1, //ConvStrideH_
+        1, //ConvStrideW_
+        1, //ConvDilationH_
+        1, //ConvDilationW_
+        1, //InLeftPadH_
+        1, //InLeftPadW_
+        1, //InRightPadH_
+        1, //InRightPadW_
+        1, //ZYX_
         // Conv shape params end
         ck::LoopScheduler::Default,
         8>; // Num groups to merge
@@ -241,9 +250,19 @@ bool run_grouped_conv_fwd_example(int argc, char* argv[])
 
     switch(conv_param.num_dim_spatial_)
     {
-    case 1: return run_grouped_conv_fwd<1>(config, conv_param);
+    case 1: 
+        {
+            //return run_grouped_conv_fwd<1>(config, conv_param);
+            std::cout << "1D not suported yet" << std::endl;
+            return 0;
+        }
     case 2: return run_grouped_conv_fwd<2>(config, conv_param);
-    case 3: return run_grouped_conv_fwd<3>(config, conv_param);
+    case 3: 
+        {
+            //return run_grouped_conv_fwd<3>(config, conv_param);
+            std::cout << "3D not suported yet" << std::endl;
+            return 0;
+        }
     }
 
     return false;

@@ -53,7 +53,8 @@ struct TransformConvFwdToGemm_V2
     static constexpr auto I1 = Number<1>{};
 
     public:
-    __host__ __device__ constexpr TransformConvFwdToGemm_V2() {}
+
+    __host__ __device__ consteval TransformConvFwdToGemm_V2() {}
 
     template <typename ALayout,
               typename ck::enable_if<
@@ -61,7 +62,7 @@ struct TransformConvFwdToGemm_V2
                                           is_same_v<ALayout, tensor_layout::convolution::NHWGC> ||
                                           is_same_v<ALayout, tensor_layout::convolution::GNHWC>),
                                      bool>::type = false>
-    __host__ __device__ auto MakeADescriptor_M_K() const
+    __host__ __device__ consteval auto MakeADescriptor_M_K() const
 
     {
         if constexpr(NumGroupsToMerge == 1)
@@ -148,7 +149,7 @@ struct TransformConvFwdToGemm_V2
                                          is_same_v<BLayout, tensor_layout::convolution::GKYXC> ||
                                          is_same_v<BLayout, tensor_layout::convolution::GKZYXC>,
                                      bool>::type = false>
-    __host__ __device__ auto MakeBDescriptor_N_K() const
+    __host__ __device__ consteval auto MakeBDescriptor_N_K() const
     {
         if constexpr(NumGroupsToMerge == 1)
         {
@@ -174,7 +175,7 @@ struct TransformConvFwdToGemm_V2
                                           is_same_v<CLayout, tensor_layout::convolution::NHWGK> ||
                                           is_same_v<CLayout, tensor_layout::convolution::GNHWK>),
                                      bool>::type = false>
-    __host__ __device__ auto MakeCDescriptor_M_N() const
+    __host__ __device__ consteval auto MakeCDescriptor_M_N() const
     {
         constexpr index_t NDoHoWo = N_ * Ho_ * Wo_;
         if constexpr(NumGroupsToMerge == 1)
