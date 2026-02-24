@@ -51,6 +51,14 @@
 
 // Simple vector addition kernel with rocWMMA include
 static const char* vectorAddSourceRocwmmaInclude = R"(
+
+// FIXME: Remove once ROCM-864 is resolved.
+typedef signed char int8_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+// FIXME
+
 #include <rocwmma/rocwmma.hpp>
 extern "C"
 __global__ void vectorAdd(const int* a, const int* b, int* c, int n)
