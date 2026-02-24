@@ -247,14 +247,8 @@ function(install_miopen_plugin_ctest_files)
         file(APPEND "${INSTALLED_CTEST_FILE}" "add_test(${test_target} \"../${test_target}\")\n")
     endforeach()
 
-    # Install the generated CTestTestfile.cmake to MIOPEN_PLUGIN_CTEST_FILE_INSTALL_PATH
     install(FILES "${INSTALLED_CTEST_FILE}"
             DESTINATION ${MIOPEN_PLUGIN_CTEST_FILE_INSTALL_PATH} RENAME CTestTestfile.cmake
-    )
-
-    # Also install to legacy path for backwards compatibility with current TheRock
-    install(FILES "${INSTALLED_CTEST_FILE}"
-            DESTINATION "${CMAKE_INSTALL_BINDIR}/miopen_legacy_plugin" RENAME CTestTestfile.cmake
     )
 
 endfunction() # install_miopen_plugin_ctest_files

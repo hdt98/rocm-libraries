@@ -5,10 +5,8 @@ add_compile_definitions(__HIP_PLATFORM_AMD__)
 find_package(hip REQUIRED)
 find_package(Threads REQUIRED)
 
-if(NOT BUILD_PLUGIN_AS_DEPENDENCY)
-    find_package(hipdnn_test_sdk CONFIG REQUIRED)
-    find_package(hipdnn_plugin_sdk CONFIG REQUIRED)
-endif()
+find_package(hipdnn_test_sdk CONFIG REQUIRED)
+find_package(hipdnn_plugin_sdk CONFIG REQUIRED)
 
 add_executable(
     miopen_plugin_tests

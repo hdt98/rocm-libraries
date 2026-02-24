@@ -49,7 +49,6 @@ project_map = {
     "miopen": {
         "cmake_options": [
             "-DTHEROCK_ENABLE_MIOPEN=ON",
-            "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
             "-DTHEROCK_ENABLE_MIOPENPROVIDER=ON",
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
         ],
@@ -84,7 +83,6 @@ additional_options = {
     "hipdnn": {
         "cmake_options": [
             "-DTHEROCK_ENABLE_HIPBLASLT_PLUGIN=ON",
-            "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
             "-DTHEROCK_ENABLE_MIOPENPROVIDER=ON",
             "-DTHEROCK_ENABLE_HIPDNN_SAMPLES=ON",
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
@@ -100,7 +98,6 @@ additional_options = {
     },
     "miopen-provider": {
         "cmake_options": [
-            "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON",
             "-DTHEROCK_ENABLE_MIOPENPROVIDER=ON",
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
         ],
