@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <stdexcept>
@@ -293,21 +294,8 @@ struct Args<SIGNATURE>
         lens[0] = this->lengths.groups;
         lens[1] = this->lengths.batch_size;
         lens[2] = this->lengths.input_channels;
-        if constexpr(SPATIAL_DIM == 1)
-        {
-            lens[3] = this->lengths.image.width;
-        }
-        else if constexpr(SPATIAL_DIM == 2)
-        {
-            lens[3] = this->lengths.image.height;
-            lens[4] = this->lengths.image.width;
-        }
-        else
-        {
-            lens[3] = this->lengths.image.depth;
-            lens[4] = this->lengths.image.height;
-            lens[5] = this->lengths.image.width;
-        }
+        const auto image = this->lengths.image.template to_array<size_t>();
+        std::copy(image.begin(), image.end(), lens.begin() + 3);
 
         const auto make_default_strides = [&] {
             constexpr auto layout = SIGNATURE.input.config.layout;
@@ -332,21 +320,8 @@ struct Args<SIGNATURE>
         lens[0] = this->lengths.groups;
         lens[1] = this->lengths.output_channels;
         lens[2] = this->lengths.input_channels;
-        if constexpr(SPATIAL_DIM == 1)
-        {
-            lens[3] = this->lengths.filter.width;
-        }
-        else if constexpr(SPATIAL_DIM == 2)
-        {
-            lens[3] = this->lengths.filter.height;
-            lens[4] = this->lengths.filter.width;
-        }
-        else
-        {
-            lens[3] = this->lengths.filter.depth;
-            lens[4] = this->lengths.filter.height;
-            lens[5] = this->lengths.filter.width;
-        }
+        const auto filter = this->lengths.filter.template to_array<size_t>();
+        std::copy(filter.begin(), filter.end(), lens.begin() + 3);
 
         const auto make_default_strides = [&] {
             constexpr auto layout = SIGNATURE.weight.config.layout;
@@ -373,21 +348,8 @@ struct Args<SIGNATURE>
         lens[0] = this->lengths.groups;
         lens[1] = this->lengths.batch_size;
         lens[2] = this->lengths.output_channels;
-        if constexpr(SPATIAL_DIM == 1)
-        {
-            lens[3] = output_spatial.width;
-        }
-        else if constexpr(SPATIAL_DIM == 2)
-        {
-            lens[3] = output_spatial.height;
-            lens[4] = output_spatial.width;
-        }
-        else
-        {
-            lens[3] = output_spatial.depth;
-            lens[4] = output_spatial.height;
-            lens[5] = output_spatial.width;
-        }
+        const auto spatial = output_spatial.template to_array<size_t>();
+        std::copy(spatial.begin(), spatial.end(), lens.begin() + 3);
 
         const auto make_default_strides = [&] {
             constexpr auto layout = SIGNATURE.output.config.layout;
