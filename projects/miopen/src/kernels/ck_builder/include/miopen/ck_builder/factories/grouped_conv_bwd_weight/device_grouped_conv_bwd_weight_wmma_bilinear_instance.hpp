@@ -38,23 +38,25 @@ constexpr auto device_grouped_conv_bwd_weight_wmma_c_shuffle_f16_bilinear_instan
     ckb::TensorLayout out_layout,
     ckb::ConvSpecialization conv_spec)
 {
-    return std::array{
-        // clang-format off
-        // generic instance
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,32,8,16,16,4,2,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,1,1,{1,16,1,4},1,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,32,8,16,16,4,2,{4,8,1},{2,0,1},{1,0,2},1,2,4,true,{4,8,1},{2,0,1},{1,0,2},1,2,4,true,1,1,{1,16,1,4},2,1,Intrawave,PipeV1),
-        // for fp16 conv.K and conv.C must be divisible by 2
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,32,32,32,8,16,16,2,1,{4,8,1},{2,0,1},{1,0,2},1,2,2,false,{4,16,1},{2,0,1},{1,0,2},1,2,2,false,1,1,{1,8,1,8},2,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,true,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,64,8,16,16,4,2,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,4},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,128,256,64,8,16,16,8,2,{8,32,1},{2,0,1},{1,0,2},1,4,8,true,{8,32,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,48,64,128,8,16,16,3,1,{16,8,1},{2,0,1},{1,0,2},1,6,8,true,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,96,128,64,8,16,16,6,2,{8,16,1},{2,0,1},{1,0,2},1,6,8,true,{8,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,64,64,128,8,16,16,4,1,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,96,128,128,8,16,16,6,1,{16,16,1},{2,0,1},{1,0,2},1,6,8,true,{16,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1)
-        // clang-format on
-    };
+    // TODO: Enable support for Wmma kernels on appropriate platforms later
+    // return std::array{
+    //     // clang-format off
+    //     // generic instance
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,32,8,16,16,4,2,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,1,1,{1,16,1,4},1,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,32,8,16,16,4,2,{4,8,1},{2,0,1},{1,0,2},1,2,4,true,{4,8,1},{2,0,1},{1,0,2},1,2,4,true,1,1,{1,16,1,4},2,1,Intrawave,PipeV1),
+    //     // for fp16 conv.K and conv.C must be divisible by 2
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,32,32,32,8,16,16,2,1,{4,8,1},{2,0,1},{1,0,2},1,2,2,false,{4,16,1},{2,0,1},{1,0,2},1,2,2,false,1,1,{1,8,1,8},2,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,true,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,64,8,16,16,4,2,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,4},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,128,256,64,8,16,16,8,2,{8,32,1},{2,0,1},{1,0,2},1,4,8,true,{8,32,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,48,64,128,8,16,16,3,1,{16,8,1},{2,0,1},{1,0,2},1,6,8,true,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,96,128,64,8,16,16,6,2,{8,16,1},{2,0,1},{1,0,2},1,6,8,true,{8,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,64,64,128,8,16,16,4,1,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,F16,F16,F16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,96,128,128,8,16,16,6,1,{16,16,1},{2,0,1},{1,0,2},1,6,8,true,{16,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1)
+    //     // clang-format on
+    // };
+    return std::array<WmmaMultiDBwdWeightInstance<1>, 0>{};
 }
 
 // =====================================================================================
@@ -69,22 +71,24 @@ constexpr auto device_grouped_conv_bwd_weight_wmma_c_shuffle_bf16_bilinear_insta
     ckb::TensorLayout out_layout,
     ckb::ConvSpecialization conv_spec)
 {
-    return std::array{
-        // clang-format off
-        // generic instance
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,32,8,16,16,4,2,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,1,1,{1,16,1,4},1,1,Intrawave,PipeV1),
-        // other instances
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,32,32,32,8,16,16,2,1,{4,8,1},{2,0,1},{1,0,2},1,2,2,false,{4,16,1},{2,0,1},{1,0,2},1,2,2,false,1,1,{1,8,1,8},2,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,true,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,64,8,16,16,4,2,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,4},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,128,256,64,8,16,16,8,2,{8,32,1},{2,0,1},{1,0,2},1,4,8,true,{8,32,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,48,64,128,8,16,16,3,1,{16,8,1},{2,0,1},{1,0,2},1,6,8,true,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,96,128,64,8,16,16,6,2,{8,16,1},{2,0,1},{1,0,2},1,6,8,true,{8,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,64,64,128,8,16,16,4,1,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
-        DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,96,128,128,8,16,16,6,1,{16,16,1},{2,0,1},{1,0,2},1,6,8,true,{16,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1)
-        // clang-format on
-    };
+    // TODO: Enable support for Wmma kernels on appropriate platforms later
+    // return std::array{
+    //     // clang-format off
+    //     // generic instance
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,32,8,16,16,4,2,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,{4,8,1},{2,0,1},{1,0,2},1,1,4,true,1,1,{1,16,1,4},1,1,Intrawave,PipeV1),
+    //     // other instances
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,32,32,32,8,16,16,2,1,{4,8,1},{2,0,1},{1,0,2},1,2,2,false,{4,16,1},{2,0,1},{1,0,2},1,2,2,false,1,1,{1,8,1,8},2,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,128,128,32,8,16,16,8,2,{4,32,1},{2,0,1},{1,0,2},1,4,8,true,{4,32,1},{2,0,1},{1,0,2},1,4,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,64,64,64,64,8,16,16,4,2,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,{8,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,4},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,128,256,64,8,16,16,8,2,{8,32,1},{2,0,1},{1,0,2},1,4,8,true,{8,32,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,48,64,128,8,16,16,3,1,{16,8,1},{2,0,1},{1,0,2},1,6,8,true,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,96,128,64,8,16,16,6,2,{8,16,1},{2,0,1},{1,0,2},1,6,8,true,{8,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,128,64,64,128,8,16,16,4,1,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,{16,8,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,8},8,1,Intrawave,PipeV1),
+    //     DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3<1>(spatial_dim,in_layout,wei_layout,out_layout,BF16,BF16,BF16,F32,PassThrough,Bilinear,PassThrough,conv_spec,256,96,128,128,8,16,16,6,1,{16,16,1},{2,0,1},{1,0,2},1,6,8,true,{16,16,1},{2,0,1},{1,0,2},1,8,8,false,1,1,{1,16,1,16},8,1,Intrawave,PipeV1)
+    //     // clang-format on
+    // };
+    return std::array<WmmaMultiDBwdWeightInstance<1>, 0>{};
 }
 
 } // namespace grouped_conv_bwd_weight

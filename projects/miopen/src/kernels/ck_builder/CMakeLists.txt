@@ -836,7 +836,7 @@ add_library(ck_builder STATIC
 )
 set_target_properties(ck_builder PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # TODO: CK_USE_WMMA should depend on what we're building for. See https://github.com/ROCm/rocm-libraries/blob/develop/projects/composablekernel/CMakeLists.txt#L286
-target_compile_definitions(ck_builder PRIVATE -DCK_EXPERIMENTAL_BUILDER -DCK_USE_WMMA)
+target_compile_definitions(ck_builder PRIVATE -DCK_EXPERIMENTAL_BUILDER)
 target_include_directories(ck_builder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
 target_link_libraries(ck_builder composable_kernel::device_conv_operations)
