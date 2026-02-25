@@ -578,6 +578,6 @@ class TestCkTileMXFlatmm : public ::testing::Test
                     Kernel{}, grids, blocks, 0, kargs));
         };
 
-        BaseFlatmmPipeline::TailHandler(Run, has_hot_loop, tail_num);
+        BaseFlatmmPipeline::template TailHandler<true>(Run, has_hot_loop, tail_num);
     }
 };
