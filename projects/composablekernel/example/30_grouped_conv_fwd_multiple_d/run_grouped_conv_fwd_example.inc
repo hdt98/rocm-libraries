@@ -111,6 +111,61 @@ using DeviceConvFwdInstance =
         256,         // BlockSize
         128,         // MPerBlock
         32,         // NPerBlock
+        64,          // KPerBlock
+        16,           // AK1
+        16,           // BK1
+        32,          // MPerXdl
+        32,          // NPerXdl
+        2,           // MXdlPerWave
+        1,           // NXdlPerWave
+        S<4, 64, 1>, // ABlockTransferThreadClusterLengths_AK0_M_AK1
+        S<1, 0, 2>,  // ABlockTransferThreadClusterArrangeOrder
+        S<1, 0, 2>,  // ABlockTransferSrcAccessOrder
+        2,           // ABlockTransferSrcVectorDim
+        4,           // ABlockTransferSrcScalarPerVector
+        8,           // ABlockTransferDstScalarPerVector_AK1
+        1,           // ABlockLdsExtraM
+        S<4, 32, 1>, // BBlockTransferThreadClusterLengths_BK0_N_BK1
+        S<1, 0, 2>,  // BBlockTransferThreadClusterArrangeOrder
+        S<1, 0, 2>,  // BBlockTransferSrcAccessOrder
+        2,           // BBlockTransferSrcVectorDim
+        4,           // BBlockTransferSrcScalarPerVector
+        8,           // BBlockTransferDstScalarPerVector_BK1
+        1,           // BBlockLdsExtraN
+        1,           // CShuffleMXdlPerWavePerShuffle
+        1,           // CShuffleNXdlPerWavePerShuffle
+        S<1, 64, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, must match with num merged groups
+        4,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
+        InKernelDataType,
+        WeiKernelDataType,
+        ck::LoopScheduler::Default,
+        8>; // Num groups to merge
+*/
+
+// Best V3 instance
+/*
+template <ck::index_t NDimSpatial>
+using DeviceConvFwdInstance =
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
+        NDimSpatial,
+        InputLayout<NDimSpatial>,
+        WeightLayout<NDimSpatial>,
+        ck::Tuple<>,
+        OutputLayout<NDimSpatial>,
+        InKernelDataType,
+        WeiKernelDataType,
+        AccDataType,
+        CShuffleDataType,
+        ck::Tuple<>,
+        OutKernelDataType,
+        InElementOp,
+        WeiElementOp,
+        OutElementOp,
+        ConvSpec,    // ConvForwardSpecialization
+        GemmSpec,    // GemmSpecialization
+        256,         // BlockSize
+        128,         // MPerBlock
+        32,         // NPerBlock
         32,          // KPerBlock
         8,           // AK1
         8,           // BK1
@@ -135,14 +190,17 @@ using DeviceConvFwdInstance =
         1,           // CShuffleMXdlPerWavePerShuffle
         1,           // CShuffleNXdlPerWavePerShuffle
         S<1, 64, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, must match with num merged groups
-        1,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
-        InKernelDataType,
+        4,          // Vector load/store size for output tensor = CDEBlockTransferScalarPerVector_NPerBlock
+        ck::BlockGemmPipelineScheduler::Interwave,
+        ck::BlockGemmPipelineVersion::v1,
+        InKernelDataType, 
         WeiKernelDataType,
-        ck::LoopScheduler::Default,
+        false, // No direct load
         8>; // Num groups to merge
 */
 
 // Baseline
+/*
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
@@ -196,6 +254,7 @@ using DeviceConvFwdInstance =
         WeiKernelDataType,
         false, // No direct load
         8>; // Num groups to merge
+*/
 
 template <ck::index_t NDimSpatial>
 using HostConvFwdInstance = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
