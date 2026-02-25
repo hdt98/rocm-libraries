@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +35,7 @@
 #include "testing_gesvda.hpp"
 #include "testing_gesvdj.hpp"
 #include "testing_getrf.hpp"
+// #include "testing_getri.hpp"  // TODO: Fix template issues in testing file
 #include "testing_getrs.hpp"
 #include "testing_orgbr_ungbr.hpp"
 #include "testing_orgqr_ungqr.hpp"
@@ -88,6 +89,7 @@ class hipsolver_dispatcher
             {"gesvdj_batched", testing_gesvdj<API_NORMAL, false, true, T>},
             {"getrf", testing_getrf<API_NORMAL, false, false, false, T, int, int>},
             {"getrf_64", testing_getrf<API_COMPAT, false, false, false, T, int64_t, size_t>},
+            // {"getri_batched", testing_getri<API_NORMAL, true, false, false, T, int, int>},  // TODO: Fix template issues
             {"getrs", testing_getrs<API_NORMAL, false, false, T, int, int>},
             {"getrs_64", testing_getrs<API_COMPAT, false, false, T, int64_t, size_t>},
             {"potrf", testing_potrf<API_NORMAL, false, false, T>},
