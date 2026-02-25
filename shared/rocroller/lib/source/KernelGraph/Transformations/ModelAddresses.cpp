@@ -206,8 +206,7 @@ namespace rocRoller::KernelGraph
             }
             else
             {
-                std::vector<std::string> comments;
-                info = tileGenerator.getStoreLDSTileInfo(tag, op, comments);
+                info = tileGenerator.getStoreLDSTileInfo(tag, op);
             }
 
             co_yield getLDSAddressesImpl(graph, tag, info, direction);

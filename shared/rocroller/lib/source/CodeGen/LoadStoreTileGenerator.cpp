@@ -961,8 +961,8 @@ namespace rocRoller
                 tileTag);
 
             LoadStoreTileInfo result;
-            result.comment = concatenate(
-                "GEN: loadMacroTileLDS OP ", tag, " LDS ", ldsTag, " MacroTile ", tileTag);
+            result.comments = {concatenate(
+                "GEN: loadMacroTileLDS OP ", tag, " LDS ", ldsTag, " MacroTile ", tileTag)};
 
             if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
             {
@@ -1070,8 +1070,8 @@ namespace rocRoller
                                                waveTileTag);
 
             LoadStoreTileInfo result;
-            result.comment = concatenate(
-                "GEN: loadMacroTileWAVELDS OP ", tag, " LDS ", ldsTag, " WaveTile ", waveTileTag);
+            result.comments = {concatenate(
+                "GEN: loadMacroTileWAVELDS OP ", tag, " LDS ", ldsTag, " WaveTile ", waveTileTag)};
 
             ldsTag = only(m_graph->coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<View>))
                          .value_or(ldsTag);
@@ -1279,8 +1279,8 @@ namespace rocRoller
         {
             auto info = getLoadLDSTileInfo(tag, load);
 
-            if(!info.comment.empty())
-                co_yield Instruction::Comment(info.comment);
+            for(auto const& comment : info.comments)
+                co_yield Instruction::Comment(comment);
 
             auto modelledAddresses = m_graph->modelledAddresses.find(tag);
             auto applyAddresses    = [&](Instruction inst) {
@@ -1306,8 +1306,8 @@ namespace rocRoller
             co_yield loadMacroTileDirect2LDS(tag, load, coords);
         }
 
-        LoadStoreTileGenerator::LoadStoreTileInfo LoadStoreTileGenerator::getStoreLDSTileInfo(
-            int tag, StoreLDSTile const& store, std::vector<std::string>& comments)
+        LoadStoreTileGenerator::LoadStoreTileInfo
+            LoadStoreTileGenerator::getStoreLDSTileInfo(int tag, StoreLDSTile const& store)
         {
             auto [macTileTag, macTile] = m_graph->getDimension<MacroTile>(tag);
             (void)macTileTag;
@@ -1316,13 +1316,13 @@ namespace rocRoller
             {
             case MemoryType::VGPR:
             case MemoryType::LDS:
-                return storeMacroTileLDSInfo(tag, store, comments);
+                return storeMacroTileLDSInfo(tag, store);
             case MemoryType::WAVE:
             {
                 switch(macTile.layoutType)
                 {
                 case LayoutType::MATRIX_ACCUMULATOR:
-                    return storeMacroTileWAVELDSInfo(tag, store, comments);
+                    return storeMacroTileWAVELDSInfo(tag, store);
                 default:
                     Throw<FatalError>("Layout type not supported yet for StoreLDSTile.");
                 }
@@ -1333,12 +1333,11 @@ namespace rocRoller
             }
         }
 
-        LoadStoreTileGenerator::LoadStoreTileInfo LoadStoreTileGenerator::storeMacroTileLDSInfo(
-            int tag, StoreLDSTile const& store, std::vector<std::string>& comments)
+        LoadStoreTileGenerator::LoadStoreTileInfo
+            LoadStoreTileGenerator::storeMacroTileLDSInfo(int tag, StoreLDSTile const& store)
         {
             auto [ldsTag, lds]   = m_graph->getDimension<LDS>(tag);
             auto [tileTag, tile] = m_graph->getDimension<MacroTile>(tag);
-            (void)comments;
             (void)lds;
 
             rocRoller::Log::getLogger()->debug(
@@ -1402,7 +1401,7 @@ namespace rocRoller
                 .offset  = ldsOffset,
                 .isTransposedTile = false,
                 .isPadded         = paddingBytes > 0};
-            info.comment       = infoComment;
+            info.comments      = {infoComment};
             info.ldsAllocation = ldsAllocation;
             return info;
         }
@@ -1447,8 +1446,8 @@ namespace rocRoller
             co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords);
         }
 
-        LoadStoreTileGenerator::LoadStoreTileInfo LoadStoreTileGenerator::storeMacroTileWAVELDSInfo(
-            int tag, StoreLDSTile const& store, std::vector<std::string>& comments)
+        LoadStoreTileGenerator::LoadStoreTileInfo
+            LoadStoreTileGenerator::storeMacroTileWAVELDSInfo(int tag, StoreLDSTile const& store)
         {
             auto [ldsTag, lds]           = m_graph->getDimension<LDS>(tag);
             auto [macTileTag, macTile]   = m_graph->getDimension<MacroTile>(tag);
@@ -1510,21 +1509,31 @@ namespace rocRoller
                         ShowValue(packing),
                         ShowValue(activeLanesInWave * packing));
 
+            LoadStoreTileInfo info{.tag     = tag,
+                                   .kind    = MemoryInstructions::MemoryKind::Local,
+                                   .m       = 0,
+                                   .n       = 0,
+                                   .data    = agpr,
+                                   .varType = varType,
+                                   .offset  = ldsOffset};
+            info.comments      = {infoComment};
+            info.ldsAllocation = ldsAllocation;
+
             if(m_context)
             {
-                comments.push_back(concatenate(ShowValue(waveTile),
-                                               ShowValue(waveTileNumElements),
-                                               ShowValue(activeLanesInWave),
-                                               ShowValue(packing),
-                                               ShowValue(activeLanesInWave * packing),
-                                               ShowValue(store.varType)));
+                info.comments.push_back(concatenate(ShowValue(waveTile),
+                                                    ShowValue(waveTileNumElements),
+                                                    ShowValue(activeLanesInWave),
+                                                    ShowValue(packing),
+                                                    ShowValue(activeLanesInWave * packing),
+                                                    ShowValue(store.varType)));
 
-                comments.push_back(concatenate(ShowValue(agpr->description()),
-                                               ShowValue(waveTile),
-                                               ShowValue(waveTileNumElements),
-                                               ShowValue(activeLanesInWave),
-                                               ShowValue(packing),
-                                               ShowValue(activeLanesInWave * packing)));
+                info.comments.push_back(concatenate(ShowValue(agpr->description()),
+                                                    ShowValue(waveTile),
+                                                    ShowValue(waveTileNumElements),
+                                                    ShowValue(activeLanesInWave),
+                                                    ShowValue(packing),
+                                                    ShowValue(activeLanesInWave * packing)));
             }
 
             uint numVgpr = waveTileNumElements / activeLanesInWave;
@@ -1546,15 +1555,8 @@ namespace rocRoller
             AssertFatal(n % packing == 0, ShowValue(n), ShowValue(packing));
             n /= packing;
 
-            LoadStoreTileInfo info{.tag     = tag,
-                                   .kind    = MemoryInstructions::MemoryKind::Local,
-                                   .m       = m,
-                                   .n       = n,
-                                   .data    = agpr,
-                                   .varType = varType,
-                                   .offset  = ldsOffset};
-            info.comment       = infoComment;
-            info.ldsAllocation = ldsAllocation;
+            info.m = m;
+            info.n = n;
             return info;
         }
 
@@ -1655,13 +1657,9 @@ namespace rocRoller
                                                                        StoreLDSTile const& store,
                                                                        Transformer         coords)
         {
-            std::vector<std::string> comments;
-            auto                     info = getStoreLDSTileInfo(tag, store, comments);
+            auto info = getStoreLDSTileInfo(tag, store);
 
-            if(!info.comment.empty())
-                co_yield Instruction::Comment(info.comment);
-
-            for(auto const& comment : comments)
+            for(auto const& comment : info.comments)
                 co_yield Instruction::Comment(comment);
 
             auto modelledAddresses = m_graph->modelledAddresses.find(tag);
