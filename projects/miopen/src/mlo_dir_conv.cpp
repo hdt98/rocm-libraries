@@ -147,7 +147,7 @@ static auto GetWindogradSolvers()
         miopen::solver::conv::TransposedConvBinWinogradRxS,
         miopen::solver::conv::TransposedConvBinWinogradRxSf2x3g1
         //,miopen::solver::conv::TransposedConvWinoFuryRxS,
-        //miopen::solver::conv::TransposedConvWinoRageRxS>
+        // miopen::solver::conv::TransposedConvWinoRageRxS>
         >{};
 }
 
@@ -196,7 +196,7 @@ static auto GetWindogradWrWSolvers()
         miopen::solver::conv::TransposedConvBinWinogradRxS,
         miopen::solver::conv::TransposedConvBinWinogradRxSf2x3g1
         //,miopen::solver::conv::TransposedConvWinoFuryRxS,
-        //miopen::solver::conv::TransposedConvWinoRageRxS>
+        // miopen::solver::conv::TransposedConvWinoRageRxS>
         >{};
 }
 

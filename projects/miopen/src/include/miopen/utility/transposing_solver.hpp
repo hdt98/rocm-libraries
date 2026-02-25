@@ -649,17 +649,67 @@ private:
     std::vector<ProblemTensorTransposeInvoke> outputs;
 };
 
+/// Helper base that provides the correct GetSolution override based on whether
+/// the solver Base is tunable or non-tunable. Tunable solvers have
+/// GetSolution(ctx, problem, config) while non-tunable solvers have
+/// GetSolution(ctx, problem). This class inherits from Base so that
+/// TransposingSolver can inherit from it and get both Base and GetSolution.
+template <class Derived,
+          class Base,
+          class Problem,
+          class InvokeParams,
+          class Inner,
+          bool IsTunable = std::is_base_of<TunableSolverTrait, Base>::value>
+struct TransposingSolverGetSolution;
+
+// Forward declaration
 template <class Derived, class Base, class Problem, class InvokeParams, class Inner>
-struct TransposingSolver : Base
+struct TransposingSolver;
+
+/// Non-tunable specialization: provides GetSolution(ctx, problem)
+template <class Derived, class Base, class Problem, class InvokeParams, class Inner>
+struct TransposingSolverGetSolution<Derived, Base, Problem, InvokeParams, Inner, false> : Base
 {
+    ConvSolution GetSolution(const ExecutionContext& ctx, const Problem& problem) const override
+    {
+        auto transposed_problem = Derived::Transpose(problem);
+        ConvSolution sln        = Inner{}.GetSolution(ctx, transposed_problem);
+        return static_cast<const Derived*>(this)->WrapSolutionWithTranspose(
+            ctx, problem, transposed_problem, std::move(sln));
+    }
+};
+
+/// Tunable specialization: provides GetSolution(ctx, problem, config)
+template <class Derived, class Base, class Problem, class InvokeParams, class Inner>
+struct TransposingSolverGetSolution<Derived, Base, Problem, InvokeParams, Inner, true> : Base
+{
+    ConvSolution GetSolution(const ExecutionContext& ctx,
+                             const Problem& problem,
+                             const typename Inner::PerformanceConfigType& config) const override
+    {
+        auto transposed_problem = Derived::Transpose(problem);
+        ConvSolution sln        = Inner{}.GetSolution(ctx, transposed_problem, config);
+        return static_cast<const Derived*>(this)->WrapSolutionWithTranspose(
+            ctx, problem, transposed_problem, std::move(sln));
+    }
+};
+
+template <class Derived, class Base, class Problem, class InvokeParams, class Inner>
+struct TransposingSolver : TransposingSolverGetSolution<Derived, Base, Problem, InvokeParams, Inner>
+{
+    // Allow the GetSolution helper to access Transpose and WrapSolutionWithTranspose
+    friend struct TransposingSolverGetSolution<Derived,
+                                               Base,
+                                               Problem,
+                                               InvokeParams,
+                                               Inner,
+                                               std::is_base_of<TunableSolverTrait, Base>::value>;
+
     using TransposeDescriptor = ProblemTensorTransposeDescriptor<Problem, InvokeParams>;
 
     /// TransposingSolver always needs workspace for transpose buffers.
     bool MayNeedWorkspace() const override { return true; }
 
-    /// Convert invoke params for inner solver invocation.
-    /// Override in derived class if inner solver expects a different params type.
-    /// Default: return params as AnyInvokeParams (pass-through).
     /// Convert from API invoke params to TransposingSolver invoke params.
     /// Override in derived class if API passes a different type than InvokeParams.
     /// Default: cast AnyInvokeParams directly to InvokeParams.
@@ -668,6 +718,9 @@ struct TransposingSolver : Base
         return any_params.CastTo<InvokeParams>();
     }
 
+    /// Convert invoke params for inner solver invocation.
+    /// Override in derived class if inner solver expects a different params type.
+    /// Default: return params as AnyInvokeParams (pass-through).
     static AnyInvokeParams ConvertForInnerSolver(const InvokeParams& params) { return params; }
 
     static std::vector<AnyTransposePseudoSolver> GetTransposeSolvers()
@@ -695,7 +748,7 @@ struct TransposingSolver : Base
         const auto transpose_solvers = Derived::GetTransposeSolversMap();
         auto any_difference          = false;
 
-        for(auto transpose : Derived::GetTransposes())
+        for(auto transpose : Derived::GetTransposes(problem))
         {
             decltype(auto) descriptor = (problem.*(transpose.cdescriptor))();
             const auto layout         = descriptor.GetLayout_str();
@@ -755,24 +808,23 @@ struct TransposingSolver : Base
         // Use Derived::Transpose to allow derived classes to override (CRTP pattern)
         const auto transposed_problem = Derived::Transpose(problem);
         auto ws_size                  = Inner{}.GetWorkspaceSize(ctx, transposed_problem);
-
-        for(const auto& transpose : Derived::GetTransposes())
+        for(const auto& transpose : Derived::GetTransposes(problem))
         {
             const auto& descriptor = (transposed_problem.*(transpose.cdescriptor))();
             const auto e_size      = get_data_size(descriptor.GetType());
-            ws_size += descriptor.GetElementSpace() * e_size;
+            const auto tensor_size = descriptor.GetElementSpace() * e_size;
+            ws_size += tensor_size;
         }
-
         return ws_size;
     }
 
-    ConvSolution GetSolution(const ExecutionContext& ctx,
-                             const Problem& problem,
-                             const typename Inner::PerformanceConfigType& config) const override
+    /// Wraps an inner solver's ConvSolution with transpose kernels.
+    /// Called by the GetSolution helper specializations.
+    ConvSolution WrapSolutionWithTranspose(const ExecutionContext& ctx,
+                                           const Problem& problem,
+                                           Problem& transposed_problem,
+                                           ConvSolution sln) const
     {
-        // Use Derived::Transpose to allow derived classes to override (CRTP pattern)
-        auto transposed_problem = Derived::Transpose(problem);
-        ConvSolution sln        = Inner{}.GetSolution(ctx, transposed_problem, config);
         // NOLINTNEXTLINE (bugprone-unchecked-optional-access)
         auto old_factory             = sln.invoker_factory.value();
         const auto old_kernels_end   = sln.construction_params.size();
@@ -781,7 +833,7 @@ struct TransposingSolver : Base
         std::vector<std::tuple<TransposeDescriptor, InvokerFactory>> in_transpose_ifs,
             out_transpose_ifs;
 
-        for(auto transpose : Derived::GetTransposes())
+        for(auto transpose : Derived::GetTransposes(problem))
         {
             // For input transposes: use original problem's layout as source
             // For output transposes: use transposed problem's layout as source
@@ -912,7 +964,7 @@ protected:
     inline static Problem Transpose(const Problem& problem)
     {
         auto transposed_problem = problem;
-        for(const auto& transpose : Derived::GetTransposes())
+        for(const auto& transpose : Derived::GetTransposes(problem))
             transpose.Transpose(problem, transposed_problem);
         return transposed_problem;
     }

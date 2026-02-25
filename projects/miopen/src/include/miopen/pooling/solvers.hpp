@@ -305,7 +305,7 @@ struct PoolingFwdNCHWTransposingSolver
     using Problem      = miopen::pooling::ProblemDescription;
     using InvokeParams = miopen::pooling::FwdInvokeParams;
 
-    inline static auto GetTransposes()
+    inline static auto GetTransposes(const Problem& /*problem*/)
     {
         auto ret = std::array<ProblemTensorTransposeDescriptor<Problem, InvokeParams>, 2>{{
             {
@@ -462,7 +462,7 @@ struct PoolingBwdNCHWTransposingSolver
     using Problem      = miopen::pooling::ProblemDescription;
     using InvokeParams = miopen::pooling::BwdInvokeParams;
 
-    inline static auto GetTransposes()
+    inline static auto GetTransposes(const Problem& /*problem*/)
     {
         auto ret = std::array<ProblemTensorTransposeDescriptor<Problem, InvokeParams>, 2>{{
             {

@@ -46,12 +46,10 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
 {
     if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_3X3))
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Disabled via MIOPEN_DEBUG_AMD_WINOGRAD_3X3");
         return false;
     }
     if(!problem.Is2d())
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Not a 2D problem");
         return false;
     }
     if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
@@ -61,22 +59,18 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
     }
     if(!(ctx.rmv.IsV2orV3() && ctx.use_asm_kernels))
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: ROCm metadata version or asm kernels not supported");
         return false;
     }
 
     const auto& target = ctx.GetStream().GetTargetProperties();
     if(target.isXnackEnabled())
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Xnack is enabled");
         return false;
     }
 
     const auto name = ctx.GetStream().GetDeviceName();
     if(!(name == "gfx803" || name == "gfx900" || name == "gfx906" || name == "gfx908"))
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Unsupported device '"
-                     << name << "'. Supported: gfx803, gfx900, gfx906, gfx908");
         return false;
     }
 
@@ -87,12 +81,10 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
 
     if(problem.HasNonPackedTensors())
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Has non-packed tensors");
         return false;
     }
     if(!problem.AllTensorsDimsFitIntoInt())
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Tensor dims don't fit into int");
         return false;
     }
 
@@ -103,13 +95,11 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
          problem.GetWeights().IsPossibleLayout4D5D("NCHW", strict) &&
          problem.GetOut().IsPossibleLayout4D5D("NCHW", strict)))
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Layout is not NCHW-compatible");
         return false;
     }
 
     if(problem.IsTensorsCasted())
     {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Tensors are casted");
         return false;
     }
 
@@ -138,25 +128,7 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
         && problem.GetGroupCount() == 1;
     // clang-format on
 
-    if(!result)
-    {
-        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Failed convolution parameter checks. "
-                     << "PadW=" << problem.GetPadW() << " (need 1), "
-                     << "PadH=" << problem.GetPadH() << " (need 1), "
-                     << "WeightsW=" << problem.GetWeightsWidth() << " (need 3), "
-                     << "WeightsH=" << problem.GetWeightsHeight() << " (need 3), "
-                     << "StrideW=" << problem.GetKernelStrideW() << " (need 1), "
-                     << "StrideH=" << problem.GetKernelStrideH() << " (need 1), "
-                     << "DilationW=" << problem.GetDilationW() << " (need 1), "
-                     << "DilationH=" << problem.GetDilationH() << " (need 1), "
-                     << "IsFp32=" << problem.IsFp32() << " (need true), "
-                     << "GroupCount=" << problem.GetGroupCount() << " (need 1)");
-    }
-
     return result;
-        /// && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
-        /// Actually, K<->C flpping is controlled by separate flag, so we can support either
-        /// layout in both directions.
 }
 
 ConvSolution ConvBinWinograd3x3U::GetSolution(const ExecutionContext& ctx,

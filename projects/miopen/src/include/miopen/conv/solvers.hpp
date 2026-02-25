@@ -35,6 +35,8 @@
 #include <miopen/miopen.h>
 #include <miopen/performance_config.hpp>
 #include <miopen/solver.hpp>
+#include <miopen/utility/transposing_solver.hpp>
+#include <miopen/conv/data_invoke_params.hpp>
 
 #include <initializer_list>
 #include <string>
@@ -5010,7 +5012,172 @@ struct ConvDepthwiseFwd2D final : ConvTunableSolver<PerformanceConfigConvDepthwi
     uint32_t GetSupportedSolutionCount(const ExecutionContext&,
                                        const miopen::conv::ProblemDescription&) const;
 };
+template <class Inner>
+struct ConvWinogradNHWCTransposingSolver
+    : TransposingSolver<ConvWinogradNHWCTransposingSolver<Inner>,
+                        ConvSolver,
+                        miopen::conv::ProblemDescription,
+                        miopen::conv::TransposeConvInvokeParams,
+                        Inner>
+{
+    using Problem      = miopen::conv::ProblemDescription;
+    using InvokeParams = miopen::conv::TransposeConvInvokeParams;
+    using Base         = TransposingSolver<ConvWinogradNHWCTransposingSolver<Inner>,
+                                           ConvSolver,
+                                           Problem,
+                                           InvokeParams,
+                                           Inner>;
 
+    /// Convert from API params to TransposeConvInvokeParams.
+    /// The API passes DataInvokeParams for Fwd/Bwd and WrWInvokeParams for WrW.
+    static InvokeParams ConvertFromApiParams(const AnyInvokeParams& any_params)
+    {
+        if(any_params.IsOfType<miopen::conv::WrWInvokeParams>())
+        {
+            const auto& wrw_params = any_params.CastTo<miopen::conv::WrWInvokeParams>();
+            return InvokeParams{wrw_params};
+        }
+        const auto& data_params = any_params.CastTo<miopen::conv::DataInvokeParams>();
+        return InvokeParams{data_params};
+    }
+
+    /// Convert TransposeConvInvokeParams back to the correct type for inner solver.
+    /// Inner Winograd solvers expect DataInvokeParams for Fwd/Bwd and WrWInvokeParams for WrW.
+    static AnyInvokeParams ConvertForInnerSolver(const InvokeParams& params)
+    {
+        if(params.is_wrw)
+            return params.ToWrWInvokeParams();
+        return params.ToDataInvokeParams();
+    }
+
+    /// Override Transpose to recompute layout strings after transposing tensors.
+    /// This is needed because conv::ProblemDescription caches layout strings at construction,
+    /// and they must be updated to reflect the new NCHW-like strides after transposition.
+    inline static Problem Transpose(const Problem& problem)
+    {
+        auto transposed_problem = Base::Transpose(problem);
+        // Trigger layout recomputation by calling HeuristicUpdateLayouts
+        // Now that the early return is removed, this should properly update the layout strings
+        transposed_problem.HeuristicUpdateLayouts();
+        return transposed_problem;
+    }
+
+    inline static auto GetTransposes(const Problem& problem)
+    {
+        const bool is_wrw = problem.IsDirectionBackwardWrW();
+
+        auto ret = std::array<ProblemTensorTransposeDescriptor<Problem, InvokeParams>, 3>{{
+            {
+                &Problem::GetIn,
+                &Problem::GetIn,
+                &InvokeParams::inDesc,
+                {&InvokeParams::in},
+                "NCHW", // in (dy for WrW): always an input, transpose NHWC->NCHW
+                true,
+            },
+            {
+                &Problem::GetWeights,
+                &Problem::GetWeights,
+                &InvokeParams::wDesc,
+                {},
+                "NCHW",
+                !is_wrw, // Fwd/Bwd: w is input; WrW: w (dw) is output
+            },
+            {
+                &Problem::GetOut,
+                &Problem::GetOut,
+                &InvokeParams::outDesc,
+                {},
+                "NCHW",
+                is_wrw, // Fwd/Bwd: out is output; WrW: out (x) is input
+            },
+        }};
+
+        // Before C++20 you can't aggregate initialize non-first union element
+        if(is_wrw)
+        {
+            // WrW: w slot holds dw (output), out slot holds x (input)
+            ret[1].as_output = &InvokeParams::w_as_output;
+            ret[2].as_input  = &InvokeParams::out_as_input;
+        }
+        else
+        {
+            // Fwd/Bwd: w is input, out is output
+            ret[1].as_input  = &InvokeParams::w;
+            ret[2].as_output = &InvokeParams::out;
+        }
+
+        return ret;
+    }
+};
+
+struct TransposedConvBinWinograd3x3U final : ConvWinogradNHWCTransposingSolver<ConvBinWinograd3x3U>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<TransposedConvBinWinograd3x3U>();
+    }
+};
+
+struct TransposedConvBinWinogradRxS final : ConvWinogradNHWCTransposingSolver<ConvBinWinogradRxS>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<TransposedConvBinWinogradRxS>();
+    }
+};
+
+struct TransposedConvBinWinogradRxSf2x3g1 final
+    : ConvWinogradNHWCTransposingSolver<ConvBinWinogradRxSf2x3g1>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<TransposedConvBinWinogradRxSf2x3g1>();
+    }
+};
+/*
+template <int WinoDataH, int WinoFilterH, int WinoDataW = WinoDataH, int WinoFilterW = WinoFilterH>
+struct TransposedConvMPBidirectWinograd final
+    : ConvWinogradNHWCTransposingSolver<ConvMPBidirectWinograd>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<
+            TransposedConvMPBidirectWinograd<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>>();
+    }
+};
+
+template <int WinoDataH, int WinoFilterH, int WinoDataW = WinoDataH, int WinoFilterW = WinoFilterH>
+struct TransposedConvWinograd3x3MultipassWrW final
+    : ConvWinogradNHWCTransposingSolver<ConvWinograd3x3MultipassWrW>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<TransposedConvWinograd3x3MultipassWrW<WinoDataH,
+                                                                   WinoFilterH,
+                                                                   WinoDataW,
+                                                                   WinoFilterW>>();
+    }
+};
+
+template <uint32_t Winodata, uint32_t Winofilter>
+struct TransposedConvWinoFuryRxS final : ConvWinogradNHWCTransposingSolver<ConvWinoFuryRxS>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<TransposedConvWinoFuryRxS<Winodata, Winofilter>>();
+    }
+};
+
+template <uint32_t Winodata, uint32_t Winofilter>
+struct TransposedConvWinoRageRxS final : ConvWinogradNHWCTransposingSolver<ConvWinoRageRxS>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<TransposedConvWinoRageRxS<Winodata, Winofilter>>();
+    }
+};
+*/
 // Test helper functions for metadata validation
 // These functions return all CK kernel TypeStrings without problem-based filtering
 // Declared here but implemented in the respective solver .cpp files

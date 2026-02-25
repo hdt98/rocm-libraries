@@ -28,6 +28,7 @@
 
 #include <miopen/common.hpp>
 #include <miopen/errors.hpp>
+#include <miopen/logger.hpp>
 
 #include <memory>
 #include <typeinfo>
@@ -109,6 +110,7 @@ public:
         if(!impl)
             MIOPEN_THROW("Attempt to use empty AnyInvokeParams.");
         if(!impl->CanCastTo(typeid(Actual)))
+
             MIOPEN_THROW("Attempt to cast AnyInvokeParams to invalid type.");
         return *reinterpret_cast<const std::remove_cv_t<Actual>*>(impl->GetRawPtr());
     }
@@ -119,8 +121,15 @@ public:
         if(!impl)
             MIOPEN_THROW("Attempt to use empty AnyInvokeParams.");
         if(!impl->CanCastTo(typeid(Actual)))
+
             MIOPEN_THROW("Attempt to cast AnyInvokeParams to invalid type.");
         return *reinterpret_cast<Actual*>(impl->GetRawPtr());
+    }
+
+    template <class Actual>
+    bool IsOfType() const
+    {
+        return impl && impl->CanCastTo(typeid(Actual));
     }
 
     operator bool() const { return impl != nullptr; }
@@ -141,6 +150,7 @@ private:
         virtual Data_t GetWorkspace() const                 = 0;
         virtual std::size_t GetWorkspaceSize() const        = 0;
         virtual bool CanCastTo(const std::type_info&) const = 0;
+        virtual const char* GetStoredTypeName() const       = 0;
         virtual void* GetRawPtr()                           = 0;
         virtual std::unique_ptr<Interface> Copy() const     = 0;
 
@@ -160,6 +170,7 @@ private:
         Data_t GetWorkspace() const override { return value.GetWorkspace(); }
         std::size_t GetWorkspaceSize() const override { return value.GetWorkspaceSize(); }
         bool CanCastTo(const std::type_info& type) const override { return typeid(Actual) == type; }
+        const char* GetStoredTypeName() const override { return typeid(Actual).name(); }
         void* GetRawPtr() override { return &value; }
 
         std::unique_ptr<Interface> Copy() const override
