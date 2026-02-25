@@ -2030,8 +2030,8 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched typically requires no workspace
-    *lwork = 0;
+    // cuBLAS gelsBatched requires workspace for info parameter
+    *lwork = sizeof(int);
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2058,8 +2058,8 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched typically requires no workspace
-    *lwork = 0;
+    // cuBLAS gelsBatched requires workspace for info parameter
+    *lwork = sizeof(int);
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2086,8 +2086,8 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched typically requires no workspace
-    *lwork = 0;
+    // cuBLAS gelsBatched requires workspace for info parameter
+    *lwork = sizeof(int);
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2114,8 +2114,8 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched typically requires no workspace
-    *lwork = 0;
+    // cuBLAS gelsBatched requires workspace for info parameter
+    *lwork = sizeof(int);
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2135,27 +2135,28 @@ hipsolverStatus_t hipsolverSSgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!A || !B || !X || !devInfo)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    // cuBLAS gelsBatched operates in-place on B
+    // For now, only support in-place (B == X)
+    // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            // Calculate the actual matrix size (max(m,n) x nrhs)
-            int    rows = (m >= n) ? m : n;
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(float);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    // Call cuBLAS gelsBatched
+    // cuBLAS needs workspace for info parameter
+    if(!work || lwork < sizeof(int))
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
+    int* info = static_cast<int*>(work);
+
     return hipsolver::cuda2hip_status(cublasSgelsBatched((cublasHandle_t)handle,
                                                          CUBLAS_OP_N,
                                                          m,
@@ -2163,10 +2164,10 @@ try
                                                          nrhs,
                                                          (float* const*)A,
                                                          lda,
-                                                         (float**)((B == X) ? B : X),
-                                                         (B == X) ? ldb : ldx,
+                                                         (float**)B,
+                                                         ldb,
                                                          devInfo,
-                                                         nullptr,
+                                                         info,
                                                          batch_count));
 }
 catch(...)
@@ -2186,24 +2187,27 @@ hipsolverStatus_t hipsolverDDgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!A || !B || !X || !devInfo)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    // cuBLAS gelsBatched operates in-place on B
+    // For now, only support in-place (B == X)
+    // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            int    rows = (m >= n) ? m : n;
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(double);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+
+    // cuBLAS needs workspace for info parameter
+    if(!work || lwork < sizeof(int))
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
+    int* info = static_cast<int*>(work);
 
     return hipsolver::cuda2hip_status(cublasDgelsBatched((cublasHandle_t)handle,
                                                          CUBLAS_OP_N,
@@ -2212,10 +2216,10 @@ try
                                                          nrhs,
                                                          (double* const*)A,
                                                          lda,
-                                                         (double**)((B == X) ? B : X),
-                                                         (B == X) ? ldb : ldx,
+                                                         (double**)B,
+                                                         ldb,
                                                          devInfo,
-                                                         nullptr,
+                                                         info,
                                                          batch_count));
 }
 catch(...)
@@ -2235,24 +2239,25 @@ hipsolverStatus_t hipsolverCCgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!A || !B || !X || !devInfo)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    // cuBLAS gelsBatched operates in-place on B
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            int    rows = (m >= n) ? m : n;
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(hipFloatComplex);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+
+    // cuBLAS needs workspace for info parameter
+    if(!work || lwork < sizeof(int))
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
+    int* info = static_cast<int*>(work);
 
     return hipsolver::cuda2hip_status(cublasCgelsBatched((cublasHandle_t)handle,
                                                          CUBLAS_OP_N,
@@ -2261,10 +2266,10 @@ try
                                                          nrhs,
                                                          (cuComplex* const*)A,
                                                          lda,
-                                                         (cuComplex**)((B == X) ? B : X),
-                                                         (B == X) ? ldb : ldx,
+                                                         (cuComplex**)B,
+                                                         ldb,
                                                          devInfo,
-                                                         nullptr,
+                                                         info,
                                                          batch_count));
 }
 catch(...)
@@ -2284,24 +2289,25 @@ hipsolverStatus_t hipsolverZZgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!A || !B || !X || !devInfo)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // Copy B to X if they're different (cuBLAS likely operates in-place)
+    // cuBLAS gelsBatched operates in-place on B
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            int    rows = (m >= n) ? m : n;
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(hipDoubleComplex);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+
+    // cuBLAS needs workspace for info parameter
+    if(!work || lwork < sizeof(int))
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
+    int* info = static_cast<int*>(work);
 
     return hipsolver::cuda2hip_status(cublasZgelsBatched((cublasHandle_t)handle,
                                                          CUBLAS_OP_N,
@@ -2310,10 +2316,10 @@ try
                                                          nrhs,
                                                          (cuDoubleComplex* const*)A,
                                                          lda,
-                                                         (cuDoubleComplex**)((B == X) ? B : X),
-                                                         (B == X) ? ldb : ldx,
+                                                         (cuDoubleComplex**)B,
+                                                         ldb,
                                                          devInfo,
-                                                         nullptr,
+                                                         info,
                                                          batch_count));
 }
 catch(...)

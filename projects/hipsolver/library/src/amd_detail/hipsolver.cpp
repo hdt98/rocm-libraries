@@ -3832,13 +3832,14 @@ hipsolverStatus_t hipsolverSSgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(!A || !B || !X || !devInfo)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
 
     if(work && lwork)
         CHECK_ROCBLAS_ERROR(rocblas_set_workspace((rocblas_handle)handle, work, lwork));
@@ -3850,28 +3851,22 @@ try
     }
 
     // ROCsolver gels_batched only supports in-place operation on B
-    // Copy B to X if out-of-place is requested
+    // For now, only support in-place (B == X)
+    // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(float);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    return hipsolver::rocblas2hip_status(
-        rocsolver_sgels_batched((rocblas_handle)handle,
-                                rocblas_operation_none,
-                                m,
-                                n,
-                                nrhs,
-                                A,
-                                lda,
-                                (B == X) ? B : X, // Use X if we copied B to X
-                                (B == X) ? ldb : ldx,
-                                devInfo,
-                                batch_count));
+    return hipsolver::rocblas2hip_status(rocsolver_sgels_batched((rocblas_handle)handle,
+                                                                 rocblas_operation_none,
+                                                                 m,
+                                                                 n,
+                                                                 nrhs,
+                                                                 A,
+                                                                 lda,
+                                                                 B,
+                                                                 ldb,
+                                                                 devInfo,
+                                                                 batch_count));
 }
 catch(...)
 {
@@ -3890,7 +3885,6 @@ hipsolverStatus_t hipsolverDDgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -3908,15 +3902,10 @@ try
     }
 
     // ROCsolver gels_batched only supports in-place operation on B
-    // Copy B to X if out-of-place is requested
+    // For now, only support in-place (B == X)
+    // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(double);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
     return hipsolver::rocblas2hip_status(rocsolver_dgels_batched((rocblas_handle)handle,
                                                                  rocblas_operation_none,
@@ -3925,8 +3914,8 @@ try
                                                                  nrhs,
                                                                  A,
                                                                  lda,
-                                                                 (B == X) ? B : X,
-                                                                 (B == X) ? ldb : ldx,
+                                                                 B,
+                                                                 ldb,
                                                                  devInfo,
                                                                  batch_count));
 }
@@ -3947,7 +3936,6 @@ hipsolverStatus_t hipsolverCCgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -3965,28 +3953,22 @@ try
     }
 
     // ROCsolver gels_batched only supports in-place operation on B
-    // Copy B to X if out-of-place is requested
+    // For now, only support in-place (B == X)
+    // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(hipFloatComplex);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    return hipsolver::rocblas2hip_status(
-        rocsolver_cgels_batched((rocblas_handle)handle,
-                                rocblas_operation_none,
-                                m,
-                                n,
-                                nrhs,
-                                (rocblas_float_complex**)A,
-                                lda,
-                                (B == X) ? (rocblas_float_complex**)B : (rocblas_float_complex**)X,
-                                (B == X) ? ldb : ldx,
-                                devInfo,
-                                batch_count));
+    return hipsolver::rocblas2hip_status(rocsolver_cgels_batched((rocblas_handle)handle,
+                                                                 rocblas_operation_none,
+                                                                 m,
+                                                                 n,
+                                                                 nrhs,
+                                                                 (rocblas_float_complex**)A,
+                                                                 lda,
+                                                                 (rocblas_float_complex**)B,
+                                                                 ldb,
+                                                                 devInfo,
+                                                                 batch_count));
 }
 catch(...)
 {
@@ -4005,7 +3987,6 @@ hipsolverStatus_t hipsolverZZgelsBatched(hipsolverHandle_t handle,
                                          int               ldx,
                                          void*             work,
                                          size_t            lwork,
-                                         int*              niters,
                                          int*              devInfo,
                                          int               batch_count)
 try
@@ -4023,28 +4004,22 @@ try
     }
 
     // ROCsolver gels_batched only supports in-place operation on B
-    // Copy B to X if out-of-place is requested
+    // For now, only support in-place (B == X)
+    // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
-    {
-        for(int i = 0; i < batch_count; i++)
-        {
-            size_t size = static_cast<size_t>(ldb) * nrhs * sizeof(hipDoubleComplex);
-            CHECK_HIP_ERROR(hipMemcpy(X[i], B[i], size, hipMemcpyDeviceToDevice));
-        }
-    }
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    return hipsolver::rocblas2hip_status(rocsolver_zgels_batched(
-        (rocblas_handle)handle,
-        rocblas_operation_none,
-        m,
-        n,
-        nrhs,
-        (rocblas_double_complex**)A,
-        lda,
-        (B == X) ? (rocblas_double_complex**)B : (rocblas_double_complex**)X,
-        (B == X) ? ldb : ldx,
-        devInfo,
-        batch_count));
+    return hipsolver::rocblas2hip_status(rocsolver_zgels_batched((rocblas_handle)handle,
+                                                                 rocblas_operation_none,
+                                                                 m,
+                                                                 n,
+                                                                 nrhs,
+                                                                 (rocblas_double_complex**)A,
+                                                                 lda,
+                                                                 (rocblas_double_complex**)B,
+                                                                 ldb,
+                                                                 devInfo,
+                                                                 batch_count));
 }
 catch(...)
 {
