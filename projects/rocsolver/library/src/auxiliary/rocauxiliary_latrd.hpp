@@ -102,7 +102,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
         sval[0] = -0.5 * pTau[0] * norm2;
     }
     __syncthreads();
-    auto w_buffer  = __builtin_amdgcn_make_buffer_rsrc(pW, 0,0xffffffff,0);
+
     // axpy
     //TODO, excessive traffic to global memory, can we keep W in registers/shared memory?
     //make last write to W l2 passthrough
@@ -115,21 +115,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n
         else
             result = pW[i] + alpha * pA[i];
 
-        int out_addr = i * sizeof(T);
-
-        if constexpr(sizeof(T) == 1)
-            __builtin_amdgcn_raw_buffer_store_b8(result, w_buffer, out_addr, 0, 0x10);
-        else if constexpr(sizeof(T) == 2)
-            __builtin_amdgcn_raw_buffer_store_b16(result, w_buffer, out_addr, 0, 0x10);
-        else if constexpr(sizeof(T) == 4)
-            __builtin_amdgcn_raw_buffer_store_b32(result, w_buffer, out_addr, 0, 0x10);
-        else if constexpr(sizeof(T) == 8)
-        {
-            using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
-            uint32x2_t tmp;
-            memcpy(&tmp, &result, sizeof(T));
-            __builtin_amdgcn_raw_buffer_store_b64(tmp, w_buffer, out_addr, 0, 0x10);
-        }
+        pW[i] = result;
     }
 }
 
@@ -652,14 +638,6 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
     int rpgc = (ngrp - 1) / groupsc + 1;
     int i, j;
 
-
-    //TODO: bounds should be sized correctly instead of set to max
-    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0);
-    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0);
-    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0);
-    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0);
-    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0);
-
     // Registers/LDS:
     // ac, acs -> accumulator
     // sx -> hold the elements of 'x'
@@ -679,78 +657,19 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
             {
                 i = ii * totalthsr + idr;
 
-                // read y
-                const auto Y_ld_addr = (idc == 0 && i < m) ? i * sizeof(T) : 0xffffffff;
-                if constexpr(sizeof(T) == 1)
-                    ac =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
-                else if constexpr(sizeof(T) == 2)
-                    ac =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
-                else if constexpr(sizeof(T) == 4)
-                    ac = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
-                else if constexpr(sizeof(T) == 8)
-                {
-                    const auto tmp =  __builtin_amdgcn_raw_buffer_load_b64(Y_buffer, Y_ld_addr, 0, 0);
-                    memcpy(&ac, &tmp, sizeof(T));
-                }
+                 // read y
+                ac = (idc == 0 && i < m) ? pY[i] : 0;
 
                 for(int jj = 0; jj < rpgc; ++jj)
                 {
                     // read x
                     j = jj * totalthsc + idc;
 
-                    const auto x_addr = (j < n) ? j * sizeof(T) : 0xffffffff;
-                    if constexpr(sizeof(T) == 1)
-                    {
-                        sx1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
-                        sx2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 2)
-                    {
-                        sx1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
-                        sx2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 4)
-                    {
-                        sx1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
-                        sx2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 8)
-                    {
-                        const auto tmp1 = __builtin_amdgcn_raw_buffer_load_b64(X1_buffer, x_addr, 0, 0);
-                        const auto tmp2 = __builtin_amdgcn_raw_buffer_load_b64(X2_buffer, x_addr, 0, 0);
-                        memcpy(&sx1, &tmp1, sizeof(T));
-                        memcpy(&sx2, &tmp2, sizeof(T));
-                    }
+                    sx1 = (j < n) ? conj(pX1[j * incx1]) : 0;
+                    sx2 = (j < n) ? conj(pX2[j * incx2]) : 0;
 
-                    sx1 = conj(sx1);
-                    sx2 = conj(sx2);
-
-                    const auto A1_addr = (i < m && j < n) ? (i + j * lda1) * sizeof(T) : 0xffffffff;
-                    const auto A2_addr = (i < m && j < n) ? (i + j * lda2) * sizeof(T) : 0xffffffff;
-                    T a1_val, a2_val = 0;
-                    if constexpr(sizeof(T) == 1)
-                    {
-                        a1_val = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
-                        a2_val = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 2)
-                    {
-                        a1_val = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
-                        a2_val = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 4)
-                    {
-                        a1_val = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
-                        a2_val = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 8)
-                    {
-                        const auto tmp1 = __builtin_amdgcn_raw_buffer_load_b64(A1_buffer, A1_addr, 0, 0);
-                        const auto tmp2 = __builtin_amdgcn_raw_buffer_load_b64(A2_buffer, A2_addr, 0, 0);
-                        memcpy(&a1_val, &tmp1, sizeof(T));
-                        memcpy(&a2_val, &tmp2, sizeof(T));
-                    }
-                    ac -= a1_val * sx1 + a2_val * sx2;
+                    if(i < m && j < n)
+                        ac -= pA1[i + j * lda1] * sx1 + pA2[i + j * lda2] * sx2;
 
                 }
                 pAcs_smem[tidr + tidc * threadsr] = ac;
@@ -767,22 +686,9 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
                     __syncthreads();
                 }
 
-        // write groups results in temp array for further reduction
-                const auto result = ac;
-                const auto Y_out_addr = (i < m) ? (i * sizeof(T)) : 0xffffffff;
-                if constexpr(sizeof(T) == 1)
-                    __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0, 0x10);
-                else if constexpr(sizeof(T) == 2)
-                    __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0, 0x10);
-                else if constexpr(sizeof(T) == 4)
-                    __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0, 0x10);
-                else if constexpr(sizeof(T) == 8)
-                {
-                    using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
-                    uint32x2_t tmp;
-                    memcpy(&tmp, &result, sizeof(T));
-                    __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0, 0x10);
-                }
+                // write results
+                if(tidc == 0 && i < m)
+                    pY[i] = ac;
             }
         }
     }
@@ -1383,25 +1289,9 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const int         blocks
             }
         }
 
-        auto outBuff  = __builtin_amdgcn_make_buffer_rsrc(pYderived, 0,0xffffffff,0);
-
         if(tx == 0)
         {
-
-            if constexpr(sizeof(T) == 1)
-                __builtin_amdgcn_raw_buffer_store_b8(res, outBuff, it, 0, 0x10);
-            else if constexpr(sizeof(T) == 2)
-                __builtin_amdgcn_raw_buffer_store_b16(res, outBuff, it, 0, 0x10);
-            else if constexpr(sizeof(T) == 4)
-                __builtin_amdgcn_raw_buffer_store_b32(res, outBuff, it, 0, 0x10);
-            else if constexpr(sizeof(T) == 8)
-            {
-                using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
-                uint32x2_t tmp;
-                memcpy(&tmp, &res, sizeof(T));
-                __builtin_amdgcn_raw_buffer_store_b64(tmp, outBuff, it, 0, 0x10);
-            }
-
+            pYderived[it] = res;
         }
     }
 }
@@ -1932,14 +1822,6 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
     int rpgc = (ngrp - 1) / groupsc + 1;
     int i, j;
 
-    //define buffer types
-    //TODO: bounds should be sized correctly instead of set to max
-    auto Y_buffer  = __builtin_amdgcn_make_buffer_rsrc(pY, 0,0xffffffff,0);
-    auto X1_buffer = __builtin_amdgcn_make_buffer_rsrc(pX1,0,0xffffffff,0);
-    auto X2_buffer = __builtin_amdgcn_make_buffer_rsrc(pX2,0,0xffffffff,0);
-    auto A1_buffer = __builtin_amdgcn_make_buffer_rsrc(pA1,0,0xffffffff,0);
-    auto A2_buffer = __builtin_amdgcn_make_buffer_rsrc(pA2,0,0xffffffff,0);
-
     // Registers/LDS:
     // ac, acs -> accumulator
     // sx -> hold the elements of 'x'
@@ -1961,74 +1843,18 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
                 i = ii * totalthsr + idr;
 
                 // read y
-                const auto Y_ld_addr = (idc == 0 && i < m) ? i * sizeof(T) : 0xffffffff;
-                if constexpr(sizeof(T) == 1)
-                    ac =  __builtin_amdgcn_raw_buffer_load_b8(Y_buffer, Y_ld_addr,0,0);
-                else if constexpr(sizeof(T) == 2)
-                    ac =__builtin_amdgcn_raw_buffer_load_b16(Y_buffer, Y_ld_addr,0,0);
-                else if constexpr(sizeof(T) == 4)
-                    ac = __builtin_amdgcn_raw_buffer_load_b32(Y_buffer, Y_ld_addr,0,0);
-                else if constexpr(sizeof(T) == 8)
-                {
-                    const auto tmp =  __builtin_amdgcn_raw_buffer_load_b64(Y_buffer, Y_ld_addr,0,0);
-                    memcpy(&ac, &tmp, sizeof(T));
-                }
+                ac = (idc == 0 && i < m) ? pY[i] : 0;
 
                 for(int jj = 0; jj < rpgc; ++jj)
                 {
                     // read x
                     j = jj * totalthsc + idc;
+                    sx1 = (j < n) ? pX1[j] : 0;
+                    sx2 = (j < n) ? pX2[j] : 0;
 
-                    const auto x_addr = (j < n) ? j * sizeof(T) : 0xffffffff;
-                    if constexpr(sizeof(T) == 1)
-                    {
-                        sx1 = __builtin_amdgcn_raw_buffer_load_b8(X1_buffer, x_addr, 0, 0);
-                        sx2 = __builtin_amdgcn_raw_buffer_load_b8(X2_buffer, x_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 2)
-                    {
-                        sx1 = __builtin_amdgcn_raw_buffer_load_b16(X1_buffer, x_addr, 0, 0);
-                        sx2 = __builtin_amdgcn_raw_buffer_load_b16(X2_buffer, x_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 4)
-                    {
-                        sx1 = __builtin_amdgcn_raw_buffer_load_b32(X1_buffer, x_addr, 0, 0);
-                        sx2 = __builtin_amdgcn_raw_buffer_load_b32(X2_buffer, x_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 8)
-                    {
-                        const auto tmp1 = __builtin_amdgcn_raw_buffer_load_b64(X1_buffer, x_addr, 0, 0);
-                        const auto tmp2 = __builtin_amdgcn_raw_buffer_load_b64(X2_buffer, x_addr, 0, 0);
-                        memcpy(&sx1, &tmp1, sizeof(T));
-                        memcpy(&sx2, &tmp2, sizeof(T));
-                    }
-
-                    const auto A1_addr = (i < m && j < n) ? (i + j * lda1) * sizeof(T) : 0xffffffff;
-                    const auto A2_addr = (i < m && j < n) ? (i + j * lda2) * sizeof(T) : 0xffffffff;
-                    T a1_val, a2_val = 0;
-                    if constexpr(sizeof(T) == 1)
-                    {
-                        a1_val = __builtin_amdgcn_raw_buffer_load_b8(A1_buffer, A1_addr, 0, 0);
-                        a2_val = __builtin_amdgcn_raw_buffer_load_b8(A2_buffer, A2_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 2)
-                    {
-                        a1_val = __builtin_amdgcn_raw_buffer_load_b16(A1_buffer, A1_addr, 0, 0);
-                        a2_val = __builtin_amdgcn_raw_buffer_load_b16(A2_buffer, A2_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 4)
-                    {
-                        a1_val = __builtin_amdgcn_raw_buffer_load_b32(A1_buffer, A1_addr, 0, 0);
-                        a2_val = __builtin_amdgcn_raw_buffer_load_b32(A2_buffer, A2_addr, 0, 0);
-                    }
-                    else if constexpr(sizeof(T) == 8)
-                    {
-                        const auto tmp1 = __builtin_amdgcn_raw_buffer_load_b64(A1_buffer, A1_addr, 0, 0);
-                        const auto tmp2 = __builtin_amdgcn_raw_buffer_load_b64(A2_buffer, A2_addr, 0, 0);
-                        memcpy(&a1_val, &tmp1, sizeof(T));
-                        memcpy(&a2_val, &tmp2, sizeof(T));
-                    }
-                    ac -= a1_val * sx1 + a2_val * sx2;
+                    // operation for all rows
+                    if(i < m && j < n)
+                        ac -= pA1[i + j * lda1] * sx1 + pA2[i + j * lda2] * sx2;
                 }
                 acs_smem[tidr + tidc * threadsr] = ac;
                 __syncthreads();
@@ -2045,21 +1871,8 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
                 }
 
                 // write groups results in temp array for further reduction
-                const auto result = ac * tauVal;
-                const auto Y_out_addr = (i < m) ? (i * sizeof(T)) : 0xffffffff;
-                if constexpr(sizeof(T) == 1)
-                    __builtin_amdgcn_raw_buffer_store_b8(result, Y_buffer, Y_out_addr, 0, 0x10);
-                else if constexpr(sizeof(T) == 2)
-                    __builtin_amdgcn_raw_buffer_store_b16(result, Y_buffer, Y_out_addr, 0, 0x10);
-                else if constexpr(sizeof(T) == 4)
-                    __builtin_amdgcn_raw_buffer_store_b32(result, Y_buffer, Y_out_addr, 0, 0x10);
-                else if constexpr(sizeof(T) == 8)
-                {
-                    using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
-                    uint32x2_t tmp;
-                    memcpy(&tmp, &result, sizeof(T));
-                    __builtin_amdgcn_raw_buffer_store_b64(tmp, Y_buffer, Y_out_addr, 0, 0x10);
-                }
+                if(tidc == 0 && i < m)
+                    pY[i] = ac * tauVal;
             }
         }
     }
@@ -2383,7 +2196,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
 
         // Tunable parameter: number of loop iterations to capture per graph
         // Adjust this value based on performance profiling for different problem sizes
-        constexpr rocblas_int GRAPH_BLOCK_SIZE = 8;
+        constexpr rocblas_int GRAPH_BLOCK_SIZE = 64;
 
         // Calculate total iterations and blocking parameters
         const rocblas_int total_iters = k;  // columns to process: n-1 down to n-k
@@ -2441,6 +2254,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                         n, k, j, A, shiftA,
                                         lda, strideA, pW,
                                         shiftW, ldw, strideW);
+
                 //-------------------------------------------------------------
                 // reduce column j of A with new reflector, then copy off-diagonal element
                 // to E(j) and set off-diagonal to 1
@@ -2472,9 +2286,6 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
 
                 // update column j of W
                 //--------------------------------------------------------------
-
-
-
                 ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
                                         update_grid,
                                         update_threads,
