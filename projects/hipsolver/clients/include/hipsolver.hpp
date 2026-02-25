@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -5350,6 +5350,167 @@ inline hipsolverStatus_t hipsolver_getrf(testAPI_t               API,
     default:
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
+}
+/********************************************************/
+
+/******************** GETRI_BATCHED ********************/
+// batched
+inline hipsolverStatus_t hipsolver_getriBatched_bufferSize(hipsolverHandle_t handle,
+                                                           int               n,
+                                                           float**           A,
+                                                           int               lda,
+                                                           float**           C,
+                                                           int               ldc,
+                                                           int               strideP,
+                                                           int*              lwork,
+                                                           int               batch_count)
+{
+    return hipsolverSgetriBatched_bufferSize(
+        handle, n, A, lda, C, ldc, strideP, lwork, batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched_bufferSize(hipsolverHandle_t handle,
+                                                           int               n,
+                                                           double**          A,
+                                                           int               lda,
+                                                           double**          C,
+                                                           int               ldc,
+                                                           int               strideP,
+                                                           int*              lwork,
+                                                           int               batch_count)
+{
+    return hipsolverDgetriBatched_bufferSize(
+        handle, n, A, lda, C, ldc, strideP, lwork, batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched_bufferSize(hipsolverHandle_t  handle,
+                                                           int                n,
+                                                           hipsolverComplex** A,
+                                                           int                lda,
+                                                           hipsolverComplex** C,
+                                                           int                ldc,
+                                                           int                strideP,
+                                                           int*               lwork,
+                                                           int                batch_count)
+{
+    return hipsolverCgetriBatched_bufferSize(handle,
+                                             n,
+                                             (hipFloatComplex**)A,
+                                             lda,
+                                             (hipFloatComplex**)C,
+                                             ldc,
+                                             strideP,
+                                             lwork,
+                                             batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched_bufferSize(hipsolverHandle_t        handle,
+                                                           int                      n,
+                                                           hipsolverDoubleComplex** A,
+                                                           int                      lda,
+                                                           hipsolverDoubleComplex** C,
+                                                           int                      ldc,
+                                                           int                      strideP,
+                                                           int*                     lwork,
+                                                           int                      batch_count)
+{
+    return hipsolverZgetriBatched_bufferSize(handle,
+                                             n,
+                                             (hipDoubleComplex**)A,
+                                             lda,
+                                             (hipDoubleComplex**)C,
+                                             ldc,
+                                             strideP,
+                                             lwork,
+                                             batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched(hipsolverHandle_t handle,
+                                                int               n,
+                                                float**           A,
+                                                int               lda,
+                                                float**           C,
+                                                int               ldc,
+                                                float*            work,
+                                                int               lwork,
+                                                int*              devIpiv,
+                                                int               strideP,
+                                                int*              devInfo,
+                                                int               batch_count)
+{
+    return hipsolverSgetriBatched(
+        handle, n, A, lda, C, ldc, work, lwork, devIpiv, strideP, devInfo, batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched(hipsolverHandle_t handle,
+                                                int               n,
+                                                double**          A,
+                                                int               lda,
+                                                double**          C,
+                                                int               ldc,
+                                                double*           work,
+                                                int               lwork,
+                                                int*              devIpiv,
+                                                int               strideP,
+                                                int*              devInfo,
+                                                int               batch_count)
+{
+    return hipsolverDgetriBatched(
+        handle, n, A, lda, C, ldc, work, lwork, devIpiv, strideP, devInfo, batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched(hipsolverHandle_t  handle,
+                                                int                n,
+                                                hipsolverComplex** A,
+                                                int                lda,
+                                                hipsolverComplex** C,
+                                                int                ldc,
+                                                hipsolverComplex*  work,
+                                                int                lwork,
+                                                int*               devIpiv,
+                                                int                strideP,
+                                                int*               devInfo,
+                                                int                batch_count)
+{
+    return hipsolverCgetriBatched(handle,
+                                  n,
+                                  (hipFloatComplex**)A,
+                                  lda,
+                                  (hipFloatComplex**)C,
+                                  ldc,
+                                  (hipFloatComplex*)work,
+                                  lwork,
+                                  devIpiv,
+                                  strideP,
+                                  devInfo,
+                                  batch_count);
+}
+
+inline hipsolverStatus_t hipsolver_getriBatched(hipsolverHandle_t        handle,
+                                                int                      n,
+                                                hipsolverDoubleComplex** A,
+                                                int                      lda,
+                                                hipsolverDoubleComplex** C,
+                                                int                      ldc,
+                                                hipsolverDoubleComplex*  work,
+                                                int                      lwork,
+                                                int*                     devIpiv,
+                                                int                      strideP,
+                                                int*                     devInfo,
+                                                int                      batch_count)
+{
+    return hipsolverZgetriBatched(handle,
+                                  n,
+                                  (hipDoubleComplex**)A,
+                                  lda,
+                                  (hipDoubleComplex**)C,
+                                  ldc,
+                                  (hipDoubleComplex*)work,
+                                  lwork,
+                                  devIpiv,
+                                  strideP,
+                                  devInfo,
+                                  batch_count);
 }
 /********************************************************/
 
