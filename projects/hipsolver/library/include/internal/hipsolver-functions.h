@@ -781,7 +781,6 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSSgelsBatched(hipsolverHandle_t hand
                                                           int               ldx,
                                                           void*             work,
                                                           size_t            lwork,
-                                                          int*              niters,
                                                           int*              devInfo,
                                                           int               batch_count);
 
@@ -797,7 +796,6 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDDgelsBatched(hipsolverHandle_t hand
                                                           int               ldx,
                                                           void*             work,
                                                           size_t            lwork,
-                                                          int*              niters,
                                                           int*              devInfo,
                                                           int               batch_count);
 
@@ -813,7 +811,6 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCCgelsBatched(hipsolverHandle_t hand
                                                           int               ldx,
                                                           void*             work,
                                                           size_t            lwork,
-                                                          int*              niters,
                                                           int*              devInfo,
                                                           int               batch_count);
 
@@ -829,7 +826,6 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZZgelsBatched(hipsolverHandle_t hand
                                                           int               ldx,
                                                           void*             work,
                                                           size_t            lwork,
-                                                          int*              niters,
                                                           int*              devInfo,
                                                           int               batch_count);
 
