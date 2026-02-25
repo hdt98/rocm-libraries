@@ -77,7 +77,7 @@ namespace rocRoller
         AssertFatal(!dataName.empty(), "InProcessAssembler needs a kernel name");
 
         const char* codeGenOptions[]
-            = {"-mcode-object-version=5",
+            = {"-v","-mcode-object-version=5",
                (wavefrontSize == 64) ? "-mwavefrontsize64" : "-mno-wavefrontsize64"};
         size_t codeGenOptionsCount = sizeof(codeGenOptions) / sizeof(codeGenOptions[0]);
 
