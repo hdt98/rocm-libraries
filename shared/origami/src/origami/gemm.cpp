@@ -560,6 +560,10 @@ double compute_l2_hit_rate_global(const problem_t& problem,
 inline size_t round_up_mul(size_t x, size_t m) { return (x + m - 1) / m * m; }
 
 size_t round_elements_to_vw(size_t elements, size_t element_size_bits, size_t vector_width) {
+  // Guard against invalid element sizes (e.g., when dtype is None)
+  if (element_size_bits == 0 || element_size_bits > 1024) {
+    return round_elements_to_128B(elements, 16);  // Fallback to 16-bit elements
+  }
   // Default (0 or 1) means use 128-bit transactions for backward compatibility
   constexpr size_t default_transaction_bits = 128u * 8u;  // 1024 bits = 128 bytes
   const size_t effective_vw = (vector_width <= 1)

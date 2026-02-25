@@ -413,8 +413,8 @@ struct config_t {
   dim3_t mt{0, 0, 0};
   dim3_t mi{0, 0, 0};
 
-  /// Custom mainloop scheduling flag
-  bool custom_mainloop_scheduling = false;
+  /// Main loop optimization flag (indicates use of any optimized kernel variant)
+  bool hand_optimized_main_loop = false;
 
   /// Occupancy (number of wavefronts resident per CU).
   int occupancy = -1;
