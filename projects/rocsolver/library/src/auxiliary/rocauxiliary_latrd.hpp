@@ -599,10 +599,6 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
     int totalthsr = groupsr * threadsr;
     int totalthsc = groupsc * threadsc;
 
-    // select batch instance
-    T* pA = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* pW = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
-
     /* ------------------------
     formulate gemv problem:
 
@@ -620,15 +616,21 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
     int n = mm - c - 1;
     int m = c + 1;
     int cw = c - mm + k;
-    T* pY = pA + idx2D(0, c, lda);
-    T* pA1 = pA + idx2D(0, c + 1, lda);
     int lda1 = lda;
-    T* pA2 = pW + idx2D(0, cw + 1, ldw);
     int lda2 = ldw;
-    T* pX1 = pW + idx2D(c, cw + 1, ldw);
     int incx1 = ldw;
-    T* pX2 = pA + idx2D(c, c + 1, lda);
     int incx2 = lda;
+
+    // select batch instance
+    T* pA = load_ptr_batch<T>(AA, bid, shiftA, strideA);
+    T* pW = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
+
+    //compute local offsets and pointers
+    T* pY  = pA + idx2D(0, c, lda);
+    T* pA1 = pA + idx2D(0, c + 1, lda);
+    T* pA2 = pW + idx2D(0, cw + 1, ldw);
+    T* pX1 = pW + idx2D(c, cw + 1, ldw);
+    T* pX2 = pA + idx2D(c, c + 1, lda);
 
     // rpgr and rpgc are the number of rounds a group should run
     // to cover all the rows and columns, respectively
@@ -2338,6 +2340,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         rocblas_int currentCol = n - 1;
 
         // Process remainder first (if any) to handle cases where k is not divisible by GRAPH_BLOCK_SIZE
+        //TODO: error handle captureBlock returns
         if(remainder > 0)
         {
             captureBlock(currentCol, remainder);
